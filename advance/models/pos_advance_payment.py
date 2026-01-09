@@ -394,9 +394,9 @@ class PosAdvancePayment(models.Model):
                 'invoice_id': invoice.id,
                 'state': 'invoiced',
             })
-            invoice.write({
-                'state': 'paid'
-            })
+            # invoice.write({
+            #     'state': 'paid'
+            # })
             return invoice
 
     def action_mark_invoiced(self, invoice):
