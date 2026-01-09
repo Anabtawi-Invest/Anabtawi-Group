@@ -484,6 +484,16 @@ class PosAdvancePayment(models.Model):
                 'pos_order_id': pos_order.id,
             })
 
+            # --------------------------------------------------
+            # 7) CREATE STOCK PICKING AND MOVES (using Odoo's standard method)
+            # --------------------------------------------------
+            try:
+                # Use Odoo's built-in method to create picking from POS order
+                pos_order._create_order_picking()
+            except Exception as e:
+                # Log any errors but don't fail the invoice creation
+                print(f"[STOCK] Warning: Could not create picking for POS order {pos_order.name}: {str(e)}")
+
             return invoice
 
     def action_mark_invoiced(self, invoice):
