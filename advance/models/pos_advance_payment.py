@@ -394,9 +394,96 @@ class PosAdvancePayment(models.Model):
                 'invoice_id': invoice.id,
                 'state': 'invoiced',
             })
-            # invoice.write({
-            #     'state': 'paid'
-            # })
+
+            # --------------------------------------------------
+            # 6) CREATE POS ORDER RECORD
+            # --------------------------------------------------
+            pos_session = self.env['pos.session'].search([
+                ('state', '=', 'opened'),
+                ('company_id', '=', company.id),
+            ], limit=1)
+
+            if not pos_session:
+                raise ValidationError(_("No open POS session found. Please open a POS session first."))
+
+            pos_config = pos_session.config_id
+
+            # Create POS order lines with taxes
+            pos_order_lines = []
+            total_tax = 0.0
+            total_with_tax = 0.0
+
+            for line in advance.line_ids:
+                product = line.product_id
+
+                # Get taxes from product (considering fiscal position if any)
+                taxes = product.taxes_id.filtered(lambda t: t.company_id == company)
+
+                # Compute tax amounts
+                if taxes:
+                    tax_result = taxes.compute_all(
+                        line.price_unit,
+                        company.currency_id,
+                        line.qty,
+                        product=product,
+                        partner=partner
+                    )
+                    price_subtotal = tax_result['total_excluded']
+                    price_subtotal_incl = tax_result['total_included']
+                    line_tax = price_subtotal_incl - price_subtotal
+                else:
+                    price_subtotal = line.subtotal
+                    price_subtotal_incl = line.subtotal
+                    line_tax = 0.0
+
+                total_tax += line_tax
+                total_with_tax += price_subtotal_incl
+
+                pos_order_lines.append((0, 0, {
+                    'product_id': product.id,
+                    'qty': line.qty,
+                    'price_unit': line.price_unit,
+                    'price_subtotal': price_subtotal,
+                    'price_subtotal_incl': price_subtotal_incl,
+                    'tax_ids': [(6, 0, taxes.ids)],
+                    'full_product_name': product.display_name,
+                }))
+
+            # Create the POS order in draft state
+            pos_order = self.env['pos.order'].sudo().create({
+                'session_id': pos_session.id,
+                'partner_id': partner.id,
+                'config_id': pos_config.id,
+                'company_id': company.id,
+                'pricelist_id': partner.property_product_pricelist.id or pos_config.pricelist_id.id,
+                'lines': pos_order_lines,
+                'amount_total': total_with_tax,
+                'amount_tax': total_tax,
+                'amount_paid': total_with_tax,
+                'amount_return': 0.0,
+            })
+
+            # First set to 'paid' to trigger name generation
+            pos_order.write({
+                'state': 'paid',
+            })
+
+            # Then update to 'done' state and link the invoice
+            pos_order.write({
+                'state': 'done',  # Set to 'done' (Posted) since it already has an invoice
+                'account_move': invoice.id,  # Link to the existing invoice
+            })
+
+            # Update invoice to reference the POS order
+            invoice.write({
+                'ref': pos_order.name,
+            })
+
+            # Link the POS order to the advance
+            advance.write({
+                'pos_order_id': pos_order.id,
+            })
+
             return invoice
 
     def action_mark_invoiced(self, invoice):
