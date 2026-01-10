@@ -9,7 +9,7 @@
         "security/ir.model.access.csv",
         "data/ir_sequence.xml",
         "views/pos_advance_payment_views.xml",
-        "views/res_config_settings.xml",
+        "views/pos_config_views.xml",
 
     ],
     "assets": {

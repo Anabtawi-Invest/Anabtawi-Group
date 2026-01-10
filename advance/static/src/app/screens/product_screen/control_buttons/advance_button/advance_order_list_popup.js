@@ -1,14 +1,14 @@
 /** @odoo-module **/
 
-import { Component, useState, onMounted } from "@odoo/owl";
-import { useService } from "@web/core/utils/hooks";
-import { Dialog } from "@web/core/dialog/dialog";
-import { _t } from "@web/core/l10n/translation";
+import {Component, useState, onMounted} from "@odoo/owl";
+import {useService} from "@web/core/utils/hooks";
+import {Dialog} from "@web/core/dialog/dialog";
+import {_t} from "@web/core/l10n/translation";
 
 export class AdvanceOrderListPopup extends Component {
     static template = "pos_advance.AdvanceOrderListPopup";
-    static components = { Dialog };
-    static props = { close: Function };
+    static components = {Dialog};
+    static props = {close: Function};
 
     setup() {
         this.orm = useService("orm");
@@ -65,26 +65,28 @@ export class AdvanceOrderListPopup extends Component {
             adv.partner_id?.[1]?.toLowerCase().includes(this.state.search)
         );
     }
+
     onSearchKeydown(ev) {
-    if (ev.key !== "Enter") {
-        return;
+        if (ev.key !== "Enter") {
+            return;
+        }
+
+        ev.preventDefault();
+
+        if (!this.filteredAdvances.length) {
+            this.notification.add(
+                _t("No advance found."),
+                {type: "warning"}
+            );
+            return;
+        }
+
+        const first = this.filteredAdvances[0];
+        console.log("[ADVANCE] Enter pressed, opening:", first);
+
+        this.selectAdvance(first);
     }
 
-    ev.preventDefault();
-
-    if (!this.filteredAdvances.length) {
-        this.notification.add(
-            _t("No advance found."),
-            { type: "warning" }
-        );
-        return;
-    }
-
-    const first = this.filteredAdvances[0];
-    console.log("[ADVANCE] Enter pressed, opening:", first);
-
-    this.selectAdvance(first);
-}
     // ==================================
     // LOAD PRODUCTS (advance lines)
     // ==================================
@@ -129,23 +131,23 @@ export class AdvanceOrderListPopup extends Component {
         if (!this.state.selectedAdvance) {
             this.notification.add(
                 _t("Please select an advance first."),
-                { type: "warning" }
+                {type: "warning"}
             );
             return;
         }
 
         try {
             await this.orm.call(
-    "pos.advance.payment",
-    "action_create_invoice",
-    [[this.state.selectedAdvance.id], {
-        payment_type: this.state.paymentType,
-    }]
-);
+                "pos.advance.payment",
+                "action_create_invoice",
+                [[this.state.selectedAdvance.id], {
+                    payment_type: this.state.paymentType,
+                }]
+            );
 
             this.notification.add(
                 _t("Invoice created successfully."),
-                { type: "success" }
+                {type: "success"}
             );
 
             this.props.close();
@@ -154,7 +156,7 @@ export class AdvanceOrderListPopup extends Component {
             console.error(error);
             this.notification.add(
                 error.message || _t("Failed to create invoice."),
-                { type: "danger" }
+                {type: "danger"}
             );
         }
     }

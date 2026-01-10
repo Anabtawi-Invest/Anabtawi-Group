@@ -82,6 +82,12 @@ class PosAdvancePayment(models.Model):
         readonly=True
     )
 
+    pos_config_id = fields.Many2one(
+        'pos.config',
+        string='POS Configuration',
+        required=True
+    )
+
     state = fields.Selection(
         [
             ('draft', 'Draft'),
@@ -130,17 +136,17 @@ class PosAdvancePayment(models.Model):
     def _get_payment_journal(self):
         self.ensure_one()
 
-        company = self.company_id
+        pos_config = self.pos_config_id
 
         if self.payment_type == 'cash':
-            journal = company.pos_cash_journal_id
+            journal = pos_config.pos_cash_journal_id
         elif self.payment_type == 'card':
-            journal = company.pos_card_journal_id
+            journal = pos_config.pos_card_journal_id
         else:
             journal = False
 
         if not journal:
-            raise ValidationError(_("Please configure journal for payment type: %s") % self.payment_type)
+            raise ValidationError(_("Please configure %s journal in POS Configuration: %s") % (self.payment_type, pos_config.name))
 
         return journal
 
@@ -162,6 +168,7 @@ class PosAdvancePayment(models.Model):
         total_expected = vals.get('total_expected')
         lines = vals.get('lines', [])
         payment_type = vals.get('payment_type')
+        pos_config_id = vals.get('pos_config_id')
 
         # --------------------------------------------------
         # VALIDATION
@@ -181,22 +188,26 @@ class PosAdvancePayment(models.Model):
         if payment_type not in ('cash', 'card'):
             raise ValidationError(_('Invalid payment type.'))
 
-        company = self.env.company
+        if not pos_config_id:
+            raise ValidationError(_('POS Configuration is required.'))
 
-        if not company.pos_advance_account_id:
-            raise ValidationError(_('Please configure POS Advance Account in Settings.'))
+        pos_config = self.env['pos.config'].browse(pos_config_id)
+        company = pos_config.company_id
+
+        if not pos_config.pos_advance_account_id:
+            raise ValidationError(_('Please configure POS Advance Account in POS Configuration: %s') % pos_config.name)
 
         # --------------------------------------------------
         # SELECT JOURNAL BY PAYMENT TYPE
         # --------------------------------------------------
         if payment_type == 'cash':
-            journal = company.pos_cash_journal_id
+            journal = pos_config.pos_cash_journal_id
             if not journal:
-                raise ValidationError(_('Please configure POS Cash Journal.'))
+                raise ValidationError(_('Please configure POS Cash Journal in POS Configuration: %s') % pos_config.name)
         else:
-            journal = company.pos_card_journal_id
+            journal = pos_config.pos_card_journal_id
             if not journal:
-                raise ValidationError(_('Please configure POS Card Journal.'))
+                raise ValidationError(_('Please configure POS Card Journal in POS Configuration: %s') % pos_config.name)
 
         # --------------------------------------------------
         # 1) CREATE ADVANCE HEADER
@@ -207,6 +218,7 @@ class PosAdvancePayment(models.Model):
             'total_expected': total_expected,
             'company_id': company.id,
             'payment_type': payment_type,
+            'pos_config_id': pos_config_id,
         })
 
         # --------------------------------------------------
@@ -243,7 +255,7 @@ class PosAdvancePayment(models.Model):
             'payment_method_line_id': payment_method_line.id,  # ✅ FIX
             'date': fields.Date.context_today(self),
             'memo': advance.name,
-            'destination_account_id': company.pos_advance_account_id.id,  # liability
+            'destination_account_id': pos_config.pos_advance_account_id.id,  # liability
         })
         payment.action_post()
 
@@ -264,10 +276,11 @@ class PosAdvancePayment(models.Model):
         self.ensure_one()
 
         partner = self.partner_id
+        pos_config = self.pos_config_id
         company = self.company_id
 
         receivable_account = partner.property_account_receivable_id
-        advance_account = company.pos_advance_account_id
+        advance_account = pos_config.pos_advance_account_id
 
         move = self.env['account.move'].sudo().create({
             'move_type': 'entry',
@@ -319,12 +332,7 @@ class PosAdvancePayment(models.Model):
             if not advance.payment_id:
                 raise ValidationError(_("Advance payment not found."))
 
-            # 1) (Optional) Create final payment for remaining amount
-            if not advance.second_payment_id and advance.remaining_amount > 0:
-                if not company.second_journal_id:
-                    raise ValidationError(_("Please configure POS Journal (second_journal_id) in Settings."))
-
-            # 2) Create invoice (full amount)
+            # 1) Create invoice (full amount)
             invoice_lines = [
                 (0, 0, {
                     'product_id': line.product_id.id,
@@ -375,6 +383,7 @@ class PosAdvancePayment(models.Model):
                 'state': 'invoiced',
             })
 
+            # 6) Create second payment for remaining amount (if any)
             if advance.remaining_amount > 0:
                 journal = advance._get_payment_journal()
 
@@ -390,13 +399,8 @@ class PosAdvancePayment(models.Model):
                 payments = wizard._create_payments()
                 advance.second_payment_id = payments.id
 
-            advance.write({
-                'invoice_id': invoice.id,
-                'state': 'invoiced',
-            })
-
             # --------------------------------------------------
-            # 6) CREATE POS ORDER RECORD
+            # 7) CREATE POS ORDER RECORD
             # --------------------------------------------------
             pos_session = self.env['pos.session'].search([
                 ('state', '=', 'opened'),
@@ -485,7 +489,7 @@ class PosAdvancePayment(models.Model):
             })
 
             # --------------------------------------------------
-            # 7) CREATE STOCK PICKING AND MOVES (using Odoo's standard method)
+            # 8) CREATE STOCK PICKING AND MOVES (using Odoo's standard method)
             # --------------------------------------------------
             try:
                 # Use Odoo's built-in method to create picking from POS order

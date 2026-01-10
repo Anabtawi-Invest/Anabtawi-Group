@@ -176,6 +176,7 @@ patch(ControlButtons.prototype, {
                     amount_paid: amount,
                     total_expected: totalExpected,
                     payment_type: paymentType, // cash / card
+                    pos_config_id: this.pos.config.id, // Pass POS config ID
                     lines: linesPayload,
                 }]
             );
