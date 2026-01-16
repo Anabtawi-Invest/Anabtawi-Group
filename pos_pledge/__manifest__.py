@@ -18,7 +18,7 @@
         * Pledge return with reversal entries
         * Three business case scenarios supported
     """,
-    'author': 'Your Company',
+    'author': 'Al_Enbtawi',
     'depends': ['point_of_sale', 'account', 'hr'],
     'data': [
         'security/ir.model.access.csv',
