@@ -4,7 +4,7 @@
     "version": "19.0.1.0.0",
     "category": "Point of Sale",
     "summary": "Create advance (deposit) orders in POS without invoice or stock move, and print receipt with products + advance.",
-    "depends": ["point_of_sale"],
+    "depends": ["point_of_sale", "mail"],
     "data": [
         "security/ir.model.access.csv",
         "data/ir_sequence.xml",
@@ -16,6 +16,8 @@
         "point_of_sale._assets_pos": [
             "advance/static/src/app/screens/product_screen/control_buttons/advance_button/advance_button.js",
             "advance/static/src/app/screens/product_screen/control_buttons/advance_button/advance_button.xml",
+            "advance/static/src/app/screens/product_screen/control_buttons/advance_button/advance_details_popup.js",
+            "advance/static/src/app/screens/product_screen/control_buttons/advance_button/advance_details_popup.xml",
             "advance/static/src/app/screens/product_screen/control_buttons/advance_button/payment_screen.js",
             "advance/static/src/app/screens/product_screen/control_buttons/advance_button/pay_advance.xml",
             "advance/static/src/app/screens/product_screen/control_buttons/advance_button/advance_order_list_popup.js",

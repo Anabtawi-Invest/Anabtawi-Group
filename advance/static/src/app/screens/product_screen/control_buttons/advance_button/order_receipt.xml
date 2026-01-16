@@ -6,7 +6,7 @@
 
         <xpath expr="//div[contains(@class,'receipt-total')]" position="after">
 
-            <t >
+            <t t-if="order.advance_amount">
                 <div class="pos-receipt-amount receipt-advance">
                     <span class="label-advance">
                         Advance (<t t-esc="order.advance_name"/>)

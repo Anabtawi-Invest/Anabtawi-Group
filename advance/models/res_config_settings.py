@@ -24,3 +24,9 @@ class PosConfig(models.Model):
         domain="[('type', 'in', ('cash', 'bank'))]",
         help="Journal for card advance payments"
     )
+
+    advance_notification_user_ids = fields.Many2many(
+        'res.users',
+        string='Advance Notification Users',
+        help="Users who will receive notifications and emails when an advance order is created for this pickup location"
+    )

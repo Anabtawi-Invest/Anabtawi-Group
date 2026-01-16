@@ -7,6 +7,7 @@ import { useService } from "@web/core/utils/hooks";
 import { usePos } from "@point_of_sale/app/hooks/pos_hook";
 import { NumberPopup } from "@point_of_sale/app/components/popups/number_popup/number_popup";
 import { AdvanceReceipt } from "./advance_receipt";
+import { AdvanceDetailsPopup } from "./advance_details_popup";
 
 patch(ControlButtons.prototype, {
     setup() {
@@ -128,9 +129,22 @@ patch(ControlButtons.prototype, {
                     return;
                 }
 
-                // ❗ لا async هنا
-                this._processAdvance(order, partner, amount, paymentType);
+                // Show details popup after amount is entered
+                this._showAdvanceDetailsPopup(order, partner, amount, paymentType);
                 return amount;
+            },
+        });
+    },
+
+    // ==================================================
+    // SHOW ADVANCE DETAILS POPUP
+    // ==================================================
+
+    _showAdvanceDetailsPopup(order, partner, amount, paymentType) {
+        this.dialog.add(AdvanceDetailsPopup, {
+            confirm: (details) => {
+                // Process advance with additional details
+                this._processAdvance(order, partner, amount, paymentType, details);
             },
         });
     },
@@ -139,7 +153,7 @@ patch(ControlButtons.prototype, {
     // REAL LOGIC (ASYNC SAFE)
     // ==================================================
 
-    async _processAdvance(order, partner, amount, paymentType) {
+    async _processAdvance(order, partner, amount, paymentType, details) {
         try {
             const totalExpected = this._getOrderTotal(order);
 
@@ -177,6 +191,8 @@ patch(ControlButtons.prototype, {
                     total_expected: totalExpected,
                     payment_type: paymentType, // cash / card
                     pos_config_id: this.pos.config.id, // Pass POS config ID
+                    pickup_pos_id: details?.pickup_pos_id, // Pickup location
+                    due_date: details?.due_date, // Due date
                     lines: linesPayload,
                 }]
             );

@@ -63,7 +63,6 @@ class ConsumptionMealController(http.Controller):
                 for key, label in (reason_field.selection if reason_field else [])
                 if key != 'employee_free'
             ]
-            print(reasons,1111)
             owners = request.env['hr.employee'].sudo().search_read(
                 [('is_owner', '=', True)],
                 ['id', 'name']
@@ -164,12 +163,10 @@ class ConsumptionMealController(http.Controller):
 
             # ---------- VALIDATE ----------
             picking.button_validate()
-            print(picking.id)
 
             return {'status': 'ok', 'picking_id': picking.id, 'picking_name': picking.name}
 
         except Exception as e:
-            _logger.exception("❌ Failed to create consumption picking")
             return {'error': str(e)}
 
 

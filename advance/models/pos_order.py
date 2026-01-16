@@ -12,11 +12,8 @@ class PosOrder(models.Model):
         )
 
         product = line_values.get('product_id')
-        print("DEBUG PRODUCT:", product)
 
         if product and product.name and product.name.strip() == "رهن":
-            print("SKIP PRODUCT رهن")
-
             return {}
 
         return vals

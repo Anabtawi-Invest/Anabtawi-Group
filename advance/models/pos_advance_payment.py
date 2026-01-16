@@ -1,9 +1,13 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class PosAdvancePayment(models.Model):
     _name = 'pos.advance.payment'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _description = 'POS Advance Payment'
     _order = 'create_date desc'
 
@@ -88,6 +92,17 @@ class PosAdvancePayment(models.Model):
         required=True
     )
 
+    pickup_pos_id = fields.Many2one(
+        'pos.config',
+        string='Pickup Location (POS)',
+        help="Point of Sale where the order will be collected"
+    )
+
+    due_date = fields.Date(
+        string='Due Date',
+        help="Expected date for order completion/pickup"
+    )
+
     state = fields.Selection(
         [
             ('draft', 'Draft'),
@@ -169,6 +184,8 @@ class PosAdvancePayment(models.Model):
         lines = vals.get('lines', [])
         payment_type = vals.get('payment_type')
         pos_config_id = vals.get('pos_config_id')
+        pickup_pos_id = vals.get('pickup_pos_id')
+        due_date = vals.get('due_date')
 
         # --------------------------------------------------
         # VALIDATION
@@ -219,6 +236,8 @@ class PosAdvancePayment(models.Model):
             'company_id': company.id,
             'payment_type': payment_type,
             'pos_config_id': pos_config_id,
+            'pickup_pos_id': pickup_pos_id or pos_config_id,  # Default to current POS if not specified
+            'due_date': due_date,
         })
 
         # --------------------------------------------------
@@ -266,6 +285,15 @@ class PosAdvancePayment(models.Model):
             'payment_id': payment.id,
             'state': 'paid',
         })
+
+        # --------------------------------------------------
+        # 6) SEND NOTIFICATIONS AND EMAILS
+        # --------------------------------------------------
+        try:
+            advance._send_advance_notifications()
+        except Exception as e:
+            # Don't fail the advance creation if notification fails
+            pass
 
         return {
             'id': advance.id,
@@ -364,18 +392,8 @@ class PosAdvancePayment(models.Model):
                 lambda l: l.account_type == 'asset_receivable' and not l.reconciled
             )
 
-            print("--- RECEIVABLE LINES BEFORE ---")
-            for l in receivable_lines:
-                print("Line", l.id, "| Move:", l.move_id.name, "| Debit:", l.debit, "| Credit:", l.credit,
-                      "| Reconciled:", l.reconciled)
-
             if receivable_lines:
                 receivable_lines.reconcile()
-
-            print("--- RECEIVABLE LINES AFTER ---")
-            for l in moves.line_ids.filtered(lambda l: l.account_type == 'asset_receivable'):
-                print("Line", l.id, "| Move:", l.move_id.name, "| Reconciled:", l.reconciled,
-                      "| Matched Debits:", l.matched_debit_ids.ids, "| Matched Credits:", l.matched_credit_ids.ids)
 
             # 5) Mark invoiced
             advance.write({
@@ -494,14 +512,193 @@ class PosAdvancePayment(models.Model):
             try:
                 # Use Odoo's built-in method to create picking from POS order
                 pos_order._create_order_picking()
-            except Exception as e:
-                # Log any errors but don't fail the invoice creation
-                print(f"[STOCK] Warning: Could not create picking for POS order {pos_order.name}: {str(e)}")
+            except Exception:
+                # Don't fail the invoice creation if picking creation fails
+                pass
 
             return invoice
 
     def action_mark_invoiced(self, invoice):
         self.write({'invoice_id': invoice.id, 'state': 'invoiced'})
+
+    def _send_advance_notifications(self):
+        """
+        Send notifications and emails to users configured in pickup_pos_id.advance_notification_user_ids
+        """
+        self.ensure_one()
+        
+        # Get pickup POS config
+        pickup_pos = self.pickup_pos_id
+        if not pickup_pos:
+            return
+        
+        # Get notification users from pickup location
+        notification_users = pickup_pos.advance_notification_user_ids
+        if not notification_users:
+            return
+        
+        # Prepare notification content
+        partner = self.partner_id
+        currency = self.currency_id
+        
+        # Build email body
+        email_body = f"""
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2 style="color: #007bff;">New Advance Order Created</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Advance Number:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Customer:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{partner.name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Customer Phone:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{partner.phone or 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Total Expected:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{currency.symbol} {self.total_expected:,.2f}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Amount Paid:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{currency.symbol} {self.amount_paid:,.2f}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Remaining Amount:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong style="color: #dc3545;">{currency.symbol} {self.remaining_amount:,.2f}</strong></td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Payment Type:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.payment_type.upper()}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Pickup Location:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{pickup_pos.name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Due Date:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.due_date.strftime('%Y-%m-%d') if self.due_date else 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Created Date:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.create_date.strftime('%Y-%m-%d %H:%M:%S')}</td>
+                </tr>
+            </table>
+            
+            <h3 style="margin-top: 30px; color: #28a745;">Products:</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <thead>
+                    <tr style="background-color: #f8f9fa;">
+                        <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Product</th>
+                        <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Quantity</th>
+                        <th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Unit Price</th>
+                        <th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        
+        # Add product lines
+        for line in self.line_ids:
+            email_body += f"""
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{line.product_id.name}</td>
+                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">{line.qty}</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">{currency.symbol} {line.price_unit:,.2f}</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">{currency.symbol} {line.subtotal:,.2f}</td>
+                    </tr>
+            """
+        
+        email_body += """
+                </tbody>
+            </table>
+            
+            <p style="margin-top: 30px; color: #6c757d;">
+                <a href="{base_url}/web#id={advance_id}&model=pos.advance.payment&view_type=form" 
+                   style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    View Advance Order
+                </a>
+            </p>
+        </div>
+        """
+        
+        # Get base URL
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', 'http://localhost:8069')
+        
+        # Replace placeholders
+        email_body = email_body.format(
+            base_url=base_url,
+            advance_id=self.id
+        )
+        
+        # Send notification and email to each user
+        notification_body = f'New Advance Order: {self.name}\nCustomer: {partner.name}\nTotal: {currency.symbol} {self.total_expected:,.2f}\nPaid: {currency.symbol} {self.amount_paid:,.2f}\nRemaining: {currency.symbol} {self.remaining_amount:,.2f}'
+        
+        # Post message in chatter first (without partner_ids to avoid auto-notification)
+        message = self.message_post(
+            body=notification_body,
+            subject=f'New Advance Order: {self.name}',
+            email_layout_xmlid='mail.mail_notification_light',
+            subtype_xmlid='mail.mt_comment',
+            mail_auto_delete=False,
+        )
+        
+        # Now manually notify the specific users using _notify_thread
+        # This ensures proper inbox notifications are created
+        partner_ids = [user.partner_id.id for user in notification_users]
+        
+        # Add partners as followers first
+        self.message_subscribe(partner_ids=partner_ids)
+        
+        # Use _notify_get_recipients to get proper recipients_data format
+        # We need to pass partner_ids in the message to get proper recipients
+        msg_vals = {
+            'partner_ids': partner_ids,
+            'model': self._name,
+            'res_id': self.id,
+        }
+        
+        # Get recipients data using the standard method
+        recipients_data = self._notify_get_recipients(message, msg_vals=msg_vals)
+        
+        # Filter to only include our notification users and force inbox notification
+        notification_partner_ids = set(partner_ids)
+        recipients_data = [
+            r for r in recipients_data 
+            if r.get('id') in notification_partner_ids
+        ]
+        
+        # Force inbox notification type
+        for r in recipients_data:
+            r['notif'] = 'inbox'
+        
+        # Call _notify_thread_by_inbox to create notifications and send bus messages
+        if recipients_data:
+            self._notify_thread_by_inbox(message, recipients_data)
+        
+        # Send email notifications separately
+        for user in notification_users:
+            try:
+                if user.email:
+                    mail_values = {
+                        'subject': f'New Advance Order: {self.name}',
+                        'body_html': email_body,
+                        'email_to': user.email,
+                        'email_from': self.env.user.email_formatted or self.env.company.email,
+                        'author_id': self.env.user.partner_id.id,
+                        'model': 'pos.advance.payment',
+                        'res_id': self.id,
+                    }
+                    
+                    mail = self.env['mail.mail'].sudo().create(mail_values)
+                    mail.send()
+                    
+            except Exception:
+                pass
 
     def action_cancel(self):
         self.write({'state': 'cancelled'})

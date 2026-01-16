@@ -19,6 +19,12 @@
                             <field name="pos_card_journal_id" 
                                    options="{'no_create': True}"/>
                         </group>
+                        <group string="Notifications">
+                            <field name="advance_notification_user_ids" 
+                                   widget="many2many_tags"
+                                   options="{'no_create': True}"
+                                   placeholder="Select users to notify when advance orders are created"/>
+                        </group>
                     </group>
                 </xpath>
                 

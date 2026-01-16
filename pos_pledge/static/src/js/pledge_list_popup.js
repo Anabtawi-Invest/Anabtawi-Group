@@ -1,0 +1,170 @@
+/** @odoo-module **/
+
+import { Component, useState, onMounted } from "@odoo/owl";
+import { useService } from "@web/core/utils/hooks";
+import { usePos } from "@point_of_sale/app/hooks/pos_hook";
+import { Dialog } from "@web/core/dialog/dialog";
+import { _t } from "@web/core/l10n/translation";
+
+export class PledgeListPopup extends Component {
+    static template = "pos_pledge.PledgeListPopup";
+    static components = { Dialog };
+    static props = {
+        close: Function,
+        getPayload: Function,
+        returnType: { type: String, optional: true }, // 'employee' or 'customer'
+    };
+
+    setup() {
+        this.orm = useService("orm");
+        this.notification = useService("notification");
+        this.pos = usePos();
+
+        this.state = useState({
+            pledges: [],
+            selectedPledge: null,
+            search: "",
+        });
+
+        onMounted(() => this._loadPledges());
+    }
+
+    // ==================================
+    // LOAD ACTIVE PLEDGES (FILTERED BY RETURN TYPE)
+    // ==================================
+    async _loadPledges() {
+        const returnType = this.props.returnType || 'customer';
+        console.log("[PLEDGE] Loading active pledges for popup (return_type:", returnType, ")...");
+        
+        try {
+            // Build domain based on return_type
+            const domain = [['state', '=', 'active']];
+            
+            if (returnType === 'employee') {
+                // Employee pledges: must have employee_id
+                domain.push(['employee_id', '!=', false]);
+                console.log("[PLEDGE] Filtering for employee pledges (with employee_id)");
+            } else {
+                // Customer pledges: must NOT have employee_id
+                domain.push(['employee_id', '=', false]);
+                console.log("[PLEDGE] Filtering for customer pledges (without employee_id)");
+            }
+            
+            this.state.pledges = await this.orm.searchRead(
+                "pos.pledge",
+                domain,
+                ['id', 'name', 'partner_id', 'pledge_amount', 'case_type', 'create_date', 'employee_id'],
+                { order: 'create_date desc' }
+            );
+            
+            // Load employee names for each pledge
+            const employeeIds = this.state.pledges
+                .map(p => p.employee_id && p.employee_id[0])
+                .filter(id => id);
+            
+            if (employeeIds.length > 0) {
+                const employees = await this.orm.searchRead(
+                    "hr.employee",
+                    [['id', 'in', employeeIds]],
+                    ['id', 'name'],
+                    {}
+                );
+                
+                // Create a map of employee_id -> employee_name
+                const employeeMap = {};
+                employees.forEach(emp => {
+                    employeeMap[emp.id] = emp.name;
+                });
+                
+                // Add employee_name to each pledge
+                this.state.pledges = this.state.pledges.map(pledge => {
+                    if (pledge.employee_id && pledge.employee_id[0]) {
+                        pledge.employee_name = employeeMap[pledge.employee_id[0]] || '';
+                    } else {
+                        pledge.employee_name = '';
+                    }
+                    return pledge;
+                });
+            }
+            console.log("[PLEDGE] Loaded", this.state.pledges.length, "active pledges for return_type:", returnType);
+        } catch (error) {
+            console.error("[PLEDGE] Error loading pledges:", error);
+            this.notification.add(
+                _t("Failed to load pledges"),
+                { type: "danger" }
+            );
+        }
+    }
+
+    // ==================================
+    // 🔍 SEARCH HANDLER
+    // ==================================
+    onSearchInput(ev) {
+        this.state.search = (ev.target.value || "").toLowerCase();
+        console.log("[PLEDGE] Search updated:", this.state.search);
+    }
+
+    // ==================================
+    // 🔍 FILTERED PLEDGES
+    // ==================================
+    get filteredPledges() {
+        if (!this.state.search) {
+            return this.state.pledges;
+        }
+
+        const searchLower = this.state.search.toLowerCase();
+        return this.state.pledges.filter(pledge =>
+            pledge.name?.toLowerCase().includes(searchLower) ||
+            pledge.partner_id?.[1]?.toLowerCase().includes(searchLower) ||
+            pledge.employee_name?.toLowerCase().includes(searchLower)
+        );
+    }
+
+    // ==================================
+    // SEARCH KEYDOWN (Enter to select first)
+    // ==================================
+    onSearchKeydown(ev) {
+        if (ev.key !== "Enter") {
+            return;
+        }
+
+        ev.preventDefault();
+
+        if (!this.filteredPledges.length) {
+            this.notification.add(
+                _t("No pledge found."),
+                { type: "warning" }
+            );
+            return;
+        }
+
+        const first = this.filteredPledges[0];
+        console.log("[PLEDGE] Enter pressed, selecting first pledge:", first);
+        this.selectPledge(first);
+    }
+
+    // ==================================
+    // SELECT PLEDGE
+    // ==================================
+    selectPledge(pledge) {
+        console.log("[PLEDGE] Pledge selected:", pledge);
+        this.props.getPayload(pledge);
+        this.props.close();
+    }
+
+    // ==================================
+    // CANCEL
+    // ==================================
+    cancel() {
+        console.log("[PLEDGE] Pledge selection cancelled");
+        this.props.getPayload(null);
+        this.props.close();
+    }
+
+    // ==================================
+    // FORMAT CURRENCY
+    // ==================================
+    formatCurrency(amount) {
+        return this.pos.env.utils.formatCurrency(amount, false);
+    }
+}
