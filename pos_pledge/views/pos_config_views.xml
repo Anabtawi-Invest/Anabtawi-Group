@@ -17,7 +17,7 @@
                         <field name="services_journal_id"/>
                     </group>
                     <group>
-                        <div class="alert alert-info" colspan="2">
+                        <div class="alert alert-info" role="status" colspan="2">
                             <strong>Note:</strong> Orders with pledge items will NOT automatically create customer invoices. 
                             Accounting entries will still be created for pledge/employee/delivery services.
                         </div>

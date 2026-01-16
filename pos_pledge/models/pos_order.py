@@ -35,8 +35,8 @@ class PosOrder(models.Model):
     
     employee_id = fields.Many2one(
         'hr.employee',
-        string='Employee',
-        help='Employee associated with this order'
+        string='Service Employee',
+        help='Employee associated with this order for service delivery'
     )
     
     pledge_product_qty = fields.Integer(

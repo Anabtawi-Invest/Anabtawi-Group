@@ -206,64 +206,92 @@ class PosPledge(models.Model):
         if not services_journal:
             raise ValidationError(_('Please configure Services Journal in POS Configuration'))
         
+        # Validate accounts based on case type
+        if case_type == 'case1':
+            # Employee service requires services_account
+            if not services_account:
+                raise ValidationError(_('Please configure Services Account in POS Configuration'))
+        elif case_type in ('case2', 'case3'):
+            # Pledge requires pledge_account
+            if not pledge_account:
+                raise ValidationError(_('Please configure Pledge Account in POS Configuration'))
+            # Delivery in case3 requires services_account
+            if case_type == 'case3' and not services_account:
+                raise ValidationError(_('Please configure Services Account in POS Configuration'))
+        
+        # Validate journal default account
+        if not services_journal.default_account_id:
+            raise ValidationError(_('Services Journal must have a default account configured'))
+        
         # Create pledge record
+        # Handle employee_product_id and delivery_product_id (convert false/None to False)
+        employee_product_id = vals.get('employee_product_id')
+        if not employee_product_id or employee_product_id is False:
+            employee_product_id = False
+        
+        delivery_product_id = vals.get('delivery_product_id')
+        if not delivery_product_id or delivery_product_id is False:
+            delivery_product_id = False
+        
         pledge_vals = {
             'pos_order_id': pos_order_id,
             'pos_config_id': pos_config.id,
             'partner_id': partner_id,
             'employee_id': pos_order.employee_id.id if pos_order.employee_id else False,
             'case_type': case_type,
-            'pledge_amount': vals.get('pledge_amount', 0),
-            'employee_amount': vals.get('employee_amount', 0),
-            'delivery_amount': vals.get('delivery_amount', 0),
-            'pledge_products': [(6, 0, vals.get('pledge_products', []))],
-            'employee_product_id': vals.get('employee_product_id'),
-            'delivery_product_id': vals.get('delivery_product_id'),
+            'pledge_amount': vals.get('pledge_amount', 0) or 0,
+            'employee_amount': vals.get('employee_amount', 0) or 0,
+            'delivery_amount': vals.get('delivery_amount', 0) or 0,
+            'pledge_products': [(6, 0, vals.get('pledge_products', []) or [])],
+            'employee_product_id': employee_product_id,
+            'delivery_product_id': delivery_product_id,
             'company_id': pos_order.company_id.id,
         }
         
         pledge = self.create(pledge_vals)
         
         # Create accounting entries based on case type
-        if case_type == 'case1':
-            # Employee service entry
-            if pledge.employee_amount > 0:
-                pledge.employee_move_id = pledge._create_service_entry(
-                    pledge.employee_amount,
-                    services_account,
-                    services_journal,
-                    _('Employee Service: %s') % pledge.name
-                )
-        
-        elif case_type == 'case2':
-            # Pledge entry only
-            if pledge.pledge_amount > 0:
-                if not pledge_account:
-                    raise ValidationError(_('Please configure Pledge Account in POS Configuration'))
-                pledge.pledge_move_id = pledge._create_pledge_entry(
-                    pledge.pledge_amount,
-                    pledge_account,
-                    services_journal
-                )
-        
-        elif case_type == 'case3':
-            # Both pledge and delivery entries
-            if pledge.pledge_amount > 0:
-                if not pledge_account:
-                    raise ValidationError(_('Please configure Pledge Account in POS Configuration'))
-                pledge.pledge_move_id = pledge._create_pledge_entry(
-                    pledge.pledge_amount,
-                    pledge_account,
-                    services_journal
-                )
+        try:
+            if case_type == 'case1':
+                # Employee service entry
+                if pledge.employee_amount > 0:
+                    pledge.employee_move_id = pledge._create_service_entry(
+                        pledge.employee_amount,
+                        services_account,
+                        services_journal,
+                        _('Employee Service: %s') % pledge.name
+                    )
             
-            if pledge.delivery_amount > 0:
-                pledge.delivery_move_id = pledge._create_service_entry(
-                    pledge.delivery_amount,
-                    services_account,
-                    services_journal,
-                    _('Delivery Service: %s') % pledge.name
-                )
+            elif case_type == 'case2':
+                # Pledge entry only
+                if pledge.pledge_amount > 0:
+                    pledge.pledge_move_id = pledge._create_pledge_entry(
+                        pledge.pledge_amount,
+                        pledge_account,
+                        services_journal
+                    )
+            
+            elif case_type == 'case3':
+                # Both pledge and delivery entries
+                if pledge.pledge_amount > 0:
+                    pledge.pledge_move_id = pledge._create_pledge_entry(
+                        pledge.pledge_amount,
+                        pledge_account,
+                        services_journal
+                    )
+                
+                if pledge.delivery_amount > 0:
+                    pledge.delivery_move_id = pledge._create_service_entry(
+                        pledge.delivery_amount,
+                        services_account,
+                        services_journal,
+                        _('Delivery Service: %s') % pledge.name
+                    )
+        except Exception as e:
+            _logger.error("[PLEDGE] Error creating journal entries for pledge %s: %s", pledge.name, str(e))
+            # Rollback pledge creation if journal entries fail
+            pledge.unlink()
+            raise ValidationError(_('Failed to create accounting entries: %s') % str(e))
         
         # Update pos_order.pledge_id link
         pos_order.write({'pledge_id': pledge.id})
@@ -284,6 +312,12 @@ class PosPledge(models.Model):
     def _create_pledge_entry(self, amount, pledge_account, journal):
         """Create journal entry for pledge (liability)"""
         self.ensure_one()
+        
+        if not pledge_account:
+            raise ValidationError(_('Pledge Account is required for pledge entries'))
+        
+        if not journal.default_account_id:
+            raise ValidationError(_('Journal default account is required'))
         
         move = self.env['account.move'].sudo().create({
             'move_type': 'entry',
@@ -315,6 +349,12 @@ class PosPledge(models.Model):
     def _create_service_entry(self, amount, services_account, journal, description):
         """Create journal entry for employee/delivery service"""
         self.ensure_one()
+        
+        if not services_account:
+            raise ValidationError(_('Services Account is required for service entries'))
+        
+        if not journal.default_account_id:
+            raise ValidationError(_('Journal default account is required'))
         
         move = self.env['account.move'].sudo().create({
             'move_type': 'entry',

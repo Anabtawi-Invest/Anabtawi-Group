@@ -445,11 +445,22 @@ patch(PaymentScreen.prototype, {
                     } catch (error) {
                         console.error("[PLEDGE] ✗ Error creating pledge record:", error);
                         console.error("[PLEDGE] Error stack:", error.stack);
+                        
+                        // Extract error message
+                        let errorMessage = "Unknown error";
+                        if (error && error.message) {
+                            errorMessage = error.message;
+                        } else if (error && error.data && error.data.message) {
+                            errorMessage = error.data.message;
+                        } else if (typeof error === 'string') {
+                            errorMessage = error;
+                        }
+                        
                         // Show error notification
                         try {
                             posInstance.env.services.notification.add(
-                                _t("Failed to create pledge record: %s", error.message || error),
-                                { type: "warning" }
+                                _t("Failed to create pledge record: %s", errorMessage),
+                                { type: "danger", sticky: true }
                             );
                         } catch (notifError) {
                             console.error("[PLEDGE] Could not show notification:", notifError);
