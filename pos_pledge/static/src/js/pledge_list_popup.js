@@ -24,6 +24,7 @@ export class PledgeListPopup extends Component {
             pledges: [],
             selectedPledge: null,
             search: "",
+            selectedPledgeDetails: null,
         });
 
         onMounted(() => this._loadPledges());
@@ -53,7 +54,7 @@ export class PledgeListPopup extends Component {
             this.state.pledges = await this.orm.searchRead(
                 "pos.pledge",
                 domain,
-                ['id', 'name', 'partner_id', 'pledge_amount', 'case_type', 'create_date', 'employee_id'],
+                ['id', 'name', 'partner_id', 'pledge_amount', 'employee_amount', 'delivery_amount', 'case_type', 'create_date', 'employee_id', 'state', 'return_date', 'pos_order_id'],
                 { order: 'create_date desc' }
             );
             
@@ -82,6 +83,32 @@ export class PledgeListPopup extends Component {
                         pledge.employee_name = employeeMap[pledge.employee_id[0]] || '';
                     } else {
                         pledge.employee_name = '';
+                    }
+                    return pledge;
+                });
+            }
+            
+            // Load partner phone numbers for search
+            const partnerIds = [...new Set(this.state.pledges.map(p => p.partner_id?.[0]).filter(Boolean))];
+            if (partnerIds.length > 0) {
+                const partners = await this.orm.searchRead(
+                    "res.partner",
+                    [["id", "in", partnerIds]],
+                    ["id", "phone"]
+                );
+                
+                // Create a map of partner_id -> phone
+                const partnerPhoneMap = {};
+                partners.forEach(partner => {
+                    partnerPhoneMap[partner.id] = partner.phone || '';
+                });
+                
+                // Add phone to each pledge
+                this.state.pledges = this.state.pledges.map(pledge => {
+                    if (pledge.partner_id && pledge.partner_id[0]) {
+                        pledge.partner_phone = partnerPhoneMap[pledge.partner_id[0]] || '';
+                    } else {
+                        pledge.partner_phone = '';
                     }
                     return pledge;
                 });
@@ -116,7 +143,8 @@ export class PledgeListPopup extends Component {
         return this.state.pledges.filter(pledge =>
             pledge.name?.toLowerCase().includes(searchLower) ||
             pledge.partner_id?.[1]?.toLowerCase().includes(searchLower) ||
-            pledge.employee_name?.toLowerCase().includes(searchLower)
+            pledge.employee_name?.toLowerCase().includes(searchLower) ||
+            (pledge.partner_phone && pledge.partner_phone.toString().toLowerCase().includes(searchLower))
         );
     }
 
@@ -159,6 +187,94 @@ export class PledgeListPopup extends Component {
         console.log("[PLEDGE] Pledge selection cancelled");
         this.props.getPayload(null);
         this.props.close();
+    }
+
+    // ==================================
+    // SHOW PLEDGE DETAILS
+    // ==================================
+    async showPledgeDetails(pledge) {
+        console.log("[PLEDGE] Showing details for pledge:", pledge);
+        
+        try {
+            // Load full pledge details including products
+            const pledgeDetails = await this.orm.searchRead(
+                "pos.pledge",
+                [['id', '=', pledge.id]],
+                ['id', 'name', 'partner_id', 'employee_id', 'pledge_amount', 'employee_amount', 'delivery_amount', 
+                 'case_type', 'create_date', 'return_date', 'state', 'pledge_products', 'pos_order_id'],
+                { limit: 1 }
+            );
+            
+            if (!pledgeDetails || !pledgeDetails.length) {
+                this.notification.add(
+                    _t("Failed to load pledge details"),
+                    { type: "warning" }
+                );
+                return;
+            }
+            
+            const fullPledge = pledgeDetails[0];
+            
+            // Load pledge products details
+            let products = [];
+            if (fullPledge.pledge_products && fullPledge.pledge_products.length > 0) {
+                const productIds = fullPledge.pledge_products.map(p => p[0]);
+                const productDetails = await this.orm.searchRead(
+                    "product.product",
+                    [['id', 'in', productIds]],
+                    ['id', 'name', 'display_name']
+                );
+                
+                // Get quantities from pos.order lines if available
+                if (fullPledge.pos_order_id && fullPledge.pos_order_id[0]) {
+                    try {
+                        const orderLines = await this.orm.searchRead(
+                            "pos.order.line",
+                            [['order_id', '=', fullPledge.pos_order_id[0]]],
+                            ['product_id', 'qty']
+                        );
+                        
+                        products = productDetails.map(product => {
+                            const line = orderLines.find(l => l.product_id && l.product_id[0] === product.id);
+                            return {
+                                id: product.id,
+                                name: product.display_name || product.name,
+                                qty: line ? line.qty : 1
+                            };
+                        });
+                    } catch (error) {
+                        console.warn("[PLEDGE] Could not load order lines:", error);
+                        products = productDetails.map(product => ({
+                            id: product.id,
+                            name: product.display_name || product.name,
+                            qty: 1
+                        }));
+                    }
+                } else {
+                    products = productDetails.map(product => ({
+                        id: product.id,
+                        name: product.display_name || product.name,
+                        qty: 1
+                    }));
+                }
+            }
+            
+            // Combine all details
+            this.state.selectedPledgeDetails = {
+                ...fullPledge,
+                employee_name: pledge.employee_name || '',
+                partner_phone: pledge.partner_phone || '',
+                products: products
+            };
+            
+            console.log("[PLEDGE] Pledge details loaded:", this.state.selectedPledgeDetails);
+        } catch (error) {
+            console.error("[PLEDGE] Error loading pledge details:", error);
+            this.notification.add(
+                _t("Failed to load pledge details: %s", error.message || error),
+                { type: "danger" }
+            );
+        }
     }
 
     // ==================================

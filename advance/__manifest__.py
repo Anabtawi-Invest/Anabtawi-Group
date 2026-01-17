@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Advance Order (Arboon) - Odoo 19",
-    "version": "19.0.2.0.0",
+    "version": "19.0.3.0.0",
     "category": "Point of Sale",
     "summary": "Create advance (deposit) orders in POS without invoice or stock move, and print receipt with products + advance.",
+    "author": "Your Company",
+    "license": "LGPL-3",
     "depends": ["point_of_sale", "mail"],
     "data": [
         "security/ir.model.access.csv",

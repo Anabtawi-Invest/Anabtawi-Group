@@ -360,16 +360,23 @@ class PosAdvancePayment(models.Model):
             if not advance.payment_id:
                 raise ValidationError(_("Advance payment not found."))
 
-            # 1) Create invoice (full amount)
-            invoice_lines = [
-                (0, 0, {
-                    'product_id': line.product_id.id,
+            # 1) Create invoice (exclude employee_service and delivery_product products)
+            invoice_lines = []
+            for line in advance.line_ids:
+                product = line.product_id
+                # Skip products with is_employee_service or is_delivery_product
+                if product.is_employee_service or product.is_delivery_product:
+                    continue
+                
+                invoice_lines.append((0, 0, {
+                    'product_id': product.id,
                     'quantity': line.qty,
                     'price_unit': line.price_unit,
-                    'name': line.product_id.display_name,
-                })
-                for line in advance.line_ids
-            ]
+                    'name': product.display_name,
+                }))
+            
+            if not invoice_lines:
+                raise ValidationError(_("No products to invoice (all products are employee/delivery services)."))
 
             invoice = advance.env['account.move'].sudo().create({
                 'move_type': 'out_invoice',
@@ -471,8 +478,11 @@ class PosAdvancePayment(models.Model):
                     'full_product_name': product.display_name,
                 }))
 
+            # Get employee_id from vals if provided
+            employee_id = (vals or {}).get('employee_id', False)
+            
             # Create the POS order in draft state
-            pos_order = self.env['pos.order'].sudo().create({
+            pos_order_vals = {
                 'session_id': pos_session.id,
                 'partner_id': partner.id,
                 'config_id': pos_config.id,
@@ -483,7 +493,11 @@ class PosAdvancePayment(models.Model):
                 'amount_tax': total_tax,
                 'amount_paid': total_with_tax,
                 'amount_return': 0.0,
-            })
+            }
+            if employee_id:
+                pos_order_vals['employee_id'] = employee_id
+            
+            pos_order = self.env['pos.order'].sudo().create(pos_order_vals)
 
             # First set to 'paid' to trigger name generation
             pos_order.write({
@@ -507,7 +521,90 @@ class PosAdvancePayment(models.Model):
             })
 
             # --------------------------------------------------
-            # 8) CREATE STOCK PICKING AND MOVES (using Odoo's standard method)
+            # 8) CREATE POS.PLEDGE RECORD IF NEEDED
+            # --------------------------------------------------
+            # Check if any line has pledge/employee/delivery products
+            has_pledge = any(line.product_id.is_pledge_product for line in advance.line_ids)
+            has_employee = any(line.product_id.is_employee_service for line in advance.line_ids)
+            has_delivery = any(line.product_id.is_delivery_product for line in advance.line_ids)
+            
+            if has_pledge or has_employee or has_delivery:
+                # Calculate amounts
+                pledge_amount = sum(
+                    (line.product_id.pledge_amount or (line.price_unit * line.qty))
+                    for line in advance.line_ids
+                    if line.product_id.is_pledge_product
+                )
+                employee_amount = sum(
+                    line.subtotal for line in advance.line_ids
+                    if line.product_id.is_employee_service
+                )
+                delivery_amount = sum(
+                    line.subtotal for line in advance.line_ids
+                    if line.product_id.is_delivery_product
+                )
+                
+                # Determine case type
+                if has_employee and not has_pledge and not has_delivery:
+                    case_type = 'case1'  # Employee Only
+                elif has_pledge and not has_delivery and not has_employee:
+                    case_type = 'case2'  # Pledge Only
+                elif has_pledge and has_delivery and not has_employee:
+                    case_type = 'case3'  # Pledge + Delivery
+                elif has_pledge and has_employee and has_delivery:
+                    case_type = 'case4'  # All Three: Pledge + Employee + Delivery
+                elif has_pledge and has_employee and not has_delivery:
+                    case_type = 'case5'  # Pledge + Employee (no delivery)
+                elif has_employee and has_delivery and not has_pledge:
+                    case_type = 'case6'  # Employee + Delivery (no pledge)
+                else:
+                    case_type = 'mixed'
+                
+                # Get pledge products
+                pledge_products = [
+                    line.product_id.id for line in advance.line_ids
+                    if line.product_id.is_pledge_product
+                ]
+                
+                # Get employee product
+                employee_line = next(
+                    (line for line in advance.line_ids if line.product_id.is_employee_service),
+                    None
+                )
+                employee_product_id = employee_line.product_id.id if employee_line else False
+                
+                # Get delivery product
+                delivery_line = next(
+                    (line for line in advance.line_ids if line.product_id.is_delivery_product),
+                    None
+                )
+                delivery_product_id = delivery_line.product_id.id if delivery_line else False
+                
+                # Create pledge record
+                # Note: employee_id will be taken from pos_order.employee_id in create_from_pos
+                pledge_vals = {
+                    'pos_order_id': pos_order.id,
+                    'pos_config_id': pos_config.id,
+                    'partner_id': partner.id,
+                    'case_type': case_type,
+                    'pledge_amount': pledge_amount or 0,
+                    'employee_amount': employee_amount or 0,
+                    'delivery_amount': delivery_amount or 0,
+                    'pledge_products': [(6, 0, pledge_products)],
+                    'employee_product_id': employee_product_id,
+                    'delivery_product_id': delivery_product_id,
+                }
+                
+                try:
+                    pledge_id = self.env['pos.pledge'].create_from_pos(pledge_vals)
+                    _logger.info("[ADVANCE] Created pos.pledge record ID %s for advance %s", pledge_id, advance.name)
+                except Exception as e:
+                    _logger.error("[ADVANCE] Failed to create pos.pledge record: %s", str(e))
+                    # Don't fail invoice creation if pledge creation fails
+                    pass
+
+            # --------------------------------------------------
+            # 9) CREATE STOCK PICKING AND MOVES (using Odoo's standard method)
             # --------------------------------------------------
             try:
                 # Use Odoo's built-in method to create picking from POS order

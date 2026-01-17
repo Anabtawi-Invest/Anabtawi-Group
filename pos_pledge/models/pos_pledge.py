@@ -211,12 +211,19 @@ class PosPledge(models.Model):
             # Employee service requires services_account
             if not services_account:
                 raise ValidationError(_('Please configure Services Account in POS Configuration'))
-        elif case_type in ('case2', 'case3'):
+        elif case_type in ('case2', 'case3', 'case4', 'case5'):
             # Pledge requires pledge_account
             if not pledge_account:
                 raise ValidationError(_('Please configure Pledge Account in POS Configuration'))
-            # Delivery in case3 requires services_account
-            if case_type == 'case3' and not services_account:
+            # Delivery in case3 and case4 requires services_account
+            if case_type in ('case3', 'case4') and not services_account:
+                raise ValidationError(_('Please configure Services Account in POS Configuration'))
+            # Employee in case4, case5, case6 requires services_account
+            if case_type in ('case4', 'case5', 'case6') and not services_account:
+                raise ValidationError(_('Please configure Services Account in POS Configuration'))
+        elif case_type == 'case6':
+            # Employee + Delivery requires services_account
+            if not services_account:
                 raise ValidationError(_('Please configure Services Account in POS Configuration'))
         
         # Validate journal default account
@@ -278,6 +285,66 @@ class PosPledge(models.Model):
                         pledge.pledge_amount,
                         pledge_account,
                         services_journal
+                    )
+                
+                if pledge.delivery_amount > 0:
+                    pledge.delivery_move_id = pledge._create_service_entry(
+                        pledge.delivery_amount,
+                        services_account,
+                        services_journal,
+                        _('Delivery Service: %s') % pledge.name
+                    )
+            
+            elif case_type == 'case4':
+                # All three: Pledge + Employee + Delivery
+                if pledge.pledge_amount > 0:
+                    pledge.pledge_move_id = pledge._create_pledge_entry(
+                        pledge.pledge_amount,
+                        pledge_account,
+                        services_journal
+                    )
+                
+                if pledge.employee_amount > 0:
+                    pledge.employee_move_id = pledge._create_service_entry(
+                        pledge.employee_amount,
+                        services_account,
+                        services_journal,
+                        _('Employee Service: %s') % pledge.name
+                    )
+                
+                if pledge.delivery_amount > 0:
+                    pledge.delivery_move_id = pledge._create_service_entry(
+                        pledge.delivery_amount,
+                        services_account,
+                        services_journal,
+                        _('Delivery Service: %s') % pledge.name
+                    )
+            
+            elif case_type == 'case5':
+                # Pledge + Employee
+                if pledge.pledge_amount > 0:
+                    pledge.pledge_move_id = pledge._create_pledge_entry(
+                        pledge.pledge_amount,
+                        pledge_account,
+                        services_journal
+                    )
+                
+                if pledge.employee_amount > 0:
+                    pledge.employee_move_id = pledge._create_service_entry(
+                        pledge.employee_amount,
+                        services_account,
+                        services_journal,
+                        _('Employee Service: %s') % pledge.name
+                    )
+            
+            elif case_type == 'case6':
+                # Employee + Delivery
+                if pledge.employee_amount > 0:
+                    pledge.employee_move_id = pledge._create_service_entry(
+                        pledge.employee_amount,
+                        services_account,
+                        services_journal,
+                        _('Employee Service: %s') % pledge.name
                     )
                 
                 if pledge.delivery_amount > 0:

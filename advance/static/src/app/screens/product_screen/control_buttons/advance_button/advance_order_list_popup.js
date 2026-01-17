@@ -5,6 +5,7 @@ import {useService} from "@web/core/utils/hooks";
 import {usePos} from "@point_of_sale/app/hooks/pos_hook";
 import {Dialog} from "@web/core/dialog/dialog";
 import {_t} from "@web/core/l10n/translation";
+import {EmployeeSelectionPopup} from "@pos_pledge/js/employee_selection_popup";
 
 export class AdvanceOrderListPopup extends Component {
     static template = "pos_advance.AdvanceOrderListPopup";
@@ -14,6 +15,7 @@ export class AdvanceOrderListPopup extends Component {
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
+        this.dialog = useService("dialog");
         this.pos = usePos();
 
         this.state = useState({
@@ -21,6 +23,7 @@ export class AdvanceOrderListPopup extends Component {
             selectedAdvance: null,
             search: "",
             paymentType: "cash",
+            selectedEmployee: null,
         });
 
         onMounted(() => this._loadAdvances());
@@ -31,7 +34,7 @@ export class AdvanceOrderListPopup extends Component {
     // ==================================
     async _loadAdvances() {
         // Filter by pickup_pos_id matching current POS
-        this.state.advances = await this.orm.searchRead(
+        const advances = await this.orm.searchRead(
             "pos.advance.payment",
             [
                 ["state", "=", "paid"],
@@ -49,6 +52,31 @@ export class AdvanceOrderListPopup extends Component {
                 "pickup_pos_id",
             ]
         );
+        
+        // Load partner phone numbers separately
+        const partnerIds = [...new Set(advances.map(adv => adv.partner_id?.[0]).filter(Boolean))];
+        if (partnerIds.length > 0) {
+            const partners = await this.orm.searchRead(
+                "res.partner",
+                [["id", "in", partnerIds]],
+                ["id", "phone"]
+            );
+            
+            // Create a map of partner_id -> phone
+            const partnerPhoneMap = {};
+            partners.forEach(partner => {
+                partnerPhoneMap[partner.id] = partner.phone || '';
+            });
+            
+            // Add phone to each advance
+            advances.forEach(adv => {
+                if (adv.partner_id && adv.partner_id[0]) {
+                    adv.partner_phone = partnerPhoneMap[adv.partner_id[0]] || '';
+                }
+            });
+        }
+        
+        this.state.advances = advances;
     }
 
     // ==================================
@@ -66,10 +94,24 @@ export class AdvanceOrderListPopup extends Component {
             return this.state.advances;
         }
 
-        return this.state.advances.filter(adv =>
-            adv.name?.toLowerCase().includes(this.state.search) ||
-            adv.partner_id?.[1]?.toLowerCase().includes(this.state.search)
-        );
+        const searchLower = this.state.search.toLowerCase();
+        
+        return this.state.advances.filter(adv => {
+            // Search by advance number
+            if (adv.name?.toLowerCase().includes(searchLower)) {
+                return true;
+            }
+            // Search by customer name
+            if (adv.partner_id?.[1]?.toLowerCase().includes(searchLower)) {
+                return true;
+            }
+            // Search by customer phone number
+            const phone = adv.partner_phone || '';
+            if (phone && phone.toString().toLowerCase().includes(searchLower)) {
+                return true;
+            }
+            return false;
+        });
     }
 
     onSearchKeydown(ev) {
@@ -97,11 +139,38 @@ export class AdvanceOrderListPopup extends Component {
     // LOAD PRODUCTS (advance lines)
     // ==================================
     async _loadAdvanceLines(advanceId) {
-        return await this.orm.searchRead(
+        const lines = await this.orm.searchRead(
             "pos.advance.line",
             [["advance_id", "=", advanceId]],
             ["product_id", "qty", "price_unit", "subtotal"]
         );
+        
+        // Load product details to check for is_employee_service
+        const productIds = lines.map(l => l.product_id?.[0]).filter(Boolean);
+        if (productIds.length > 0) {
+            const products = await this.orm.searchRead(
+                "product.product",
+                [["id", "in", productIds]],
+                ["id", "is_employee_service"]
+            );
+            
+            // Create a map of product_id -> is_employee_service
+            const productServiceMap = {};
+            products.forEach(product => {
+                productServiceMap[product.id] = product.is_employee_service || false;
+            });
+            
+            // Add is_employee_service to each line
+            lines.forEach(line => {
+                if (line.product_id && line.product_id[0]) {
+                    line.is_employee_service = productServiceMap[line.product_id[0]] || false;
+                } else {
+                    line.is_employee_service = false;
+                }
+            });
+        }
+        
+        return lines;
     }
 
     // ==================================
@@ -111,6 +180,9 @@ export class AdvanceOrderListPopup extends Component {
         const customer = adv.partner_id?.[1];
         const lines = await this._loadAdvanceLines(adv.id);
 
+        // Check if any product has is_employee_service
+        const hasEmployeeService = lines.some(l => l.is_employee_service === true);
+
         this.state.selectedAdvance = {
             id: adv.id,
             name: adv.name,
@@ -118,16 +190,51 @@ export class AdvanceOrderListPopup extends Component {
             total: adv.total_expected,
             paid: adv.amount_paid,
             remaining: adv.remaining_amount,
+            hasEmployeeService: hasEmployeeService,
             products: lines.map(l => ({
                 product_id: l.product_id?.[0],
                 product_name: l.product_id?.[1],
                 qty: l.qty,
                 price_unit: l.price_unit,
                 subtotal: l.subtotal,
+                is_employee_service: l.is_employee_service || false,
             })),
         };
 
+        // Reset employee selection when selecting a new advance
+        this.state.selectedEmployee = null;
+
         console.log("[ADVANCE] selectedAdvance =", this.state.selectedAdvance);
+        console.log("[ADVANCE] hasEmployeeService =", hasEmployeeService);
+    }
+
+    // ==================================
+    // SELECT EMPLOYEE
+    // ==================================
+    async selectEmployee() {
+        try {
+            const selectedEmployee = await new Promise((resolve) => {
+                this.dialog.add(EmployeeSelectionPopup, {
+                    getPayload: (payload) => {
+                        resolve(payload);
+                    },
+                });
+            });
+
+            if (selectedEmployee) {
+                this.state.selectedEmployee = selectedEmployee;
+                this.notification.add(
+                    _t("Employee selected: %s", selectedEmployee.name),
+                    { type: "success" }
+                );
+            }
+        } catch (error) {
+            console.error("[ADVANCE] Error selecting employee:", error);
+            this.notification.add(
+                error.message || _t("Failed to select employee"),
+                { type: "danger" }
+            );
+        }
     }
 
     // ==================================
@@ -142,12 +249,22 @@ export class AdvanceOrderListPopup extends Component {
             return;
         }
 
+        // Check if employee service is required
+        if (this.state.selectedAdvance.hasEmployeeService && !this.state.selectedEmployee) {
+            this.notification.add(
+                _t("Please select an employee. This order contains employee service products."),
+                {type: "warning"}
+            );
+            return;
+        }
+
         try {
             await this.orm.call(
                 "pos.advance.payment",
                 "action_create_invoice",
                 [[this.state.selectedAdvance.id], {
                     payment_type: this.state.paymentType,
+                    employee_id: this.state.selectedEmployee?.id || false,
                 }]
             );
 
