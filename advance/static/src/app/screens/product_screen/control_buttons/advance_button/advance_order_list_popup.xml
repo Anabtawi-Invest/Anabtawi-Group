@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="pos_advance.AdvanceOrderListPopup">
+
+    <!-- ===============================
+         ADVANCE LIST
+         =============================== -->
+    <Dialog title="'Complete Advance Order'">
+        <div class="p-3">
+            <div class="mb-3">
+                <input type="text"
+                       class="form-control"
+                       placeholder="Search by advance number, customer name or phone..."
+                       t-on-input="onSearchInput"
+                       t-on-keydown="onSearchKeydown"
+                       autofocus="autofocus"/>
+            </div>
+            
+            <!-- Show results only when there's a search query -->
+            <t t-if="state.search">
+                <t t-if="!filteredAdvances.length">
+                    <div class="alert alert-info">
+                        <i class="fa fa-search me-2"/>
+                        No advances match your search.
+                    </div>
+                </t>
+
+                <ul class="list-group" t-if="filteredAdvances.length">
+                    <t t-foreach="filteredAdvances" t-as="adv" t-key="adv.id">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong t-esc="adv.name"/>
+                                <br/>
+                                <small>
+                                    Customer:
+                                    <t t-esc="adv.partner_id[1]"/>
+                                </small>
+                            </div>
+
+                            <button class="btn btn-primary"
+                                    t-on-click="selectAdvance.bind(this, adv)">
+                                Open
+                            </button>
+                        </li>
+                    </t>
+                </ul>
+            </t>
+            
+            <!-- Show message when no search -->
+            <t t-if="!state.search">
+                <div class="alert alert-info">
+                    <i class="fa fa-info-circle me-2"/>
+                    Please enter a search term to find advance orders.
+                </div>
+            </t>
+
+        </div>
+    </Dialog>
+
+    <!-- ===============================
+         SELECTED ADVANCE DETAILS
+         =============================== -->
+    <Dialog t-if="state.selectedAdvance" title="'Advance Details'">
+        <div class="p-3">
+
+            <!-- Customer & Amounts -->
+            <div><b>Advance #</b>
+                <t t-esc="state.selectedAdvance.name"/></div>
+
+            <div><b>Customer:</b>
+                <t t-esc="state.selectedAdvance.customer"/></div>
+            <div><b>Total:</b>
+                <t t-esc="state.selectedAdvance.total"/></div>
+            <div><b>Paid:</b>
+                <t t-esc="state.selectedAdvance.paid"/></div>
+            <div class="text-danger mb-3">
+                <b>Remaining:</b>
+                <t t-esc="state.selectedAdvance.remaining"/>
+            </div>
+
+            <!-- ===============================
+                 PRODUCTS TABLE
+                 =============================== -->
+            <t t-if="state.selectedAdvance.products and state.selectedAdvance.products.length">
+                <table class="table table-sm table-bordered mt-3">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-end">Qty</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="state.selectedAdvance.products" t-as="p" t-key="p.product_id">
+                            <tr>
+                                <td>
+                                    <t t-esc="p.product_name"/>
+                                </td>
+                                <td class="text-end">
+                                    <t t-esc="p.qty"/>
+                                </td>
+                                <td class="text-end">
+                                    <t t-esc="p.price_unit"/>
+                                </td>
+                                <td class="text-end">
+                                    <t t-esc="p.subtotal"/>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </t>
+
+            <t t-if="!state.selectedAdvance.products or !state.selectedAdvance.products.length">
+                <p class="text-muted mt-3">
+                    No products found for this advance.
+                </p>
+            </t>
+
+            <!-- Employee Selection (Required if has employee service) -->
+            <t t-if="state.selectedAdvance.hasEmployeeService">
+                <div class="mt-3">
+                    <label class="form-label mb-2">
+                        Employee <span class="text-danger">*</span>
+                    </label>
+                    <t t-if="state.selectedEmployee">
+                        <div class="alert alert-info d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fa fa-user-tie me-2"/>
+                                <strong><t t-esc="state.selectedEmployee.name"/></strong>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    t-on-click="selectEmployee">
+                                <i class="fa fa-edit me-1"/>
+                                Change
+                            </button>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <button class="btn btn-outline-primary w-100"
+                                t-on-click="selectEmployee">
+                            <i class="fa fa-user-tie me-2"/>
+                            Select Employee
+                        </button>
+                        <small class="text-muted d-block mt-1">
+                            This order contains employee service products. Please select an employee.
+                        </small>
+                    </t>
+                </div>
+            </t>
+
+            <div class="mt-3">
+                <label class="form-label mb-2">Payment Method</label>
+                <div class="d-flex gap-2">
+                    <button class="btn flex-grow-1"
+                            t-att-class="state.paymentType === 'cash' ? 'btn-primary' : 'btn-outline-primary'"
+                            t-on-click="() => this.state.paymentType = 'cash'">
+                        <i class="fa fa-money me-2"/>
+                        Cash
+                    </button>
+                    <button class="btn flex-grow-1"
+                            t-att-class="state.paymentType === 'card' ? 'btn-primary' : 'btn-outline-primary'"
+                            t-on-click="() => this.state.paymentType = 'card'">
+                        <i class="fa fa-credit-card me-2"/>
+                        Card
+                    </button>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="mt-3 text-end">
+                <button class="btn btn-success"
+                        t-on-click="createInvoice">
+                    Complete the Order
+                </button>
+            </div>
+
+        </div>
+    </Dialog>
+
+</t>
+
+</templates>

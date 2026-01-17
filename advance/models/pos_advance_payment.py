@@ -1,0 +1,835 @@
+from odoo import models, fields, api, _
+from odoo.exceptions import ValidationError
+import logging
+
+_logger = logging.getLogger(__name__)
+
+
+class PosAdvancePayment(models.Model):
+    _name = 'pos.advance.payment'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _description = 'POS Advance Payment'
+    _order = 'create_date desc'
+
+    name = fields.Char(
+        string='Advance Number',
+        required=True,
+        readonly=True,
+        copy=False,
+        default=lambda self: _('New')
+    )
+
+    partner_id = fields.Many2one(
+        'res.partner',
+        string='Customer',
+        required=True
+    )
+
+    currency_id = fields.Many2one(
+        'res.currency',
+        default=lambda self: self.env.company.currency_id,
+        readonly=True
+    )
+
+    total_expected = fields.Monetary(
+        string='Total Expected Amount',
+        required=True
+    )
+
+    amount_paid = fields.Monetary(
+        string='Advance Amount',
+        required=True
+    )
+
+    remaining_amount = fields.Monetary(
+        string='Remaining Amount',
+        compute='_compute_remaining_amount',
+        store=True
+    )
+
+    payment_id = fields.Many2one(
+        'account.payment',
+        string='Advance Payment',
+        readonly=True
+    )
+    payment_type = fields.Selection(
+        [
+            ('cash', 'Cash'),
+            ('card', 'Card'),
+        ],
+        string='Payment Type',
+        readonly=True
+    )
+
+    second_payment_id = fields.Many2one(
+        'account.payment',
+        string='Final Payment',
+        readonly=True
+    )
+
+    # ✅ transfer entry that moves advance from liability to receivable
+    transfer_move_id = fields.Many2one(
+        'account.move',
+        string='Advance Transfer Entry',
+        readonly=True
+    )
+
+    invoice_id = fields.Many2one(
+        'account.move',
+        string='Final Invoice',
+        readonly=True
+    )
+
+    pos_order_id = fields.Many2one(
+        'pos.order',
+        string='POS Order',
+        readonly=True
+    )
+
+    pos_config_id = fields.Many2one(
+        'pos.config',
+        string='POS Configuration',
+        required=True
+    )
+
+    pickup_pos_id = fields.Many2one(
+        'pos.config',
+        string='Pickup Location (POS)',
+        help="Point of Sale where the order will be collected"
+    )
+
+    due_date = fields.Date(
+        string='Due Date',
+        help="Expected date for order completion/pickup"
+    )
+
+    state = fields.Selection(
+        [
+            ('draft', 'Draft'),
+            ('paid', 'Paid'),
+            ('invoiced', 'Invoiced'),
+            ('cancelled', 'Cancelled'),
+        ],
+        default='draft',
+    )
+
+    company_id = fields.Many2one(
+        'res.company',
+        default=lambda self: self.env.company,
+        required=True
+    )
+
+    note = fields.Text(string='Notes')
+
+    line_ids = fields.One2many(
+        "pos.advance.line",
+        "advance_id",
+        string="Advance Lines"
+    )
+
+    # --------------------------------------------------
+    # COMPUTE
+    # --------------------------------------------------
+    @api.depends('total_expected', 'amount_paid')
+    def _compute_remaining_amount(self):
+        for record in self:
+            record.remaining_amount = (record.total_expected or 0.0) - (record.amount_paid or 0.0)
+
+    # --------------------------------------------------
+    # SEQUENCE
+    # --------------------------------------------------
+    @api.model
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('name', _('New')) == _('New'):
+                vals['name'] = self.env['ir.sequence'].next_by_code('pos.advance.payment') or _('New')
+        return super().create(vals_list)
+
+    # --------------------------------------------------
+    # CREATE ADVANCE FROM POS
+    # --------------------------------------------------
+    def _get_payment_journal(self):
+        self.ensure_one()
+
+        pos_config = self.pos_config_id
+
+        if self.payment_type == 'cash':
+            journal = pos_config.pos_cash_journal_id
+        elif self.payment_type == 'card':
+            journal = pos_config.pos_card_journal_id
+        else:
+            journal = False
+
+        if not journal:
+            raise ValidationError(_("Please configure %s journal in POS Configuration: %s") % (self.payment_type, pos_config.name))
+
+        return journal
+
+    def _get_inbound_payment_method_line(self, journal):
+        """
+        Return first inbound payment method line of a journal
+        """
+        method_line = journal.inbound_payment_method_line_ids[:1]
+        if not method_line:
+            raise ValidationError(
+                _("No inbound payment method line defined for journal: %s") % journal.display_name
+            )
+        return method_line
+
+    @api.model
+    def create_from_pos(self, vals):
+        partner_id = vals.get('partner_id')
+        amount_paid = vals.get('amount_paid')
+        total_expected = vals.get('total_expected')
+        lines = vals.get('lines', [])
+        payment_type = vals.get('payment_type')
+        pos_config_id = vals.get('pos_config_id')
+        pickup_pos_id = vals.get('pickup_pos_id')
+        due_date = vals.get('due_date')
+
+        # --------------------------------------------------
+        # VALIDATION
+        # --------------------------------------------------
+        if not partner_id:
+            raise ValidationError(_('Customer is required.'))
+
+        if not amount_paid or amount_paid <= 0:
+            raise ValidationError(_('Advance amount must be greater than zero.'))
+
+        if amount_paid > total_expected:
+            raise ValidationError(_('Advance amount cannot exceed total amount.'))
+
+        if not lines:
+            raise ValidationError(_('Advance must contain at least one product.'))
+
+        if payment_type not in ('cash', 'card'):
+            raise ValidationError(_('Invalid payment type.'))
+
+        if not pos_config_id:
+            raise ValidationError(_('POS Configuration is required.'))
+
+        pos_config = self.env['pos.config'].browse(pos_config_id)
+        company = pos_config.company_id
+
+        if not pos_config.pos_advance_account_id:
+            raise ValidationError(_('Please configure POS Advance Account in POS Configuration: %s') % pos_config.name)
+
+        # --------------------------------------------------
+        # SELECT JOURNAL BY PAYMENT TYPE
+        # --------------------------------------------------
+        if payment_type == 'cash':
+            journal = pos_config.pos_cash_journal_id
+            if not journal:
+                raise ValidationError(_('Please configure POS Cash Journal in POS Configuration: %s') % pos_config.name)
+        else:
+            journal = pos_config.pos_card_journal_id
+            if not journal:
+                raise ValidationError(_('Please configure POS Card Journal in POS Configuration: %s') % pos_config.name)
+
+        # --------------------------------------------------
+        # 1) CREATE ADVANCE HEADER
+        # --------------------------------------------------
+        advance = self.sudo().create({
+            'partner_id': partner_id,
+            'amount_paid': amount_paid,
+            'total_expected': total_expected,
+            'company_id': company.id,
+            'payment_type': payment_type,
+            'pos_config_id': pos_config_id,
+            'pickup_pos_id': pickup_pos_id or pos_config_id,  # Default to current POS if not specified
+            'due_date': due_date,
+        })
+
+        # --------------------------------------------------
+        # 2) CREATE ADVANCE LINES
+        # --------------------------------------------------
+        for line in lines:
+            self.env['pos.advance.line'].sudo().create({
+                'advance_id': advance.id,
+                'product_id': line['product_id'],
+                'qty': line['qty'],
+                'price_unit': line['price_unit'],
+            })
+
+        # --------------------------------------------------
+        # 3) FIND PAYMENT METHOD LINE (🔥 CRITICAL)
+        # --------------------------------------------------
+        payment_method_line = journal.inbound_payment_method_line_ids[:1]
+        if not payment_method_line:
+            raise ValidationError(
+                _('Please define an inbound payment method on journal %s.')
+                % journal.display_name
+            )
+
+        # --------------------------------------------------
+        # 4) CREATE PAYMENT (LIABILITY)
+        # --------------------------------------------------
+        payment = self.env['account.payment'].sudo().create({
+            'payment_type': 'inbound',
+            'partner_type': 'customer',
+            'partner_id': partner_id,
+            'amount': amount_paid,
+            'currency_id': company.currency_id.id,
+            'journal_id': journal.id,
+            'payment_method_line_id': payment_method_line.id,  # ✅ FIX
+            'date': fields.Date.context_today(self),
+            'memo': advance.name,
+            'destination_account_id': pos_config.pos_advance_account_id.id,  # liability
+        })
+        payment.action_post()
+
+        # --------------------------------------------------
+        # 5) MARK ADVANCE AS PAID
+        # --------------------------------------------------
+        advance.write({
+            'payment_id': payment.id,
+            'state': 'paid',
+        })
+
+        # --------------------------------------------------
+        # 6) SEND NOTIFICATIONS AND EMAILS
+        # --------------------------------------------------
+        try:
+            advance._send_advance_notifications()
+        except Exception as e:
+            # Don't fail the advance creation if notification fails
+            pass
+
+        return {
+            'id': advance.id,
+            'name': advance.name,
+        }
+
+    def _create_advance_transfer_move(self, invoice):
+        self.ensure_one()
+
+        partner = self.partner_id
+        pos_config = self.pos_config_id
+        company = self.company_id
+
+        receivable_account = partner.property_account_receivable_id
+        advance_account = pos_config.pos_advance_account_id
+
+        move = self.env['account.move'].sudo().create({
+            'move_type': 'entry',
+            'date': invoice.invoice_date or fields.Date.context_today(self),
+            'ref': self.name,
+            'company_id': company.id,
+            'line_ids': [
+                # 🔴 Credit Receivable (reduce customer debt)
+                (0, 0, {
+                    'name': _('Apply POS Advance %s') % self.name,
+                    'partner_id': partner.id,
+                    'account_id': receivable_account.id,
+                    'debit': 0.0,
+                    'credit': self.amount_paid,
+                }),
+                # 🟢 Debit Advance Liability (close advance)
+                (0, 0, {
+                    'name': _('Apply POS Advance %s') % self.name,
+                    'partner_id': partner.id,
+                    'account_id': advance_account.id,
+                    'debit': self.amount_paid,
+                    'credit': 0.0,
+                }),
+            ],
+        })
+
+        move.action_post()
+        self.transfer_move_id = move.id
+        return move
+
+    # --------------------------------------------------
+    # CREATE INVOICE + APPLY ADVANCE + RECONCILE
+    # --------------------------------------------------
+    def action_create_invoice(self, vals=None):
+        payment_type = (vals or {}).get('payment_type')
+
+        for advance in self:
+            if payment_type:
+                advance.payment_type = payment_type
+            if advance.invoice_id:
+                raise ValidationError(_("Invoice already created."))
+
+            if not advance.line_ids:
+                raise ValidationError(_("No products to invoice."))
+
+            company = advance.company_id
+            partner = advance.partner_id
+
+            if not advance.payment_id:
+                raise ValidationError(_("Advance payment not found."))
+
+            # 1) Create invoice (exclude employee_service and delivery_product products)
+            invoice_lines = []
+            for line in advance.line_ids:
+                product = line.product_id
+                # Skip products with is_employee_service or is_delivery_product
+                if product.is_employee_service or product.is_delivery_product:
+                    continue
+                
+                invoice_lines.append((0, 0, {
+                    'product_id': product.id,
+                    'quantity': line.qty,
+                    'price_unit': line.price_unit,
+                    'name': product.display_name,
+                }))
+            
+            if not invoice_lines:
+                raise ValidationError(_("No products to invoice (all products are employee/delivery services)."))
+
+            invoice = advance.env['account.move'].sudo().create({
+                'move_type': 'out_invoice',
+                'partner_id': partner.id,
+                'invoice_date': fields.Date.context_today(advance),
+                'invoice_line_ids': invoice_lines,
+                'company_id': company.id,
+            })
+            invoice.action_post()
+
+            # 3) Create transfer entry to move advance from liability -> receivable
+            transfer_move = advance._create_advance_transfer_move(invoice)
+
+            # 4) Reconcile receivable lines (Invoice + Transfer + Second Payment)
+            moves = invoice | transfer_move
+            if advance.second_payment_id and advance.second_payment_id.move_id:
+                moves |= advance.second_payment_id.move_id
+
+            receivable_lines = moves.line_ids.filtered(
+                lambda l: l.account_type == 'asset_receivable' and not l.reconciled
+            )
+
+            if receivable_lines:
+                receivable_lines.reconcile()
+
+            # 5) Mark invoiced
+            advance.write({
+                'invoice_id': invoice.id,
+                'state': 'invoiced',
+            })
+
+            # 6) Create second payment for remaining amount (if any)
+            if advance.remaining_amount > 0:
+                journal = advance._get_payment_journal()
+
+                wizard = self.env['account.payment.register'].with_context(
+                    active_model='account.move',
+                    active_ids=invoice.ids,
+                ).create({
+                    'journal_id': journal.id,  # 👈 cash / card
+                    'amount': advance.remaining_amount,
+                    'payment_date': fields.Date.context_today(self),
+                })
+
+                payments = wizard._create_payments()
+                advance.second_payment_id = payments.id
+
+            # --------------------------------------------------
+            # 7) CREATE POS ORDER RECORD
+            # --------------------------------------------------
+            pos_session = self.env['pos.session'].search([
+                ('state', '=', 'opened'),
+                ('company_id', '=', company.id),
+            ], limit=1)
+
+            if not pos_session:
+                raise ValidationError(_("No open POS session found. Please open a POS session first."))
+
+            pos_config = pos_session.config_id
+
+            # Create POS order lines with taxes
+            pos_order_lines = []
+            total_tax = 0.0
+            total_with_tax = 0.0
+
+            for line in advance.line_ids:
+                product = line.product_id
+
+                # Get taxes from product (considering fiscal position if any)
+                taxes = product.taxes_id.filtered(lambda t: t.company_id == company)
+
+                # Compute tax amounts
+                if taxes:
+                    tax_result = taxes.compute_all(
+                        line.price_unit,
+                        company.currency_id,
+                        line.qty,
+                        product=product,
+                        partner=partner
+                    )
+                    price_subtotal = tax_result['total_excluded']
+                    price_subtotal_incl = tax_result['total_included']
+                    line_tax = price_subtotal_incl - price_subtotal
+                else:
+                    price_subtotal = line.subtotal
+                    price_subtotal_incl = line.subtotal
+                    line_tax = 0.0
+
+                total_tax += line_tax
+                total_with_tax += price_subtotal_incl
+
+                pos_order_lines.append((0, 0, {
+                    'product_id': product.id,
+                    'qty': line.qty,
+                    'price_unit': line.price_unit,
+                    'price_subtotal': price_subtotal,
+                    'price_subtotal_incl': price_subtotal_incl,
+                    'tax_ids': [(6, 0, taxes.ids)],
+                    'full_product_name': product.display_name,
+                }))
+
+            # Get employee_id from vals if provided
+            employee_id = (vals or {}).get('employee_id', False)
+            
+            # Create the POS order in draft state
+            pos_order_vals = {
+                'session_id': pos_session.id,
+                'partner_id': partner.id,
+                'config_id': pos_config.id,
+                'company_id': company.id,
+                'pricelist_id': partner.property_product_pricelist.id or pos_config.pricelist_id.id,
+                'lines': pos_order_lines,
+                'amount_total': total_with_tax,
+                'amount_tax': total_tax,
+                'amount_paid': total_with_tax,
+                'amount_return': 0.0,
+            }
+            if employee_id:
+                pos_order_vals['employee_id'] = employee_id
+            
+            pos_order = self.env['pos.order'].sudo().create(pos_order_vals)
+
+            # First set to 'paid' to trigger name generation
+            pos_order.write({
+                'state': 'paid',
+            })
+
+            # Then update to 'done' state and link the invoice
+            pos_order.write({
+                'state': 'done',  # Set to 'done' (Posted) since it already has an invoice
+                'account_move': invoice.id,  # Link to the existing invoice
+            })
+
+            # Update invoice to reference the POS order
+            invoice.write({
+                'ref': pos_order.name,
+            })
+
+            # Link the POS order to the advance
+            advance.write({
+                'pos_order_id': pos_order.id,
+            })
+
+            # --------------------------------------------------
+            # 8) CREATE POS.PLEDGE RECORD IF NEEDED
+            # --------------------------------------------------
+            # Check if any line has pledge/employee/delivery products
+            has_pledge = any(line.product_id.is_pledge_product for line in advance.line_ids)
+            has_employee = any(line.product_id.is_employee_service for line in advance.line_ids)
+            has_delivery = any(line.product_id.is_delivery_product for line in advance.line_ids)
+            
+            if has_pledge or has_employee or has_delivery:
+                # Calculate amounts
+                pledge_amount = sum(
+                    (line.product_id.pledge_amount or (line.price_unit * line.qty))
+                    for line in advance.line_ids
+                    if line.product_id.is_pledge_product
+                )
+                employee_amount = sum(
+                    line.subtotal for line in advance.line_ids
+                    if line.product_id.is_employee_service
+                )
+                delivery_amount = sum(
+                    line.subtotal for line in advance.line_ids
+                    if line.product_id.is_delivery_product
+                )
+                
+                # Determine case type
+                if has_employee and not has_pledge and not has_delivery:
+                    case_type = 'case1'  # Employee Only
+                elif has_pledge and not has_delivery and not has_employee:
+                    case_type = 'case2'  # Pledge Only
+                elif has_pledge and has_delivery and not has_employee:
+                    case_type = 'case3'  # Pledge + Delivery
+                elif has_pledge and has_employee and has_delivery:
+                    case_type = 'case4'  # All Three: Pledge + Employee + Delivery
+                elif has_pledge and has_employee and not has_delivery:
+                    case_type = 'case5'  # Pledge + Employee (no delivery)
+                elif has_employee and has_delivery and not has_pledge:
+                    case_type = 'case6'  # Employee + Delivery (no pledge)
+                else:
+                    case_type = 'mixed'
+                
+                # Get pledge products
+                pledge_products = [
+                    line.product_id.id for line in advance.line_ids
+                    if line.product_id.is_pledge_product
+                ]
+                
+                # Get employee product
+                employee_line = next(
+                    (line for line in advance.line_ids if line.product_id.is_employee_service),
+                    None
+                )
+                employee_product_id = employee_line.product_id.id if employee_line else False
+                
+                # Get delivery product
+                delivery_line = next(
+                    (line for line in advance.line_ids if line.product_id.is_delivery_product),
+                    None
+                )
+                delivery_product_id = delivery_line.product_id.id if delivery_line else False
+                
+                # Create pledge record
+                # Note: employee_id will be taken from pos_order.employee_id in create_from_pos
+                pledge_vals = {
+                    'pos_order_id': pos_order.id,
+                    'pos_config_id': pos_config.id,
+                    'partner_id': partner.id,
+                    'case_type': case_type,
+                    'pledge_amount': pledge_amount or 0,
+                    'employee_amount': employee_amount or 0,
+                    'delivery_amount': delivery_amount or 0,
+                    'pledge_products': [(6, 0, pledge_products)],
+                    'employee_product_id': employee_product_id,
+                    'delivery_product_id': delivery_product_id,
+                }
+                
+                try:
+                    pledge_id = self.env['pos.pledge'].create_from_pos(pledge_vals)
+                    _logger.info("[ADVANCE] Created pos.pledge record ID %s for advance %s", pledge_id, advance.name)
+                except Exception as e:
+                    _logger.error("[ADVANCE] Failed to create pos.pledge record: %s", str(e))
+                    # Don't fail invoice creation if pledge creation fails
+                    pass
+
+            # --------------------------------------------------
+            # 9) CREATE STOCK PICKING AND MOVES (using Odoo's standard method)
+            # --------------------------------------------------
+            try:
+                # Use Odoo's built-in method to create picking from POS order
+                pos_order._create_order_picking()
+            except Exception:
+                # Don't fail the invoice creation if picking creation fails
+                pass
+
+            return invoice
+
+    def action_mark_invoiced(self, invoice):
+        self.write({'invoice_id': invoice.id, 'state': 'invoiced'})
+
+    def _send_advance_notifications(self):
+        """
+        Send notifications and emails to users configured in pickup_pos_id.advance_notification_user_ids
+        """
+        self.ensure_one()
+        
+        # Get pickup POS config
+        pickup_pos = self.pickup_pos_id
+        if not pickup_pos:
+            return
+        
+        # Get notification users from pickup location
+        notification_users = pickup_pos.advance_notification_user_ids
+        if not notification_users:
+            return
+        
+        # Prepare notification content
+        partner = self.partner_id
+        currency = self.currency_id
+        
+        # Build email body
+        email_body = f"""
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2 style="color: #007bff;">New Advance Order Created</h2>
+            
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Advance Number:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Customer:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{partner.name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Customer Phone:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{partner.phone or 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Total Expected:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{currency.symbol} {self.total_expected:,.2f}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Amount Paid:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{currency.symbol} {self.amount_paid:,.2f}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Remaining Amount:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong style="color: #dc3545;">{currency.symbol} {self.remaining_amount:,.2f}</strong></td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Payment Type:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.payment_type.upper()}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Pickup Location:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{pickup_pos.name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Due Date:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.due_date.strftime('%Y-%m-%d') if self.due_date else 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Created Date:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.create_date.strftime('%Y-%m-%d %H:%M:%S')}</td>
+                </tr>
+            </table>
+            
+            <h3 style="margin-top: 30px; color: #28a745;">Products:</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <thead>
+                    <tr style="background-color: #f8f9fa;">
+                        <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Product</th>
+                        <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Quantity</th>
+                        <th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Unit Price</th>
+                        <th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        
+        # Add product lines
+        for line in self.line_ids:
+            email_body += f"""
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{line.product_id.name}</td>
+                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">{line.qty}</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">{currency.symbol} {line.price_unit:,.2f}</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">{currency.symbol} {line.subtotal:,.2f}</td>
+                    </tr>
+            """
+        
+        email_body += """
+                </tbody>
+            </table>
+            
+            <p style="margin-top: 30px; color: #6c757d;">
+                <a href="{base_url}/web#id={advance_id}&model=pos.advance.payment&view_type=form" 
+                   style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    View Advance Order
+                </a>
+            </p>
+        </div>
+        """
+        
+        # Get base URL
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', 'http://localhost:8069')
+        
+        # Replace placeholders
+        email_body = email_body.format(
+            base_url=base_url,
+            advance_id=self.id
+        )
+        
+        # Send notification and email to each user
+        notification_body = f'New Advance Order: {self.name}\nCustomer: {partner.name}\nTotal: {currency.symbol} {self.total_expected:,.2f}\nPaid: {currency.symbol} {self.amount_paid:,.2f}\nRemaining: {currency.symbol} {self.remaining_amount:,.2f}'
+        
+        # Post message in chatter first (without partner_ids to avoid auto-notification)
+        message = self.message_post(
+            body=notification_body,
+            subject=f'New Advance Order: {self.name}',
+            email_layout_xmlid='mail.mail_notification_light',
+            subtype_xmlid='mail.mt_comment',
+            mail_auto_delete=False,
+        )
+        
+        # Now manually notify the specific users using _notify_thread
+        # This ensures proper inbox notifications are created
+        partner_ids = [user.partner_id.id for user in notification_users]
+        
+        # Add partners as followers first
+        self.message_subscribe(partner_ids=partner_ids)
+        
+        # Use _notify_get_recipients to get proper recipients_data format
+        # We need to pass partner_ids in the message to get proper recipients
+        msg_vals = {
+            'partner_ids': partner_ids,
+            'model': self._name,
+            'res_id': self.id,
+        }
+        
+        # Get recipients data using the standard method
+        recipients_data = self._notify_get_recipients(message, msg_vals=msg_vals)
+        
+        # Filter to only include our notification users and force inbox notification
+        notification_partner_ids = set(partner_ids)
+        recipients_data = [
+            r for r in recipients_data 
+            if r.get('id') in notification_partner_ids
+        ]
+        
+        # Force inbox notification type
+        for r in recipients_data:
+            r['notif'] = 'inbox'
+        
+        # Call _notify_thread_by_inbox to create notifications and send bus messages
+        if recipients_data:
+            self._notify_thread_by_inbox(message, recipients_data)
+        
+        # Send email notifications separately
+        for user in notification_users:
+            try:
+                if user.email:
+                    mail_values = {
+                        'subject': f'New Advance Order: {self.name}',
+                        'body_html': email_body,
+                        'email_to': user.email,
+                        'email_from': self.env.user.email_formatted or self.env.company.email,
+                        'author_id': self.env.user.partner_id.id,
+                        'model': 'pos.advance.payment',
+                        'res_id': self.id,
+                    }
+                    
+                    mail = self.env['mail.mail'].sudo().create(mail_values)
+                    mail.send()
+                    
+            except Exception:
+                pass
+
+    def action_cancel(self):
+        self.write({'state': 'cancelled'})
+
+
+class PosAdvanceLine(models.Model):
+    _name = "pos.advance.line"
+    _description = "POS Advance Line"
+
+    advance_id = fields.Many2one(
+        "pos.advance.payment",
+        required=True,
+        ondelete="cascade"
+    )
+
+    product_id = fields.Many2one(
+        "product.product",
+        required=True
+    )
+
+    qty = fields.Float(required=True)
+    price_unit = fields.Float(required=True)
+
+    subtotal = fields.Monetary(
+        compute="_compute_subtotal",
+        store=True
+    )
+
+    currency_id = fields.Many2one(
+        related="advance_id.currency_id",
+        store=True
+    )
+
+    @api.depends("qty", "price_unit")
+    def _compute_subtotal(self):
+        for line in self:
+            line.subtotal = line.qty * line.price_unit
