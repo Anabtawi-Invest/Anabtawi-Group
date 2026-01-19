@@ -496,6 +496,108 @@ class PosPledge(models.Model):
             _logger.info("[PLEDGE] No existing payment found, creating refund payment directly...")
             return self._return_pledge_with_payment(return_type=return_type)
     
+    def _get_pos_payment_method_from_journal(self, journal, pos_config):
+        """
+        Get or create pos.payment.method from account.journal
+        For cash journals, must create a new payment method for each POS config (cannot be shared)
+        For bank journals, can be shared between configs
+        """
+        is_cash = journal.type == 'cash'
+        
+        # Check if there's an open session
+        opened_session = pos_config.session_ids.filtered(lambda s: s.state != 'closed')
+        has_open_session = bool(opened_session)
+        
+        # First, search in payment_method_ids of the config (already available)
+        pos_payment_method = pos_config.payment_method_ids.filtered(
+            lambda pm: pm.journal_id.id == journal.id
+        )[:1]
+        
+        if pos_payment_method:
+            # Payment method already in config - use it
+            return pos_payment_method
+        
+        # If not found in config, search more broadly (anywhere)
+        # Search for any payment method with this journal
+        pos_payment_method = self.env['pos.payment.method'].search([
+            ('journal_id', '=', journal.id),
+        ], limit=1)
+        
+        if pos_payment_method:
+            # Found a payment method - add it to config if not already there
+            if pos_payment_method not in pos_config.payment_method_ids:
+                # Use bypass context to allow modification even with open session
+                try:
+                    pos_config.with_context(bypass_payment_method_ids_forbidden_change=True).write({
+                        'payment_method_ids': [(4, pos_payment_method.id)],
+                    })
+                except Exception:
+                    # If still fails, try to add to config_ids only (might work)
+                    if pos_config.id not in pos_payment_method.config_ids.ids:
+                        pos_payment_method.write({
+                            'config_ids': [(4, pos_config.id)],
+                        })
+            return pos_payment_method
+        
+        # If not found anywhere, create new one
+        if is_cash:
+            # For cash journals, search only in this config (cash cannot be shared)
+            pos_payment_method = self.env['pos.payment.method'].search([
+                ('journal_id', '=', journal.id),
+                ('config_ids', 'in', [pos_config.id]),
+            ], limit=1)
+            
+            # For cash, check if journal is already used by another payment method in another config
+            if pos_payment_method:
+                other_configs = self.env['pos.config'].search([
+                    ('payment_method_ids', 'in', [pos_payment_method.id]),
+                    ('id', '!=', pos_config.id),
+                ])
+                if other_configs:
+                    # Journal is already used in another config - cannot reuse for cash
+                    raise ValidationError(_(
+                        'The cash journal "%s" is already used in another POS configuration. '
+                        'Please configure a different cash journal for this POS configuration, '
+                        'or remove it from the other configuration first.'
+                    ) % journal.name)
+            
+            if not pos_payment_method:
+                # Create a new payment method for this config
+                pos_payment_method = self.env['pos.payment.method'].sudo().create({
+                    'name': journal.name,
+                    'journal_id': journal.id,
+                    'config_ids': [(4, pos_config.id)],
+                    'company_id': pos_config.company_id.id,
+                })
+                # Add to payment_method_ids using bypass context
+                try:
+                    pos_config.with_context(bypass_payment_method_ids_forbidden_change=True).write({
+                        'payment_method_ids': [(4, pos_payment_method.id)],
+                    })
+                except Exception:
+                    # If still fails, at least add to config_ids
+                    pass
+        else:
+            # For bank journals, can be shared between configs
+            if not pos_payment_method:
+                # Create a new pos.payment.method if not found
+                pos_payment_method = self.env['pos.payment.method'].sudo().create({
+                    'name': journal.name,
+                    'journal_id': journal.id,
+                    'config_ids': [(4, pos_config.id)],
+                    'company_id': pos_config.company_id.id,
+                })
+                # Add to payment_method_ids using bypass context
+                try:
+                    pos_config.with_context(bypass_payment_method_ids_forbidden_change=True).write({
+                        'payment_method_ids': [(4, pos_payment_method.id)],
+                    })
+                except Exception:
+                    # If still fails, at least add to config_ids
+                    pass
+        
+        return pos_payment_method
+
     def _return_pledge_with_payment(self, return_type='customer'):
         """Create reverse payment for pledge refund"""
         self.ensure_one()
@@ -513,6 +615,11 @@ class PosPledge(models.Model):
         journal = config.services_journal_id
         _logger.info("[PLEDGE]   - Using journal: %s", journal.name)
         
+        # Get pos.session from pos_order_id
+        pos_session = self.pos_order_id.session_id
+        if not pos_session:
+            raise ValidationError(_('No POS session found for order %s') % self.pos_order_id.name)
+        
         # Get outbound payment method
         outbound_methods = journal.outbound_payment_method_line_ids
         _logger.info("[PLEDGE]   - Found %d outbound payment methods", len(outbound_methods))
@@ -526,27 +633,40 @@ class PosPledge(models.Model):
         payment_method_line_id = outbound_methods[0].id
         _logger.info("[PLEDGE]   - Using payment method: %s", outbound_methods[0].name)
         
-        # Create reverse (outbound) payment for pledge
-        payment_vals = {
-            'payment_type': 'outbound',  # We pay back to customer
-            'partner_type': 'customer',
-            'partner_id': self.partner_id.id,
-            'amount': self.pledge_amount,
-            'currency_id': self.currency_id.id,
-            'journal_id': journal.id,
-            'date': fields.Date.context_today(self),
-            'memo': _('Pledge Refund (%s): %s') % (return_type_label, self.name),
-            'payment_method_line_id': payment_method_line_id,
-        }
+        # Get pos.payment.method
+        pos_payment_method = self._get_pos_payment_method_from_journal(journal, config)
         
-        _logger.info("[PLEDGE]   - Creating refund payment with vals: %s", payment_vals)
+        # Use existing pos.order or create a simple one
+        pos_order = self.pos_order_id
         
         try:
+            # Create account.payment for accounting
+            payment_vals = {
+                'payment_type': 'outbound',  # We pay back to customer
+                'partner_type': 'customer',
+                'partner_id': self.partner_id.id,
+                'amount': self.pledge_amount,
+                'currency_id': self.currency_id.id,
+                'journal_id': journal.id,
+                'date': fields.Date.context_today(self),
+                'memo': _('Pledge Refund (%s): %s') % (return_type_label, self.name),
+                'payment_method_line_id': payment_method_line_id,
+            }
+            
             refund_payment = self.env['account.payment'].create(payment_vals)
-            _logger.info("[PLEDGE]   - ✓ Refund payment created: %s", refund_payment.name)
+            _logger.info("[PLEDGE]   - ✓ Refund account.payment created: %s", refund_payment.name)
             
             refund_payment.action_post()
-            _logger.info("[PLEDGE]   - ✓ Refund payment posted")
+            _logger.info("[PLEDGE]   - ✓ Refund account.payment posted")
+            
+            # Create pos.payment (negative amount for refund)
+            refund_pos_payment = self.env['pos.payment'].sudo().create({
+                'pos_order_id': pos_order.id,
+                'payment_method_id': pos_payment_method.id,
+                'amount': -self.pledge_amount,  # Negative for refund
+                'payment_date': fields.Datetime.now(),
+            })
+            _logger.info("[PLEDGE]   - ✓ Refund pos.payment created: %s", refund_pos_payment.id)
             
             self.write({
                 'return_payment_id': refund_payment.id,
