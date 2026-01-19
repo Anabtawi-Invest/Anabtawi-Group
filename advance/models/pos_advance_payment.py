@@ -475,6 +475,13 @@ class PosAdvancePayment(models.Model):
         card_pos_payment = None
         main_pos_payment = None
 
+        # Set pos.order state to 'paid' BEFORE creating pos.payment records
+        # This ensures payments are included in closing register calculations
+        pos_order.state = 'paid'
+        pos_order.amount_paid = amount_paid
+        # Flush to ensure state is saved before creating pos.payment records
+        self.env.flush_all()
+        
         if payment_type == 'mixed':
             # Create two separate payments for mixed payment
             if cash_amount > 0:
@@ -582,10 +589,7 @@ class PosAdvancePayment(models.Model):
                 'payment_date': fields.Datetime.now(),
             })
 
-        # Update pos.order amount_paid and state
-        pos_order.amount_paid = amount_paid
-        # Set state to 'paid' so payments appear in closing register
-        pos_order.state = 'paid'
+        # Note: state and amount_paid are already set before creating pos.payment records
 
         # --------------------------------------------------
         # 5) MARK ADVANCE AS PAID
