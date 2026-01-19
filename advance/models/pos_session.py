@@ -129,9 +129,6 @@ class PosSession(models.Model):
         currency_rounding = self.currency_id.rounding
         closed_orders = self._get_closed_orders()
         
-        # Track advance payments separately for balanced accounting entry
-        advance_payments = defaultdict(amounts)
-        
         _logger.info("[ADVANCE SESSION CLOSE] Starting _accumulate_amounts for session %s", self.name)
         _logger.info("[ADVANCE SESSION CLOSE] Total closed orders: %d", len(closed_orders))
         
@@ -149,40 +146,17 @@ class PosSession(models.Model):
                 is_split_payment = payment.payment_method_id.split_transactions
                 payment_type = payment_method.type
 
-                # For advance orders, collect payments separately (will create balanced entry)
-                # BUT: Skip if advance has been invoiced (transfer_move already created)
+                # For advance orders, skip payment processing in session closing
+                # REASON: Advance payments are already recorded via account.payment when created
+                # (with Debit: Cash/Bank, Credit: Advance Account)
+                # No need to create additional journal entries during session closing
                 if is_advance_order and payment_type != 'pay_later':
-                    # Check if advance has been invoiced
-                    advance = order.advance_payment_id if hasattr(order, 'advance_payment_id') and order.advance_payment_id else False
-                    if advance and advance.state == 'invoiced':
-                        # Advance already invoiced - transfer_move already created
-                        # Don't create balanced entry in session closing
-                        continue
-                    
-                    # Get pos_config from order or advance_payment_id
-                    pos_config = order.config_id
-                    if advance:
-                        pos_config = advance.pos_config_id
-                    
-                    old_amount = advance_payments[pos_config]['amount']
-                    advance_payments[pos_config] = self._update_amounts(
-                        advance_payments[pos_config],
-                        {'amount': amount},
-                        date
-                    )
-                    new_amount = advance_payments[pos_config]['amount']
-                    
-                    _logger.info("[ADVANCE SESSION CLOSE] Advance payment collected:")
+                    _logger.info("[ADVANCE SESSION CLOSE] Skipping advance payment in session closing:")
                     _logger.info("  - Order: %s (ID: %d)", order.name, order.id)
                     _logger.info("  - Amount: %.2f", amount)
-                    _logger.info("  - Payment Method: %s", payment_method.name)
-                    _logger.info("  - POS Config: %s (ID: %d)", pos_config.name, pos_config.id)
-                    _logger.info("  - Advance Account Configured: %s", bool(pos_config.pos_advance_account_id))
-                    if pos_config.pos_advance_account_id:
-                        _logger.info("  - Advance Account: %s (ID: %d)", pos_config.pos_advance_account_id.name, pos_config.pos_advance_account_id.id)
-                    _logger.info("  - Total advance payments for this POS Config: %.2f (was %.2f)", new_amount, old_amount)
+                    _logger.info("  - Reason: Already recorded via account.payment (journal entry exists)")
                     
-                    # Skip adding to receivables - we'll create balanced entry separately
+                    # Skip - payment already has journal entry from account.payment
                     continue
 
                 # If not pay_later, we create the receivable vals for both invoiced and uninvoiced orders.
@@ -328,15 +302,8 @@ class PosSession(models.Model):
 
         MoveLine = self.env['account.move.line'].with_context(check_move_validity=False, skip_invoice_sync=True)
 
-        # Log summary of advance payments collected
-        total_advance_amount = sum(amts['amount'] for amts in advance_payments.values())
         _logger.info("[ADVANCE SESSION CLOSE] Summary of _accumulate_amounts:")
-        _logger.info("  - Total advance payments collected: %.2f", total_advance_amount)
-        _logger.info("  - Number of POS configs with advance payments: %d", len(advance_payments))
-        for pos_config, amts in advance_payments.items():
-            _logger.info("    * POS Config: %s (ID: %d) - Amount: %.2f - Account: %s",
-                        pos_config.name, pos_config.id, amts['amount'],
-                        pos_config.pos_advance_account_id.name if pos_config.pos_advance_account_id else "NOT CONFIGURED")
+        _logger.info("  - Advance payments are NOT processed here (already recorded via account.payment)")
         
         data.update({
             'taxes':                               taxes,
@@ -356,7 +323,6 @@ class PosSession(models.Model):
             'MoveLine':                            MoveLine,
             'split_invoice_receivables': split_invoice_receivables,
             'split_inv_payment_receivable_lines': split_inv_payment_receivable_lines,
-            'advance_payments':                    advance_payments,  # Add advance payments for balanced entry
         })
         return data
 
@@ -388,7 +354,7 @@ class PosSession(models.Model):
         self.write({'move_id': account_move.id})
         _logger.info("[ADVANCE SESSION CLOSE] Account Move created - ID: %d", account_move.id)
 
-        # Accumulate amounts (this will include advance_payments)
+        # Accumulate amounts (advance payments are skipped - already recorded via account.payment)
         data = {'bank_payment_method_diffs': bank_payment_method_diffs or {}}
         data = self._accumulate_amounts(data)
         
@@ -400,14 +366,11 @@ class PosSession(models.Model):
         data = self._create_invoice_receivable_lines(data)
         data = self._create_stock_valuation_lines(data)
         
-        # Create balanced entry for advance payments
-        advance_payments = data.get('advance_payments', {})
-        _logger.info("[ADVANCE SESSION CLOSE] In _create_account_move - advance_payments count: %d", len(advance_payments))
-        if advance_payments:
-            _logger.info("[ADVANCE SESSION CLOSE] Calling _create_advance_payment_move_lines")
-            self._create_advance_payment_move_lines(data, advance_payments)
-        else:
-            _logger.info("[ADVANCE SESSION CLOSE] No advance payments to process")
+        # NOTE: Advance payments are NOT processed here
+        # They are already recorded via account.payment when advance order is created
+        # (with Debit: Cash/Bank, Credit: Advance Account)
+        # No additional journal entries needed during session closing
+        _logger.info("[ADVANCE SESSION CLOSE] Advance payments skipped - already recorded via account.payment")
         
         # Create balancing line if needed
         if balancing_account and amount_to_balance:
@@ -437,67 +400,14 @@ class PosSession(models.Model):
 
         return data
 
-    def _create_advance_payment_move_lines(self, data, advance_payments):
-        """
-        Create balanced accounting entry for advance payments:
-        - Debit: Receivable (from payments)
-        - Credit: Advance Account (liability)
-        """
-        MoveLine = data.get('MoveLine')
-        pos_receivable_account = self.company_id.account_default_pos_receivable_account_id
-        
-        _logger.info("[ADVANCE SESSION CLOSE] _create_advance_payment_move_lines called for session %s", self.name)
-        _logger.info("[ADVANCE SESSION CLOSE] Processing %d POS config(s) with advance payments", len(advance_payments))
-        
-        total_skipped_no_account = 0.0
-        total_skipped_zero = 0.0
-        total_created = 0.0
-        
-        for pos_config, amounts in advance_payments.items():
-            _logger.info("[ADVANCE SESSION CLOSE] Processing POS Config: %s (ID: %d) - Amount: %.2f",
-                        pos_config.name, pos_config.id, amounts['amount'])
-            
-            if float_is_zero(amounts['amount'], precision_rounding=self.currency_id.rounding):
-                _logger.warning("[ADVANCE SESSION CLOSE] SKIPPED: Zero amount for POS Config %s", pos_config.name)
-                total_skipped_zero += amounts['amount']
-                continue
-            
-            if not pos_config.pos_advance_account_id:
-                # Skip if advance account not configured
-                _logger.error("[ADVANCE SESSION CLOSE] ⚠️ SKIPPED: POS Config '%s' (ID: %d) has NO advance account configured! Amount: %.2f",
-                            pos_config.name, pos_config.id, amounts['amount'])
-                _logger.error("[ADVANCE SESSION CLOSE] ⚠️ THIS WILL CAUSE UNBALANCED MOVE - Amount %.2f will be missing from accounting!",
-                            amounts['amount'])
-                total_skipped_no_account += amounts['amount']
-                continue
-            
-            # Debit: Receivable (from payments)
-            debit_vals = self._debit_amounts({
-                'account_id': pos_receivable_account.id,
-                'move_id': self.move_id.id,
-                'partner_id': False,  # No specific partner for advance payments
-                'name': _('Advance Payment: %s') % self.name,
-            }, amounts['amount'], amounts['amount_converted'])
-            
-            # Credit: Advance Account (liability)
-            credit_vals = self._credit_amounts({
-                'account_id': pos_config.pos_advance_account_id.id,
-                'move_id': self.move_id.id,
-                'partner_id': False,
-                'name': _('Advance Payment: %s') % self.name,
-            }, amounts['amount'], amounts['amount_converted'])
-            
-            MoveLine.create([debit_vals, credit_vals])
-            total_created += amounts['amount']
-            _logger.info("[ADVANCE SESSION CLOSE] ✓ Created move lines for POS Config %s - Amount: %.2f", pos_config.name, amounts['amount'])
-            _logger.info("[ADVANCE SESSION CLOSE]   Debit: %s (%.2f) | Credit: %s (%.2f)",
-                        pos_receivable_account.name, amounts['amount'],
-                        pos_config.pos_advance_account_id.name, amounts['amount'])
-        
-        _logger.info("[ADVANCE SESSION CLOSE] Summary of _create_advance_payment_move_lines:")
-        _logger.info("  - Total created: %.2f", total_created)
-        _logger.info("  - Total skipped (zero amount): %.2f", total_skipped_zero)
-        if total_skipped_no_account > 0:
-            _logger.error("[ADVANCE SESSION CLOSE] ⚠️⚠️⚠️ Total skipped (NO ACCOUNT CONFIGURED): %.2f ⚠️⚠️⚠️", total_skipped_no_account)
-            _logger.error("[ADVANCE SESSION CLOSE] ⚠️ THIS IS THE CAUSE OF UNBALANCED MOVE!")
-            _logger.error("[ADVANCE SESSION CLOSE] ⚠️ Please configure 'POS Advance Account' in POS Config!")
+    # DEPRECATED: This function is no longer used
+    # Advance payments are now recorded via account.payment when created
+    # (with Debit: Cash/Bank, Credit: Advance Account)
+    # No additional journal entries are needed during session closing
+    # def _create_advance_payment_move_lines(self, data, advance_payments):
+    #     """
+    #     Create balanced accounting entry for advance payments:
+    #     - Debit: Receivable (from payments)
+    #     - Credit: Advance Account (liability)
+    #     """
+    #     ... REMOVED - No longer needed

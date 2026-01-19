@@ -798,6 +798,8 @@ class PosAdvancePayment(models.Model):
                         # Also create account.payment for accounting
                         cash_payment_method_line = cash_journal.inbound_payment_method_line_ids[:1]
                         if cash_payment_method_line:
+                            # Get receivable account for the partner (NOT advance account)
+                            receivable_account = partner.property_account_receivable_id
                             cash_account_payment = self.env['account.payment'].sudo().create({
                                 'payment_type': 'inbound',
                                 'partner_type': 'customer',
@@ -808,6 +810,7 @@ class PosAdvancePayment(models.Model):
                                 'payment_method_line_id': cash_payment_method_line.id,
                                 'date': fields.Date.context_today(self),
                                 'memo': _('%s (Cash - Second Payment)') % advance.name,
+                                'destination_account_id': receivable_account.id,  # Explicitly set to Receivable, NOT Advance Account
                             })
                             cash_account_payment.action_post()
                             advance.second_payment_id = cash_account_payment.id
@@ -823,6 +826,8 @@ class PosAdvancePayment(models.Model):
                         # Also create account.payment for accounting
                         card_payment_method_line = card_journal.inbound_payment_method_line_ids[:1]
                         if card_payment_method_line:
+                            # Get receivable account for the partner (NOT advance account)
+                            receivable_account = partner.property_account_receivable_id
                             card_account_payment = self.env['account.payment'].sudo().create({
                                 'payment_type': 'inbound',
                                 'partner_type': 'customer',
@@ -833,6 +838,7 @@ class PosAdvancePayment(models.Model):
                                 'payment_method_line_id': card_payment_method_line.id,
                                 'date': fields.Date.context_today(self),
                                 'memo': _('%s (Card - Second Payment)') % advance.name,
+                                'destination_account_id': receivable_account.id,  # Explicitly set to Receivable, NOT Advance Account
                             })
                             card_account_payment.action_post()
                             if not advance.second_payment_id:
@@ -852,6 +858,8 @@ class PosAdvancePayment(models.Model):
                     # Also create account.payment for accounting
                     payment_method_line = journal.inbound_payment_method_line_ids[:1]
                     if payment_method_line:
+                        # Get receivable account for the partner (NOT advance account)
+                        receivable_account = partner.property_account_receivable_id
                         account_payment = self.env['account.payment'].sudo().create({
                             'payment_type': 'inbound',
                             'partner_type': 'customer',
@@ -862,6 +870,7 @@ class PosAdvancePayment(models.Model):
                             'payment_method_line_id': payment_method_line.id,
                             'date': fields.Date.context_today(self),
                             'memo': _('%s (Second Payment)') % advance.name,
+                            'destination_account_id': receivable_account.id,  # Explicitly set to Receivable, NOT Advance Account
                         })
                         account_payment.action_post()
                         advance.second_payment_id = account_payment.id
@@ -992,12 +1001,28 @@ class PosAdvancePayment(models.Model):
             # --------------------------------------------------
             # 9) CREATE STOCK PICKING AND MOVES (using Odoo's standard method)
             # --------------------------------------------------
-            try:
-                # Use Odoo's built-in method to create picking from POS order
-                pos_order._create_order_picking()
-            except Exception:
-                # Don't fail the invoice creation if picking creation fails
-                pass
+            # Check if picking already exists for this order
+            existing_pickings = pos_order.picking_ids.filtered(lambda p: p.state != 'cancel')
+            if existing_pickings:
+                _logger.info("[ADVANCE] Picking already exists for order %s (ID: %d), skipping creation", pos_order.name, pos_order.id)
+            else:
+                # Use savepoint to protect main transaction from picking creation errors
+                try:
+                    with self.env.cr.savepoint():
+                        # Use Odoo's built-in method to create picking from POS order
+                        pos_order._create_order_picking()
+                        _logger.info("[ADVANCE] Successfully created picking for order %s (ID: %d)", pos_order.name, pos_order.id)
+                except Exception as e:
+                    error_msg = str(e)
+                    _logger.warning("[ADVANCE] Failed to create picking for order %s (ID: %d): %s", pos_order.name, pos_order.id, error_msg)
+                    
+                    # If it's a duplicate key error, the picking might already exist but not linked
+                    # Try to find and link it if possible
+                    if 'duplicate key value violates unique constraint "stock_picking_name_uniq"' in error_msg:
+                        _logger.info("[ADVANCE] Duplicate picking name detected, checking if picking can be linked to order %s (ID: %d)", pos_order.name, pos_order.id)
+                        # The picking creation failed, but we continue without failing the invoice
+                    # Don't fail the invoice creation if picking creation fails
+                    pass
 
             return invoice
 
