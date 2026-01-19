@@ -6,6 +6,8 @@ import {usePos} from "@point_of_sale/app/hooks/pos_hook";
 import {Dialog} from "@web/core/dialog/dialog";
 import {_t} from "@web/core/l10n/translation";
 import {EmployeeSelectionPopup} from "@pos_pledge/js/employee_selection_popup";
+import {MixedPaymentPopup} from "./mixed_payment_popup";
+import {makeAwaitable} from "@point_of_sale/app/utils/make_awaitable_dialog";
 
 export class AdvanceOrderListPopup extends Component {
     static template = "pos_advance.AdvanceOrderListPopup";
@@ -22,7 +24,9 @@ export class AdvanceOrderListPopup extends Component {
             advances: [],
             selectedAdvance: null,
             search: "",
-            paymentType: "cash",
+            paymentType: "cash", // 'cash', 'card', or 'mixed'
+            cashAmount: 0,
+            cardAmount: 0,
             selectedEmployee: null,
         });
 
@@ -238,6 +242,32 @@ export class AdvanceOrderListPopup extends Component {
     }
 
     // ==================================
+    // SELECT MIXED PAYMENT
+    // ==================================
+    async selectMixedPayment() {
+        if (!this.state.selectedAdvance) {
+            return;
+        }
+
+        const remainingAmount = this.state.selectedAdvance.remaining;
+
+        try {
+            const paymentData = await makeAwaitable(this.dialog, MixedPaymentPopup, {
+                totalAmount: remainingAmount,
+            });
+
+            if (paymentData) {
+                this.state.paymentType = 'mixed';
+                this.state.cashAmount = paymentData.cash_amount || 0;
+                this.state.cardAmount = paymentData.card_amount || 0;
+            }
+        } catch (error) {
+            // User cancelled
+            console.log("[ADVANCE] Mixed payment cancelled");
+        }
+    }
+
+    // ==================================
     // CREATE INVOICE
     // ==================================
     async createInvoice() {
@@ -258,18 +288,54 @@ export class AdvanceOrderListPopup extends Component {
             return;
         }
 
+        // For mixed payment, validate amounts
+        if (this.state.paymentType === 'mixed') {
+            const totalPaid = (this.state.cashAmount || 0) + (this.state.cardAmount || 0);
+            const remaining = this.state.selectedAdvance.remaining;
+
+            if (totalPaid <= 0) {
+                this.notification.add(
+                    _t("Please enter payment amounts for mixed payment."),
+                    {type: "warning"}
+                );
+                return;
+            }
+
+            if (totalPaid > remaining) {
+                this.notification.add(
+                    _t("Total payment amount cannot exceed remaining amount."),
+                    {type: "warning"}
+                );
+                return;
+            }
+        }
+
         try {
+            const payload = {
+                payment_type: this.state.paymentType,
+                employee_id: this.state.selectedEmployee?.id || false,
+            };
+
+            // Add cash_amount and card_amount for mixed payment
+            if (this.state.paymentType === 'mixed') {
+                payload.cash_amount = this.state.cashAmount || 0;
+                payload.card_amount = this.state.cardAmount || 0;
+            } else if (this.state.paymentType === 'cash') {
+                payload.cash_amount = this.state.selectedAdvance.remaining;
+                payload.card_amount = 0;
+            } else if (this.state.paymentType === 'card') {
+                payload.cash_amount = 0;
+                payload.card_amount = this.state.selectedAdvance.remaining;
+            }
+
             await this.orm.call(
                 "pos.advance.payment",
                 "action_create_invoice",
-                [[this.state.selectedAdvance.id], {
-                    payment_type: this.state.paymentType,
-                    employee_id: this.state.selectedEmployee?.id || false,
-                }]
+                [[this.state.selectedAdvance.id], payload]
             );
 
             this.notification.add(
-                _t("Invoice created successfully."),
+                _t("Order completed successfully."),
                 {type: "success"}
             );
 
@@ -280,8 +346,9 @@ export class AdvanceOrderListPopup extends Component {
 
         } catch (error) {
             console.error(error);
+            const errorMessage = error.message?.data?.message || error.message || _t("Failed to complete order.");
             this.notification.add(
-                error.message || _t("Failed to create invoice."),
+                errorMessage,
                 {type: "danger"}
             );
         }
@@ -311,7 +378,11 @@ export class AdvanceOrderListPopup extends Component {
                     <div><strong>Advance #:</strong> ${advance.name}</div>
                     <div><strong>Customer:</strong> ${advance.customer}</div>
                     <div><strong>Date:</strong> ${new Date().toLocaleString()}</div>
-                    <div><strong>Payment Method:</strong> ${this.state.paymentType === 'cash' ? 'Cash' : 'Card'}</div>
+                    <div><strong>Payment Method:</strong> ${
+                        this.state.paymentType === 'mixed' 
+                            ? `Mixed (Cash: ${this.pos.env.utils.formatCurrency(this.state.cashAmount, false)}, Card: ${this.pos.env.utils.formatCurrency(this.state.cardAmount, false)})`
+                            : this.state.paymentType === 'cash' ? 'Cash' : 'Card'
+                    }</div>
                 </div>
                 
                 <div class="table-borderless mb-3">
@@ -327,10 +398,11 @@ export class AdvanceOrderListPopup extends Component {
                         <tbody>
         `;
 
-        let totalAmount = 0;
+        // Calculate products subtotal (for display only)
+        let productsSubtotal = 0;
         advance.products.forEach(product => {
             const lineTotal = parseFloat(product.subtotal) || 0;
-            totalAmount += lineTotal;
+            productsSubtotal += lineTotal;
             receiptHtml += `
                 <tr style="border-bottom: 1px solid #ddd;">
                     <td style="padding: 5px;">${product.product_name}</td>
@@ -341,6 +413,21 @@ export class AdvanceOrderListPopup extends Component {
             `;
         });
 
+        // Use total_expected as the total amount (not products subtotal)
+        const totalAmount = advance.total || 0; // Total Expected Amount
+
+        // Calculate total paid amount (advance + final payment)
+        let totalPaidAmount = advance.paid || 0;
+        if (this.state.paymentType === 'mixed') {
+            totalPaidAmount += (this.state.cashAmount || 0) + (this.state.cardAmount || 0);
+        } else {
+            // For cash or card, add the remaining amount that was just paid
+            totalPaidAmount += advance.remaining || 0;
+        }
+        
+        // Calculate new remaining (should be 0 after completion)
+        const newRemaining = Math.max(0, totalAmount - totalPaidAmount);
+
         receiptHtml += `
                         </tbody>
                     </table>
@@ -348,8 +435,8 @@ export class AdvanceOrderListPopup extends Component {
                 
                 <div class="text-end mb-3">
                     <div><strong>Total:</strong> ${this.pos.env.utils.formatCurrency(totalAmount, false)}</div>
-                    <div><strong>Paid:</strong> ${this.pos.env.utils.formatCurrency(advance.paid, false)}</div>
-                    <div><strong>Remaining:</strong> ${this.pos.env.utils.formatCurrency(advance.remaining, false)}</div>
+                    <div><strong>Paid:</strong> ${this.pos.env.utils.formatCurrency(totalPaidAmount, false)}</div>
+                    <div><strong>Remaining:</strong> ${this.pos.env.utils.formatCurrency(newRemaining, false)}</div>
                 </div>
                 
                 <div class="text-center mt-4">

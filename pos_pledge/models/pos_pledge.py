@@ -579,8 +579,8 @@ class PosPledge(models.Model):
         # Create reversal entry for pledge
         if self.pledge_move_id:
             reversal = self.pledge_move_id._reverse_moves(
-                date=fields.Date.context_today(self),
                 default_values_list=[{
+                    'date': fields.Date.context_today(self),
                     'ref': _('Pledge Return (%s): %s') % (return_type_label, self.name),
                 }]
             )
@@ -589,8 +589,8 @@ class PosPledge(models.Model):
         # Create reversal entry for employee if exists
         if self.employee_move_id:
             self.employee_move_id._reverse_moves(
-                date=fields.Date.context_today(self),
                 default_values_list=[{
+                    'date': fields.Date.context_today(self),
                     'ref': _('Employee Service Return: %s') % self.name,
                 }]
             )

@@ -8,6 +8,7 @@ import { usePos } from "@point_of_sale/app/hooks/pos_hook";
 import { NumberPopup } from "@point_of_sale/app/components/popups/number_popup/number_popup";
 import { AdvanceReceipt } from "./advance_receipt";
 import { AdvanceDetailsPopup } from "./advance_details_popup";
+import { MixedPaymentPopup } from "./mixed_payment_popup";
 
 patch(ControlButtons.prototype, {
     setup() {
@@ -99,9 +100,37 @@ patch(ControlButtons.prototype, {
         this._openAdvancePopup("card");
     },
 
+    onClickMixedAdvance() {
+        this._openMixedAdvancePopup();
+    },
+
     // ==================================================
     // Popup (NO ASYNC HERE)
     // ==================================================
+
+    _openMixedAdvancePopup() {
+        const order = this.pos?.selectedOrder;
+        if (!order) return;
+
+        const partner = this._getCurrentPartner(order);
+        if (!partner) {
+            this.notification.add(
+                _t("Please select a customer before taking an advance."),
+                { type: "warning" }
+            );
+            return;
+        }
+
+        const totalExpected = this._getOrderTotal(order);
+
+        this.dialog.add(MixedPaymentPopup, {
+            totalAmount: totalExpected,
+            confirm: (paymentData) => {
+                // paymentData contains: cash_amount, card_amount, amount_paid
+                this._showAdvanceDetailsPopup(order, partner, paymentData.amount_paid, "mixed", paymentData);
+            },
+        });
+    },
 
     _openAdvancePopup(paymentType) {
         const order = this.pos?.selectedOrder;
@@ -140,11 +169,11 @@ patch(ControlButtons.prototype, {
     // SHOW ADVANCE DETAILS POPUP
     // ==================================================
 
-    _showAdvanceDetailsPopup(order, partner, amount, paymentType) {
+    _showAdvanceDetailsPopup(order, partner, amount, paymentType, paymentData = null) {
         this.dialog.add(AdvanceDetailsPopup, {
             confirm: (details) => {
                 // Process advance with additional details
-                this._processAdvance(order, partner, amount, paymentType, details);
+                this._processAdvance(order, partner, amount, paymentType, details, paymentData);
             },
         });
     },
@@ -153,7 +182,7 @@ patch(ControlButtons.prototype, {
     // REAL LOGIC (ASYNC SAFE)
     // ==================================================
 
-    async _processAdvance(order, partner, amount, paymentType, details) {
+    async _processAdvance(order, partner, amount, paymentType, details, paymentData = null) {
         try {
             const totalExpected = this._getOrderTotal(order);
 
@@ -181,20 +210,35 @@ patch(ControlButtons.prototype, {
                 return;
             }
 
+            // Prepare payment data for mixed payment
+            const payload = {
+                partner_id: partner.id,
+                amount_paid: amount,
+                total_expected: totalExpected,
+                payment_type: paymentType, // cash / card / mixed
+                pos_config_id: this.pos.config.id,
+                pickup_pos_id: details?.pickup_pos_id,
+                due_date: details?.due_date,
+                lines: linesPayload,
+            };
+
+            // Add cash_amount and card_amount for mixed payment
+            if (paymentType === "mixed" && paymentData) {
+                payload.cash_amount = paymentData.cash_amount || 0;
+                payload.card_amount = paymentData.card_amount || 0;
+            } else if (paymentType === "cash") {
+                payload.cash_amount = amount;
+                payload.card_amount = 0;
+            } else if (paymentType === "card") {
+                payload.cash_amount = 0;
+                payload.card_amount = amount;
+            }
+
             // ================= RPC =================
             const res = await this.env.services.orm.call(
                 "pos.advance.payment",
                 "create_from_pos",
-                [{
-                    partner_id: partner.id,
-                    amount_paid: amount,
-                    total_expected: totalExpected,
-                    payment_type: paymentType, // cash / card
-                    pos_config_id: this.pos.config.id, // Pass POS config ID
-                    pickup_pos_id: details?.pickup_pos_id, // Pickup location
-                    due_date: details?.due_date, // Due date
-                    lines: linesPayload,
-                }]
+                [payload]
             );
             order.advance_payment_id = res?.id || false;
 order.advance_name = res?.name || "";

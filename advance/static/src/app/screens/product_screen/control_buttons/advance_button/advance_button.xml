@@ -19,6 +19,13 @@
     Credit Advance
 </button>
 
+<button
+    class="btn btn-info btn-lg"
+    t-on-click="onClickMixedAdvance">
+    <i class="fa fa-money-bill-wave me-1"/>
+    Mixed Payment
+</button>
+
 
     </xpath>
 </t>
