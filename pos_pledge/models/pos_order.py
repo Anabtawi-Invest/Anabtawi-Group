@@ -252,6 +252,108 @@ class PosOrder(models.Model):
         
         return result
 
+    def _get_pos_payment_method_from_journal(self, journal, pos_config):
+        """
+        Get or create pos.payment.method from account.journal
+        For cash journals, must create a new payment method for each POS config (cannot be shared)
+        For bank journals, can be shared between configs
+        """
+        is_cash = journal.type == 'cash'
+        
+        # Check if there's an open session
+        opened_session = pos_config.session_ids.filtered(lambda s: s.state != 'closed')
+        has_open_session = bool(opened_session)
+        
+        # First, search in payment_method_ids of the config (already available)
+        pos_payment_method = pos_config.payment_method_ids.filtered(
+            lambda pm: pm.journal_id.id == journal.id
+        )[:1]
+        
+        if pos_payment_method:
+            # Payment method already in config - use it
+            return pos_payment_method
+        
+        # If not found in config, search more broadly (anywhere)
+        # Search for any payment method with this journal
+        pos_payment_method = self.env['pos.payment.method'].search([
+            ('journal_id', '=', journal.id),
+        ], limit=1)
+        
+        if pos_payment_method:
+            # Found a payment method - add it to config if not already there
+            if pos_payment_method not in pos_config.payment_method_ids:
+                # Use bypass context to allow modification even with open session
+                try:
+                    pos_config.with_context(bypass_payment_method_ids_forbidden_change=True).write({
+                        'payment_method_ids': [(4, pos_payment_method.id)],
+                    })
+                except Exception:
+                    # If still fails, try to add to config_ids only (might work)
+                    if pos_config.id not in pos_payment_method.config_ids.ids:
+                        pos_payment_method.write({
+                            'config_ids': [(4, pos_config.id)],
+                        })
+            return pos_payment_method
+        
+        # If not found anywhere, create new one
+        if is_cash:
+            # For cash journals, search only in this config (cash cannot be shared)
+            pos_payment_method = self.env['pos.payment.method'].search([
+                ('journal_id', '=', journal.id),
+                ('config_ids', 'in', [pos_config.id]),
+            ], limit=1)
+            
+            # For cash, check if journal is already used by another payment method in another config
+            if pos_payment_method:
+                other_configs = self.env['pos.config'].search([
+                    ('payment_method_ids', 'in', [pos_payment_method.id]),
+                    ('id', '!=', pos_config.id),
+                ])
+                if other_configs:
+                    # Journal is already used in another config - cannot reuse for cash
+                    raise ValidationError(_(
+                        'The cash journal "%s" is already used in another POS configuration. '
+                        'Please configure a different cash journal for this POS configuration, '
+                        'or remove it from the other configuration first.'
+                    ) % journal.name)
+            
+            if not pos_payment_method:
+                # Create a new payment method for this config
+                pos_payment_method = self.env['pos.payment.method'].sudo().create({
+                    'name': journal.name,
+                    'journal_id': journal.id,
+                    'config_ids': [(4, pos_config.id)],
+                    'company_id': pos_config.company_id.id,
+                })
+                # Add to payment_method_ids using bypass context
+                try:
+                    pos_config.with_context(bypass_payment_method_ids_forbidden_change=True).write({
+                        'payment_method_ids': [(4, pos_payment_method.id)],
+                    })
+                except Exception:
+                    # If still fails, at least add to config_ids
+                    pass
+        else:
+            # For bank journals, can be shared between configs
+            if not pos_payment_method:
+                # Create a new pos.payment.method if not found
+                pos_payment_method = self.env['pos.payment.method'].sudo().create({
+                    'name': journal.name,
+                    'journal_id': journal.id,
+                    'config_ids': [(4, pos_config.id)],
+                    'company_id': pos_config.company_id.id,
+                })
+                # Add to payment_method_ids using bypass context
+                try:
+                    pos_config.with_context(bypass_payment_method_ids_forbidden_change=True).write({
+                        'payment_method_ids': [(4, pos_payment_method.id)],
+                    })
+                except Exception:
+                    # If still fails, at least add to config_ids
+                    pass
+        
+        return pos_payment_method
+
     def _create_independent_payment(self, order, amount, journal, description):
         """
         Create an independent payment record for pledge/employee/delivery
@@ -289,32 +391,44 @@ class PosOrder(models.Model):
         payment_method = journal.inbound_payment_method_line_ids[0]
         _logger.info("[PLEDGE] Payment method: %s (ID: %s)", payment_method.name, payment_method.id)
         
-        # Prepare payment values
-        payment_vals = {
-            'payment_type': 'inbound',  # Customer pays us
-            'partner_type': 'customer',
-            'partner_id': order.partner_id.id,
-            'amount': amount,
-            'currency_id': order.currency_id.id or order.company_id.currency_id.id,
-            'journal_id': journal.id,
-            'date': order.date_order,
-            'memo': f"{order.name} - {description}",
-            'payment_method_line_id': payment_method.id,
-            # Do NOT set invoice_ids or reconciled_invoice_ids - this payment is independent
-        }
-        
-        _logger.info("[PLEDGE] Payment values prepared: %s", payment_vals)
+        # Get pos.payment.method
+        pos_config = order.config_id
+        pos_payment_method = order._get_pos_payment_method_from_journal(journal, pos_config)
         
         try:
+            # Create account.payment for accounting
+            payment_vals = {
+                'payment_type': 'inbound',  # Customer pays us
+                'partner_type': 'customer',
+                'partner_id': order.partner_id.id,
+                'amount': amount,
+                'currency_id': order.currency_id.id or order.company_id.currency_id.id,
+                'journal_id': journal.id,
+                'date': order.date_order,
+                'memo': f"{order.name} - {description}",
+                'payment_method_line_id': payment_method.id,
+                # Do NOT set invoice_ids or reconciled_invoice_ids - this payment is independent
+            }
+            
             _logger.info("[PLEDGE] Creating account.payment record...")
             payment = self.env['account.payment'].create(payment_vals)
-            _logger.info("[PLEDGE] ✓ Created independent payment for %s: %.2f (ID: %s, Name: %s)", 
+            _logger.info("[PLEDGE] ✓ Created independent account.payment for %s: %.2f (ID: %s, Name: %s)", 
                         description, amount, payment.id, payment.name)
             
             # POST the payment immediately
             _logger.info("[PLEDGE] Posting payment %s...", payment.name)
             payment.action_post()
             _logger.info("[PLEDGE] ✓ Payment %s posted successfully", payment.name)
+            
+            # Create pos.payment
+            pos_payment = self.env['pos.payment'].sudo().create({
+                'pos_order_id': order.id,
+                'payment_method_id': pos_payment_method.id,
+                'amount': amount,
+                'payment_date': fields.Datetime.now(),
+            })
+            _logger.info("[PLEDGE] ✓ Created pos.payment for %s: %.2f (ID: %s)", 
+                        description, amount, pos_payment.id)
             
             # Store reference in pos.pledge for tracking
             _logger.info("[PLEDGE] Searching for pos.pledge record with pos_order_id=%s", order.id)

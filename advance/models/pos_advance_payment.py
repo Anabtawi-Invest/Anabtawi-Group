@@ -207,6 +207,132 @@ class PosAdvancePayment(models.Model):
             )
         return method_line
 
+    def _get_pos_payment_method_from_journal(self, journal, pos_config):
+        """
+        Get or create pos.payment.method from account.journal
+        For cash journals, must create a new payment method for each POS config (cannot be shared)
+        For bank journals, can be shared between configs
+        """
+        is_cash = journal.type == 'cash'
+        
+        # Check if there's an open session
+        opened_session = pos_config.session_ids.filtered(lambda s: s.state != 'closed')
+        has_open_session = bool(opened_session)
+        
+        # First, search in payment_method_ids of the config (already available)
+        pos_payment_method = pos_config.payment_method_ids.filtered(
+            lambda pm: pm.journal_id.id == journal.id
+        )[:1]
+        
+        if pos_payment_method:
+            # Payment method already in config - use it
+            return pos_payment_method
+        
+        # If not found in config, search more broadly (anywhere)
+        # Search for any payment method with this journal
+        pos_payment_method = self.env['pos.payment.method'].search([
+            ('journal_id', '=', journal.id),
+        ], limit=1)
+        
+        if pos_payment_method:
+            # Found a payment method - add it to config if not already there
+            if pos_payment_method not in pos_config.payment_method_ids:
+                # Use bypass context to allow modification even with open session
+                try:
+                    pos_config.with_context(bypass_payment_method_ids_forbidden_change=True).write({
+                        'payment_method_ids': [(4, pos_payment_method.id)],
+                    })
+                except Exception:
+                    # If still fails, try to add to config_ids only (might work)
+                    if pos_config.id not in pos_payment_method.config_ids.ids:
+                        pos_payment_method.write({
+                            'config_ids': [(4, pos_config.id)],
+                        })
+            return pos_payment_method
+        
+        # If not found anywhere, create new one
+        if is_cash:
+            # For cash, check if journal is already used by another payment method in another config
+            if pos_payment_method:
+                other_configs = self.env['pos.config'].search([
+                    ('payment_method_ids', 'in', [pos_payment_method.id]),
+                    ('id', '!=', pos_config.id),
+                ])
+                if other_configs:
+                    # Journal is already used in another config - cannot reuse for cash
+                    raise ValidationError(_(
+                        'The cash journal "%s" is already used in another POS configuration. '
+                        'Please configure a different cash journal for this POS configuration, '
+                        'or remove it from the other configuration first.'
+                    ) % journal.name)
+        
+        if not pos_payment_method:
+            # Create a new payment method for this config
+            pos_payment_method = self.env['pos.payment.method'].sudo().create({
+                'name': journal.name,
+                'journal_id': journal.id,
+                'config_ids': [(4, pos_config.id)],
+                'company_id': pos_config.company_id.id,
+            })
+            # Add to payment_method_ids using bypass context
+            try:
+                pos_config.with_context(bypass_payment_method_ids_forbidden_change=True).write({
+                    'payment_method_ids': [(4, pos_payment_method.id)],
+                })
+            except Exception:
+                # If still fails, at least add to config_ids
+                pass
+        
+        return pos_payment_method
+
+    def _create_pos_order_for_advance(self, pos_session, partner, pos_config, employee_id=False):
+        """
+        Create a minimal pos.order for advance payment
+        """
+        # Create a dummy order line (required by pos.order)
+        dummy_product = self.env['product.product'].search([
+            ('sale_ok', '=', True),
+            ('available_in_pos', '=', True),
+        ], limit=1)
+        
+        if not dummy_product:
+            raise ValidationError(_('No product available for POS. Please create at least one product.'))
+        
+        # Generate unique pos_reference for advance order
+        # Use prefix "ADV-" to distinguish from regular orders
+        pos_reference, tracking_number = pos_config._get_next_order_refs()
+        # Add "ADV-" prefix to make it unique
+        pos_reference = f"ADV-{pos_reference}"
+        
+        pos_order_vals = {
+            'session_id': pos_session.id,
+            'partner_id': partner.id,
+            'config_id': pos_config.id,
+            'company_id': pos_config.company_id.id,
+            'pricelist_id': partner.property_product_pricelist.id or pos_config.pricelist_id.id,
+            'pos_reference': pos_reference,  # Set pos_reference explicitly to avoid duplicate
+            'tracking_number': tracking_number,
+            'lines': [(0, 0, {
+                'product_id': dummy_product.id,
+                'qty': 0,  # Zero quantity
+                'price_unit': 0.0,
+                'price_subtotal': 0.0,
+                'price_subtotal_incl': 0.0,
+            })],
+            'amount_total': 0.0,
+            'amount_tax': 0.0,
+            'amount_paid': 0.0,
+            'amount_return': 0.0,
+            'advance_payment_id': self.id,
+            'is_advance_order': True,
+        }
+        
+        if employee_id:
+            pos_order_vals['employee_id'] = employee_id
+        
+        pos_order = self.env['pos.order'].sudo().create(pos_order_vals)
+        return pos_order
+
     @api.model
     def create_from_pos(self, vals):
         partner_id = vals.get('partner_id')
@@ -317,15 +443,45 @@ class PosAdvancePayment(models.Model):
             })
 
         # --------------------------------------------------
-        # 3) CREATE PAYMENT(S) (LIABILITY)
+        # 3) GET POS SESSION AND CREATE POS ORDER
+        # --------------------------------------------------
+        pos_session = self.env['pos.session'].search([
+            ('state', '=', 'opened'),
+            ('config_id', '=', pos_config_id),
+            ('company_id', '=', company.id),
+        ], limit=1)
+
+        if not pos_session:
+            raise ValidationError(_("No open POS session found. Please open a POS session first."))
+
+        # Get partner record
+        partner = self.env['res.partner'].browse(partner_id)
+        
+        # Create pos.order for advance
+        pos_order = advance._create_pos_order_for_advance(
+            pos_session,
+            partner,
+            pos_config,
+            employee_id=False
+        )
+
+        # --------------------------------------------------
+        # 4) CREATE POS.PAYMENT(S) AND ACCOUNT.PAYMENT(S)
         # --------------------------------------------------
         cash_payment = None
         card_payment = None
         main_payment = None
+        cash_pos_payment = None
+        card_pos_payment = None
+        main_pos_payment = None
 
         if payment_type == 'mixed':
             # Create two separate payments for mixed payment
             if cash_amount > 0:
+                # Get pos.payment.method for cash journal
+                cash_pos_payment_method = advance._get_pos_payment_method_from_journal(cash_journal, pos_config)
+                
+                # Create account.payment
                 cash_payment_method_line = cash_journal.inbound_payment_method_line_ids[:1]
                 if not cash_payment_method_line:
                     raise ValidationError(
@@ -346,7 +502,19 @@ class PosAdvancePayment(models.Model):
                 })
                 cash_payment.action_post()
 
+                # Create pos.payment
+                cash_pos_payment = self.env['pos.payment'].sudo().create({
+                    'pos_order_id': pos_order.id,
+                    'payment_method_id': cash_pos_payment_method.id,
+                    'amount': cash_amount,
+                    'payment_date': fields.Datetime.now(),
+                })
+
             if card_amount > 0:
+                # Get pos.payment.method for card journal
+                card_pos_payment_method = advance._get_pos_payment_method_from_journal(card_journal, pos_config)
+                
+                # Create account.payment
                 card_payment_method_line = card_journal.inbound_payment_method_line_ids[:1]
                 if not card_payment_method_line:
                     raise ValidationError(
@@ -367,11 +535,24 @@ class PosAdvancePayment(models.Model):
                 })
                 card_payment.action_post()
 
+                # Create pos.payment
+                card_pos_payment = self.env['pos.payment'].sudo().create({
+                    'pos_order_id': pos_order.id,
+                    'payment_method_id': card_pos_payment_method.id,
+                    'amount': card_amount,
+                    'payment_date': fields.Datetime.now(),
+                })
+
             # For mixed payment, set main_payment to cash_payment if exists, else card_payment
             main_payment = cash_payment or card_payment
+            main_pos_payment = cash_pos_payment or card_pos_payment
 
         else:
             # Single payment type (cash or card)
+            # Get pos.payment.method for journal
+            pos_payment_method = advance._get_pos_payment_method_from_journal(journal, pos_config)
+            
+            # Create account.payment
             payment_method_line = journal.inbound_payment_method_line_ids[:1]
             if not payment_method_line:
                 raise ValidationError(
@@ -393,12 +574,26 @@ class PosAdvancePayment(models.Model):
             })
             main_payment.action_post()
 
+            # Create pos.payment
+            main_pos_payment = self.env['pos.payment'].sudo().create({
+                'pos_order_id': pos_order.id,
+                'payment_method_id': pos_payment_method.id,
+                'amount': amount_paid,
+                'payment_date': fields.Datetime.now(),
+            })
+
+        # Update pos.order amount_paid and state
+        pos_order.amount_paid = amount_paid
+        # Set state to 'paid' so payments appear in closing register
+        pos_order.state = 'paid'
+
         # --------------------------------------------------
-        # 4) MARK ADVANCE AS PAID
+        # 5) MARK ADVANCE AS PAID
         # --------------------------------------------------
         payment_vals = {
             'payment_id': main_payment.id if main_payment else False,
             'state': 'paid',
+            'pos_order_id': pos_order.id,
         }
         if cash_payment:
             payment_vals['cash_payment_id'] = cash_payment.id
@@ -500,125 +695,30 @@ class PosAdvancePayment(models.Model):
                 if not advance.payment_id:
                     raise ValidationError(_("Advance payment not found."))
 
-            # 1) Create invoice (exclude employee_service and delivery_product products)
-            invoice_lines = []
-            for line in advance.line_ids:
-                product = line.product_id
-                # Skip products with is_employee_service or is_delivery_product
-                if product.is_employee_service or product.is_delivery_product:
-                    continue
-                
-                invoice_lines.append((0, 0, {
-                    'product_id': product.id,
-                    'quantity': line.qty,
-                    'price_unit': line.price_unit,
-                    'name': product.display_name,
-                }))
-            
-            if not invoice_lines:
-                raise ValidationError(_("No products to invoice (all products are employee/delivery services)."))
-
-            invoice = advance.env['account.move'].sudo().create({
-                'move_type': 'out_invoice',
-                'partner_id': partner.id,
-                'invoice_date': fields.Date.context_today(advance),
-                'invoice_line_ids': invoice_lines,
-                'company_id': company.id,
-            })
-            invoice.action_post()
-
-            # 3) Create transfer entry to move advance from liability -> receivable
-            transfer_move = advance._create_advance_transfer_move(invoice)
-
-            # 4) Reconcile receivable lines (Invoice + Transfer + Second Payment)
-            moves = invoice | transfer_move
-            if advance.second_payment_id and advance.second_payment_id.move_id:
-                moves |= advance.second_payment_id.move_id
-
-            receivable_lines = moves.line_ids.filtered(
-                lambda l: l.account_type == 'asset_receivable' and not l.reconciled
-            )
-
-            if receivable_lines:
-                receivable_lines.reconcile()
-
-            # 5) Mark invoiced
-            advance.write({
-                'invoice_id': invoice.id,
-                'state': 'invoiced',
-            })
-
-            # 6) Create second payment(s) for remaining amount (if any)
-            if advance.remaining_amount > 0:
-                if advance.payment_type == 'mixed':
-                    # Create two separate payments for mixed payment
-                    cash_journal = pos_config.pos_cash_journal_id if cash_amount > 0 else None
-                    card_journal = pos_config.pos_card_journal_id if card_amount > 0 else None
-
-                    if cash_amount > 0 and cash_journal:
-                        cash_wizard = self.env['account.payment.register'].with_context(
-                            active_model='account.move',
-                            active_ids=invoice.ids,
-                        ).create({
-                            'journal_id': cash_journal.id,
-                            'amount': cash_amount,
-                            'payment_date': fields.Date.context_today(self),
-                        })
-                        cash_payments = cash_wizard._create_payments()
-                        # Store cash payment as second_payment_id (or create a separate field if needed)
-                        advance.second_payment_id = cash_payments.id
-
-                    if card_amount > 0 and card_journal:
-                        card_wizard = self.env['account.payment.register'].with_context(
-                            active_model='account.move',
-                            active_ids=invoice.ids,
-                        ).create({
-                            'journal_id': card_journal.id,
-                            'amount': card_amount,
-                            'payment_date': fields.Date.context_today(self),
-                        })
-                        card_payments = card_wizard._create_payments()
-                        # If cash payment was created, we need to handle both payments
-                        # For now, store the last one (card) as second_payment_id
-                        # In a more complex scenario, you might want to create a separate field
-                        if not advance.second_payment_id:
-                            advance.second_payment_id = card_payments.id
-                else:
-                    # Single payment type
-                    journal = advance._get_payment_journal()
-
-                    wizard = self.env['account.payment.register'].with_context(
-                        active_model='account.move',
-                        active_ids=invoice.ids,
-                    ).create({
-                        'journal_id': journal.id,  # 👈 cash / card
-                        'amount': advance.remaining_amount,
-                        'payment_date': fields.Date.context_today(self),
-                    })
-
-                    payments = wizard._create_payments()
-                    advance.second_payment_id = payments.id
-
             # --------------------------------------------------
-            # 7) CREATE POS ORDER RECORD
+            # 1) GET POS SESSION
             # --------------------------------------------------
             pos_session = self.env['pos.session'].search([
                 ('state', '=', 'opened'),
+                ('config_id', '=', pos_config.id),
                 ('company_id', '=', company.id),
             ], limit=1)
 
             if not pos_session:
                 raise ValidationError(_("No open POS session found. Please open a POS session first."))
 
-            pos_config = pos_session.config_id
-
-            # Create POS order lines with taxes
+            # --------------------------------------------------
+            # 2) CREATE POS ORDER WITH PRODUCTS (exclude employee_service and delivery_product)
+            # --------------------------------------------------
             pos_order_lines = []
             total_tax = 0.0
             total_with_tax = 0.0
 
             for line in advance.line_ids:
                 product = line.product_id
+                # Skip products with is_employee_service or is_delivery_product
+                if product.is_employee_service or product.is_delivery_product:
+                    continue
 
                 # Get taxes from product (considering fiscal position if any)
                 taxes = product.taxes_id.filtered(lambda t: t.company_id == company)
@@ -653,10 +753,13 @@ class PosAdvancePayment(models.Model):
                     'full_product_name': product.display_name,
                 }))
 
+            if not pos_order_lines:
+                raise ValidationError(_("No products to invoice (all products are employee/delivery services)."))
+
             # Get employee_id from vals if provided
             employee_id = (vals or {}).get('employee_id', False)
             
-            # Create the POS order in draft state
+            # Create the POS order
             pos_order_vals = {
                 'session_id': pos_session.id,
                 'partner_id': partner.id,
@@ -666,32 +769,140 @@ class PosAdvancePayment(models.Model):
                 'lines': pos_order_lines,
                 'amount_total': total_with_tax,
                 'amount_tax': total_tax,
-                'amount_paid': total_with_tax,
+                'amount_paid': 0.0,  # Will be updated after adding payments
                 'amount_return': 0.0,
+                'advance_payment_id': advance.id,
             }
             if employee_id:
                 pos_order_vals['employee_id'] = employee_id
             
             pos_order = self.env['pos.order'].sudo().create(pos_order_vals)
 
-            # First set to 'paid' to trigger name generation
-            pos_order.write({
-                'state': 'paid',
-            })
+            # --------------------------------------------------
+            # 3) ADD POS.PAYMENT(S) FOR REMAINING AMOUNT (if any)
+            # --------------------------------------------------
+            if advance.remaining_amount > 0:
+                if advance.payment_type == 'mixed':
+                    # Create two separate pos.payment for mixed payment
+                    cash_journal = pos_config.pos_cash_journal_id if cash_amount > 0 else None
+                    card_journal = pos_config.pos_card_journal_id if card_amount > 0 else None
 
-            # Then update to 'done' state and link the invoice
-            pos_order.write({
-                'state': 'done',  # Set to 'done' (Posted) since it already has an invoice
-                'account_move': invoice.id,  # Link to the existing invoice
-            })
+                    if cash_amount > 0 and cash_journal:
+                        cash_pos_payment_method = advance._get_pos_payment_method_from_journal(cash_journal, pos_config)
+                        cash_pos_payment = self.env['pos.payment'].sudo().create({
+                            'pos_order_id': pos_order.id,
+                            'payment_method_id': cash_pos_payment_method.id,
+                            'amount': cash_amount,
+                            'payment_date': fields.Datetime.now(),
+                        })
+                        # Also create account.payment for accounting
+                        cash_payment_method_line = cash_journal.inbound_payment_method_line_ids[:1]
+                        if cash_payment_method_line:
+                            cash_account_payment = self.env['account.payment'].sudo().create({
+                                'payment_type': 'inbound',
+                                'partner_type': 'customer',
+                                'partner_id': partner.id,
+                                'amount': cash_amount,
+                                'currency_id': company.currency_id.id,
+                                'journal_id': cash_journal.id,
+                                'payment_method_line_id': cash_payment_method_line.id,
+                                'date': fields.Date.context_today(self),
+                                'memo': _('%s (Cash - Second Payment)') % advance.name,
+                            })
+                            cash_account_payment.action_post()
+                            advance.second_payment_id = cash_account_payment.id
 
-            # Update invoice to reference the POS order
-            invoice.write({
-                'ref': pos_order.name,
-            })
+                    if card_amount > 0 and card_journal:
+                        card_pos_payment_method = advance._get_pos_payment_method_from_journal(card_journal, pos_config)
+                        card_pos_payment = self.env['pos.payment'].sudo().create({
+                            'pos_order_id': pos_order.id,
+                            'payment_method_id': card_pos_payment_method.id,
+                            'amount': card_amount,
+                            'payment_date': fields.Datetime.now(),
+                        })
+                        # Also create account.payment for accounting
+                        card_payment_method_line = card_journal.inbound_payment_method_line_ids[:1]
+                        if card_payment_method_line:
+                            card_account_payment = self.env['account.payment'].sudo().create({
+                                'payment_type': 'inbound',
+                                'partner_type': 'customer',
+                                'partner_id': partner.id,
+                                'amount': card_amount,
+                                'currency_id': company.currency_id.id,
+                                'journal_id': card_journal.id,
+                                'payment_method_line_id': card_payment_method_line.id,
+                                'date': fields.Date.context_today(self),
+                                'memo': _('%s (Card - Second Payment)') % advance.name,
+                            })
+                            card_account_payment.action_post()
+                            if not advance.second_payment_id:
+                                advance.second_payment_id = card_account_payment.id
+                else:
+                    # Single payment type
+                    journal = advance._get_payment_journal()
+                    pos_payment_method = advance._get_pos_payment_method_from_journal(journal, pos_config)
+                    
+                    pos_payment = self.env['pos.payment'].sudo().create({
+                        'pos_order_id': pos_order.id,
+                        'payment_method_id': pos_payment_method.id,
+                        'amount': advance.remaining_amount,
+                        'payment_date': fields.Datetime.now(),
+                    })
+                    
+                    # Also create account.payment for accounting
+                    payment_method_line = journal.inbound_payment_method_line_ids[:1]
+                    if payment_method_line:
+                        account_payment = self.env['account.payment'].sudo().create({
+                            'payment_type': 'inbound',
+                            'partner_type': 'customer',
+                            'partner_id': partner.id,
+                            'amount': advance.remaining_amount,
+                            'currency_id': company.currency_id.id,
+                            'journal_id': journal.id,
+                            'payment_method_line_id': payment_method_line.id,
+                            'date': fields.Date.context_today(self),
+                            'memo': _('%s (Second Payment)') % advance.name,
+                        })
+                        account_payment.action_post()
+                        advance.second_payment_id = account_payment.id
 
-            # Link the POS order to the advance
+            # Update pos.order amount_paid
+            pos_order.amount_paid = advance.remaining_amount if advance.remaining_amount > 0 else 0.0
+            # Ensure state is 'paid' so payments appear in closing register
+            if pos_order.state != 'paid':
+                pos_order.state = 'paid'
+
+            # --------------------------------------------------
+            # 4) GENERATE INVOICE FROM POS ORDER (same as normal POS)
+            # --------------------------------------------------
+            pos_order.write({'to_invoice': True})
+            invoice = pos_order._generate_pos_order_invoice()
+
+            # --------------------------------------------------
+            # 5) CREATE TRANSFER ENTRY TO MOVE ADVANCE FROM LIABILITY -> RECEIVABLE
+            # --------------------------------------------------
+            transfer_move = advance._create_advance_transfer_move(invoice)
+
+            # --------------------------------------------------
+            # 6) RECONCILE RECEIVABLE LINES (Invoice + Transfer + Second Payment)
+            # --------------------------------------------------
+            moves = invoice | transfer_move
+            if advance.second_payment_id and advance.second_payment_id.move_id:
+                moves |= advance.second_payment_id.move_id
+
+            receivable_lines = moves.line_ids.filtered(
+                lambda l: l.account_type == 'asset_receivable' and not l.reconciled
+            )
+
+            if receivable_lines:
+                receivable_lines.reconcile()
+
+            # --------------------------------------------------
+            # 7) MARK INVOICED AND LINK POS ORDER
+            # --------------------------------------------------
             advance.write({
+                'invoice_id': invoice.id,
+                'state': 'invoiced',
                 'pos_order_id': pos_order.id,
             })
 
