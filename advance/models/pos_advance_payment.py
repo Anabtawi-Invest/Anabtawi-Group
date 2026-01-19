@@ -50,15 +50,43 @@ class PosAdvancePayment(models.Model):
     payment_id = fields.Many2one(
         'account.payment',
         string='Advance Payment',
-        readonly=True
+        readonly=True,
+        help='Main payment (for single payment type). For mixed payments, see cash_payment_id and card_payment_id.'
+    )
+
+    cash_payment_id = fields.Many2one(
+        'account.payment',
+        string='Cash Payment',
+        readonly=True,
+        help='Cash payment (for mixed payments)'
+    )
+
+    card_payment_id = fields.Many2one(
+        'account.payment',
+        string='Card Payment',
+        readonly=True,
+        help='Card payment (for mixed payments)'
     )
     payment_type = fields.Selection(
         [
             ('cash', 'Cash'),
             ('card', 'Card'),
+            ('mixed', 'Mixed (Cash & Card)'),
         ],
         string='Payment Type',
         readonly=True
+    )
+
+    cash_amount = fields.Monetary(
+        string='Cash Amount',
+        help='Amount paid in cash (for mixed payments)',
+        default=0.0
+    )
+
+    card_amount = fields.Monetary(
+        string='Card Amount',
+        help='Amount paid by card (for mixed payments)',
+        default=0.0
     )
 
     second_payment_id = fields.Many2one(
@@ -157,11 +185,14 @@ class PosAdvancePayment(models.Model):
             journal = pos_config.pos_cash_journal_id
         elif self.payment_type == 'card':
             journal = pos_config.pos_card_journal_id
+        elif self.payment_type == 'mixed':
+            # For mixed payment, return cash journal as primary (for backward compatibility)
+            journal = pos_config.pos_cash_journal_id or pos_config.pos_card_journal_id
         else:
             journal = False
 
         if not journal:
-            raise ValidationError(_("Please configure %s journal in POS Configuration: %s") % (self.payment_type, pos_config.name))
+            raise ValidationError(_("Please configure %s journal in POS Configuration: %s") % (self.payment_type or 'payment', pos_config.name))
 
         return journal
 
@@ -202,8 +233,24 @@ class PosAdvancePayment(models.Model):
         if not lines:
             raise ValidationError(_('Advance must contain at least one product.'))
 
-        if payment_type not in ('cash', 'card'):
+        if payment_type not in ('cash', 'card', 'mixed'):
             raise ValidationError(_('Invalid payment type.'))
+
+        # For mixed payment, validate cash_amount and card_amount
+        cash_amount = vals.get('cash_amount', 0.0) or 0.0
+        card_amount = vals.get('card_amount', 0.0) or 0.0
+
+        if payment_type == 'mixed':
+            if cash_amount <= 0 and card_amount <= 0:
+                raise ValidationError(_('For mixed payment, at least one amount (cash or card) must be greater than zero.'))
+            if cash_amount + card_amount != amount_paid:
+                raise ValidationError(_('Cash amount + Card amount must equal total amount paid.'))
+        elif payment_type == 'cash':
+            cash_amount = amount_paid
+            card_amount = 0.0
+        elif payment_type == 'card':
+            cash_amount = 0.0
+            card_amount = amount_paid
 
         if not pos_config_id:
             raise ValidationError(_('POS Configuration is required.'))
@@ -217,14 +264,30 @@ class PosAdvancePayment(models.Model):
         # --------------------------------------------------
         # SELECT JOURNAL BY PAYMENT TYPE
         # --------------------------------------------------
-        if payment_type == 'cash':
-            journal = pos_config.pos_cash_journal_id
-            if not journal:
+        cash_journal = None
+        card_journal = None
+
+        if payment_type in ('cash', 'mixed'):
+            cash_journal = pos_config.pos_cash_journal_id
+            if payment_type == 'cash' and not cash_journal:
                 raise ValidationError(_('Please configure POS Cash Journal in POS Configuration: %s') % pos_config.name)
-        else:
-            journal = pos_config.pos_card_journal_id
-            if not journal:
+            if payment_type == 'mixed' and cash_amount > 0 and not cash_journal:
+                raise ValidationError(_('Please configure POS Cash Journal in POS Configuration: %s') % pos_config.name)
+
+        if payment_type in ('card', 'mixed'):
+            card_journal = pos_config.pos_card_journal_id
+            if payment_type == 'card' and not card_journal:
                 raise ValidationError(_('Please configure POS Card Journal in POS Configuration: %s') % pos_config.name)
+            if payment_type == 'mixed' and card_amount > 0 and not card_journal:
+                raise ValidationError(_('Please configure POS Card Journal in POS Configuration: %s') % pos_config.name)
+
+        # For single payment type, set journal variable for backward compatibility
+        if payment_type == 'cash':
+            journal = cash_journal
+        elif payment_type == 'card':
+            journal = card_journal
+        else:
+            journal = None  # Will not be used for mixed payment
 
         # --------------------------------------------------
         # 1) CREATE ADVANCE HEADER
@@ -235,6 +298,8 @@ class PosAdvancePayment(models.Model):
             'total_expected': total_expected,
             'company_id': company.id,
             'payment_type': payment_type,
+            'cash_amount': cash_amount,
+            'card_amount': card_amount,
             'pos_config_id': pos_config_id,
             'pickup_pos_id': pickup_pos_id or pos_config_id,  # Default to current POS if not specified
             'due_date': due_date,
@@ -252,39 +317,95 @@ class PosAdvancePayment(models.Model):
             })
 
         # --------------------------------------------------
-        # 3) FIND PAYMENT METHOD LINE (🔥 CRITICAL)
+        # 3) CREATE PAYMENT(S) (LIABILITY)
         # --------------------------------------------------
-        payment_method_line = journal.inbound_payment_method_line_ids[:1]
-        if not payment_method_line:
-            raise ValidationError(
-                _('Please define an inbound payment method on journal %s.')
-                % journal.display_name
-            )
+        cash_payment = None
+        card_payment = None
+        main_payment = None
+
+        if payment_type == 'mixed':
+            # Create two separate payments for mixed payment
+            if cash_amount > 0:
+                cash_payment_method_line = cash_journal.inbound_payment_method_line_ids[:1]
+                if not cash_payment_method_line:
+                    raise ValidationError(
+                        _('Please define an inbound payment method on cash journal %s.')
+                        % cash_journal.display_name
+                    )
+                cash_payment = self.env['account.payment'].sudo().create({
+                    'payment_type': 'inbound',
+                    'partner_type': 'customer',
+                    'partner_id': partner_id,
+                    'amount': cash_amount,
+                    'currency_id': company.currency_id.id,
+                    'journal_id': cash_journal.id,
+                    'payment_method_line_id': cash_payment_method_line.id,
+                    'date': fields.Date.context_today(self),
+                    'memo': _('%s (Cash)') % advance.name,
+                    'destination_account_id': pos_config.pos_advance_account_id.id,
+                })
+                cash_payment.action_post()
+
+            if card_amount > 0:
+                card_payment_method_line = card_journal.inbound_payment_method_line_ids[:1]
+                if not card_payment_method_line:
+                    raise ValidationError(
+                        _('Please define an inbound payment method on card journal %s.')
+                        % card_journal.display_name
+                    )
+                card_payment = self.env['account.payment'].sudo().create({
+                    'payment_type': 'inbound',
+                    'partner_type': 'customer',
+                    'partner_id': partner_id,
+                    'amount': card_amount,
+                    'currency_id': company.currency_id.id,
+                    'journal_id': card_journal.id,
+                    'payment_method_line_id': card_payment_method_line.id,
+                    'date': fields.Date.context_today(self),
+                    'memo': _('%s (Card)') % advance.name,
+                    'destination_account_id': pos_config.pos_advance_account_id.id,
+                })
+                card_payment.action_post()
+
+            # For mixed payment, set main_payment to cash_payment if exists, else card_payment
+            main_payment = cash_payment or card_payment
+
+        else:
+            # Single payment type (cash or card)
+            payment_method_line = journal.inbound_payment_method_line_ids[:1]
+            if not payment_method_line:
+                raise ValidationError(
+                    _('Please define an inbound payment method on journal %s.')
+                    % journal.display_name
+                )
+
+            main_payment = self.env['account.payment'].sudo().create({
+                'payment_type': 'inbound',
+                'partner_type': 'customer',
+                'partner_id': partner_id,
+                'amount': amount_paid,
+                'currency_id': company.currency_id.id,
+                'journal_id': journal.id,
+                'payment_method_line_id': payment_method_line.id,
+                'date': fields.Date.context_today(self),
+                'memo': advance.name,
+                'destination_account_id': pos_config.pos_advance_account_id.id,
+            })
+            main_payment.action_post()
 
         # --------------------------------------------------
-        # 4) CREATE PAYMENT (LIABILITY)
+        # 4) MARK ADVANCE AS PAID
         # --------------------------------------------------
-        payment = self.env['account.payment'].sudo().create({
-            'payment_type': 'inbound',
-            'partner_type': 'customer',
-            'partner_id': partner_id,
-            'amount': amount_paid,
-            'currency_id': company.currency_id.id,
-            'journal_id': journal.id,
-            'payment_method_line_id': payment_method_line.id,  # ✅ FIX
-            'date': fields.Date.context_today(self),
-            'memo': advance.name,
-            'destination_account_id': pos_config.pos_advance_account_id.id,  # liability
-        })
-        payment.action_post()
-
-        # --------------------------------------------------
-        # 5) MARK ADVANCE AS PAID
-        # --------------------------------------------------
-        advance.write({
-            'payment_id': payment.id,
+        payment_vals = {
+            'payment_id': main_payment.id if main_payment else False,
             'state': 'paid',
-        })
+        }
+        if cash_payment:
+            payment_vals['cash_payment_id'] = cash_payment.id
+        if card_payment:
+            payment_vals['card_payment_id'] = card_payment.id
+
+        advance.write(payment_vals)
 
         # --------------------------------------------------
         # 6) SEND NOTIFICATIONS AND EMAILS
@@ -344,10 +465,23 @@ class PosAdvancePayment(models.Model):
     # --------------------------------------------------
     def action_create_invoice(self, vals=None):
         payment_type = (vals or {}).get('payment_type')
+        cash_amount = (vals or {}).get('cash_amount', 0.0) or 0.0
+        card_amount = (vals or {}).get('card_amount', 0.0) or 0.0
 
         for advance in self:
+            # Update payment type and amounts
             if payment_type:
                 advance.payment_type = payment_type
+                if payment_type == 'mixed':
+                    advance.cash_amount = cash_amount
+                    advance.card_amount = card_amount
+                elif payment_type == 'cash':
+                    advance.cash_amount = advance.remaining_amount
+                    advance.card_amount = 0.0
+                elif payment_type == 'card':
+                    advance.cash_amount = 0.0
+                    advance.card_amount = advance.remaining_amount
+
             if advance.invoice_id:
                 raise ValidationError(_("Invoice already created."))
 
@@ -356,9 +490,15 @@ class PosAdvancePayment(models.Model):
 
             company = advance.company_id
             partner = advance.partner_id
+            pos_config = advance.pos_config_id
 
-            if not advance.payment_id:
-                raise ValidationError(_("Advance payment not found."))
+            # For mixed payment, check cash_payment_id or card_payment_id instead
+            if advance.payment_type == 'mixed':
+                if not advance.cash_payment_id and not advance.card_payment_id:
+                    raise ValidationError(_("Advance payment not found (mixed payment requires at least one payment)."))
+            else:
+                if not advance.payment_id:
+                    raise ValidationError(_("Advance payment not found."))
 
             # 1) Create invoice (exclude employee_service and delivery_product products)
             invoice_lines = []
@@ -408,21 +548,56 @@ class PosAdvancePayment(models.Model):
                 'state': 'invoiced',
             })
 
-            # 6) Create second payment for remaining amount (if any)
+            # 6) Create second payment(s) for remaining amount (if any)
             if advance.remaining_amount > 0:
-                journal = advance._get_payment_journal()
+                if advance.payment_type == 'mixed':
+                    # Create two separate payments for mixed payment
+                    cash_journal = pos_config.pos_cash_journal_id if cash_amount > 0 else None
+                    card_journal = pos_config.pos_card_journal_id if card_amount > 0 else None
 
-                wizard = self.env['account.payment.register'].with_context(
-                    active_model='account.move',
-                    active_ids=invoice.ids,
-                ).create({
-                    'journal_id': journal.id,  # 👈 cash / card
-                    'amount': advance.remaining_amount,
-                    'payment_date': fields.Date.context_today(self),
-                })
+                    if cash_amount > 0 and cash_journal:
+                        cash_wizard = self.env['account.payment.register'].with_context(
+                            active_model='account.move',
+                            active_ids=invoice.ids,
+                        ).create({
+                            'journal_id': cash_journal.id,
+                            'amount': cash_amount,
+                            'payment_date': fields.Date.context_today(self),
+                        })
+                        cash_payments = cash_wizard._create_payments()
+                        # Store cash payment as second_payment_id (or create a separate field if needed)
+                        advance.second_payment_id = cash_payments.id
 
-                payments = wizard._create_payments()
-                advance.second_payment_id = payments.id
+                    if card_amount > 0 and card_journal:
+                        card_wizard = self.env['account.payment.register'].with_context(
+                            active_model='account.move',
+                            active_ids=invoice.ids,
+                        ).create({
+                            'journal_id': card_journal.id,
+                            'amount': card_amount,
+                            'payment_date': fields.Date.context_today(self),
+                        })
+                        card_payments = card_wizard._create_payments()
+                        # If cash payment was created, we need to handle both payments
+                        # For now, store the last one (card) as second_payment_id
+                        # In a more complex scenario, you might want to create a separate field
+                        if not advance.second_payment_id:
+                            advance.second_payment_id = card_payments.id
+                else:
+                    # Single payment type
+                    journal = advance._get_payment_journal()
+
+                    wizard = self.env['account.payment.register'].with_context(
+                        active_model='account.move',
+                        active_ids=invoice.ids,
+                    ).create({
+                        'journal_id': journal.id,  # 👈 cash / card
+                        'amount': advance.remaining_amount,
+                        'payment_date': fields.Date.context_today(self),
+                    })
+
+                    payments = wizard._create_payments()
+                    advance.second_payment_id = payments.id
 
             # --------------------------------------------------
             # 7) CREATE POS ORDER RECORD
