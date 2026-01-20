@@ -849,86 +849,61 @@ class PosAdvancePayment(models.Model):
             pos_order = self.env['pos.order'].sudo().create(pos_order_vals)
 
             # --------------------------------------------------
-            # 3) CALCULATE SALES AND TAX AMOUNTS
+            # 3) GENERATE INVOICE FROM POS ORDER FIRST
             # --------------------------------------------------
-            # Calculate total sales amount (without tax) and tax amount
-            total_sales_amount = 0.0
-            total_tax_amount = 0.0
+            # Create invoice first to get accurate sales and tax amounts
+            pos_order.write({'to_invoice': True})
+            invoice = pos_order._generate_pos_order_invoice()
+            _logger.info("[ADVANCE COMPLETION] Invoice created - ID: %d, Amount: %.2f", 
+                        invoice.id, invoice.amount_total)
+            
+            # --------------------------------------------------
+            # 4) EXTRACT SALES AND TAX AMOUNTS FROM INVOICE
+            # --------------------------------------------------
+            # Get sales and tax amounts directly from invoice to ensure accuracy
             sales_accounts = {}  # Dictionary to group by sales account
             tax_accounts = {}  # Dictionary to group by tax account
+            total_sales_amount = 0.0
+            total_tax_amount = 0.0
             
-            for line in advance.line_ids:
-                product = line.product_id
-                # Skip products with is_employee_service or is_delivery_product
-                if product.is_employee_service or product.is_delivery_product:
+            # Extract from invoice line_ids
+            for invoice_line in invoice.line_ids:
+                # Skip receivable lines
+                if invoice_line.account_type == 'asset_receivable':
                     continue
                 
-                # Get sales account from product
-                accounts = product.product_tmpl_id.get_product_accounts()
-                sales_account = accounts['income']
+                # Sales lines (product lines)
+                if invoice_line.display_type == 'product' and invoice_line.account_id:
+                    sales_account_id = invoice_line.account_id.id
+                    if sales_account_id not in sales_accounts:
+                        sales_accounts[sales_account_id] = 0.0
+                    # Use balance (credit is positive for sales, so we use abs)
+                    sales_amount = abs(invoice_line.balance)
+                    sales_accounts[sales_account_id] += sales_amount
+                    total_sales_amount += sales_amount
                 
-                # Get taxes from product
-                taxes = product.taxes_id.filtered(lambda t: t.company_id == company)
-                
-                # Compute tax amounts
-                tax_result = None
-                if taxes:
-                    tax_result = taxes.compute_all(
-                        line.price_unit,
-                        company.currency_id,
-                        line.qty,
-                        product=product,
-                        partner=partner
-                    )
-                    price_subtotal = tax_result['total_excluded']
-                    price_subtotal_incl = tax_result['total_included']
-                    line_tax = price_subtotal_incl - price_subtotal
-                else:
-                    price_subtotal = line.subtotal
-                    line_tax = 0.0
-                
-                total_sales_amount += price_subtotal
-                total_tax_amount += line_tax
-                
-                # Group by sales account
-                if sales_account.id not in sales_accounts:
-                    sales_accounts[sales_account.id] = 0.0
-                sales_accounts[sales_account.id] += price_subtotal
-                
-                # Group by tax account
-                # Distribute tax amount across all taxes
-                if taxes and line_tax > 0 and tax_result:
-                    # Get tax breakdown from compute_all
-                    tax_details = tax_result.get('taxes', [])
-                    for tax_detail in tax_details:
-                        tax_id = tax_detail.get('id')
-                        if tax_id:
-                            tax = self.env['account.tax'].browse(tax_id)
-                            # Get tax account from invoice repartition line (credit line)
-                            tax_repartition_line = tax.invoice_repartition_line_ids.filtered(
-                                lambda r: r.repartition_type == 'tax' and r.factor_percent > 0
-                            )[:1]
-                            if tax_repartition_line and tax_repartition_line.account_id:
-                                tax_account = tax_repartition_line.account_id
-                            else:
-                                # Fallback to tax_receivable_account_id for sales taxes
-                                tax_account = tax.tax_receivable_account_id
-                            
-                            if tax_account:
-                                if tax_account.id not in tax_accounts:
-                                    tax_accounts[tax_account.id] = 0.0
-                                # Use the tax amount from tax_detail
-                                tax_amount = tax_detail.get('amount', 0.0)
-                                tax_accounts[tax_account.id] += tax_amount
+                # Tax lines
+                if invoice_line.display_type == 'tax' and invoice_line.account_id:
+                    tax_account_id = invoice_line.account_id.id
+                    if tax_account_id not in tax_accounts:
+                        tax_accounts[tax_account_id] = 0.0
+                    # Use balance (credit is positive for tax, so we use abs)
+                    tax_amount = abs(invoice_line.balance)
+                    tax_accounts[tax_account_id] += tax_amount
+                    total_tax_amount += tax_amount
+            
+            _logger.info("[ADVANCE COMPLETION] Extracted from invoice - Sales: %.2f, Tax: %.2f, Total: %.2f", 
+                        total_sales_amount, total_tax_amount, invoice.amount_total)
             
             # --------------------------------------------------
-            # 4) CREATE SINGLE JOURNAL ENTRY (Last Part)
+            # 5) CREATE SINGLE JOURNAL ENTRY (Last Part)
             # --------------------------------------------------
             # According to new requirements:
             # - Debit: Cash/Bank (remaining amount)
             # - Debit: Advance Account (advance amount)
-            # - Credit: Sales Account(s)
-            # - Credit: Tax Account(s)
+            # - Credit: Sales Account(s) - from invoice
+            # - Credit: Tax Account(s) - from invoice
+            # - Credit: Receivable Account - to reconcile with invoice
             
             advance_account = pos_config.pos_advance_account_id
             move_line_vals = []
@@ -998,14 +973,6 @@ class PosAdvancePayment(models.Model):
                     'debit': 0.0,
                     'credit': amount,
                 }))
-            
-            # --------------------------------------------------
-            # 5) GENERATE INVOICE FROM POS ORDER (BEFORE CREATING COMPLETION MOVE)
-            # --------------------------------------------------
-            pos_order.write({'to_invoice': True})
-            invoice = pos_order._generate_pos_order_invoice()
-            _logger.info("[ADVANCE COMPLETION] Invoice created - ID: %d, Amount: %.2f", 
-                        invoice.id, invoice.amount_total)
             
             # Add Credit Receivable Account to completion move to reconcile with invoice
             receivable_account = partner.property_account_receivable_id
