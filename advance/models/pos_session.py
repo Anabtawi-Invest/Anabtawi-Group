@@ -14,7 +14,7 @@ _logger.info("=" * 80)
 
 class PosSession(models.Model):
     _inherit = 'pos.session'
-    
+
     # Log when class is defined
     _logger.info("[ADVANCE MODULE] PosSession class inherited in enbtawi.advance")
 
@@ -26,9 +26,9 @@ class PosSession(models.Model):
         _logger.info("[ADVANCE SESSION CLOSE] action_pos_session_closing_control called for session: %s (ID: %d)", self.name, self.id)
         _logger.info("[ADVANCE SESSION CLOSE] Parameters - balancing_account: %s, amount_to_balance: %.2f",
                     balancing_account.name if balancing_account else "None", amount_to_balance)
-        
+
         result = super().action_pos_session_closing_control(balancing_account, amount_to_balance, bank_payment_method_diffs)
-        
+
         _logger.info("[ADVANCE SESSION CLOSE] action_pos_session_closing_control completed, result type: %s", type(result))
         return result
 
@@ -40,10 +40,10 @@ class PosSession(models.Model):
         _logger.info("[ADVANCE SESSION CLOSE] _validate_session called for session: %s (ID: %d)", self.name, self.id)
         _logger.info("[ADVANCE SESSION CLOSE] Parameters - balancing_account: %s, amount_to_balance: %.2f",
                     balancing_account.name if balancing_account else "None", amount_to_balance)
-        
+
         # Call parent method
         result = super()._validate_session(balancing_account, amount_to_balance, bank_payment_method_diffs)
-        
+
         _logger.info("[ADVANCE SESSION CLOSE] _validate_session completed")
         return result
 
@@ -53,12 +53,12 @@ class PosSession(models.Model):
         """
         _logger.info("[ADVANCE SESSION CLOSE] =========================================")
         _logger.info("[ADVANCE SESSION CLOSE] _close_session_action called - amount_to_balance: %.2f", amount_to_balance)
-        
+
         result = super()._close_session_action(amount_to_balance)
-        
+
         _logger.info("[ADVANCE SESSION CLOSE] Force Close wizard created and returned")
         _logger.info("[ADVANCE SESSION CLOSE] Wizard action: %s", result)
-        
+
         return result
 
     def _get_closed_orders(self):
@@ -120,23 +120,21 @@ class PosSession(models.Model):
         stock_return = defaultdict(amounts)
         stock_valuation = defaultdict(amounts)
         rounding_difference = {'amount': 0.0, 'amount_converted': 0.0}
-        # Track the receivable lines of the order's invoice payment moves for reconciliation
-        # These receivable lines are reconciled to the corresponding invoice receivable lines
-        # of this session's move_id.
+        
         combine_inv_payment_receivable_lines = defaultdict(lambda: self.env['account.move.line'])
         split_inv_payment_receivable_lines = defaultdict(lambda: self.env['account.move.line'])
         pos_receivable_account = self.company_id.account_default_pos_receivable_account_id
         currency_rounding = self.currency_id.rounding
         closed_orders = self._get_closed_orders()
-        
+
         _logger.info("[ADVANCE SESSION CLOSE] Starting _accumulate_amounts for session %s", self.name)
         _logger.info("[ADVANCE SESSION CLOSE] Total closed orders: %d", len(closed_orders))
-        
+
         for order in closed_orders:
             # Skip sales/taxes calculations for advance orders, but keep payments
             is_advance_order = getattr(order, 'is_advance_order', False)
-            
             order_is_invoiced = order.is_invoiced
+
             for payment in order.payment_ids:
                 amount = payment.amount
                 if float_is_zero(amount, precision_rounding=currency_rounding):
@@ -146,23 +144,13 @@ class PosSession(models.Model):
                 is_split_payment = payment.payment_method_id.split_transactions
                 payment_type = payment_method.type
 
-                # For advance orders, skip payment processing in session closing
-                # REASON: Advance payments are already recorded via account.payment when created
-                # (with Debit: Cash/Bank, Credit: Advance Account)
-                # No need to create additional journal entries during session closing
                 if is_advance_order and payment_type != 'pay_later':
                     _logger.info("[ADVANCE SESSION CLOSE] Skipping advance payment in session closing:")
                     _logger.info("  - Order: %s (ID: %d)", order.name, order.id)
                     _logger.info("  - Amount: %.2f", amount)
                     _logger.info("  - Reason: Already recorded via account.payment (journal entry exists)")
-                    
-                    # Skip - payment already has journal entry from account.payment
                     continue
 
-                # If not pay_later, we create the receivable vals for both invoiced and uninvoiced orders.
-                #   Separate the split and aggregated payments.
-                # Moreover, if the order is invoiced, we create the pos receivable vals that will balance the
-                # pos receivable lines from the invoice payments.
                 if payment_type != 'pay_later':
                     if is_split_payment and payment_type == 'cash':
                         split_receivables_cash[payment] = self._update_amounts(split_receivables_cash[payment], {'amount': amount}, date)
@@ -173,7 +161,6 @@ class PosSession(models.Model):
                     elif not is_split_payment and payment_type == 'bank':
                         combine_receivables_bank[payment_method] = self._update_amounts(combine_receivables_bank[payment_method], {'amount': amount}, date)
 
-                    # Create the vals to create the pos receivables that will balance the pos receivables from invoice payment moves.
                     if order_is_invoiced:
                         if is_split_payment:
                             split_inv_payment_receivable_lines[payment] |= payment.account_move_id.line_ids.filtered(lambda line: line.account_id == pos_receivable_account)
@@ -182,17 +169,12 @@ class PosSession(models.Model):
                             combine_inv_payment_receivable_lines[payment_method] |= payment.account_move_id.line_ids.filtered(lambda line: line.account_id == pos_receivable_account)
                             combine_invoice_receivables[payment_method] = self._update_amounts(combine_invoice_receivables[payment_method], {'amount': payment.amount}, order.date_order)
 
-                # If pay_later, we create the receivable lines.
-                #   if split, with partner
-                #   Otherwise, it's aggregated (combined)
-                # But only do if order is *not* invoiced because no account move is created for pay later invoice payments.
                 if payment_type == 'pay_later' and not order_is_invoiced:
                     if is_split_payment:
                         split_receivables_pay_later[payment] = self._update_amounts(split_receivables_pay_later[payment], {'amount': amount}, date)
                     elif not is_split_payment:
                         combine_receivables_pay_later[payment_method] = self._update_amounts(combine_receivables_pay_later[payment_method], {'amount': amount}, date)
 
-            # Skip sales/taxes/stock calculations for advance orders
             if not order_is_invoiced and not is_advance_order:
                 base_lines = order.with_context(linked_to_pos=True)._prepare_tax_base_line_values()
                 AccountTax._add_tax_details_in_base_lines(base_lines, order.company_id)
@@ -200,8 +182,8 @@ class PosSession(models.Model):
                 AccountTax._add_accounting_data_in_base_lines_tax_details(base_lines, order.company_id, include_caba_tags=True)
                 tax_results = AccountTax._prepare_tax_lines(base_lines, order.company_id)
                 total_amount_currency = 0.0
+
                 for base_line, to_update in tax_results['base_lines_to_update']:
-                    # Combine sales/refund lines
                     sale_vals_dict = self._get_sale_key(base_line)
                     sale_key = frozendict(sale_vals_dict)
                     total_amount_currency += to_update['amount_currency']
@@ -217,7 +199,6 @@ class PosSession(models.Model):
                         sales[sale_key].setdefault('quantity', 0)
                         sales[sale_key]['quantity'] += base_line['quantity']
 
-                # Combine tax lines
                 for tax_line in tax_results['tax_lines_to_add']:
                     tax_key = (
                         tax_line['account_id'],
@@ -225,13 +206,29 @@ class PosSession(models.Model):
                         tuple(tax_line['tax_tag_ids'][0][2]),
                     )
                     total_amount_currency += tax_line['amount_currency']
+
+                    base_amount = tax_line.get('tax_base_amount')
+                    if base_amount is None:
+                        base_amount = tax_line.get('base_amount', 0.0)
+
+                    base_balance = tax_line.get('base_balance')
+                    if base_balance is None:
+                        order_currency = getattr(order, 'currency_id', False) or self.currency_id
+                        company_currency = self.company_id.currency_id
+                        convert_date = fields.Date.to_date(order.date_order) if order.date_order else fields.Date.context_today(self)
+
+                        if order_currency and company_currency and order_currency != company_currency:
+                            base_balance = order_currency._convert(base_amount, company_currency, self.company_id, convert_date)
+                        else:
+                            base_balance = base_amount
+
                     taxes[tax_key] = self._update_amounts(
                         taxes[tax_key],
                         {
                             'amount': tax_line['amount_currency'],
                             'amount_converted': tax_line['balance'],
-                            'base_amount': tax_line['tax_base_amount'],
-                            'base_amount_converted': tax_line['base_balance'],
+                            'base_amount': base_amount,
+                            'base_amount_converted': base_balance,
                         },
                         order.date_order,
                     )
@@ -240,14 +237,17 @@ class PosSession(models.Model):
                     diff = order.amount_paid + total_amount_currency
                     rounding_difference = self._update_amounts(rounding_difference, {'amount': diff}, order.date_order)
 
-                # Increasing current partner's customer_rank
-                partners = (order.partner_id | order.partner_id.commercial_partner_id)
-                partners._increase_rank('customer_rank')
+            # Increasing current partner's customer_rank
+            partners = (order.partner_id | order.partner_id.commercial_partner_id)
+            partners._increase_rank('customer_rank')
 
             # Stock valuation lines (skip for advance orders)
             if not is_advance_order:
                 if self.config_id._is_quantities_set():
-                    order_stock_lines = order.lines.filtered(lambda l: l.product_id.type in ('product', 'consu') and float_is_zero(l.qty, precision_rounding=currency_rounding) == False)
+                    order_stock_lines = order.lines.filtered(
+                        lambda l: l.product_id.type in ('product', 'consu')
+                        and not float_is_zero(l.qty, precision_rounding=currency_rounding)
+                    )
                     for stock_line in order_stock_lines:
                         exp_key = self._get_stock_expense_key(stock_line)
                         stock_expense[exp_key] = self._update_amounts(
@@ -277,7 +277,6 @@ class PosSession(models.Model):
             if all_picking_ids:
                 from odoo.tools.constants import PREFETCH_MAX
                 from odoo.tools import split_every
-                # Combine stock lines
                 stock_move_sudo = self.env['stock.move'].sudo()
                 stock_moves = stock_move_sudo.search([
                     ('picking_id', 'in', all_picking_ids),
@@ -294,17 +293,32 @@ class PosSession(models.Model):
                         if move._is_in():
                             signed_product_qty *= -1
                         amount = signed_product_qty * move._get_price_unit()
-                        stock_expense[exp_key] = self._update_amounts(stock_expense[exp_key], {'amount': amount}, move.picking_id.date_done, force_company_currency=True)
+                        stock_expense[exp_key] = self._update_amounts(
+                            stock_expense[exp_key],
+                            {'amount': amount},
+                            move.picking_id.date_done,
+                            force_company_currency=True
+                        )
                         if move._is_in():
-                            stock_return[stock_key] = self._update_amounts(stock_return[stock_key], {'amount': amount}, move.picking_id.date_done, force_company_currency=True)
+                            stock_return[stock_key] = self._update_amounts(
+                                stock_return[stock_key],
+                                {'amount': amount},
+                                move.picking_id.date_done,
+                                force_company_currency=True
+                            )
                         else:
-                            stock_valuation[stock_key] = self._update_amounts(stock_valuation[stock_key], {'amount': amount}, move.picking_id.date_done, force_company_currency=True)
+                            stock_valuation[stock_key] = self._update_amounts(
+                                stock_valuation[stock_key],
+                                {'amount': amount},
+                                move.picking_id.date_done,
+                                force_company_currency=True
+                            )
 
         MoveLine = self.env['account.move.line'].with_context(check_move_validity=False, skip_invoice_sync=True)
 
         _logger.info("[ADVANCE SESSION CLOSE] Summary of _accumulate_amounts:")
         _logger.info("  - Advance payments are NOT processed here (already recorded via account.payment)")
-        
+
         data.update({
             'taxes':                               taxes,
             'sales':                               sales,
@@ -321,8 +335,8 @@ class PosSession(models.Model):
             'combine_inv_payment_receivable_lines': combine_inv_payment_receivable_lines,
             'rounding_difference':                 rounding_difference,
             'MoveLine':                            MoveLine,
-            'split_invoice_receivables': split_invoice_receivables,
-            'split_inv_payment_receivable_lines': split_inv_payment_receivable_lines,
+            'split_invoice_receivables':           split_invoice_receivables,
+            'split_inv_payment_receivable_lines':  split_inv_payment_receivable_lines,
         })
         return data
 
@@ -334,18 +348,17 @@ class PosSession(models.Model):
         _logger.info("[ADVANCE SESSION CLOSE] _create_account_move called for session: %s (ID: %d)", self.name, self.id)
         _logger.info("[ADVANCE SESSION CLOSE] Parameters - balancing_account: %s, amount_to_balance: %.2f",
                     balancing_account.name if balancing_account else "None", amount_to_balance)
-        
-        # Check for advance orders in session
+
         all_orders = self.order_ids
         advance_orders = all_orders.filtered(lambda o: getattr(o, 'is_advance_order', False))
         _logger.info("[ADVANCE SESSION CLOSE] Total orders in session: %d", len(all_orders))
         _logger.info("[ADVANCE SESSION CLOSE] Advance orders found: %d", len(advance_orders))
+        
         if advance_orders:
             for order in advance_orders:
                 _logger.info("[ADVANCE SESSION CLOSE]   - Advance Order: %s (ID: %d) - Amount: %.2f - State: %s",
                             order.name, order.id, order.amount_total, order.state)
-        
-        # Create account move (same as base)
+
         account_move = self.env['account.move'].create({
             'journal_id': self.config_id.journal_id.id,
             'date': fields.Date.context_today(self),
@@ -354,36 +367,27 @@ class PosSession(models.Model):
         self.write({'move_id': account_move.id})
         _logger.info("[ADVANCE SESSION CLOSE] Account Move created - ID: %d", account_move.id)
 
-        # Accumulate amounts (advance payments are skipped - already recorded via account.payment)
         data = {'bank_payment_method_diffs': bank_payment_method_diffs or {}}
         data = self._accumulate_amounts(data)
-        
-        # Create regular move lines
+
         data = self._create_non_reconciliable_move_lines(data)
         data = self._create_bank_payment_moves(data)
         data = self._create_pay_later_receivable_lines(data)
         data = self._create_cash_statement_lines_and_cash_move_lines(data)
         data = self._create_invoice_receivable_lines(data)
         data = self._create_stock_valuation_lines(data)
-        
-        # NOTE: Advance payments are NOT processed here
-        # They are already recorded via account.payment when advance order is created
-        # (with Debit: Cash/Bank, Credit: Advance Account)
-        # No additional journal entries needed during session closing
+
         _logger.info("[ADVANCE SESSION CLOSE] Advance payments skipped - already recorded via account.payment")
-        
-        # Create balancing line if needed
+
         if balancing_account and amount_to_balance:
             data = self._create_balancing_line(data, balancing_account, amount_to_balance)
             _logger.info("[ADVANCE SESSION CLOSE] Balancing line created - Account: %s, Amount: %.2f",
                         balancing_account.name, amount_to_balance)
 
-        # Log move balance status
         if self.move_id:
             move_balance = sum(self.move_id.line_ids.mapped('balance'))
             _logger.info("[ADVANCE SESSION CLOSE] Account Move created - ID: %d, Balance: %.2f", self.move_id.id, move_balance)
-            
-            # Check if balanced
+
             try:
                 from odoo.exceptions import UserError
                 with self.move_id._check_balanced({'records': self.move_id.sudo()}):
@@ -391,23 +395,9 @@ class PosSession(models.Model):
             except UserError:
                 _logger.error("[ADVANCE SESSION CLOSE] ⚠️⚠️⚠️ Move is UNBALANCED - Balance: %.2f ⚠️⚠️⚠️", move_balance)
                 _logger.error("[ADVANCE SESSION CLOSE] This will trigger Force Close Session wizard")
-                
-                # Log all move lines for debugging
                 _logger.error("[ADVANCE SESSION CLOSE] Move lines details:")
                 for line in self.move_id.line_ids:
                     _logger.error("  - Account: %s | Debit: %.2f | Credit: %.2f | Balance: %.2f | Name: %s",
                                 line.account_id.name, line.debit, line.credit, line.balance, line.name)
 
         return data
-
-    # DEPRECATED: This function is no longer used
-    # Advance payments are now recorded via account.payment when created
-    # (with Debit: Cash/Bank, Credit: Advance Account)
-    # No additional journal entries are needed during session closing
-    # def _create_advance_payment_move_lines(self, data, advance_payments):
-    #     """
-    #     Create balanced accounting entry for advance payments:
-    #     - Debit: Receivable (from payments)
-    #     - Credit: Advance Account (liability)
-    #     """
-    #     ... REMOVED - No longer needed
