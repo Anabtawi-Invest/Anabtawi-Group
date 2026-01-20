@@ -626,6 +626,12 @@ class PosAdvancePayment(models.Model):
         receivable_account = partner.property_account_receivable_id
         advance_account = pos_config.pos_advance_account_id
 
+        _logger.info("[ADVANCE TRANSFER] Creating transfer move:")
+        _logger.info("  - Advance: %s (ID: %d)", self.name, self.id)
+        _logger.info("  - Amount Paid: %.2f", self.amount_paid)
+        _logger.info("  - Advance Account: %s (ID: %d)", advance_account.name, advance_account.id)
+        _logger.info("  - Receivable Account: %s (ID: %d)", receivable_account.name, receivable_account.id)
+
         move = self.env['account.move'].sudo().create({
             'move_type': 'entry',
             'date': invoice.invoice_date or fields.Date.context_today(self),
@@ -651,7 +657,15 @@ class PosAdvancePayment(models.Model):
             ],
         })
 
+        _logger.info("[ADVANCE TRANSFER] Transfer move created - ID: %d, State: %s", move.id, move.state)
         move.action_post()
+        _logger.info("[ADVANCE TRANSFER] Transfer move posted - ID: %d, State: %s", move.id, move.state)
+        
+        # Verify the move lines
+        for line in move.line_ids:
+            _logger.info("  - Line: Account=%s, Debit=%.2f, Credit=%.2f", 
+                        line.account_id.name, line.debit, line.credit)
+        
         self.transfer_move_id = move.id
         return move
 
@@ -890,7 +904,11 @@ class PosAdvancePayment(models.Model):
             # --------------------------------------------------
             # 5) CREATE TRANSFER ENTRY TO MOVE ADVANCE FROM LIABILITY -> RECEIVABLE
             # --------------------------------------------------
+            _logger.info("[ADVANCE] Creating transfer move for advance %s (ID: %d) - Amount: %.2f", 
+                        advance.name, advance.id, advance.amount_paid)
             transfer_move = advance._create_advance_transfer_move(invoice)
+            _logger.info("[ADVANCE] Transfer move created - ID: %d, State: %s", 
+                        transfer_move.id, transfer_move.state)
 
             # --------------------------------------------------
             # 6) RECONCILE RECEIVABLE LINES (Invoice + Transfer + Second Payment)
