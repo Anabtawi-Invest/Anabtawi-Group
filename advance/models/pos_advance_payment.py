@@ -335,6 +335,8 @@ class PosAdvancePayment(models.Model):
 
     @api.model
     def create_from_pos(self, vals):
+        _logger.info("[ADVANCE CREATE] =========================================")
+        _logger.info("[ADVANCE CREATE] create_from_pos called with vals: %s", vals)
         partner_id = vals.get('partner_id')
         amount_paid = vals.get('amount_paid')
         total_expected = vals.get('total_expected')
@@ -343,6 +345,7 @@ class PosAdvancePayment(models.Model):
         pos_config_id = vals.get('pos_config_id')
         pickup_pos_id = vals.get('pickup_pos_id')
         due_date = vals.get('due_date')
+        _logger.info("[ADVANCE CREATE] Amount Paid: %.2f, Payment Type: %s", amount_paid, payment_type)
 
         # --------------------------------------------------
         # VALIDATION
@@ -488,6 +491,10 @@ class PosAdvancePayment(models.Model):
                         _('Please define an inbound payment method on cash journal %s.')
                         % cash_journal.display_name
                     )
+                _logger.info("[ADVANCE PAYMENT] =========================================")
+                _logger.info("[ADVANCE PAYMENT] Creating cash payment for advance %s", advance.name)
+                _logger.info("[ADVANCE PAYMENT] Amount: %.2f, Destination Account: %s (ID: %d)", 
+                            cash_amount, pos_config.pos_advance_account_id.name, pos_config.pos_advance_account_id.id)
                 cash_payment = self.env['account.payment'].sudo().create({
                     'payment_type': 'inbound',
                     'partner_type': 'customer',
@@ -500,7 +507,19 @@ class PosAdvancePayment(models.Model):
                     'memo': _('%s (Cash)') % advance.name,
                     'destination_account_id': pos_config.pos_advance_account_id.id,
                 })
+                _logger.info("[ADVANCE PAYMENT] Cash payment created - ID: %d, State: %s", 
+                            cash_payment.id, cash_payment.state)
                 cash_payment.action_post()
+                _logger.info("[ADVANCE PAYMENT] Cash payment posted - ID: %d, State: %s, Move ID: %s", 
+                            cash_payment.id, cash_payment.state, cash_payment.move_id.id if cash_payment.move_id else "None")
+                if cash_payment.move_id:
+                    _logger.info("[ADVANCE PAYMENT] Cash payment move - ID: %d, State: %s", 
+                                cash_payment.move_id.id, cash_payment.move_id.state)
+                    for line in cash_payment.move_id.line_ids:
+                        _logger.info("[ADVANCE PAYMENT]   - Line: Account=%s (ID: %d), Debit=%.2f, Credit=%.2f", 
+                                    line.account_id.name, line.account_id.id, line.debit, line.credit)
+                else:
+                    _logger.warning("[ADVANCE PAYMENT] Cash payment has no move_id after action_post()!")
 
                 # Create pos.payment
                 cash_pos_payment = self.env['pos.payment'].sudo().create({
@@ -521,6 +540,10 @@ class PosAdvancePayment(models.Model):
                         _('Please define an inbound payment method on card journal %s.')
                         % card_journal.display_name
                     )
+                _logger.info("[ADVANCE PAYMENT] =========================================")
+                _logger.info("[ADVANCE PAYMENT] Creating card payment for advance %s", advance.name)
+                _logger.info("[ADVANCE PAYMENT] Amount: %.2f, Destination Account: %s (ID: %d)", 
+                            card_amount, pos_config.pos_advance_account_id.name, pos_config.pos_advance_account_id.id)
                 card_payment = self.env['account.payment'].sudo().create({
                     'payment_type': 'inbound',
                     'partner_type': 'customer',
@@ -533,7 +556,19 @@ class PosAdvancePayment(models.Model):
                     'memo': _('%s (Card)') % advance.name,
                     'destination_account_id': pos_config.pos_advance_account_id.id,
                 })
+                _logger.info("[ADVANCE PAYMENT] Card payment created - ID: %d, State: %s", 
+                            card_payment.id, card_payment.state)
                 card_payment.action_post()
+                _logger.info("[ADVANCE PAYMENT] Card payment posted - ID: %d, State: %s, Move ID: %s", 
+                            card_payment.id, card_payment.state, card_payment.move_id.id if card_payment.move_id else "None")
+                if card_payment.move_id:
+                    _logger.info("[ADVANCE PAYMENT] Card payment move - ID: %d, State: %s", 
+                                card_payment.move_id.id, card_payment.move_id.state)
+                    for line in card_payment.move_id.line_ids:
+                        _logger.info("[ADVANCE PAYMENT]   - Line: Account=%s (ID: %d), Debit=%.2f, Credit=%.2f", 
+                                    line.account_id.name, line.account_id.id, line.debit, line.credit)
+                else:
+                    _logger.warning("[ADVANCE PAYMENT] Card payment has no move_id after action_post()!")
 
                 # Create pos.payment
                 card_pos_payment = self.env['pos.payment'].sudo().create({
@@ -560,6 +595,10 @@ class PosAdvancePayment(models.Model):
                     % journal.display_name
                 )
 
+            _logger.info("[ADVANCE PAYMENT] =========================================")
+            _logger.info("[ADVANCE PAYMENT] Creating payment for advance %s", advance.name)
+            _logger.info("[ADVANCE PAYMENT] Amount: %.2f, Destination Account: %s (ID: %d)", 
+                        amount_paid, pos_config.pos_advance_account_id.name, pos_config.pos_advance_account_id.id)
             main_payment = self.env['account.payment'].sudo().create({
                 'payment_type': 'inbound',
                 'partner_type': 'customer',
@@ -572,7 +611,19 @@ class PosAdvancePayment(models.Model):
                 'memo': advance.name,
                 'destination_account_id': pos_config.pos_advance_account_id.id,
             })
+            _logger.info("[ADVANCE PAYMENT] Payment created - ID: %d, State: %s", 
+                        main_payment.id, main_payment.state)
             main_payment.action_post()
+            _logger.info("[ADVANCE PAYMENT] Payment posted - ID: %d, State: %s, Move ID: %s", 
+                        main_payment.id, main_payment.state, main_payment.move_id.id if main_payment.move_id else "None")
+            if main_payment.move_id:
+                _logger.info("[ADVANCE PAYMENT] Payment move - ID: %d, State: %s", 
+                            main_payment.move_id.id, main_payment.move_id.state)
+                for line in main_payment.move_id.line_ids:
+                    _logger.info("[ADVANCE PAYMENT]   - Line: Account=%s (ID: %d), Debit=%.2f, Credit=%.2f", 
+                                line.account_id.name, line.account_id.id, line.debit, line.credit)
+            else:
+                _logger.warning("[ADVANCE PAYMENT] Payment has no move_id after action_post()!")
 
             # Create pos.payment
             main_pos_payment = self.env['pos.payment'].sudo().create({
@@ -814,6 +865,12 @@ class PosAdvancePayment(models.Model):
                         if cash_payment_method_line:
                             # Get receivable account for the partner (NOT advance account)
                             receivable_account = partner.property_account_receivable_id
+                            advance_account = pos_config.pos_advance_account_id
+                            _logger.info("[ADVANCE SECOND PAYMENT] =========================================")
+                            _logger.info("[ADVANCE SECOND PAYMENT] Creating cash second payment for advance %s", advance.name)
+                            _logger.info("[ADVANCE SECOND PAYMENT] Amount: %.2f", cash_amount)
+                            _logger.info("[ADVANCE SECOND PAYMENT] Receivable Account: %s (ID: %d)", receivable_account.name, receivable_account.id)
+                            _logger.info("[ADVANCE SECOND PAYMENT] Advance Account: %s (ID: %d) - SHOULD NOT BE USED!", advance_account.name, advance_account.id)
                             cash_account_payment = self.env['account.payment'].sudo().create({
                                 'payment_type': 'inbound',
                                 'partner_type': 'customer',
@@ -824,9 +881,23 @@ class PosAdvancePayment(models.Model):
                                 'payment_method_line_id': cash_payment_method_line.id,
                                 'date': fields.Date.context_today(self),
                                 'memo': _('%s (Cash - Second Payment)') % advance.name,
-                                'destination_account_id': receivable_account.id,  # Explicitly set to Receivable, NOT Advance Account
                             })
+                            # CRITICAL: Set destination_account_id AFTER create to override computed value
+                            cash_account_payment.write({'destination_account_id': receivable_account.id})
+                            _logger.info("[ADVANCE SECOND PAYMENT] Cash second payment created - ID: %d, destination_account_id: %d", 
+                                        cash_account_payment.id, cash_account_payment.destination_account_id.id)
+                            _logger.info("[ADVANCE SECOND PAYMENT] Destination account name: %s", cash_account_payment.destination_account_id.name)
+                            if cash_account_payment.destination_account_id.id == advance_account.id:
+                                _logger.error("[ADVANCE SECOND PAYMENT] ERROR: Second payment is using Advance Account instead of Receivable Account!")
                             cash_account_payment.action_post()
+                            _logger.info("[ADVANCE SECOND PAYMENT] Cash second payment posted - ID: %d, Move ID: %s", 
+                                        cash_account_payment.id, cash_account_payment.move_id.id if cash_account_payment.move_id else "None")
+                            if cash_account_payment.move_id:
+                                for line in cash_account_payment.move_id.line_ids:
+                                    _logger.info("[ADVANCE SECOND PAYMENT]   - Line: Account=%s (ID: %d), Debit=%.2f, Credit=%.2f", 
+                                                line.account_id.name, line.account_id.id, line.debit, line.credit)
+                                    if line.account_id.id == advance_account.id:
+                                        _logger.error("[ADVANCE SECOND PAYMENT] ERROR: Second payment has line on Advance Account! This should NOT happen!")
                             advance.second_payment_id = cash_account_payment.id
 
                     if card_amount > 0 and card_journal:
@@ -842,6 +913,12 @@ class PosAdvancePayment(models.Model):
                         if card_payment_method_line:
                             # Get receivable account for the partner (NOT advance account)
                             receivable_account = partner.property_account_receivable_id
+                            advance_account = pos_config.pos_advance_account_id
+                            _logger.info("[ADVANCE SECOND PAYMENT] =========================================")
+                            _logger.info("[ADVANCE SECOND PAYMENT] Creating card second payment for advance %s", advance.name)
+                            _logger.info("[ADVANCE SECOND PAYMENT] Amount: %.2f", card_amount)
+                            _logger.info("[ADVANCE SECOND PAYMENT] Receivable Account: %s (ID: %d)", receivable_account.name, receivable_account.id)
+                            _logger.info("[ADVANCE SECOND PAYMENT] Advance Account: %s (ID: %d) - SHOULD NOT BE USED!", advance_account.name, advance_account.id)
                             card_account_payment = self.env['account.payment'].sudo().create({
                                 'payment_type': 'inbound',
                                 'partner_type': 'customer',
@@ -852,9 +929,23 @@ class PosAdvancePayment(models.Model):
                                 'payment_method_line_id': card_payment_method_line.id,
                                 'date': fields.Date.context_today(self),
                                 'memo': _('%s (Card - Second Payment)') % advance.name,
-                                'destination_account_id': receivable_account.id,  # Explicitly set to Receivable, NOT Advance Account
                             })
+                            # CRITICAL: Set destination_account_id AFTER create to override computed value
+                            card_account_payment.write({'destination_account_id': receivable_account.id})
+                            _logger.info("[ADVANCE SECOND PAYMENT] Card second payment created - ID: %d, destination_account_id: %d", 
+                                        card_account_payment.id, card_account_payment.destination_account_id.id)
+                            _logger.info("[ADVANCE SECOND PAYMENT] Destination account name: %s", card_account_payment.destination_account_id.name)
+                            if card_account_payment.destination_account_id.id == advance_account.id:
+                                _logger.error("[ADVANCE SECOND PAYMENT] ERROR: Second payment is using Advance Account instead of Receivable Account!")
                             card_account_payment.action_post()
+                            _logger.info("[ADVANCE SECOND PAYMENT] Card second payment posted - ID: %d, Move ID: %s", 
+                                        card_account_payment.id, card_account_payment.move_id.id if card_account_payment.move_id else "None")
+                            if card_account_payment.move_id:
+                                for line in card_account_payment.move_id.line_ids:
+                                    _logger.info("[ADVANCE SECOND PAYMENT]   - Line: Account=%s (ID: %d), Debit=%.2f, Credit=%.2f", 
+                                                line.account_id.name, line.account_id.id, line.debit, line.credit)
+                                    if line.account_id.id == advance_account.id:
+                                        _logger.error("[ADVANCE SECOND PAYMENT] ERROR: Second payment has line on Advance Account! This should NOT happen!")
                             if not advance.second_payment_id:
                                 advance.second_payment_id = card_account_payment.id
                 else:
@@ -874,6 +965,12 @@ class PosAdvancePayment(models.Model):
                     if payment_method_line:
                         # Get receivable account for the partner (NOT advance account)
                         receivable_account = partner.property_account_receivable_id
+                        advance_account = pos_config.pos_advance_account_id
+                        _logger.info("[ADVANCE SECOND PAYMENT] =========================================")
+                        _logger.info("[ADVANCE SECOND PAYMENT] Creating second payment for advance %s", advance.name)
+                        _logger.info("[ADVANCE SECOND PAYMENT] Amount: %.2f", advance.remaining_amount)
+                        _logger.info("[ADVANCE SECOND PAYMENT] Receivable Account: %s (ID: %d)", receivable_account.name, receivable_account.id)
+                        _logger.info("[ADVANCE SECOND PAYMENT] Advance Account: %s (ID: %d) - SHOULD NOT BE USED!", advance_account.name, advance_account.id)
                         account_payment = self.env['account.payment'].sudo().create({
                             'payment_type': 'inbound',
                             'partner_type': 'customer',
@@ -884,9 +981,23 @@ class PosAdvancePayment(models.Model):
                             'payment_method_line_id': payment_method_line.id,
                             'date': fields.Date.context_today(self),
                             'memo': _('%s (Second Payment)') % advance.name,
-                            'destination_account_id': receivable_account.id,  # Explicitly set to Receivable, NOT Advance Account
                         })
+                        # CRITICAL: Set destination_account_id AFTER create to override computed value
+                        account_payment.write({'destination_account_id': receivable_account.id})
+                        _logger.info("[ADVANCE SECOND PAYMENT] Second payment created - ID: %d, destination_account_id: %d", 
+                                    account_payment.id, account_payment.destination_account_id.id)
+                        _logger.info("[ADVANCE SECOND PAYMENT] Destination account name: %s", account_payment.destination_account_id.name)
+                        if account_payment.destination_account_id.id == advance_account.id:
+                            _logger.error("[ADVANCE SECOND PAYMENT] ERROR: Second payment is using Advance Account instead of Receivable Account!")
                         account_payment.action_post()
+                        _logger.info("[ADVANCE SECOND PAYMENT] Second payment posted - ID: %d, Move ID: %s", 
+                                    account_payment.id, account_payment.move_id.id if account_payment.move_id else "None")
+                        if account_payment.move_id:
+                            for line in account_payment.move_id.line_ids:
+                                _logger.info("[ADVANCE SECOND PAYMENT]   - Line: Account=%s (ID: %d), Debit=%.2f, Credit=%.2f", 
+                                            line.account_id.name, line.account_id.id, line.debit, line.credit)
+                                if line.account_id.id == advance_account.id:
+                                    _logger.error("[ADVANCE SECOND PAYMENT] ERROR: Second payment has line on Advance Account! This should NOT happen!")
                         advance.second_payment_id = account_payment.id
 
             # Update pos.order amount_paid
