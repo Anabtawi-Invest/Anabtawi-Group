@@ -987,65 +987,33 @@ class PosAdvancePayment(models.Model):
                         invoice.id, invoice.amount_total)
             
             # --------------------------------------------------
-            # 4) EXTRACT SALES AND TAX AMOUNTS FROM INVOICE
+            # 4) CREATE COMPLETION JOURNAL ENTRY
             # --------------------------------------------------
-            # Get sales and tax amounts directly from invoice to ensure accuracy
-            sales_accounts = {}  # Dictionary to group by sales account
-            tax_accounts = {}  # Dictionary to group by tax account
-            total_sales_amount = 0.0
-            total_tax_amount = 0.0
-            
-            # Extract from invoice line_ids
-            for invoice_line in invoice.line_ids:
-                # Skip receivable/payable lines
-                if invoice_line.account_id and invoice_line.account_id.account_type in ('asset_receivable', 'liability_payable'):
-                    continue
-                
-                # Skip lines without account_id
-                if not invoice_line.account_id:
-                    continue
-                
-                # Sales lines (product lines) - display_type can be 'product' or False/None
-                if (not invoice_line.display_type or invoice_line.display_type == 'product') and invoice_line.account_id:
-                    # Check if it's a sales account (income account)
-                    if invoice_line.account_id.account_type in ('income', 'income_other'):
-                        sales_account_id = invoice_line.account_id.id
-                        if sales_account_id not in sales_accounts:
-                            sales_accounts[sales_account_id] = 0.0
-                        # Use balance (credit is positive for sales, so we use abs)
-                        sales_amount = abs(invoice_line.balance)
-                        sales_accounts[sales_account_id] += sales_amount
-                        total_sales_amount += sales_amount
-                
-                # Tax lines
-                if invoice_line.display_type == 'tax' and invoice_line.account_id:
-                    # Tax accounts are usually liability accounts
-                    if invoice_line.account_id.account_type in ('liability', 'liability_current', 'liability_non_current'):
-                        tax_account_id = invoice_line.account_id.id
-                        if tax_account_id not in tax_accounts:
-                            tax_accounts[tax_account_id] = 0.0
-                        # Use balance (credit is positive for tax, so we use abs)
-                        tax_amount = abs(invoice_line.balance)
-                        tax_accounts[tax_account_id] += tax_amount
-                        total_tax_amount += tax_amount
-            
-            _logger.info("[ADVANCE COMPLETION] Extracted from invoice - Sales: %.2f, Tax: %.2f, Total: %.2f", 
-                        total_sales_amount, total_tax_amount, invoice.amount_total)
-            
-            # --------------------------------------------------
-            # 5) CREATE SINGLE JOURNAL ENTRY (Last Part)
-            # --------------------------------------------------
-            # According to new requirements:
+            # IMPORTANT: The invoice already contains Sales and Tax lines.
+            # We should NOT duplicate them in the completion move.
+            # The completion move should only record:
             # - Debit: Cash/Bank (remaining amount)
             # - Debit: Advance Account (advance amount)
-            # - Credit: Sales Account(s) - from invoice
-            # - Credit: Tax Account(s) - from invoice
-            # - Credit: Receivable Account - to reconcile with invoice
+            # - Credit: Receivable Account (to reconcile with invoice)
+            #
+            # The invoice already has:
+            # - Debit: Receivable
+            # - Credit: Sales
+            # - Credit: Tax
+            #
+            # So the completion move will reconcile with the invoice's Receivable line.
+            
+            _logger.info("[ADVANCE COMPLETION] Invoice created - ID: %d, Amount: %.2f", 
+                        invoice.id, invoice.amount_total)
+            _logger.info("[ADVANCE COMPLETION] Invoice already contains Sales and Tax lines - we will NOT duplicate them in completion move")
             
             advance_account = pos_config.pos_advance_account_id
+            receivable_account = partner.property_account_receivable_id
             move_line_vals = []
             
-            # Get payment journal for remaining amount
+            # --------------------------------------------------
+            # Debit: Cash/Bank (remaining amount)
+            # --------------------------------------------------
             if advance.remaining_amount > 0:
                 if advance.payment_type == 'mixed':
                     # For mixed payment, we need to create separate debit lines for cash and card
@@ -1082,7 +1050,9 @@ class PosAdvancePayment(models.Model):
                             'credit': 0.0,
                         }))
             
+            # --------------------------------------------------
             # Debit: Advance Account (to zero it out)
+            # --------------------------------------------------
             move_line_vals.append((0, 0, {
                 'name': _('Apply Advance Payment: %s') % advance.name,
                 'partner_id': partner.id,
@@ -1091,126 +1061,53 @@ class PosAdvancePayment(models.Model):
                 'credit': 0.0,
             }))
             
-            # Credit: Sales Account(s)
-            for sales_account_id, amount in sales_accounts.items():
-                move_line_vals.append((0, 0, {
-                    'name': _('Sales from Advance: %s') % advance.name,
-                    'partner_id': partner.id,
-                    'account_id': sales_account_id,
-                    'debit': 0.0,
-                    'credit': amount,
-                }))
-            
-            # Credit: Tax Account(s)
-            for tax_account_id, amount in tax_accounts.items():
-                move_line_vals.append((0, 0, {
-                    'name': _('Tax from Advance: %s') % advance.name,
-                    'partner_id': partner.id,
-                    'account_id': tax_account_id,
-                    'debit': 0.0,
-                    'credit': amount,
-                }))
-            
-            # Calculate total debits and credits (before adding Receivable)
+            # --------------------------------------------------
+            # Credit: Receivable Account (to reconcile with invoice)
+            # --------------------------------------------------
+            # The total debit should equal invoice.amount_total
+            # Debit = Cash/Bank (remaining) + Advance Account (advance) = invoice.amount_total
+            # Credit = Receivable = invoice.amount_total
             total_debit = sum(line_vals[2].get('debit', 0.0) for line_vals in move_line_vals if isinstance(line_vals, tuple) and len(line_vals) > 2)
-            total_credit = sum(line_vals[2].get('credit', 0.0) for line_vals in move_line_vals if isinstance(line_vals, tuple) and len(line_vals) > 2)
             
-            _logger.info("[ADVANCE COMPLETION] Balance check - Total Debit: %.2f, Total Credit (before Receivable): %.2f", 
-                        total_debit, total_credit)
+            move_line_vals.append((0, 0, {
+                'name': _('Invoice Receivable: %s') % invoice.name,
+                'partner_id': partner.id,
+                'account_id': receivable_account.id,
+                'debit': 0.0,
+                'credit': total_debit,  # This should equal invoice.amount_total
+            }))
             
-            # IMPORTANT: For reconciliation with invoice
-            # The invoice has: Debit Receivable = invoice.amount_total
-            # We need to ensure the completion move can be reconciled
-            #
-            # The completion move structure:
-            # - Debit: Cash/Bank (remaining_amount) + Advance Account (advance.amount_paid)
-            # - Credit: Sales + Tax + Receivable (if needed for balance)
-            #
-            # If Sales + Tax = Invoice Total, then:
-            #   - Total Debit = remaining + advance = Invoice Total
-            #   - Total Credit (Sales + Tax) = Invoice Total
-            #   - Balance = 0 (no Receivable line needed)
-            #   - Reconciliation: Invoice Receivable (Debit) will be reconciled with Cash/Bank + Advance (Credit)
-            #
-            # If Sales + Tax < Invoice Total (shouldn't happen, but handle it):
-            #   - Receivable = Invoice Total - (Sales + Tax) (Credit)
-            #
-            # If Sales + Tax > Invoice Total (shouldn't happen, but handle it):
-            #   - Receivable = (Sales + Tax) - Invoice Total (Debit)
+            _logger.info("[ADVANCE COMPLETION] Creating completion move for advance %s", advance.name)
+            _logger.info("[ADVANCE COMPLETION] Remaining Amount: %.2f, Advance Amount: %.2f", 
+                        advance.remaining_amount, advance.amount_paid)
+            _logger.info("[ADVANCE COMPLETION] Total Debit: %.2f, Receivable Credit: %.2f, Invoice Total: %.2f", 
+                        total_debit, total_debit, invoice.amount_total)
             
-            receivable_account = partner.property_account_receivable_id
-            receivable_balance = total_debit - total_credit
-            
-            # IMPORTANT: We always need a Receivable line for reconciliation with invoice
-            # The invoice has: Debit Receivable = invoice.amount_total
-            # We need: Credit Receivable in completion move for reconciliation
-            # 
-            # However, if Sales + Tax = Invoice Total, then:
-            #   - Total Debit = remaining + advance = Invoice Total
-            #   - Total Credit (Sales + Tax) = Invoice Total
-            #   - Balance = 0 (balanced without Receivable)
-            #
-            # Solution: Add Receivable Credit = Invoice Total for reconciliation
-            # And adjust one of the Debit lines to balance the entry
-            
-            if abs(receivable_balance) > 0.01:  # Significant difference - add Receivable for balance
-                if receivable_balance > 0.0:
-                    # Need Credit Receivable to balance
-                    move_line_vals.append((0, 0, {
-                        'name': _('Invoice Receivable: %s') % invoice.name,
-                        'partner_id': partner.id,
-                        'account_id': receivable_account.id,
-                        'debit': 0.0,
-                        'credit': receivable_balance,
-                    }))
-                    _logger.info("[ADVANCE COMPLETION] Added Receivable Credit line - Amount: %.2f (for balance and reconciliation)", receivable_balance)
-                else:
-                    # Need Debit Receivable to balance (unusual)
-                    move_line_vals.append((0, 0, {
-                        'name': _('Invoice Receivable: %s') % invoice.name,
-                        'partner_id': partner.id,
-                        'account_id': receivable_account.id,
-                        'debit': abs(receivable_balance),
-                        'credit': 0.0,
-                    }))
-                    _logger.warning("[ADVANCE COMPLETION] Added Receivable Debit line - Amount: %.2f (unusual!)", abs(receivable_balance))
-            else:
-                # Entry is balanced (Sales + Tax = Cash + Advance = Invoice Total)
-                # We need Receivable Credit for reconciliation with invoice
-                # But adding it alone would unbalance the entry (Credit > Debit by invoice.amount_total)
-                # 
-                # Solution: Add Receivable Credit for reconciliation, and adjust Cash/Bank debit to balance
-                # This is the standard Odoo approach - when payment destination is Receivable Account,
-                # the Cash/Bank debit equals the full payment amount (not just remaining)
-                #
-                # The accounting structure:
-                # - Debit: Cash/Bank (remaining + invoice_total) + Advance Account (advance)
-                # - Credit: Sales + Tax + Receivable
-                # 
-                # Note: Cash/Bank = remaining + invoice_total is correct for reconciliation purposes
-                # because the total cash collected = remaining (at completion) + advance (already paid) = invoice_total
-                
-                move_line_vals.append((0, 0, {
+            # Verify that total_debit equals invoice.amount_total (they should be equal)
+            if abs(total_debit - invoice.amount_total) > 0.01:
+                _logger.warning("[ADVANCE COMPLETION] Warning: Total Debit (%.2f) != Invoice Total (%.2f). Using invoice.amount_total for Receivable.", 
+                               total_debit, invoice.amount_total)
+                # Update Receivable credit to match invoice.amount_total
+                move_line_vals[-1] = (0, 0, {
                     'name': _('Invoice Receivable: %s') % invoice.name,
                     'partner_id': partner.id,
                     'account_id': receivable_account.id,
                     'debit': 0.0,
                     'credit': invoice.amount_total,
-                }))
-                _logger.info("[ADVANCE COMPLETION] Added Receivable Credit line (%.2f) for reconciliation. Entry was balanced, adjusting Cash/Bank line.", invoice.amount_total)
-                
-                # Adjust Cash/Bank line debit to balance with Receivable Credit
+                })
+                # Adjust Cash/Bank line to balance
                 # Find the Cash/Bank debit line (first debit line that's not Advance Account)
-                for i in range(len(move_line_vals) - 1):  # Skip the Receivable line we just added
+                for i in range(len(move_line_vals) - 1):  # Skip the Receivable line
                     line_val = move_line_vals[i]
                     if isinstance(line_val, tuple) and len(line_val) > 2:
                         line_dict = line_val[2]
                         if line_dict.get('debit', 0.0) > 0.0 and line_dict.get('account_id') != advance_account.id:
                             # This is the Cash/Bank line - adjust it
                             current_debit = line_dict.get('debit', 0.0)
-                            line_dict['debit'] = current_debit + invoice.amount_total
-                            _logger.info("[ADVANCE COMPLETION] Adjusted Cash/Bank line debit from %.2f to %.2f to balance with Receivable Credit (standard Odoo approach)", 
-                                       current_debit, current_debit + invoice.amount_total)
+                            adjustment = invoice.amount_total - advance.amount_paid - current_debit
+                            line_dict['debit'] = current_debit + adjustment
+                            _logger.info("[ADVANCE COMPLETION] Adjusted Cash/Bank line debit from %.2f to %.2f to balance with Invoice Total", 
+                                       current_debit, current_debit + adjustment)
                             break
             
             # Create the journal entry
@@ -1237,11 +1134,6 @@ class PosAdvancePayment(models.Model):
                 'line_ids': move_line_vals,
             })
             
-            _logger.info("[ADVANCE COMPLETION] Creating completion move for advance %s", advance.name)
-            _logger.info("[ADVANCE COMPLETION] Remaining Amount: %.2f, Advance Amount: %.2f", 
-                        advance.remaining_amount, advance.amount_paid)
-            _logger.info("[ADVANCE COMPLETION] Sales Amount: %.2f, Tax Amount: %.2f, Invoice Total: %.2f", 
-                        total_sales_amount, total_tax_amount, invoice.amount_total)
             
             completion_move.action_post()
             
