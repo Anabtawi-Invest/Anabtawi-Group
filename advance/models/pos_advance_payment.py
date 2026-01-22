@@ -1,6 +1,7 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 from odoo.tools import float_compare
+from datetime import timedelta
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -494,6 +495,19 @@ class PosAdvancePayment(models.Model):
 
                 # Get pos.payment.method for cash journal
                 cash_pos_payment_method = advance._get_pos_payment_method_from_journal(cash_journal, pos_config)
+                
+                # Verify that payment method is linked to this POS config only
+                # If it's linked to another config, don't set pos_payment_method_id to avoid constraint error
+                can_use_payment_method = True
+                if cash_pos_payment_method:
+                    other_configs = self.env['pos.config'].search([
+                        ('payment_method_ids', 'in', [cash_pos_payment_method.id]),
+                        ('id', '!=', pos_config.id),
+                    ])
+                    if other_configs:
+                        _logger.warning("[ADVANCE PAYMENT] Cash payment method %s (ID: %d) is linked to other POS configs: %s. Not setting pos_payment_method_id to avoid constraint error.",
+                                       cash_pos_payment_method.name, cash_pos_payment_method.id, other_configs.mapped('name'))
+                        can_use_payment_method = False
 
                 # Create account.payment
                 cash_payment_method_line = cash_journal.inbound_payment_method_line_ids[:1]
@@ -509,7 +523,8 @@ class PosAdvancePayment(models.Model):
                 _logger.info("[ADVANCE PAYMENT] Payment Method Line: %s, Payment Account: %s",
                              cash_payment_method_line.name,
                              cash_payment_method_line.payment_account_id.name if cash_payment_method_line.payment_account_id else "None")
-                cash_payment = self.env['account.payment'].sudo().create({
+                
+                payment_vals = {
                     'payment_type': 'inbound',
                     'partner_type': 'customer',
                     'partner_id': partner_id,
@@ -520,7 +535,38 @@ class PosAdvancePayment(models.Model):
                     'date': fields.Date.context_today(self),
                     'memo': _('%s (Cash)') % advance.name,
                     'destination_account_id': pos_config.pos_advance_account_id.id,
-                })
+                    'pos_session_id': pos_session.id,
+                }
+                # Only set pos_payment_method_id if it's safe (not linked to other configs)
+                if can_use_payment_method and cash_pos_payment_method:
+                    payment_vals['pos_payment_method_id'] = cash_pos_payment_method.id
+                
+                _logger.info("[ADVANCE PAYMENT] About to create account.payment for cash payment:")
+                _logger.info("  - Amount: %.2f", cash_amount)
+                _logger.info("  - Partner: %s (ID: %d)", partner.name, partner_id)
+                _logger.info("  - Journal: %s (ID: %d)", cash_journal.name, cash_journal.id)
+                _logger.info("  - Destination Account: %s (ID: %d)", pos_config.pos_advance_account_id.name, pos_config.pos_advance_account_id.id)
+                
+                # Count existing payments before creation
+                existing_payments_before = self.env['account.payment'].search_count([
+                    ('partner_id', '=', partner_id),
+                    ('amount', '=', cash_amount),
+                    ('create_date', '>=', fields.Datetime.now() - timedelta(minutes=1)),
+                ])
+                _logger.info("[ADVANCE PAYMENT] Existing payments with same amount (last minute): %d", existing_payments_before)
+                
+                cash_payment = self.env['account.payment'].sudo().create(payment_vals)
+                _logger.info("[ADVANCE PAYMENT] ✓ Created account.payment - ID: %d, Name: %s, Amount: %.2f", 
+                            cash_payment.id, cash_payment.name, cash_payment.amount)
+                
+                # Count existing payments after creation
+                existing_payments_after = self.env['account.payment'].search_count([
+                    ('partner_id', '=', partner_id),
+                    ('amount', '=', cash_amount),
+                    ('create_date', '>=', fields.Datetime.now() - timedelta(minutes=1)),
+                ])
+                _logger.info("[ADVANCE PAYMENT] Total payments with same amount (last minute): %d", existing_payments_after)
+                
                 # Flush to ensure computed fields are updated
                 cash_payment.flush_recordset(['outstanding_account_id', 'destination_account_id'])
 
@@ -580,6 +626,19 @@ class PosAdvancePayment(models.Model):
             if card_amount > 0:
                 # Get pos.payment.method for card journal
                 card_pos_payment_method = advance._get_pos_payment_method_from_journal(card_journal, pos_config)
+                
+                # Verify that payment method is linked to this POS config only
+                # If it's linked to another config, don't set pos_payment_method_id to avoid constraint error
+                can_use_payment_method = True
+                if card_pos_payment_method:
+                    other_configs = self.env['pos.config'].search([
+                        ('payment_method_ids', 'in', [card_pos_payment_method.id]),
+                        ('id', '!=', pos_config.id),
+                    ])
+                    if other_configs:
+                        _logger.warning("[ADVANCE PAYMENT] Card payment method %s (ID: %d) is linked to other POS configs: %s. Not setting pos_payment_method_id to avoid constraint error.",
+                                       card_pos_payment_method.name, card_pos_payment_method.id, other_configs.mapped('name'))
+                        can_use_payment_method = False
 
                 # Create account.payment
                 card_payment_method_line = card_journal.inbound_payment_method_line_ids[:1]
@@ -595,7 +654,8 @@ class PosAdvancePayment(models.Model):
                 _logger.info("[ADVANCE PAYMENT] Payment Method Line: %s, Payment Account: %s",
                              card_payment_method_line.name,
                              card_payment_method_line.payment_account_id.name if card_payment_method_line.payment_account_id else "None")
-                card_payment = self.env['account.payment'].sudo().create({
+                
+                payment_vals = {
                     'payment_type': 'inbound',
                     'partner_type': 'customer',
                     'partner_id': partner_id,
@@ -606,7 +666,13 @@ class PosAdvancePayment(models.Model):
                     'date': fields.Date.context_today(self),
                     'memo': _('%s (Card)') % advance.name,
                     'destination_account_id': pos_config.pos_advance_account_id.id,
-                })
+                    'pos_session_id': pos_session.id,
+                }
+                # Only set pos_payment_method_id if it's safe (not linked to other configs)
+                if can_use_payment_method and card_pos_payment_method:
+                    payment_vals['pos_payment_method_id'] = card_pos_payment_method.id
+                
+                card_payment = self.env['account.payment'].sudo().create(payment_vals)
                 # Flush to ensure computed fields are updated
                 card_payment.flush_recordset(['outstanding_account_id', 'destination_account_id'])
 
@@ -672,6 +738,19 @@ class PosAdvancePayment(models.Model):
             # Single payment type (cash or card)
             # Get pos.payment.method for journal
             pos_payment_method = advance._get_pos_payment_method_from_journal(journal, pos_config)
+            
+            # Verify that payment method is linked to this POS config only
+            # If it's linked to another config, don't set pos_payment_method_id to avoid constraint error
+            can_use_payment_method = True
+            if pos_payment_method:
+                other_configs = self.env['pos.config'].search([
+                    ('payment_method_ids', 'in', [pos_payment_method.id]),
+                    ('id', '!=', pos_config.id),
+                ])
+                if other_configs:
+                    _logger.warning("[ADVANCE PAYMENT] Payment method %s (ID: %d) is linked to other POS configs: %s. Not setting pos_payment_method_id to avoid constraint error.",
+                                   pos_payment_method.name, pos_payment_method.id, other_configs.mapped('name'))
+                    can_use_payment_method = False
 
             # Create account.payment
             payment_method_line = journal.inbound_payment_method_line_ids[:1]
@@ -689,7 +768,8 @@ class PosAdvancePayment(models.Model):
             _logger.info("[ADVANCE PAYMENT] Payment Method Line: %s, Payment Account: %s",
                          payment_method_line.name,
                          payment_method_line.payment_account_id.name if payment_method_line.payment_account_id else "None")
-            main_payment = self.env['account.payment'].sudo().create({
+            
+            payment_vals = {
                 'payment_type': 'inbound',
                 'partner_type': 'customer',
                 'partner_id': partner_id,
@@ -700,7 +780,13 @@ class PosAdvancePayment(models.Model):
                 'date': fields.Date.context_today(self),
                 'memo': advance.name,
                 'destination_account_id': pos_config.pos_advance_account_id.id,
-            })
+                'pos_session_id': pos_session.id,
+            }
+            # Only set pos_payment_method_id if it's safe (not linked to other configs)
+            if can_use_payment_method and pos_payment_method:
+                payment_vals['pos_payment_method_id'] = pos_payment_method.id
+            
+            main_payment = self.env['account.payment'].sudo().create(payment_vals)
             # Flush to ensure computed fields are updated
             main_payment.flush_recordset(['outstanding_account_id', 'destination_account_id'])
 
@@ -971,6 +1057,16 @@ class PosAdvancePayment(models.Model):
             # --------------------------------------------------
             # IMPORTANT: Create pos.payment BEFORE creating invoice
             # Because invoice creation may change pos_order.state to 'done', which prevents pos.payment creation
+            _logger.info("[ADVANCE COMPLETION] =========================================")
+            _logger.info("[ADVANCE COMPLETION] Creating payments for remaining amount - Advance: %s (ID: %d)", advance.name, advance.id)
+            _logger.info("[ADVANCE COMPLETION] Remaining Amount: %.2f, Payment Type: %s", advance.remaining_amount, advance.payment_type)
+            
+            # Count existing pos.payment records before creation
+            existing_pos_payments_before = self.env['pos.payment'].search_count([
+                ('pos_order_id', '=', pos_order.id),
+            ])
+            _logger.info("[ADVANCE COMPLETION] Existing pos.payment records before: %d", existing_pos_payments_before)
+            
             if advance.remaining_amount > 0:
                 if advance.payment_type == 'mixed':
                     cash_journal = pos_config.pos_cash_journal_id if cash_amount > 0 else None
@@ -978,30 +1074,59 @@ class PosAdvancePayment(models.Model):
 
                     if cash_amount > 0 and cash_journal:
                         cash_pos_payment_method = advance._get_pos_payment_method_from_journal(cash_journal, pos_config)
-                        self.env['pos.payment'].sudo().create({
+                        _logger.info("[ADVANCE COMPLETION] Creating cash pos.payment - Amount: %.2f, Method: %s", 
+                                    cash_amount, cash_pos_payment_method.name)
+                        cash_pos_payment = self.env['pos.payment'].sudo().create({
                             'pos_order_id': pos_order.id,
                             'payment_method_id': cash_pos_payment_method.id,
                             'amount': cash_amount,
                             'payment_date': fields.Datetime.now(),
                         })
+                        _logger.info("[ADVANCE COMPLETION] ✓ Created cash pos.payment - ID: %d, Amount: %.2f", 
+                                    cash_pos_payment.id, cash_pos_payment.amount)
 
                     if card_amount > 0 and card_journal:
                         card_pos_payment_method = advance._get_pos_payment_method_from_journal(card_journal, pos_config)
-                        self.env['pos.payment'].sudo().create({
+                        _logger.info("[ADVANCE COMPLETION] Creating card pos.payment - Amount: %.2f, Method: %s", 
+                                    card_amount, card_pos_payment_method.name)
+                        card_pos_payment = self.env['pos.payment'].sudo().create({
                             'pos_order_id': pos_order.id,
                             'payment_method_id': card_pos_payment_method.id,
                             'amount': card_amount,
                             'payment_date': fields.Datetime.now(),
                         })
+                        _logger.info("[ADVANCE COMPLETION] ✓ Created card pos.payment - ID: %d, Amount: %.2f", 
+                                    card_pos_payment.id, card_pos_payment.amount)
                 else:
                     journal = advance._get_payment_journal()
                     pos_payment_method = advance._get_pos_payment_method_from_journal(journal, pos_config)
-                    self.env['pos.payment'].sudo().create({
+                    _logger.info("[ADVANCE COMPLETION] Creating pos.payment - Amount: %.2f, Method: %s, Journal: %s", 
+                                advance.remaining_amount, pos_payment_method.name, journal.name)
+                    pos_payment = self.env['pos.payment'].sudo().create({
                         'pos_order_id': pos_order.id,
                         'payment_method_id': pos_payment_method.id,
                         'amount': advance.remaining_amount,
                         'payment_date': fields.Datetime.now(),
                     })
+                    _logger.info("[ADVANCE COMPLETION] ✓ Created pos.payment - ID: %d, Amount: %.2f", 
+                                pos_payment.id, pos_payment.amount)
+            else:
+                _logger.info("[ADVANCE COMPLETION] No remaining amount - skipping pos.payment creation")
+            
+            # Count existing pos.payment records after creation
+            existing_pos_payments_after = self.env['pos.payment'].search_count([
+                ('pos_order_id', '=', pos_order.id),
+            ])
+            _logger.info("[ADVANCE COMPLETION] Total pos.payment records after: %d (Created: %d)", 
+                        existing_pos_payments_after, existing_pos_payments_after - existing_pos_payments_before)
+            
+            # Count account.payment records before invoice creation
+            account_payments_before = self.env['account.payment'].search_count([
+                ('partner_id', '=', partner.id),
+                ('pos_session_id', '=', pos_session.id),
+                ('create_date', '>=', fields.Datetime.now() - timedelta(minutes=5)),
+            ])
+            _logger.info("[ADVANCE COMPLETION] account.payment records before invoice creation: %d", account_payments_before)
 
             # --------------------------------------------------
             # 4) GENERATE INVOICE FROM POS ORDER FIRST
@@ -1011,6 +1136,28 @@ class PosAdvancePayment(models.Model):
             invoice = pos_order._generate_pos_order_invoice()
             _logger.info("[ADVANCE COMPLETION] Invoice created - ID: %d, Amount: %.2f",
                          invoice.id, invoice.amount_total)
+            
+            # Count account.payment records after invoice creation
+            account_payments_after = self.env['account.payment'].search_count([
+                ('partner_id', '=', partner.id),
+                ('pos_session_id', '=', pos_session.id),
+                ('create_date', '>=', fields.Datetime.now() - timedelta(minutes=5)),
+            ])
+            _logger.info("[ADVANCE COMPLETION] account.payment records after invoice creation: %d (New: %d)", 
+                        account_payments_after, account_payments_after - account_payments_before)
+            
+            if account_payments_after > account_payments_before:
+                new_payments = self.env['account.payment'].search([
+                    ('partner_id', '=', partner.id),
+                    ('pos_session_id', '=', pos_session.id),
+                    ('create_date', '>=', fields.Datetime.now() - timedelta(minutes=5)),
+                ], order='create_date desc', limit=account_payments_after - account_payments_before)
+                _logger.info("[ADVANCE COMPLETION] ⚠️ New account.payment records created during completion:")
+                for payment in new_payments:
+                    _logger.info("  - Payment ID: %d, Name: %s, Amount: %.2f, State: %s", 
+                               payment.id, payment.name, payment.amount, payment.state)
+            else:
+                _logger.info("[ADVANCE COMPLETION] ✓ No new account.payment records created (expected - only pos.payment created)")
 
             # --------------------------------------------------
             # 4) CREATE COMPLETION JOURNAL ENTRY
@@ -1221,6 +1368,50 @@ class PosAdvancePayment(models.Model):
                 'state': 'invoiced',
                 'pos_order_id': pos_order.id,
             })
+            
+            # --------------------------------------------------
+            # 9) LOG SUMMARY OF ALL PAYMENTS CREATED
+            # --------------------------------------------------
+            _logger.info("[ADVANCE COMPLETION] =========================================")
+            _logger.info("[ADVANCE COMPLETION] PAYMENT SUMMARY for Advance: %s (ID: %d)", advance.name, advance.id)
+            
+            # Summary of pos.payment records
+            all_pos_payments = self.env['pos.payment'].search([
+                ('pos_order_id', '=', pos_order.id),
+            ])
+            _logger.info("[ADVANCE COMPLETION] pos.payment records created: %d", len(all_pos_payments))
+            total_pos_payment_amount = 0.0
+            for pos_payment in all_pos_payments:
+                _logger.info("  - pos.payment ID: %d, Amount: %.2f, Method: %s, Date: %s", 
+                           pos_payment.id, pos_payment.amount, pos_payment.payment_method_id.name, pos_payment.payment_date)
+                total_pos_payment_amount += pos_payment.amount
+            _logger.info("[ADVANCE COMPLETION] Total pos.payment amount: %.2f", total_pos_payment_amount)
+            
+            # Summary of account.payment records (should be 0 - only pos.payment created)
+            final_account_payments = self.env['account.payment'].search([
+                ('partner_id', '=', partner.id),
+                ('pos_session_id', '=', pos_session.id),
+                ('create_date', '>=', fields.Datetime.now() - timedelta(minutes=5)),
+            ])
+            _logger.info("[ADVANCE COMPLETION] account.payment records in session: %d", len(final_account_payments))
+            if final_account_payments:
+                _logger.warning("[ADVANCE COMPLETION] ⚠️ account.payment records found (should be 0 for completion):")
+                for payment in final_account_payments:
+                    _logger.warning("  - account.payment ID: %d, Name: %s, Amount: %.2f, State: %s, Memo: %s", 
+                                  payment.id, payment.name, payment.amount, payment.state, payment.memo or "None")
+            else:
+                _logger.info("[ADVANCE COMPLETION] ✓ No account.payment records created (expected - only pos.payment)")
+            
+            # Summary of advance payments (original)
+            _logger.info("[ADVANCE COMPLETION] Original advance payment:")
+            if advance.payment_id:
+                _logger.info("  - account.payment ID: %d, Amount: %.2f", advance.payment_id.id, advance.payment_id.amount)
+            if advance.cash_payment_id:
+                _logger.info("  - Cash account.payment ID: %d, Amount: %.2f", advance.cash_payment_id.id, advance.cash_payment_id.amount)
+            if advance.card_payment_id:
+                _logger.info("  - Card account.payment ID: %d, Amount: %.2f", advance.card_payment_id.id, advance.card_payment_id.amount)
+            
+            _logger.info("[ADVANCE COMPLETION] =========================================")
 
             # --------------------------------------------------
             # 8) CREATE POS.PLEDGE RECORD IF NEEDED
