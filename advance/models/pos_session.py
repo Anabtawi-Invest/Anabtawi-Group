@@ -2,6 +2,7 @@
 from odoo import models, api, fields, _
 from collections import defaultdict
 from odoo.tools import float_is_zero, frozendict
+from datetime import timedelta
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -41,9 +42,80 @@ class PosSession(models.Model):
         _logger.info("[ADVANCE SESSION CLOSE] Parameters - balancing_account: %s, amount_to_balance: %.2f",
                     balancing_account.name if balancing_account else "None", amount_to_balance)
         
+        # Count account.payment records before closing
+        account_payments_before = self.env['account.payment'].search_count([
+            ('pos_session_id', '=', self.id),
+        ])
+        _logger.info("[ADVANCE SESSION CLOSE] account.payment records before closing: %d", account_payments_before)
+        
+        # Count advance orders and their payments
+        advance_orders = self.order_ids.filtered(lambda o: getattr(o, 'is_advance_order', False))
+        advance_account_payments = self.env['account.payment'].search([
+            ('pos_session_id', '=', self.id),
+        ]).filtered(lambda p: p.pos_order_id and getattr(p.pos_order_id, 'is_advance_order', False))
+        _logger.info("[ADVANCE SESSION CLOSE] Advance orders in session: %d", len(advance_orders))
+        _logger.info("[ADVANCE SESSION CLOSE] Advance account.payment records: %d", len(advance_account_payments))
+        
+        if advance_account_payments:
+            _logger.info("[ADVANCE SESSION CLOSE] Advance account.payment details:")
+            for payment in advance_account_payments:
+                _logger.info("  - Payment ID: %d, Name: %s, Amount: %.2f, State: %s, Order: %s", 
+                           payment.id, payment.name, payment.amount, payment.state,
+                           payment.pos_order_id.name if payment.pos_order_id else "None")
+        
         # Call parent method
         result = super()._validate_session(balancing_account, amount_to_balance, bank_payment_method_diffs)
         
+        # Count account.payment records after closing
+        account_payments_after = self.env['account.payment'].search_count([
+            ('pos_session_id', '=', self.id),
+        ])
+        _logger.info("[ADVANCE SESSION CLOSE] account.payment records after closing: %d (New: %d)", 
+                    account_payments_after, account_payments_after - account_payments_before)
+        
+        if account_payments_after > account_payments_before:
+            new_payments = self.env['account.payment'].search([
+                ('pos_session_id', '=', self.id),
+            ], order='create_date desc', limit=account_payments_after - account_payments_before)
+            _logger.info("[ADVANCE SESSION CLOSE] ⚠️ New account.payment records created during closing:")
+            for payment in new_payments:
+                is_advance = payment.pos_order_id and getattr(payment.pos_order_id, 'is_advance_order', False)
+                _logger.info("  - Payment ID: %d, Name: %s, Amount: %.2f, State: %s, Order: %s, Is Advance: %s", 
+                           payment.id, payment.name, payment.amount, payment.state,
+                           payment.pos_order_id.name if payment.pos_order_id else "None", is_advance)
+                if is_advance:
+                    _logger.error("[ADVANCE SESSION CLOSE] ⚠️ ERROR: account.payment created for advance order during closing!")
+        else:
+            _logger.info("[ADVANCE SESSION CLOSE] ✓ No new account.payment records created during closing (expected)")
+        
+        # Summary of all payments in session
+        all_account_payments = self.env['account.payment'].search([
+            ('pos_session_id', '=', self.id),
+        ])
+        _logger.info("[ADVANCE SESSION CLOSE] =========================================")
+        _logger.info("[ADVANCE SESSION CLOSE] FINAL PAYMENT SUMMARY for Session: %s (ID: %d)", self.name, self.id)
+        _logger.info("[ADVANCE SESSION CLOSE] Total account.payment records: %d", len(all_account_payments))
+        
+        advance_payments_summary = all_account_payments.filtered(
+            lambda p: p.pos_order_id and getattr(p.pos_order_id, 'is_advance_order', False)
+        )
+        regular_payments_summary = all_account_payments - advance_payments_summary
+        
+        _logger.info("[ADVANCE SESSION CLOSE] Advance account.payment records: %d", len(advance_payments_summary))
+        if advance_payments_summary:
+            total_advance_amount = sum(advance_payments_summary.mapped('amount'))
+            _logger.info("[ADVANCE SESSION CLOSE] Total advance payment amount: %.2f", total_advance_amount)
+            for payment in advance_payments_summary:
+                _logger.info("  - Advance Payment ID: %d, Name: %s, Amount: %.2f, State: %s, Order: %s", 
+                           payment.id, payment.name, payment.amount, payment.state,
+                           payment.pos_order_id.name if payment.pos_order_id else "None")
+        
+        _logger.info("[ADVANCE SESSION CLOSE] Regular account.payment records: %d", len(regular_payments_summary))
+        if regular_payments_summary:
+            total_regular_amount = sum(regular_payments_summary.mapped('amount'))
+            _logger.info("[ADVANCE SESSION CLOSE] Total regular payment amount: %.2f", total_regular_amount)
+        
+        _logger.info("[ADVANCE SESSION CLOSE] =========================================")
         _logger.info("[ADVANCE SESSION CLOSE] _validate_session completed")
         return result
 
@@ -132,9 +204,37 @@ class PosSession(models.Model):
         _logger.info("[ADVANCE SESSION CLOSE] Starting _accumulate_amounts for session %s", self.name)
         _logger.info("[ADVANCE SESSION CLOSE] Total closed orders: %d", len(closed_orders))
         
+        # Count advance orders, completion orders, and their payments
+        advance_orders_count = 0
+        completion_orders_count = 0
+        advance_payments_count = 0
+        completion_payments_count = 0
+        advance_payments_total = 0.0
+        completion_payments_total = 0.0
+        
         for order in closed_orders:
             # Skip sales/taxes calculations for advance orders, but keep payments
+            # Check both is_advance_order (for initial advance orders) and advance_payment_id (for completion orders)
             is_advance_order = getattr(order, 'is_advance_order', False)
+            is_completion_order = bool(order.advance_payment_id)
+            is_advance_related = is_advance_order or is_completion_order
+            
+            if is_advance_order:
+                advance_orders_count += 1
+                for payment in order.payment_ids:
+                    if payment.payment_method_id.type != 'pay_later':
+                        advance_payments_count += 1
+                        advance_payments_total += payment.amount
+            
+            # Also count completion orders (orders with advance_payment_id)
+            if is_completion_order and not is_advance_order:
+                completion_orders_count += 1
+                for payment in order.payment_ids:
+                    if payment.payment_method_id.type != 'pay_later':
+                        completion_payments_count += 1
+                        completion_payments_total += payment.amount
+                _logger.info("[ADVANCE SESSION CLOSE] Found completion order: %s (ID: %d), Advance Payment ID: %d", 
+                           order.name, order.id, order.advance_payment_id.id)
             
             order_is_invoiced = order.is_invoiced
             for payment in order.payment_ids:
@@ -146,17 +246,24 @@ class PosSession(models.Model):
                 is_split_payment = payment.payment_method_id.split_transactions
                 payment_type = payment_method.type
 
-                # For advance orders, skip payment processing in session closing
-                # REASON: Advance payments are already recorded via account.payment when created
-                # (with Debit: Cash/Bank, Credit: Advance Account)
+                # For advance orders and completion orders, skip payment processing in session closing
+                # REASON: 
+                # - Advance payments: Already recorded via account.payment when created
+                #   (with Debit: Cash/Bank, Credit: Advance Account)
+                # - Completion payments: Already handled by Completion Move in action_create_invoice()
+                #   (Completion Move records: Debit Cash/Bank + Advance Account, Credit Receivable)
                 # No need to create additional journal entries during session closing
-                if is_advance_order and payment_type != 'pay_later':
-                    _logger.info("[ADVANCE SESSION CLOSE] Skipping advance payment in session closing:")
+                if is_advance_related and payment_type != 'pay_later':
+                    order_type = "Advance Order" if is_advance_order else "Completion Order"
+                    _logger.info("[ADVANCE SESSION CLOSE] Skipping %s payment in session closing:", order_type)
                     _logger.info("  - Order: %s (ID: %d)", order.name, order.id)
                     _logger.info("  - Amount: %.2f", amount)
-                    _logger.info("  - Reason: Already recorded via account.payment (journal entry exists)")
+                    if is_advance_order:
+                        _logger.info("  - Reason: Already recorded via account.payment (journal entry exists)")
+                    else:
+                        _logger.info("  - Reason: Already handled by Completion Move (journal entry exists)")
                     
-                    # Skip - payment already has journal entry from account.payment
+                    # Skip - payment already has journal entry (either from account.payment or Completion Move)
                     continue
 
                 # If not pay_later, we create the receivable vals for both invoiced and uninvoiced orders.
@@ -303,7 +410,17 @@ class PosSession(models.Model):
         MoveLine = self.env['account.move.line'].with_context(check_move_validity=False, skip_invoice_sync=True)
 
         _logger.info("[ADVANCE SESSION CLOSE] Summary of _accumulate_amounts:")
+        _logger.info("  - Advance orders found: %d", advance_orders_count)
+        _logger.info("  - Advance payments skipped: %d (Total amount: %.2f)", advance_payments_count, advance_payments_total)
         _logger.info("  - Advance payments are NOT processed here (already recorded via account.payment)")
+        _logger.info("  - Completion orders found: %d", completion_orders_count)
+        _logger.info("  - Completion payments skipped: %d (Total amount: %.2f)", completion_payments_count, completion_payments_total)
+        _logger.info("  - Completion payments are NOT processed here (already handled by Completion Move)")
+        _logger.info("  - Regular orders processed: %d", len(closed_orders) - advance_orders_count - completion_orders_count)
+        _logger.info("  - combine_receivables_bank entries: %d", len(combine_receivables_bank))
+        _logger.info("  - split_receivables_bank entries: %d", len(split_receivables_bank))
+        _logger.info("  - combine_receivables_cash entries: %d", len(combine_receivables_cash))
+        _logger.info("  - split_receivables_cash entries: %d", len(split_receivables_cash))
         
         data.update({
             'taxes':                               taxes,
@@ -335,15 +452,21 @@ class PosSession(models.Model):
         _logger.info("[ADVANCE SESSION CLOSE] Parameters - balancing_account: %s, amount_to_balance: %.2f",
                     balancing_account.name if balancing_account else "None", amount_to_balance)
         
-        # Check for advance orders in session
+        # Check for advance and completion orders in session
         all_orders = self.order_ids
         advance_orders = all_orders.filtered(lambda o: getattr(o, 'is_advance_order', False))
+        completion_orders = all_orders.filtered(lambda o: o.advance_payment_id and not getattr(o, 'is_advance_order', False))
         _logger.info("[ADVANCE SESSION CLOSE] Total orders in session: %d", len(all_orders))
         _logger.info("[ADVANCE SESSION CLOSE] Advance orders found: %d", len(advance_orders))
+        _logger.info("[ADVANCE SESSION CLOSE] Completion orders found: %d", len(completion_orders))
         if advance_orders:
             for order in advance_orders:
                 _logger.info("[ADVANCE SESSION CLOSE]   - Advance Order: %s (ID: %d) - Amount: %.2f - State: %s",
                             order.name, order.id, order.amount_total, order.state)
+        if completion_orders:
+            for order in completion_orders:
+                _logger.info("[ADVANCE SESSION CLOSE]   - Completion Order: %s (ID: %d) - Amount: %.2f - State: %s - Advance Payment ID: %d",
+                            order.name, order.id, order.amount_total, order.state, order.advance_payment_id.id)
         
         # Create account move (same as base)
         account_move = self.env['account.move'].create({
@@ -354,7 +477,7 @@ class PosSession(models.Model):
         self.write({'move_id': account_move.id})
         _logger.info("[ADVANCE SESSION CLOSE] Account Move created - ID: %d", account_move.id)
 
-        # Accumulate amounts (advance payments are skipped - already recorded via account.payment)
+        # Accumulate amounts (advance and completion payments are skipped - already recorded)
         data = {'bank_payment_method_diffs': bank_payment_method_diffs or {}}
         data = self._accumulate_amounts(data)
         
@@ -366,9 +489,11 @@ class PosSession(models.Model):
         data = self._create_invoice_receivable_lines(data)
         data = self._create_stock_valuation_lines(data)
         
-        # NOTE: Advance payments are NOT processed here
-        # They are already recorded via account.payment when advance order is created
-        # (with Debit: Cash/Bank, Credit: Advance Account)
+        # NOTE: Advance and completion payments are NOT processed here
+        # - Advance payments: Already recorded via account.payment when advance order is created
+        #   (with Debit: Cash/Bank, Credit: Advance Account)
+        # - Completion payments: Already handled by Completion Move in action_create_invoice()
+        #   (Completion Move records: Debit Cash/Bank + Advance Account, Credit Receivable)
         # No additional journal entries needed during session closing
         _logger.info("[ADVANCE SESSION CLOSE] Advance payments skipped - already recorded via account.payment")
         
@@ -399,6 +524,175 @@ class PosSession(models.Model):
                                 line.account_id.name, line.debit, line.credit, line.balance, line.name)
 
         return data
+    
+    def _create_bank_payment_moves(self, data):
+        """
+        Override to add logging and verify that advance payments are NOT processed
+        """
+        _logger.info("[ADVANCE SESSION CLOSE] =========================================")
+        _logger.info("[ADVANCE SESSION CLOSE] _create_bank_payment_moves called for session: %s (ID: %d)", self.name, self.id)
+        
+        combine_receivables_bank = data.get('combine_receivables_bank', {})
+        split_receivables_bank = data.get('split_receivables_bank', {})
+        
+        # Count advance and completion payments that should be skipped
+        advance_orders = self.order_ids.filtered(lambda o: getattr(o, 'is_advance_order', False))
+        completion_orders = self.order_ids.filtered(lambda o: o.advance_payment_id and not getattr(o, 'is_advance_order', False))
+        advance_bank_payments = []
+        completion_bank_payments = []
+        for order in advance_orders:
+            for payment in order.payment_ids:
+                if payment.payment_method_id.type == 'bank':
+                    advance_bank_payments.append(payment)
+        for order in completion_orders:
+            for payment in order.payment_ids:
+                if payment.payment_method_id.type == 'bank':
+                    completion_bank_payments.append(payment)
+        
+        _logger.info("[ADVANCE SESSION CLOSE] Bank payments processing:")
+        _logger.info("  - Total combine_receivables_bank entries: %d", len(combine_receivables_bank))
+        _logger.info("  - Total split_receivables_bank entries: %d", len(split_receivables_bank))
+        _logger.info("  - Advance orders with bank payments: %d", len(advance_bank_payments))
+        _logger.info("  - Completion orders with bank payments: %d", len(completion_bank_payments))
+        
+        all_advance_related_payments = advance_bank_payments + completion_bank_payments
+        if all_advance_related_payments:
+            _logger.info("[ADVANCE SESSION CLOSE] ✓ VERIFICATION: Advance/Completion bank payments should NOT be in receivables:")
+            for payment in all_advance_related_payments:
+                order_type = "Advance" if payment.pos_order_id in advance_orders else "Completion"
+                is_in_combine = any(pm.id == payment.payment_method_id.id for pm in combine_receivables_bank.keys())
+                is_in_split = payment in split_receivables_bank.keys()
+                if is_in_combine or is_in_split:
+                    _logger.error("[ADVANCE SESSION CLOSE] ⚠️ ERROR: %s payment found in receivables!", order_type)
+                    _logger.error("  - Payment: %s (ID: %d), Amount: %.2f", payment.pos_order_id.name, payment.id, payment.amount)
+                    _logger.error("  - In combine_receivables_bank: %s", is_in_combine)
+                    _logger.error("  - In split_receivables_bank: %s", is_in_split)
+                else:
+                    _logger.info("  - ✓ %s payment skipped correctly: %s (ID: %d), Amount: %.2f", 
+                                order_type, payment.pos_order_id.name, payment.id, payment.amount)
+        else:
+            _logger.info("[ADVANCE SESSION CLOSE] ✓ No advance/completion bank payments found - skipping verification")
+        
+        # Call parent method
+        result = super()._create_bank_payment_moves(data)
+        
+        # Verify that no account.payment was created for advance or completion payments
+        # Count account.payments created in this session
+        account_payments_created = self.env['account.payment'].search([
+            ('pos_session_id', '=', self.id),
+            ('create_date', '>=', fields.Datetime.now() - timedelta(seconds=5)),  # Created in last 5 seconds
+        ])
+        advance_account_payments = account_payments_created.filtered(
+            lambda p: p.pos_order_id and getattr(p.pos_order_id, 'is_advance_order', False)
+        )
+        completion_account_payments = account_payments_created.filtered(
+            lambda p: p.pos_order_id and p.pos_order_id.advance_payment_id and not getattr(p.pos_order_id, 'is_advance_order', False)
+        )
+        
+        all_advance_related_account_payments = advance_account_payments | completion_account_payments
+        if all_advance_related_account_payments:
+            _logger.error("[ADVANCE SESSION CLOSE] ⚠️ ERROR: account.payment was created for advance/completion payments during session closing!")
+            for payment in advance_account_payments:
+                _logger.error("  - account.payment ID: %d (Advance), Amount: %.2f, Order: %s", 
+                             payment.id, payment.amount, payment.pos_order_id.name if payment.pos_order_id else "None")
+            for payment in completion_account_payments:
+                _logger.error("  - account.payment ID: %d (Completion), Amount: %.2f, Order: %s", 
+                             payment.id, payment.amount, payment.pos_order_id.name if payment.pos_order_id else "None")
+        else:
+            _logger.info("[ADVANCE SESSION CLOSE] ✓ VERIFICATION: No account.payment created for advance/completion payments")
+        
+        _logger.info("[ADVANCE SESSION CLOSE] _create_bank_payment_moves completed")
+        return result
+    
+    def _create_cash_statement_lines_and_cash_move_lines(self, data):
+        """
+        Override to add logging and verify that advance payments are NOT processed
+        """
+        _logger.info("[ADVANCE SESSION CLOSE] =========================================")
+        _logger.info("[ADVANCE SESSION CLOSE] _create_cash_statement_lines_and_cash_move_lines called for session: %s (ID: %d)", self.name, self.id)
+        
+        combine_receivables_cash = data.get('combine_receivables_cash', {})
+        split_receivables_cash = data.get('split_receivables_cash', {})
+        
+        # Count advance and completion payments that should be skipped
+        advance_orders = self.order_ids.filtered(lambda o: getattr(o, 'is_advance_order', False))
+        completion_orders = self.order_ids.filtered(lambda o: o.advance_payment_id and not getattr(o, 'is_advance_order', False))
+        advance_cash_payments = []
+        completion_cash_payments = []
+        for order in advance_orders:
+            for payment in order.payment_ids:
+                if payment.payment_method_id.type == 'cash':
+                    advance_cash_payments.append(payment)
+        for order in completion_orders:
+            for payment in order.payment_ids:
+                if payment.payment_method_id.type == 'cash':
+                    completion_cash_payments.append(payment)
+        
+        _logger.info("[ADVANCE SESSION CLOSE] Cash payments processing:")
+        _logger.info("  - Total combine_receivables_cash entries: %d", len(combine_receivables_cash))
+        _logger.info("  - Total split_receivables_cash entries: %d", len(split_receivables_cash))
+        _logger.info("  - Advance orders with cash payments: %d", len(advance_cash_payments))
+        _logger.info("  - Completion orders with cash payments: %d", len(completion_cash_payments))
+        
+        all_advance_related_payments = advance_cash_payments + completion_cash_payments
+        if all_advance_related_payments:
+            _logger.info("[ADVANCE SESSION CLOSE] ✓ VERIFICATION: Advance/Completion cash payments should NOT be in receivables:")
+            for payment in all_advance_related_payments:
+                order_type = "Advance" if payment.pos_order_id in advance_orders else "Completion"
+                is_in_combine = any(pm.id == payment.payment_method_id.id for pm in combine_receivables_cash.keys())
+                is_in_split = payment in split_receivables_cash.keys()
+                if is_in_combine or is_in_split:
+                    _logger.error("[ADVANCE SESSION CLOSE] ⚠️ ERROR: %s payment found in receivables!", order_type)
+                    _logger.error("  - Payment: %s (ID: %d), Amount: %.2f", payment.pos_order_id.name, payment.id, payment.amount)
+                    _logger.error("  - In combine_receivables_cash: %s", is_in_combine)
+                    _logger.error("  - In split_receivables_cash: %s", is_in_split)
+                else:
+                    _logger.info("  - ✓ %s payment skipped correctly: %s (ID: %d), Amount: %.2f", 
+                                order_type, payment.pos_order_id.name, payment.id, payment.amount)
+        else:
+            _logger.info("[ADVANCE SESSION CLOSE] ✓ No advance/completion cash payments found - skipping verification")
+        
+        # Call parent method
+        result = super()._create_cash_statement_lines_and_cash_move_lines(data)
+        
+        # Verify that no account.payment or statement lines were created for advance or completion payments
+        # Note: Cash payments create account.bank.statement.line, not account.payment
+        # But we can verify by checking if any statement lines were created for advance/completion orders
+        statement_lines_created = self.env['account.bank.statement.line'].search([
+            ('pos_session_id', '=', self.id),
+            ('create_date', '>=', fields.Datetime.now() - timedelta(seconds=5)),  # Created in last 5 seconds
+        ])
+        
+        # Check if any statement lines are related to advance or completion orders
+        advance_statement_lines = []
+        completion_statement_lines = []
+        for st_line in statement_lines_created:
+            # Try to find related pos.payment and check if it's from advance/completion order
+            pos_payments = self.env['pos.payment'].search([
+                ('pos_order_id.session_id', '=', self.id),
+                ('payment_date', '>=', st_line.date - timedelta(days=1)),
+                ('payment_date', '<=', st_line.date + timedelta(days=1)),
+            ])
+            for pos_payment in pos_payments:
+                if getattr(pos_payment.pos_order_id, 'is_advance_order', False) and abs(pos_payment.amount - abs(st_line.amount)) < 0.01:
+                    advance_statement_lines.append(st_line)
+                    break
+                elif pos_payment.pos_order_id.advance_payment_id and not getattr(pos_payment.pos_order_id, 'is_advance_order', False) and abs(pos_payment.amount - abs(st_line.amount)) < 0.01:
+                    completion_statement_lines.append(st_line)
+                    break
+        
+        all_advance_related_statement_lines = advance_statement_lines + completion_statement_lines
+        if all_advance_related_statement_lines:
+            _logger.error("[ADVANCE SESSION CLOSE] ⚠️ ERROR: account.bank.statement.line was created for advance/completion payments during session closing!")
+            for st_line in advance_statement_lines:
+                _logger.error("  - Statement Line ID: %d (Advance), Amount: %.2f", st_line.id, st_line.amount)
+            for st_line in completion_statement_lines:
+                _logger.error("  - Statement Line ID: %d (Completion), Amount: %.2f", st_line.id, st_line.amount)
+        else:
+            _logger.info("[ADVANCE SESSION CLOSE] ✓ VERIFICATION: No account.bank.statement.line created for advance/completion payments")
+        
+        _logger.info("[ADVANCE SESSION CLOSE] _create_cash_statement_lines_and_cash_move_lines completed")
+        return result
 
     # DEPRECATED: This function is no longer used
     # Advance payments are now recorded via account.payment when created
