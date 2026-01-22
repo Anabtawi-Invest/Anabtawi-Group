@@ -198,7 +198,9 @@ class PosAdvancePayment(models.Model):
             journal = False
 
         if not journal:
-            raise ValidationError(_("Please configure %s journal in POS Configuration: %s") % (self.payment_type or 'payment', pos_config.name))
+            raise ValidationError(
+                _("Please configure %s journal in POS Configuration: %s") % (self.payment_type or 'payment',
+                                                                             pos_config.name))
 
         return journal
 
@@ -220,26 +222,26 @@ class PosAdvancePayment(models.Model):
         For bank journals, can be shared between configs
         """
         is_cash = journal.type == 'cash'
-        
+
         # Check if there's an open session
         opened_session = pos_config.session_ids.filtered(lambda s: s.state != 'closed')
         has_open_session = bool(opened_session)
-        
+
         # First, search in payment_method_ids of the config (already available)
         pos_payment_method = pos_config.payment_method_ids.filtered(
             lambda pm: pm.journal_id.id == journal.id
         )[:1]
-        
+
         if pos_payment_method:
             # Payment method already in config - use it
             return pos_payment_method
-        
+
         # If not found in config, search more broadly (anywhere)
         # Search for any payment method with this journal
         pos_payment_method = self.env['pos.payment.method'].search([
             ('journal_id', '=', journal.id),
         ], limit=1)
-        
+
         if pos_payment_method:
             # Found a payment method - add it to config if not already there
             if pos_payment_method not in pos_config.payment_method_ids:
@@ -255,7 +257,7 @@ class PosAdvancePayment(models.Model):
                             'config_ids': [(4, pos_config.id)],
                         })
             return pos_payment_method
-        
+
         # If not found anywhere, create new one
         if is_cash:
             # For cash, check if journal is already used by another payment method in another config
@@ -271,7 +273,7 @@ class PosAdvancePayment(models.Model):
                         'Please configure a different cash journal for this POS configuration, '
                         'or remove it from the other configuration first.'
                     ) % journal.name)
-        
+
         if not pos_payment_method:
             # Create a new payment method for this config
             pos_payment_method = self.env['pos.payment.method'].sudo().create({
@@ -288,7 +290,7 @@ class PosAdvancePayment(models.Model):
             except Exception:
                 # If still fails, at least add to config_ids
                 pass
-        
+
         return pos_payment_method
 
     def _create_pos_order_for_advance(self, pos_session, partner, pos_config, employee_id=False):
@@ -300,16 +302,16 @@ class PosAdvancePayment(models.Model):
             ('sale_ok', '=', True),
             ('available_in_pos', '=', True),
         ], limit=1)
-        
+
         if not dummy_product:
             raise ValidationError(_('No product available for POS. Please create at least one product.'))
-        
+
         # Generate unique pos_reference for advance order
         # Use prefix "ADV-" to distinguish from regular orders
         pos_reference, tracking_number = pos_config._get_next_order_refs()
         # Add "ADV-" prefix to make it unique
         pos_reference = f"ADV-{pos_reference}"
-        
+
         pos_order_vals = {
             'session_id': pos_session.id,
             'partner_id': partner.id,
@@ -332,10 +334,10 @@ class PosAdvancePayment(models.Model):
             'advance_payment_id': self.id,
             'is_advance_order': True,
         }
-        
+
         if employee_id:
             pos_order_vals['employee_id'] = employee_id
-        
+
         pos_order = self.env['pos.order'].sudo().create(pos_order_vals)
         return pos_order
 
@@ -378,7 +380,8 @@ class PosAdvancePayment(models.Model):
 
         if payment_type == 'mixed':
             if cash_amount <= 0 and card_amount <= 0:
-                raise ValidationError(_('For mixed payment, at least one amount (cash or card) must be greater than zero.'))
+                raise ValidationError(
+                    _('For mixed payment, at least one amount (cash or card) must be greater than zero.'))
             if cash_amount + card_amount != amount_paid:
                 raise ValidationError(_('Cash amount + Card amount must equal total amount paid.'))
         elif payment_type == 'cash':
@@ -502,9 +505,10 @@ class PosAdvancePayment(models.Model):
                 _logger.info("[ADVANCE PAYMENT] =========================================")
                 _logger.info("[ADVANCE PAYMENT] Creating cash payment for advance %s", advance.name)
                 _logger.info("[ADVANCE PAYMENT] Amount: %.2f, Destination Account: %s (ID: %d)",
-                            cash_amount, pos_config.pos_advance_account_id.name, pos_config.pos_advance_account_id.id)
+                             cash_amount, pos_config.pos_advance_account_id.name, pos_config.pos_advance_account_id.id)
                 _logger.info("[ADVANCE PAYMENT] Payment Method Line: %s, Payment Account: %s",
-                            cash_payment_method_line.name, cash_payment_method_line.payment_account_id.name if cash_payment_method_line.payment_account_id else "None")
+                             cash_payment_method_line.name,
+                             cash_payment_method_line.payment_account_id.name if cash_payment_method_line.payment_account_id else "None")
                 cash_payment = self.env['account.payment'].sudo().create({
                     'payment_type': 'inbound',
                     'partner_type': 'customer',
@@ -519,46 +523,49 @@ class PosAdvancePayment(models.Model):
                 })
                 # Flush to ensure computed fields are updated
                 cash_payment.flush_recordset(['outstanding_account_id', 'destination_account_id'])
-                
+
                 # Set outstanding_account_id to Cash/Bank (journal.default_account_id) directly
                 # This ensures advance payment is posted to Cash/Bank, not Outstanding Receipts
                 if cash_journal and cash_journal.default_account_id:
                     cash_payment.outstanding_account_id = cash_journal.default_account_id.id
                     cash_payment.flush_recordset(['outstanding_account_id'])
-                    _logger.info("[ADVANCE PAYMENT] Set outstanding_account_id to Cash/Bank: %s (ID: %d)", 
-                               cash_journal.default_account_id.name, cash_journal.default_account_id.id)
+                    _logger.info("[ADVANCE PAYMENT] Set outstanding_account_id to Cash/Bank: %s (ID: %d)",
+                                 cash_journal.default_account_id.name, cash_journal.default_account_id.id)
                 elif not cash_payment.outstanding_account_id:
                     # Fallback: get outstanding account from journal/company (should not happen)
                     outstanding_account = cash_payment._get_outstanding_account(cash_payment.payment_type)
                     cash_payment.outstanding_account_id = outstanding_account.id
                     cash_payment.flush_recordset(['outstanding_account_id'])
-                    _logger.warning("[ADVANCE PAYMENT] Using fallback outstanding account: %s (ID: %d)", 
-                                  outstanding_account.name, outstanding_account.id)
+                    _logger.warning("[ADVANCE PAYMENT] Using fallback outstanding account: %s (ID: %d)",
+                                    outstanding_account.name, outstanding_account.id)
 
-                _logger.info("[ADVANCE PAYMENT] Cash payment created - ID: %d, State: %s, Outstanding Account: %s (ID: %s), Destination Account: %s (ID: %s)",
-                            cash_payment.id, cash_payment.state,
-                            cash_payment.outstanding_account_id.name if cash_payment.outstanding_account_id else "None",
-                            cash_payment.outstanding_account_id.id if cash_payment.outstanding_account_id else "None",
-                            cash_payment.destination_account_id.name if cash_payment.destination_account_id else "None",
-                            cash_payment.destination_account_id.id if cash_payment.destination_account_id else "None")
+                _logger.info(
+                    "[ADVANCE PAYMENT] Cash payment created - ID: %d, State: %s, Outstanding Account: %s (ID: %s), Destination Account: %s (ID: %s)",
+                    cash_payment.id, cash_payment.state,
+                    cash_payment.outstanding_account_id.name if cash_payment.outstanding_account_id else "None",
+                    cash_payment.outstanding_account_id.id if cash_payment.outstanding_account_id else "None",
+                    cash_payment.destination_account_id.name if cash_payment.destination_account_id else "None",
+                    cash_payment.destination_account_id.id if cash_payment.destination_account_id else "None")
 
                 # Generate journal entry explicitly to ensure account.move.line are created
                 if cash_payment.outstanding_account_id:
                     cash_payment._generate_journal_entry()
                     _logger.info("[ADVANCE PAYMENT] Journal entry generated for cash payment")
                 else:
-                    _logger.warning("[ADVANCE PAYMENT] Cannot generate journal entry: outstanding_account_id is missing!")
+                    _logger.warning(
+                        "[ADVANCE PAYMENT] Cannot generate journal entry: outstanding_account_id is missing!")
 
                 # Post the payment (this will also post the journal entry if it's draft)
                 cash_payment.action_post()
                 _logger.info("[ADVANCE PAYMENT] Cash payment posted - ID: %d, State: %s, Move ID: %s",
-                            cash_payment.id, cash_payment.state, cash_payment.move_id.id if cash_payment.move_id else "None")
+                             cash_payment.id, cash_payment.state,
+                             cash_payment.move_id.id if cash_payment.move_id else "None")
                 if cash_payment.move_id:
                     _logger.info("[ADVANCE PAYMENT] Cash payment move - ID: %d, State: %s",
-                                cash_payment.move_id.id, cash_payment.move_id.state)
+                                 cash_payment.move_id.id, cash_payment.move_id.state)
                     for line in cash_payment.move_id.line_ids:
                         _logger.info("[ADVANCE PAYMENT]   - Line: Account=%s (ID: %d), Debit=%.2f, Credit=%.2f",
-                                    line.account_id.name, line.account_id.id, line.debit, line.credit)
+                                     line.account_id.name, line.account_id.id, line.debit, line.credit)
                 else:
                     _logger.warning("[ADVANCE PAYMENT] Cash payment has no move_id after action_post()!")
 
@@ -584,9 +591,10 @@ class PosAdvancePayment(models.Model):
                 _logger.info("[ADVANCE PAYMENT] =========================================")
                 _logger.info("[ADVANCE PAYMENT] Creating card payment for advance %s", advance.name)
                 _logger.info("[ADVANCE PAYMENT] Amount: %.2f, Destination Account: %s (ID: %d)",
-                            card_amount, pos_config.pos_advance_account_id.name, pos_config.pos_advance_account_id.id)
+                             card_amount, pos_config.pos_advance_account_id.name, pos_config.pos_advance_account_id.id)
                 _logger.info("[ADVANCE PAYMENT] Payment Method Line: %s, Payment Account: %s",
-                            card_payment_method_line.name, card_payment_method_line.payment_account_id.name if card_payment_method_line.payment_account_id else "None")
+                             card_payment_method_line.name,
+                             card_payment_method_line.payment_account_id.name if card_payment_method_line.payment_account_id else "None")
                 card_payment = self.env['account.payment'].sudo().create({
                     'payment_type': 'inbound',
                     'partner_type': 'customer',
@@ -601,46 +609,49 @@ class PosAdvancePayment(models.Model):
                 })
                 # Flush to ensure computed fields are updated
                 card_payment.flush_recordset(['outstanding_account_id', 'destination_account_id'])
-                
+
                 # Set outstanding_account_id to Card Account (journal.default_account_id) directly
                 # This ensures advance payment is posted to Card Account, not Outstanding Receipts
                 if card_journal and card_journal.default_account_id:
                     card_payment.outstanding_account_id = card_journal.default_account_id.id
                     card_payment.flush_recordset(['outstanding_account_id'])
-                    _logger.info("[ADVANCE PAYMENT] Set outstanding_account_id to Card Account: %s (ID: %d)", 
-                               card_journal.default_account_id.name, card_journal.default_account_id.id)
+                    _logger.info("[ADVANCE PAYMENT] Set outstanding_account_id to Card Account: %s (ID: %d)",
+                                 card_journal.default_account_id.name, card_journal.default_account_id.id)
                 elif not card_payment.outstanding_account_id:
                     # Fallback: get outstanding account from journal/company (should not happen)
                     outstanding_account = card_payment._get_outstanding_account(card_payment.payment_type)
                     card_payment.outstanding_account_id = outstanding_account.id
                     card_payment.flush_recordset(['outstanding_account_id'])
-                    _logger.warning("[ADVANCE PAYMENT] Using fallback outstanding account: %s (ID: %d)", 
-                                  outstanding_account.name, outstanding_account.id)
+                    _logger.warning("[ADVANCE PAYMENT] Using fallback outstanding account: %s (ID: %d)",
+                                    outstanding_account.name, outstanding_account.id)
 
-                _logger.info("[ADVANCE PAYMENT] Card payment created - ID: %d, State: %s, Outstanding Account: %s (ID: %s), Destination Account: %s (ID: %s)",
-                            card_payment.id, card_payment.state,
-                            card_payment.outstanding_account_id.name if card_payment.outstanding_account_id else "None",
-                            card_payment.outstanding_account_id.id if card_payment.outstanding_account_id else "None",
-                            card_payment.destination_account_id.name if card_payment.destination_account_id else "None",
-                            card_payment.destination_account_id.id if card_payment.destination_account_id else "None")
+                _logger.info(
+                    "[ADVANCE PAYMENT] Card payment created - ID: %d, State: %s, Outstanding Account: %s (ID: %s), Destination Account: %s (ID: %s)",
+                    card_payment.id, card_payment.state,
+                    card_payment.outstanding_account_id.name if card_payment.outstanding_account_id else "None",
+                    card_payment.outstanding_account_id.id if card_payment.outstanding_account_id else "None",
+                    card_payment.destination_account_id.name if card_payment.destination_account_id else "None",
+                    card_payment.destination_account_id.id if card_payment.destination_account_id else "None")
 
                 # Generate journal entry explicitly to ensure account.move.line are created
                 if card_payment.outstanding_account_id:
                     card_payment._generate_journal_entry()
                     _logger.info("[ADVANCE PAYMENT] Journal entry generated for card payment")
                 else:
-                    _logger.warning("[ADVANCE PAYMENT] Cannot generate journal entry: outstanding_account_id is missing!")
+                    _logger.warning(
+                        "[ADVANCE PAYMENT] Cannot generate journal entry: outstanding_account_id is missing!")
 
                 # Post the payment (this will also post the journal entry if it's draft)
                 card_payment.action_post()
                 _logger.info("[ADVANCE PAYMENT] Card payment posted - ID: %d, State: %s, Move ID: %s",
-                            card_payment.id, card_payment.state, card_payment.move_id.id if card_payment.move_id else "None")
+                             card_payment.id, card_payment.state,
+                             card_payment.move_id.id if card_payment.move_id else "None")
                 if card_payment.move_id:
                     _logger.info("[ADVANCE PAYMENT] Card payment move - ID: %d, State: %s",
-                                card_payment.move_id.id, card_payment.move_id.state)
+                                 card_payment.move_id.id, card_payment.move_id.state)
                     for line in card_payment.move_id.line_ids:
                         _logger.info("[ADVANCE PAYMENT]   - Line: Account=%s (ID: %d), Debit=%.2f, Credit=%.2f",
-                                    line.account_id.name, line.account_id.id, line.debit, line.credit)
+                                     line.account_id.name, line.account_id.id, line.debit, line.credit)
                 else:
                     _logger.warning("[ADVANCE PAYMENT] Card payment has no move_id after action_post()!")
 
@@ -664,7 +675,7 @@ class PosAdvancePayment(models.Model):
 
             # Create account.payment
             payment_method_line = journal.inbound_payment_method_line_ids[:1]
-            print(22222,payment_method_line)
+            print(22222, payment_method_line)
             if not payment_method_line:
                 raise ValidationError(
                     _('Please define an inbound payment method on journal %s.')
@@ -674,9 +685,10 @@ class PosAdvancePayment(models.Model):
             _logger.info("[ADVANCE PAYMENT] =========================================")
             _logger.info("[ADVANCE PAYMENT] Creating payment for advance %s", advance.name)
             _logger.info("[ADVANCE PAYMENT] Amount: %.2f, Destination Account: %s (ID: %d)",
-                        amount_paid, pos_config.pos_advance_account_id.name, pos_config.pos_advance_account_id.id)
+                         amount_paid, pos_config.pos_advance_account_id.name, pos_config.pos_advance_account_id.id)
             _logger.info("[ADVANCE PAYMENT] Payment Method Line: %s, Payment Account: %s",
-                        payment_method_line.name, payment_method_line.payment_account_id.name if payment_method_line.payment_account_id else "None")
+                         payment_method_line.name,
+                         payment_method_line.payment_account_id.name if payment_method_line.payment_account_id else "None")
             main_payment = self.env['account.payment'].sudo().create({
                 'payment_type': 'inbound',
                 'partner_type': 'customer',
@@ -691,28 +703,29 @@ class PosAdvancePayment(models.Model):
             })
             # Flush to ensure computed fields are updated
             main_payment.flush_recordset(['outstanding_account_id', 'destination_account_id'])
-            
+
             # Set outstanding_account_id to Cash/Bank or Card Account (journal.default_account_id) directly
             # This ensures advance payment is posted to Cash/Bank or Card Account, not Outstanding Receipts
             if journal and journal.default_account_id:
                 main_payment.outstanding_account_id = journal.default_account_id.id
                 main_payment.flush_recordset(['outstanding_account_id'])
-                _logger.info("[ADVANCE PAYMENT] Set outstanding_account_id to Journal Account: %s (ID: %d)", 
-                           journal.default_account_id.name, journal.default_account_id.id)
+                _logger.info("[ADVANCE PAYMENT] Set outstanding_account_id to Journal Account: %s (ID: %d)",
+                             journal.default_account_id.name, journal.default_account_id.id)
             elif not main_payment.outstanding_account_id:
                 # Fallback: get outstanding account from journal/company (should not happen)
                 outstanding_account = main_payment._get_outstanding_account(main_payment.payment_type)
                 main_payment.outstanding_account_id = outstanding_account.id
                 main_payment.flush_recordset(['outstanding_account_id'])
-                _logger.warning("[ADVANCE PAYMENT] Using fallback outstanding account: %s (ID: %d)", 
-                              outstanding_account.name, outstanding_account.id)
+                _logger.warning("[ADVANCE PAYMENT] Using fallback outstanding account: %s (ID: %d)",
+                                outstanding_account.name, outstanding_account.id)
 
-            _logger.info("[ADVANCE PAYMENT] Payment created - ID: %d, State: %s, Outstanding Account: %s (ID: %s), Destination Account: %s (ID: %s)",
-                        main_payment.id, main_payment.state,
-                        main_payment.outstanding_account_id.name if main_payment.outstanding_account_id else "None",
-                        main_payment.outstanding_account_id.id if main_payment.outstanding_account_id else "None",
-                        main_payment.destination_account_id.name if main_payment.destination_account_id else "None",
-                        main_payment.destination_account_id.id if main_payment.destination_account_id else "None")
+            _logger.info(
+                "[ADVANCE PAYMENT] Payment created - ID: %d, State: %s, Outstanding Account: %s (ID: %s), Destination Account: %s (ID: %s)",
+                main_payment.id, main_payment.state,
+                main_payment.outstanding_account_id.name if main_payment.outstanding_account_id else "None",
+                main_payment.outstanding_account_id.id if main_payment.outstanding_account_id else "None",
+                main_payment.destination_account_id.name if main_payment.destination_account_id else "None",
+                main_payment.destination_account_id.id if main_payment.destination_account_id else "None")
 
             # Generate journal entry explicitly to ensure account.move.line are created
             if main_payment.outstanding_account_id:
@@ -724,13 +737,14 @@ class PosAdvancePayment(models.Model):
             # Post the payment (this will also post the journal entry if it's draft)
             main_payment.action_post()
             _logger.info("[ADVANCE PAYMENT] Payment posted - ID: %d, State: %s, Move ID: %s",
-                        main_payment.id, main_payment.state, main_payment.move_id.id if main_payment.move_id else "None")
+                         main_payment.id, main_payment.state,
+                         main_payment.move_id.id if main_payment.move_id else "None")
             if main_payment.move_id:
                 _logger.info("[ADVANCE PAYMENT] Payment move - ID: %d, State: %s",
-                            main_payment.move_id.id, main_payment.move_id.state)
+                             main_payment.move_id.id, main_payment.move_id.state)
                 for line in main_payment.move_id.line_ids:
                     _logger.info("[ADVANCE PAYMENT]   - Line: Account=%s (ID: %d), Debit=%.2f, Credit=%.2f",
-                                line.account_id.name, line.account_id.id, line.debit, line.credit)
+                                 line.account_id.name, line.account_id.id, line.debit, line.credit)
             else:
                 _logger.warning("[ADVANCE PAYMENT] Payment has no move_id after action_post()!")
 
@@ -786,9 +800,8 @@ class PosAdvancePayment(models.Model):
         receivable_account = partner.property_account_receivable_id
         advance_account = pos_config.pos_advance_account_id
 
-
         unique_ref = _('Advance Transfer: %s (ID: %d)') % (self.name, self.id)
-        
+
         move = self.env['account.move'].sudo().create({
             'move_type': 'entry',
             'date': invoice.invoice_date or fields.Date.context_today(self),
@@ -817,12 +830,12 @@ class PosAdvancePayment(models.Model):
         _logger.info("[ADVANCE TRANSFER] Transfer move created - ID: %d, State: %s", move.id, move.state)
         move.action_post()
         _logger.info("[ADVANCE TRANSFER] Transfer move posted - ID: %d, State: %s", move.id, move.state)
-        
+
         # Verify the move lines
         for line in move.line_ids:
-            _logger.info("  - Line: Account=%s, Debit=%.2f, Credit=%.2f", 
-                        line.account_id.name, line.debit, line.credit)
-        
+            _logger.info("  - Line: Account=%s, Debit=%.2f, Credit=%.2f",
+                         line.account_id.name, line.debit, line.credit)
+
         self.transfer_move_id = move.id
         return move
 
@@ -881,9 +894,14 @@ class PosAdvancePayment(models.Model):
             # --------------------------------------------------
             # 2) CREATE POS ORDER WITH PRODUCTS (exclude employee_service and delivery_product)
             # --------------------------------------------------
+            # ✅ IMPORTANT: Let Odoo calculate taxes automatically
+            # ❌ DO NOT calculate taxes manually
+            # ❌ DO NOT pass price_subtotal or price_subtotal_incl
+            # ❌ DO NOT pass amount_tax or amount_total
+            # ✅ Only pass: product_id, qty, price_unit, tax_ids
+            # Odoo's _generate_pos_order_invoice() will handle everything
+            
             pos_order_lines = []
-            total_tax = 0.0
-            total_with_tax = 0.0
 
             for line in advance.line_ids:
                 product = line.product_id
@@ -891,37 +909,17 @@ class PosAdvancePayment(models.Model):
                 if product.is_employee_service or product.is_delivery_product:
                     continue
 
-                # Get taxes from product (considering fiscal position if any)
-                taxes = product.taxes_id.filtered(lambda t: t.company_id == company)
-
-                # Compute tax amounts
-                if taxes:
-                    tax_result = taxes.compute_all(
-                        line.price_unit,
-                        company.currency_id,
-                        line.qty,
-                        product=product,
-                        partner=partner
-                    )
-                    price_subtotal = tax_result['total_excluded']
-                    price_subtotal_incl = tax_result['total_included']
-                    line_tax = price_subtotal_incl - price_subtotal
-                else:
-                    price_subtotal = line.subtotal
-                    price_subtotal_incl = line.subtotal
-                    line_tax = 0.0
-
-                total_tax += line_tax
-                total_with_tax += price_subtotal_incl
-
+                # ✅ Create pos.order.line - Let POS calculate taxes automatically
+                # Note: price_subtotal and price_subtotal_incl are required fields
+                # We pass simple values (price_unit * qty) without tax calculation
+                # POS will recalculate them correctly when creating invoice using fiscal_position_id
+                simple_subtotal = line.price_unit * line.qty
                 pos_order_lines.append((0, 0, {
                     'product_id': product.id,
                     'qty': line.qty,
                     'price_unit': line.price_unit,
-                    'price_subtotal': price_subtotal,
-                    'price_subtotal_incl': price_subtotal_incl,
-                    'tax_ids': [(6, 0, taxes.ids)],
-                    'full_product_name': product.display_name,
+                    'price_subtotal': simple_subtotal,  # Required field - simple calculation
+                    'price_subtotal_incl': simple_subtotal,  # Required field - simple calculation
                 }))
 
             if not pos_order_lines:
@@ -931,15 +929,18 @@ class PosAdvancePayment(models.Model):
             employee_id = (vals or {}).get('employee_id', False)
 
             # Create the POS order
+            # ✅ Let POS calculate everything automatically - DO NOT calculate taxes manually
+            # ✅ IMPORTANT: Add fiscal_position_id - taxes in POS always go through Fiscal Position
             pos_order_vals = {
                 'session_id': pos_session.id,
                 'partner_id': partner.id,
                 'config_id': pos_config.id,
                 'company_id': company.id,
                 'pricelist_id': partner.property_product_pricelist.id or pos_config.pricelist_id.id,
+                'fiscal_position_id': partner.property_account_position_id.id or False,
                 'lines': pos_order_lines,
-                'amount_total': total_with_tax,
-                'amount_tax': total_tax,
+                'amount_total': 0.0,  # Required field - POS will calculate automatically
+                'amount_tax': 0.0,  # Required field - POS will calculate automatically
                 'amount_paid': 0.0,  # Will be updated after adding payments
                 'amount_return': 0.0,
                 'advance_payment_id': advance.id,
@@ -948,28 +949,90 @@ class PosAdvancePayment(models.Model):
                 pos_order_vals['employee_id'] = employee_id
 
             pos_order = self.env['pos.order'].sudo().create(pos_order_vals)
+            
+            # ✅ IMPORTANT: Set tax_ids for each line from product.taxes_id (required for _compute_amount_line_all)
+            # Then recalculate price_subtotal and price_subtotal_incl using POS's internal method
+            # This ensures taxes are calculated correctly with fiscal_position_id before invoice creation
+            for line in pos_order.lines:
+                # Set tax_ids from product (POS does this automatically in onchange, but we need to do it manually)
+                if line.product_id:
+                    line.sudo().tax_ids = line.product_id.taxes_id.filtered_domain(
+                        self.env['account.tax']._check_company_domain(company)
+                    )
+                    # Use POS's internal method to calculate correct values with fiscal position
+                    computed_values = line._compute_amount_line_all()
+                    line.sudo().write(computed_values)
+            
+            # ✅ DO NOT call _compute_prices() - it may interfere with invoice generation
+            # _generate_pos_order_invoice() will recalculate everything using its internal logic
 
             # --------------------------------------------------
-            # 3) GENERATE INVOICE FROM POS ORDER FIRST
+            # 3) CREATE POS.PAYMENT(S) FOR REMAINING AMOUNT (if any) - BEFORE INVOICE
+            # --------------------------------------------------
+            # IMPORTANT: Create pos.payment BEFORE creating invoice
+            # Because invoice creation may change pos_order.state to 'done', which prevents pos.payment creation
+            if advance.remaining_amount > 0:
+                if advance.payment_type == 'mixed':
+                    cash_journal = pos_config.pos_cash_journal_id if cash_amount > 0 else None
+                    card_journal = pos_config.pos_card_journal_id if card_amount > 0 else None
+
+                    if cash_amount > 0 and cash_journal:
+                        cash_pos_payment_method = advance._get_pos_payment_method_from_journal(cash_journal, pos_config)
+                        self.env['pos.payment'].sudo().create({
+                            'pos_order_id': pos_order.id,
+                            'payment_method_id': cash_pos_payment_method.id,
+                            'amount': cash_amount,
+                            'payment_date': fields.Datetime.now(),
+                        })
+
+                    if card_amount > 0 and card_journal:
+                        card_pos_payment_method = advance._get_pos_payment_method_from_journal(card_journal, pos_config)
+                        self.env['pos.payment'].sudo().create({
+                            'pos_order_id': pos_order.id,
+                            'payment_method_id': card_pos_payment_method.id,
+                            'amount': card_amount,
+                            'payment_date': fields.Datetime.now(),
+                        })
+                else:
+                    journal = advance._get_payment_journal()
+                    pos_payment_method = advance._get_pos_payment_method_from_journal(journal, pos_config)
+                    self.env['pos.payment'].sudo().create({
+                        'pos_order_id': pos_order.id,
+                        'payment_method_id': pos_payment_method.id,
+                        'amount': advance.remaining_amount,
+                        'payment_date': fields.Datetime.now(),
+                    })
+
+            # --------------------------------------------------
+            # 4) GENERATE INVOICE FROM POS ORDER FIRST
             # --------------------------------------------------
             # Create invoice first to get accurate sales and tax amounts
             pos_order.write({'to_invoice': True})
             invoice = pos_order._generate_pos_order_invoice()
             _logger.info("[ADVANCE COMPLETION] Invoice created - ID: %d, Amount: %.2f",
-                        invoice.id, invoice.amount_total)
+                         invoice.id, invoice.amount_total)
 
             # --------------------------------------------------
             # 4) CREATE COMPLETION JOURNAL ENTRY
             # --------------------------------------------------
-            # IMPORTANT: The invoice already contains Sales, Tax, and Receivable lines.
+            # IMPORTANT: The invoice already contains Sales and Tax lines.
+            # We should NOT duplicate them in the completion move.
             # The completion move should only record:
             # - Debit: Cash/Bank (remaining amount)
             # - Debit: Advance Account (advance amount)
+            # - Credit: Receivable Account (to reconcile with invoice)
             #
-            # NO Credit on Receivable here - reconciliation will close it using transfer_move_id
+            # The invoice already has:
+            # - Debit: Receivable
+            # - Credit: Sales
+            # - Credit: Tax
+            #
+            # So the completion move will reconcile with the invoice's Receivable line.
 
             _logger.info("[ADVANCE COMPLETION] Invoice created - ID: %d, Amount: %.2f",
-                        invoice.id, invoice.amount_total)
+                         invoice.id, invoice.amount_total)
+            _logger.info(
+                "[ADVANCE COMPLETION] Invoice already contains Sales and Tax lines - we will NOT duplicate them in completion move")
 
             advance_account = pos_config.pos_advance_account_id
             receivable_account = partner.property_account_receivable_id
@@ -979,15 +1042,40 @@ class PosAdvancePayment(models.Model):
             # Debit: Cash/Bank (remaining amount)
             # --------------------------------------------------
             if advance.remaining_amount > 0:
-                journal = advance._get_payment_journal()
-                if journal and journal.default_account_id:
-                    move_line_vals.append((0, 0, {
-                        'name': _('Complete Advance Payment: %s') % advance.name,
-                        'partner_id': partner.id,
-                        'account_id': journal.default_account_id.id,
-                        'debit': advance.remaining_amount,
-                        'credit': 0.0,
-                    }))
+                if advance.payment_type == 'mixed':
+                    # For mixed payment, we need to create separate debit lines for cash and card
+                    if cash_amount > 0:
+                        cash_journal = pos_config.pos_cash_journal_id
+                        if cash_journal and cash_journal.default_account_id:
+                            move_line_vals.append((0, 0, {
+                                'name': _('Complete Advance Payment - Cash: %s') % advance.name,
+                                'partner_id': partner.id,
+                                'account_id': cash_journal.default_account_id.id,
+                                'debit': cash_amount,
+                                'credit': 0.0,
+                            }))
+
+                    if card_amount > 0:
+                        card_journal = pos_config.pos_card_journal_id
+                        if card_journal and card_journal.default_account_id:
+                            move_line_vals.append((0, 0, {
+                                'name': _('Complete Advance Payment - Card: %s') % advance.name,
+                                'partner_id': partner.id,
+                                'account_id': card_journal.default_account_id.id,
+                                'debit': card_amount,
+                                'credit': 0.0,
+                            }))
+                else:
+                    # Single payment type
+                    journal = advance._get_payment_journal()
+                    if journal and journal.default_account_id:
+                        move_line_vals.append((0, 0, {
+                            'name': _('Complete Advance Payment: %s') % advance.name,
+                            'partner_id': partner.id,
+                            'account_id': journal.default_account_id.id,
+                            'debit': advance.remaining_amount,
+                            'credit': 0.0,
+                        }))
 
             # --------------------------------------------------
             # Debit: Advance Account (to zero it out)
@@ -1001,22 +1089,67 @@ class PosAdvancePayment(models.Model):
             }))
 
             # --------------------------------------------------
-            # Credit: Receivable Account (to balance the move)
+            # Credit: Receivable Account (to reconcile with invoice)
             # --------------------------------------------------
+            # Calculate total debit (Cash/Bank + Advance Account)
+            total_debit = sum(line_vals[2].get('debit', 0.0) for line_vals in move_line_vals if
+                              isinstance(line_vals, tuple) and len(line_vals) > 2)
+
+            # The Receivable credit should equal total_debit (which should equal invoice.amount_total)
+            # Total Debit = Cash/Bank (remaining) + Advance Account (advance) = invoice.amount_total
+            # Total Credit = Receivable = invoice.amount_total
+            receivable_credit = invoice.amount_total
+
             move_line_vals.append((0, 0, {
                 'name': _('Invoice Receivable: %s') % invoice.name,
                 'partner_id': partner.id,
                 'account_id': receivable_account.id,
                 'debit': 0.0,
-                'credit': invoice.amount_total,
+                'credit': receivable_credit,
             }))
 
-            # Calculate total debit for logging
-            total_debit = sum(line_vals[2].get('debit', 0.0) for line_vals in move_line_vals if isinstance(line_vals, tuple) and len(line_vals) > 2)
-            
+            # Verify balance: total_debit should equal invoice.amount_total
+            balance_diff = total_debit - invoice.amount_total
+            currency_rounding = company.currency_id.rounding or 0.01
+
             _logger.info("[ADVANCE COMPLETION] Creating completion move for advance %s", advance.name)
-            _logger.info("[ADVANCE COMPLETION] Remaining Amount: %.2f, Advance Amount: %.2f, Total Debit: %.2f", 
-                        advance.remaining_amount, advance.amount_paid, total_debit)
+            _logger.info("[ADVANCE COMPLETION] Remaining Amount: %.2f, Advance Amount: %.2f",
+                         advance.remaining_amount, advance.amount_paid)
+            _logger.info(
+                "[ADVANCE COMPLETION] Total Debit: %.2f, Receivable Credit: %.2f, Invoice Total: %.2f, Balance Diff: %.2f",
+                total_debit, receivable_credit, invoice.amount_total, balance_diff)
+
+            # If not balanced, adjust Cash/Bank line
+            # Use float_compare for accurate comparison with currency rounding
+            balance_compare = float_compare(abs(balance_diff), currency_rounding, precision_rounding=currency_rounding)
+
+            if balance_compare >= 0:  # balance_diff >= currency_rounding (including equal)
+                _logger.warning(
+                    "[ADVANCE COMPLETION] Warning: Entry not balanced (Diff: %.2f >= Rounding: %.2f). Adjusting Cash/Bank line.",
+                    balance_diff, currency_rounding)
+                # Find the Cash/Bank debit line (first debit line that's not Advance Account)
+                cash_bank_line_found = False
+                for i in range(len(move_line_vals) - 1):  # Skip the Receivable line
+                    line_val = move_line_vals[i]
+                    if isinstance(line_val, tuple) and len(line_val) > 2:
+                        line_dict = line_val[2]
+                        if (line_dict.get('debit', 0.0) > 0.0 and
+                                line_dict.get('account_id') != advance_account.id):
+                            # This is the Cash/Bank line - adjust it
+                            current_debit = line_dict.get('debit', 0.0)
+                            line_dict['debit'] = current_debit - balance_diff  # Subtract difference to balance
+                            _logger.info(
+                                "[ADVANCE COMPLETION] Adjusted Cash/Bank line debit from %.2f to %.2f to balance entry (diff: %.2f)",
+                                current_debit, current_debit - balance_diff, balance_diff)
+                            cash_bank_line_found = True
+                            break
+
+                if not cash_bank_line_found:
+                    _logger.warning(
+                        "[ADVANCE COMPLETION] Could not find Cash/Bank line to adjust - entry may not be balanced")
+            else:
+                _logger.info("[ADVANCE COMPLETION] Entry is balanced (diff: %.2f < rounding: %.2f)", balance_diff,
+                             currency_rounding)
 
             # Create the journal entry
             # Use POS journal or fallback to first available journal
@@ -1042,51 +1175,45 @@ class PosAdvancePayment(models.Model):
                 'line_ids': move_line_vals,
             })
 
-
             completion_move.action_post()
 
             _logger.info("[ADVANCE COMPLETION] Completion move posted - ID: %d", completion_move.id)
             for line in completion_move.line_ids:
                 _logger.info("[ADVANCE COMPLETION]   - Line: Account=%s, Debit=%.2f, Credit=%.2f",
-                            line.account_id.name, line.debit, line.credit)
+                             line.account_id.name, line.debit, line.credit)
 
             # --------------------------------------------------
-            # 5) RECONCILE INVOICE RECEIVABLE WITH TRANSFER MOVE
+            # 6) RECONCILE INVOICE WITH COMPLETION MOVE
             # --------------------------------------------------
-            # Reconcile invoice receivable (Debit) with transfer_move receivable (Credit)
-            # This closes the Receivable account properly without duplication
 
-            receivable_account = partner.property_account_receivable_id
-            
-            # Get invoice receivable lines (Debit)
+            # Reconcile invoice receivable with completion move receivable
             invoice_receivable_lines = invoice.line_ids.filtered(
-                lambda l: l.account_id.account_type == 'asset_receivable' and not l.reconciled
+                lambda l: l.account_id and l.account_id.account_type == 'asset_receivable' and not l.reconciled
             )
-            
-            # Get transfer_move receivable lines (Credit)
-            advance_lines = []
-            if advance.transfer_move_id:
-                advance_lines = advance.transfer_move_id.line_ids.filtered(
-                    lambda l: l.account_id.account_type == 'asset_receivable' and not l.reconciled
-                )
+            completion_receivable_lines = completion_move.line_ids.filtered(
+                lambda l: l.account_id.id == receivable_account.id and not l.reconciled
+            )
 
-            if invoice_receivable_lines and advance_lines:
-                (invoice_receivable_lines | advance_lines).reconcile()
-                _logger.info("[ADVANCE COMPLETION] Invoice receivable reconciled with transfer move - Receivable is now closed")
+            if invoice_receivable_lines and completion_receivable_lines:
+                (invoice_receivable_lines | completion_receivable_lines).reconcile()
+                _logger.info("[ADVANCE COMPLETION] Invoice reconciled with completion move - Invoice is now Paid")
             else:
-                _logger.warning("[ADVANCE COMPLETION] Could not reconcile receivable - Invoice Lines: %d, Transfer Move Lines: %d",
-                               len(invoice_receivable_lines), len(advance_lines))
+                _logger.warning(
+                    "[ADVANCE COMPLETION] Could not reconcile invoice - Invoice Receivable Lines: %d, Completion Receivable Lines: %d",
+                    len(invoice_receivable_lines), len(completion_receivable_lines))
 
             # --------------------------------------------------
-            # 6) UPDATE POS ORDER AMOUNT_PAID AND STATE
+            # 7) UPDATE POS ORDER AMOUNT_PAID AND STATE
             # --------------------------------------------------
+            # Note: pos.payment records were already created before invoice creation (step 3)
+            # to avoid constraint error when order state becomes 'done'
             pos_order.amount_paid = advance.remaining_amount if advance.remaining_amount > 0 else 0.0
-            # Ensure state is 'paid' so order appears correctly
+            # Ensure state is 'paid' so payments appear in closing register
             if pos_order.state != 'paid':
                 pos_order.state = 'paid'
 
             # --------------------------------------------------
-            # 7) MARK COMPLETED AND LINK POS ORDER AND INVOICE
+            # 8) MARK COMPLETED AND LINK POS ORDER AND INVOICE
             # --------------------------------------------------
             advance.write({
                 'completion_move_id': completion_move.id,
@@ -1184,12 +1311,15 @@ class PosAdvancePayment(models.Model):
             # Check if picking already exists for this order
             existing_pickings = pos_order.picking_ids.filtered(lambda p: p.state != 'cancel')
             if existing_pickings:
-                _logger.info("[ADVANCE] Picking already exists for order %s (ID: %d), skipping creation", pos_order.name, pos_order.id)
+                _logger.info("[ADVANCE] Picking already exists for order %s (ID: %d), skipping creation",
+                             pos_order.name, pos_order.id)
             else:
                 # Double-check if picking should be created
                 # _create_order_picking() only creates picking if _should_create_picking_real_time() returns True
                 if not pos_order._should_create_picking_real_time():
-                    _logger.info("[ADVANCE] Picking creation not required for order %s (ID: %d) - stock update at closing", pos_order.name, pos_order.id)
+                    _logger.info(
+                        "[ADVANCE] Picking creation not required for order %s (ID: %d) - stock update at closing",
+                        pos_order.name, pos_order.id)
                 else:
                     # Use savepoint to protect main transaction from picking creation errors
                     # The error can occur in both INSERT (create) and UPDATE (write/action_done) operations
@@ -1197,27 +1327,31 @@ class PosAdvancePayment(models.Model):
                         with self.env.cr.savepoint():
                             # Use Odoo's built-in method to create picking from POS order
                             pos_order._create_order_picking()
-                            _logger.info("[ADVANCE] Successfully created picking for order %s (ID: %d)", pos_order.name, pos_order.id)
+                            _logger.info("[ADVANCE] Successfully created picking for order %s (ID: %d)", pos_order.name,
+                                         pos_order.id)
                     except Exception as e:
                         error_msg = str(e)
                         # Check if it's a duplicate key constraint violation (can occur in INSERT or UPDATE)
                         # The error can be raised as ValidationError with message "Reference must be unique per company!"
                         # or as IntegrityError with message "duplicate key value violates unique constraint..."
                         is_duplicate_error = (
-                            'duplicate key value violates unique constraint "stock_picking_name_uniq"' in error_msg.lower() or
-                            'stock_picking_name_uniq' in error_msg.lower() or
-                            'reference must be unique per company' in error_msg.lower() or
-                            ('duplicate' in error_msg.lower() and 'key' in error_msg.lower() and 'stock_picking' in error_msg.lower())
+                                'duplicate key value violates unique constraint "stock_picking_name_uniq"' in error_msg.lower() or
+                                'stock_picking_name_uniq' in error_msg.lower() or
+                                'reference must be unique per company' in error_msg.lower() or
+                                (
+                                            'duplicate' in error_msg.lower() and 'key' in error_msg.lower() and 'stock_picking' in error_msg.lower())
                         )
 
                         if is_duplicate_error:
-                            _logger.warning("[ADVANCE] Duplicate picking name detected for order %s (ID: %d). This may be due to a race condition or existing picking.",
-                                          pos_order.name, pos_order.id)
+                            _logger.warning(
+                                "[ADVANCE] Duplicate picking name detected for order %s (ID: %d). This may be due to a race condition or existing picking.",
+                                pos_order.name, pos_order.id)
 
                             # Refresh to check if picking was created and linked despite the error
                             pos_order.invalidate_recordset(['picking_ids'])
                             if pos_order.picking_ids:
-                                _logger.info("[ADVANCE] Picking was created and linked successfully despite error (race condition handled)")
+                                _logger.info(
+                                    "[ADVANCE] Picking was created and linked successfully despite error (race condition handled)")
                             else:
                                 # Try to find and link existing picking by origin (pos_order.name)
                                 existing_picking = self.env['stock.picking'].sudo().search([
@@ -1234,17 +1368,23 @@ class PosAdvancePayment(models.Model):
                                                 'pos_order_id': pos_order.id,
                                                 'pos_session_id': pos_order.session_id.id if pos_order.session_id else False,
                                             })
-                                            _logger.info("[ADVANCE] Linked existing picking %s (ID: %d) to order %s (ID: %d)",
-                                                      existing_picking.name, existing_picking.id, pos_order.name, pos_order.id)
+                                            _logger.info(
+                                                "[ADVANCE] Linked existing picking %s (ID: %d) to order %s (ID: %d)",
+                                                existing_picking.name, existing_picking.id, pos_order.name,
+                                                pos_order.id)
                                     except Exception as link_error:
-                                        _logger.warning("[ADVANCE] Could not link existing picking %s (ID: %d) to order %s (ID: %d): %s. This is non-critical.",
-                                                      existing_picking.name, existing_picking.id, pos_order.name, pos_order.id, str(link_error))
+                                        _logger.warning(
+                                            "[ADVANCE] Could not link existing picking %s (ID: %d) to order %s (ID: %d): %s. This is non-critical.",
+                                            existing_picking.name, existing_picking.id, pos_order.name, pos_order.id,
+                                            str(link_error))
                                 else:
-                                    _logger.warning("[ADVANCE] Could not find or link existing picking for order %s (ID: %d). This is non-critical - picking may be created later during session closing.",
-                                                  pos_order.name, pos_order.id)
+                                    _logger.warning(
+                                        "[ADVANCE] Could not find or link existing picking for order %s (ID: %d). This is non-critical - picking may be created later during session closing.",
+                                        pos_order.name, pos_order.id)
                         else:
-                            _logger.warning("[ADVANCE] Failed to create picking for order %s (ID: %d): %s. This is non-critical - picking may be created later during session closing.",
-                                          pos_order.name, pos_order.id, error_msg)
+                            _logger.warning(
+                                "[ADVANCE] Failed to create picking for order %s (ID: %d): %s. This is non-critical - picking may be created later during session closing.",
+                                pos_order.name, pos_order.id, error_msg)
 
             return invoice
 
@@ -1256,26 +1396,26 @@ class PosAdvancePayment(models.Model):
         Send notifications and emails to users configured in pickup_pos_id.advance_notification_user_ids
         """
         self.ensure_one()
-        
+
         # Get pickup POS config
         pickup_pos = self.pickup_pos_id
         if not pickup_pos:
             return
-        
+
         # Get notification users from pickup location
         notification_users = pickup_pos.advance_notification_user_ids
         if not notification_users:
             return
-        
+
         # Prepare notification content
         partner = self.partner_id
         currency = self.currency_id
-        
+
         # Build email body
         email_body = f"""
         <div style="font-family: Arial, sans-serif; padding: 20px;">
             <h2 style="color: #007bff;">New Advance Order Created</h2>
-            
+
             <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
                 <tr>
                     <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Advance Number:</strong></td>
@@ -1318,7 +1458,7 @@ class PosAdvancePayment(models.Model):
                     <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.create_date.strftime('%Y-%m-%d %H:%M:%S')}</td>
                 </tr>
             </table>
-            
+
             <h3 style="margin-top: 30px; color: #28a745;">Products:</h3>
             <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
                 <thead>
@@ -1331,7 +1471,7 @@ class PosAdvancePayment(models.Model):
                 </thead>
                 <tbody>
         """
-        
+
         # Add product lines
         for line in self.line_ids:
             email_body += f"""
@@ -1342,11 +1482,11 @@ class PosAdvancePayment(models.Model):
                         <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">{currency.symbol} {line.subtotal:,.2f}</td>
                     </tr>
             """
-        
+
         email_body += """
                 </tbody>
             </table>
-            
+
             <p style="margin-top: 30px; color: #6c757d;">
                 <a href="{base_url}/web#id={advance_id}&model=pos.advance.payment&view_type=form" 
                    style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
@@ -1355,19 +1495,19 @@ class PosAdvancePayment(models.Model):
             </p>
         </div>
         """
-        
+
         # Get base URL
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', 'http://localhost:8069')
-        
+
         # Replace placeholders
         email_body = email_body.format(
             base_url=base_url,
             advance_id=self.id
         )
-        
+
         # Send notification and email to each user
         notification_body = f'New Advance Order: {self.name}\nCustomer: {partner.name}\nTotal: {currency.symbol} {self.total_expected:,.2f}\nPaid: {currency.symbol} {self.amount_paid:,.2f}\nRemaining: {currency.symbol} {self.remaining_amount:,.2f}'
-        
+
         # Post message in chatter first (without partner_ids to avoid auto-notification)
         message = self.message_post(
             body=notification_body,
@@ -1376,14 +1516,14 @@ class PosAdvancePayment(models.Model):
             subtype_xmlid='mail.mt_comment',
             mail_auto_delete=False,
         )
-        
+
         # Now manually notify the specific users using _notify_thread
         # This ensures proper inbox notifications are created
         partner_ids = [user.partner_id.id for user in notification_users]
-        
+
         # Add partners as followers first
         self.message_subscribe(partner_ids=partner_ids)
-        
+
         # Use _notify_get_recipients to get proper recipients_data format
         # We need to pass partner_ids in the message to get proper recipients
         msg_vals = {
@@ -1391,25 +1531,25 @@ class PosAdvancePayment(models.Model):
             'model': self._name,
             'res_id': self.id,
         }
-        
+
         # Get recipients data using the standard method
         recipients_data = self._notify_get_recipients(message, msg_vals=msg_vals)
-        
+
         # Filter to only include our notification users and force inbox notification
         notification_partner_ids = set(partner_ids)
         recipients_data = [
-            r for r in recipients_data 
+            r for r in recipients_data
             if r.get('id') in notification_partner_ids
         ]
-        
+
         # Force inbox notification type
         for r in recipients_data:
             r['notif'] = 'inbox'
-        
+
         # Call _notify_thread_by_inbox to create notifications and send bus messages
         if recipients_data:
             self._notify_thread_by_inbox(message, recipients_data)
-        
+
         # Send email notifications separately
         for user in notification_users:
             try:
@@ -1423,10 +1563,10 @@ class PosAdvancePayment(models.Model):
                         'model': 'pos.advance.payment',
                         'res_id': self.id,
                     }
-                    
+
                     mail = self.env['mail.mail'].sudo().create(mail_values)
                     mail.send()
-                    
+
             except Exception:
                 pass
 
