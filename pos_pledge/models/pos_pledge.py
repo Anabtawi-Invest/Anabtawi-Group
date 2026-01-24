@@ -704,16 +704,18 @@ class PosPledge(models.Model):
                     'ref': _('Pledge Return (%s): %s') % (return_type_label, self.name),
                 }]
             )
+            reversal.action_post()  # Post the reversal entry
             self.return_move_id = reversal.id
 
         # Create reversal entry for employee if exists
         if self.employee_move_id:
-            self.employee_move_id._reverse_moves(
+            employee_reversal = self.employee_move_id._reverse_moves(
                 default_values_list=[{
                     'date': fields.Date.context_today(self),
                     'ref': _('Employee Service Return: %s') % self.name,
                 }]
             )
+            employee_reversal.action_post()  # Post the reversal entry
 
         self.write({
             'state': 'returned',
