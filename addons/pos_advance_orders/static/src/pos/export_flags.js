@@ -1,25 +1,39 @@
-/** @odoo-module **/
+from odoo import models, fields
 
-import { patch } from "@web/core/utils/patch";
-import { Order, Orderline } from "@point_of_sale/app/store/models";
+class PosConfig(models.Model):
+    _inherit = "pos.config"
 
-patch(Order.prototype, {
-    export_as_JSON() {
-        const json = super.export_as_JSON(...arguments);
-        json.advance_order_id = this.advance_order_id || false;
-        json.customer_mobile =
-            this.customer_mobile ||
-            (this.get_partner() ? (this.get_partner().mobile || this.get_partner().phone || false) : false);
-        return json;
-    },
-});
+    # --- Advance & Pledge Liability Configuration ---
+    advance_liability_account_id = fields.Many2one(
+        "account.account",
+        string="Advance Liability Account",
+        help="Account used for Customer Advances Liability"
+    )
 
-patch(Orderline.prototype, {
-    export_as_JSON() {
-        const json = super.export_as_JSON(...arguments);
-        json.is_pledge_line = !!this.is_pledge_line;
-        json.is_advance_deposit_line = !!this.is_advance_deposit_line;
-        json.pledge_origin_product_id = this.pledge_origin_product_id || false;
-        return json;
-    },
-});
+    pledge_liability_account_id = fields.Many2one(
+        "account.account",
+        string="Pledge Liability Account",
+        help="Account used for Customer Plate Deposits"
+    )
+
+    advance_deposit_product_id = fields.Many2one(
+        "product.product",
+        string="Advance Deposit Product"
+    )
+
+    pledge_product_id = fields.Many2one(
+        "product.product",
+        string="Pledge Product"
+    )
+
+    # --- Discount Profile Configuration ---
+    discount_profile_id = fields.Many2one(
+        "pos.discount.profile",
+        string="Discount Profile",
+    )
+
+    discount_product_id = fields.Many2one(
+        "product.product",
+        string="Discount Product",
+        help="Service product, no tax. Used to post discount as a negative line.",
+    )
