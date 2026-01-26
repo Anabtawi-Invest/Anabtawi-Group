@@ -11,6 +11,8 @@
             <field name="pledge_liability_account_id"/>
             <field name="advance_deposit_product_id"/>
             <field name="pledge_product_id"/>
+            <field name="discount_profile_id"/>
+            <field name="discount_product_id"/>
           </group>
         </page>
       </xpath>
