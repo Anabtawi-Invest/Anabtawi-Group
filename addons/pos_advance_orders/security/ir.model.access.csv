@@ -2,3 +2,5 @@ id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_pos_advance_order,advance order,model_pos_advance_order,,1,1,1,0
 access_pos_advance_order_line,advance order line,model_pos_advance_order_line,,1,1,1,0
 access_pos_advance_payment,advance payment,model_pos_advance_payment,,1,1,1,0
+access_pos_discount_profile,pos.discount.profile,model_pos_discount_profile,,1,1,1,0
+access_pos_discount_profile_line,pos.discount.profile.line,model_pos_discount_profile_line,,1,1,1,0
