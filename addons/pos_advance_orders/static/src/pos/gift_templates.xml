@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+  <t t-name="pos_advance_orders.GiftLineButton" owl="1">
+    <button class="control-button" t-on-click="onClick">
+      <i class="fa fa-gift me-1"/>
+      Gift
+    </button>
+  </t>
+
+</templates>
