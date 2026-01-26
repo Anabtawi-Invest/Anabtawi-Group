@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+  <t t-name="pos_advance_orders.DiscountButton" owl="1">
+    <button class="control-button" t-on-click="onClick">
+      <i class="fa fa-percent me-1"/>
+      Discount
+    </button>
+  </t>
+
+  <t t-name="pos_advance_orders.DiscountPopup" owl="1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="popup popup-textinput">
+          <div class="title">Discount</div>
+
+          <div class="body">
+            <div class="mb-2">
+              <div class="fw-bold mb-1">Percent Buttons</div>
+              <div class="d-flex flex-wrap gap-2">
+                <t t-foreach="state.buttons" t-as="b" t-key="b.id">
+                  <button class="button" t-on-click="() =&gt; applyPercent(b.percent)">
+                    <t t-esc="b.name"/>
+                  </button>
+                </t>
+              </div>
+            </div>
+
+            <hr/>
+
+            <div class="mb-2">
+              <div class="fw-bold mb-1">Fixed Total Discount (decimal &lt; 1.0)</div>
+              <input class="form-control" type="number" step="0.01" t-model="state.fixed"/>
+              <small class="text-muted">Allowed: 0.01 … <t t-esc="state.maxFixed"/></small>
+            </div>
+          </div>
+
+          <div class="footer">
+            <button class="button cancel" t-on-click="cancel">Cancel</button>
+            <button class="button confirm" t-on-click="applyFixed">Apply Fixed</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </t>
+
+</templates>
