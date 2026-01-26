@@ -5,3 +5,4 @@ import "./export_flags";
 import "./receipt_split";
 import "./discount_popup";
 import "./discount_button";
+import "./gift_button";
