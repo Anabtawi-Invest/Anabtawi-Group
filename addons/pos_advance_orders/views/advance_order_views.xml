@@ -1,0 +1,113 @@
+<odoo>
+  <record id="view_pos_advance_order_tree" model="ir.ui.view">
+    <field name="name">pos.advance.order.tree</field>
+    <field name="model">pos.advance.order</field>
+    <field name="arch" type="xml">
+      <tree string="Advance Orders">
+        <field name="name"/>
+        <field name="state"/>
+        <field name="pos_config_id"/>
+        <field name="partner_id"/>
+        <field name="partner_mobile"/>
+        <field name="due_date"/>
+        <field name="amount_total"/>
+        <field name="amount_paid"/>
+        <field name="amount_due"/>
+        <field name="invoice_id"/>
+      </tree>
+    </field>
+  </record>
+
+  <record id="view_pos_advance_order_form" model="ir.ui.view">
+    <field name="name">pos.advance.order.form</field>
+    <field name="model">pos.advance.order</field>
+    <field name="arch" type="xml">
+      <form string="Advance Order">
+        <header>
+          <button name="action_confirm" type="object" string="Confirm" class="btn-primary"
+                  attrs="{'invisible': [('state','!=','draft')]}"/>
+          <button name="action_fulfill_create_invoice" type="object" string="Fulfill &amp; Invoice" class="btn-primary"
+                  attrs="{'invisible': [('state','!=','confirmed')]}"/>
+          <button name="action_cancel" type="object" string="Cancel" class="btn-secondary"
+                  attrs="{'invisible': [('state','in',('cancelled','fulfilled'))]}"/>
+          <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,fulfilled,cancelled"/>
+        </header>
+
+        <sheet>
+          <div class="oe_title">
+            <h1><field name="name" readonly="1"/></h1>
+          </div>
+
+          <group>
+            <group>
+              <field name="pos_config_id" attrs="{'readonly': [('state','!=','draft')]}"/>
+              <field name="partner_id" attrs="{'readonly': [('state','!=','draft')]}"/>
+              <field name="partner_mobile" attrs="{'readonly': [('state','!=','draft')]}"/>
+              <field name="due_date" attrs="{'readonly': [('state','!=','draft')]}"/>
+            </group>
+            <group>
+              <field name="amount_total" readonly="1"/>
+              <field name="amount_paid" readonly="1"/>
+              <field name="amount_due" readonly="1"/>
+              <field name="invoice_id" readonly="1"/>
+            </group>
+          </group>
+
+          <notebook>
+            <page string="Lines">
+              <field name="line_ids" attrs="{'readonly': [('state','!=','draft')]}">
+                <tree editable="bottom">
+                  <field name="product_id"/>
+                  <field name="name"/>
+                  <field name="qty"/>
+                  <field name="price_unit"/>
+                  <field name="price_subtotal" readonly="1"/>
+                </tree>
+              </field>
+            </page>
+
+            <page string="Payments">
+              <field name="payment_ids" readonly="1">
+                <tree>
+                  <field name="journal_id"/>
+                  <field name="amount"/>
+                  <field name="state"/>
+                  <field name="move_id"/>
+                </tree>
+              </field>
+              <label string="Phase 1: post payments from the payment record (Action Post)."/>
+            </page>
+
+            <page string="Revisions" groups="pos_advance_orders.group_pos_advance_manager">
+              <field name="revision_ids" readonly="1">
+                <tree>
+                  <field name="create_date"/>
+                  <field name="user_id"/>
+                  <field name="partner_id"/>
+                  <field name="partner_mobile"/>
+                  <field name="due_date"/>
+                </tree>
+              </field>
+            </page>
+
+            <page string="Notes">
+              <field name="note" attrs="{'readonly': [('state','!=','draft')]}"/>
+            </page>
+          </notebook>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_pos_advance_orders" model="ir.actions.act_window">
+    <field name="name">Advance Orders</field>
+    <field name="res_model">pos.advance.order</field>
+    <field name="view_mode">tree,form</field>
+  </record>
+
+  <menuitem id="menu_pos_advance_root" name="Advance Orders"
+            parent="point_of_sale.menu_point_root" sequence="75"/>
+  <menuitem id="menu_pos_advance_orders" name="Advance Orders"
+            parent="pos_advance_orders.menu_pos_advance_root"
+            action="pos_advance_orders.action_pos_advance_orders" sequence="10"/>
+</odoo>
