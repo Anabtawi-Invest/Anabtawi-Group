@@ -1,113 +1,81 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<odoo>
+from odoo import models, fields, api
 
-  <!-- List View -->
-  <record id="view_pos_advance_order_list" model="ir.ui.view">
-    <field name="name">pos.advance.order.list</field>
-    <field name="model">pos.advance.order</field>
-    <field name="arch" type="xml">
-      <list string="Advance Orders">
-        <field name="name"/>
-        <field name="state"/>
-        <field name="pos_config_id"/>
-        <field name="partner_id"/>
-        <field name="partner_mobile"/>
-        <field name="due_date"/>
-        <field name="amount_total"/>
-        <field name="amount_paid"/>
-        <field name="amount_due"/>
-        <field name="invoice_id"/>
-      </list>
-    </field>
-  </record>
+class PosAdvanceOrder(models.Model):
+    _name = "pos.advance.order"
+    _description = "POS Advance Order"
 
-  <!-- Form View -->
-  <record id="view_pos_advance_order_form" model="ir.ui.view">
-    <field name="name">pos.advance.order.form</field>
-    <field name="model">pos.advance.order</field>
-    <field name="arch" type="xml">
-      <form string="Advance Order">
+    name = fields.Char(default="Advance Order")
+    pos_config_id = fields.Many2one("pos.config", required=True)
+    partner_id = fields.Many2one("res.partner")
+    partner_mobile = fields.Char()
+    due_date = fields.Date()
+    note = fields.Text()
 
-        <header>
-          <button name="action_confirm"
-                  type="object"
-                  string="Confirm"
-                  class="btn-primary"
-                  invisible="state != 'draft'"/>
+    line_ids = fields.One2many("pos.advance.order.line", "order_id", string="Lines")
+    payment_ids = fields.One2many("pos.advance.payment", "order_id", string="Payments")
+    invoice_id = fields.Many2one("account.move", string="Invoice")
 
-          <button name="action_fulfill_create_invoice"
-                  type="object"
-                  string="Fulfill &amp; Invoice"
-                  class="btn-primary"
-                  invisible="state != 'confirmed'"/>
+    amount_total = fields.Monetary(string="Total", compute="_compute_amounts", store=True)
+    amount_paid = fields.Monetary(string="Paid", compute="_compute_amounts", store=True)
+    amount_due = fields.Monetary(string="Due", compute="_compute_amounts", store=True)
+    currency_id = fields.Many2one("res.currency", default=lambda self: self.env.company.currency_id)
 
-          <button name="action_cancel"
-                  type="object"
-                  string="Cancel"
-                  class="btn-secondary"
-                  invisible="state in ('cancelled','fulfilled')"/>
+    state = fields.Selection([
+        ("draft", "Draft"),
+        ("confirmed", "Confirmed"),
+        ("fulfilled", "Fulfilled"),
+        ("cancelled", "Cancelled")
+    ], default="draft")
 
-          <field name="state"
-                 widget="statusbar"
-                 statusbar_visible="draft,confirmed,fulfilled,cancelled"/>
-        </header>
+    @api.depends('line_ids.price_subtotal', 'payment_ids.amount')
+    def _compute_amounts(self):
+        for order in self:
+            order.amount_total = sum(line.price_subtotal for line in order.line_ids)
+            order.amount_paid = sum(payment.amount for payment in order.payment_ids)
+            order.amount_due = order.amount_total - order.amount_paid
 
-        <sheet>
-          <group>
-            <group>
-              <field name="pos_config_id"/>
-              <field name="partner_id"/>
-              <field name="partner_mobile"/>
-              <field name="due_date"/>
-            </group>
-            <group>
-              <field name="amount_total" readonly="1"/>
-              <field name="amount_paid" readonly="1"/>
-              <field name="amount_due" readonly="1"/>
-              <field name="invoice_id" readonly="1"/>
-            </group>
-          </group>
+    def action_confirm(self):
+        for order in self:
+            order.state = "confirmed"
 
-          <notebook>
+    def action_fulfill_create_invoice(self):
+        for order in self:
+            order.state = "fulfilled"
 
-            <page string="Lines">
-              <field name="line_ids">
-                <list>
-                  <field name="product_id"/>
-                  <field name="name"/>
-                  <field name="qty"/>
-                  <field name="price_unit"/>
-                  <field name="price_subtotal"/>
-                </list>
-              </field>
-            </page>
+    def action_cancel(self):
+        for order in self:
+            order.state = "cancelled"
 
-            <page string="Payments">
-              <field name="payment_ids">
-                <list>
-                  <field name="journal_id"/>
-                  <field name="amount"/>
-                  <field name="state"/>
-                  <field name="move_id"/>
-                </list>
-              </field>
-            </page>
 
-            <page string="Notes">
-              <field name="note"/>
-            </page>
+class PosAdvanceOrderLine(models.Model):
+    _name = "pos.advance.order.line"
+    _description = "Advance Order Line"
 
-          </notebook>
-        </sheet>
-      </form>
-    </field>
-  </record>
+    order_id = fields.Many2one("pos.advance.order")
+    product_id = fields.Many2one("product.product")
+    qty = fields.Float(default=1)
+    price_unit = fields.Float()
+    name = fields.Char()
 
-  <!-- Action -->
-  <record id="action_pos_advance_orders" model="ir.actions.act_window">
-    <field name="name">Advance Orders</field>
-    <field name="res_model">pos.advance.order</field>
-    <field name="view_mode">list,form</field>
-  </record>
+    price_subtotal = fields.Monetary(string="Subtotal", compute="_compute_subtotal", store=True)
+    currency_id = fields.Many2one(related="order_id.currency_id", store=True)
 
-</odoo>
+    @api.depends("qty", "price_unit")
+    def _compute_subtotal(self):
+        for line in self:
+            line.price_subtotal = line.qty * line.price_unit
+
+
+class PosAdvancePayment(models.Model):
+    _name = "pos.advance.payment"
+    _description = "Advance Payment"
+
+    order_id = fields.Many2one("pos.advance.order", string="Order")
+    journal_id = fields.Many2one("account.journal", string="Journal")
+    amount = fields.Monetary()
+    state = fields.Selection([
+        ("draft", "Draft"),
+        ("posted", "Posted")
+    ], default="draft")
+    move_id = fields.Many2one("account.move")
+    currency_id = fields.Many2one("res.currency", default=lambda self: self.env.company.currency_id)
