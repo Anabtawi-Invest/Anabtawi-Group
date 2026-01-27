@@ -1,10 +1,15 @@
+# Configuration & base models
 from . import pos_config
-from . import advance_order
-from . import advance_payment
-from . import advance_order_revision
 from . import discount_profile
-from . import pos_order_line
-from . import pos_order_gift
+
+# Core advance order models
 from . import pos_advance_order
 from . import pos_advance_order_line
+from . import pos_advance_order_revision
+
+# Payments
 from . import pos_advance_payment
+
+# POS extensions
+from . import pos_order_line
+from . import pos_order_gift
