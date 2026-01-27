@@ -5,3 +5,6 @@ from . import advance_order_revision
 from . import discount_profile
 from . import pos_order_line
 from . import pos_order_gift
+from . import pos_advance_order
+from . import pos_advance_order_line
+from . import pos_advance_payment
