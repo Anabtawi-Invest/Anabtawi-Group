@@ -1,21 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-  <record id="view_pos_config_form_advance" model="ir.ui.view">
-    <field name="name">pos.config.advance</field>
-    <field name="model">pos.config</field>
-    <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
-    <field name="arch" type="xml">
-      <xpath expr="//notebook" position="inside">
-        <page string="Advance & Pledge">
-          <group>
-            <field name="advance_liability_account_id"/>
-            <field name="pledge_liability_account_id"/>
-            <field name="advance_deposit_product_id"/>
-            <field name="pledge_product_id"/>
-            <field name="discount_profile_id"/>
-            <field name="discount_product_id"/>
-          </group>
-        </page>
-      </xpath>
-    </field>
-  </record>
+    <record id="view_pos_config_form_advance" model="ir.ui.view">
+        <field name="name">pos.config.advance</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Inject into sheet (Odoo 19 safe) -->
+            <xpath expr="//form//sheet" position="inside">
+                <group string="Advance &amp; Pledge">
+                    <field name="advance_liability_account_id"/>
+                    <field name="pledge_liability_account_id"/>
+                    <field name="advance_deposit_product_id"/>
+                    <field name="pledge_product_id"/>
+                    <field name="discount_profile_id"/>
+                    <field name="discount_product_id"/>
+                </group>
+            </xpath>
+
+        </field>
+    </record>
 </odoo>
