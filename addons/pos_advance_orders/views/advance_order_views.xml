@@ -1,4 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+
+  <!-- Tree View -->
   <record id="view_pos_advance_order_tree" model="ir.ui.view">
     <field name="name">pos.advance.order.tree</field>
     <field name="model">pos.advance.order</field>
@@ -18,6 +21,7 @@
     </field>
   </record>
 
+  <!-- Form View -->
   <record id="view_pos_advance_order_form" model="ir.ui.view">
     <field name="name">pos.advance.order.form</field>
     <field name="model">pos.advance.order</field>
@@ -25,11 +29,11 @@
       <form string="Advance Order">
         <header>
           <button name="action_confirm" type="object" string="Confirm" class="btn-primary"
-                  attrs="{'invisible': [('state','!=','draft')]}"/>
+                  invisible="state != 'draft'"/>
           <button name="action_fulfill_create_invoice" type="object" string="Fulfill &amp; Invoice" class="btn-primary"
-                  attrs="{'invisible': [('state','!=','confirmed')]}"/>
+                  invisible="state != 'confirmed'"/>
           <button name="action_cancel" type="object" string="Cancel" class="btn-secondary"
-                  attrs="{'invisible': [('state','in',('cancelled','fulfilled'))]}"/>
+                  invisible="state in ('cancelled','fulfilled')"/>
           <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,fulfilled,cancelled"/>
         </header>
 
@@ -40,10 +44,10 @@
 
           <group>
             <group>
-              <field name="pos_config_id" attrs="{'readonly': [('state','!=','draft')]}"/>
-              <field name="partner_id" attrs="{'readonly': [('state','!=','draft')]}"/>
-              <field name="partner_mobile" attrs="{'readonly': [('state','!=','draft')]}"/>
-              <field name="due_date" attrs="{'readonly': [('state','!=','draft')]}"/>
+              <field name="pos_config_id" readonly="state != 'draft'"/>
+              <field name="partner_id" readonly="state != 'draft'"/>
+              <field name="partner_mobile" readonly="state != 'draft'"/>
+              <field name="due_date" readonly="state != 'draft'"/>
             </group>
             <group>
               <field name="amount_total" readonly="1"/>
@@ -55,7 +59,7 @@
 
           <notebook>
             <page string="Lines">
-              <field name="line_ids" attrs="{'readonly': [('state','!=','draft')]}">
+              <field name="line_ids" readonly="state != 'draft'">
                 <tree editable="bottom">
                   <field name="product_id"/>
                   <field name="name"/>
@@ -91,7 +95,7 @@
             </page>
 
             <page string="Notes">
-              <field name="note" attrs="{'readonly': [('state','!=','draft')]}"/>
+              <field name="note" readonly="state != 'draft'"/>
             </page>
           </notebook>
         </sheet>
@@ -99,15 +103,18 @@
     </field>
   </record>
 
+  <!-- Action -->
   <record id="action_pos_advance_orders" model="ir.actions.act_window">
     <field name="name">Advance Orders</field>
     <field name="res_model">pos.advance.order</field>
     <field name="view_mode">tree,form</field>
   </record>
 
+  <!-- Menus -->
   <menuitem id="menu_pos_advance_root" name="Advance Orders"
             parent="point_of_sale.menu_point_root" sequence="75"/>
   <menuitem id="menu_pos_advance_orders" name="Advance Orders"
             parent="pos_advance_orders.menu_pos_advance_root"
             action="pos_advance_orders.action_pos_advance_orders" sequence="10"/>
+
 </odoo>
