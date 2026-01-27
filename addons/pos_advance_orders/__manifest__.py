@@ -27,6 +27,8 @@
         "pos_advance_orders/static/src/pos/discount_popup.js",
         "pos_advance_orders/static/src/pos/discount_button.js",
         "pos_advance_orders/static/src/pos/gift_button.js",
+        "pos_advance_orders/static/src/pos/receipt_templates.xml",
+
         # Removed export_flags.js
     ],
 }
