@@ -23,7 +23,6 @@
             "pos_advance_orders/static/src/pos/advance_orders_popup.js",
             "pos_advance_orders/static/src/pos/advance_orders_button.js",
             "pos_advance_orders/static/src/pos/pledge_autoline.js",
-            "pos_advance_orders/static/src/pos/export_flags.js",
             "pos_advance_orders/static/src/pos/receipt_split.js",
             "pos_advance_orders/static/src/pos/discount_popup.js",
             "pos_advance_orders/static/src/pos/discount_button.js",
