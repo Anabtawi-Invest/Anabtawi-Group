@@ -6,12 +6,12 @@ class PosAdvanceOrder(models.Model):
     _name = "pos.advance.order"
     _description = "POS Advance Order"
 
-    name = fields.Char(default="Advance Order")
-    pos_config_id = fields.Many2one("pos.config", required=True)
-    partner_id = fields.Many2one("res.partner")
-    partner_mobile = fields.Char()
-    due_date = fields.Date()
-    note = fields.Text()
+    name = fields.Char(string="Reference", default="Advance Order")
+    pos_config_id = fields.Many2one("pos.config", string="POS Config", required=True)
+    partner_id = fields.Many2one("res.partner", string="Customer")
+    partner_mobile = fields.Char(string="Mobile")
+    due_date = fields.Date(string="Due Date")
+    note = fields.Text(string="Notes")
 
     line_ids = fields.One2many("pos.advance.order.line", "order_id", string="Lines")
     payment_ids = fields.One2many("pos.advance.payment", "order_id", string="Payments")
@@ -20,14 +20,18 @@ class PosAdvanceOrder(models.Model):
     amount_total = fields.Monetary(string="Total", compute="_compute_amounts", store=True)
     amount_paid = fields.Monetary(string="Paid", compute="_compute_amounts", store=True)
     amount_due = fields.Monetary(string="Due", compute="_compute_amounts", store=True)
-    currency_id = fields.Many2one("res.currency", default=lambda self: self.env.company.currency_id)
+    currency_id = fields.Many2one(
+        "res.currency", 
+        string="Currency",
+        default=lambda self: self.env.company.currency_id
+    )
 
     state = fields.Selection([
         ("draft", "Draft"),
         ("confirmed", "Confirmed"),
         ("fulfilled", "Fulfilled"),
         ("cancelled", "Cancelled")
-    ], default="draft")
+    ], string="Status", default="draft")
 
     @api.depends('line_ids.price_subtotal', 'payment_ids.amount')
     def _compute_amounts(self):
@@ -43,6 +47,7 @@ class PosAdvanceOrder(models.Model):
     def action_fulfill_create_invoice(self):
         for order in self:
             order.state = "fulfilled"
+            # You can later add invoice creation logic here
 
     def action_cancel(self):
         for order in self:
@@ -53,14 +58,21 @@ class PosAdvanceOrderLine(models.Model):
     _name = "pos.advance.order.line"
     _description = "Advance Order Line"
 
-    order_id = fields.Many2one("pos.advance.order")
-    product_id = fields.Many2one("product.product")
-    qty = fields.Float(default=1)
-    price_unit = fields.Float()
-    name = fields.Char()
+    order_id = fields.Many2one("pos.advance.order", string="Advance Order", required=True)
+    product_id = fields.Many2one("product.product", string="Product", required=True)
+    qty = fields.Float(string="Quantity", default=1)
+    price_unit = fields.Float(string="Unit Price")
+    name = fields.Char(string="Description")
 
-    price_subtotal = fields.Monetary(string="Subtotal", compute="_compute_subtotal", store=True)
-    currency_id = fields.Many2one(related="order_id.currency_id", store=True)
+    price_subtotal = fields.Monetary(
+        string="Subtotal", compute="_compute_subtotal", store=True
+    )
+    currency_id = fields.Many2one(
+        "res.currency", 
+        string="Currency",
+        related="order_id.currency_id", 
+        store=True
+    )
 
     @api.depends("qty", "price_unit")
     def _compute_subtotal(self):
@@ -72,12 +84,16 @@ class PosAdvancePayment(models.Model):
     _name = "pos.advance.payment"
     _description = "Advance Payment"
 
-    order_id = fields.Many2one("pos.advance.order", string="Order")
-    journal_id = fields.Many2one("account.journal", string="Journal")
-    amount = fields.Monetary()
+    order_id = fields.Many2one("pos.advance.order", string="Advance Order", required=True)
+    journal_id = fields.Many2one("account.journal", string="Journal", required=True)
+    amount = fields.Monetary(string="Amount", required=True)
     state = fields.Selection([
         ("draft", "Draft"),
         ("posted", "Posted")
-    ], default="draft")
-    move_id = fields.Many2one("account.move")
-    currency_id = fields.Many2one("res.currency", default=lambda self: self.env.company.currency_id)
+    ], string="State", default="draft")
+    move_id = fields.Many2one("account.move", string="Accounting Entry")
+    currency_id = fields.Many2one(
+        "res.currency", 
+        string="Currency",
+        default=lambda self: self.env.company.currency_id
+    )
