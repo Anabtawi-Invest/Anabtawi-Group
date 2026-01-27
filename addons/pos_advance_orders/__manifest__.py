@@ -14,27 +14,23 @@
         "security/ir.model.access.csv",
         "views/pos_config_views.xml",
         "views/advance_order_views.xml",
-        "views/discount_profile_views.xml"
+        "views/discount_profile_views.xml",
     ],
-  "assets": {
-    "point_of_sale._assets_pos": [
-        "pos_advance_orders/static/src/pos/index.js",
-        "pos_advance_orders/static/src/pos/**/*.xml",
-        "pos_advance_orders/static/src/pos/advance_orders_popup.js",
-        "pos_advance_orders/static/src/pos/advance_orders_button.js",
-        "pos_advance_orders/static/src/pos/pledge_autoline.js",
-        "pos_advance_orders/static/src/pos/receipt_split.js",
-        "pos_advance_orders/static/src/pos/discount_popup.js",
-        "pos_advance_orders/static/src/pos/discount_button.js",
-        "pos_advance_orders/static/src/pos/gift_button.js",
-        "pos_advance_orders/static/src/pos/receipt_templates.xml",
-
-        # Removed export_flags.js
-    ],
-}
-
-
+    "assets": {
+        "point_of_sale._assets_pos": [
+            "pos_advance_orders/static/src/pos/index.js",
+            "pos_advance_orders/static/src/pos/**/*.xml",
+            "pos_advance_orders/static/src/pos/advance_orders_popup.js",
+            "pos_advance_orders/static/src/pos/advance_orders_button.js",
+            "pos_advance_orders/static/src/pos/pledge_autoline.js",
+            "pos_advance_orders/static/src/pos/receipt_split.js",
+            "pos_advance_orders/static/src/pos/discount_popup.js",
+            "pos_advance_orders/static/src/pos/discount_button.js",
+            "pos_advance_orders/static/src/pos/gift_button.js",
+            "pos_advance_orders/static/src/pos/receipt_templates.xml",
+        ],
+    },
     "installable": True,
     "application": False,
-    "license": "LGPL-3"
+    "license": "LGPL-3",
 }
