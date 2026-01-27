@@ -1,23 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
-  <record id="view_pos_discount_profile_tree" model="ir.ui.view">
-    <field name="name">pos.discount.profile.tree</field>
+  <!-- List View -->
+  <record id="view_pos_discount_profile_list" model="ir.ui.view">
+    <field name="name">pos.discount.profile.list</field>
     <field name="model">pos.discount.profile</field>
     <field name="arch" type="xml">
-      <tree>
+      <list>
         <field name="name"/>
         <field name="allow_fixed_total_decimal"/>
         <field name="max_fixed_total"/>
-      </tree>
+      </list>
     </field>
   </record>
 
+  <!-- Form View -->
   <record id="view_pos_discount_profile_form" model="ir.ui.view">
     <field name="name">pos.discount.profile.form</field>
     <field name="model">pos.discount.profile</field>
     <field name="arch" type="xml">
       <form>
         <sheet>
+
           <group>
             <field name="name"/>
             <field name="allow_fixed_total_decimal"/>
@@ -27,24 +31,27 @@
           <notebook>
             <page string="Percent Buttons">
               <field name="line_ids">
-                <tree editable="bottom">
+                <list editable="bottom">
                   <field name="name"/>
                   <field name="percent"/>
-                </tree>
+                </list>
               </field>
             </page>
           </notebook>
+
         </sheet>
       </form>
     </field>
   </record>
 
+  <!-- Action -->
   <record id="action_pos_discount_profile" model="ir.actions.act_window">
     <field name="name">Discount Profiles</field>
     <field name="res_model">pos.discount.profile</field>
-    <field name="view_mode">tree,form</field>
+    <field name="view_mode">list,form</field>
   </record>
 
+  <!-- Menu -->
   <menuitem id="menu_pos_discount_profile_root"
             name="Discount Profiles"
             parent="point_of_sale.menu_point_root"
