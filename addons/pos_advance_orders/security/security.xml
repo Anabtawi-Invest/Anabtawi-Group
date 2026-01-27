@@ -4,13 +4,13 @@
     <!-- POS Advance Cashier -->
     <record id="group_pos_advance_cashier" model="res.groups">
         <field name="name">POS Advance Cashier</field>
-        <field name="category_id" ref="point_of_sale.module_category_point_of_sale"/>
+        <field name="category_id" ref="point_of_sale.module_category_pos"/>
     </record>
 
     <!-- POS Advance Manager -->
     <record id="group_pos_advance_manager" model="res.groups">
         <field name="name">POS Advance Manager</field>
-        <field name="category_id" ref="point_of_sale.module_category_point_of_sale"/>
+        <field name="category_id" ref="point_of_sale.module_category_pos"/>
         <field name="implied_ids" eval="[(4, ref('group_pos_advance_cashier'))]"/>
     </record>
 
