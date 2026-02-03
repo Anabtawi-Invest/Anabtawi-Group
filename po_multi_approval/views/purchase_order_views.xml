@@ -1,0 +1,34 @@
+<odoo>
+
+    <record id="view_po_form_approval" model="ir.ui.view">
+        <field name="name">purchase.order.form.approval</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+
+            <header position="inside">
+
+                <button name="action_submit_for_approval"
+                        type="object"
+                        string="Submit"
+                        groups="po_multi_approval.group_purchase_officer"
+                        invisible="approval_state != 'none'"/>
+
+                <button name="action_approve_step"
+                        type="object"
+                        string="Approve"
+                        groups="po_multi_approval.group_purchase_manager_custom,po_multi_approval.group_purchase_accounting"
+                        invisible="approval_state != 'to_approve'"/>
+
+                <field name="approval_state" widget="statusbar"/>
+            </header>
+
+            <sheet position="inside">
+                <field name="approval_line_ids" readonly="1"/>
+            </sheet>
+
+        </field>
+    </record>
+
+</odoo>
+
