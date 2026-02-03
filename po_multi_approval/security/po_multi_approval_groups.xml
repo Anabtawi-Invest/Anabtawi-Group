@@ -1,0 +1,15 @@
+<odoo>
+
+    <record id="group_purchase_officer" model="res.groups">
+        <field name="name">Purchase Officer</field>
+    </record>
+
+    <record id="group_purchase_manager_custom" model="res.groups">
+        <field name="name">Purchase Manager (Custom)</field>
+    </record>
+
+    <record id="group_purchase_accounting" model="res.groups">
+        <field name="name">Purchase Accounting</field>
+    </record>
+
+</odoo>
