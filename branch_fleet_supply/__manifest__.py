@@ -12,6 +12,6 @@
     "views/branch_supply_menus.xml"
   ],
   "installable": true,
-  "application": false,
+  "application": true,
   "license": "LGPL-3"
 }
