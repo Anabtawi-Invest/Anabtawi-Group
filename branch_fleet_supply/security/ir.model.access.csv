@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_branch_supply_order_user,branch.supply.order user,model_branch_supply_order,stock.group_stock_user,1,1,1,0
+access_branch_supply_line_user,branch.supply.line user,model_branch_supply_line,stock.group_stock_user,1,1,1,0
+access_fleet_discrepancy_stock_user,fleet.discrepancy.case stock,model_fleet_discrepancy_case,stock.group_stock_user,1,1,1,0
+access_fleet_discrepancy_account_user,fleet.discrepancy.case account,model_fleet_discrepancy_case,account.group_account_user,1,1,1,0
