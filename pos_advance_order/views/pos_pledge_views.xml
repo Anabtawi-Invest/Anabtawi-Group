@@ -6,6 +6,7 @@
         <field name="arch" type="xml">
             <list string="Pledges">
                 <field name="partner_id"/>
+                <field name="employee_id" optional="hide"/>
                 <field name="pos_order_id"/>
                 <field name="order_id" optional="hide"/>
                 <field name="product_id"/>
@@ -25,6 +26,7 @@
                 <sheet>
                     <group>
                         <field name="partner_id"/>
+                        <field name="employee_id" readonly="1" invisible="not employee_id"/>
                         <field name="pos_order_id"/>
                         <field name="order_id" invisible="not order_id"/>
                         <field name="product_id" required="1"/>
@@ -46,6 +48,7 @@
         <field name="arch" type="xml">
             <search string="Pledges">
                 <field name="partner_id"/>
+                <field name="employee_id"/>
                 <field name="order_id"/>
                 <field name="pos_order_id"/>
                 <field name="product_id"/>
