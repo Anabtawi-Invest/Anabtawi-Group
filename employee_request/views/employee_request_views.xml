@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_employee_form_inherit_employee_request_password" model="ir.ui.view">
+        <field name="name">hr.employee.form.employee_request.password</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='hr_settings']/group[@name='settings_group']" position="inside">
+                <group string="Employee Request" name="employee_request_group" groups="hr.group_hr_manager">
+                    <field name="employee_password" widget="password_eye_char" password="True"/>
+                    <field name="employee_password_generated_at" readonly="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+
