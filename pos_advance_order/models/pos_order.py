@@ -19,3 +19,11 @@ class PosOrder(models.Model):
         index=True,
     )
 
+    advance_pledge_line_ids = fields.One2many(
+        "pos.advance.order.pledge",
+        "pos_order_id",
+        string="Pledge Lines",
+        readonly=True,
+        copy=False,
+    )
+

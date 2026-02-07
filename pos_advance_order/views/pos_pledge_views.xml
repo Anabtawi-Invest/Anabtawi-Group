@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_advance_order_pledge_list" model="ir.ui.view">
+        <field name="name">pos.advance.order.pledge.list</field>
+        <field name="model">pos.advance.order.pledge</field>
+        <field name="arch" type="xml">
+            <list string="Pledges">
+                <field name="partner_id"/>
+                <field name="pos_order_id"/>
+                <field name="order_id" optional="hide"/>
+                <field name="product_id"/>
+                <field name="pledge_qty"/>
+                <field name="pledge_amount_unit" widget="monetary"/>
+                <field name="pledge_subtotal" widget="monetary"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pos_advance_order_pledge_form" model="ir.ui.view">
+        <field name="name">pos.advance.order.pledge.form</field>
+        <field name="model">pos.advance.order.pledge</field>
+        <field name="arch" type="xml">
+            <form string="Pledge">
+                <sheet>
+                    <group>
+                        <field name="partner_id"/>
+                        <field name="pos_order_id"/>
+                        <field name="order_id" invisible="not order_id"/>
+                        <field name="product_id" required="1"/>
+                    </group>
+                    <group>
+                        <field name="pledge_qty"/>
+                        <field name="pledge_amount_unit" widget="monetary"/>
+                        <field name="pledge_subtotal" widget="monetary" readonly="1"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pos_advance_order_pledge_search" model="ir.ui.view">
+        <field name="name">pos.advance.order.pledge.search</field>
+        <field name="model">pos.advance.order.pledge</field>
+        <field name="arch" type="xml">
+            <search string="Pledges">
+                <field name="partner_id"/>
+                <field name="order_id"/>
+                <field name="pos_order_id"/>
+                <field name="product_id"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_pos_advance_order_pledge" model="ir.actions.act_window">
+        <field name="name">Pledges</field>
+        <field name="res_model">pos.advance.order.pledge</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_pos_advance_order_pledge_search"/>
+        <field name="context">{}</field>
+    </record>
+
+    <menuitem
+        id="menu_pos_advance_order_pledge"
+        name="Pledges"
+        parent="point_of_sale.menu_point_of_sale"
+        action="action_pos_advance_order_pledge"
+        sequence="20"
+        groups="point_of_sale.group_pos_user,point_of_sale.group_pos_manager"
+    />
+</odoo>
+

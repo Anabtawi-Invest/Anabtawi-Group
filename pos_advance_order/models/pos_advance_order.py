@@ -9,7 +9,7 @@ from odoo.fields import Command
 class PosAdvanceOrder(models.Model):
     _name = "pos.advance.order"
     _description = "POS Advance Order"
-    _inherit = ["product.catalog.mixin"]
+    _inherit = ["product.catalog.mixin", "mail.thread", "mail.activity.mixin"]
     _order = "id desc"
 
     name = fields.Char(string="Reference", required=True, readonly=True, default="New")
@@ -56,6 +56,19 @@ class PosAdvanceOrder(models.Model):
         store=True,
         readonly=True,
     )
+    is_employee_pricelist = fields.Boolean(
+        string="Is Employee Pricelist",
+        default=False,
+        help="If enabled, you can apply the Employee Pricelist (from the POS config) after employee password verification.",
+    )
+    employee_pricelist_employee_id = fields.Many2one(
+        "hr.employee",
+        string="Employee (Pricelist Authorization)",
+        readonly=True,
+        copy=False,
+        help="Employee who authorized applying the employee pricelist on this advance order.",
+    )
+
     currency_id = fields.Many2one(
         "res.currency",
         string="Currency",
@@ -114,15 +127,307 @@ class PosAdvanceOrder(models.Model):
     )
     pledge_count = fields.Float(string="Pledges Count", compute="_compute_pledge_count", store=True)
 
+    def _get_effective_pricelist(self):
+        """Return the pricelist that should be used for pricing this advance order.
+
+        Default is the POS config pricelist (related field `pricelist_id`).
+        If the user enabled employee pricelist and it was authorized via the wizard,
+        we switch to the employee pricelist configured on the POS.
+        """
+        self.ensure_one()
+        employee_pricelist = getattr(self.pos_config_id, "employee_pricelist_id", False)
+        if self.is_employee_pricelist and self.employee_pricelist_employee_id and employee_pricelist:
+            return employee_pricelist
+        return self.pricelist_id
+
+    def _apply_pricelist_to_lines(self, pricelist):
+        """Apply given pricelist to all product lines (draft only)."""
+        self.ensure_one()
+        if self.state != "draft":
+            raise UserError(_("You can only reprice lines on a Draft advance order."))
+        if not pricelist:
+            return
+        for line in self.line_ids.filtered(lambda l: not l.display_type and l.product_id):
+            qty = line.product_qty or 0.0
+            if qty <= 0:
+                continue
+            line.price_unit = pricelist._get_product_price(
+                product=line.product_id,
+                quantity=max(qty, 1.0),
+                currency=self.currency_id,
+                uom=line.product_uom_id,
+                date=self.picking_date,
+            )
+
+    def _send_create_payment_email_to_manager(self):
+        """Notify the configured manager on the Picking POS when advance payment is created."""
+        self.ensure_one()
+        manager = getattr(self.pos_config_id, "advance_order_manager_id", False)
+        if not manager:
+            return
+
+        email_to = manager.email or manager.partner_id.email
+        if not email_to:
+            return
+
+        base_url = self.env["ir.config_parameter"].sudo().get_param("web.base.url", "http://localhost:8069")
+        order_link = f"{base_url}/web#id={self.id}&model=pos.advance.order&view_type=form"
+
+        currency = self.currency_id
+        partner = self.partner_id
+
+        # Keep it simple (can be moved to a template later).
+        lines_html = ""
+        for l in self.line_ids.filtered(lambda x: not x.display_type and x.product_id):
+            lines_html += (
+                f"<tr>"
+                f"<td style='padding:6px;border:1px solid #ddd'>{l.product_id.display_name}</td>"
+                f"<td style='padding:6px;border:1px solid #ddd;text-align:center'>{l.product_qty:g}</td>"
+                f"<td style='padding:6px;border:1px solid #ddd;text-align:right'>{currency.symbol} {l.price_unit:,.2f}</td>"
+                f"<td style='padding:6px;border:1px solid #ddd;text-align:right'>{currency.symbol} {l.price_subtotal_incl:,.2f}</td>"
+                f"</tr>"
+            )
+
+        pledge_html = ""
+        if (not self.with_employee) and self.pledge_amount:
+            pledge_html = f"<strong>Pledge Amount:</strong> {currency.symbol} {self.pledge_amount:,.2f}<br/>"
+
+        body_html = f"""
+            <div style="font-family: Arial, sans-serif; padding: 16px;">
+                <h3 style="margin:0 0 10px 0;">Advance Payment Created</h3>
+                <p style="margin:0 0 10px 0;">
+                    <strong>Advance Order:</strong> {self.name}<br/>
+                    <strong>Customer:</strong> {partner.display_name}<br/>
+                    <strong>Phone:</strong> {partner.phone or "N/A"}<br/>
+                    <strong>Paid (Advance):</strong> {currency.symbol} {self.advance_amount:,.2f}<br/>
+                    <strong>Invoice Total:</strong> {currency.symbol} {self.amount_total:,.2f}<br/>
+                    {pledge_html}
+                    <strong>Remaining:</strong> {currency.symbol} {self.amount_remaining:,.2f}<br/>
+                </p>
+
+                <h4 style="margin:14px 0 6px 0;">Products</h4>
+                <table style="width:100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background:#f7f7f7">
+                            <th style="padding:6px;border:1px solid #ddd;text-align:left;">Product</th>
+                            <th style="padding:6px;border:1px solid #ddd;text-align:center;">Qty</th>
+                            <th style="padding:6px;border:1px solid #ddd;text-align:right;">Unit Price</th>
+                            <th style="padding:6px;border:1px solid #ddd;text-align:right;">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {lines_html or "<tr><td colspan='4' style='padding:6px;border:1px solid #ddd'>No lines</td></tr>"}
+                    </tbody>
+                </table>
+
+                <p style="margin-top: 14px;">
+                    <a href="{order_link}" style="background:#875A7B;color:#fff;padding:8px 14px;text-decoration:none;border-radius:4px;display:inline-block;">
+                        View Advance Order
+                    </a>
+                </p>
+            </div>
+        """
+
+        mail_values = {
+            "subject": _("Advance Payment Created: %s") % (self.name,),
+            "body_html": body_html,
+            "email_to": email_to,
+            "email_from": self.env.user.email_formatted or self.env.company.email,
+            "author_id": self.env.user.partner_id.id,
+            "model": self._name,
+            "res_id": self.id,
+        }
+        mail = self.env["mail.mail"].sudo().create(mail_values)
+        mail.send()
+
+    def _send_advance_notifications(self):
+        """Send inbox notifications and emails to users configured on the Picking POS."""
+        self.ensure_one()
+
+        pickup_pos = self.pos_config_id
+        if not pickup_pos:
+            return
+
+        notification_users = pickup_pos.advance_notification_user_ids
+        if not notification_users:
+            return
+
+        partner = self.partner_id
+        currency = self.currency_id
+
+        base_url = self.env["ir.config_parameter"].sudo().get_param("web.base.url", "http://localhost:8069")
+        order_link = f"{base_url}/web#id={self.id}&model=pos.advance.order&view_type=form"
+
+        email_body = f"""
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2 style="color: #007bff;">Advance Payment Created</h2>
+
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Advance Number:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Customer:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{partner.name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Customer Phone:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{partner.phone or 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Invoice Total:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{currency.symbol} {self.amount_total:,.2f}</td>
+                </tr>
+                {"".join([
+                    f"""
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Pledge Amount:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{currency.symbol} {self.pledge_amount:,.2f}</td>
+                </tr>
+                    """ if ((not self.with_employee) and self.pledge_amount) else ""
+                ])}
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Advance Paid:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{currency.symbol} {self.advance_amount:,.2f}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Remaining Amount:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong style="color: #dc3545;">{currency.symbol} {self.amount_remaining:,.2f}</strong></td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Payment Method:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{(self.payment_method or '').upper()}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Picking POS:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{pickup_pos.name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Picking Date:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.picking_date.strftime('%Y-%m-%d %H:%M:%S') if self.picking_date else 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Created Date:</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{self.create_date.strftime('%Y-%m-%d %H:%M:%S') if self.create_date else 'N/A'}</td>
+                </tr>
+            </table>
+
+            <h3 style="margin-top: 30px; color: #28a745;">Products:</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <thead>
+                    <tr style="background-color: #f8f9fa;">
+                        <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Product</th>
+                        <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Quantity</th>
+                        <th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Unit Price</th>
+                        <th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+
+        for line in self.line_ids.filtered(lambda l: not l.display_type and l.product_id):
+            email_body += f"""
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{line.product_id.display_name}</td>
+                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">{line.product_qty:g}</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">{currency.symbol} {line.price_unit:,.2f}</td>
+                        <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">{currency.symbol} {line.price_subtotal_incl:,.2f}</td>
+                    </tr>
+            """
+
+        email_body += f"""
+                </tbody>
+            </table>
+
+            <p style="margin-top: 30px; color: #6c757d;">
+                <a href="{order_link}"
+                   style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    View Advance Order
+                </a>
+            </p>
+        </div>
+        """
+
+        parts = [
+            f"Advance Payment Created: {self.name}",
+            f"Customer: {partner.name}",
+            f"Invoice Total: {currency.symbol} {self.amount_total:,.2f}",
+        ]
+        if (not self.with_employee) and self.pledge_amount:
+            parts.append(f"Pledge: {currency.symbol} {self.pledge_amount:,.2f}")
+        parts.extend([
+            f"Advance Paid: {currency.symbol} {self.advance_amount:,.2f}",
+            f"Remaining: {currency.symbol} {self.amount_remaining:,.2f}",
+        ])
+        notification_body = "\n".join(parts)
+
+        message = self.message_post(
+            body=notification_body,
+            subject=f"Advance Payment Created: {self.name}",
+            email_layout_xmlid="mail.mail_notification_light",
+            subtype_xmlid="mail.mt_comment",
+            mail_auto_delete=False,
+        )
+
+        partner_ids = [u.partner_id.id for u in notification_users if u.partner_id]
+        if partner_ids:
+            self.message_subscribe(partner_ids=partner_ids)
+
+            msg_vals = {
+                "partner_ids": partner_ids,
+                "model": self._name,
+                "res_id": self.id,
+            }
+            recipients_data = self._notify_get_recipients(message, msg_vals=msg_vals)
+            notification_partner_ids = set(partner_ids)
+            recipients_data = [r for r in recipients_data if r.get("id") in notification_partner_ids]
+            for r in recipients_data:
+                r["notif"] = "inbox"
+            if recipients_data:
+                self._notify_thread_by_inbox(message, recipients_data)
+
+        for user in notification_users:
+            try:
+                email_to = user.email or user.partner_id.email
+                if email_to:
+                    mail_values = {
+                        "subject": f"Advance Payment Created: {self.name}",
+                        "body_html": email_body,
+                        "email_to": email_to,
+                        "email_from": self.env.user.email_formatted or self.env.company.email,
+                        "author_id": self.env.user.partner_id.id,
+                        "model": self._name,
+                        "res_id": self.id,
+                    }
+                    mail = self.env["mail.mail"].sudo().create(mail_values)
+                    mail.send()
+            except Exception:
+                pass
+
+    def action_open_employee_pricelist_wizard(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Employee Authorization"),
+            "res_model": "pos.advance.order.employee_pricelist.wizard",
+            "view_mode": "form",
+            "target": "new",
+            "context": {
+                "default_advance_order_id": self.id,
+            },
+        }
+
     @api.depends("line_ids.price_subtotal_incl", "pledge_line_ids.pledge_subtotal", "with_employee")
     def _compute_amounts(self):
         for order in self:
             # Align with POS order totals: include taxes in product total.
             order.amount_products = sum(order.line_ids.mapped("price_subtotal_incl"))
             order.pledge_amount = sum(order.pledge_line_ids.mapped("pledge_subtotal"))
-            # UI total remains products total; pledges are shown separately.
+            # Invoice total remains products total; pledges are shown separately (not part of invoice total).
             order.amount_total = order.amount_products
-            order.amount_grand_total = order.amount_products + (0.0 if order.with_employee else order.pledge_amount)
+            # Keep for backward compatibility, but do NOT include pledge in totals.
+            order.amount_grand_total = order.amount_products
 
     @api.depends("pledge_line_ids.pledge_qty")
     def _compute_pledge_count(self):
@@ -147,6 +452,11 @@ class PosAdvanceOrder(models.Model):
         - pledge_amount_unit = product template pledge_amount
         """
         for order in self:
+            # Link pledge lines to the POS order which collected the pledge (remaining payment order)
+            linked_pos_order_id = False
+            if (not order.with_employee) and order.remaining_pos_order_id:
+                linked_pos_order_id = order.remaining_pos_order_id.id
+
             # Aggregate qty by product for pledged products
             qty_by_product = {}
             amount_by_product = {}
@@ -168,12 +478,15 @@ class PosAdvanceOrder(models.Model):
                     commands.append(fields.Command.update(pl.id, {
                         "pledge_qty": qty,
                         "pledge_amount_unit": unit_amount,
+                        "pos_order_id": linked_pos_order_id or False,
                     }))
                 else:
                     commands.append(fields.Command.create({
                         "product_id": product.id,
                         "pledge_qty": qty,
                         "pledge_amount_unit": unit_amount,
+                        "pos_order_id": linked_pos_order_id or False,
+                        "partner_id": order.partner_id.id,
                     }))
 
             # Remove pledge lines for products that are no longer pledged in order lines
@@ -265,6 +578,8 @@ class PosAdvanceOrder(models.Model):
             "amount_paid": 0.0,
             "amount_return": 0.0,
             "amount_difference": 0.0,
+            "is_advance_generated": True,
+            "advance_order_id": self.id,
         })
         PosOrderLine = self.env["pos.order.line"].sudo()
         for spec in (lines or []):
@@ -337,6 +652,10 @@ class PosAdvanceOrder(models.Model):
         self.write({"state": "cancel"})
         return True
 
+    def unlink(self):
+        # Business rule: Advance Orders must never be deleted (audit trail).
+        raise UserError(_("You cannot delete Advance Orders. You can cancel them instead."))
+
     def write(self, vals):
         # Make cancelled advance orders fully read-only (server-side safety).
         for order in self:
@@ -407,6 +726,10 @@ class PosAdvanceOrder(models.Model):
             order._pay_pos_order(pos_order, pm, pos_order.amount_total)
             order.advance_pos_order_id = pos_order.id
             order.state = "advance_paid"
+            # Notify manager on Picking POS
+            order._send_create_payment_email_to_manager()
+            # Notify configured users (inbox + email)
+            order._send_advance_notifications()
 
         return True
 
@@ -414,7 +737,6 @@ class PosAdvanceOrder(models.Model):
         """After confirm:
         Create a POS sale order in the Picking POS session:
         - Products lines (income)
-        - Optional pledge line (liability)
         - Advance reversal line (liability) as negative amount to clear the deposit
         Then register a pos.payment and mark the order paid.
         """
@@ -447,19 +769,6 @@ class PosAdvanceOrder(models.Model):
                     "tax_ids": [(6, 0, l.product_id.taxes_id.ids)],
                     "product_uom_id": l.product_uom_id.id,
                     "name": l.product_id.display_name,
-                })
-
-            # Pledge line (liability) if needed
-            if (not order.with_employee) and order.pledge_amount and order.pledge_amount > 0 and pos_config.pledge_product_id:
-                pledge_product = pos_config.pledge_product_id
-                lines.append({
-                    "product_id": pledge_product.id,
-                    "qty": 1.0,
-                    "price_unit": order.pledge_amount,
-                    "discount": 0.0,
-                    "tax_ids": [(6, 0, [])],
-                    "product_uom_id": pledge_product.uom_id.id,
-                    "name": _("Pledge"),
                 })
 
             # Apply advance as negative liability line
@@ -525,14 +834,16 @@ class PosAdvanceOrder(models.Model):
     def action_return_pledge(self):
         for order in self:
             order.ensure_one()
-            if not order.remaining_pos_order_id:
-                raise UserError(_("No remaining payment order found."))
             if order.return_pledge_pos_order_id:
                 raise UserError(_("Pledge return payment is already created."))
             if not order.pledge_amount or order.pledge_amount <= 0 or order.with_employee:
                 raise UserError(_("No pledge amount to return."))
 
-            pos_config = order.pos_config_id
+            pledge_collection_order = order.pledge_line_ids.filtered(lambda pl: pl.pos_order_id)[:1].pos_order_id
+            if not pledge_collection_order:
+                raise UserError(_("Pledge was not collected yet on a POS order, so it cannot be returned."))
+
+            pos_config = pledge_collection_order.config_id or pledge_collection_order.session_id.config_id
             if not pos_config.pledge_product_id:
                 raise UserError(_("Please set 'Pledge Product' on the POS configuration first."))
 
@@ -583,7 +894,7 @@ class PosAdvanceOrder(models.Model):
 
     def _get_product_catalog_order_data(self, products, **kwargs):
         res = super()._get_product_catalog_order_data(products, **kwargs)
-        pricelist = self.pricelist_id
+        pricelist = self._get_effective_pricelist()
         if pricelist:
             price_map = pricelist._get_products_price(
                 quantity=1.0,
@@ -614,7 +925,7 @@ class PosAdvanceOrder(models.Model):
         lines = self[child_field].filtered(lambda l: l.product_id.id == product_id and not l.display_type)
         product = self.env["product.product"].browse(product_id)
 
-        pricelist = self.pricelist_id
+        pricelist = self._get_effective_pricelist()
         product_price = (
             pricelist._get_product_price(
                 product=product,
@@ -738,12 +1049,13 @@ class PosAdvanceOrderLine(models.Model):
             )
             if not line.price_unit:
                 order = line.order_id
-                pricelist = order.pricelist_id if order else False
+                pricelist = order._get_effective_pricelist() if order else False
                 line.price_unit = (
                     pricelist._get_product_price(
                         product=line.product_id,
                         quantity=max(line.product_qty or 1.0, 1.0),
                         currency=order.currency_id,
+                        uom=line.product_uom_id,
                         date=order.picking_date,
                     )
                     if pricelist and order and order.currency_id
