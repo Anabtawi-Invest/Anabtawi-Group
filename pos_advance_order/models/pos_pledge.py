@@ -20,6 +20,14 @@ class PosAdvanceOrderPledge(models.Model):
     )
     pos_order_id = fields.Many2one("pos.order", string="Order", ondelete="cascade", index=True)
     partner_id = fields.Many2one("res.partner", string="Customer", index=True)
+    employee_id = fields.Many2one(
+        "hr.employee",
+        string="Employee",
+        compute="_compute_employee_id",
+        store=True,
+        readonly=True,
+        help="Filled from the linked Advance Order employee when With Employee is enabled.",
+    )
     product_id = fields.Many2one(
         "product.product",
         string="Product",
@@ -69,6 +77,21 @@ class PosAdvanceOrderPledge(models.Model):
     def _compute_pledge_subtotal(self):
         for rec in self:
             rec.pledge_subtotal = (rec.pledge_qty or 0.0) * (rec.pledge_amount_unit or 0.0)
+
+    @api.depends(
+        "order_id.with_employee",
+        "order_id.employee_id",
+        "pos_order_id.advance_order_id",
+        "pos_order_id.advance_order_id.with_employee",
+        "pos_order_id.advance_order_id.employee_id",
+    )
+    def _compute_employee_id(self):
+        for rec in self:
+            order = rec.order_id or rec.pos_order_id.advance_order_id
+            if order and order.with_employee and order.employee_id:
+                rec.employee_id = order.employee_id.id
+            else:
+                rec.employee_id = False
 
     def init(self):
         # Backfill links for POS-created pledge lines when possible

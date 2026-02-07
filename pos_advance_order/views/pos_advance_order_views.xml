@@ -185,6 +185,7 @@
                             </group>
                             <field name="pledge_line_ids" readonly="1">
                                 <list string="Pledges">
+                                    <field name="employee_id" optional="hide"/>
                                     <field name="product_id"/>
                                     <field name="pledge_qty"/>
                                     <field name="pledge_amount_unit" widget="monetary"/>

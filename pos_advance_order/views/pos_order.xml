@@ -15,6 +15,7 @@
                         <field name="advance_pledge_line_ids" nolabel="1">
                             <list string="Pledges" create="0" delete="0">
                                 <field name="partner_id"/>
+                                <field name="employee_id" optional="hide"/>
                                 <field name="order_id" optional="hide"/>
                                 <field name="product_id"/>
                                 <field name="pledge_qty"/>
