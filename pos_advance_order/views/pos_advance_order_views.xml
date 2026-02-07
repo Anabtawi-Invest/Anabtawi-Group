@@ -92,7 +92,7 @@
                         string="Return Pledge"
                         class="btn-secondary"
                         groups="point_of_sale.group_pos_manager"
-                        invisible="state == 'cancel' or with_employee or pledge_amount &lt;= 0 or return_pledge_pos_order_id"
+                        invisible="state == 'cancel' or pledge_amount &lt;= 0 or return_pledge_pos_order_id"
                     />
                     <button
                         name="action_create_remaining_payment"
@@ -197,11 +197,12 @@
                     <group class="oe_subtotal_footer oe_right">
                         <field name="amount_total" widget="monetary" readonly="1"/>
                         <field name="amount_paid" widget="monetary" readonly="1"/>
-                        <field name="pledge_amount" widget="monetary" readonly="1" invisible="with_employee or pledge_amount == 0"/>
+                        <field name="pledge_amount" widget="monetary" readonly="1" invisible="pledge_amount == 0"/>
                         <field name="amount_remaining" widget="monetary" readonly="1"/>
                         <field name="from_pos_config_id" readonly="state != 'draft'"/>
                         <field name="advance_pos_order_id" readonly="1" invisible="not advance_pos_order_id"/>
                         <field name="remaining_pos_order_id" readonly="1" invisible="not remaining_pos_order_id"/>
+                        <field name="pledge_pos_order_id" readonly="1" invisible="not pledge_pos_order_id"/>
                         <field name="return_pledge_pos_order_id" readonly="1" invisible="not return_pledge_pos_order_id"/>
                     </group>
                 </sheet>
