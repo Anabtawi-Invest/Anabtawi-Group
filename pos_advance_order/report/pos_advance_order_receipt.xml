@@ -48,7 +48,7 @@
                                 <span>Total</span>
                                 <span t-esc="o.currency_id.format(o.amount_total)"/>
                             </div>
-                            <t t-if="not o.with_employee and o.pledge_amount">
+                            <t t-if="o.pledge_amount">
                                 <div style="display:flex; justify-content:space-between;">
                                     <span>Pledge Amount</span>
                                     <span t-esc="o.currency_id.format(o.pledge_amount)"/>

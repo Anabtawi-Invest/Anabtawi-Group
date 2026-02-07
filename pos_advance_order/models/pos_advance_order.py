@@ -109,6 +109,7 @@ class PosAdvanceOrder(models.Model):
     )
     advance_pos_order_id = fields.Many2one("pos.order", string="Advance POS Order", readonly=True, copy=False)
     remaining_pos_order_id = fields.Many2one("pos.order", string="Remaining POS Order", readonly=True, copy=False)
+    pledge_pos_order_id = fields.Many2one("pos.order", string="Pledge POS Order", readonly=True, copy=False)
     refund_advance_pos_order_id = fields.Many2one("pos.order", string="Refund Advance POS Order", readonly=True, copy=False)
     return_pledge_pos_order_id = fields.Many2one("pos.order", string="Return Pledge POS Order", readonly=True, copy=False)
     # Kept for UI (can be removed later). Now computed from POS orders rather than account.payment.
@@ -189,7 +190,7 @@ class PosAdvanceOrder(models.Model):
             )
 
         pledge_html = ""
-        if (not self.with_employee) and self.pledge_amount:
+        if self.pledge_amount:
             pledge_html = f"<strong>Pledge Amount:</strong> {currency.symbol} {self.pledge_amount:,.2f}<br/>"
 
         body_html = f"""
@@ -285,7 +286,7 @@ class PosAdvanceOrder(models.Model):
                     <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Pledge Amount:</strong></td>
                     <td style="padding: 8px; border-bottom: 1px solid #ddd;">{currency.symbol} {self.pledge_amount:,.2f}</td>
                 </tr>
-                    """ if ((not self.with_employee) and self.pledge_amount) else ""
+                    """ if (self.pledge_amount) else ""
                 ])}
                 <tr>
                     <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Advance Paid:</strong></td>
@@ -354,7 +355,7 @@ class PosAdvanceOrder(models.Model):
             f"Customer: {partner.name}",
             f"Invoice Total: {currency.symbol} {self.amount_total:,.2f}",
         ]
-        if (not self.with_employee) and self.pledge_amount:
+        if self.pledge_amount:
             parts.append(f"Pledge: {currency.symbol} {self.pledge_amount:,.2f}")
         parts.extend([
             f"Advance Paid: {currency.symbol} {self.advance_amount:,.2f}",
@@ -454,8 +455,8 @@ class PosAdvanceOrder(models.Model):
         for order in self:
             # Link pledge lines to the POS order which collected the pledge (remaining payment order)
             linked_pos_order_id = False
-            if (not order.with_employee) and order.remaining_pos_order_id:
-                linked_pos_order_id = order.remaining_pos_order_id.id
+            if order.pledge_pos_order_id:
+                linked_pos_order_id = order.pledge_pos_order_id.id
 
             # Aggregate qty by product for pledged products
             qty_by_product = {}
@@ -748,6 +749,8 @@ class PosAdvanceOrder(models.Model):
                 raise UserError(_("Please create the advance payment first."))
             if order.remaining_pos_order_id:
                 raise UserError(_("Remaining/reversal payments are already created for this order."))
+            if order.pledge_pos_order_id:
+                raise UserError(_("Pledge payment order is already created for this advance order."))
             if not order.amount_grand_total or order.amount_grand_total <= 0:
                 raise UserError(_("Total amount must be greater than zero."))
 
@@ -788,6 +791,28 @@ class PosAdvanceOrder(models.Model):
             order._pay_pos_order(pos_order, pm, pos_order.amount_total)
             order.remaining_pos_order_id = pos_order.id
             order.state = "fully_paid"
+
+            # Create a separate POS order for pledge (paid immediately) in the same session
+            if order.pledge_amount and order.pledge_amount > 0 and pos_config.pledge_product_id:
+                pledge_product = pos_config.pledge_product_id
+                pledge_lines = [{
+                    "product_id": pledge_product.id,
+                    "qty": 1.0,
+                    "price_unit": order.pledge_amount,
+                    "discount": 0.0,
+                    "tax_ids": [(6, 0, [])],
+                    "product_uom_id": pledge_product.uom_id.id,
+                    "name": _("Pledge"),
+                }]
+                pledge_order = order._create_pos_order(session, pledge_lines)
+                order._pay_pos_order(pledge_order, pm, pledge_order.amount_total)
+                order.pledge_pos_order_id = pledge_order.id
+                # Link pledge lines to the POS order that collected the pledge.
+                if order.pledge_line_ids:
+                    order.pledge_line_ids.sudo().write({
+                        "pos_order_id": pledge_order.id,
+                        "partner_id": order.partner_id.id,
+                    })
 
         return True
 
@@ -836,7 +861,7 @@ class PosAdvanceOrder(models.Model):
             order.ensure_one()
             if order.return_pledge_pos_order_id:
                 raise UserError(_("Pledge return payment is already created."))
-            if not order.pledge_amount or order.pledge_amount <= 0 or order.with_employee:
+            if not order.pledge_amount or order.pledge_amount <= 0:
                 raise UserError(_("No pledge amount to return."))
 
             pledge_collection_order = order.pledge_line_ids.filtered(lambda pl: pl.pos_order_id)[:1].pos_order_id
