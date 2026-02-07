@@ -6,6 +6,20 @@ from odoo import fields, models
 class PosConfig(models.Model):
     _inherit = "pos.config"
 
+    advance_order_manager_id = fields.Many2one(
+        "res.users",
+        string="Advance Orders Manager",
+        help="This user will receive an email notification when an advance order payment is created.",
+    )
+    advance_notification_user_ids = fields.Many2many(
+        "res.users",
+        "pos_config_advance_notification_user_rel",
+        "config_id",
+        "user_id",
+        string="Advance Notification Users",
+        help="Users who will receive inbox notifications and emails when an advance order payment is created.",
+    )
+
     pos_advance_account_id = fields.Many2one(
         "account.account",
         string="POS Advance Account",

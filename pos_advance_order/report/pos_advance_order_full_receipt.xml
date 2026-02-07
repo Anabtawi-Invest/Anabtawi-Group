@@ -56,7 +56,7 @@
                             </t>
                             <div style="display:flex; justify-content:space-between;">
                                 <span>Paid Amount</span>
-                                <span t-esc="o.currency_id.format(o.amount_grand_total)"/>
+                                <span t-esc="o.currency_id.format(o.amount_paid)"/>
                             </div>
                             <div style="display:flex; justify-content:space-between;">
                                 <span>Remaining</span>

@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <record id="action_pos_advance_order_employee_pricelist_wizard" model="ir.actions.act_window">
+        <field name="name">Employee Authorization</field>
+        <field name="res_model">pos.advance.order.employee_pricelist.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_advance_order_id': active_id}</field>
+    </record>
+
     <record id="action_pos_advance_order" model="ir.actions.act_window">
         <field name="name">Advance Orders</field>
         <field name="res_model">pos.advance.order</field>
@@ -21,7 +29,7 @@
         <field name="name">pos.advance.order.tree</field>
         <field name="model">pos.advance.order</field>
         <field name="arch" type="xml">
-            <list string="Advance Orders">
+            <list string="Advance Orders" delete="0">
                 <field name="name"/>
                 <field name="partner_id"/>
                 <field name="user_id"/>
@@ -39,9 +47,16 @@
         <field name="name">pos.advance.order.form</field>
         <field name="model">pos.advance.order</field>
         <field name="arch" type="xml">
-            <form string="Advance Order">
+            <form string="Advance Order" delete="0">
                 <header>
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,advance_paid,fully_paid,cancel"/>
+                    <button
+                        name="%(action_pos_advance_order_employee_pricelist_wizard)d"
+                        type="action"
+                        string="Apply Employee Pricelist"
+                        class="btn-secondary"
+                        invisible="state != 'draft' or not is_employee_pricelist"
+                    />
                     <button
                         name="action_confirm"
                         type="object"
@@ -123,6 +138,8 @@
                             <field name="user_id" required="1" readonly="state != 'draft'"/>
                             <field name="payment_method" required="1" readonly="state != 'draft'"/>
                             <field name="advance_amount" widget="monetary" readonly="state != 'draft'"/>
+                            <field name="is_employee_pricelist" readonly="state != 'draft'"/>
+                            <field name="employee_pricelist_employee_id" readonly="1" invisible="not employee_pricelist_employee_id"/>
                         </group>
                         <group>
                             <field name="picking_date" required="1" readonly="state != 'draft'"/>
