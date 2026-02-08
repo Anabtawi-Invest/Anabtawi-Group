@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_inherit_prr" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.prr</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form//sheet" position="inside">
+                <div class="app_settings_block" data-string="Payroll Reconciliation" string="Payroll Reconciliation">
+                    <h2>Payroll Reconciliation</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane"/>
+                            <div class="o_setting_right_pane">
+                                <span class="o_form_label">Lateness Work Entry Type</span>
+                                <div class="text-muted">
+                                    Work Entry Type used to represent lateness (hours) in Work Entries.
+                                </div>
+                                <field name="prr_lateness_work_entry_type_id"/>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane"/>
+                            <div class="o_setting_right_pane">
+                                <span class="o_form_label">OT Work Entry Types (Bank)</span>
+                                <div class="text-muted">
+                                    Optional. If your overtime bank is represented by work entries, select those types here.
+                                </div>
+                                <field name="prr_ot_work_entry_type_ids" widget="many2many_tags"/>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane"/>
+                            <div class="o_setting_right_pane">
+                                <span class="o_form_label">Annual Leave Type (Hours)</span>
+                                <div class="text-muted">
+                                    Time Off Type to consume (hours) when lateness exceeds OT bank.
+                                </div>
+                                <field name="prr_annual_leave_type_id"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>

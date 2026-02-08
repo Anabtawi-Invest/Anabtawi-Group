@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hr_payrun_reconciliation_manager,hr.payrun.reconciliation manager,model_hr_payrun_reconciliation,hr_payroll.group_hr_payroll_manager,1,1,1,1
+access_hr_payrun_reconciliation_user,hr.payrun.reconciliation user,model_hr_payrun_reconciliation,hr.group_hr_user,1,0,0,0
