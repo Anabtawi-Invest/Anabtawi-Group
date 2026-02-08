@@ -8,7 +8,6 @@
     "license": "LGPL-3",
     "depends": ["hr", "hr_payroll", "hr_attendance", "hr_work_entry", "hr_holidays"],
     "data": [
-        "security/security.xml",
         "security/ir.model.access.csv",
         "views/hr_payslip_run_view.xml",
         "views/hr_payrun_reconciliation_view.xml"
