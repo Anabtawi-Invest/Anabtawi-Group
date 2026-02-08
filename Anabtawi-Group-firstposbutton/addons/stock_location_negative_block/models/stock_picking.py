@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 from collections import defaultdict
-
 from odoo import _, models
 from odoo.exceptions import UserError
 from odoo.tools.float_utils import float_compare
@@ -13,33 +12,31 @@ class StockPicking(models.Model):
     def button_validate(self):
         """
         Block negative stock ONLY for Internal Transfers.
-        Do NOT interfere with procurement, MRP, purchases, receipts, or deliveries.
+        Safe for Odoo 19.
         """
 
-        # 🔹 Apply ONLY to Internal Transfers
         internal_pickings = self.filtered(
-            lambda p: p.picking_type_id and p.picking_type_id.code == "internal"
+            lambda p: p.picking_type_id
+            and p.picking_type_id.code == "internal"
         )
 
-        # If none are internal, behave exactly like standard Odoo
         if not internal_pickings:
             return super().button_validate()
 
         Quant = self.env["stock.quant"]
         outgoing = defaultdict(float)
 
-        # 🔹 Collect quantities actually being moved (qty_done)
         for picking in internal_pickings:
-            for move in picking.move_ids:
-                product = move.product_id
+            for move in picking.move_ids_without_package:
 
-                # Only stockable products
+                if not move.move_line_ids:
+                    continue
+
+                product = move.product_id
                 if product.type != "product":
                     continue
 
                 source_location = move.location_id
-
-                # Only internal source locations
                 if not source_location or source_location.usage != "internal":
                     continue
 
@@ -54,7 +51,6 @@ class StockPicking(models.Model):
 
                     outgoing[(product.id, source_location.id)] += qty
 
-        # 🔹 Validate availability (AFTER reservation)
         for (product_id, location_id), out_qty in outgoing.items():
             product = self.env["product.product"].browse(product_id)
             location = self.env["stock.location"].browse(location_id)
