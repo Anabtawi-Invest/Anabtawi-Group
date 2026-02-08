@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_hr_payrun_reconciliation_tree" model="ir.ui.view">
-        <field name="name">hr.payrun.reconciliation.tree</field>
+    <record id="view_hr_payrun_reconciliation_list" model="ir.ui.view">
+        <field name="name">hr.payrun.reconciliation.list</field>
         <field name="model">hr.payrun.reconciliation</field>
         <field name="arch" type="xml">
-            <tree>
+            <list>
                 <field name="pay_run_id"/>
                 <field name="employee_id"/>
                 <field name="lateness_hours"/>
@@ -14,7 +14,7 @@
                 <field name="execution_datetime"/>
                 <field name="executed_by"/>
                 <field name="state"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -55,7 +55,7 @@
     <record id="action_hr_payrun_reconciliation" model="ir.actions.act_window">
         <field name="name">Pay Run Reconciliation</field>
         <field name="res_model">hr.payrun.reconciliation</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 
     <menuitem
