@@ -36,7 +36,7 @@
                 <notebook position="inside">
                     <page string="Reconciliation Lines" attrs="{'invisible': [('reconciliation_count','=',0)]}">
                         <field name="reconciliation_ids" readonly="1" context="{'default_pay_run_id': active_id}">
-                            <tree>
+                            <list>
                                 <field name="employee_id"/>
                                 <field name="lateness_hours"/>
                                 <field name="ot_used_hours"/>
@@ -45,7 +45,7 @@
                                 <field name="execution_datetime"/>
                                 <field name="executed_by"/>
                                 <field name="state"/>
-                            </tree>
+                            </list>
                         </field>
                     </page>
                 </notebook>
