@@ -58,12 +58,13 @@
         <field name="view_mode">list,form</field>
     </record>
 
-    <menuitem
-        id="menu_hr_payrun_reconciliation_root"
-        name="Pay Run Reconciliation"
-        parent="hr_payroll.menu_hr_payroll_root"
-        sequence="90"
-        action="action_hr_payrun_reconciliation"
-        groups="hr_payroll.group_hr_payroll_manager"
-    />
+<menuitem
+    id="menu_hr_payrun_reconciliation_root"
+    name="Pay Run Reconciliation"
+    parent="hr.menu_hr_root"
+    sequence="90"
+    action="action_hr_payrun_reconciliation"
+    groups="hr_payroll.group_hr_payroll_manager"
+/>
+
 </odoo>
