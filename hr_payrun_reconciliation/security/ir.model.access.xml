@@ -2,7 +2,7 @@
 <odoo>
 
     <!-- Payroll Manager: full access -->
-    <record id="access_hr_payrun_reconciliation_manager" model="ir_model_access">
+    <record id="access_hr_payrun_reconciliation_manager" model="ir.model.access">
         <field name="name">hr.payrun.reconciliation manager</field>
         <field name="model_id" ref="model_hr_payrun_reconciliation"/>
         <field name="group_id" ref="hr_payroll.group_hr_payroll_manager"/>
@@ -13,7 +13,7 @@
     </record>
 
     <!-- HR User: read-only -->
-    <record id="access_hr_payrun_reconciliation_user" model="ir_model_access">
+    <record id="access_hr_payrun_reconciliation_user" model="ir.model.access">
         <field name="name">hr.payrun.reconciliation user</field>
         <field name="model_id" ref="model_hr_payrun_reconciliation"/>
         <field name="group_id" ref="hr.group_hr_user"/>
