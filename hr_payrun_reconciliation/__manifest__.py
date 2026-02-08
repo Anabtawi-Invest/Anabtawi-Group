@@ -20,6 +20,7 @@
         "views/res_config_settings_views.xml",
         "data/hr_payslip_input_types.xml",
     ],
+   "post_init_hook": "post_init_hook",
     "installable": True,
     "application": False,
 }
