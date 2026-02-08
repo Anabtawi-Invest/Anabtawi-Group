@@ -93,11 +93,10 @@ class HrPayslipRun(models.Model):
             blocked_states = {"done", "paid"}
             bad = slips.filtered(lambda s: s.state in blocked_states)
             if bad:
-                raise UserError(_(
-                    "Reconciliation cannot run because some payslips are already confirmed/paid.
-"
-                    "Please reset those payslips to Draft/To Verify first."
-                ))
+               raise UserError(_(
+                   "Reconciliation cannot run because some payslips are already confirmed or paid. "
+                   "Please reset those payslips to Draft or To Verify first."
+               ))
 
         # Company configuration checks (no hardcoded IDs)
         company = self.company_id
