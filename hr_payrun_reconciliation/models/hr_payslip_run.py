@@ -102,14 +102,12 @@ class HrPayslipRun(models.Model):
         company = self.company_id
         if not company.prr_lateness_work_entry_type_id:
             raise UserError(_(
-                "Missing configuration: Lateness Work Entry Type.
-"
+                "Missing configuration: Lateness Work Entry Type. "
                 "Go to Settings → Payroll Reconciliation and set it for the current company."
             ))
         if not company.prr_annual_leave_type_id:
             raise UserError(_(
-                "Missing configuration: Annual Leave Type (Hours).
-"
+                "Missing configuration: Annual Leave Type (Hours). "
                 "Go to Settings → Payroll Reconciliation and set it for the current company."
             ))
 
@@ -125,8 +123,7 @@ class HrPayslipRun(models.Model):
             bad = slips.filtered(lambda s: s.state in {"done", "paid"})
             if bad:
                 raise UserError(_(
-                    "Rollback is blocked because some payslips are already confirmed/paid.
-"
+                    "Rollback is blocked because some payslips are already confirmed/paid. "
                     "Please reset them first, then retry."
                 ))
 
@@ -477,8 +474,7 @@ class HrPayslipRun(models.Model):
             return max(alloc_hours - used_hours, 0.0)
 
         raise UserError(_(
-            "Cannot determine Annual Leave remaining hours using standard APIs.
-"
+            "Cannot determine Annual Leave remaining hours using standard APIs."
             "Please ensure Annual Leave Type supports hour-based tracking and that allocations exist."
         ))
 
@@ -515,8 +511,7 @@ class HrPayslipRun(models.Model):
         else:
             # If system does not support hour-based leave, block instead of making wrong record.
             raise UserError(_(
-                "Annual Leave consumption requires hour-based time off configuration.
-"
+                "Annual Leave consumption requires hour-based time off configuration."
                 "Your Odoo setup does not expose hour fields on Time Off requests."
             ))
 
@@ -542,8 +537,7 @@ class HrPayslipRun(models.Model):
         # If still not validated, raise error to avoid silent non-deduction.
         if "state" in leave._fields and leave.state not in ("validate", "validated"):
             raise UserError(_(
-                "Annual Leave request could not be validated automatically.
-"
+                "Annual Leave request could not be validated automatically."
                 "Please check Time Off approval settings and user access rights."
             ))
         return leave
