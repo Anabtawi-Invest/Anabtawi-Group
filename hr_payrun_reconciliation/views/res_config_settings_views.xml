@@ -6,27 +6,31 @@
         <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
 
-            <!-- Attach to HR app in Settings -->
-            <xpath expr="//app[@name='hr']" position="inside">
+            <!-- Odoo 19 SAFE insertion point -->
+            <xpath expr="//form" position="inside">
 
-                <block title="Payroll Reconciliation">
+                <app name="payroll_reconciliation" string="Payroll Reconciliation">
 
-                    <setting string="Lateness Work Entry Type"
-                             help="Work Entry Type used to represent lateness hours.">
-                        <field name="prr_lateness_work_entry_type_id"/>
-                    </setting>
+                    <block title="Payroll Reconciliation">
 
-                    <setting string="OT Work Entry Types (Bank)"
-                             help="Optional. Select Work Entry Types that represent accrued overtime.">
-                        <field name="prr_ot_work_entry_type_ids" widget="many2many_tags"/>
-                    </setting>
+                        <setting string="Lateness Work Entry Type"
+                                 help="Work Entry Type used to represent lateness hours.">
+                            <field name="prr_lateness_work_entry_type_id"/>
+                        </setting>
 
-                    <setting string="Annual Leave Type (Hours)"
-                             help="Time Off Type (in hours) consumed when lateness exceeds overtime.">
-                        <field name="prr_annual_leave_type_id"/>
-                    </setting>
+                        <setting string="OT Work Entry Types (Bank)"
+                                 help="Optional. Select Work Entry Types that represent accrued overtime.">
+                            <field name="prr_ot_work_entry_type_ids" widget="many2many_tags"/>
+                        </setting>
 
-                </block>
+                        <setting string="Annual Leave Type (Hours)"
+                                 help="Time Off Type (in hours) consumed when lateness exceeds overtime.">
+                            <field name="prr_annual_leave_type_id"/>
+                        </setting>
+
+                    </block>
+
+                </app>
 
             </xpath>
 
