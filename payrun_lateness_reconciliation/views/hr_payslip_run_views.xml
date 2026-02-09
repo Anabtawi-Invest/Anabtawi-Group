@@ -13,7 +13,7 @@
                             type="object"
                             string="Reconcile Lateness"
                             class="btn btn-primary"
-                            attrs="{'invisible': [('slip_ids','=',False)]}"/>
+                            modifiers="{'invisible': [['slip_ids', '=', false]]}"/>
                 </div>
             </xpath>
 
