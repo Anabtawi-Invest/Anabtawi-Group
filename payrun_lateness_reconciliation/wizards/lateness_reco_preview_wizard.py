@@ -98,7 +98,11 @@ class LatenessPreviewWizard(models.TransientModel):
                 )
             )
 
-        self.preview_results = "
+        self.preview_results = """
+Employee: %s
+Late Minutes: %s
+Deducted From OT: %s
+""" % (employee.name, late_minutes, deducted_ot)
 ".join(preview_lines) or _("No lateness found.")
         return {
             "type": "ir.actions.act_window",
