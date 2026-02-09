@@ -5,10 +5,9 @@
     "summary": "Reconcile lateness: OT bank -> Annual Leave -> Unpaid input",
     "depends": ["hr_payroll", "hr_work_entry", "hr_holidays"],
     "data": [
-        "security/ir.model.access.csv",
         "views/hr_payslip_run_views.xml",
-        "views/lateness_reco_preview_wizard_view.xml"
+        "views/lateness_reco_preview_wizard_view.xml",
     ],
     "installable": True,
-    "application": False
+    "application": False,
 }
