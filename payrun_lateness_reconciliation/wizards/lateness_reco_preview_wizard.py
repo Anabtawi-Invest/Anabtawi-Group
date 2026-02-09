@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+from dateutil.relativedelta import relativedelta
 
 
 class LatenessPreviewWizard(models.TransientModel):
@@ -58,6 +60,50 @@ class LatenessPreviewWizard(models.TransientModel):
             alloc.sudo().action_approve()
             slip.sudo().write({field_name: alloc.id})
 
+    def _get_late_hours_for_slip(self, slip):
+        """Return lateness hours for this slip, compatible with dbs that lack date_start/date_stop."""
+        WorkEntry = self.env["hr.work.entry"]
+        employee = slip.employee_id
+        if not employee:
+            return 0.0
+
+        # Slip period: Date -> Datetime inclusive
+        date_from_dt = fields.Datetime.to_datetime(slip.date_from)
+        date_to_dt = fields.Datetime.to_datetime(slip.date_to) + relativedelta(days=1)
+
+        has_dt = ("date_start" in WorkEntry._fields) and ("date_stop" in WorkEntry._fields)
+        has_date = ("date" in WorkEntry._fields)
+
+        if has_dt:
+            domain = [
+                ("employee_id", "=", employee.id),
+                ("work_entry_type_id.code", "=", "LATE"),
+                ("state", "in", ["draft", "validated"]),
+                ("date_start", "<", date_to_dt),
+                ("date_stop", ">", date_from_dt),
+            ]
+        elif has_date:
+            domain = [
+                ("employee_id", "=", employee.id),
+                ("work_entry_type_id.code", "=", "LATE"),
+                ("state", "in", ["draft", "validated"]),
+                ("date", ">=", slip.date_from),
+                ("date", "<=", slip.date_to),
+            ]
+        else:
+            # آخر fallback: create_date داخل الفترة (أفضل من لا شيء)
+            domain = [
+                ("employee_id", "=", employee.id),
+                ("work_entry_type_id.code", "=", "LATE"),
+                ("state", "in", ["draft", "validated"]),
+                ("create_date", ">=", date_from_dt),
+                ("create_date", "<", date_to_dt),
+            ]
+
+        late_entries = WorkEntry.search(domain)
+        late_hours = sum(late_entries.mapped("duration")) if late_entries else 0.0
+        return float(late_hours or 0.0)
+
     def action_preview(self):
         self.ensure_one()
 
@@ -72,14 +118,7 @@ class LatenessPreviewWizard(models.TransientModel):
             if not employee:
                 continue
 
-            late_entries = self.env["hr.work.entry"].search([
-                ("employee_id", "=", employee.id),
-                ("date_start", "<", slip.date_to),
-                ("date_stop", ">", slip.date_from),
-                ("work_entry_type_id.code", "=", "LATE"),
-                ("state", "in", ["draft", "validated"]),
-            ])
-            late_hours = sum(late_entries.mapped("duration")) if late_entries else 0.0
+            late_hours = self._get_late_hours_for_slip(slip)
             if late_hours <= 0:
                 continue
 
@@ -119,14 +158,7 @@ class LatenessPreviewWizard(models.TransientModel):
             if not employee:
                 continue
 
-            late_entries = self.env["hr.work.entry"].search([
-                ("employee_id", "=", employee.id),
-                ("date_start", "<", slip.date_to),
-                ("date_stop", ">", slip.date_from),
-                ("work_entry_type_id.code", "=", "LATE"),
-                ("state", "in", ["draft", "validated"]),
-            ])
-            late_hours = sum(late_entries.mapped("duration")) if late_entries else 0.0
+            late_hours = self._get_late_hours_for_slip(slip)
 
             if late_hours <= 0:
                 self._update_unpaid_input(slip, "LATE_UNPAID_H", 0.0)
