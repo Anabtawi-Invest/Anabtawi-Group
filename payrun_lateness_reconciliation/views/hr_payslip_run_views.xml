@@ -3,20 +3,16 @@
     <record id="view_hr_payslip_run_form_inherit_lateness" model="ir.ui.view">
         <field name="name">hr.payslip.run.form.lateness</field>
         <field name="model">hr.payslip.run</field>
-
-        <!-- IMPORTANT: keep your current inherit_id that is now working -->
         <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
-
         <field name="arch" type="xml">
 
-            <!-- Put the button in a safe place: inside sheet -->
-            <xpath expr="//sheet" position="inside">
-                <div class="oe_button_box" name="button_box">
+            <!-- Safest anchor: form exists even when header/sheet don't -->
+            <xpath expr="//form" position="inside">
+                <div class="oe_title" style="margin-bottom: 8px;">
                     <button name="action_open_lateness_preview"
                             type="object"
                             string="Reconcile Lateness"
-                            class="oe_stat_button"
-                            icon="fa-exchange"
+                            class="btn btn-primary"
                             attrs="{'invisible': [('slip_ids','=',False)]}"/>
                 </div>
             </xpath>
