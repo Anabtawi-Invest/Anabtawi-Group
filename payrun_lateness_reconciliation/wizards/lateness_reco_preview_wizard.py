@@ -1,13 +1,12 @@
-# -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+
 
 class LatenessPreviewWizard(models.TransientModel):
     _name = "lateness.preview.wizard"
     _description = "Preview Lateness Reconciliation"
 
     payrun_id = fields.Many2one("hr.payslip.run", required=True, readonly=True)
-
     preview_results = fields.Text("Preview Results", readonly=True)
 
     def _get_leave_balance_hours(self, leave_type, employee):
@@ -98,12 +97,7 @@ class LatenessPreviewWizard(models.TransientModel):
                 )
             )
 
-        self.preview_results = """
-Employee: %s
-Late Minutes: %s
-Deducted From OT: %s
-""" % (employee.name, late_minutes, deducted_ot)
-".join(preview_lines) or _("No lateness found.")
+        self.preview_results = "\n".join(preview_lines) or _("No lateness found.")
         return {
             "type": "ir.actions.act_window",
             "res_model": "lateness.preview.wizard",
@@ -117,6 +111,8 @@ Deducted From OT: %s
 
         ot_type = self.env["hr.leave.type"].search([("name", "=", "Overtime Bank")], limit=1)
         al_type = self.env["hr.leave.type"].search([("name", "=", "Annual Leave")], limit=1)
+        if not ot_type or not al_type:
+            raise UserError(_("Missing time off types: Overtime Bank or Annual Leave."))
 
         for slip in self.payrun_id.slip_ids:
             employee = slip.employee_id
@@ -153,9 +149,11 @@ Deducted From OT: %s
             self._update_unpaid_input(slip, "LATE_UNPAID_H", unpaid_hours)
 
             self._upsert_negative_allocation(
-                slip, ot_type, ot_used, "late_reco_ot_alloc_id", _("OT used to cover lateness"))
+                slip, ot_type, ot_used, "late_reco_ot_alloc_id", _("OT used to cover lateness")
+            )
             self._upsert_negative_allocation(
-                slip, al_type, al_used, "late_reco_al_alloc_id", _("Annual Leave used to cover lateness"))
+                slip, al_type, al_used, "late_reco_al_alloc_id", _("Annual Leave used to cover lateness")
+            )
 
             slip.write({
                 "late_reco_late_hours": late_hours,
@@ -164,4 +162,4 @@ Deducted From OT: %s
                 "late_reco_unpaid_hours": unpaid_hours,
             })
 
-        return {'type': 'ir.actions.act_window_close'}
+        return {"type": "ir.actions.act_window_close"}
