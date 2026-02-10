@@ -1,11 +1,20 @@
+# models/hr_payslip.py
+
 from odoo import models, fields, api, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError
 from datetime import timedelta
+
 
 class HrPayslip(models.Model):
     _inherit = 'hr.payslip'
 
     def action_reconcile_lateness(self):
+        """
+        Reconcile lateness by:
+        1. Offsetting with OT hours (ot_hours_bank)
+        2. Offsetting with Annual Leave (if available)
+        3. Remaining lateness is unpaid (handled via payroll rules)
+        """
         WorkEntry = self.env['hr.work.entry']
         Leave = self.env['hr.leave']
         AttendanceType = self.env.ref('hr_work_entry.work_entry_type_attendance', raise_if_not_found=False)
@@ -13,12 +22,14 @@ class HrPayslip(models.Model):
 
         for slip in self:
             employee = slip.employee_id
-            ot_bank = employee.ot_hours_bank or 0.0
-            leave_days = employee.leaves_count or 0.0
             period_start = slip.date_from
             period_end = slip.date_to
 
-            # Get lateness work entries
+            # Track employee balances
+            ot_bank = employee.ot_hours_bank or 0.0
+            leave_days = employee.leaves_count or 0.0
+
+            # Fetch work entries tagged as lateness
             lateness_entries = WorkEntry.search([
                 ('employee_id', '=', employee.id),
                 ('date_start', '>=', period_start),
@@ -26,14 +37,14 @@ class HrPayslip(models.Model):
                 ('work_entry_type_id.name', 'ilike', 'late')
             ])
 
-            total_lateness = sum(e.duration for e in lateness_entries)
+            total_lateness = sum(e.duration for e in lateness_entries)  # in hours
             hours_to_resolve = total_lateness
 
-            # Offset with OT bank
-            if ot_bank > 0:
+            # === Step 1: Resolve with OT hours ===
+            if ot_bank > 0 and AttendanceType:
                 use_ot = min(ot_bank, hours_to_resolve)
                 WorkEntry.create({
-                    'name': 'Lateness Compensation - OT',
+                    'name': 'Lateness Compensation (OT)',
                     'employee_id': employee.id,
                     'work_entry_type_id': AttendanceType.id,
                     'date_start': slip.date_from,
@@ -41,12 +52,12 @@ class HrPayslip(models.Model):
                     'duration': use_ot,
                     'state': 'draft',
                 })
-                hours_to_resolve -= use_ot
                 employee.ot_hours_bank -= use_ot
+                hours_to_resolve -= use_ot
 
-            # Offset with leave
+            # === Step 2: Resolve with Annual Leave ===
             if hours_to_resolve > 0 and leave_days > 0 and LeaveType:
-                use_leave_hours = min(leave_days * 8, hours_to_resolve)
+                use_leave_hours = min(leave_days * 8.0, hours_to_resolve)
                 leave = Leave.create({
                     'name': 'Lateness Reconciliation',
                     'employee_id': employee.id,
@@ -59,4 +70,6 @@ class HrPayslip(models.Model):
                 leave.action_approve()
                 hours_to_resolve -= use_leave_hours
 
-            # Remaining lateness will be deducted from net salary automatically
+            # Remaining lateness is unpaid (handled in payroll rules, not here)
+
+        return True
