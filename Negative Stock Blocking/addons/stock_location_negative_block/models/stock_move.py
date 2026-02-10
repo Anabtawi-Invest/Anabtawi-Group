@@ -7,43 +7,52 @@ class StockMove(models.Model):
     _inherit = 'stock.move'
 
     def _action_done(self, cancel_backorder=False):
+
         for move in self:
             location = move.location_id
+
+            # 1️⃣ لا يوجد موقع أو لا يوجد تقييد
             if not location or not location.restrict_negative:
                 continue
 
-            # ✅ السماح دائمًا بالاستلام
-            if move.picking_id and move.picking_type_id.code == 'incoming':
+            picking = move.picking_id
+            if not picking:
                 continue
 
-            # 🔒 Internal Transfer
-            is_internal = bool(
-                move.picking_id and move.picking_type_id.code == 'internal'
-            )
-
-            # 🔒 Inventory Adjustment
-            is_inventory_adjustment = not move.picking_id
-
-            if not (is_internal or is_inventory_adjustment):
+            # 2️⃣ اسمح دائمًا بالـ Incoming (PO Receipt)
+            if picking.picking_type_id.code == 'incoming':
                 continue
 
-            # 🔥 الحساب الصحيح
+            # 3️⃣ نطبق المنع فقط على Internal Transfer
+            if picking.picking_type_id.code != 'internal':
+                continue
+
+            # 4️⃣ الكمية المنفذة (حسب حقولك)
+            done_qty = sum(move.move_line_ids.mapped('quantity'))
+            if not done_qty:
+                continue
+
+            # 5️⃣ الكمية المتاحة قبل التنفيذ
             available_qty = self.env['stock.quant']._get_available_quantity(
                 move.product_id, location
             )
 
-            qty_after_move = available_qty - move.quantity_done
+            qty_after = available_qty - done_qty
 
-            if qty_after_move < 0:
+            # 6️⃣ المنع مع رسالة واضحة
+            if qty_after < 0:
                 raise UserError(_(
-                    "Negative stock is not allowed in location '%s' for product '%s'.\n"
-                    "Available: %s, Requested: %s"
+                    "You cannot validate this Internal Transfer.\n\n"
+                    "Product: %s\n"
+                    "Source Location: %s\n"
+                    "Available Quantity: %s\n"
+                    "Requested Quantity: %s"
                 ) % (
-                    location.display_name,
                     move.product_id.display_name,
+                    location.display_name,
                     available_qty,
-                    move.quantity_done,
+                    done_qty,
                 ))
 
-        # ننفذ الحركة فقط إذا لم يُرفع خطأ
+        # إذا لم يحدث منع → نكمل التنفيذ
         return super()._action_done(cancel_backorder)
