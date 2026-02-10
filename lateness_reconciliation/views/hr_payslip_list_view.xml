@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <record id="view_hr_payslip_list_inherit_lateness" model="ir.ui.view">
-    <field name="name">hr.payslip.tree.lateness.reconciliation</field>
+    <field name="name">hr.payslip.list.lateness.reconciliation</field>
     <field name="model">hr.payslip</field>
     <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
     <field name="arch" type="xml">
-      <!-- Instead of using //tree, we insert the field after employee_id's parent -->
-      <xpath expr="//field[@name='employee_id']/.." position="inside">
+
+      <xpath expr="//field[@name='employee_id']" position="after">
         <field name="lateness_hours" invisible="1"/>
       </xpath>
+
     </field>
   </record>
 </odoo>
