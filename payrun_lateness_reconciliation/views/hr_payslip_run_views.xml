@@ -1,23 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="view_hr_payslip_run_form_inherit_lateness" model="ir.ui.view">
-        <field name="name">hr.payslip.run.form.lateness.button</field>
+        <field name="name">hr.payslip.run.form.lateness</field>
         <field name="model">hr.payslip.run</field>
 
-      
-        <field name="inherit_id" ref="hr.view_payslip_run_form"/>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
 
         <field name="arch" type="xml">
-        
+
+         
             <xpath expr="//sheet" position="inside">
-                <div class="oe_button_box" name="lateness_reco_box">
-                    <button
-                        name="action_open_lateness_preview"
-                        type="object"
-                        string="Reconcile Lateness"
-                        class="oe_stat_button btn-primary"
-                        attrs="{'invisible': [('slip_ids','=',False)]}"/>
+                <div class="oe_button_box" name="button_box">
+                    <button name="action_open_lateness_preview"
+                            type="object"
+                            string="Reconcile Lateness"
+                            class="oe_stat_button"
+                            icon="fa-exchange"
+                            modifiers="{'invisible': [['slip_ids', '=', false]]}"/>
                 </div>
             </xpath>
+
         </field>
     </record>
 </odoo>
