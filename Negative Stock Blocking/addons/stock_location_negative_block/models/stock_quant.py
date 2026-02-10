@@ -1,48 +1,41 @@
+# -*- coding: utf-8 -*-
 from odoo import models, _
 from odoo.exceptions import UserError
-from odoo.tools.float_utils import float_compare
 
 
 class StockQuant(models.Model):
-    _inherit = "stock.quant"
+    _inherit = 'stock.quant'
 
-    # ======================================================
-    # SAFE UNIVERSAL PROTECTION (works for ALL call styles)
-    # ======================================================
-    def _update_available_quantity(self, *args, **kwargs):
+    def action_apply_inventory(self):
+        for quant in self:
+            location = quant.location_id
 
-        product = args[0]
-        location = args[1]
+            # 1️⃣ إذا لا يوجد تقييد على الموقع → تجاهل
+            if not location or not location.restrict_negative:
+                continue
 
-        # quantity may come from different names
-        quantity = (
-            kwargs.get("quantity")
-            or kwargs.get("reserved_quantity")
-            or (args[2] if len(args) > 2 else 0)
-        )
+            # 2️⃣ الفرق في الجرد (الذي سيُطبق)
+            diff_qty = quant.inventory_diff_quantity
+            if not diff_qty:
+                continue
 
-        # only outgoing
-        if quantity and quantity < 0:
+            # 3️⃣ إذا الجرد سيُنقص المخزون
+            if diff_qty < 0:
+                qty_after = quant.available_quantity + diff_qty
 
-            if location.usage == "internal" and location.restrict_negative:
-
-                available = self._get_available_quantity(product, location)
-                requested = abs(quantity)
-
-                if float_compare(
-                    requested,
-                    available,
-                    precision_rounding=product.uom_id.rounding
-                ) > 0:
-
+                if qty_after < 0:
                     raise UserError(_(
-                        "❌ Negative stock NOT allowed\n\n"
-                        "Location: %s\nProduct: %s\nAvailable: %s\nRequested: %s"
+                        "You cannot apply this Inventory Adjustment.\n\n"
+                        "Product: %s\n"
+                        "Location: %s\n"
+                        "Available Quantity: %s\n"
+                        "Inventory Difference: %s"
                     ) % (
+                        quant.product_id.display_name,
                         location.display_name,
-                        product.display_name,
-                        available,
-                        requested,
+                        quant.available_quantity,
+                        diff_qty,
                     ))
 
-        return super()._update_available_quantity(*args, **kwargs)
+        # إذا لا يوجد منع → نكمل التطبيق
+        return super().action_apply_inventory()
