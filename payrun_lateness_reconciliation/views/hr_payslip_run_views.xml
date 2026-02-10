@@ -1,13 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-<record id="view_hr_payslip_run_form_inherit_lateness" model="ir.ui.view">
-<field name="name">hr.payslip.run.form.lateness</field>
-<field name="model">hr.payslip.run</field>
 
-<field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_form"/>
-<field name="arch" type="xml">
-<xpath expr="//header" position="inside">
-<button name="action_open_lateness_preview" type="object" string="Reconcile Lateness" class="btn-primary" invisible="not slip_ids" help="Open wizard to preview and apply lateness reconciliation for all payslips in this pay run"/>
-</xpath>
-</field>
-</record>
+    <record id="view_hr_payslip_run_form_inherit_lateness_safe" model="ir.ui.view">
+        <field name="name">hr.payslip.run.form.lateness.safe</field>
+        <field name="model">hr.payslip.run</field>
+        
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
+        
+        <field name="arch" type="xml">
+          
+            <xpath expr="//header" position="inside">
+                <button name="action_open_lateness_preview"
+                        type="object"
+                        string="Reconcile Lateness"
+                        class="btn-primary"
+                        attrs="{'invisible': [('slip_ids', '=', False)]}"/>
+            </xpath>
+            
+            
+            <xpath expr="//field[@name='name']" position="before">
+                <button name="action_open_lateness_preview"
+                        type="object"
+                        string="Reconcile Lateness"
+                        class="btn-primary"
+                        attrs="{'invisible': [('slip_ids', '=', False)]}"/>
+            </xpath>
+            
+        
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-info" role="alert">
+                    <button name="action_open_lateness_preview"
+                            type="object"
+                            string="Reconcile Lateness"
+                            class="btn-primary"
+                            attrs="{'invisible': [('slip_ids', '=', False)]}"/>
+                    <small>Automatically deduct lateness hours from OT, Annual Leave, or Salary</small>
+                </div>
+            </xpath>
+        </field>
+    </record>
 </odoo>
