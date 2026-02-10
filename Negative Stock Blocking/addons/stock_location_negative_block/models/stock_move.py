@@ -12,28 +12,27 @@ class StockMove(models.Model):
         StockQuant = self.env['stock.quant']
 
         for move in self:
-            # نتحقق فقط من الموقع المصدر
             location = move.location_id
             if not location or not location.restrict_negative:
                 continue
 
-            # ✅ السماح دائمًا بالاستلام (Purchase Receipts)
+            # ✅ السماح دائمًا بالاستلام (PO / Incoming)
             if move.picking_type_id and move.picking_type_id.code == 'incoming':
                 continue
 
-            # 🔒 نمنع فقط:
-            # 1) Internal Transfers
+            # 🔒 Internal Transfer
             is_internal = bool(
                 move.picking_type_id and move.picking_type_id.code == 'internal'
             )
 
-            # 2) Inventory Adjustments
-            is_inventory_adjustment = bool(move.inventory_id)
+            # 🔒 Inventory Adjustment (Odoo 19)
+            is_inventory_adjustment = bool(
+                move.picking_type_id and move.picking_type_id.code == 'inventory'
+            )
 
             if not (is_internal or is_inventory_adjustment):
                 continue
 
-            # بعد تنفيذ الحركة نتحقق من الكمية المتاحة
             available_qty = StockQuant._get_available_quantity(
                 move.product_id, location
             )
