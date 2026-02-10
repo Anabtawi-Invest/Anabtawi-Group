@@ -2,11 +2,12 @@
     <record id="view_hr_payslip_run_form_inherit_lateness" model="ir.ui.view">
         <field name="name">hr.payslip.run.form.lateness.button</field>
         <field name="model">hr.payslip.run</field>
-        <field name="inherit_id" ref="hr_payroll.view_payslip_run_form"/>
+        
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_form"/>
+
         <field name="arch" type="xml">
 
-            <!-- نضيف الزر داخل الفورم مباشرة -->
-            <xpath expr="//form/sheet" position="inside">
+            <xpath expr="//sheet" position="inside">
                 <div class="oe_button_box" name="lateness_reco_box">
                     <button name="action_open_lateness_preview"
                             type="object"
