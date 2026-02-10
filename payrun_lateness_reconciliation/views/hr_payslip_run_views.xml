@@ -7,11 +7,12 @@
         <field name="arch" type="xml">
 
             <xpath expr="//header" position="inside">
-                <button name="action_open_lateness_preview"
-                        type="object"
-                        string="Reconcile Lateness"
-                        class="btn btn-primary"
-                        modifiers="{'invisible': ['|', ['id', '=', false], ['slip_ids', '=', false]]}"/>
+               <button name="action_open_lateness_preview"
+        type="object"
+        string="Reconcile Lateness"
+        class="btn-primary"
+        attrs="{'invisible': [('slip_ids','=',False)]}"/>
+
             </xpath>
 
         </field>
