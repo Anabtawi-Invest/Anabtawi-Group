@@ -5,10 +5,8 @@
     <field name="model">hr.payslip</field>
     <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
     <field name="arch" type="xml">
-      <xpath expr="//tree" position="attributes">
-        <attribute name="create">false</attribute>
-      </xpath>
-      <xpath expr="//field[@name='employee_id']" position="after">
+      <!-- Instead of using //tree, we insert the field after employee_id's parent -->
+      <xpath expr="//field[@name='employee_id']/.." position="inside">
         <field name="lateness_hours" invisible="1"/>
       </xpath>
     </field>
