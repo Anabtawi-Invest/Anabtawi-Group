@@ -5,19 +5,15 @@ from datetime import timedelta
 class HrPayslip(models.Model):
     _inherit = 'hr.payslip'
 
-    # Flag to prevent double processing
     lateness_reconciled = fields.Boolean(
         string="Lateness Reconciled",
-        default=False,
-        help="Indicates whether lateness has already been processed for this payslip."
+        default=False
     )
 
-    # Needed for list view – MUST exist
     lateness_hours = fields.Float(
         string="Lateness Hours",
         compute="_compute_lateness_hours",
-        store=True,
-        help="Total lateness hours from work entries."
+        store=True
     )
 
     @api.depends('employee_id', 'date_from', 'date_to')
@@ -36,14 +32,6 @@ class HrPayslip(models.Model):
                 slip.lateness_hours = 0.0
 
     def action_reconcile_lateness(self):
-        """
-        Odoo 19 safe lateness reconciliation:
-        1. Add OT to bank (OTW / OTR / PHO)
-        2. Use OT bank
-        3. Use Annual Leave
-        4. Remaining lateness is unpaid
-        """
-
         WorkEntry = self.env['hr.work.entry']
         Leave = self.env['hr.leave']
 
@@ -68,36 +56,37 @@ class HrPayslip(models.Model):
                 continue
 
             employee = slip.employee_id
-            period_start = slip.date_from
-            period_end = slip.date_to
+            start = slip.date_from
+            end = slip.date_to
 
             # ─────────────────────────────
             # 1️⃣ ADD OT TO BANK
             # ─────────────────────────────
             ot_entries = WorkEntry.search([
                 ('employee_id', '=', employee.id),
-                ('date_start', '>=', period_start),
-                ('date_stop', '<=', period_end),
+                ('date_start', '>=', start),
+                ('date_stop', '<=', end),
                 ('work_entry_type_id.code', 'in', list(OT_MULTIPLIERS.keys())),
             ])
 
             ot_earned = 0.0
             for entry in ot_entries:
-                multiplier = OT_MULTIPLIERS.get(entry.work_entry_type_id.code, 1.0)
-                ot_earned += entry.duration * multiplier
+                ot_earned += entry.duration * OT_MULTIPLIERS.get(
+                    entry.work_entry_type_id.code, 1.0
+                )
 
             if ot_earned:
                 employee.ot_hours_bank += ot_earned
 
             # ─────────────────────────────
-            # 2️⃣ TOTAL LATENESS
+            # 2️⃣ COLLECT LATENESS ENTRIES
             # ─────────────────────────────
             lateness_entries = WorkEntry.search([
                 ('employee_id', '=', employee.id),
-                ('date_start', '>=', period_start),
-                ('date_stop', '<=', period_end),
+                ('date_start', '>=', start),
+                ('date_stop', '<=', end),
                 ('work_entry_type_id.code', '=', 'LATE'),
-            ])
+            ], order="date_start asc")
 
             total_lateness = sum(e.duration for e in lateness_entries)
             remaining = total_lateness
@@ -113,8 +102,8 @@ class HrPayslip(models.Model):
                     'name': 'Lateness Compensation (OT)',
                     'employee_id': employee.id,
                     'work_entry_type_id': AttendanceType.id,
-                    'date_start': period_start,
-                    'date_stop': period_start + timedelta(hours=ot_used),
+                    'date_start': start,
+                    'date_stop': start + timedelta(hours=ot_used),
                     'duration': ot_used,
                     'state': 'draft',
                 })
@@ -127,23 +116,42 @@ class HrPayslip(models.Model):
             # ─────────────────────────────
             leave_used = 0.0
             if remaining > 0 and LeaveType and employee.leaves_count:
-                leave_hours_available = employee.leaves_count * 8
-                leave_used = min(leave_hours_available, remaining)
+                leave_hours = min(employee.leaves_count * 8, remaining)
 
                 leave = Leave.create({
                     'name': 'Lateness Reconciliation',
                     'employee_id': employee.id,
                     'holiday_status_id': LeaveType.id,
-                    'request_date_from': period_start,
-                    'request_date_to': period_start + timedelta(hours=leave_used),
-                    'number_of_days': leave_used / 8,
+                    'request_date_from': start,
+                    'request_date_to': start + timedelta(hours=leave_hours),
+                    'number_of_days': leave_hours / 8,
                     'state': 'confirm',
                 })
                 leave.action_approve()
-                remaining -= leave_used
+
+                leave_used = leave_hours
+                remaining -= leave_hours
 
             # ─────────────────────────────
-            # 5️⃣ FINALIZE
+            # 5️⃣ CLEANUP LATENESS ENTRIES (STRATEGY 1)
+            # ─────────────────────────────
+            hours_to_remove = ot_used + leave_used
+
+            for entry in lateness_entries:
+                if hours_to_remove <= 0:
+                    break
+
+                if entry.duration <= hours_to_remove:
+                    hours_to_remove -= entry.duration
+                    entry.write({'duration': 0.0})
+                else:
+                    entry.write({
+                        'duration': entry.duration - hours_to_remove
+                    })
+                    hours_to_remove = 0.0
+
+            # ─────────────────────────────
+            # 6️⃣ FINALIZE
             # ─────────────────────────────
             slip.lateness_reconciled = True
             slip.message_post(body=_(
