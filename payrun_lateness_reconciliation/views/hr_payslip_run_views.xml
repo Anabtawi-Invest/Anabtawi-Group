@@ -3,11 +3,9 @@
     <record id="view_hr_payslip_run_form_inherit_lateness" model="ir.ui.view">
         <field name="name">hr.payslip.run.form.lateness</field>
         <field name="model">hr.payslip.run</field>
-
-        <field name="inherit_id" ref="hr.view_payslip_run_form"/>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_run_form"/>
 
         <field name="arch" type="xml">
-           
             <xpath expr="//form" position="inside">
                 <div class="o_button_box" name="lateness_reco_box">
                     <button
