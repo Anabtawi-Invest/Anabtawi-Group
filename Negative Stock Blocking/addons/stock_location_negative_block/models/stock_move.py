@@ -17,18 +17,16 @@ class StockMove(models.Model):
                 continue
 
             # ✅ السماح دائمًا بالاستلام (PO / Incoming)
-            if move.picking_type_id and move.picking_type_id.code == 'incoming':
+            if move.picking_id and move.picking_type_id.code == 'incoming':
                 continue
 
             # 🔒 Internal Transfer
             is_internal = bool(
-                move.picking_type_id and move.picking_type_id.code == 'internal'
+                move.picking_id and move.picking_type_id.code == 'internal'
             )
 
-            # 🔒 Inventory Adjustment (Odoo 19)
-            is_inventory_adjustment = bool(
-                move.picking_type_id and move.picking_type_id.code == 'inventory'
-            )
+            # 🔒 Inventory Adjustment (Odoo 19 الصحيح)
+            is_inventory_adjustment = not move.picking_id
 
             if not (is_internal or is_inventory_adjustment):
                 continue
