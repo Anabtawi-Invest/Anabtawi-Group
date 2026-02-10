@@ -6,7 +6,6 @@
     <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
     <field name="arch" type="xml">
 
-      <!-- Button: visible ONLY in draft -->
       <xpath expr="//header" position="inside">
         <button name="action_reconcile_lateness"
                 string="Reconcile Lateness"
@@ -15,7 +14,6 @@
                 invisible="state != 'draft'"/>
       </xpath>
 
-      <!-- Read-only technical flag -->
       <xpath expr="//group" position="inside">
         <field name="lateness_reconciled" readonly="1"/>
       </xpath>
