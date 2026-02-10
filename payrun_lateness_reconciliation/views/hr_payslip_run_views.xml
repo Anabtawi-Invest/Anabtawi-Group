@@ -1,21 +1,13 @@
-<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_hr_payslip_run_form_inherit_lateness" model="ir.ui.view">
-        <field name="name">hr.payslip.run.form.lateness</field>
-        <field name="model">hr.payslip.run</field>
-        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_run_form"/>
+<record id="view_hr_payslip_run_form_inherit_lateness" model="ir.ui.view">
+<field name="name">hr.payslip.run.form.lateness</field>
+<field name="model">hr.payslip.run</field>
 
-        <field name="arch" type="xml">
-            <xpath expr="//form" position="inside">
-                <div class="o_button_box" name="lateness_reco_box">
-                    <button
-                        name="action_open_lateness_preview"
-                        type="object"
-                        string="Reconcile Lateness"
-                        class="btn btn-primary"
-                        modifiers="{'invisible': [['slip_ids', '=', false]]}"/>
-                </div>
-            </xpath>
-        </field>
-    </record>
+<field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_form"/>
+<field name="arch" type="xml">
+<xpath expr="//header" position="inside">
+<button name="action_open_lateness_preview" type="object" string="Reconcile Lateness" class="btn-primary" invisible="not slip_ids" help="Open wizard to preview and apply lateness reconciliation for all payslips in this pay run"/>
+</xpath>
+</field>
+</record>
 </odoo>
