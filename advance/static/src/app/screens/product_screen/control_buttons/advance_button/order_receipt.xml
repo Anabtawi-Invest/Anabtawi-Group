@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- Inherit POS Receipt -->
+    <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension">
+
+        <xpath expr="//div[contains(@class,'receipt-total')]" position="after">
+
+            <t t-if="order.advance_amount">
+                <div class="pos-receipt-amount receipt-advance">
+                    <span class="label-advance">
+                        Advance (<t t-esc="order.advance_name"/>)
+                    </span>
+                    <span class="pos-receipt-right-align font-monospace">
+                        <t t-out="formatCurrency(order.advance_amount)"/>
+                    </span>
+                </div>
+
+                <div class="pos-receipt-amount receipt-remaining fw-bolder">
+                    <span>Remaining</span>
+                    <span class="pos-receipt-right-align font-monospace">
+                        <t t-out="formatCurrency(order.remaining_amount)"/>
+                    </span>
+                </div>
+            </t>
+
+        </xpath>
+
+    </t>
+</templates>
