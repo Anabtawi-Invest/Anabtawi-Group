@@ -69,10 +69,10 @@ def _compute_lateness_hours(self):
 
             # 1️⃣ ADD OT TO BANK
             ot_entries = WorkEntry.search([
-                ('employee_id', '=', employee.id),
-                ('date_start', '>=', start_dt),
-                ('date_stop', '<=', end_dt),
-                ('work_entry_type_id.code', 'in', list(OT_MULTIPLIERS.keys())),
+            ('employee_id', '=', employee.id),
+            ('date', '>=', slip.date_from),
+            ('date', '<=', slip.date_to),
+            ('work_entry_type_id.code', 'in', list(OT_MULTIPLIERS.keys())),
             ])
 
             ot_earned = sum(
@@ -85,11 +85,11 @@ def _compute_lateness_hours(self):
 
             # 2️⃣ COLLECT LATENESS
             lateness_entries = WorkEntry.search([
-                ('employee_id', '=', employee.id),
-                ('date_start', '>=', start_dt),
-                ('date_stop', '<=', end_dt),
-                ('work_entry_type_id.code', '=', 'LATE'),
-            ], order="date_start asc")
+            ('employee_id', '=', employee.id),
+            ('date', '>=', slip.date_from),
+            ('date', '<=', slip.date_to),
+            ('work_entry_type_id.code', '=', 'LATE'),
+            ], order="date asc")
 
             total_lateness = sum(e.duration for e in lateness_entries)
             remaining = total_lateness
