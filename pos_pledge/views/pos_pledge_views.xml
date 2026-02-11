@@ -109,15 +109,16 @@
     </record>
 
     <!-- Menu Items -->
-    <menuitem id="menu_pos_pledge_root"
-              name="Pledges"
-              parent="point_of_sale.menu_point_root"
-              sequence="60"/>
+<!--    <menuitem id="menu_pos_pledge_root"-->
+<!--              name="Pledges"-->
+<!--              parent="point_of_sale.menu_point_root"-->
+<!--              sequence="60"/>-->
 
-    <menuitem id="menu_pos_pledge"
-              name="Pledge Records"
-              parent="menu_pos_pledge_root"
-              action="action_pos_pledge"
-              sequence="10"/>
+<!--    <menuitem id="menu_pos_pledge"-->
+<!--              name="Pledge Records"-->
+<!--              parent="menu_pos_pledge_root"-->
+<!--              action="action_pos_pledge"-->
+<!--              sequence="10"/>-->
 
 </odoo>
+
