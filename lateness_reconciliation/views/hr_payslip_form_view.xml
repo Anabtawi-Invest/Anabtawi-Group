@@ -4,22 +4,20 @@
     <record id="view_hr_payslip_form_inherit_lateness" model="ir.ui.view">
         <field name="name">hr.payslip.form.lateness.reconciliation</field>
         <field name="model">hr.payslip</field>
-
-        <!-- ✅ CORRECT VIEW ID FOR ODOO 19 -->
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
 
         <field name="arch" type="xml">
 
-            <!-- Add button inside header -->
+            <!-- Header Button -->
             <xpath expr="//header" position="inside">
                 <button name="action_reconcile_lateness"
                         string="Reconcile Lateness"
                         type="object"
                         class="oe_highlight"
-                        attrs="{'invisible': ['|', ('state','!=','draft'), ('lateness_reconciled','=',True)]}"/>
+                        invisible="state != 'draft' or lateness_reconciled"/>
             </xpath>
 
-            <!-- Add information block above notebook -->
+            <!-- Info Block -->
             <xpath expr="//sheet/notebook" position="before">
                 <group string="Lateness Reconciliation">
                     <field name="lateness_hours" readonly="1"/>
