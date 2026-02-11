@@ -424,14 +424,16 @@ patch(PaymentScreen.prototype, {
                             delivery_product_id: pledgeData.delivery_product_id || false,
                         };
 
-                        console.log("[PLEDGE] Calling pos.advance.order.pledge.create_from_pos with:", finalPledgeData);
+                        console.log("[PLEDGE] Calling pos.pledge.create_from_pos with:", finalPledgeData);
 
                         // Use the ORM service directly from the environment
                         const pledgeId = await posInstance.env.services.orm.call(
-                            "pos.advance.order.pledge",
+                            "pos.pledge",
                             "create_from_pos",
                             [finalPledgeData]
                         );
+
+                        order.pledge_id = pledgeId;
                         
                         console.log("[PLEDGE] ✅ Pledge record created successfully! ID:", pledgeId);
                         
@@ -1030,14 +1032,16 @@ patch(PaymentScreen.prototype, {
             };
 
             console.log("[PLEDGE] Prepared pledge data for backend:", pledgeData);
-            console.log("[PLEDGE] Calling pos.advance.order.pledge.create_from_pos...");
+            console.log("[PLEDGE] Calling pos.pledge.create_from_pos...");
 
             // Use the orm service from setup
             const pledgeId = await this.orm.call(
-                "pos.advance.order.pledge",
+                "pos.pledge",
                 "create_from_pos",
                 [pledgeData]
             );
+
+            order.pledge_id = pledgeId;
             
             console.log("[PLEDGE] ✅ Pledge record created successfully! ID:", pledgeId);
             

@@ -14,18 +14,6 @@ class PosOrder(models.Model):
         string='Pledge Record',
         readonly=True
     )
-    pledge_collection_pos_order_id = fields.Many2one(
-        'pos.order',
-        string='Pledge Collection POS Order',
-        readonly=True,
-        copy=False,
-        help='Technical link to the POS order created automatically to collect pledge amount.',
-    )
-    is_pledge_generated = fields.Boolean(
-        string='Pledge Generated Order',
-        default=False,
-        help='Technical flag for POS orders generated automatically by pledge flow.',
-    )
 
     has_pledge = fields.Boolean(
         string='Has Pledge',
@@ -231,123 +219,6 @@ class PosOrder(models.Model):
                 _logger.info("[PLEDGE] ✓ Payment creation complete for order %s", order.name)
             else:
                 _logger.warning("[PLEDGE] ⚠️ No payments were created for order %s - flag NOT set", order.name)
-
-    def _compute_pledge_from_lines(self):
-        """Return (total_pledge_amount, pledge_product_ids) computed from pledged order lines."""
-        self.ensure_one()
-        total_pledge_amount = 0.0
-        pledge_product_ids = []
-        for line in self.lines.filtered(lambda l: l.product_id):
-            if not (line.product_id.has_pledge or line.product_id.is_pledge_product):
-                continue
-            qty = line.qty or 0.0
-            unit_pledge = line.product_id.pledge_amount or 0.0
-            line_pledge = qty * unit_pledge
-            if line_pledge <= 0:
-                continue
-            total_pledge_amount += line_pledge
-            pledge_product_ids.append(line.product_id.id)
-        return total_pledge_amount, list(set(pledge_product_ids))
-
-    def _create_pledge_collection_orders(self):
-        """Create a separate paid POS order for pledge amount (same behavior as advance flow)."""
-        PosOrder = self.env['pos.order'].sudo()
-        PosOrderLine = self.env['pos.order.line'].sudo()
-        PosPayment = self.env['pos.payment'].sudo()
-
-        for order in self:
-            if order.is_pledge_generated:
-                continue
-            if order.pledge_collection_pos_order_id:
-                continue
-
-            has_pledge_field = 'pledge_product_id' in order.config_id._fields
-            pledge_product = order.config_id.pledge_product_id if has_pledge_field else False
-            if not pledge_product:
-                _logger.info(
-                    "[PLEDGE] Skipping pledge collection order for %s (missing config pledge_product_id).",
-                    order.name,
-                )
-                continue
-
-            pledge_total, pledge_product_ids = order._compute_pledge_from_lines()
-            if pledge_total <= 0:
-                continue
-
-            payment_method = order.payment_ids[:1].payment_method_id or order.session_id.payment_method_ids[:1]
-            if not payment_method:
-                _logger.warning("[PLEDGE] No payment method found to create pledge collection order for %s", order.name)
-                continue
-
-            pledge_order = PosOrder.create({
-                'session_id': order.session_id.id,
-                'partner_id': order.partner_id.id if order.partner_id else False,
-                'to_invoice': False,
-                'amount_tax': 0.0,
-                'amount_total': 0.0,
-                'amount_paid': 0.0,
-                'amount_return': 0.0,
-                'amount_difference': 0.0,
-                'is_pledge_generated': True,
-            })
-
-            PosOrderLine.create({
-                'order_id': pledge_order.id,
-                'product_id': pledge_product.id,
-                'name': _("Pledge"),
-                'qty': 1.0,
-                'price_unit': pledge_total,
-                'discount': 0.0,
-                'tax_ids': [(6, 0, [])],
-                'price_subtotal': pledge_total,
-                'price_subtotal_incl': pledge_total,
-                'price_extra': 0.0,
-                'full_product_name': pledge_product.display_name,
-            })
-
-            pledge_order._compute_prices()
-            PosPayment.create({
-                'pos_order_id': pledge_order.id,
-                'payment_method_id': payment_method.id,
-                'amount': pledge_order.amount_total,
-            })
-            pledge_order._compute_prices()
-            pledge_order.action_pos_order_paid()
-            pledge_order._create_order_picking()
-
-            order.pledge_collection_pos_order_id = pledge_order.id
-            _logger.info(
-                "[PLEDGE] Created pledge collection POS order %s for source order %s (amount=%s).",
-                pledge_order.name,
-                order.name,
-                pledge_total,
-            )
-
-            if 'pos.advance.order.pledge' not in self.env:
-                continue
-
-            PledgeLine = self.env['pos.advance.order.pledge'].sudo()
-            pledge_lines = PledgeLine.search([('pos_order_id', '=', order.id)])
-            if not pledge_lines and pledge_product_ids and order.partner_id:
-                try:
-                    PledgeLine.create_from_pos({
-                        'pos_order_id': order.id,
-                        'partner_id': order.partner_id.id,
-                        'pledge_products': pledge_product_ids,
-                    })
-                    pledge_lines = PledgeLine.search([('pos_order_id', '=', order.id)])
-                except Exception as e:
-                    _logger.warning(
-                        "[PLEDGE] Could not create pos.advance.order.pledge from source order %s: %s",
-                        order.name,
-                        e,
-                    )
-
-            if pledge_lines:
-                pledge_lines.write({
-                    'pos_order_id': pledge_order.id,
-                    'partner_id': order.partner_id.id if order.partner_id else False,
-                })
     
     def write(self, vals):
         """Override write to trigger pledge payments if order state changes"""
@@ -359,8 +230,6 @@ class PosOrder(models.Model):
         # This happens after order is synced from POS
         if vals.get('state') in ('paid', 'done'):
             _logger.info("[PLEDGE] Order state changed to %s, checking for pledge orders", vals.get('state'))
-            normal_orders = self.filtered(lambda o: not o.is_pledge_generated)
-            normal_orders._create_pledge_collection_orders()
             
             for order in self:
                 _logger.info(
@@ -368,9 +237,7 @@ class PosOrder(models.Model):
                     order.name, order.has_pledge, order.pledge_payments_created
                 )
             
-            pledge_orders = normal_orders.filtered(
-                lambda o: o.has_pledge and not o.pledge_payments_created and not o.pledge_collection_pos_order_id
-            )
+            pledge_orders = self.filtered(lambda o: o.has_pledge and not o.pledge_payments_created)
             _logger.info("[PLEDGE] Found %d pledge orders needing payments", len(pledge_orders))
             
             if pledge_orders:
@@ -562,13 +429,13 @@ class PosOrder(models.Model):
             })
             _logger.info("[PLEDGE] ✓ Created pos.payment for %s: %.2f (ID: %s)", 
                         description, amount, pos_payment.id)
-
+            
             # Store reference in pos.pledge for tracking
             _logger.info("[PLEDGE] Searching for pos.pledge record with pos_order_id=%s", order.id)
             pledge_record = self.env['pos.pledge'].search([
                 ('pos_order_id', '=', order.id)
             ], limit=1)
-
+            
             if pledge_record:
                 _logger.info("[PLEDGE] Found pledge record: %s (ID: %s)", pledge_record.name, pledge_record.id)
                 if description == 'Pledge':

@@ -12,8 +12,8 @@
             <xpath expr="//notebook/page[@name='sales']" position="inside">
                 <group string="Pledge (Rahn) Configuration" name="pledge_config">
                     <group>
-                        <field name="has_pledge"/>
-                        <field name="pledge_amount" invisible="not has_pledge"/>
+                        <field name="is_pledge_product"/>
+                        <field name="pledge_amount" invisible="not is_pledge_product"/>
                     </group>
                     <group>
                         <field name="is_employee_service"/>
