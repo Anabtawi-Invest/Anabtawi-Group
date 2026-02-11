@@ -16,24 +16,27 @@ class HrPayslip(models.Model):
         store=True
     )
 
-   @api.depends('employee_id', 'date_from', 'date_to')
-def _compute_lateness_hours(self):
-    WorkEntry = self.env['hr.work.entry']
+    @api.depends('employee_id', 'date_from', 'date_to')
+    def _compute_lateness_hours(self):
+        WorkEntry = self.env['hr.work.entry']
 
-    for slip in self:
-        slip.lateness_hours = 0.0
+        for slip in self:
+            slip.lateness_hours = 0.0
 
-        if not slip.employee_id or not slip.date_from or not slip.date_to:
-            continue
+            if not slip.employee_id or not slip.date_from or not slip.date_to:
+                continue
 
-        entries = WorkEntry.search([
-            ('employee_id', '=', slip.employee_id.id),
-            ('date', '>=', slip.date_from),
-            ('date', '<=', slip.date_to),
-            ('work_entry_type_id.code', '=', 'LATE'),
-        ])
+            start_dt = datetime.combine(slip.date_from, time.min)
+            end_dt = datetime.combine(slip.date_to, time.max)
 
-        slip.lateness_hours = sum(e.duration for e in entries)
+            entries = WorkEntry.search([
+                ('employee_id', '=', slip.employee_id.id),
+                ('date_start', '>=', start_dt),
+                ('date_stop', '<=', end_dt),
+                ('work_entry_type_id.code', '=', 'LATE'),
+            ])
+
+            slip.lateness_hours = sum(e.duration for e in entries)
 
     def action_reconcile_lateness(self):
         WorkEntry = self.env['hr.work.entry']
@@ -69,10 +72,10 @@ def _compute_lateness_hours(self):
 
             # 1️⃣ ADD OT TO BANK
             ot_entries = WorkEntry.search([
-            ('employee_id', '=', employee.id),
-            ('date', '>=', slip.date_from),
-            ('date', '<=', slip.date_to),
-            ('work_entry_type_id.code', 'in', list(OT_MULTIPLIERS.keys())),
+                ('employee_id', '=', employee.id),
+                ('date_start', '>=', start_dt),
+                ('date_stop', '<=', end_dt),
+                ('work_entry_type_id.code', 'in', list(OT_MULTIPLIERS.keys())),
             ])
 
             ot_earned = sum(
@@ -85,11 +88,11 @@ def _compute_lateness_hours(self):
 
             # 2️⃣ COLLECT LATENESS
             lateness_entries = WorkEntry.search([
-            ('employee_id', '=', employee.id),
-            ('date', '>=', slip.date_from),
-            ('date', '<=', slip.date_to),
-            ('work_entry_type_id.code', '=', 'LATE'),
-            ], order="date asc")
+                ('employee_id', '=', employee.id),
+                ('date_start', '>=', start_dt),
+                ('date_stop', '<=', end_dt),
+                ('work_entry_type_id.code', '=', 'LATE'),
+            ], order="date_start asc")
 
             total_lateness = sum(e.duration for e in lateness_entries)
             remaining = total_lateness
