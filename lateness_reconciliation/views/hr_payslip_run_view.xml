@@ -6,14 +6,11 @@
 
         <field name="name">hr.payslip.run.form.lateness.bulk</field>
         <field name="model">hr.payslip.run</field>
-
-        <!-- Correct Enterprise ID -->
         <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
-
         <field name="arch" type="xml">
 
-            <!-- Inject button into existing header -->
-            <xpath expr="//header" position="inside">
+            <!-- Insert button after an existing button -->
+            <xpath expr="//button[@name='action_validate']" position="after">
 
                 <button name="action_bulk_reconcile_lateness"
                         type="object"
@@ -27,3 +24,4 @@
     </record>
 
 </odoo>
+
