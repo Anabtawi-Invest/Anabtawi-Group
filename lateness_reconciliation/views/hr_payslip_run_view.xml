@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <record id="view_hr_payslip_run_form_inherit_lateness_bulk" model="ir.ui.view">
+        <field name="name">hr.payslip.run.form.lateness.bulk</field>
+        <field name="model">hr.payslip.run</field>
+
+        <!-- Odoo 19 Enterprise correct external ID -->
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_run_form"/>
+
+        <field name="arch" type="xml">
+
+            <!-- Add button in Pay Run header -->
+            <xpath expr="//header" position="inside">
+                <button name="action_bulk_reconcile_lateness"
+                        string="Reconcile Lateness"
+                        type="object"
+                        class="oe_highlight"
+                        invisible="state != 'draft'"/>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>
