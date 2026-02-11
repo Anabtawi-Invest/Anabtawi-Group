@@ -1,5 +1,5 @@
 from odoo import models, fields, api, _
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 
 class HrPayslip(models.Model):
@@ -19,17 +19,24 @@ class HrPayslip(models.Model):
     @api.depends('employee_id', 'date_from', 'date_to')
     def _compute_lateness_hours(self):
         WorkEntry = self.env['hr.work.entry']
+
         for slip in self:
-            if slip.employee_id and slip.date_from and slip.date_to:
-                entries = WorkEntry.search([
-                    ('employee_id', '=', slip.employee_id.id),
-                    ('date_start', '>=', slip.date_from),
-                    ('date_stop', '<=', slip.date_to),
-                    ('work_entry_type_id.code', '=', 'LATE'),
-                ])
-                slip.lateness_hours = sum(e.duration for e in entries)
-            else:
-                slip.lateness_hours = 0.0
+            slip.lateness_hours = 0.0
+
+            if not slip.employee_id or not slip.date_from or not slip.date_to:
+                continue
+
+            start_dt = datetime.combine(slip.date_from, time.min)
+            end_dt = datetime.combine(slip.date_to, time.max)
+
+            entries = WorkEntry.search([
+                ('employee_id', '=', slip.employee_id.id),
+                ('date_start', '>=', start_dt),
+                ('date_stop', '<=', end_dt),
+                ('work_entry_type_id.code', '=', 'LATE'),
+            ])
+
+            slip.lateness_hours = sum(e.duration for e in entries)
 
     def action_reconcile_lateness(self):
         WorkEntry = self.env['hr.work.entry']
@@ -55,45 +62,42 @@ class HrPayslip(models.Model):
             if slip.lateness_reconciled:
                 continue
 
-            employee = slip.employee_id
-            start = slip.date_from
-            end = slip.date_to
+            if not slip.employee_id or not slip.date_from or not slip.date_to:
+                continue
 
-            # ─────────────────────────────
+            employee = slip.employee_id
+
+            start_dt = datetime.combine(slip.date_from, time.min)
+            end_dt = datetime.combine(slip.date_to, time.max)
+
             # 1️⃣ ADD OT TO BANK
-            # ─────────────────────────────
             ot_entries = WorkEntry.search([
                 ('employee_id', '=', employee.id),
-                ('date_start', '>=', start),
-                ('date_stop', '<=', end),
+                ('date_start', '>=', start_dt),
+                ('date_stop', '<=', end_dt),
                 ('work_entry_type_id.code', 'in', list(OT_MULTIPLIERS.keys())),
             ])
 
-            ot_earned = 0.0
-            for entry in ot_entries:
-                ot_earned += entry.duration * OT_MULTIPLIERS.get(
-                    entry.work_entry_type_id.code, 1.0
-                )
+            ot_earned = sum(
+                entry.duration * OT_MULTIPLIERS.get(entry.work_entry_type_id.code, 1.0)
+                for entry in ot_entries
+            )
 
             if ot_earned:
                 employee.ot_hours_bank += ot_earned
 
-            # ─────────────────────────────
-            # 2️⃣ COLLECT LATENESS ENTRIES
-            # ─────────────────────────────
+            # 2️⃣ COLLECT LATENESS
             lateness_entries = WorkEntry.search([
                 ('employee_id', '=', employee.id),
-                ('date_start', '>=', start),
-                ('date_stop', '<=', end),
+                ('date_start', '>=', start_dt),
+                ('date_stop', '<=', end_dt),
                 ('work_entry_type_id.code', '=', 'LATE'),
             ], order="date_start asc")
 
             total_lateness = sum(e.duration for e in lateness_entries)
             remaining = total_lateness
 
-            # ─────────────────────────────
             # 3️⃣ USE OT BANK
-            # ─────────────────────────────
             ot_used = 0.0
             if remaining > 0 and employee.ot_hours_bank and AttendanceType:
                 ot_used = min(employee.ot_hours_bank, remaining)
@@ -102,8 +106,8 @@ class HrPayslip(models.Model):
                     'name': 'Lateness Compensation (OT)',
                     'employee_id': employee.id,
                     'work_entry_type_id': AttendanceType.id,
-                    'date_start': start,
-                    'date_stop': start + timedelta(hours=ot_used),
+                    'date_start': start_dt,
+                    'date_stop': start_dt + timedelta(hours=ot_used),
                     'duration': ot_used,
                     'state': 'draft',
                 })
@@ -111,9 +115,7 @@ class HrPayslip(models.Model):
                 employee.ot_hours_bank -= ot_used
                 remaining -= ot_used
 
-            # ─────────────────────────────
-            # 4️⃣ USE ANNUAL LEAVE
-            # ─────────────────────────────
+            # 4️⃣ USE LEAVE
             leave_used = 0.0
             if remaining > 0 and LeaveType and employee.leaves_count:
                 leave_hours = min(employee.leaves_count * 8, remaining)
@@ -122,8 +124,8 @@ class HrPayslip(models.Model):
                     'name': 'Lateness Reconciliation',
                     'employee_id': employee.id,
                     'holiday_status_id': LeaveType.id,
-                    'request_date_from': start,
-                    'request_date_to': start + timedelta(hours=leave_hours),
+                    'request_date_from': slip.date_from,
+                    'request_date_to': slip.date_from,
                     'number_of_days': leave_hours / 8,
                     'state': 'confirm',
                 })
@@ -132,28 +134,8 @@ class HrPayslip(models.Model):
                 leave_used = leave_hours
                 remaining -= leave_hours
 
-            # ─────────────────────────────
-            # 5️⃣ CLEANUP LATENESS ENTRIES (STRATEGY 1)
-            # ─────────────────────────────
-            hours_to_remove = ot_used + leave_used
-
-            for entry in lateness_entries:
-                if hours_to_remove <= 0:
-                    break
-
-                if entry.duration <= hours_to_remove:
-                    hours_to_remove -= entry.duration
-                    entry.write({'duration': 0.0})
-                else:
-                    entry.write({
-                        'duration': entry.duration - hours_to_remove
-                    })
-                    hours_to_remove = 0.0
-
-            # ─────────────────────────────
-            # 6️⃣ FINALIZE
-            # ─────────────────────────────
             slip.lateness_reconciled = True
+
             slip.message_post(body=_(
                 "<b>Lateness Reconciliation Completed</b><br/>"
                 f"Total Lateness: <b>{total_lateness:.2f} h</b><br/>"
