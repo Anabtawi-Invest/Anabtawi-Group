@@ -7,21 +7,22 @@
         <field name="name">hr.payslip.run.form.lateness.bulk</field>
         <field name="model">hr.payslip.run</field>
 
-        <!-- Inherit the real Pay Run form -->
+        <!-- Inherit base Pay Run form -->
         <field name="inherit_id"
                search="[('model','=','hr.payslip.run'), ('type','=','form')]"/>
 
         <field name="arch" type="xml">
 
-            <!-- Insert button right after Create Draft Entry -->
-            <xpath expr="//button[@name='action_create_draft_entry']"
-                   position="after">
+            <!-- Insert button at top of sheet -->
+            <xpath expr="//sheet" position="inside">
 
-                <button name="action_bulk_reconcile_lateness"
-                        string="Reconcile Lateness"
-                        type="object"
-                        class="btn-primary"
-                        invisible="state != 'draft'"/>
+                <div class="oe_button_box" name="lateness_button_box">
+                    <button name="action_bulk_reconcile_lateness"
+                            type="object"
+                            string="Reconcile Lateness"
+                            class="btn-primary"
+                            invisible="state != 'draft'"/>
+                </div>
 
             </xpath>
 
