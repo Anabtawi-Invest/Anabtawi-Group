@@ -328,6 +328,8 @@ class PosOrder(models.Model):
 
             PledgeLine = self.env['pos.advance.order.pledge'].sudo()
             pledge_lines = PledgeLine.search([('pos_order_id', '=', order.id)])
+
+            # Try the original API first (if partner exists); if it fails, use direct creation fallback.
             if not pledge_lines and pledge_product_ids and order.partner_id:
                 try:
                     PledgeLine.create_from_pos({
@@ -338,10 +340,34 @@ class PosOrder(models.Model):
                     pledge_lines = PledgeLine.search([('pos_order_id', '=', order.id)])
                 except Exception as e:
                     _logger.warning(
-                        "[PLEDGE] Could not create pos.advance.order.pledge from source order %s: %s",
+                        "[PLEDGE] create_from_pos failed for source order %s, using fallback create. Error: %s",
                         order.name,
                         e,
                     )
+
+            if not pledge_lines:
+                qty_by_product = {}
+                pledged_source_lines = order.lines.filtered(
+                    lambda l: l.product_id and (l.product_id.has_pledge or l.product_id.is_pledge_product)
+                )
+                for src_line in pledged_source_lines:
+                    qty_by_product[src_line.product_id.id] = qty_by_product.get(src_line.product_id.id, 0.0) + (src_line.qty or 0.0)
+
+                fallback_vals = []
+                for product_id, qty in qty_by_product.items():
+                    if qty <= 0:
+                        continue
+                    product = self.env['product.product'].browse(product_id)
+                    fallback_vals.append({
+                        'pos_order_id': pledge_order.id,
+                        'partner_id': order.partner_id.id if order.partner_id else False,
+                        'product_id': product_id,
+                        'pledge_qty': qty,
+                        'pledge_amount_unit': product.pledge_amount or 0.0,
+                    })
+
+                if fallback_vals:
+                    pledge_lines = PledgeLine.create(fallback_vals)
 
             if pledge_lines:
                 pledge_lines.write({
