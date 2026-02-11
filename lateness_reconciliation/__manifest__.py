@@ -11,6 +11,7 @@
     "data": [
         "views/hr_payslip_form_view.xml",
         "views/hr_payslip_list_view.xml",
+        'views/hr_payslip_run_view.xml', 
         "data/lateness_cron.xml",
         "data/mass_reconcile_action.xml"
     ],
