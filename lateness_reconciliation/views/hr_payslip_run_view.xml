@@ -9,8 +9,8 @@
         <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
         <field name="arch" type="xml">
 
-            <!-- Insert button after an existing button -->
-            <xpath expr="//button[@name='action_validate']" position="after">
+            <!-- Insert button at top of form safely -->
+            <xpath expr="//form" position="inside">
 
                 <button name="action_bulk_reconcile_lateness"
                         type="object"
