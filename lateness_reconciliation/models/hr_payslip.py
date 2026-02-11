@@ -246,25 +246,19 @@ class HrPayslip(models.Model):
             slip._lateness_reconcile_for_slip()
         return True
 
-
 class HrPayslipRun(models.Model):
     _inherit = 'hr.payslip.run'
 
     def action_bulk_reconcile_lateness(self):
-        """
-        Bulk reconcile lateness for ALL draft payslips in this pay run.
-        Designed to be triggered from a button on the Pay Run form.
-        """
         for run in self:
-            if not run.slip_ids:
-                raise UserError(_("No payslips found in this pay run."))
 
             draft_slips = run.slip_ids.filtered(lambda s: s.state == 'draft')
-            if not draft_slips:
-                raise UserError(_("No draft payslips to reconcile in this pay run."))
 
-            # Reconcile each slip safely
+            if not draft_slips:
+                raise UserError("No draft payslips to reconcile.")
+
             for slip in draft_slips:
                 slip._lateness_reconcile_for_slip()
 
         return True
+
