@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
     <record id="view_hr_payslip_run_form_inherit_lateness_bulk"
@@ -6,23 +6,17 @@
 
         <field name="name">hr.payslip.run.form.lateness.bulk</field>
         <field name="model">hr.payslip.run</field>
-
-        <!-- Inherit base Pay Run form -->
-        <field name="inherit_id"
-               search="[('model','=','hr.payslip.run'), ('type','=','form')]"/>
-
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_run_form"/>
         <field name="arch" type="xml">
 
-            <!-- Insert button at top of sheet -->
-            <xpath expr="//sheet" position="inside">
+            <!-- Insert button inside header (safe in all versions) -->
+            <xpath expr="//header" position="inside">
 
-                <div class="oe_button_box" name="lateness_button_box">
-                    <button name="action_bulk_reconcile_lateness"
-                            type="object"
-                            string="Reconcile Lateness"
-                            class="btn-primary"
-                            invisible="state != 'draft'"/>
-                </div>
+                <button name="action_bulk_reconcile_lateness"
+                        type="object"
+                        string="Reconcile Lateness"
+                        class="btn-primary"
+                        invisible="state != 'draft'"/>
 
             </xpath>
 
