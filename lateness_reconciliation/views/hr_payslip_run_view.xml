@@ -1,28 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
-    <!-- Inherit ANY existing form view of hr.payslip.run -->
     <record id="view_hr_payslip_run_form_inherit_lateness_bulk"
             model="ir.ui.view">
 
         <field name="name">hr.payslip.run.form.lateness.bulk</field>
         <field name="model">hr.payslip.run</field>
+
+        <!-- Inherit the real Pay Run form -->
         <field name="inherit_id"
-               search="[('model','=','hr.payslip.run'), ('type','=','form')]"
-               />
+               search="[('model','=','hr.payslip.run'), ('type','=','form')]"/>
 
         <field name="arch" type="xml">
 
-            <xpath expr="//header" position="inside">
+            <!-- Insert button right after Create Draft Entry -->
+            <xpath expr="//button[@name='action_create_draft_entry']"
+                   position="after">
+
                 <button name="action_bulk_reconcile_lateness"
                         string="Reconcile Lateness"
                         type="object"
-                        class="oe_highlight"
+                        class="btn-primary"
                         invisible="state != 'draft'"/>
+
             </xpath>
 
         </field>
     </record>
 
 </odoo>
-
