@@ -1,6 +1,6 @@
 {
     "name": "Lateness Reconciliation - FINAL Enterprise Dashboard",
-    "version": "19.0.2.0.1",
+    "version": "19.0.1.0",
     "category": "Payroll",
     "summary": "Enterprise dashboard for LAT + OT bank reconciliation with live updates.",
     "author": "Anabtawi Group",
