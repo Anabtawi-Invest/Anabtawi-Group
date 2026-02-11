@@ -1,0 +1,32 @@
+
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_hr_payslip_tree_ultra_pro_dashboard"
+            model="ir.ui.view">
+
+        <field name="name">hr.payslip.tree.ultra.pro.dashboard</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//tree/field[@name='employee_id']" position="after">
+
+                <field name="lateness_hours"
+                       string="Lateness"
+                       decoration-warning="lateness_hours &gt; 0"/>
+
+                <field name="dashboard_ot_bank"
+                       string="OT Bank"
+                       decoration-success="dashboard_ot_bank &gt; 0"/>
+
+                <field name="dashboard_remaining"
+                       string="Remaining"
+                       decoration-danger="dashboard_remaining &gt; 0"/>
+
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>
