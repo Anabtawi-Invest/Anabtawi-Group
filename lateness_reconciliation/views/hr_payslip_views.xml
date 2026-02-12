@@ -1,38 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <record id="view_hr_payslip_run_form_enterprise_dashboard"
+    <!-- Enterprise Safe List Extension (Odoo 19 Compatible) -->
+    <record id="view_hr_payslip_list_enterprise_dashboard"
             model="ir.ui.view">
 
-        <field name="name">hr.payslip.run.form.enterprise.dashboard</field>
-        <field name="model">hr.payslip.run</field>
+        <field name="name">hr.payslip.list.enterprise.dashboard</field>
+        <field name="model">hr.payslip</field>
 
-        <!-- Keep your original parent -->
-        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
+        <!-- 🔥 NO XMLID GUESSING -->
+        <field name="inherit_id"
+               search="[('model','=','hr.payslip'),('type','=','list')]"/>
 
         <field name="arch" type="xml">
 
-            <xpath expr="//form" position="inside">
+            <xpath expr="//list" position="inside">
 
-                <button name="action_mass_reconcile_lateness_enterprise"
-                        type="object"
-                        string="Mass Reconcile Lateness"
-                        class="btn-primary"
-                        invisible="state != 'draft'"/>
-
-            </xpath>
-
-            <!-- Enterprise KPIs -->
-            <xpath expr="//sheet" position="inside">
-
-                <group col="4">
-
-                    <field name="dashboard_total_lateness"/>
-                    <field name="dashboard_total_overtime"/>
-                    <field name="dashboard_total_remaining"/>
-                    <field name="dashboard_coverage_pct"/>
-
-                </group>
+                <field name="dashboard_lateness_hours"/>
+                <field name="dashboard_ot_hours"/>
+                <field name="dashboard_ot_bank"/>
+                <field name="dashboard_remaining"/>
 
             </xpath>
 
