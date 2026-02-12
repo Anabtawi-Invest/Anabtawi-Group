@@ -2,6 +2,7 @@ import logging
 
 from odoo import _, api, models
 from odoo.exceptions import ValidationError
+from odoo.tools.float_utils import float_compare
 
 _logger = logging.getLogger(__name__)
 
@@ -9,17 +10,64 @@ _logger = logging.getLogger(__name__)
 class StockPicking(models.Model):
     _inherit = "stock.picking"
 
-    # ---------------------------------------------------------
-    # 1️⃣ Open wizard AFTER validation (not before)
-    # ---------------------------------------------------------
+    # =========================================================
+    # 1️⃣ ORIGINAL DISCREPANCY DETECTION LOGIC (KEEP THIS)
+    # =========================================================
+    def _get_transfer_discrepancy_move_vals(self):
+        self.ensure_one()
+
+        # Only if truck involved
+        if not (self.location_id.is_truck or self.location_dest_id.is_truck):
+            return []
+
+        if self.location_dest_id.is_truck and not self.location_id.is_truck:
+            truck_location = self.location_dest_id
+            stage = "dispatch"
+        elif self.location_id.is_truck and not self.location_dest_id.is_truck:
+            truck_location = self.location_id
+            stage = "receipt"
+        else:
+            truck_location = self.location_id
+            stage = "dispatch"
+
+        vals_list = []
+
+        for move in self.move_ids.filtered(lambda m: m.state != "cancel"):
+            picked_qty = move._get_picked_quantity()
+            expected_qty = move.product_uom_qty
+
+            if move.product_uom.compare(expected_qty, picked_qty) > 0:
+                expected = move.product_uom._compute_quantity(
+                    expected_qty, move.product_id.uom_id, round=False
+                )
+                actual = move.product_uom._compute_quantity(
+                    picked_qty, move.product_id.uom_id, round=False
+                )
+
+                vals_list.append(
+                    {
+                        "picking_id": self.id,
+                        "product_id": move.product_id.id,
+                        "expected_qty": expected,
+                        "actual_qty": actual,
+                        "difference_qty": expected - actual,
+                        "truck_location_id": truck_location.id,
+                        "stage": stage,
+                    }
+                )
+
+        return vals_list
+
+    # =========================================================
+    # 2️⃣ OPEN WIZARD AFTER VALIDATION (NOT BEFORE)
+    # =========================================================
     def button_validate(self):
         res = super().button_validate()
 
-        # If Odoo returned another wizard (like backorder), keep it
+        # If Odoo returns another wizard (backorder), respect it
         if isinstance(res, dict):
             return res
 
-        # Only for internal transfers that are already done
         done_pickings = self.filtered(
             lambda p: p.state == "done" and p.picking_type_code == "internal"
         )
@@ -28,8 +76,7 @@ class StockPicking(models.Model):
 
         discrepancy_lines = []
         for picking in done_pickings:
-            lines = picking._get_transfer_discrepancy_move_vals()
-            discrepancy_lines += lines
+            discrepancy_lines += picking._get_transfer_discrepancy_move_vals()
 
         if not discrepancy_lines:
             return res
@@ -52,9 +99,9 @@ class StockPicking(models.Model):
             ),
         }
 
-    # ---------------------------------------------------------
-    # 2️⃣ Keep settlement logic AFTER done (no create here)
-    # ---------------------------------------------------------
+    # =========================================================
+    # 3️⃣ SETTLEMENT LOGIC (NO CREATE HERE)
+    # =========================================================
     def _action_done(self):
         res = super()._action_done()
 
@@ -71,15 +118,13 @@ class StockPicking(models.Model):
             if picking.location_dest_id.is_truck:
                 truck = picking.location_dest_id
                 for move in done_moves:
-                    qty_prod_uom = move.product_uom._compute_quantity(
-                        move.quantity,
-                        move.product_id.uom_id,
-                        round=False,
+                    qty = move.product_uom._compute_quantity(
+                        move.quantity, move.product_id.uom_id, round=False
                     )
                     Discrepancy.apply_resolution(
                         truck,
                         move.product_id,
-                        qty_prod_uom,
+                        qty,
                         stage="dispatch",
                         exclude_picking_ids=[picking.id],
                     )
@@ -88,15 +133,13 @@ class StockPicking(models.Model):
             if picking.location_id.is_truck:
                 truck = picking.location_id
                 for move in done_moves:
-                    qty_prod_uom = move.product_uom._compute_quantity(
-                        move.quantity,
-                        move.product_id.uom_id,
-                        round=False,
+                    qty = move.product_uom._compute_quantity(
+                        move.quantity, move.product_id.uom_id, round=False
                     )
                     Discrepancy.apply_resolution(
                         truck,
                         move.product_id,
-                        qty_prod_uom,
+                        qty,
                         stage="receipt",
                         exclude_picking_ids=[picking.id],
                     )
