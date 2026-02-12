@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <record id="view_hr_payslip_tree_enterprise_dashboard"
+    <record id="view_hr_payslip_list_enterprise_dashboard"
             model="ir.ui.view">
 
-        <field name="name">hr.payslip.tree.enterprise.dashboard</field>
+        <field name="name">hr.payslip.list.enterprise.dashboard</field>
         <field name="model">hr.payslip</field>
-        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
+
+        <!-- ✅ REAL Odoo 19 list view -->
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_view_tree"/>
 
         <field name="arch" type="xml">
 
-            <!-- Odoo 19 SAFE INSERT -->
-            <xpath expr="//tree" position="inside">
+            <!-- Odoo 19 uses LIST not TREE -->
+            <xpath expr="//list" position="inside">
 
                 <field name="dashboard_lateness_hours"/>
                 <field name="dashboard_ot_hours"/>
