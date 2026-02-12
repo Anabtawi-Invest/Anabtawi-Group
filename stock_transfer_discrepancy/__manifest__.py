@@ -8,6 +8,7 @@
         "security/ir.model.access.csv",
         "views/stock_transfer_discrepancy_views.xml",
         "wizard/stock_transfer_discrepancy_wizard_views.xml",
+        "stock_transfer_discrepancy/reports/stock_transfer_discrepancy_report.xml",
     ],
     "license": "LGPL-3",
     "application": False,
