@@ -5,11 +5,12 @@
     "summary": "Require discrepancy reason when validated quantities are lower than expected",
     "depends": ["stock"],
     "data": [
-        "security/ir.model.access.csv",
-        "views/stock_transfer_discrepancy_views.xml",
-        "wizard/stock_transfer_discrepancy_wizard_views.xml",
-        "stock_transfer_discrepancy/reports/stock_transfer_discrepancy_report.xml",
-    ],
+    "security/ir.model.access.csv",
+    "reports/stock_transfer_discrepancy_report.xml",
+    "views/stock_transfer_discrepancy_views.xml",
+    "wizard/stock_transfer_discrepancy_wizard_views.xml",
+         ],
+
     "license": "LGPL-3",
     "application": False,
     "installable": True,
