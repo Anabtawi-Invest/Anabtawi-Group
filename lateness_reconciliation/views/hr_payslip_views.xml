@@ -16,10 +16,10 @@
 
             <xpath expr="//list" position="inside">
 
-                <field name="dashboard_lateness_hours"/>
-                <field name="dashboard_ot_hours"/>
-                <field name="dashboard_ot_bank"/>
-                <field name="dashboard_remaining"/>
+                <field name="lateness_hours"/>
+                <field name="ot_hours"/>
+                <field name="ot_bank"/>
+                <field name="late hours remaining"/>
 
             </xpath>
 
