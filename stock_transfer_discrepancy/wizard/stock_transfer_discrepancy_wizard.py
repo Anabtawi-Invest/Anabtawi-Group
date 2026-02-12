@@ -18,13 +18,14 @@ class StockTransferDiscrepancyWizard(models.TransientModel):
     @api.model
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
+
         pick_ids = []
         if res.get("pick_ids"):
-            # already provided by default_* context
             pick_ids = res["pick_ids"][0][2]
         else:
-            ctx_pick_ids = self.env.context.get("button_validate_picking_ids") or self.env.context.get(
-                "active_ids"
+            ctx_pick_ids = (
+                self.env.context.get("button_validate_picking_ids")
+                or self.env.context.get("active_ids")
             )
             if ctx_pick_ids:
                 pick_ids = ctx_pick_ids
@@ -43,9 +44,9 @@ class StockTransferDiscrepancyWizard(models.TransientModel):
 
     def action_confirm(self):
         self.ensure_one()
+
         discrepancies = []
         for line in self.line_ids:
-            # Only create if there is an actual difference (safety)
             if line.expected_qty > line.actual_qty:
                 discrepancies.append(
                     {
@@ -61,15 +62,12 @@ class StockTransferDiscrepancyWizard(models.TransientModel):
                         "state": "open",
                     }
                 )
+
         if discrepancies:
             self.env["stock.transfer.discrepancy"].create(discrepancies)
 
-        # Resume normal validation flow (backorder wizards etc.) but skip our wizard.
-        pickings_to_validate_ids = self.env.context.get("button_validate_picking_ids") or self.pick_ids.ids
-        pickings_to_validate = self.env["stock.picking"].browse(pickings_to_validate_ids)
-        return pickings_to_validate.with_context(
-            **dict(self.env.context, skip_transfer_discrepancy_wizard=True)
-        ).button_validate()
+        # ✅ CLOSE WIZARD AFTER CONFIRM
+        return {"type": "ir.actions.act_window_close"}
 
 
 class StockTransferDiscrepancyWizardLine(models.TransientModel):
@@ -77,8 +75,11 @@ class StockTransferDiscrepancyWizardLine(models.TransientModel):
     _description = "Stock Transfer Discrepancy Wizard Line"
 
     wizard_id = fields.Many2one(
-        "stock.transfer.discrepancy.wizard", required=True, ondelete="cascade"
+        "stock.transfer.discrepancy.wizard",
+        required=True,
+        ondelete="cascade",
     )
+
     picking_id = fields.Many2one("stock.picking", string="Transfer", required=True)
     product_id = fields.Many2one("product.product", string="Product", required=True)
     expected_qty = fields.Float(string="Expected Qty", required=True, digits="Product Unit")
@@ -93,4 +94,3 @@ class StockTransferDiscrepancyWizardLine(models.TransientModel):
         string="Stage",
         required=True,
     )
-
