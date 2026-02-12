@@ -17,26 +17,18 @@ class StockMove(models.Model):
             if not picking:
                 continue
 
-            # 🔹 Apply restriction ONLY on normal Delivery Orders
-            # Exclude:
-            # - PO receipts (incoming)
-            # - Internal transfers
-            # - Vendor returns
-            # - Customer returns
-            # - Any return picking
-
+            # 🔹 Only apply to outgoing pickings
             if picking.picking_type_id.code != 'outgoing':
                 continue
 
-            # 🚫 Skip ALL return pickings
-            if picking.origin_returned_move_id or move.origin_returned_move_id:
+            # 🔹 Skip ALL return pickings (correct detection)
+            if any(m.origin_returned_move_id for m in picking.move_ids):
                 continue
 
-            # Skip if destination is supplier (vendor return)
+            # 🔹 Skip vendor returns (extra safety)
             if picking.location_dest_id.usage == 'supplier':
                 continue
 
-            # Quantity done
             done_qty = sum(move.move_line_ids.mapped('quantity'))
             if not done_qty:
                 continue
