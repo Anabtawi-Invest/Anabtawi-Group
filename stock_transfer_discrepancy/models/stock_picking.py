@@ -11,12 +11,11 @@ class StockPicking(models.Model):
     _inherit = "stock.picking"
 
     # =========================================================
-    # 1️⃣ ORIGINAL DISCREPANCY DETECTION LOGIC (KEEP THIS)
+    # 1️⃣ ORIGINAL DISCREPANCY DETECTION LOGIC
     # =========================================================
     def _get_transfer_discrepancy_move_vals(self):
         self.ensure_one()
 
-        # Only if truck involved
         if not (self.location_id.is_truck or self.location_dest_id.is_truck):
             return []
 
@@ -59,15 +58,31 @@ class StockPicking(models.Model):
         return vals_list
 
     # =========================================================
-    # 2️⃣ OPEN WIZARD AFTER VALIDATION (NOT BEFORE)
+    # 2️⃣ VALIDATION + BLOCK TRUCK WITH OPEN DISCREPANCY
     # =========================================================
     def button_validate(self):
+
+        # 🔴 BLOCK transfer TO truck with open discrepancies
+        for picking in self.filtered(lambda p: p.picking_type_code == "internal"):
+            if (
+                picking.location_dest_id.is_truck
+                and picking.location_dest_id.has_open_discrepancy
+            ):
+                raise ValidationError(
+                    _(
+                        "Cannot transfer stock to truck '%s' because it has open discrepancies.\n"
+                        "Please settle the discrepancies first."
+                    )
+                    % picking.location_dest_id.display_name
+                )
+
         res = super().button_validate()
 
-        # If Odoo returns another wizard (backorder), respect it
+        # Respect other Odoo wizards (backorder etc.)
         if isinstance(res, dict):
             return res
 
+        # 🔵 Open discrepancy wizard AFTER picking becomes done
         done_pickings = self.filtered(
             lambda p: p.state == "done" and p.picking_type_code == "internal"
         )
@@ -115,11 +130,14 @@ class StockPicking(models.Model):
             if not done_moves:
                 continue
 
+            # Move INTO truck resolves DISPATCH discrepancies
             if picking.location_dest_id.is_truck:
                 truck = picking.location_dest_id
                 for move in done_moves:
                     qty = move.product_uom._compute_quantity(
-                        move.quantity, move.product_id.uom_id, round=False
+                        move.quantity,
+                        move.product_id.uom_id,
+                        round=False,
                     )
                     Discrepancy.apply_resolution(
                         truck,
@@ -130,11 +148,14 @@ class StockPicking(models.Model):
                     )
                     truck_locations_to_recompute.add(truck)
 
+            # Move OUT OF truck resolves RECEIPT discrepancies
             if picking.location_id.is_truck:
                 truck = picking.location_id
                 for move in done_moves:
                     qty = move.product_uom._compute_quantity(
-                        move.quantity, move.product_id.uom_id, round=False
+                        move.quantity,
+                        move.product_id.uom_id,
+                        round=False,
                     )
                     Discrepancy.apply_resolution(
                         truck,
