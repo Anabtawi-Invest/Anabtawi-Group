@@ -9,7 +9,8 @@
     "depends": ["hr_payroll"],
     "data": [
         "views/hr_payslip_views.xml",
-        "views/hr_payslip_run_views.xml"
+        "views/hr_payslip_run_views.xml",
+        "data/mass_reconcile_action.xml"
     ],
     "installable": True,
     "application": False
