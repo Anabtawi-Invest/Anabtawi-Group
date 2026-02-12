@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <!-- Enterprise Safe List Extension (Odoo 19 Compatible) -->
     <record id="view_hr_payslip_list_enterprise_dashboard"
             model="ir.ui.view">
 
         <field name="name">hr.payslip.list.enterprise.dashboard</field>
         <field name="model">hr.payslip</field>
 
-        <!-- ✅ REAL Odoo 19 list view -->
-        <field name="inherit_id" ref="hr_payroll.hr_payslip_view_tree"/>
+        <field name="inherit_id"
+               search="[('model','=','hr.payslip'),('type','=','list')]"/>
 
         <field name="arch" type="xml">
 
-            <!-- Odoo 19 uses LIST not TREE -->
             <xpath expr="//list" position="inside">
 
                 <field name="dashboard_lateness_hours"/>
