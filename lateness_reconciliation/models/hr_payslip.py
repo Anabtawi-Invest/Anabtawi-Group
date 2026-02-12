@@ -1,4 +1,3 @@
-
 from odoo import models, fields
 
 class HrPayslip(models.Model):
