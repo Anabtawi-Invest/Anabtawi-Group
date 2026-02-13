@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+<record id="view_hr_payslip_run_form_enterprise_dashboard"
+        model="ir.ui.view">
+    <field name="name">hr.payslip.run.form.enterprise.dashboard</field>
+    <field name="model">hr.payslip.run</field>
+    <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
+    <field name="arch" type="xml">
+
+        <xpath expr="//header" position="inside">
+            <button name="action_mass_reconcile_lateness_enterprise"
+                    type="object"
+                    string="Mass Reconcile Lateness"
+                    class="btn-primary"
+                    invisible="state != 'draft'"/>
+        </xpath>
+
+        <xpath expr="//sheet" position="inside">
+            <group col="4">
+                <field name="total_lateness"/>
+                <field name="total_overtime"/>
+                <field name="total_remaining"/>
+                <field name="coverage_pct"/>
+            </group>
+        </xpath>
+
+    </field>
+</record>
+
+</odoo>
