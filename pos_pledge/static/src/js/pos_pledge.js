@@ -1058,6 +1058,9 @@ patch(ReceiptScreen.prototype, {
             const lines = order.lines || [];
             console.log("[PLEDGE] Total lines in order:", lines.length);
             
+            // Hide pledge section when an employee is selected, even without employee service lines.
+            const hasSelectedEmployee = !!(order.employee_id && (order.employee_id.id || order.employee_id));
+
             // Check if there's an employee service
             const hasEmployeeService = lines.some(line => {
                 const product = line.product_id;
@@ -1067,9 +1070,12 @@ patch(ReceiptScreen.prototype, {
                 }
                 return isEmp;
             });
+            const hidePledgeByEmployee = hasEmployeeService || hasSelectedEmployee;
             
             console.log("[PLEDGE] Has employee service:", hasEmployeeService);
-            console.log("[PLEDGE] Will filter delivery products:", hasEmployeeService);
+            console.log("[PLEDGE] Has selected employee:", hasSelectedEmployee);
+            console.log("[PLEDGE] Hide pledge section:", hidePledgeByEmployee);
+            console.log("[PLEDGE] Will filter delivery products:", hidePledgeByEmployee);
             
             // Prepare receipt data
             const company = this.pos.company;
@@ -1107,7 +1113,7 @@ patch(ReceiptScreen.prototype, {
                 console.log(`[PLEDGE]   - is_delivery_product:`, product?.is_delivery_product);
                 
                 // If employee service exists, skip delivery products
-                if (hasEmployeeService && product?.is_delivery_product) {
+                if (hidePledgeByEmployee && product?.is_delivery_product) {
                     console.log("[PLEDGE] 🚫 SKIPPING delivery product (employee exists):", product.display_name || product.name);
                     return;
                 }
@@ -1137,7 +1143,7 @@ patch(ReceiptScreen.prototype, {
             
             lines.forEach(line => {
                 const product = line.product_id;
-                if (product?.is_pledge_product && !hasEmployeeService) {
+                if (product?.is_pledge_product && !hidePledgeByEmployee) {
                     const pledgeAmt = (product.pledge_amount || 0) * line.qty;
                     pledgeTotal += pledgeAmt;
                     pledgeLines.push({
