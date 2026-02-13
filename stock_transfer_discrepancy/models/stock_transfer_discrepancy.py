@@ -87,7 +87,6 @@ class StockTransferDiscrepancy(models.Model):
         if not truck_location or not product:
             return
         if not qty_in_product_uom:
-            print(222,qty_in_product_uom)
             return
 
         domain = [
@@ -100,37 +99,8 @@ class StockTransferDiscrepancy(models.Model):
         if exclude_picking_ids:
             domain.append(("picking_id", "not in", exclude_picking_ids))
 
-        # Debug: Check all open discrepancies for this truck/product
-        all_open = self.sudo().search([
-            ("truck_location_id", "=", truck_location.id),
-            ("product_id", "=", product.id),
-            ("state", "=", "open"),
-        ])
-        
-        # Debug: Check ALL open discrepancies in database (for debugging)
-        all_open_all = self.sudo().search([("state", "=", "open")])
-        
-        print("=== DEBUG apply_resolution ===")
-        print(f"Truck Location ID: {truck_location.id}, Name: {truck_location.name}")
-        print(f"Product ID: {product.id}, Name: {product.name}")
-        print(f"Stage filter: {stage}")
-        print(f"Qty to resolve: {qty_in_product_uom}")
-        print(f"All open discrepancies (no stage filter): {len(all_open)}")
-        for disc in all_open:
-            print(f"  - Disc ID {disc.id}: stage={disc.stage}, truck={disc.truck_location_id.name}, product={disc.product_id.name}, state={disc.state}")
-        print(f"Domain: {domain}")
-        print(f"\n=== ALL OPEN DISCREPANCIES IN DB (for debugging) ===")
-        print(f"Total open discrepancies: {len(all_open_all)}")
-        for disc in all_open_all:
-            print(f"  - Disc ID {disc.id}: stage={disc.stage}, truck={disc.truck_location_id.name if disc.truck_location_id else 'EMPTY'}, product={disc.product_id.name}, state={disc.state}, expected={disc.expected_qty}, actual={disc.actual_qty}, diff={disc.difference_qty}")
-        print("=== END DEBUG ===")
-
         # Oldest first
         discrepancies = self.sudo().search(domain, order="date asc, id asc")
-        print(f"Found discrepancies after search: {len(discrepancies)}")
-        for disc in discrepancies:
-            print(f"  - Matched Disc ID {disc.id}: stage={disc.stage}")
-        print("=== END DEBUG ===")
         
         remaining_qty = qty_in_product_uom
         for disc in discrepancies:
@@ -171,4 +141,3 @@ class StockTransferDiscrepancy(models.Model):
         self.sudo().write(vals)
         if not skip_recompute and self.truck_location_id:
             self.truck_location_id._compute_has_open_discrepancy()
-
