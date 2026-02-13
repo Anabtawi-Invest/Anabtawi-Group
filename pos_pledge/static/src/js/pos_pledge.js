@@ -383,90 +383,9 @@ patch(PaymentScreen.prototype, {
             const result = await super.validateOrder(isForceValidate);
             console.log("[PLEDGE] ✅ Validation completed successfully");
             
-            // After validation completes without error, create pledge record
-            // (Note: validateOrder returns undefined in Odoo 19, so we don't check result)
+            // Pledge creation is handled in backend (pos.order write flow) to avoid duplicate records.
             if (order.hasPledge && order.pledgeData) {
-                console.log("[PLEDGE] ✅ Scheduling pledge record creation");
-                
-                // Store data (not component references) before navigation
-                const pledgeData = {
-                    ...order.pledgeData,
-                    pos_config_id: this.pos.config.id,
-                };
-                const posInstance = this.pos; // Store pos instance (survives component destruction)
-                
-                // Schedule pledge creation after a delay to ensure order is synced
-                setTimeout(async () => {
-                    try {
-                        console.log("[PLEDGE] Creating pledge record after order sync...");
-                        
-                        // Wait a bit more for order to get server_id
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                        
-                        const orderId = order.server_id || order.id;
-                        console.log("[PLEDGE] Final order ID:", orderId);
-                        
-                        if (!orderId) {
-                            console.error("[PLEDGE] ⚠️ Order not synced yet");
-                            return;
-                        }
-
-                        const finalPledgeData = {
-                            pos_order_id: orderId,
-                            pos_config_id: pledgeData.pos_config_id,
-                            partner_id: pledgeData.partner_id,
-                            case_type: pledgeData.case_type,
-                            pledge_amount: pledgeData.pledge_amount || 0,
-                            employee_amount: pledgeData.employee_amount || 0,
-                            delivery_amount: pledgeData.delivery_amount || 0,
-                            pledge_products: pledgeData.pledge_products || [],
-                            employee_product_id: pledgeData.employee_product_id || false,
-                            delivery_product_id: pledgeData.delivery_product_id || false,
-                        };
-
-                        console.log("[PLEDGE] Calling pos.advance.order.pledge.create_from_pos with:", finalPledgeData);
-
-                        // Use the ORM service directly from the environment
-                        const pledgeId = await posInstance.env.services.orm.call(
-                            "pos.advance.order.pledge",
-                            "create_from_pos",
-                            [finalPledgeData]
-                        );
-                        
-                        console.log("[PLEDGE] ✅ Pledge record created successfully! ID:", pledgeId);
-                        
-                        // Show notification using pos notification service
-                        posInstance.env.services.notification.add(
-                            _t("Pledge record created: %s", pledgeData.case_type.toUpperCase()),
-                            { type: "success" }
-                        );
-                    } catch (error) {
-                        console.error("[PLEDGE] ✗ Error creating pledge record:", error);
-                        console.error("[PLEDGE] Error stack:", error.stack);
-                        
-                        // Extract error message
-                        let errorMessage = "Unknown error";
-                        if (error && error.message) {
-                            errorMessage = error.message;
-                        } else if (error && error.data && error.data.message) {
-                            errorMessage = error.data.message;
-                        } else if (typeof error === 'string') {
-                            errorMessage = error;
-                        }
-                        
-                        // Show error notification
-                        try {
-                            posInstance.env.services.notification.add(
-                                _t("Failed to create pledge record: %s", errorMessage),
-                                { type: "danger", sticky: true }
-                            );
-                        } catch (notifError) {
-                            console.error("[PLEDGE] Could not show notification:", notifError);
-                        }
-                    }
-                }, 2000); // Wait 2 seconds for order to sync
-            } else {
-                console.log("[PLEDGE] ⚠️ Not creating pledge record - missing hasPledge or pledgeData");
+                console.log("[PLEDGE] Backend pledge flow will create related records (frontend creation skipped).");
             }
             
             return result;
@@ -487,24 +406,9 @@ patch(PaymentScreen.prototype, {
         console.log("[PLEDGE] order.pledgeData:", order.pledgeData);
         console.log("[PLEDGE] result:", result);
         
-        // If order has pledge, create pledge record after order is synced
-        if (order.hasPledge && order.pledgeData && result) {
-            console.log("[PLEDGE] ✅ All conditions met - calling createPledgeRecord");
-            try {
-                await this.createPledgeRecord(order);
-            } catch (error) {
-                console.error("[PLEDGE] ✗ Error creating pledge record:", error);
-                this.notification.add(
-                    error.message || _t("Failed to create pledge record"),
-                    { type: "warning" }
-                );
-                // Don't block order completion, just warn
-            }
-        } else {
-            console.log("[PLEDGE] ⚠️ Conditions not met for pledge creation:");
-            console.log("[PLEDGE]   - order.hasPledge:", order.hasPledge);
-            console.log("[PLEDGE]   - order.pledgeData:", order.pledgeData);
-            console.log("[PLEDGE]   - result:", result);
+        // Keep finalize hook passive; backend handles pledge line creation to prevent duplicates.
+        if (order?.hasPledge) {
+            console.log("[PLEDGE] _finalizeValidation: backend pledge flow active, skipping frontend create.");
         }
         
         return result;
