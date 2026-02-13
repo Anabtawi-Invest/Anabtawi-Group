@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_lateness_coverage" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.lateness.coverage</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('settings')]" position="inside">
+                <div class="app_settings_block" data-string="Lateness Coverage" string="Lateness Coverage">
+                    <h2>Lateness Coverage</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="lateness_annual_leave_type_id"/>
+                                <div class="text-muted">
+                                    Select the hour-based Annual Leave type to consume when overtime is not enough.
+                                </div>
+                                <field name="lateness_annual_leave_type_id"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>
