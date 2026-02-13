@@ -10,12 +10,11 @@
         <field name="binding_type">action</field>
         <field name="binding_view_types">form</field>
         <field name="code">
-records.action_mass_reconcile_lateness_enterprise()
-action = {'type': 'ir.actions.client', 'tag': 'reload'}
-</field>
+action = records.action_mass_reconcile_lateness()
+        </field>
     </record>
 
-    <!-- Action on Payslips list (Pay Run Payslips / Payslips) -->
+    <!-- Action on Payslips list -->
     <record id="action_server_mass_reconcile_lateness_slip" model="ir.actions.server">
         <field name="name">Mass Reconcile Lateness</field>
         <field name="state">code</field>
@@ -24,9 +23,9 @@ action = {'type': 'ir.actions.client', 'tag': 'reload'}
         <field name="binding_type">action</field>
         <field name="binding_view_types">list,form</field>
         <field name="code">
-for slip in records:
-    slip._lateness_reconcile_for_slip()
-action = {'type': 'ir.actions.client', 'tag': 'reload'}
+for slip in records.filtered(lambda s: s.state == 'draft'):
+    slip._lateness_reconcile_for_slip_no_ot_bank()
+action = {"type": "ir.actions.client", "tag": "reload"}
         </field>
     </record>
 
