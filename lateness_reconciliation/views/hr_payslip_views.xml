@@ -9,10 +9,10 @@
     <field name="arch" type="xml">
 
         <xpath expr="//*[self::tree or self::list]" position="inside">
-            <field name="dashboard_lateness_hours"/>
-            <field name="dashboard_ot_hours"/>
+            <field name="lateness_hours"/>
+            <field name="ot_hours"/>
             
-            <field name="dashboard_remaining"/>
+            <field name="remaining"/>
         </xpath>
 
     </field>
