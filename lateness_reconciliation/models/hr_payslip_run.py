@@ -1,7 +1,6 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 
-
 class HrPayslipRun(models.Model):
     _inherit = "hr.payslip.run"
 
@@ -12,15 +11,15 @@ class HrPayslipRun(models.Model):
 
     @api.depends(
         "slip_ids.lateness_hours",
-        "slip_ids.ot_hours_total",
-        "slip_ids.lateness_remaining",
+        "slip_ids.overtime_hours",
+        "slip_ids.remaining_lateness_hours",
     )
     def _compute_totals(self):
         for run in self:
             slips = run.slip_ids
             total_lateness = sum(slips.mapped("lateness_hours"))
-            total_overtime = sum(slips.mapped("ot_hours_total"))
-            total_remaining = sum(slips.mapped("lateness_remaining"))
+            total_overtime = sum(slips.mapped("overtime_hours"))
+            total_remaining = sum(slips.mapped("remaining_lateness_hours"))
 
             run.total_lateness = total_lateness
             run.total_overtime = total_overtime
@@ -31,31 +30,15 @@ class HrPayslipRun(models.Model):
             else:
                 run.coverage_pct = 100.0
 
-    def action_mass_reconcile_lateness_enterprise(self):
-        """Mass reconcile action that works from:
-        - Pay Run (hr.payslip.run) form action
-        - Payslips list action (active_ids = payslips)
-        """
-        active_model = self.env.context.get("active_model")
-        active_ids = self.env.context.get("active_ids", [])
-
-        slips = self.env["hr.payslip"]
-
-        if active_model == "hr.payslip" and active_ids:
-            slips = slips.browse(active_ids)
-        else:
-            # Called from Pay Run form
-            slips = self.slip_ids
-
+    def action_mass_reconcile_lateness(self):
+        # Called from server action on Pay Run form
+        slips = self.env["hr.payslip"].browse(self.env.context.get("active_ids", []))
         if not slips:
-            raise UserError(_("No payslips found to reconcile."))
+            raise UserError(_("No payslips selected."))
 
         slips = slips.filtered(lambda s: s.state == "draft")
-
         for slip in slips:
-            if hasattr(slip, "_lateness_reconcile_for_slip"):
-                slip._lateness_reconcile_for_slip()
-
-        slips._recompute_dashboard_fields()
+            if hasattr(slip, "_lateness_reconcile_for_slip_no_ot_bank"):
+                slip._lateness_reconcile_for_slip_no_ot_bank()
 
         return {"type": "ir.actions.client", "tag": "reload"}
