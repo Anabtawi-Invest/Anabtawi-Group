@@ -29,13 +29,22 @@ class StockMove(models.Model):
             if picking.location_dest_id.usage == 'supplier':
                 continue
 
-            done_qty = sum(move.move_line_ids.mapped('quantity'))
+            done_qty = move.quantity
             if not done_qty:
                 continue
 
-            available_qty = self.env['stock.quant']._get_available_quantity(
+            available_qty_product_uom = self.env['stock.quant']._get_available_quantity(
                 move.product_id, location
             )
+            available_qty = move.product_id.uom_id._compute_quantity(
+                available_qty_product_uom, move.product_uom, round=False
+            )
+
+            if available_qty - done_qty < 0 and cancel_backorder:
+                allowed_qty = max(available_qty, 0.0)
+                if move.product_uom.compare(allowed_qty, move.quantity) < 0:
+                    move.quantity = allowed_qty
+                continue
 
             if available_qty - done_qty < 0:
                 raise UserError(_(
