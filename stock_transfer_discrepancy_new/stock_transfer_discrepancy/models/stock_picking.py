@@ -140,7 +140,7 @@ class StockPicking(models.Model):
                     len(discrepancy_lines),
                 )
                 view = self.env.ref(
-                    "stock_transfer_discrepancy.stock_transfer_discrepancy_wizard_view_form"
+                    "stock_transfer_discrepancy_new.stock_transfer_discrepancy_wizard_view_form"
                 )
                 return {
                     "name": self.env._("Discrepancy Reason Required"),
