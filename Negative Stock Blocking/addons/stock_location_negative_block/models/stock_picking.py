@@ -12,7 +12,6 @@ class StockPicking(models.Model):
 
         Quant = self.env["stock.quant"]
         outgoing = defaultdict(float)
-        raise UserError("Negative Stock Is Not Allowed, Be Carefull My Friend")
 
         # ---------------------------------------
         # collect outgoing quantities

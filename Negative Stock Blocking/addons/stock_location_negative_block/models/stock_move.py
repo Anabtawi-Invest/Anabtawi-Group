@@ -27,17 +27,28 @@ class StockMove(models.Model):
             if picking.picking_type_id.code != 'internal':
                 continue
 
-            # 4️⃣ الكمية المنفذة (حسب حقولك)
-            done_qty = sum(move.move_line_ids.mapped('quantity'))
+            # 4️⃣ الكمية المنفذة (بوحدة move.product_uom)
+            done_qty = move.quantity
             if not done_qty:
                 continue
 
             # 5️⃣ الكمية المتاحة قبل التنفيذ
-            available_qty = self.env['stock.quant']._get_available_quantity(
+            available_qty_product_uom = self.env['stock.quant']._get_available_quantity(
                 move.product_id, location
+            )
+            available_qty = move.product_id.uom_id._compute_quantity(
+                available_qty_product_uom, move.product_uom, round=False
             )
 
             qty_after = available_qty - done_qty
+
+            # 6️⃣ In "No Backorder" flow, trim done qty to available qty.
+            # This keeps negative stock blocked while allowing validation without creating backorder.
+            if qty_after < 0 and cancel_backorder:
+                allowed_qty = max(available_qty, 0.0)
+                if move.product_uom.compare(allowed_qty, move.quantity) < 0:
+                    move.quantity = allowed_qty
+                continue
 
             # 6️⃣ المنع مع رسالة واضحة
             if qty_after < 0:
