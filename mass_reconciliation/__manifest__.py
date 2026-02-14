@@ -9,7 +9,6 @@
     'data': [
         'security/ir.model.access.csv',
         'views/hr_payslip_views.xml',
-        'views/res_config_settings_views.xml',
         'data/server_actions.xml',
     ],
     'installable': True,
