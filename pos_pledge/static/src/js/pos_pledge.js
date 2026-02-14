@@ -56,6 +56,21 @@ function printHtmlReceipt(html, title = 'Receipt') {
     printWindow.document.close();
 }
 
+function getOrderPricelistName(order, pos) {
+    const orderPricelist =
+        (typeof order?.get_pricelist === "function" && order.get_pricelist()) ||
+        (typeof order?.getPricelist === "function" && order.getPricelist()) ||
+        order?.pricelist ||
+        order?.pricelist_id ||
+        pos?.config?.pricelist_id ||
+        pos?.default_pricelist;
+    return (
+        orderPricelist?.name ||
+        (Array.isArray(orderPricelist) ? orderPricelist[1] : null) ||
+        ""
+    );
+}
+
 // =============================================================================
 // 1. Pledge processing is now automatic (no popup needed)
 // =============================================================================
@@ -520,6 +535,7 @@ patch(PaymentScreen.prototype, {
         // Get base receipt data
         const receiptData = order.export_for_printing();
         const lines = order.getOrderlines ? order.getOrderlines() : order.lines || [];
+        receiptData.pricelist_name = getOrderPricelistName(order, this.pos);
         
         console.log("[PLEDGE] Preparing receipt data for order");
         
@@ -683,6 +699,7 @@ patch(PaymentScreen.prototype, {
                         <div>Cashier: ${receiptData.cashier || ''}</div>
                         <div>Order: ${receiptData.name || ''}</div>
                         <div>Date: ${receiptData.date || ''}</div>
+                        ${receiptData.pricelist_name ? `<div>Pricelist: ${receiptData.pricelist_name}</div>` : ''}
                     </div>
                     ${receiptData.partner ? `
                         <div class="partner-info mb-2">
@@ -1080,6 +1097,17 @@ patch(ReceiptScreen.prototype, {
             // Prepare receipt data
             const company = this.pos.company;
             const cashierName = order.getCashierName ? order.getCashierName() : (order.employee_id?.name || 'Cashier');
+            const orderPricelist =
+                (typeof order.get_pricelist === "function" && order.get_pricelist()) ||
+                (typeof order.getPricelist === "function" && order.getPricelist()) ||
+                order.pricelist ||
+                order.pricelist_id ||
+                this.pos?.config?.pricelist_id ||
+                this.pos?.default_pricelist;
+            const pricelistName =
+                orderPricelist?.name ||
+                (Array.isArray(orderPricelist) ? orderPricelist[1] : null) ||
+                "";
             
             const receiptData = {
                 company: {
@@ -1096,6 +1124,7 @@ patch(ReceiptScreen.prototype, {
                     name: order.partner_id.name,
                     phone: order.partner_id.phone,
                 } : null,
+                pricelist_name: pricelistName,
                 total_with_tax: this.env.utils.formatCurrency(order.amount_total || 0, false),
                 change: this.env.utils.formatCurrency(0, false),
             };
@@ -1198,6 +1227,7 @@ _buildFullReceiptHtml(receiptData) {
                 <div>Cashier: ${receiptData.cashier}</div>
                 <div>Order: ${receiptData.name}</div>
                 <div>Date: ${receiptData.date}</div>
+                ${receiptData.pricelist_name ? `<div>Pricelist: ${receiptData.pricelist_name}</div>` : ''}
             </div>
 
             ${receiptData.partner ? `
@@ -1219,6 +1249,16 @@ _buildFullReceiptHtml(receiptData) {
                 <table style="width: 100%; margin: 10px 0;">
         `;
 
+        receiptData.pledgeLines.forEach(pline => {
+            html += `
+                    <tr>
+                        <td>${pline.name}</td>
+                        <td style="text-align: right;">
+                            ${this.env.utils.formatCurrency(pline.amount, false)}
+                        </td>
+                    </tr>
+            `;
+        });
 
         html += `
                     <tr style="border-top: 2px solid #000;">
@@ -1270,6 +1310,7 @@ _buildFullReceiptHtml(receiptData) {
             // Prepare receipt data manually from order properties
             const company = this.pos.company;
             const cashierName = order.getCashierName ? order.getCashierName() : (order.employee_id?.name || 'Cashier');
+            const pricelistName = getOrderPricelistName(order, this.pos);
             
             const receiptData = {
                 company: {
@@ -1286,6 +1327,7 @@ _buildFullReceiptHtml(receiptData) {
                     name: order.partner_id.name,
                     phone: order.partner_id.phone,
                 } : null,
+                pricelist_name: pricelistName,
                 total_with_tax: this.env.utils.formatCurrency(order.amount_total || order.priceIncl || 0, false),
                 change: this.env.utils.formatCurrency(0, false), // No change on completed orders
             };
@@ -1380,6 +1422,7 @@ _buildFullReceiptHtml(receiptData) {
                         <div>Cashier: ${receiptData.cashier || ''}</div>
                         <div>Order: ${receiptData.name || ''}</div>
                         <div>Date: ${receiptData.date || ''}</div>
+                        ${receiptData.pricelist_name ? `<div>Pricelist: ${receiptData.pricelist_name}</div>` : ''}
                     </div>
                     ${receiptData.partner ? `
                         <div class="partner-info mb-2">
