@@ -85,10 +85,21 @@ patch(ControlButtons.prototype, {
         }
 
         const amountWithTax = this.env.utils.parseValidFloat(payload?.toString() || "");
-        if (isNaN(amountWithTax) || amountWithTax <= 0) {
-            this.notification.add(_t("Please enter a valid amount."), { type: "warning" });
-            return;
-        }
+
+if (isNaN(amountWithTax) || amountWithTax <= 0) {
+    this.notification.add(_t("Please enter a valid amount."), { type: "warning" });
+    return;
+}
+
+// 🔒 Restrict to maximum 0.09
+if (amountWithTax > 0.09) {
+    this.notification.add(
+        _t("Maximum allowed rounding amount is 0.09."),
+        { type: "warning" }
+    );
+    return;
+}
+
 
         const adjustmentId = extractId(adjustmentProduct);
         if (!adjustmentId) {
