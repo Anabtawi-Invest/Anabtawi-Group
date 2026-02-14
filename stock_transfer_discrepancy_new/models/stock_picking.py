@@ -139,9 +139,26 @@ class StockPicking(models.Model):
                     "[DISCREPANCY] ✓ Opening wizard with %s discrepancy lines",
                     len(discrepancy_lines),
                 )
-                view = self.env.ref(
-                    "stock_transfer_discrepancy.stock_transfer_discrepancy_wizard_view_form"
+                view = (
+                    self.env.ref(
+                        "stock_transfer_discrepancy_new.stock_transfer_discrepancy_wizard_view_form",
+                        raise_if_not_found=False,
+                    )
+                    or self.env.ref(
+                        "stock_transfer_discrepancy.stock_transfer_discrepancy_wizard_view_form",
+                        raise_if_not_found=False,
+                    )
                 )
+                if not view:
+                    view = self.env["ir.ui.view"].search(
+                        [("model", "=", "stock.transfer.discrepancy.wizard"), ("type", "=", "form")],
+                        limit=1,
+                    )
+                if not view:
+                    _logger.warning(
+                        "[DISCREPANCY] Wizard view not found, skipping discrepancy wizard for now."
+                    )
+                    return super()._pre_action_done_hook()
                 return {
                     "name": self.env._("Discrepancy Reason Required"),
                     "type": "ir.actions.act_window",
