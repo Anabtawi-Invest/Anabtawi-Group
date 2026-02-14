@@ -170,6 +170,9 @@
                 <!-- First, check if ANY product is an employee service or delivery product -->
                 <t t-set="hasEmployeeService" t-value="false"/>
                 <t t-set="hasDeliveryProduct" t-value="false"/>
+                <t t-if="props.order.employee_id">
+                    <t t-set="hasEmployeeService" t-value="true"/>
+                </t>
                 <t t-foreach="props.order.lines" t-as="checkLine" t-key="'check_' + checkLine_index">
                     <t t-if="checkLine.product_id and checkLine.product_id.is_employee_service">
                         <t t-set="hasEmployeeService" t-value="true"/>
