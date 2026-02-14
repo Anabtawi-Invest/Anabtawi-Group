@@ -23,15 +23,3 @@ class PosConfig(models.Model):
         if "discount_adjustment_product_id" not in fields_to_load:
             fields_to_load.append("discount_adjustment_product_id")
         return fields_to_load
-
-    @api.model
-    def _load_pos_data_read(self, records, config):
-        """Guarantee discount_adjustment_product_id is present in POS config payload."""
-        read_records = super()._load_pos_data_read(records, config)
-        if not read_records:
-            return read_records
-        for record in read_records:
-            if "discount_adjustment_product_id" not in record:
-                current_config = self.browse(record["id"])
-                record["discount_adjustment_product_id"] = current_config.discount_adjustment_product_id.id
-        return read_records

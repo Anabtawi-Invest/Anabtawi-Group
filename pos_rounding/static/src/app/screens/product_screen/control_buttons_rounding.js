@@ -7,7 +7,7 @@ import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { _t } from "@web/core/l10n/translation";
 
 patch(ControlButtons.prototype, {
-    async applyDiscount() {
+    async applyRounding() {
         const order = this.currentOrder;
         if (!order) {
             return;
@@ -84,7 +84,7 @@ patch(ControlButtons.prototype, {
             return;
         }
 
-        const amountWithTax = parseFloat(payload);
+        const amountWithTax = this.env.utils.parseValidFloat(payload?.toString() || "");
         if (isNaN(amountWithTax) || amountWithTax <= 0) {
             this.notification.add(_t("Please enter a valid amount."), { type: "warning" });
             return;
@@ -96,23 +96,89 @@ patch(ControlButtons.prototype, {
             return;
         }
 
-        const taxRate = (adjustmentProduct.taxes_id?.[0]?.amount || 0) / 100;
-        const baseAmount = amountWithTax / (1 + taxRate);
-
         order
             .getOrderlines()
             .filter((line) => extractId(line?.product_id) === adjustmentId)
             .forEach((line) => order.removeOrderline(line));
 
-        await this.pos.addLineToCurrentOrder(
+        const totalBefore = order.priceIncl;
+        const targetDecrease = Math.abs(amountWithTax);
+        const taxRate = (adjustmentProduct.taxes_id?.[0]?.amount || 0) / 100;
+        const initialBaseAmount = targetDecrease / (1 + taxRate);
+
+        const adjustmentLine = await this.pos.addLineToCurrentOrder(
             {
                 product_tmpl_id: adjustmentProduct.product_tmpl_id,
                 product_id: adjustmentProduct,
-                price_unit: -baseAmount,
+                price_unit: -initialBaseAmount,
                 qty: 1,
             },
             {},
             false
         );
+
+        if (!adjustmentLine) {
+            this.notification.add(_t("Could not create adjustment line."), { type: "danger" });
+            return;
+        }
+
+        const setPreciseUnitPrice = (line, value) => {
+            // Avoid setUnitPrice() here because it rounds to Product Price precision.
+            // We need higher precision to hit tax-included target deltas exactly.
+            line.update({ price_unit: Number(value) || 0 });
+        };
+
+        const currencyRounding = this.pos.currency?.rounding || 0.01;
+        const tolerance = Math.max(currencyRounding / 2, 0.000001);
+        const getDecrease = () => totalBefore - order.priceIncl;
+        const getResidual = () => targetDecrease - getDecrease();
+
+        // Adjust the line price so the order total decreases by the exact entered tax-included amount.
+        let residual = getResidual();
+        const probeStep = Math.max(currencyRounding, 0.01);
+        for (let i = 0; i < 12 && Math.abs(residual) > tolerance; i++) {
+            const base = adjustmentLine.price_unit;
+            setPreciseUnitPrice(adjustmentLine, base + probeStep);
+            const decreasePlus = getDecrease();
+            setPreciseUnitPrice(adjustmentLine, base);
+            const decreaseBase = getDecrease();
+            const slope = (decreasePlus - decreaseBase) / probeStep;
+
+            if (!Number.isFinite(slope) || Math.abs(slope) < 1e-9) {
+                break;
+            }
+
+            setPreciseUnitPrice(adjustmentLine, base + residual / slope);
+            residual = getResidual();
+        }
+
+        // Fallback discrete search around the computed unit price to absorb line-level tax rounding.
+        if (Math.abs(residual) > tolerance) {
+            const center = adjustmentLine.price_unit;
+            const searchStep = Math.max(currencyRounding / 10, 0.0001);
+            let bestUnitPrice = center;
+            let bestError = Math.abs(residual);
+            for (let n = -400; n <= 400; n++) {
+                const candidate = center + n * searchStep;
+                setPreciseUnitPrice(adjustmentLine, candidate);
+                const error = Math.abs(getResidual());
+                if (error < bestError) {
+                    bestError = error;
+                    bestUnitPrice = candidate;
+                    if (bestError <= tolerance) {
+                        break;
+                    }
+                }
+            }
+            setPreciseUnitPrice(adjustmentLine, bestUnitPrice);
+            residual = getResidual();
+        }
+
+        if (Math.abs(residual) > tolerance) {
+            this.notification.add(
+                _t("Applied amount is very close but not exact due to tax rounding."),
+                { type: "warning" }
+            );
+        }
     },
 });
