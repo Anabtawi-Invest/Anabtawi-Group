@@ -16,7 +16,12 @@ class StockQuant(models.Model):
             qty_prod_uom = quant.product_uom_id._compute_quantity(abs(diff), quant.product_id.uom_id, round=False)
             resolutions.append((quant.location_id, quant.product_id, qty_prod_uom))
 
-        res = super()._apply_inventory(date=date)
+        try:
+            res = super()._apply_inventory(date=date)
+        except TypeError:
+            # Compatibility fallback in case another inherited module defines _apply_inventory(self)
+            # without the optional date kwarg.
+            res = super()._apply_inventory()
 
         Discrepancy = self.env["stock.transfer.discrepancy"]
         truck_locations_to_recompute = set()
