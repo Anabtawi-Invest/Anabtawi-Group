@@ -6,8 +6,8 @@
             <field name="name">Transfer Discrepancy Report</field>
             <field name="model">stock.transfer.discrepancy</field>
             <field name="report_type">qweb-pdf</field>
-            <field name="report_name">stock_transfer_discrepancy.report_transfer_discrepancy</field>
-            <field name="report_file">stock_transfer_discrepancy.report_transfer_discrepancy</field>
+            <field name="report_name">stock_transfer_discrepancy_new.report_transfer_discrepancy</field>
+            <field name="report_file">stock_transfer_discrepancy_new.report_transfer_discrepancy</field>
             <field name="print_report_name">'Transfer Discrepancy - %s' % (object.picking_id.name or '')</field>
             <field name="binding_model_id" ref="model_stock_transfer_discrepancy"/>
             <field name="binding_type">report</field>
