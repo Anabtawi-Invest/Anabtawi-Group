@@ -1,5 +1,5 @@
 {
-    'name': 'Lateness Coverage (No OT Bank)',
+    'name': 'Mass Reconciliation',
     'version': '19.0.1.0.1',
     'summary': 'Cover lateness using OT buckets then Annual Leave (hours) then remaining lateness for payroll deduction. No OT Bank.',
     'category': 'Human Resources/Payroll',
