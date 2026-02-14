@@ -1,7 +1,9 @@
+# -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
 OT_PRIORITY_CODES = ['OTR', 'PHO', 'OTW']  # Weekend, Public Holiday, Weekday
+
 
 class HrPayslip(models.Model):
     _inherit = 'hr.payslip'
@@ -11,18 +13,28 @@ class HrPayslip(models.Model):
     overtime_hours = fields.Float(string='Overtime (hrs)', compute='_compute_lateness_and_ot', store=False)
     remaining_lateness_hours = fields.Float(string='Remaining Lateness (hrs)', compute='_compute_remaining_lateness', store=False)
 
+    # ---- Helpers -------------------------------------------------------------
+
     def _get_worked_day_hours_by_code(self):
+        """Return (lateness_hours, overtime_buckets_dict)"""
         self.ensure_one()
         buckets = {code: 0.0 for code in OT_PRIORITY_CODES}
         lateness = 0.0
+
         for line in self.worked_days_line_ids:
             code = (line.work_entry_type_id.code or '').strip()
+
+            # OT buckets
             if code in buckets:
                 buckets[code] += line.number_of_hours or 0.0
-            # Common lateness codes - adjust in settings or extend if needed
+
+            # Lateness codes (adjust if your lateness code differs)
             if code in ('LAT', 'LATE', 'Lateness', 'L'):
                 lateness += line.number_of_hours or 0.0
+
         return lateness, buckets
+
+    # ---- Computes ------------------------------------------------------------
 
     @api.depends('worked_days_line_ids.number_of_hours', 'worked_days_line_ids.work_entry_type_id.code')
     def _compute_lateness_and_ot(self):
@@ -31,43 +43,52 @@ class HrPayslip(models.Model):
             slip.lateness_hours = lateness
             slip.overtime_hours = sum(buckets.values())
 
-    @api.depends('worked_days_line_ids.number_of_hours', 'worked_days_line_ids.work_entry_type_id.code')
+    @api.depends('input_line_ids.amount', 'input_line_ids.code', 'worked_days_line_ids.number_of_hours',
+                 'worked_days_line_ids.work_entry_type_id.code')
     def _compute_remaining_lateness(self):
-        # Remaining after reconciliation is stored in a payroll input line (code: REMLATE)
-        # If not present, fallback to lateness as "remaining"
+        """
+        Remaining after reconciliation is stored in payslip input code REMLATE.
+        If not present yet, fallback to current lateness.
+        """
         for slip in self:
-            rem = 0.0
             inp = slip.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')
             if inp:
-                rem = sum(inp.mapped('amount'))
+                slip.remaining_lateness_hours = sum(inp.mapped('amount'))
             else:
-                rem = slip.lateness_hours
-            slip.remaining_lateness_hours = rem
+                slip.remaining_lateness_hours = slip.lateness_hours
+
+    # ---- Main Action ---------------------------------------------------------
 
     def action_reconcile_lateness_no_ot_bank(self):
-        """Core reconciliation:
-        - Consume OT hours in order OTR -> PHO -> OTW by reducing worked days OT hours.
-        - If still remaining, create a Time Off (hr.leave) request in HOURS against configured Annual Leave type,
-          so balance decreases.
-        - If still remaining, store remaining hours into payslip input line code REMLATE (for salary deduction rule).
         """
-        Leave = self.env['hr.leave']
-        LeaveType = self.env['hr.leave.type']
+        Core reconciliation:
+        1) Consume OT hours in order OTR -> PHO -> OTW by reducing worked days OT hours.
+        2) If still remaining, deduct from Annual Leave (hours) using Time Off so balance decreases.
+        3) Store remaining hours into payslip input line code REMLATE (salary deduction rule).
+        """
+        Leave = self.env['hr.leave'].sudo()
+        LeaveType = self.env['hr.leave.type'].sudo()
+
         for slip in self:
             lateness, buckets = slip._get_worked_day_hours_by_code()
             remaining = lateness
 
-            # 1) consume OT buckets by reducing worked days lines (number_of_hours)
+            # 1) Consume OT buckets by reducing worked days lines (number_of_hours)
             for code in OT_PRIORITY_CODES:
                 if remaining <= 0:
                     break
+
                 available = buckets.get(code, 0.0)
                 if available <= 0:
                     continue
+
                 consume = min(available, remaining)
 
-                # Reduce hours from worked days lines for that code (FIFO)
-                lines = slip.worked_days_line_ids.filtered(lambda l: (l.work_entry_type_id.code or '').strip() == code).sorted('id')
+                # Reduce hours from worked days lines for that code (FIFO by id)
+                lines = slip.worked_days_line_ids.filtered(
+                    lambda l: (l.work_entry_type_id.code or '').strip() == code
+                ).sorted('id')
+
                 to_consume = consume
                 for line in lines:
                     if to_consume <= 0:
@@ -81,21 +102,30 @@ class HrPayslip(models.Model):
 
                 remaining -= consume
 
-            # 2) if remaining > 0, deduct from Annual Leave in hours (Time Off)
+            # 2) If remaining > 0, deduct from Annual Leave (hours) via Time Off
             if remaining > 0:
-                leave_type_id = int(self.env['ir.config_parameter'].sudo().get_param('lateness_coverage.annual_leave_type_id') or 0)
+                # ✅ FIX: read the correct key
+                leave_type_id = int(
+                    self.env['ir.config_parameter'].sudo().get_param(
+                        'mass_reconciliation.annual_leave_type_id'
+                    ) or 0
+                )
                 if not leave_type_id:
                     raise UserError(_(
                         'Annual Leave Type for lateness coverage is not configured.\n'
-                        'Go to Settings > Lateness Coverage and set an hour-based Annual Leave Type.'
+                        'Please set system parameter:\n'
+                        'mass_reconciliation.annual_leave_type_id = <Leave Type ID>'
                     ))
+
                 leave_type = LeaveType.browse(leave_type_id).exists()
                 if not leave_type:
-                    raise UserError(_('Configured Annual Leave Type not found. Please reconfigure Settings > Lateness Coverage.'))
+                    raise UserError(_(
+                        'Configured Annual Leave Type not found.\n'
+                        'Please reconfigure system parameter:\n'
+                        'mass_reconciliation.annual_leave_type_id'
+                    ))
 
-                # Create a validated leave in hours so balance decreases.
-                # NOTE: Depending on company policy, you may want "confirm" only; here we validate.
-                # Odoo uses request_unit / request_unit_half_day in recent versions; here we set hours via number_of_hours_display.
+                # Create a validated leave in hours so balance decreases
                 leave_vals = {
                     'name': _('Lateness Coverage (%s)') % (slip.number or slip.name),
                     'employee_id': slip.employee_id.id,
@@ -107,32 +137,37 @@ class HrPayslip(models.Model):
                     'request_hour_to': 0.0,
                     'number_of_hours_display': remaining,
                 }
-                leave = Leave.sudo().create(leave_vals)
+                leave = Leave.create(leave_vals)
+
                 # confirm & validate to impact balance
-                leave.sudo().action_confirm()
-                leave.sudo().action_approve() if hasattr(leave, 'action_approve') else None
+                leave.action_confirm()
                 if hasattr(leave, 'action_validate'):
-                    leave.sudo().action_validate()
-                else:
-                    # v19 should have action_validate; keep safe fallback
-                    leave.sudo().action_approve()
+                    leave.action_validate()
+                elif hasattr(leave, 'action_approve'):
+                    leave.action_approve()
 
                 remaining = 0.0
 
             # 3) Store remaining lateness for payroll deduction rule (input line)
-            # Always keep input line consistent (even if 0)
             inp = slip.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')
             if inp:
                 inp.write({'amount': remaining})
             else:
-                input_type = self.env['hr.payslip.input.type'].search([('code', '=', 'REMLATE')], limit=1)
+                input_type = self.env['hr.payslip.input.type'].sudo().search([('code', '=', 'REMLATE')], limit=1)
                 if not input_type:
-                    input_type = self.env['hr.payslip.input.type'].create({'name': 'Remaining Lateness (hrs)', 'code': 'REMLATE'})
-                self.env['hr.payslip.input'].create({
+                    input_type = self.env['hr.payslip.input.type'].sudo().create({
+                        'name': 'Remaining Lateness (hrs)',
+                        'code': 'REMLATE'
+                    })
+
+                self.env['hr.payslip.input'].sudo().create({
                     'payslip_id': slip.id,
                     'input_type_id': input_type.id,
                     'name': 'Remaining Lateness (hrs)',
                     'code': 'REMLATE',
                     'amount': remaining,
                 })
-        return True
+
+        # ✅ FIX: return valid action dict (avoid RPC issues)
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
+    
