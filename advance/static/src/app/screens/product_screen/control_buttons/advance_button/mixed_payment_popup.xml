@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <t t-name="pos_advance.MixedPaymentPopup">
+        <Dialog title="'Mixed Payment - Cash &amp; Card'" size="'md'">
+            <div class="popup-body p-4">
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Total Expected Amount</label>
+                    <div class="alert alert-info mb-3">
+                        <strong><t t-esc="pos.env.utils.formatCurrency(props.totalAmount, false)"/></strong>
+                    </div>
+                </div>
+
+                <!-- Cash Amount -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fw-bold mb-0">
+                            <i class="fa fa-money me-2"/>
+                            Cash Amount
+                        </label>
+                        <button class="btn btn-sm btn-outline-primary"
+                                t-on-click="setFullCash">
+                            Set Full Amount
+                        </button>
+                    </div>
+                    <input 
+                        type="number" 
+                        class="form-control form-control-lg"
+                        t-att-value="state.cashAmount"
+                        t-on-input="onCashAmountChange"
+                        step="0.01"
+                        min="0"
+                        t-att-max="props.totalAmount"
+                        placeholder="0.00"/>
+                </div>
+
+                <!-- Card Amount -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fw-bold mb-0">
+                            <i class="fa fa-credit-card me-2"/>
+                            Card Amount
+                        </label>
+                        <button class="btn btn-sm btn-outline-primary"
+                                t-on-click="setFullCard">
+                            Set Full Amount
+                        </button>
+                    </div>
+                    <input 
+                        type="number" 
+                        class="form-control form-control-lg"
+                        t-att-value="state.cardAmount"
+                        t-on-input="onCardAmountChange"
+                        step="0.01"
+                        min="0"
+                        t-att-max="props.totalAmount"
+                        placeholder="0.00"/>
+                </div>
+
+                <!-- Summary -->
+                <div class="alert" t-att-class="remaining >= 0 ? 'alert-success' : 'alert-warning'">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Total Paid:</span>
+                        <strong><t t-esc="pos.env.utils.formatCurrency(totalPaid, false)"/></strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Remaining:</span>
+                        <strong><t t-esc="pos.env.utils.formatCurrency(remaining, false)"/></strong>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer Buttons -->
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary btn-lg" t-on-click="onCancel">
+                    <i class="fa fa-times me-2"/>
+                    Cancel
+                </button>
+                <button class="btn btn-primary btn-lg" t-on-click="onConfirm">
+                    <i class="fa fa-check me-2"/>
+                    Confirm
+                </button>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>

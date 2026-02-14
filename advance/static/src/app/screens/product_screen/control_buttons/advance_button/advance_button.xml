@@ -1,0 +1,31 @@
+<t t-name="pos_consumption.ControlButtons"
+   t-inherit="point_of_sale.ControlButtons"
+   t-inherit-mode="extension">
+
+    <xpath expr="//t[@t-if='props.showRemainingButtons']/div/NoteButton" position="after">
+
+        <!-- CASH ADVANCE -->
+        <button
+    class="btn btn-success btn-lg"
+    t-on-click="onClickCashAdvance">
+    <i class="fa fa-money me-1"/>
+    Cash Advance
+</button>
+
+<button
+    class="btn btn-primary btn-lg"
+    t-on-click="onClickCardAdvance">
+    <i class="fa fa-credit-card me-1"/>
+    Credit Advance
+</button>
+
+<button
+    class="btn btn-info btn-lg"
+    t-on-click="onClickMixedAdvance">
+    <i class="fa fa-money-bill-wave me-1"/>
+    Mixed Payment
+</button>
+
+
+    </xpath>
+</t>
