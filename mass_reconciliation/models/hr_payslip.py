@@ -125,6 +125,9 @@ class HrPayslip(models.Model):
             if inp:
                 inp.write({'amount': remaining})
             else:
+                input_type = self.env['hr.payslip.input.type'].search([('code', '=', 'REMLATE')], limit=1)
+                if not input_type:
+                    input_type = self.env['hr.payslip.input.type'].create({'name': 'Remaining Lateness (hrs)', 'code': 'REMLATE'})
                 self.env['hr.payslip.input'].create({
                     'payslip_id': slip.id,
                     'name': 'Remaining Lateness (hrs)',
