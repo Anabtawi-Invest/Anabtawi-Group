@@ -5,7 +5,7 @@
             <button
                 t-att-class="buttonClass"
                 t-if="!props.showRemainingButtons"
-                t-on-click="applyDiscount"
+                t-on-click="applyRounding"
                 type="button">
                 <i class="fa fa-percent me-2" role="img" aria-label="Discount" title="Discount"/>
                 <span>Discount</span>
