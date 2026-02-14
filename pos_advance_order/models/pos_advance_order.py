@@ -128,6 +128,19 @@ class PosAdvanceOrder(models.Model):
     )
     pledge_count = fields.Float(string="Pledges Count", compute="_compute_pledge_count", store=True)
 
+    discount_id = fields.Many2one(
+        "pos.advance.discount",
+        string="Discount",
+        domain="[('active','=',True), ('company_id','=',company_id)]",
+    )
+
+    discount_amount = fields.Monetary(
+        string="Discount Amount",
+        currency_field="currency_id",
+        default=0.0,
+    )
+
+
     def _get_effective_pricelist(self):
         """Return the pricelist that should be used for pricing this advance order.
 
@@ -419,16 +432,20 @@ class PosAdvanceOrder(models.Model):
             },
         }
 
-    @api.depends("line_ids.price_subtotal_incl", "pledge_line_ids.pledge_subtotal", "with_employee")
+    @api.depends(
+        "line_ids.price_subtotal_incl",
+        "pledge_line_ids.pledge_subtotal",
+        "discount_amount",
+    )
     def _compute_amounts(self):
         for order in self:
-            # Align with POS order totals: include taxes in product total.
             order.amount_products = sum(order.line_ids.mapped("price_subtotal_incl"))
             order.pledge_amount = sum(order.pledge_line_ids.mapped("pledge_subtotal"))
-            # Invoice total remains products total; pledges are shown separately (not part of invoice total).
-            order.amount_total = order.amount_products
-            # Keep for backward compatibility, but do NOT include pledge in totals.
-            order.amount_grand_total = order.amount_products
+
+            total_after_discount = order.amount_products - (order.discount_amount or 0.0)
+
+            order.amount_total = total_after_discount
+            order.amount_grand_total = total_after_discount
 
     @api.depends("pledge_line_ids.pledge_qty")
     def _compute_pledge_count(self):
@@ -497,16 +514,21 @@ class PosAdvanceOrder(models.Model):
 
             if commands:
                 order.write({"pledge_line_ids": commands})
-    @api.depends("amount_grand_total", "advance_amount", "state")
+
+    @api.depends("amount_grand_total", "advance_amount", "discount_amount", "state")
     def _compute_payment_amounts(self):
         for order in self:
+            total = order.amount_grand_total or 0.0
+            paid = max(order.advance_amount or 0.0, 0.0)
+
             if order.state == "fully_paid":
-                order.amount_paid = order.amount_grand_total or 0.0
+                order.amount_paid = total
                 order.amount_remaining = 0.0
                 continue
-            paid = max(order.advance_amount or 0.0, 0.0)
-            order.amount_paid = min(paid, order.amount_grand_total or 0.0)
-            order.amount_remaining = (order.amount_grand_total or 0.0) - order.amount_paid
+
+            order.amount_paid = min(paid, total)
+            order.amount_remaining = total - order.amount_paid
+
     def _get_open_session(self, config):
         session = self.env["pos.session"].sudo().search(
             [("config_id", "=", config.id), ("state", "=", "opened"), ("rescue", "=", False)],
@@ -638,11 +660,32 @@ class PosAdvanceOrder(models.Model):
         for order in self:
             if order.state != "draft":
                 continue
+
+            # --- 1️⃣ حساب الخصم ---
+            discount = 0.0
+            if order.discount_id:
+                if order.discount_id.discount_type == "percent":
+                    discount = order.amount_products * (order.discount_id.value / 100.0)
+                else:
+                    discount = order.discount_id.value
+
+            order.discount_amount = max(
+                0.0,
+                min(discount, order.amount_products or 0.0)
+            )
+
+            # --- 2️⃣ إعادة حساب التوتال قبل الفاليديشن ---
+            order._compute_amounts()
+
+            # --- 3️⃣ فاليديشن advance ---
             if order.advance_amount < 0:
                 raise UserError(_("Advance amount cannot be negative."))
+
             if order.advance_amount > order.amount_grand_total:
                 raise UserError(_("Advance amount cannot be greater than the total."))
+
             order.state = "confirmed"
+
         return True
 
     def action_set_to_draft(self):

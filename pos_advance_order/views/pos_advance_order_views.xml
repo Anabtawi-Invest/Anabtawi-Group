@@ -140,6 +140,9 @@
                             <field name="advance_amount" widget="monetary" readonly="state != 'draft'"/>
                             <field name="is_employee_pricelist" readonly="state != 'draft'"/>
                             <field name="employee_pricelist_employee_id" readonly="1" invisible="not employee_pricelist_employee_id"/>
+                            <field name="discount_id" readonly="state != 'draft'" />
+
+
                         </group>
                         <group>
                             <field name="picking_date" required="1" readonly="state != 'draft'"/>
@@ -199,6 +202,9 @@
                         <field name="amount_total" widget="monetary" readonly="1"/>
                         <field name="amount_paid" widget="monetary" readonly="1"/>
                         <field name="pledge_amount" widget="monetary" readonly="1" invisible="pledge_amount == 0"/>
+
+                        <field name="discount_amount" widget="monetary" readonly="1"/>
+
                         <field name="amount_remaining" widget="monetary" readonly="1"/>
                         <field name="from_pos_config_id" readonly="state != 'draft'"/>
                         <field name="advance_pos_order_id" readonly="1" invisible="not advance_pos_order_id"/>

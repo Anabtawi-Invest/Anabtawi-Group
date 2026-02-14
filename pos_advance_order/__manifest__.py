@@ -23,9 +23,12 @@
         "views/pos_order.xml",
         "views/pos_pledge_views.xml",
         "views/product_pledge_views.xml",
+        "views/pos_advance_discount_views.xml",
+
         "report/pos_advance_order_report.xml",
         "report/pos_advance_order_receipt.xml",
         "report/pos_advance_order_full_receipt.xml",
+
     ],
     "installable": True,
     "application": False,
