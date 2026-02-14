@@ -1184,103 +1184,73 @@ patch(ReceiptScreen.prototype, {
     /**
      * Build full receipt HTML
      */
-    _buildFullReceiptHtml(receiptData) {
-        let html = `
-            <div class="pos-receipt">
-                <div class="pos-receipt-header text-center mb-3">
-                    <h2>RECEIPT</h2>
-                    <div class="mb-2">${receiptData.company.name || ''}</div>
-                    ${receiptData.company.street ? `<div>${receiptData.company.street}</div>` : ''}
-                    ${receiptData.company.phone ? `<div>Tel: ${receiptData.company.phone}</div>` : ''}
+_buildFullReceiptHtml(receiptData) {
+    let html = `
+        <div class="pos-receipt">
+            <div class="pos-receipt-header text-center mb-3">
+                <h2>PLEDGE RECEIPT</h2>
+                <div class="mb-2">${receiptData.company.name || ''}</div>
+                ${receiptData.company.street ? `<div>${receiptData.company.street}</div>` : ''}
+                ${receiptData.company.phone ? `<div>Tel: ${receiptData.company.phone}</div>` : ''}
+            </div>
+
+            <div class="cashier mb-2">
+                <div>Cashier: ${receiptData.cashier}</div>
+                <div>Order: ${receiptData.name}</div>
+                <div>Date: ${receiptData.date}</div>
+            </div>
+
+            ${receiptData.partner ? `
+                <div class="partner-info mb-2">
+                    <div><strong>Customer: ${receiptData.partner.name}</strong></div>
+                    ${receiptData.partner.phone ? `<div>Phone: ${receiptData.partner.phone}</div>` : ''}
                 </div>
-                
-                <div class="cashier mb-2">
-                    <div>Cashier: ${receiptData.cashier}</div>
-                    <div>Order: ${receiptData.name}</div>
-                    <div>Date: ${receiptData.date}</div>
-                </div>
-                
-                ${receiptData.partner ? `
-                    <div class="partner-info mb-2">
-                        <div><strong>Customer: ${receiptData.partner.name}</strong></div>
-                        ${receiptData.partner.phone ? `<div>Phone: ${receiptData.partner.phone}</div>` : ''}
-                    </div>
-                ` : ''}
-                
-                <hr/>
-                
-                <div class="orderlines">
-        `;
-        
-        receiptData.orderlines.forEach(line => {
-            html += `
-                    <div class="orderline mb-2">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <div>${line.product_name}</div>
-                                <div style="color: #666; font-size: 0.9em;">${line.quantity} x ${line.price}</div>
-                            </div>
-                            <div>${line.price_display}</div>
-                        </div>
-                    </div>
-            `;
-        });
-        
+            ` : ''}
+
+            <hr/>
+    `;
+
+    if (receiptData.hasPledge) {
         html += `
-                </div>
-                
-                <hr/>
-                
-                <div class="total mb-3">
-                    <div class="d-flex justify-content-between">
-                        <strong>TOTAL:</strong>
-                        <strong>${receiptData.total}</strong>
-                    </div>
-                </div>
+            <div style="margin-top: 20px; padding-top: 15px;">
+                <h4 style="text-align: center; font-weight: bold; text-decoration: underline;">
+                    معلومات الرهن / Pledge Information
+                </h4>
+                <table style="width: 100%; margin: 10px 0;">
         `;
-        
-        // Add pledge section if exists
-        if (receiptData.hasPledge) {
-            html += `
-                <div style="border-top: 2px dashed #000; margin-top: 20px; padding-top: 15px;">
-                    <h4 style="text-align: center; font-weight: bold; text-decoration: underline;">
-                        معلومات الرهن / Pledge Information
-                    </h4>
-                    <table style="width: 100%; margin: 10px 0;">
-            `;
-            
-            receiptData.pledgeLines.forEach(pline => {
-                html += `
-                        <tr>
-                            <td>${pline.name}</td>
-                            <td style="text-align: right;">${this.env.utils.formatCurrency(pline.amount, false)}</td>
-                        </tr>
-                `;
-            });
-            
-            html += `
-                        <tr style="border-top: 2px solid #000;">
-                            <td><strong>إجمالي الرهن / Total Pledge:</strong></td>
-                            <td style="text-align: right;"><strong>${receiptData.pledgeTotal}</strong></td>
-                        </tr>
-                    </table>
-                    <div style="text-align: center; font-size: 0.85em; color: #666; font-style: italic; border-top: 1px dashed #999; padding-top: 8px;">
-                        ⚠️ هذا المبلغ سيُرد عند إعادة المنتج<br/>
-                        This amount will be refunded upon product return
-                    </div>
-                </div>
-            `;
-        }
-        
+
+
         html += `
-                <div class="text-center mt-4">
-                    <div>Thank you for your business!</div>
+                    <tr style="border-top: 2px solid #000;">
+                        <td><strong>إجمالي الرهن:</strong></td>
+                        <td style="text-align: right;">
+                            <strong>${receiptData.pledgeTotal}</strong>
+                        </td>
+                    </tr>
+                </table>
+                <div style="text-align: center; font-size: 0.85em; color: #666; font-style: italic; border-top: 1px dashed #999; padding-top: 8px;">
+                    ⚠️ هذا المبلغ سيُرد عند إعادة المنتج<br/>
+                    This amount will be refunded upon product return
                 </div>
             </div>
         `;
-        
-        return html;
-    },
+    } else {
+        html += `
+            <div style="text-align:center; margin-top:20px;">
+                No pledge items found.
+            </div>
+        `;
+    }
+
+    html += `
+            <div class="text-center mt-4">
+                <div>Thank you!</div>
+            </div>
+        </div>
+    `;
+
+    return html;
+},
     
     /**
      * Print customer receipt (filtered - no pledge products, no virtual pledge lines)
