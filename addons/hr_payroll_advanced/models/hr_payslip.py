@@ -5,47 +5,69 @@ from odoo.exceptions import UserError
 class HrPayslip(models.Model):
     _inherit = "hr.payslip"
 
-    # ========= Reconciliation control =========
-    reconciliation_state = fields.Selection(
-        [
-            ("pending", "Pending"),
-            ("reconciled", "Reconciled"),
-        ],
-        default="pending",
-        tracking=True,
-    )
-    reconciled_at = fields.Datetime(readonly=True)
+    # =====================================================
+    # RECONCILIATION CONTROL
+    # =====================================================
 
-    # If True, we will deduct lateness from Annual Leave (hours), instead of Salary
+    reconciliation_state = fields.Selection([
+        ("pending", "Pending"),
+        ("reconciled", "Reconciled"),
+    ], default="pending")
+
+    reconciled_at = fields.Datetime()
+
     late_use_leave = fields.Boolean(string="Use Annual Leave for Lateness", default=False)
 
-    # Link created leave request (so we never create duplicates)
-    late_leave_id = fields.Many2one("hr.leave", string="Auto Lateness Leave", readonly=True)
+    late_leave_id = fields.Many2one("hr.leave", string="Auto Lateness Leave")
 
-    # ========= Dashboard columns (stored so list views are fast) =========
-    late_hours = fields.Float(string="Late Hours", compute="_compute_recon_metrics", store=True, readonly=True)
-    ot_total_amount = fields.Monetary(
+    # =====================================================
+    # DISPLAY FIELDS (FLOAT ONLY — FIXED)
+    # =====================================================
+
+    late_hours = fields.Float(
+        string="Late Hours",
+        compute="_compute_recon_metrics",
+        store=True,
+    )
+
+    ot_total_amount = fields.Float(   # 🔥 FIXED (was Monetary)
         string="OT Total (Amount)",
         compute="_compute_recon_metrics",
         store=True,
-        readonly=True,
-        currency_field="company_currency_id",
     )
 
-    ot_deduct_hours = fields.Float(string="Deduct from OT (Hours)", compute="_compute_recon_metrics", store=True, readonly=True)
-    leave_deduct_hours = fields.Float(string="Deduct from Leave (Hours)", compute="_compute_recon_metrics", store=True, readonly=True)
-    salary_deduct_hours = fields.Float(string="Salary Deduction (Hours)", compute="_compute_recon_metrics", store=True, readonly=True)
+    ot_deduct_hours = fields.Float(
+        string="Deduct from OT (Hours)",
+        compute="_compute_recon_metrics",
+        store=True,
+    )
 
-    leave_hours_available = fields.Float(string="Annual Leave Available (Hours)", compute="_compute_recon_metrics", store=True, readonly=True)
+    leave_deduct_hours = fields.Float(
+        string="Deduct from Leave (Hours)",
+        compute="_compute_recon_metrics",
+        store=True,
+    )
 
-    # ========= Helpers =========
+    salary_deduct_hours = fields.Float(
+        string="Salary Deduction (Hours)",
+        compute="_compute_recon_metrics",
+        store=True,
+    )
+
+    leave_hours_available = fields.Float(
+        string="Annual Leave Available (Hours)",
+        compute="_compute_recon_metrics",
+        store=True,
+    )
+
+    # =====================================================
+    # HELPERS
+    # =====================================================
+
     def _get_annual_leave_type(self):
-        # If your leave type name is different, change it here
         return self.env["hr.leave.type"].search([("name", "=", "Annual Leave")], limit=1)
 
     def _get_hour_rate(self):
-        # Keep aligned with your wage/hour convention
-        # (You can change 240 if your monthly hours are different)
         self.ensure_one()
         if not self.contract_id or not self.contract_id.wage:
             return 0.0
@@ -68,42 +90,39 @@ class HrPayslip(models.Model):
         return total
 
     def _get_leave_hours_available(self):
-        """
-        Standard Odoo way to read remaining leaves.
-        We convert remaining days to hours using 8h/day (your standard).
-        """
         self.ensure_one()
         lt = self._get_annual_leave_type()
         if not lt:
             return 0.0
 
-        # get_days returns per leave type data
         data = lt.get_days(self.employee_id.id).get(lt.id, {})
         remaining_days = data.get("remaining_leaves", 0.0) or 0.0
         return remaining_days * 8.0
 
-    # ========= Stored metrics =========
+    # =====================================================
+    # COMPUTE ENGINE
+    # =====================================================
+
     @api.depends("worked_days_line_ids", "line_ids", "contract_id.wage", "late_use_leave")
     def _compute_recon_metrics(self):
+
         for slip in self:
+
             late = slip._get_late_hours()
             ot_amount = slip._get_ot_total_amount()
             hr = slip._get_hour_rate()
-
             leave_avail_h = slip._get_leave_hours_available()
 
             slip.late_hours = late
             slip.ot_total_amount = ot_amount
             slip.leave_hours_available = leave_avail_h
 
-            # Convert OT amount to hours cover
             ot_cover_h = 0.0
             if hr > 0:
                 ot_cover_h = min(late, (ot_amount / hr))
 
             remaining_after_ot = max(0.0, late - ot_cover_h)
 
-            # If late_use_leave is True we try to consume leave up to availability
             leave_cover_h = min(remaining_after_ot, leave_avail_h) if slip.late_use_leave else 0.0
             remaining_after_leave = max(0.0, remaining_after_ot - leave_cover_h)
 
@@ -111,15 +130,14 @@ class HrPayslip(models.Model):
             slip.leave_deduct_hours = leave_cover_h
             slip.salary_deduct_hours = remaining_after_leave
 
-    # ========= Single payslip reconciliation (full engine) =========
+    # =====================================================
+    # RECONCILIATION ENGINE
+    # =====================================================
+
     def action_reconcile_lateness_engine(self):
-        """
-        This button does NOT "manually edit" payroll numbers.
-        It sets flags + recomputes the sheet so your salary rules reflect the decision.
-        Columns then update immediately.
-        """
+
         for slip in self:
-            # Recompute first so OT_TOTAL and worked days lines are up to date
+
             slip.compute_sheet()
 
             late = slip._get_late_hours()
@@ -133,13 +151,11 @@ class HrPayslip(models.Model):
             ot_amount = slip._get_ot_total_amount()
             leave_avail_h = slip._get_leave_hours_available()
 
-            # If OT can't cover all lateness, use leave if available
             ot_cover_h = (ot_amount / hr) if hr > 0 else 0.0
             remaining_after_ot = max(0.0, late - ot_cover_h)
 
             slip.late_use_leave = bool(remaining_after_ot > 0 and leave_avail_h >= 0.01)
 
-            # Recompute again so salary rules that depend on late_use_leave update immediately
             slip.compute_sheet()
 
             slip.reconciliation_state = "reconciled"
@@ -147,46 +163,41 @@ class HrPayslip(models.Model):
 
         return True
 
-    # ========= Auto-create leave on confirm (optional, but you asked for it) =========
+    # =====================================================
+    # AUTO LEAVE CREATION
+    # =====================================================
+
     def action_payslip_done(self):
         res = super().action_payslip_done()
 
         for slip in self:
-            # Only create leave if reconciliation decided to use leave
+
             if not slip.late_use_leave:
                 continue
 
-            # Prevent duplicates if the payslip is reconfirmed/upgraded
             if slip.late_leave_id:
                 continue
 
-            # Use computed hours (after reconcile)
             leave_hours = slip.leave_deduct_hours or 0.0
             if leave_hours <= 0:
                 continue
 
             lt = slip._get_annual_leave_type()
             if not lt:
-                raise UserError(_("Annual Leave type not found. Please create it or rename it to 'Annual Leave'."))
+                raise UserError(_("Annual Leave type not found."))
 
             leave_days = leave_hours / 8.0
 
-            leave = self.env["hr.leave"].create(
-                {
-                    "name": _("Auto Lateness Deduction (%s)") % (slip.name or ""),
-                    "employee_id": slip.employee_id.id,
-                    "holiday_status_id": lt.id,
-                    "request_date_from": slip.date_to,
-                    "request_date_to": slip.date_to,
-                    "number_of_days": leave_days,
-                }
-            )
+            leave = self.env["hr.leave"].create({
+                "name": _("Auto Lateness Deduction (%s)") % (slip.name or ""),
+                "employee_id": slip.employee_id.id,
+                "holiday_status_id": lt.id,
+                "request_date_from": slip.date_to,
+                "request_date_to": slip.date_to,
+                "number_of_days": leave_days,
+            })
 
-            # Validate automatically (enterprise automation)
-            # This uses standard approvals flow; if your policy requires approvals,
-            # we can switch to "confirm" only and let HR approve.
             leave.action_validate()
-
             slip.late_leave_id = leave.id
 
         return res
