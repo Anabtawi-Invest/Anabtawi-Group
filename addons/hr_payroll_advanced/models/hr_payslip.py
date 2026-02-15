@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from odoo import models, fields, api
 
 
@@ -5,141 +7,129 @@ class HrPayslip(models.Model):
     _inherit = "hr.payslip"
 
     # =====================================================
-    # SMART LEDGER FIELDS
+    # RECONCILIATION STATUS (BADGE)
     # =====================================================
 
     reconciliation_state = fields.Selection(
-        [("pending", "Pending"), ("reconciled", "Reconciled")],
+        [
+            ("pending", "Pending"),
+            ("reconciled", "Reconciled"),
+        ],
         default="pending",
-        string="Reconcile Status",
-    )
-
-    late_hours = fields.Float(string="Late Hours", store=True)
-    ot_total_amount = fields.Float(string="OT Total Amount", store=True)
-
-    ot_deduct_hours = fields.Float(string="OT Deduct Hours", store=True)
-    leave_deduct_hours = fields.Float(string="Leave Deduct Hours", store=True)
-    salary_deduct_hours = fields.Float(string="Salary Deduct Hours", store=True)
-
-    leave_hours_available = fields.Float(string="Annual Leave Available", store=True)
-
-    late_salary_deduction_amount = fields.Float(
-        string="Auto Salary Deduction Amount",
-        store=True,
+        tracking=True,
     )
 
     # =====================================================
-    # HELPERS
+    # DASHBOARD METRICS (SAFE COMPUTE)
     # =====================================================
 
-    def _get_hour_rate(self):
-        self.ensure_one()
-        contract = self.contract_id
-        if not contract or not contract.wage:
-            return 0.0
-        return contract.wage / 240.0
+    late_hours = fields.Float(string="Late Hours", compute="_compute_recon_metrics", store=True)
+    ot_total_amount = fields.Float(string="OT Total Amount", compute="_compute_recon_metrics", store=True)
+    leave_hours_available = fields.Float(string="Leave Hours", compute="_compute_recon_metrics", store=True)
 
-    def _get_late_hours(self):
-        total = 0.0
-        for w in self.worked_days_line_ids:
-            if w.code == "LAT":
-                total += w.number_of_hours or 0.0
-        return total
-
-    def _get_ot_total_amount(self):
-        total = 0.0
-        for l in self.line_ids:
-            if l.code == "OT_TOTAL":
-                total += l.total or 0.0
-        return total
+    ot_deduct_hours = fields.Float(string="OT Deducted")
+    leave_deduct_hours = fields.Float(string="Leave Deducted")
+    salary_deduct_hours = fields.Float(string="Salary Deducted")
 
     # =====================================================
-    # INPUT CREATOR
+    # SAFE COMPUTE ENGINE (NO CONTRACT DEPENDS)
     # =====================================================
 
-    def _upsert_input(self, code, amount):
-        self.ensure_one()
-
-        line = self.input_line_ids.filtered(lambda x: x.code == code)[:1]
-
-        if line:
-            line.write({"amount": amount})
-        else:
-            self.env["hr.payslip.input"].create({
-                "payslip_id": self.id,
-                "code": code,
-                "name": code,
-                "amount": amount,
-            })
-
-    # =====================================================
-    # SMART LEDGER ENGINE
-    # =====================================================
-
-    def _smart_ledger_update(self):
-
+    @api.depends("worked_days_line_ids")
+    def _compute_recon_metrics(self):
+        """
+        Enterprise SAFE:
+        - Reads Work Entries only
+        - No contract_id dependency (fixes registry crash)
+        """
         for slip in self:
 
-            employee = slip.employee_id
+            late = 0.0
+            ot = 0.0
 
-            late_hours = slip._get_late_hours()
-            ot_total_amount = slip._get_ot_total_amount()
-            hour_rate = slip._get_hour_rate()
+            for line in slip.worked_days_line_ids:
 
-            slip.late_hours = late_hours
-            slip.ot_total_amount = ot_total_amount
+                code = (line.code or "").upper()
 
-            if hour_rate <= 0:
-                continue
+                if code == "LAT":
+                    late += line.number_of_hours
 
-            # -----------------------------------
-            # ADD OT TO EMPLOYEE BANK
-            # -----------------------------------
+                if code in ("OTW", "OTR", "PHO"):
+                    ot += line.number_of_hours
 
-            ot_hours_generated = ot_total_amount / hour_rate if hour_rate else 0.0
+            slip.late_hours = late
+            slip.ot_total_amount = ot
 
-            employee.overtime_bank_hours += ot_hours_generated
-            employee.overtime_bank_amount += ot_total_amount
-
-            # -----------------------------------
-            # AUTO CONSUME LATENESS FROM OT BANK
-            # -----------------------------------
-
-            consume_ot = min(employee.overtime_bank_hours, late_hours)
-
-            employee.overtime_bank_hours -= consume_ot
-            employee.overtime_bank_amount -= (consume_ot * hour_rate)
-
-            remaining_late = late_hours - consume_ot
-
-            slip.ot_deduct_hours = consume_ot
-            slip.salary_deduct_hours = remaining_late
-
-            salary_ded_amount = remaining_late * hour_rate
-
-            slip.late_salary_deduction_amount = salary_ded_amount
-
-            # WRITE INPUT FOR LAT_REC RULE
-            slip._upsert_input("LAT_SAL_DED", -salary_ded_amount)
-
-            slip.reconciliation_state = "reconciled"
+            # LIVE OT BANK FROM EMPLOYEE
+            slip.leave_hours_available = getattr(
+                slip.employee_id, "x_ot_bank_balance", 0.0
+            )
 
     # =====================================================
-    # AUTO RUN ENGINE
-    # =====================================================
-
-    def compute_sheet(self):
-        res = super().compute_sheet()
-
-        # SMART LEDGER AUTO ENGINE
-        self._smart_ledger_update()
-
-        return res
-
-    # =====================================================
-    # BUTTON COMPATIBILITY (if called from older views)
+    # ENTERPRISE FINAL v3 RECONCILIATION ENGINE
     # =====================================================
 
     def action_reconcile_lateness_engine(self):
-        self._smart_ledger_update()
+        """
+        FULL AUTO v3 ENGINE
+        Invisible logic:
+        1) Deduct from OT Bank
+        2) Deduct from Annual Leave
+        3) Remaining becomes Salary deduction
+        """
+
+        for slip in self:
+
+            late = slip.late_hours or 0.0
+            if not late:
+                slip.reconciliation_state = "reconciled"
+                continue
+
+            employee = slip.employee_id
+
+            # -------------------------------------------------
+            # STEP 1 — OT BANK
+            # -------------------------------------------------
+
+            ot_bank = getattr(employee, "x_ot_bank_balance", 0.0)
+
+            ot_deduct = min(late, ot_bank)
+
+            late -= ot_deduct
+            slip.ot_deduct_hours = ot_deduct
+
+            if hasattr(employee, "x_ot_bank_balance"):
+                employee.x_ot_bank_balance -= ot_deduct
+
+            # -------------------------------------------------
+            # STEP 2 — ANNUAL LEAVE (SAFE)
+            # -------------------------------------------------
+
+            leave_balance = 0.0
+
+            if hasattr(employee, "remaining_leaves"):
+                leave_balance = employee.remaining_leaves
+
+            leave_deduct = min(late, leave_balance)
+
+            late -= leave_deduct
+            slip.leave_deduct_hours = leave_deduct
+
+            # NOTE:
+            # We DO NOT write to Time Off here.
+            # LAT_REC salary rule handles accounting side.
+
+            # -------------------------------------------------
+            # STEP 3 — SALARY DEDUCTION
+            # -------------------------------------------------
+
+            salary_deduct = late if late > 0 else 0.0
+            slip.salary_deduct_hours = salary_deduct
+
+            # -------------------------------------------------
+            # FINAL STATUS
+            # -------------------------------------------------
+
+            slip.reconciliation_state = "reconciled"
+
         return True
