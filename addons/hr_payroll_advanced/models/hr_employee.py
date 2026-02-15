@@ -1,5 +1,4 @@
 from odoo import models, fields, api
-from odoo import models, fields, api
 
 
 class HrEmployee(models.Model):
@@ -38,18 +37,3 @@ class HrEmployee(models.Model):
                 total += (l.credit - l.debit)
 
             emp.overtime_bank_balance = total
-
-
-class HrEmployee(models.Model):
-    _inherit = "hr.employee"
-
-    overtime_bank_hours = fields.Float(
-        string="OT Bank (Hours)",
-        readonly=True,
-        help="Live overtime bank balance used by Smart Ledger Mode",
-    )
-
-    overtime_bank_amount = fields.Float(
-        string="OT Bank Amount",
-        readonly=True,
-    )
