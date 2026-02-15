@@ -5,6 +5,7 @@
     "data": [
         "views/hr_payslip_views.xml",
         "views/hr_employee_views.xml",
+        "data/server_actions.xml",
     ],
     "installable": True,
     "application": False,
