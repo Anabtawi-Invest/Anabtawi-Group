@@ -1,7 +1,7 @@
 <odoo>
 
     <!-- ============================= -->
-    <!-- Payslip Form Button + Status -->
+    <!-- Payslip FORM BUTTON -->
     <!-- ============================= -->
     <record id="hr_payslip_form_reconcile_btn" model="ir.ui.view">
         <field name="name">hr.payslip.form.reconcile.btn</field>
@@ -16,8 +16,7 @@
                         string="Reconcile Lateness"
                         class="btn-primary"/>
 
-                <field name="reconciliation_state"
-                       widget="badge"/>
+                <field name="reconciliation_state" widget="badge"/>
 
             </xpath>
 
@@ -26,15 +25,16 @@
 
 
     <!-- ============================= -->
-    <!-- Payslip List Columns -->
+    <!-- Payslip TREE COLUMNS -->
     <!-- ============================= -->
-    <record id="hr_payslip_list_reconcile_cols" model="ir.ui.view">
-        <field name="name">hr.payslip.list.reconcile.cols</field>
+    <record id="hr_payslip_tree_reconcile_cols" model="ir.ui.view">
+        <field name="name">hr.payslip.tree.reconcile.cols</field>
         <field name="model">hr.payslip</field>
-        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_list"/>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
         <field name="arch" type="xml">
 
-            <xpath expr="//list" position="inside">
+            <!-- Odoo 19 uses TREE view -->
+            <xpath expr="//tree" position="inside">
 
                 <field name="reconciliation_state" widget="badge"/>
                 <field name="late_hours"/>
@@ -51,7 +51,7 @@
 
 
     <!-- ============================= -->
-    <!-- Payrun Bulk Button -->
+    <!-- PAYRUN BULK BUTTON -->
     <!-- ============================= -->
     <record id="hr_payslip_run_form_bulk_reconcile_btn" model="ir.ui.view">
         <field name="name">hr.payslip.run.form.bulk.reconcile.btn</field>
