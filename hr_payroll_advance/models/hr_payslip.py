@@ -17,7 +17,6 @@ class HrPayslip(models.Model):
     pce_leave_id = fields.Many2one("hr.leave", string="Created Leave", readonly=True, copy=False)
     pce_reconciliation_applied = fields.Boolean(string="Reconciliation Applied", default=False, readonly=True, copy=False)
 
-    # Payroll inputs created by this engine (used by included salary rule)
     def _pce_set_input(self, code, amount):
         self.ensure_one()
         Input = self.env["hr.payslip.input"]
