@@ -25,7 +25,7 @@
 
 
     <!-- ============================= -->
-    <!-- Payslip LIST COLUMNS (🔥 FINAL FIX) -->
+    <!-- Payslip LIST COLUMNS (FINAL) -->
     <!-- ============================= -->
     <record id="hr_payslip_tree_reconcile_cols" model="ir.ui.view">
         <field name="name">hr.payslip.tree.reconcile.cols</field>
@@ -33,15 +33,18 @@
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
         <field name="arch" type="xml">
 
-            <!-- Insert fields directly into root -->
-            <field name="reconciliation_state" position="after">
+            <!-- Anchor on a field that exists 100% مثل employee_id -->
+            <xpath expr="//field[@name='employee_id']" position="after">
+
+                <field name="reconciliation_state" widget="badge"/>
                 <field name="late_hours"/>
                 <field name="ot_total_amount"/>
                 <field name="leave_hours_available"/>
                 <field name="ot_deduct_hours"/>
                 <field name="leave_deduct_hours"/>
                 <field name="salary_deduct_hours"/>
-            </field>
+
+            </xpath>
 
         </field>
     </record>
