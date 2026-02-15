@@ -1,12 +1,30 @@
 from odoo import models
+from odoo.exceptions import UserError
 
 
 class HrPayslipRun(models.Model):
     _inherit = "hr.payslip.run"
 
-    def action_bulk_reconcile_lateness_engine(self):
+    def _ensure_all_slips_reconciled(self):
         for run in self:
-            # reconcile each slip (FULL AUTO v2)
-            for slip in run.slip_ids:
-                slip.action_reconcile_lateness_engine_v2()
-        return True
+            pending = run.slip_ids.filtered(lambda s: s.reconciliation_state != "reconciled")
+            if pending:
+                names = ", ".join(pending.mapped("employee_id.name"))
+                raise UserError(
+                    "Cannot validate/close this Pay Run because reconciliation is still Pending for: %s\n"
+                    "Please reconcile the payslips first." % (names,)
+                )
+
+    # Common button to close/confirm in payroll runs
+    def close_payslip_run(self):
+        self._ensure_all_slips_reconciled()
+        return super().close_payslip_run()
+
+    # Some flows use these names
+    def action_close(self):
+        self._ensure_all_slips_reconciled()
+        return super().action_close()
+
+    def action_validate(self):
+        self._ensure_all_slips_reconciled()
+        return super().action_validate()
