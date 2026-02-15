@@ -1,11 +1,11 @@
-from odoo import models, fields, api
+from odoo import models, fields
 
 
 class HrPayslip(models.Model):
     _inherit = "hr.payslip"
 
     # =====================================================
-    # RECONCILE STATUS BADGE
+    # RECONCILIATION STATUS BADGE
     # =====================================================
 
     reconciliation_state = fields.Selection(
@@ -19,7 +19,7 @@ class HrPayslip(models.Model):
     )
 
     # =====================================================
-    # LIVE ENGINE — AUTO RESET STATUS
+    # SAFE RESET ENGINE
     # =====================================================
 
     def _reset_reconcile_if_changed(self):
@@ -28,25 +28,25 @@ class HrPayslip(models.Model):
                 slip.reconciliation_state = "pending"
 
     # =====================================================
-    # TRIGGER WHEN WORK ENTRIES CHANGE
+    # SAFE HOOK — DO NOT OVERRIDE COMPUTE METHODS
     # =====================================================
 
-    @api.depends("worked_days_line_ids.number_of_hours")
-    def _compute_worked_days_line_ids(self):
-        super()._compute_worked_days_line_ids()
-        self._reset_reconcile_if_changed()
+    def write(self, vals):
+        res = super().write(vals)
+
+        trigger_fields = {
+            "worked_days_line_ids",
+            "input_line_ids",
+            "line_ids",
+        }
+
+        if trigger_fields.intersection(vals.keys()):
+            self._reset_reconcile_if_changed()
+
+        return res
 
     # =====================================================
-    # TRIGGER WHEN INPUTS CHANGE
-    # =====================================================
-
-    @api.depends("input_line_ids.amount")
-    def _compute_input_line_ids(self):
-        super()._compute_input_line_ids()
-        self._reset_reconcile_if_changed()
-
-    # =====================================================
-    # TRIGGER WHEN COMPUTE SHEET RUNS
+    # ALSO RESET WHEN PAYSLIP RECOMPUTES
     # =====================================================
 
     def compute_sheet(self):
@@ -55,7 +55,7 @@ class HrPayslip(models.Model):
         return res
 
     # =====================================================
-    # FULL RECONCILIATION ENGINE (FINAL v2)
+    # FINAL RECONCILIATION ENGINE
     # =====================================================
 
     def action_reconcile_lateness_engine_v2(self):
@@ -69,17 +69,17 @@ class HrPayslip(models.Model):
             leave_deduct = 0.0
             salary_deduct = 0.0
 
-            # 1️⃣ Deduct from OT Bank
+            # Deduct OT
             if lateness_hours > 0 and ot_available > 0:
                 ot_deduct = min(lateness_hours, ot_available)
                 lateness_hours -= ot_deduct
 
-            # 2️⃣ Deduct from Annual Leave
+            # Deduct Annual Leave
             if lateness_hours > 0 and leave_available > 0:
                 leave_deduct = min(lateness_hours, leave_available)
                 lateness_hours -= leave_deduct
 
-            # 3️⃣ Remaining goes to salary deduction
+            # Remaining = salary
             if lateness_hours > 0:
                 salary_deduct = lateness_hours
 
