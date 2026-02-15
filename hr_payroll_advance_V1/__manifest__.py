@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "HR Payroll Advance",
+    "name": "HR Payroll Advanced (OT/Late Reconciliation)",
     "version": "19.0.1.0.0",
     "category": "Human Resources/Payroll",
     "summary": "Enterprise-safe lateness reconciliation: OT bank -> Annual Leave -> Unpaid, with dashboards on Payslip & Payrun.",
