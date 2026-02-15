@@ -74,30 +74,30 @@ class HrPayslip(models.Model):
                 {"reconciliation_state": "pending"}
             )
 
-    def write(self, vals):
-        res = super().write(vals)
+  def write(self, vals):
+    # Prevent recursive reset loop
+    if self.env.context.get("skip_recon_reset"):
+        return super(HrPayslip, self).write(vals)
 
-        if self.env.context.get("skip_recon_reset"):
-            return res
+    res = super(HrPayslip, self).write(vals)
 
-        trigger_fields = {
-            "worked_days_line_ids",
-            "input_line_ids",
-            "line_ids",
-            "date_from",
-            "date_to",
-            "employee_id",
-        }
-        if trigger_fields.intersection(vals.keys()):
-            self._set_pending_if_reconciled()
+    trigger_fields = {
+        "worked_days_line_ids",
+        "input_line_ids",
+        "line_ids",
+        "date_from",
+        "date_to",
+        "employee_id",
+    }
 
-        return res
+    if trigger_fields.intersection(vals.keys()):
+        slips = self.filtered(lambda s: s.reconciliation_state == "reconciled")
+        if slips:
+            super(HrPayslip, slips.with_context(skip_recon_reset=True)).write({
+                "reconciliation_state": "pending"
+            })
 
-    def compute_sheet(self):
-        res = super().compute_sheet()
-        if not self.env.context.get("skip_recon_reset"):
-            self._set_pending_if_reconciled()
-        return res
+    return res
 
     # -----------------------------------------------------
     # Reconcile button (OT -> Leave -> Salary)
