@@ -71,7 +71,6 @@ class HrPayslip(models.Model):
         return contract.wage / 240.0
 
     def _get_late_hours(self):
-        self.ensure_one()
         total = 0.0
         for w in self.worked_days_line_ids:
             if w.code == "LAT":
@@ -79,7 +78,6 @@ class HrPayslip(models.Model):
         return total
 
     def _get_ot_total_amount(self):
-        self.ensure_one()
         total = 0.0
         for l in self.line_ids:
             if l.code == "OT_TOTAL":
@@ -87,7 +85,6 @@ class HrPayslip(models.Model):
         return total
 
     def _get_leave_hours_available(self):
-        self.ensure_one()
         lt = self._get_annual_leave_type()
         if not lt:
             return 0.0
@@ -96,7 +93,7 @@ class HrPayslip(models.Model):
         return remaining_days * 8.0
 
     # =====================================================
-    # COMPUTE ENGINE
+    # COMPUTE ENGINE  (🔥 FIXED DEPENDS)
     # =====================================================
 
     @api.depends(
@@ -104,8 +101,7 @@ class HrPayslip(models.Model):
         "worked_days_line_ids.code",
         "line_ids.total",
         "line_ids.code",
-        "late_use_leave",
-        "contract_id.wage"
+        "late_use_leave"
     )
     def _compute_recon_metrics(self):
 
@@ -185,7 +181,7 @@ class HrPayslip(models.Model):
             if leave_hours <= 0:
                 continue
 
-            lt = slip._get_annual_leave_type()
+            lt = self._get_annual_leave_type()
             if not lt:
                 raise UserError(_("Annual Leave type not found."))
 
