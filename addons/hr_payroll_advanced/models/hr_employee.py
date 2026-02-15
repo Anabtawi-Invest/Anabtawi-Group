@@ -4,11 +4,10 @@ from odoo import models, fields
 class HrEmployee(models.Model):
     _inherit = "hr.employee"
 
-    overtime_bank_balance = fields.Monetary(
-        string="OT Bank Balance (OT_TOTAL)",
-        compute="_compute_overtime_bank_balance",
-        currency_field="company_currency_id",
-    )
+   overtime_bank_balance = fields.Float(
+    string="OT Bank Balance (OT_TOTAL)",
+    compute="_compute_overtime_bank_balance",
+)
 
     def _compute_overtime_bank_balance(self):
         for emp in self:
