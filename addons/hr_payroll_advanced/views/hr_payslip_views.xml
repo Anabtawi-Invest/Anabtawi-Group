@@ -28,13 +28,13 @@
     <!-- ============================= -->
     <!-- Payslip List Columns -->
     <!-- ============================= -->
-    <record id="hr_payslip_tree_reconcile_cols" model="ir.ui.view">
-        <field name="name">hr.payslip.tree.reconcile.cols</field>
+    <record id="hr_payslip_list_reconcile_cols" model="ir.ui.view">
+        <field name="name">hr.payslip.list.reconcile.cols</field>
         <field name="model">hr.payslip</field>
-        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_list"/>
         <field name="arch" type="xml">
 
-            <xpath expr="//tree" position="inside">
+            <xpath expr="//list" position="inside">
 
                 <field name="reconciliation_state" widget="badge"/>
                 <field name="late_hours"/>
