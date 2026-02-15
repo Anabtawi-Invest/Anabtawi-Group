@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="view_hr_employee_ot_bank_tree" model="ir.ui.view">
+    <field name="name">hr.employee.ot.bank.tree</field>
+    <field name="model">hr.employee.ot.bank</field>
+    <field name="arch" type="xml">
+      <tree string="OT Bank Ledger">
+        <field name="date"/>
+        <field name="employee_id"/>
+        <field name="reference"/>
+        <field name="delta_hours"/>
+        <field name="balance_after"/>
+        <field name="slip_id"/>
+      </tree>
+    </field>
+  </record>
+
+  <record id="action_hr_employee_ot_bank" model="ir.actions.act_window">
+    <field name="name">OT Bank Ledger</field>
+    <field name="res_model">hr.employee.ot.bank</field>
+    <field name="view_mode">tree</field>
+    <field name="domain">[]</field>
+    <field name="context">{}</field>
+  </record>
+
+  <menuitem id="menu_pce_root" name="Payroll Control" parent="hr_payroll.menu_hr_payroll_root" sequence="90" groups="hr_payroll_control_engine.group_pce_hr_manager"/>
+  <menuitem id="menu_pce_ot_bank" name="OT Bank Ledger" parent="hr_payroll_control_engine.menu_pce_root"
+            action="hr_payroll_control_engine.action_hr_employee_ot_bank" sequence="10"
+            groups="hr_payroll_control_engine.group_pce_hr_manager"/>
+</odoo>

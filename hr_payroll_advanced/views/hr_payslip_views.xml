@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="view_hr_payslip_form_pce" model="ir.ui.view">
+    <field name="name">hr.payslip.form.pce</field>
+    <field name="model">hr.payslip</field>
+    <field name="inherit_id" ref="hr_payroll.hr_payslip_view_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//sheet/notebook" position="inside">
+        <page string="Payroll Control">
+          <group>
+            <group string="Dashboard">
+              <field name="pce_lateness_hours" readonly="1"/>
+              <field name="pce_ot_hours" readonly="1"/>
+              <field name="pce_remaining_lateness_hours" readonly="1"/>
+            </group>
+            <group string="Reconciliation Result">
+              <field name="pce_deduct_ot_hours" readonly="1"/>
+              <field name="pce_deduct_leave_hours" readonly="1"/>
+              <field name="pce_unpaid_hours" readonly="1"/>
+              <field name="pce_leave_id" readonly="1"/>
+              <field name="pce_reconciliation_applied" readonly="1"/>
+            </group>
+          </group>
+          <group string="Notes" colspan="2">
+            <label string="Order: OT Bank → Annual Leave → Unpaid. Applied automatically when the payslip is marked Done."/>
+          </group>
+        </page>
+      </xpath>
+    </field>
+  </record>
+</odoo>

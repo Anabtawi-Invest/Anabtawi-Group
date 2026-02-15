@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- This rule is optional but provides end-to-end deduction for remaining unpaid hours.
+       It uses payslip input PCE_UNPAID_H (hours) and converts it to money using contract wage / month hours.
+  -->
+  <record id="pce_rule_category_deductions" model="hr.salary.rule.category">
+    <field name="name">Payroll Control Deductions</field>
+    <field name="code">PCE_DED</field>
+    <field name="parent_id" ref="hr_payroll.DED"/>
+  </record>
+
+  <record id="pce_rule_unpaid_hours" model="hr.salary.rule">
+    <field name="name">Lateness Unpaid Hours (PCE)</field>
+    <field name="code">PCE_UNPAID</field>
+    <field name="category_id" ref="hr_payroll_control_engine.pce_rule_category_deductions"/>
+    <field name="sequence">350</field>
+    <field name="active">True</field>
+    <field name="appears_on_payslip">True</field>
+    <field name="condition_select">python</field>
+    <field name="condition_python">result = inputs.PCE_UNPAID_H and inputs.PCE_UNPAID_H.amount and inputs.PCE_UNPAID_H.amount &gt; 0</field>
+    <field name="amount_select">python</field>
+    <field name="amount_python">
+hours = inputs.PCE_UNPAID_H.amount or 0.0
+# Prefer regular worked hours line for month-hours; fallback to configured default
+month_hours = 0.0
+try:
+    lateness_code = payslip.env['ir.config_parameter'].sudo().get_param('pce.lateness_code', 'LAT')
+    ot_codes = payslip.env['ir.config_parameter'].sudo().get_param('pce.ot_codes', 'OTW,OTR,PHO')
+    ot_codes = [c.strip() for c in (ot_codes or '').split(',') if c.strip()]
+    ignore = set(ot_codes + [lateness_code])
+    for l in payslip.worked_days_line_ids:
+        if (l.code or '') and (l.code not in ignore):
+            month_hours = max(month_hours, l.number_of_hours or 0.0)
+except Exception:
+    month_hours = 0.0
+
+if not month_hours:
+    month_hours = float(payslip.env['ir.config_parameter'].sudo().get_param('pce.default_month_hours', '173.33') or 173.33)
+
+hourly = (contract.wage or 0.0) / month_hours if month_hours else 0.0
+# Salary rule amount must be positive; we use amount_negative to apply deduction
+result = hours * hourly
+    </field>
+    <field name="amount_percentage">100</field>
+    <field name="amount_percentage_base">result</field>
+    <field name="quantity">1</field>
+    <field name="amount_round">0.01</field>
+    <field name="amount_negate">True</field>
+  </record>
+</odoo>
