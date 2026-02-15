@@ -1,7 +1,7 @@
 <odoo>
 
     <!-- ============================= -->
-    <!-- Payslip FORM BUTTON -->
+    <!-- Payslip FORM BUTTON + BADGE -->
     <!-- ============================= -->
     <record id="hr_payslip_form_reconcile_btn" model="ir.ui.view">
         <field name="name">hr.payslip.form.reconcile.btn</field>
@@ -9,6 +9,7 @@
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
         <field name="arch" type="xml">
 
+            <!-- SAFE HEADER INSERT -->
             <xpath expr="//header" position="inside">
 
                 <button name="action_reconcile_lateness_engine"
@@ -25,7 +26,7 @@
 
 
     <!-- ============================= -->
-    <!-- Payslip LIST COLUMNS -->
+    <!-- Payslip LIST SAFE COLUMNS -->
     <!-- ============================= -->
     <record id="hr_payslip_tree_reconcile_cols" model="ir.ui.view">
         <field name="name">hr.payslip.tree.reconcile.cols</field>
@@ -33,15 +34,10 @@
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
         <field name="arch" type="xml">
 
+            <!-- SAFE ANCHOR -->
             <xpath expr="//field[@name='employee_id']" position="after">
 
                 <field name="reconciliation_state" widget="badge"/>
-                <field name="late_hours"/>
-                <field name="ot_total_amount"/>
-                <field name="leave_hours_available"/>
-                <field name="ot_deduct_hours"/>
-                <field name="leave_deduct_hours"/>
-                <field name="salary_deduct_hours"/>
 
             </xpath>
 
