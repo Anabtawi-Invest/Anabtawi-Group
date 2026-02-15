@@ -4,7 +4,6 @@
     "depends": ["hr_payroll", "hr_holidays"],
     "data": [
         "data/server_actions.xml",
-        "views/hr_payslip_views.xml",
         "views/hr_employee_views.xml",
     ],
     "installable": True,
