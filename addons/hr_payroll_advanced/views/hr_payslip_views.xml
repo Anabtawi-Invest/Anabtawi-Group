@@ -1,6 +1,8 @@
 <odoo>
 
-    <!-- Payslip form: add reconcile button + status badge -->
+    <!-- ============================= -->
+    <!-- Payslip Form Button + Status -->
+    <!-- ============================= -->
     <record id="hr_payslip_form_reconcile_btn" model="ir.ui.view">
         <field name="name">hr.payslip.form.reconcile.btn</field>
         <field name="model">hr.payslip</field>
@@ -8,54 +10,64 @@
         <field name="arch" type="xml">
 
             <xpath expr="//header" position="inside">
+
                 <button name="action_reconcile_lateness_engine"
                         type="object"
                         string="Reconcile Lateness"
-                        class="btn-primary"
-                        attrs="{'invisible': [('state', 'in', ['done','cancel'])]}"/>
+                        class="btn-primary"/>
+
                 <field name="reconciliation_state"
-                       widget="badge"
-                       class="oe_inline"
-                       decoration-warning="reconciliation_state == 'pending'"
-                       decoration-success="reconciliation_state == 'reconciled'"/>
+                       widget="badge"/>
+
             </xpath>
 
         </field>
     </record>
 
-    <!-- Payslip tree/list: add columns -->
+
+    <!-- ============================= -->
+    <!-- Payslip List Columns -->
+    <!-- ============================= -->
     <record id="hr_payslip_tree_reconcile_cols" model="ir.ui.view">
         <field name="name">hr.payslip.tree.reconcile.cols</field>
         <field name="model">hr.payslip</field>
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
         <field name="arch" type="xml">
+
             <xpath expr="//tree" position="inside">
-                <field name="reconciliation_state" widget="badge"
-                       decoration-warning="reconciliation_state == 'pending'"
-                       decoration-success="reconciliation_state == 'reconciled'"/>
+
+                <field name="reconciliation_state" widget="badge"/>
                 <field name="late_hours"/>
                 <field name="ot_total_amount"/>
                 <field name="leave_hours_available"/>
                 <field name="ot_deduct_hours"/>
                 <field name="leave_deduct_hours"/>
                 <field name="salary_deduct_hours"/>
+
             </xpath>
+
         </field>
     </record>
 
-    <!-- Payrun form: add BULK reconcile button -->
+
+    <!-- ============================= -->
+    <!-- Payrun Bulk Button -->
+    <!-- ============================= -->
     <record id="hr_payslip_run_form_bulk_reconcile_btn" model="ir.ui.view">
         <field name="name">hr.payslip.run.form.bulk.reconcile.btn</field>
         <field name="model">hr.payslip.run</field>
         <field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_form"/>
         <field name="arch" type="xml">
+
             <xpath expr="//header" position="inside">
+
                 <button name="action_bulk_reconcile_lateness_engine"
                         type="object"
                         string="Bulk Reconcile Lateness"
-                        class="btn-primary"
-                        attrs="{'invisible': [('state', 'in', ['done','close','cancel'])]}"/>
+                        class="btn-primary"/>
+
             </xpath>
+
         </field>
     </record>
 
