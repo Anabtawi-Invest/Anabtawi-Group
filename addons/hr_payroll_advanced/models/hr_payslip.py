@@ -11,6 +11,7 @@ class HrPayslip(models.Model):
     reconciliation_state = fields.Selection(
         [("pending", "Pending"), ("reconciled", "Reconciled")],
         default="pending",
+        string="Reconcile Status",
     )
 
     late_hours = fields.Float(string="Late Hours", store=True)
