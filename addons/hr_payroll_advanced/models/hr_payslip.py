@@ -5,10 +5,6 @@ from odoo.exceptions import UserError
 class HrPayslip(models.Model):
     _inherit = "hr.payslip"
 
-    # =====================================================
-    # RECONCILIATION CONTROL
-    # =====================================================
-
     reconciliation_state = fields.Selection([
         ("pending", "Pending"),
         ("reconciled", "Reconciled"),
@@ -21,7 +17,7 @@ class HrPayslip(models.Model):
     late_leave_id = fields.Many2one("hr.leave", string="Auto Lateness Leave")
 
     # =====================================================
-    # DISPLAY FIELDS (FLOAT ONLY — FIXED)
+    # DISPLAY FIELDS
     # =====================================================
 
     late_hours = fields.Float(
@@ -30,7 +26,7 @@ class HrPayslip(models.Model):
         store=True,
     )
 
-    ot_total_amount = fields.Float(   # 🔥 FIXED (was Monetary)
+    ot_total_amount = fields.Float(
         string="OT Total (Amount)",
         compute="_compute_recon_metrics",
         store=True,
@@ -69,16 +65,17 @@ class HrPayslip(models.Model):
 
     def _get_hour_rate(self):
         self.ensure_one()
-        if not self.contract_id or not self.contract_id.wage:
+        contract = self.contract_id
+        if not contract or not contract.wage:
             return 0.0
-        return self.contract_id.wage / 240.0
+        return contract.wage / 240.0
 
     def _get_late_hours(self):
         self.ensure_one()
         total = 0.0
         for w in self.worked_days_line_ids:
             if w.code == "LAT":
-                total += (w.number_of_hours or 0.0)
+                total += w.number_of_hours or 0.0
         return total
 
     def _get_ot_total_amount(self):
@@ -86,7 +83,7 @@ class HrPayslip(models.Model):
         total = 0.0
         for l in self.line_ids:
             if l.code == "OT_TOTAL":
-                total += (l.total or 0.0)
+                total += l.total or 0.0
         return total
 
     def _get_leave_hours_available(self):
@@ -94,7 +91,6 @@ class HrPayslip(models.Model):
         lt = self._get_annual_leave_type()
         if not lt:
             return 0.0
-
         data = lt.get_days(self.employee_id.id).get(lt.id, {})
         remaining_days = data.get("remaining_leaves", 0.0) or 0.0
         return remaining_days * 8.0
@@ -103,7 +99,14 @@ class HrPayslip(models.Model):
     # COMPUTE ENGINE
     # =====================================================
 
-    @api.depends("worked_days_line_ids", "line_ids", "contract_id.wage", "late_use_leave")
+    @api.depends(
+        "worked_days_line_ids.number_of_hours",
+        "worked_days_line_ids.code",
+        "line_ids.total",
+        "line_ids.code",
+        "late_use_leave",
+        "contract_id.wage"
+    )
     def _compute_recon_metrics(self):
 
         for slip in self:
