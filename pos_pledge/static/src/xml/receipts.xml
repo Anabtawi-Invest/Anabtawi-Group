@@ -162,6 +162,17 @@
        t-inherit="point_of_sale.OrderReceipt" 
        t-inherit-mode="extension"
        owl="1">
+
+        <!-- Show active pricelist on the original Odoo receipt -->
+        <xpath expr="//ReceiptHeader" position="after">
+            <t t-set="orderPricelist"
+               t-value="(props.order and props.order.get_pricelist and props.order.get_pricelist()) or (props.order and props.order.pricelist) or (props.order and props.order.pricelist_id)"/>
+            <t t-set="orderPricelistName"
+               t-value="(orderPricelist and orderPricelist.name) or (Array.isArray(orderPricelist) and orderPricelist[1]) or ''"/>
+            <div t-if="orderPricelistName" class="pos-receipt-order-data text-start pt-1">
+                Pricelist: <t t-esc="orderPricelistName"/>
+            </div>
+        </xpath>
         
         <!-- Add Pledge Amount section at the end (match any root element) -->
         <xpath expr="/*" position="inside">
