@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <record id="payslip_input_type_remaining_lateness" model="hr.payslip.input.type">
-        <field name="name">Remaining Lateness (hrs)</field>
-        <field name="code">REMLATE</field>
-    </record>
-</odoo>
