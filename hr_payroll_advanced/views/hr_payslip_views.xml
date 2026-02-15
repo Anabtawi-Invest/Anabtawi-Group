@@ -1,7 +1,8 @@
 <odoo>
-    <!-- Payslip FORM: status badge + reconcile button -->
-    <record id="hr_payslip_form_reconcile_badge" model="ir.ui.view">
-        <field name="name">hr.payslip.form.reconcile.badge</field>
+
+    <!-- Payslip FORM: badge + reconcile button -->
+    <record id="hr_payslip_form_reconcile_badge_btn" model="ir.ui.view">
+        <field name="name">hr.payslip.form.reconcile.badge.btn</field>
         <field name="model">hr.payslip</field>
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
         <field name="arch" type="xml">
@@ -15,9 +16,9 @@
         </field>
     </record>
 
-    <!-- Payslip TREE/LIST: add badge and key columns (safe anchor: employee_id) -->
-    <record id="hr_payslip_tree_reconcile_badge" model="ir.ui.view">
-        <field name="name">hr.payslip.tree.reconcile.badge</field>
+    <!-- Payslip TREE/LIST: add badge + columns (safe anchor: employee_id) -->
+    <record id="hr_payslip_tree_reconcile_cols" model="ir.ui.view">
+        <field name="name">hr.payslip.tree.reconcile.cols</field>
         <field name="model">hr.payslip</field>
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
         <field name="arch" type="xml">
@@ -32,4 +33,5 @@
             </xpath>
         </field>
     </record>
+
 </odoo>
