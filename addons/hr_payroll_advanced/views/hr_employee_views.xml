@@ -1,0 +1,12 @@
+<odoo>
+    <record id="hr_employee_form_ot_bank_balance" model="ir.ui.view">
+        <field name="name">hr.employee.form.ot.bank.balance</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet//group" position="inside">
+                <field name="overtime_bank_balance" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
