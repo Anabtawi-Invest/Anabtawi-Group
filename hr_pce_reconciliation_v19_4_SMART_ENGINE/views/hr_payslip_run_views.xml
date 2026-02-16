@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_hr_payslip_run_form_pce_recon" model="ir.ui.view">
+        <field name="name">hr.payslip.run.form.pce.reconciliation</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//header" position="inside">
+                <button name="action_pce_mass_reconcile"
+                        type="object"
+                        string="Reconcile All"
+                        class="btn-primary"
+                        groups="hr_payroll.group_hr_payroll_user"/>
+            </xpath>
+
+            <xpath expr="//sheet" position="inside">
+                <div class="oe_button_box" name="button_box">
+                    <button type="object" name="action_open_pce_to_reconcile" class="oe_stat_button" icon="fa-tasks"
+                            groups="hr_payroll.group_hr_payroll_user">
+                        <field name="pce_to_reconcile_count" widget="statinfo" string="To Reconcile"/>
+                    </button>
+                    <button type="object" name="action_open_pce_need_deduction" class="oe_stat_button" icon="fa-exclamation-triangle"
+                            groups="hr_payroll.group_hr_payroll_user">
+                        <field name="pce_has_deduction_count" widget="statinfo" string="Needs Salary Deduction"/>
+                    </button>
+                </div>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>
