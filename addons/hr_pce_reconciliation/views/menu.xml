@@ -1,0 +1,12 @@
+<odoo>
+    <menuitem id="menu_pce_root"
+              name="Payroll Reconciliation"
+              parent="hr_payroll.menu_hr_payroll_root"
+              sequence="99"/>
+
+    <menuitem id="menu_pce_review"
+              name="Smart Review"
+              parent="menu_pce_root"
+              action="action_pce_smart_review"/>
+</odoo>
+
