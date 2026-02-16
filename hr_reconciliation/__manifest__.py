@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "HR Payroll Reconciliation",
-    "version": "19.1.0.0.0",
+    "version": "19.0.1.0",
     "category": "Human Resources/Payroll",
     "summary": "Enterprise-safe reconciliation dashboard: Lateness hours, OT hours, Annual Leave hours, Remaining after reconciliation with Payrun/Payslip buttons.",
     "author": "Anabtawi Group (Generated)",
