@@ -8,7 +8,7 @@
     <record id="view_hr_payslip_run_form_pce" model="ir.ui.view">
         <field name="name">hr.payslip.run.form.pce</field>
         <field name="model">hr.payslip.run</field>
-        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_run_form"/>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_form"/>
         <field name="arch" type="xml">
 
             <!-- Reconcile Button -->
