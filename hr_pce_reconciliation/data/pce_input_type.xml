@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- OPTIONAL: If you already have LAT_SAL_DED input type, you can delete this file
+         and remove it from __manifest__.py -->
+    <record id="pce_input_type_lat_sal_ded" model="hr.payslip.input.type">
+        <field name="name">Lateness Deduction Hours</field>
+        <field name="code">LAT_SAL_DED</field>
+        <field name="description">Hours to deduct from salary after OT Bank then Annual Leave.</field>
+    </record>
+</odoo>
