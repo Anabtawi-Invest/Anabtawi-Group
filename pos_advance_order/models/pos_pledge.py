@@ -182,16 +182,45 @@ class PosAdvanceOrderPledge(models.Model):
         if not qty_by_product:
             raise ValidationError(_("No pledge products found to create pledge lines."))
 
-        created = self.sudo().create([
-            {
-                "order_id": advance_order_id,
-                "pos_order_id": pos_order.id,
-                "partner_id": partner_id,
-                "product_id": product_id,
-                "pledge_qty": qty,
-                "pledge_amount_unit": self.env["product.product"].browse(product_id).pledge_amount or 0.0,
-            }
-            for product_id, qty in qty_by_product.items()
-        ])
+        # Idempotent upsert to avoid duplicates when multiple flows call create_from_pos.
+        # For advance orders, dedupe by (order_id, product_id). Otherwise by (pos_order_id, product_id).
+        created = self.browse()
+        for product_id, qty in qty_by_product.items():
+            product = self.env["product.product"].browse(product_id)
+            unit_amount = product.pledge_amount or 0.0
+
+            if advance_order_id:
+                existing = self.sudo().search(
+                    [("order_id", "=", advance_order_id), ("product_id", "=", product_id)],
+                    limit=1,
+                )
+            else:
+                existing = self.sudo().search(
+                    [("pos_order_id", "=", pos_order.id), ("product_id", "=", product_id)],
+                    limit=1,
+                )
+
+            if existing:
+                existing.write(
+                    {
+                        "pos_order_id": pos_order.id,
+                        "partner_id": partner_id,
+                        "pledge_qty": qty,
+                        "pledge_amount_unit": unit_amount,
+                    }
+                )
+                created |= existing
+                continue
+
+            created |= self.sudo().create(
+                {
+                    "order_id": advance_order_id,
+                    "pos_order_id": pos_order.id,
+                    "partner_id": partner_id,
+                    "product_id": product_id,
+                    "pledge_qty": qty,
+                    "pledge_amount_unit": unit_amount,
+                }
+            )
         return created[:1].id
 

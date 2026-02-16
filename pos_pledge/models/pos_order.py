@@ -256,6 +256,14 @@ class PosOrder(models.Model):
         PosPayment = self.env['pos.payment'].sudo()
 
         for order in self:
+            # Advance-order flow already creates/syncs pledge lines and pledge POS order.
+            # Skip here to avoid duplicate pos.advance.order.pledge records.
+            if getattr(order, "advance_order_id", False):
+                _logger.info(
+                    "[PLEDGE] Skipping pledge collection for %s (managed by pos_advance_order flow).",
+                    order.name,
+                )
+                continue
             if order.is_pledge_generated:
                 continue
             if order.pledge_collection_pos_order_id:
