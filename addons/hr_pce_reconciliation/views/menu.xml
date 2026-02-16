@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- ROOT MENU UNDER PAYROLL (Odoo 19 SAFE) -->
+    <!-- ROOT MENU (NO PARENT = SAFE FOR ALL ODOO 19 BUILDS) -->
     <menuitem
         id="menu_pce_root"
         name="Payroll Reconciliation"
-        parent="hr_payroll.menu_hr_payroll_configuration"
         sequence="99"
         groups="hr_payroll.group_hr_payroll_user"
     />
