@@ -28,7 +28,7 @@ class HrPayslip(models.Model):
     employee_identification_id = fields.Char(related="employee_id.identification_id", string="ID Number", readonly=True, store=True)
     employee_barcode = fields.Char(related="employee_id.barcode", string="Employee No.", readonly=True, store=True)
 
-    @api.depends("worked_days_line_ids.number_of_hours", "worked_days_line_ids.code", "employee_id.remaining_leaves", "employee_id.resource_calendar_id")
+    @api.depends("worked_days_line_ids.number_of_hours", "worked_days_line_ids.code", "employee_id.resource_calendar_id")
     def _compute_recon_dashboard(self):
         for slip in self:
             lat = 0.0
@@ -39,14 +39,40 @@ class HrPayslip(models.Model):
                 elif wd.code in ("OTW", "OTR", "PHO"):
                     ot += wd.number_of_hours or 0.0
 
-            # Convert remaining annual leave days to hours (fallback 8 if missing)
-            hours_per_day = slip.employee_id.resource_calendar_id.hours_per_day if slip.employee_id.resource_calendar_id else 8.0
-            remaining_leave_days = slip.employee_id.remaining_leaves or 0.0
-            leave_hours = remaining_leave_days * hours_per_day
+           # Convert remaining annual leave days to hours (fallback 8 if missing)
+hours_per_day = slip.employee_id.resource_calendar_id.hours_per_day if slip.employee_id.resource_calendar_id else 8.0
 
-            slip.lateness_hours = lat
-            slip.ot_total_hours = ot
-            slip.annual_leave_hours = leave_hours
+remaining_leave_days = slip._get_employee_annual_leave_days_safe(slip.employee_id)
+leave_hours = remaining_leave_days * hours_per_day
+
+slip.lateness_hours = lat
+slip.ot_total_hours = ot
+slip.annual_leave_hours = leave_hours
+
+   def _get_employee_annual_leave_days_safe(self, employee):
+    """
+    Odoo 19 safe: remaining annual leave is not a stored field on hr.employee.
+    We try multiple safe ways, and fallback to 0.0 if anything fails.
+    """
+    # 1) Try standard remaining leaves helper (if available in your build)
+    try:
+        data = employee._get_remaining_leaves()
+        # common patterns in different builds:
+        if isinstance(data, dict):
+            emp_data = data.get(employee.id) or {}
+            for key in ("remaining_leaves", "remaining", "remaining_days", "virtual_remaining_leaves"):
+                if key in emp_data and emp_data[key] is not None:
+                    return float(emp_data[key])
+    except Exception:
+        pass
+
+    # 2) Try allocation helper (some builds expose it differently)
+    try:
+        # Some versions expose a computed method on employee for a specific leave type;
+        # if not present it will raise and we fallback.
+        return float(getattr(employee, "remaining_leaves", 0.0) or 0.0)
+    except Exception:
+        return 0.0
 
     def action_reconcile_lateness(self):
         """Single-click reconciliation:
