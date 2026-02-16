@@ -8,7 +8,7 @@
             <xpath expr="//header" position="inside">
                 <button name="action_pce_reconcile" type="object" string="Reconcile" class="btn-primary"
                         groups="hr_pce_reconciliation.group_pce_manager"
-                        attrs="{'invisible': [('pce_reconciled','=',True)]}"/>
+                        modifiers="{'invisible': [('pce_reconciled','=',True)]}"/>
             </xpath>
 
             <xpath expr="//sheet/notebook" position="inside">
