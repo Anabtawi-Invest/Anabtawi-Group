@@ -1,0 +1,23 @@
+<odoo>
+
+    <record id="view_pce_smart_review_tree" model="ir.ui.view">
+        <field name="name">pce.smart.review.tree</field>
+        <field name="model">pce.smart.review</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="employee_id"/>
+                <field name="lateness_hours"/>
+                <field name="ot_total_hours"/>
+                <field name="annual_leave_hours"/>
+                <field name="remaining_hours"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_pce_smart_review" model="ir.actions.act_window">
+        <field name="name">Smart Review</field>
+        <field name="res_model">pce.smart.review</field>
+        <field name="view_mode">tree</field>
+    </record>
+
+</odoo>
