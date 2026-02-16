@@ -13,8 +13,7 @@
                         type="object"
                         string="Reconciliation"
                         class="btn-primary"
-                        groups="hr_pce_reconciliation.group_pce_manager"
-                        attrs="{'invisible': [('state','not in', ['draft','verify'])]}"/>
+                        groups="hr_payroll.group_hr_payroll_manager"
             </xpath>
 
             <xpath expr="//sheet" position="inside">
