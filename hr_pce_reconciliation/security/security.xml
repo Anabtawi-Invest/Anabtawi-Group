@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_pce_manager" model="res.groups">
+        <field name="name">PCE Payroll Manager</field>
+        <field name="implied_ids" eval="[(4, ref('hr_payroll.group_hr_payroll_manager'))]"/>
+    </record>
+</odoo>

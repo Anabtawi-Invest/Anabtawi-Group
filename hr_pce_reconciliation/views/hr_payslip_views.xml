@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Payslip Form: button + dashboard -->
+    <record id="view_hr_payslip_form_pce" model="ir.ui.view">
+        <field name="name">hr.payslip.form.pce</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//header" position="inside">
+                <button name="action_pce_reconcile"
+                        type="object"
+                        string="Reconciliation"
+                        class="btn-primary"
+                        groups="hr_pce_reconciliation.group_pce_manager"
+                        attrs="{'invisible': [('state','not in', ['draft','verify'])]}"/>
+            </xpath>
+
+            <xpath expr="//sheet" position="inside">
+                <group string="PCE Dashboard" groups="hr_pce_reconciliation.group_pce_manager">
+                    <field name="pce_lateness_hours" readonly="1"/>
+                    <field name="pce_ot_total_hours" readonly="1"/>
+                    <field name="pce_annual_available_hours" readonly="1"/>
+                    <field name="pce_ot_used_hours" readonly="1"/>
+                    <field name="pce_annual_used_hours" readonly="1"/>
+                    <field name="pce_remaining_hours" readonly="1"/>
+                    <field name="pce_reconciled" readonly="1"/>
+                    <field name="pce_reconciled_on" readonly="1"/>
+                </group>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- Payslip List: anchor after employee_id (no tree/list dependency) -->
+    <record id="view_hr_payslip_list_pce" model="ir.ui.view">
+        <field name="name">hr.payslip.list.pce</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//field[@name='employee_id']" position="after">
+                <field name="employee_barcode" optional="show"/>
+                <field name="employee_identification_id" optional="show"/>
+                <field name="pce_lateness_hours" optional="show"/>
+                <field name="pce_ot_total_hours" optional="show"/>
+                <field name="pce_annual_available_hours" optional="show"/>
+                <field name="pce_remaining_hours" optional="show"/>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>
