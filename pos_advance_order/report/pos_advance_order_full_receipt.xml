@@ -14,6 +14,10 @@
                         <div style="margin-bottom: 6px;">
                             <div><strong>Customer:</strong> <span t-esc="o.partner_id.display_name"/></div>
                             <div><strong>Date:</strong> <span t-esc="o.picking_date"/></div>
+                            <div t-if="o._get_effective_pricelist()">
+                                <strong>Pricelist:</strong>
+                                <span t-esc="o._get_effective_pricelist().display_name"/>
+                            </div>
                         </div>
 
                         <div style="border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px;">
