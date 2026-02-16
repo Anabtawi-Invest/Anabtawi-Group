@@ -1,4 +1,4 @@
-# HR Payroll Reconciliation Dashboard (Odoo 19) — Enterprise Safe
+# HR Payroll Reconciliation Dashboard (Odoo 19) — Enterprise Safe V1
 
 ## What this module does
 Adds a simple, stable reconciliation dashboard for HR to review **before payroll finalization**:
