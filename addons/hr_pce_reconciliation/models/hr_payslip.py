@@ -1,36 +1,36 @@
-from odoo import models
+from odoo import models, fields
+
 
 class HrPayslip(models.Model):
     _inherit = "hr.payslip"
 
-    def action_reconcile_lateness(self):
-        for slip in self:
-            slip._pce_apply_reconciliation()
+    lateness_hours = fields.Float()
+    ot_total_hours = fields.Float()
+    annual_leave_hours = fields.Float()
 
     def _pce_apply_reconciliation(self):
 
-        lateness = self.lateness_hours or 0.0
-        ot_total = self.ot_total_hours or 0.0
-        annual = self.annual_leave_hours or 0.0
+        for slip in self:
 
-        remaining = lateness
+            lateness = slip.lateness_hours or 0.0
+            ot_total = slip.ot_total_hours or 0.0
+            annual = slip.annual_leave_hours or 0.0
 
-        # OT First
-        ot_used = min(remaining, ot_total)
-        remaining -= ot_used
+            remaining = lateness - ot_total - annual
 
-        # Annual Leave
-        leave_used = min(remaining, annual)
-        remaining -= leave_used
+            # ENGINELESS → only create salary input if needed
+            if remaining > 0:
 
-        # Salary Deduction Input
-        if remaining > 0:
-            input_type = self.env["hr.payslip.input.type"].search(
-                [("code", "=", "LAT_SAL_DED")], limit=1
-            )
-            if input_type:
-                self.env["hr.payslip.input"].create({
-                    "payslip_id": self.id,
-                    "input_type_id": input_type.id,
-                    "amount": remaining,
-                })
+                existing = slip.input_line_ids.filtered(
+                    lambda x: x.code == "LAT_SAL_DED"
+                )
+
+                if existing:
+                    existing.amount = remaining
+                else:
+                    self.env["hr.payslip.input"].create({
+                        "payslip_id": slip.id,
+                        "name": "Lateness Salary Deduction",
+                        "code": "LAT_SAL_DED",
+                        "amount": remaining,
+                    })
