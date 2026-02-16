@@ -1,14 +1,23 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+
+    <!-- =====================================================
+         Payroll Control Engine - Work Entry Tree Extension
+         Odoo 19 SAFE VERSION
+    ====================================================== -->
+
     <record id="view_hr_work_entry_tree_pce" model="ir.ui.view">
         <field name="name">hr.work.entry.tree.pce</field>
         <field name="model">hr.work.entry</field>
-        <field name="inherit_id" ref="hr_work_entry.hr_work_entry_view_tree"/>
+        <field name="inherit_id" ref="hr_work_entry.view_hr_work_entry_tree"/>
         <field name="arch" type="xml">
-            <xpath expr="//tree" position="inside">
+
+            <xpath expr="/tree" position="inside">
                 <field name="pce_reconciled" optional="show"/>
                 <field name="pce_reconciled_payslip_id" optional="show"/>
             </xpath>
+
         </field>
     </record>
+
 </odoo>
