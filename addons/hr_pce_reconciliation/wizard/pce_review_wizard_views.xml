@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_pce_payrun_review_wizard_form" model="ir.ui.view">
+        <field name="name">pce.payrun.review.wizard.form</field>
+        <field name="model">pce.payrun.review.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Smart Review">
+                <header>
+                    <button name="action_reconcile_all" type="object" string="Reconcile All" class="btn-primary"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </header>
+
+                <sheet>
+                    <group>
+                        <field name="run_id" readonly="1"/>
+                    </group>
+
+                    <div class="oe_button_box" name="button_box">
+                        <button type="action" class="oe_stat_button" icon="fa-tasks">
+                            <field name="to_reconcile_count" widget="statinfo" string="To Review"/>
+                        </button>
+                        <button type="action" class="oe_stat_button" icon="fa-exclamation-triangle">
+                            <field name="need_salary_deduction_count" widget="statinfo" string="Needs Deduction"/>
+                        </button>
+                    </div>
+
+                    <field name="line_ids">
+                        <tree create="0" delete="0" edit="0">
+                            <field name="review_status" widget="badge"/>
+                            <field name="employee_id"/>
+                            <field name="employee_barcode"/>
+                            <field name="employee_identification_id"/>
+                            <field name="lateness_hours"/>
+                            <field name="ot_total_hours"/>
+                            <field name="annual_leave_hours"/>
+                            <field name="bank_before_hours"/>
+                            <field name="bank_after_hours"/>
+                            <field name="remaining_hours"/>
+                            <field name="reconciled"/>
+                        </tree>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>
