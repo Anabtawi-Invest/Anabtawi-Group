@@ -3,7 +3,7 @@
     "name": "HR Payroll Reconciliation",
     "version": "19.0.1.0",
     "category": "Human Resources/Payroll",
-    "summary": "Enterprise-safe reconciliation dashboard: Lateness hours, OT hours, Annual Leave hours, Remaining after reconciliation with Payrun/Payslip buttons.",
+    "summary": "Idempotent reconciliation: OT banked once, lateness deducted OT→Leave→Salary remainder. Buttons on Payslip & Payrun.",
     "author": "Anabtawi Group (Generated)",
     "license": "LGPL-3",
     "depends": ["hr_payroll", "hr_holidays"],
