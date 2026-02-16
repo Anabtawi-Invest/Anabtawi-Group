@@ -1,23 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Payslip form button + dashboard -->
-    <record id="hr_payslip_form_inherit_recon_dashboard_v192" model="ir.ui.view">
-        <field name="name">hr.payslip.form.inherit.recon.dashboard.v192</field>
+
+    <!-- ============================= -->
+    <!-- SAFE PAYSLIP FORM EXTENSION   -->
+    <!-- ============================= -->
+
+    <record id="hr_payslip_form_inherit_recon_dashboard_safe" model="ir.ui.view">
+        <field name="name">hr.payslip.form.inherit.recon.dashboard.safe</field>
         <field name="model">hr.payslip</field>
-        <field name="inherit_id" ref="hr_payroll.hr_payslip_view_form"/>
+
+        <!-- ULTRA SAFE: inherit ANY payslip form -->
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+
         <field name="arch" type="xml">
 
+            <!-- Add Reconciliation Button -->
             <xpath expr="//header" position="inside">
                 <button name="action_reconcile_lateness"
                         type="object"
                         string="Reconciliation"
                         class="btn-primary"
-                        groups="hr_payroll.group_hr_payroll_manager"
-                        attrs="{'invisible': [('state', 'not in', ['draft','verify'])]}"/>
+                        groups="hr_payroll.group_hr_payroll_manager"/>
             </xpath>
 
-            <xpath expr="//sheet//group" position="inside">
-                <group string="Reconciliation Dashboard" groups="hr_payroll.group_hr_payroll_manager">
+            <!-- Dashboard Fields -->
+            <xpath expr="//sheet" position="inside">
+                <group string="Reconciliation Dashboard"
+                       groups="hr_payroll.group_hr_payroll_manager">
+
                     <field name="lateness_hours" readonly="1"/>
                     <field name="ot_total_hours" readonly="1"/>
                     <field name="annual_leave_hours" readonly="1"/>
@@ -25,28 +35,32 @@
                     <field name="recon_ot_used_hours" readonly="1"/>
                     <field name="recon_leave_used_hours" readonly="1"/>
                     <field name="recon_bank_delta_hours" readonly="1"/>
-                    <field name="reconciliation_state" readonly="1"/>
-                    <field name="reconciliation_date" readonly="1"/>
+
                 </group>
             </xpath>
 
         </field>
     </record>
 
-    <!-- Payslip list columns -->
-    <record id="hr_payslip_tree_inherit_recon_columns_v192" model="ir.ui.view">
-        <field name="name">hr.payslip.tree.inherit.recon.columns.v192</field>
+
+    <!-- ============================= -->
+    <!-- SAFE PAYSLIP TREE EXTENSION   -->
+    <!-- ============================= -->
+
+    <record id="hr_payslip_tree_inherit_recon_columns_safe" model="ir.ui.view">
+        <field name="name">hr.payslip.tree.inherit.recon.columns.safe</field>
         <field name="model">hr.payslip</field>
-        <field name="inherit_id" ref="hr_payroll.hr_payslip_view_tree"/>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
         <field name="arch" type="xml">
+
             <xpath expr="//tree" position="inside">
-                <field name="employee_barcode" optional="show"/>
-                <field name="employee_identification_id" optional="show"/>
-                <field name="lateness_hours" optional="show"/>
-                <field name="ot_total_hours" optional="show"/>
-                <field name="annual_leave_hours" optional="show"/>
-                <field name="remaining_after_reconciliation_hours" optional="show"/>
+                <field name="lateness_hours"/>
+                <field name="ot_total_hours"/>
+                <field name="annual_leave_hours"/>
+                <field name="remaining_after_reconciliation_hours"/>
             </xpath>
+
         </field>
     </record>
+
 </odoo>
