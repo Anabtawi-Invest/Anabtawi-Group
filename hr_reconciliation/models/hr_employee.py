@@ -7,7 +7,7 @@ class HrEmployee(models.Model):
 
     overtime_bank_hours = fields.Float(
         string="OT Bank (Hours)",
-        help="Running overtime bank balance in hours. Increased by approved OT, decreased when lateness is reconciled against OT bank.",
         default=0.0,
         tracking=True,
+        help="Running OT bank in hours. Updated by v19.2 reconciliation safely (no double counting).",
     )
