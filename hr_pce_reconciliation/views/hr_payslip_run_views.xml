@@ -1,14 +1,26 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
+
+    <!-- =====================================================
+         Payroll Control Engine - Payrun View (Odoo 19 SAFE)
+    ====================================================== -->
+
     <record id="view_hr_payslip_run_form_pce" model="ir.ui.view">
         <field name="name">hr.payslip.run.form.pce</field>
         <field name="model">hr.payslip.run</field>
-        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_form"/>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_run_form"/>
         <field name="arch" type="xml">
+
+            <!-- Reconcile Button -->
             <xpath expr="//header" position="inside">
-                <button name="action_pce_reconcile" type="object" string="Reconcile" class="btn-primary"
+                <button name="action_pce_reconcile"
+                        type="object"
+                        string="Reconcile"
+                        class="btn-primary"
                         groups="hr_pce_reconciliation.group_pce_manager"/>
             </xpath>
+
         </field>
     </record>
+
 </odoo>
