@@ -585,7 +585,7 @@ patch(PaymentScreen.prototype, {
             if (orderline) {
                 const product = orderline.product || orderline.product_id;
                 // Add pledge properties to receipt line
-                receiptLine.is_pledge_product = product?.is_pledge_product || false;
+                receiptLine.has_pledge = product?.has_pledge || false;
                 receiptLine.pledge_amount = product?.pledge_amount || 0;
                 receiptLine.is_employee_service = product?.is_employee_service || false;
             }
@@ -597,7 +597,7 @@ patch(PaymentScreen.prototype, {
         
         lines.forEach(line => {
             const product = line.product || line.product_id;
-            if (product?.is_pledge_product === true) {
+            if (product?.has_pledge === true) {
                 const pledgeAmount = product.pledge_amount || 0;
                 const quantity = line.get_quantity ? line.get_quantity() : line.qty;
                 const lineTotal = pledgeAmount * quantity;
@@ -682,7 +682,7 @@ patch(PaymentScreen.prototype, {
         // Add ALL orderlines with badges
         receiptData.orderlines.forEach(line => {
             const badges = [];
-            if (line.is_pledge_product) badges.push('<span class="badge bg-warning text-dark ms-1">PLEDGE</span>');
+            if (line.has_pledge) badges.push('<span class="badge bg-warning text-dark ms-1">PLEDGE</span>');
             if (line.is_employee_service) badges.push('<span class="badge bg-info text-dark ms-1">EMPLOYEE</span>');
             if (line.is_virtual_pledge) badges.push('<span class="badge bg-success text-white ms-1">VIRTUAL PLEDGE</span>');
             
@@ -793,7 +793,7 @@ patch(PaymentScreen.prototype, {
         const lines = order.getOrderlines ? order.getOrderlines() : order.lines || [];
         return lines.some(line => {
             const product = line.product || line.product_id;
-            return product?.is_pledge_product || 
+            return product?.has_pledge || 
                    product?.is_employee_service;
         });
     },
@@ -808,7 +808,7 @@ patch(PaymentScreen.prototype, {
         });
         const hasPledge = lines.some(l => {
             const product = l.product || l.product_id;
-            return product?.is_pledge_product;
+            return product?.has_pledge;
         });
         const hasDelivery = lines.some(l => {
             const product = l.product || l.product_id;
@@ -848,7 +848,7 @@ patch(PaymentScreen.prototype, {
             const product = line.product || line.product_id;
             console.log(`[PLEDGE] Line ${idx}:`, {
                 product_name: product?.display_name || product?.name,
-                is_pledge_product: product?.is_pledge_product,
+                has_pledge: product?.has_pledge,
                 is_employee_service: product?.is_employee_service,
                 is_delivery_product: product?.is_delivery_product,
                 pledge_amount: product?.pledge_amount,
@@ -885,7 +885,7 @@ patch(PaymentScreen.prototype, {
             
             console.log(`[PLEDGE]   -> Final price for line: ${price}`);
             
-            if (product?.is_pledge_product) {
+            if (product?.has_pledge) {
                 const lineAmount = product.pledge_amount || price;
                 pledgeAmount += lineAmount;
                 console.log(`[PLEDGE]   -> Adding ${lineAmount} to pledgeAmount (total: ${pledgeAmount})`);
@@ -916,7 +916,7 @@ patch(PaymentScreen.prototype, {
         const pledgeProducts = lines
             .filter(l => {
                 const product = l.product || l.product_id;
-                return product?.is_pledge_product;
+                return product?.has_pledge;
             })
             .map(l => {
                 const product = l.product || l.product_id;
@@ -1060,7 +1060,7 @@ patch(ReceiptScreen.prototype, {
         
         lines.forEach(line => {
             const product = line.get_product();
-            if (product?.is_pledge_product === true) {
+            if (product?.has_pledge === true) {
                 const pledgeAmount = product.pledge_amount || 0;
                 const quantity = line.get_quantity();
                 const lineTotal = pledgeAmount * quantity;
@@ -1212,7 +1212,7 @@ patch(ReceiptScreen.prototype, {
             
             lines.forEach(line => {
                 const product = line.product_id;
-                if (product?.is_pledge_product && !hidePledgeByEmployee) {
+                if (product?.has_pledge && !hidePledgeByEmployee) {
                     const pledgeAmt = (product.pledge_amount || 0) * line.qty;
                     pledgeTotal += pledgeAmt;
                     pledgeLines.push({

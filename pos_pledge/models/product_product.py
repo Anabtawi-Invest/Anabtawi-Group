@@ -16,6 +16,7 @@ class ProductProduct(models.Model):
         
         # Add our custom fields
         fields.extend([
+            'has_pledge',
             'is_pledge_product',
             'pledge_amount',
             'is_employee_service',

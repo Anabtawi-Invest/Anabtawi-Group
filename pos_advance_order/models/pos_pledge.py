@@ -171,12 +171,12 @@ class PosAdvanceOrderPledge(models.Model):
         if not pledge_product_ids:
             pledge_product_ids = list({
                 l.product_id.id
-                for l in pos_order.lines.filtered(lambda l: l.product_id and l.product_id.is_pledge_product)
+                for l in pos_order.lines.filtered(lambda l: l.product_id and l.product_id.has_pledge)
             })
 
         qty_by_product = defaultdict(float)
         for line in pos_order.lines.filtered(lambda l: l.product_id and l.product_id.id in pledge_product_ids):
-            if line.product_id.is_pledge_product:
+            if line.product_id.has_pledge:
                 qty_by_product[line.product_id.id] += line.qty or 0.0
 
         if not qty_by_product:

@@ -74,7 +74,7 @@ class PosOrder(models.Model):
         _logger.info("[PLEDGE] _order_fields: employee_id = %s", employee_id)
         return vals
 
-    @api.depends('lines.product_id.is_pledge_product')
+    @api.depends('lines.product_id.has_pledge')
     def _compute_has_pledge(self):
         for order in self:
             _logger.info("[PLEDGE] Computing has_pledge for order: %s", order.name)
@@ -84,9 +84,9 @@ class PosOrder(models.Model):
             for line in order.lines:
                 _logger.info("[PLEDGE]   Line: %s (Product ID: %s)", 
                             line.product_id.name, line.product_id.id)
-                _logger.info("[PLEDGE]     - is_pledge_product: %s", line.product_id.is_pledge_product)
+                _logger.info("[PLEDGE]     - has_pledge: %s", line.product_id.has_pledge)
                 
-                if line.product_id.is_pledge_product:
+                if line.product_id.has_pledge:
                     pledge_lines.append(line)
                     _logger.info("[PLEDGE]     ✓ This is a pledge product!")
             
@@ -143,12 +143,12 @@ class PosOrder(models.Model):
             _logger.info("[PLEDGE] Processing %d order lines", len(order.lines))
             for line in order.lines:
                 _logger.info("[PLEDGE]   Line: %s", line.product_id.name)
-                _logger.info("[PLEDGE]     - is_pledge_product: %s", line.product_id.is_pledge_product)
+                _logger.info("[PLEDGE]     - has_pledge: %s", line.product_id.has_pledge)
                 _logger.info("[PLEDGE]     - is_employee_service: %s", line.product_id.is_employee_service)
                 _logger.info("[PLEDGE]     - is_delivery_product: %s", line.product_id.is_delivery_product)
                 _logger.info("[PLEDGE]     - price_subtotal_incl: %.2f", line.price_subtotal_incl)
                 
-                if line.product_id.is_pledge_product:
+                if line.product_id.has_pledge:
                     # Use pledge_amount from product or line total
                     line_amount = line.product_id.pledge_amount or line.price_subtotal_incl
                     pledge_amount += line_amount
@@ -238,7 +238,7 @@ class PosOrder(models.Model):
         total_pledge_amount = 0.0
         pledge_product_ids = []
         for line in self.lines.filtered(lambda l: l.product_id):
-            if not (line.product_id.has_pledge or line.product_id.is_pledge_product):
+            if not line.product_id.has_pledge:
                 continue
             qty = line.qty or 0.0
             unit_pledge = line.product_id.pledge_amount or 0.0
@@ -683,7 +683,7 @@ class PosOrder(models.Model):
         
         # Exclude pledge products
         filtered_lines = lines.filtered(
-            lambda l: not l.product_id.is_pledge_product
+            lambda l: not l.product_id.has_pledge
         )
         
         _logger.info(
@@ -704,7 +704,7 @@ class PosOrderLine(models.Model):
         store=True
     )
 
-    @api.depends('product_id.is_pledge_product')
+    @api.depends('product_id.has_pledge')
     def _compute_pledge_related(self):
         for line in self:
-            line.is_pledge_related = line.product_id.is_pledge_product
+            line.is_pledge_related = line.product_id.has_pledge

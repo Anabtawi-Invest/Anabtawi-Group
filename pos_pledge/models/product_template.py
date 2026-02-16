@@ -1,23 +1,14 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models
+from odoo import fields, models
 
 
 class ProductTemplate(models.Model):
     _inherit = "product.template"
 
-    # Standard pledge fields (aligned with pos_advance_order)
-    has_pledge = fields.Boolean(string="Has Pledge")
-    pledge_currency_id = fields.Many2one(
-        "res.currency",
-        compute="_compute_pledge_currency_id",
-        readonly=True,
-    )
-    pledge_amount = fields.Monetary(
-        string="Pledge Amount",
-        currency_field="pledge_currency_id",
-        default=0.0,
-        help="Fixed pledge amount for this product (only used if Has Pledge = True).",
-    )
+    # Canonical pledge fields are provided by pos_advance_order:
+    # - has_pledge
+    # - pledge_amount
+    # - pledge_currency_id
 
     # Backward-compatibility alias for existing pos_pledge code (JS/Python/XML)
     is_pledge_product = fields.Boolean(
@@ -50,11 +41,6 @@ class ProductTemplate(models.Model):
                AND (has_pledge IS NULL OR has_pledge = FALSE)
             """
         )
-
-    @api.depends("company_id")
-    def _compute_pledge_currency_id(self):
-        for rec in self:
-            rec.pledge_currency_id = (rec.company_id or self.env.company).currency_id
 
 
 class ProductProduct(models.Model):
