@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
-    <!-- =====================================================
-         Payroll Control Engine - Payslip View Extension
-         Odoo 19 SAFE VERSION
-    ====================================================== -->
+    <!-- Payroll Control Engine - Odoo 19 SAFE Payslip View -->
 
     <record id="view_hr_payslip_form_pce" model="ir.ui.view">
         <field name="name">hr.payslip.form.pce</field>
@@ -12,35 +9,23 @@
         <field name="inherit_id" ref="hr_payroll.hr_payslip_view_form"/>
         <field name="arch" type="xml">
 
-            <!-- ===============================
-                 HEADER BUTTON (RECONCILIATION)
-            ================================ -->
-
+            <!-- Header Button -->
             <xpath expr="//header" position="inside">
-
                 <button name="action_pce_reconcile"
                         string="Reconciliation"
                         type="object"
                         class="btn-primary"
                         modifiers="{'invisible': [['state','!=','draft']]}"/>
-
             </xpath>
 
-            <!-- ===============================
-                 ENTERPRISE DASHBOARD FIELDS
-            ================================ -->
-
+            <!-- Dashboard Fields -->
             <xpath expr="//sheet//group" position="inside">
-
                 <group string="Payroll Control Engine">
-
                     <field name="pce_lateness_hours" readonly="1"/>
                     <field name="pce_ot_total_hours" readonly="1"/>
                     <field name="pce_annual_used_hours" readonly="1"/>
                     <field name="pce_salary_deduction_hours" readonly="1"/>
-
                 </group>
-
             </xpath>
 
         </field>
