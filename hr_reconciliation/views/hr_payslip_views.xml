@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Payslip form: add dashboard fields + reconciliation button -->
-    <record id="hr_payslip_form_inherit_recon_dashboard" model="ir.ui.view">
-        <field name="name">hr.payslip.form.inherit.recon.dashboard</field>
+    <!-- Payslip form button + dashboard -->
+    <record id="hr_payslip_form_inherit_recon_dashboard_v192" model="ir.ui.view">
+        <field name="name">hr.payslip.form.inherit.recon.dashboard.v192</field>
         <field name="model">hr.payslip</field>
         <field name="inherit_id" ref="hr_payroll.hr_payslip_view_form"/>
         <field name="arch" type="xml">
+
             <xpath expr="//header" position="inside">
                 <button name="action_reconcile_lateness"
                         type="object"
@@ -23,16 +24,18 @@
                     <field name="remaining_after_reconciliation_hours" readonly="1"/>
                     <field name="recon_ot_used_hours" readonly="1"/>
                     <field name="recon_leave_used_hours" readonly="1"/>
+                    <field name="recon_bank_delta_hours" readonly="1"/>
                     <field name="reconciliation_state" readonly="1"/>
                     <field name="reconciliation_date" readonly="1"/>
                 </group>
             </xpath>
+
         </field>
     </record>
 
-    <!-- Payslip list: show the 4 simple columns -->
-    <record id="hr_payslip_tree_inherit_recon_columns" model="ir.ui.view">
-        <field name="name">hr.payslip.tree.inherit.recon.columns</field>
+    <!-- Payslip list columns -->
+    <record id="hr_payslip_tree_inherit_recon_columns_v192" model="ir.ui.view">
+        <field name="name">hr.payslip.tree.inherit.recon.columns.v192</field>
         <field name="model">hr.payslip</field>
         <field name="inherit_id" ref="hr_payroll.hr_payslip_view_tree"/>
         <field name="arch" type="xml">
