@@ -39,7 +39,7 @@ class PosPledge(models.Model):
     pledge_products = fields.Many2many(
         "product.product",
         string="Pledge Products",
-        domain=[("is_pledge_product", "=", True)],
+        domain=[("has_pledge", "=", True)],
     )
     employee_product_id = fields.Many2one(
         "product.product",

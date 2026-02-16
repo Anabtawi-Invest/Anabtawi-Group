@@ -201,7 +201,7 @@
                     <!-- Loop through order lines to find pledge products -->
                     <t t-foreach="props.order.lines" t-as="line" t-key="line_index">
                         <t t-set="product" t-value="line.product_id"/>
-                        <t t-if="product and product.is_pledge_product">
+                        <t t-if="product and product.has_pledge">
                             <t t-set="qty" t-value="line.qty or line.get_quantity and line.get_quantity() or 1"/>
                             <t t-set="pledgeAmt" t-value="(product.pledge_amount or 0) * qty"/>
                             <t t-set="totalPledge" t-value="totalPledge + pledgeAmt"/>
