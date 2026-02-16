@@ -1,34 +1,19 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<odoo>
+<!-- FINAL SAFE LIST EXTENSION -->
+<record id="hr_payslip_list_inherit_recon_columns_final" model="ir.ui.view">
+    <field name="name">hr.payslip.list.inherit.recon.columns.final</field>
+    <field name="model">hr.payslip</field>
+    <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
+    <field name="arch" type="xml">
 
-    <!-- Payroll Control Engine - Odoo 19 SAFE Payslip View -->
+        <!-- Anchor to employee_id instead of list/tree -->
+        <xpath expr="//field[@name='employee_id']" position="after">
+            <field name="employee_barcode" optional="show"/>
+            <field name="employee_identification_id" optional="show"/>
+            <field name="lateness_hours" optional="show"/>
+            <field name="ot_total_hours" optional="show"/>
+            <field name="annual_leave_hours" optional="show"/>
+            <field name="remaining_after_reconciliation_hours" optional="show"/>
+        </xpath>
 
-    <record id="view_hr_payslip_form_pce" model="ir.ui.view">
-        <field name="name">hr.payslip.form.pce</field>
-        <field name="model">hr.payslip</field>
-        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
-        <field name="arch" type="xml">
-
-            <!-- Header Button -->
-            <xpath expr="//header" position="inside">
-                <button name="action_pce_reconcile"
-                        string="Reconciliation"
-                        type="object"
-                        class="btn-primary"
-                        modifiers="{'invisible': [['state','!=','draft']]}"/>
-            </xpath>
-
-            <!-- Dashboard Fields -->
-            <xpath expr="//sheet//group" position="inside">
-                <group string="Payroll Control Engine">
-                    <field name="pce_lateness_hours" readonly="1"/>
-                    <field name="pce_ot_total_hours" readonly="1"/>
-                    <field name="pce_annual_used_hours" readonly="1"/>
-                    <field name="pce_salary_deduction_hours" readonly="1"/>
-                </group>
-            </xpath>
-
-        </field>
-    </record>
-
-</odoo>
+    </field>
+</record>
