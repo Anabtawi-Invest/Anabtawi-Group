@@ -1,3 +1,3 @@
-from . import payslip
-from . import work_entry
-from . import payslip_run
+from . import hr_payslip
+from . import hr_work_entry
+from . import hr_payslip_run
