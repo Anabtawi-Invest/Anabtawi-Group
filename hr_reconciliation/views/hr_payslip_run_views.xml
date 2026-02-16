@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Payrun: Mass reconciliation button -->
+    <record id="hr_payslip_run_form_inherit_mass_recon" model="ir.ui.view">
+        <field name="name">hr.payslip.run.form.inherit.mass.recon</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_mass_reconciliation"
+                        type="object"
+                        string="Mass Reconciliation"
+                        class="btn-primary"
+                        groups="hr_payroll.group_hr_payroll_manager"
+                        attrs="{'invisible': [('state', 'not in', ['draft','verify'])]}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
