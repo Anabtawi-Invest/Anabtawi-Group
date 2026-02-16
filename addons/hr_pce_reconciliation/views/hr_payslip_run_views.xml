@@ -4,7 +4,7 @@
     <record id="view_hr_payslip_run_form_pce_ultra" model="ir.ui.view">
         <field name="name">hr.payslip.run.form.pce.ultra</field>
         <field name="model">hr.payslip.run</field>
-        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_form"/>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_run_form"/>
         <field name="arch" type="xml">
 
             <xpath expr="//header" position="inside">
@@ -13,6 +13,7 @@
                         string="Reconcile All"
                         class="btn-primary"
                         groups="hr_payroll.group_hr_payroll_user"/>
+
                 <button name="action_open_pce_smart_review"
                         type="object"
                         string="Smart Review"
@@ -20,17 +21,24 @@
                         groups="hr_payroll.group_hr_payroll_user"/>
             </xpath>
 
-            <xpath expr="//sheet" position="inside">
-                <div class="oe_button_box" name="button_box">
-                    <button type="object" name="action_open_pce_smart_review" class="oe_stat_button" icon="fa-check-square"
-                            groups="hr_payroll.group_hr_payroll_user">
-                        <field name="pce_to_reconcile_count" widget="statinfo" string="To Reconcile"/>
-                    </button>
-                    <button type="object" name="action_open_pce_smart_review" class="oe_stat_button" icon="fa-exclamation-triangle"
-                            groups="hr_payroll.group_hr_payroll_user">
-                        <field name="pce_need_salary_deduction_count" widget="statinfo" string="Needs Salary Deduction"/>
-                    </button>
-                </div>
+            <xpath expr="//div[@name='button_box']" position="inside">
+
+                <button type="object"
+                        name="action_open_pce_smart_review"
+                        class="oe_stat_button"
+                        icon="fa-check-square"
+                        groups="hr_payroll.group_hr_payroll_user">
+                    <field name="pce_to_reconcile_count" widget="statinfo" string="To Reconcile"/>
+                </button>
+
+                <button type="object"
+                        name="action_open_pce_smart_review"
+                        class="oe_stat_button"
+                        icon="fa-exclamation-triangle"
+                        groups="hr_payroll.group_hr_payroll_user">
+                    <field name="pce_need_salary_deduction_count" widget="statinfo" string="Needs Salary Deduction"/>
+                </button>
+
             </xpath>
 
         </field>
