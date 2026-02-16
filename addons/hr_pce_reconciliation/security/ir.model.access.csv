@@ -1,3 +1,2 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_pce_review_wizard,access.pce.review.wizard,model_pce_payrun_review_wizard,hr_payroll.group_hr_payroll_user,1,1,1,1
-access_pce_review_line,access.pce.review.line,model_pce_payrun_review_line,hr_payroll.group_hr_payroll_user,1,0,0,0
+access_pce_review,access_pce_review,model_pce_smart_review,hr_payroll.group_hr_payroll_user,1,1,1,1
