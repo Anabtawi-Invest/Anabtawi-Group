@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hr_work_entry_pce,access.hr.work.entry.pce,model_hr_work_entry,hr_pce_reconciliation.group_pce_manager,1,1,0,0
