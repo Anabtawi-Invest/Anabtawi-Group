@@ -6,6 +6,7 @@ import { ControlButtons } from "@point_of_sale/app/screens/product_screen/contro
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { ReceiptScreen } from "@point_of_sale/app/screens/receipt_screen/receipt_screen";
 import { SelectionPopup } from "@point_of_sale/app/components/popups/selection_popup/selection_popup";
+import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { PledgeListPopup } from "@pos_pledge/js/pledge_list_popup";
 import { EmployeeSelectionPopup } from "@pos_pledge/js/employee_selection_popup";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
@@ -70,6 +71,45 @@ function getOrderPricelistName(order, pos) {
         ""
     );
 }
+
+// =============================================================================
+// Guard against occasional race where product template is not yet loaded
+// (seen on pos_sale down-payment flow during validate/deposit).
+// =============================================================================
+patch(PosStore.prototype, {
+    addLineToCurrentOrder(vals, opts = {}, configure = true) {
+        const safeVals = vals ? { ...vals } : {};
+
+        if (!safeVals.product_tmpl_id && safeVals.product_id?.product_tmpl_id) {
+            safeVals.product_tmpl_id = safeVals.product_id.product_tmpl_id;
+        }
+
+        if (!safeVals.product_tmpl_id && typeof safeVals.product_id === "number") {
+            const product = this.models["product.product"]?.get(safeVals.product_id);
+            if (product?.product_tmpl_id) {
+                safeVals.product_tmpl_id = product.product_tmpl_id;
+            }
+        }
+
+        if (!safeVals.product_tmpl_id && safeVals.product_id?.id) {
+            const product = this.models["product.product"]?.get(safeVals.product_id.id);
+            if (product?.product_tmpl_id) {
+                safeVals.product_tmpl_id = product.product_tmpl_id;
+            }
+        }
+
+        if (!safeVals.product_tmpl_id && safeVals.product_id) {
+            console.warn("[PLEDGE] Skipping line add: product template is not loaded yet.", safeVals);
+            this.notification?.add(
+                _t("Product data is still loading. Please try again."),
+                { type: "warning" }
+            );
+            return null;
+        }
+
+        return super.addLineToCurrentOrder(safeVals, opts, configure);
+    },
+});
 
 // =============================================================================
 // 1. Pledge processing is now automatic (no popup needed)
