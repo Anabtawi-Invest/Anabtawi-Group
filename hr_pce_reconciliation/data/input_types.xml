@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pce_input_otw_h" model="hr.payslip.input.type">
+        <field name="name">OT Weekday Hours</field>
+        <field name="code">OTW_H</field>
+        <field name="active">True</field>
+    </record>
+    <record id="pce_input_otr_h" model="hr.payslip.input.type">
+        <field name="name">OT Weekend Hours</field>
+        <field name="code">OTR_H</field>
+        <field name="active">True</field>
+    </record>
+    <record id="pce_input_pho_h" model="hr.payslip.input.type">
+        <field name="name">OT Holiday Hours</field>
+        <field name="code">PHO_H</field>
+        <field name="active">True</field>
+    </record>
+    <record id="pce_input_lat_h" model="hr.payslip.input.type">
+        <field name="name">Lateness Hours</field>
+        <field name="code">LAT_H</field>
+        <field name="active">True</field>
+    </record>
+</odoo>

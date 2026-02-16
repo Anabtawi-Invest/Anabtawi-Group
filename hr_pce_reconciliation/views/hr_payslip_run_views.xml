@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_payslip_run_form_pce" model="ir.ui.view">
+        <field name="name">hr.payslip.run.form.pce</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_pce_reconcile" type="object" string="Reconcile" class="btn-primary"
+                        groups="hr_pce_reconciliation.group_pce_manager"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
