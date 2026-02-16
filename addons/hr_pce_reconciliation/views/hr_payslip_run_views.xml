@@ -4,10 +4,15 @@
     <record id="view_hr_payslip_run_form_pce_ultra" model="ir.ui.view">
         <field name="name">hr.payslip.run.form.pce.ultra</field>
         <field name="model">hr.payslip.run</field>
+
+        <!-- ✅ Odoo 19 Enterprise correct XMLID -->
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_run_form"/>
+
         <field name="arch" type="xml">
 
+            <!-- Header Buttons -->
             <xpath expr="//header" position="inside">
+
                 <button name="action_pce_mass_reconcile"
                         type="object"
                         string="Reconcile All"
@@ -19,8 +24,10 @@
                         string="Smart Review"
                         class="btn-secondary"
                         groups="hr_payroll.group_hr_payroll_user"/>
+
             </xpath>
 
+            <!-- Smart Badge Buttons -->
             <xpath expr="//div[@name='button_box']" position="inside">
 
                 <button type="object"
@@ -28,7 +35,9 @@
                         class="oe_stat_button"
                         icon="fa-check-square"
                         groups="hr_payroll.group_hr_payroll_user">
-                    <field name="pce_to_reconcile_count" widget="statinfo" string="To Reconcile"/>
+                    <field name="pce_to_reconcile_count"
+                           widget="statinfo"
+                           string="To Reconcile"/>
                 </button>
 
                 <button type="object"
@@ -36,7 +45,9 @@
                         class="oe_stat_button"
                         icon="fa-exclamation-triangle"
                         groups="hr_payroll.group_hr_payroll_user">
-                    <field name="pce_need_salary_deduction_count" widget="statinfo" string="Needs Salary Deduction"/>
+                    <field name="pce_need_salary_deduction_count"
+                           widget="statinfo"
+                           string="Needs Salary Deduction"/>
                 </button>
 
             </xpath>
