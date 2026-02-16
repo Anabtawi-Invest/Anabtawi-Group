@@ -10,7 +10,6 @@
     "data": [
         "security/security.xml",
         "security/ir.model.access.csv",
-        "data/pce_input_type.xml",
         "views/hr_payslip_views.xml",
         "views/hr_payslip_run_views.xml",
         "views/hr_pce_review_views.xml",
