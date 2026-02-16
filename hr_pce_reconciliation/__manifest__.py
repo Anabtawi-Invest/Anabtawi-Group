@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "PCE Reconciliation (Button + Smart Review) - Odoo 19 Enterprise Safe",
-    "version": "19.2.2.1.0",
+    "version": "19.0.1.0.0",
     "category": "Human Resources/Payroll",
     "summary": "Separate reconciliation button: OT unpaid bank, lateness offsets OT->Annual->Salary input. Smart Review screen with badges on Payrun.",
     "author": "Anabtawi Group",
