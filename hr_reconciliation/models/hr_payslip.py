@@ -6,18 +6,19 @@ from odoo.exceptions import UserError
 class HrPayslip(models.Model):
     _inherit = "hr.payslip"
 
-    # HR dashboard (before reconciliation)
+    # Dashboard (before reconciliation)
     lateness_hours = fields.Float(string="Lateness (Hours)", compute="_compute_recon_dashboard", store=True)
     ot_total_hours = fields.Float(string="OT Total (Hours)", compute="_compute_recon_dashboard", store=True)
     annual_leave_hours = fields.Float(string="Annual Leave (Hours)", compute="_compute_recon_dashboard", store=True)
 
-    # Results after reconciliation
+    # Results (after reconciliation)
     remaining_after_reconciliation_hours = fields.Float(string="Remaining (Hours)", readonly=True)
     recon_ot_used_hours = fields.Float(string="OT Used (Hours)", readonly=True)
     recon_leave_used_hours = fields.Float(string="Leave Used (Hours)", readonly=True)
 
-    # v19.2 SAFE: store the delta we applied to employee bank to prevent double counting
-    recon_bank_delta_hours = fields.Float(string="Bank Delta (Hours)", readonly=True, help="Net bank change applied by reconciliation.")
+    # Idempotency anchor (prevents OT bank double-counting)
+    recon_bank_delta_hours = fields.Float(string="Bank Delta (Hours)", readonly=True)
+
     reconciliation_state = fields.Selection(
         [("not_reconciled", "Not Reconciled"), ("reconciled", "Reconciled")],
         default="not_reconciled",
@@ -26,28 +27,28 @@ class HrPayslip(models.Model):
     )
     reconciliation_date = fields.Datetime(readonly=True, copy=False)
 
-    # Helpful identifiers for list views
+    # Optional identifiers for HR lists
     employee_identification_id = fields.Char(related="employee_id.identification_id", string="ID Number", readonly=True, store=True)
     employee_barcode = fields.Char(related="employee_id.barcode", string="Employee No.", readonly=True, store=True)
 
     # -----------------------------------------------------
-    # Odoo 19 SAFE annual leave balance
+    # Odoo 19 SAFE: Annual leave remaining days reader
     # -----------------------------------------------------
     def _get_employee_annual_leave_days_safe(self, employee):
         """
-        Odoo 19 safe: 'remaining_leaves' is not a simple stored field on hr.employee.
-        We try _get_remaining_leaves() and fallback to 0.0.
+        Odoo 19 safe: remaining annual leave is not a stored field on hr.employee.
+        We read via _get_remaining_leaves() and fallback to 0.0.
         """
         try:
             data = employee._get_remaining_leaves()
             if isinstance(data, dict):
                 emp_data = data.get(employee.id) or {}
-                # Most common key:
-                if emp_data.get("remaining_leaves") is not None:
-                    return float(emp_data.get("remaining_leaves") or 0.0)
+                val = emp_data.get("remaining_leaves")
+                if val is None:
+                    return 0.0
+                return float(val or 0.0)
         except Exception:
-            pass
-        return 0.0
+            return 0.0
 
     # -----------------------------------------------------
     # Dashboard compute
@@ -77,16 +78,9 @@ class HrPayslip(models.Model):
             slip.annual_leave_hours = leave_hours
 
     # -----------------------------------------------------
-    # v19.2 SAFE RECONCILIATION (IDEMPOTENT)
+    # FINAL: Idempotent reconciliation button
     # -----------------------------------------------------
     def action_reconcile_lateness(self):
-        """
-        One-click reconciliation (SAFE / idempotent):
-        - Reads LAT (lateness) + OTW/OTR/PHO (OT approved) hours
-        - Uses OT bank first, then annual leave hours, then leaves remaining hours
-        - Updates employee overtime_bank_hours with a delta that is stored on the payslip
-        - If HR presses again: revert old delta first, then re-apply new delta (no double counting)
-        """
         for slip in self:
             if slip.state not in ("draft", "verify"):
                 raise UserError(_("Reconciliation is only allowed in Draft or Waiting states."))
@@ -96,35 +90,32 @@ class HrPayslip(models.Model):
             employee = slip.employee_id.sudo()
             current_bank = employee.overtime_bank_hours or 0.0
 
-            # v19.2 SAFE STEP A: if already reconciled, revert previous applied delta first
+            # Revert old delta if already reconciled (prevents double counting)
             old_delta = slip.recon_bank_delta_hours or 0.0
             if slip.reconciliation_state == "reconciled" and old_delta:
-                current_bank -= old_delta  # revert net change from previous run
+                current_bank -= old_delta
 
-            # v19.2 STEP B: compute reconciliation using the reverted bank
             lateness = slip.lateness_hours or 0.0
             approved_ot = slip.ot_total_hours or 0.0
 
-            # OT gets banked for this period, but might be consumed by lateness
+            # Add OT for this period to bank, then consume by lateness
             bank_after_banking = current_bank + approved_ot
 
             remaining = lateness
 
-            # Deduct from OT bank first
+            # 1) OT bank first
             ot_used = min(remaining, bank_after_banking)
             bank_after_ot = bank_after_banking - ot_used
             remaining -= ot_used
 
-            # Deduct from annual leave hours (display-only; not creating leave request here)
+            # 2) Annual leave next (hours) - display only, no leave request created here
             leave_avail = slip.annual_leave_hours or 0.0
             leave_used = min(remaining, leave_avail)
             remaining -= leave_used
 
-            # Net delta we apply to employee bank this run:
-            # bank_after_ot - current_bank  == approved_ot - ot_used
+            # Net bank delta applied this run = approved_ot - ot_used
             new_delta = bank_after_ot - current_bank
 
-            # v19.2 STEP C: persist results
             slip.write({
                 "remaining_after_reconciliation_hours": remaining,
                 "recon_ot_used_hours": ot_used,
@@ -136,5 +127,5 @@ class HrPayslip(models.Model):
 
             employee.write({"overtime_bank_hours": current_bank + new_delta})
 
-            # Recompute payslip so any salary rules that depend on remaining hours reflect instantly
+            # Refresh payroll lines immediately
             slip.compute_sheet()
