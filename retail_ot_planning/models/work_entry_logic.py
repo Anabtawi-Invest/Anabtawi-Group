@@ -47,14 +47,14 @@ class RetailOTAutomation(models.Model):
 
             existing = WorkEntry.search([
                 ('employee_id', '=', employee.id),
-                ('date_start', '=', start),
-                ('date_stop', '=', end),
+                 ('date_from', '=', start),
+                 ('date_to', '=', end),
             ], limit=1)
 
             if not existing:
                 WorkEntry.create({
                     'name': name,
                     'employee_id': employee.id,
-                    'date_start': start,
-                    'date_stop': end,
+                    'date_from': start,
+                    'date_to': end,
                 })
