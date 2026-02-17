@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="stock_transfer_discrepancy_wizard_view_form" model="ir.ui.view">
+        <field name="name">stock.transfer.discrepancy.wizard.form</field>
+        <field name="model">stock.transfer.discrepancy.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Discrepancy Reason Required">
+                <sheet>
+                    <group>
+                        <field name="pick_ids" widget="many2many_tags" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="reason" required="1" placeholder="Mandatory reason for the discrepancy..."/>
+                    </group>
+                    <group string="Discrepancies">
+                        <field name="line_ids" nolabel="1" readonly="1">
+                            <list create="0" delete="0">
+                                <field name="picking_id"/>
+                                <field name="stage"/>
+                                <field name="product_id"/>
+                                <field name="expected_qty"/>
+                                <field name="actual_qty"/>
+                                <field name="difference_qty"/>
+                            </list>
+                        </field>
+                    </group>
+                    <footer>
+                        <button name="action_confirm" string="Confirm" type="object" class="btn-primary"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>
+

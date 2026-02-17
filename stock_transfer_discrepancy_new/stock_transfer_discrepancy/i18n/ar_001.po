@@ -1,0 +1,450 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* stock_transfer_discrepancy
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0+e\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-02-11 04:58+0000\n"
+"PO-Revision-Date: 2026-02-11 04:58+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+"Language: ar_001\n"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.actions.report,print_report_name:stock_transfer_discrepancy.action_report_stock_transfer_discrepancy
+msgid "'Transfer Discrepancy - %s' % (object.picking_id.name or '')"
+msgstr "'تناقض النقل - %s' % (object.picking_id.name or '')"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "<strong>Date:</strong>"
+msgstr "<strong>التاريخ:</strong>"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__actual_qty
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__actual_qty
+msgid "Actual Qty"
+msgstr "الكمية الفعلية"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Actual Quantity"
+msgstr "الكمية الفعلية"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Additional Information"
+msgstr "معلومات إضافية"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Basic Information"
+msgstr "المعلومات الأساسية"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.stock_transfer_discrepancy_wizard_view_form
+msgid "Cancel"
+msgstr "إلغاء"
+
+#. module: stock_transfer_discrepancy
+#. odoo-python
+#: code:addons/stock_transfer_discrepancy/models/stock_picking.py:0
+msgid ""
+"Cannot use truck location '%s' as destination location: it has open "
+"discrepancies. Please settle the discrepancies first or choose another "
+"location."
+msgstr "لا يمكن استخدام موقع الشاحنة '%s' كموقع وجهة: لديه تناقضات مفتوحة. يرجى تسوية التناقضات أولاً أو اختيار موقع آخر."
+
+#. module: stock_transfer_discrepancy
+#. odoo-python
+#: code:addons/stock_transfer_discrepancy/models/stock_picking.py:0
+msgid ""
+"Cannot use truck location '%s' as source location: it has open "
+"discrepancies. Please settle the discrepancies first or choose another "
+"location."
+msgstr "لا يمكن استخدام موقع الشاحنة '%s' كموقع مصدر: لديه تناقضات مفتوحة. يرجى تسوية التناقضات أولاً أو اختيار موقع آخر."
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__company_id
+msgid "Company"
+msgstr "الشركة"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Company:"
+msgstr "الشركة:"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.stock_transfer_discrepancy_wizard_view_form
+msgid "Confirm"
+msgstr "تأكيد"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__create_uid
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard__create_uid
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__create_uid
+msgid "Created by"
+msgstr "تم الإنشاء بواسطة"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__create_date
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard__create_date
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__create_date
+msgid "Created on"
+msgstr "تم الإنشاء في"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__date
+msgid "Date"
+msgstr "التاريخ"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Date:"
+msgstr "التاريخ:"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Destination Location:"
+msgstr "موقع الوجهة:"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__difference_qty
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__difference_qty
+msgid "Difference Qty"
+msgstr "كمية الفرق"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Difference Quantity"
+msgstr "كمية الفرق"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard__line_ids
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.stock_transfer_discrepancy_wizard_view_form
+msgid "Discrepancies"
+msgstr "التناقضات"
+
+#. module: stock_transfer_discrepancy
+#. odoo-python
+#: code:addons/stock_transfer_discrepancy/models/stock_picking.py:0
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.stock_transfer_discrepancy_wizard_view_form
+msgid "Discrepancy Reason Required"
+msgstr "سبب التناقض مطلوب"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields.selection,name:stock_transfer_discrepancy.selection__stock_transfer_discrepancy__stage__dispatch
+#: model:ir.model.fields.selection,name:stock_transfer_discrepancy.selection__stock_transfer_discrepancy_wizard_line__stage__dispatch
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Dispatch"
+msgstr "الإرسال"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_location__display_name
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_move__display_name
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_picking__display_name
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_quant__display_name
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_scrap__display_name
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__display_name
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard__display_name
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__display_name
+msgid "Display Name"
+msgstr "اسم العرض"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.stock_transfer_discrepancy_view_form
+msgid "Enter discrepancy reason..."
+msgstr "أدخل سبب التناقض..."
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__expected_qty
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__expected_qty
+msgid "Expected Qty"
+msgstr "الكمية المتوقعة"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Expected Quantity"
+msgstr "الكمية المتوقعة"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.stock_picking_view_form_inherit_truck_discrepancy
+msgid "From"
+msgstr "من"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Generated on"
+msgstr "تم الإنشاء في"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_location__has_open_discrepancy
+msgid "Has Open Discrepancy"
+msgstr "يحتوي على تناقض مفتوح"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_location__id
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_move__id
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_picking__id
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_quant__id
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_scrap__id
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__id
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard__id
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__id
+msgid "ID"
+msgstr "المُعرف"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model,name:stock_transfer_discrepancy.model_stock_location
+msgid "Inventory Locations"
+msgstr "مواقع المخزون"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_location__is_truck
+msgid "Is Truck"
+msgstr "شاحنة"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__write_uid
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard__write_uid
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__write_uid
+msgid "Last Updated by"
+msgstr "آخر تحديث بواسطة"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__write_date
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard__write_date
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__write_date
+msgid "Last Updated on"
+msgstr "آخر تحديث في"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.stock_transfer_discrepancy_wizard_view_form
+msgid "Mandatory reason for the discrepancy..."
+msgstr "سبب إجباري للتناقض..."
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields.selection,name:stock_transfer_discrepancy.selection__stock_transfer_discrepancy__state__open
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Open"
+msgstr "مفتوح"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.stock_transfer_discrepancy_view_form
+msgid "Print Report"
+msgstr "طباعة التقرير"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__product_id
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__product_id
+msgid "Product"
+msgstr "المنتج"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Product Barcode:"
+msgstr "باركود المنتج:"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Product Category:"
+msgstr "فئة المنتج:"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Product Code:"
+msgstr "رمز المنتج:"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Product:"
+msgstr "المنتج:"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Quantities Information"
+msgstr "معلومات الكميات"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model,name:stock_transfer_discrepancy.model_stock_quant
+msgid "Quants"
+msgstr "سجلات الكميات"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__reason
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard__reason
+msgid "Reason"
+msgstr "السبب"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Reason for Discrepancy"
+msgstr "سبب التناقض"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields.selection,name:stock_transfer_discrepancy.selection__stock_transfer_discrepancy__stage__receipt
+#: model:ir.model.fields.selection,name:stock_transfer_discrepancy.selection__stock_transfer_discrepancy_wizard_line__stage__receipt
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Receipt"
+msgstr "الاستلام"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Remaining to Resolve:"
+msgstr "المتبقي للحل:"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__resolved_qty
+msgid "Resolved Qty"
+msgstr "الكمية المحلولة"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Resolved Quantity"
+msgstr "الكمية المحلولة"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__responsible_user_id
+msgid "Responsible User"
+msgstr "المستخدم المسؤول"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Responsible User:"
+msgstr "المستخدم المسؤول:"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model,name:stock_transfer_discrepancy.model_stock_scrap
+msgid "Scrap"
+msgstr "مخلفات التصنيع"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields.selection,name:stock_transfer_discrepancy.selection__stock_transfer_discrepancy__state__settled
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Settled"
+msgstr "محلول"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Source Location:"
+msgstr "موقع المصدر:"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__stage
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__stage
+msgid "Stage"
+msgstr "المرحلة"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Stage:"
+msgstr "المرحلة:"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__state
+msgid "State"
+msgstr "الحالة"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "State:"
+msgstr "الحالة:"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model,name:stock_transfer_discrepancy.model_stock_move
+msgid "Stock Move"
+msgstr "حركة المخزون"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model,name:stock_transfer_discrepancy.model_stock_transfer_discrepancy
+msgid "Stock Transfer Discrepancy"
+msgstr "تناقضات نقل المخزون"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model,name:stock_transfer_discrepancy.model_stock_transfer_discrepancy_wizard
+msgid "Stock Transfer Discrepancy Wizard"
+msgstr "معالج تناقضات نقل المخزون"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model,name:stock_transfer_discrepancy.model_stock_transfer_discrepancy_wizard_line
+msgid "Stock Transfer Discrepancy Wizard Line"
+msgstr "سطر معالج تناقضات نقل المخزون"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model,name:stock_transfer_discrepancy.model_stock_picking
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__picking_id
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__picking_id
+msgid "Transfer"
+msgstr "تحويل"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.actions.act_window,name:stock_transfer_discrepancy.stock_transfer_discrepancy_action
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_location__discrepancy_ids
+#: model:ir.ui.menu,name:stock_transfer_discrepancy.menu_stock_transfer_discrepancy_root
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.stock_transfer_discrepancy_view_tree
+msgid "Transfer Discrepancies"
+msgstr "تناقضات النقل"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.stock_transfer_discrepancy_view_form
+msgid "Transfer Discrepancy"
+msgstr "تناقض النقل"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.actions.report,name:stock_transfer_discrepancy.action_report_stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Transfer Discrepancy Report"
+msgstr "تقرير تناقض النقل"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Transfer Reference:"
+msgstr "مرجع النقل:"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Transfer Type:"
+msgstr "نوع النقل:"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Transfer:"
+msgstr "النقل:"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard__pick_ids
+msgid "Transfers"
+msgstr "النقلات"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy__truck_location_id
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__truck_location_id
+msgid "Truck Location"
+msgstr "موقع الشاحنة"
+
+#. module: stock_transfer_discrepancy
+#. odoo-python
+#: code:addons/stock_transfer_discrepancy/models/stock_picking.py:0
+msgid "Truck Location with Open Discrepancy"
+msgstr "موقع الشاحنة مع تناقض مفتوح"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "Truck Location:"
+msgstr "موقع الشاحنة:"
+
+#. module: stock_transfer_discrepancy
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy.field_stock_transfer_discrepancy_wizard_line__wizard_id
+msgid "Wizard"
+msgstr "المعالج"
+
+#. module: stock_transfer_discrepancy
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
+msgid "by"
+msgstr "بواسطة"

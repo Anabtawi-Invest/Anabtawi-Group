@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_pos_config_form_pos_advance_order" model="ir.ui.view">
+            <field name="name">pos.config.form.pos.advance.order</field>
+            <field name="model">pos.config</field>
+            <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//sheet" position="inside">
+                    <group string="Advance Order Configuration" name="pos_advance_order_config">
+                        <group>
+                            <field name="advance_order_manager_id" options="{'no_create': True}"/>
+                            <field name="advance_notification_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                            <field name="pos_advance_account_id" options="{'no_create': True}"/>
+                            <field name="pos_cash_journal_id" options="{'no_create': True}"/>
+                            <field name="pos_card_journal_id" options="{'no_create': True}"/>
+                            <field name="pos_profit_account_id" options="{'no_create': True}"/>
+                            <field name="advance_deposit_product_id" options="{'no_create': True}"/>
+                            <field name="pledge_product_id" options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>
+

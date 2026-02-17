@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension" owl="1">
+        <xpath expr="//button[hasclass('more-btn')]" position="before">
+            <button
+                t-att-class="buttonClass"
+                t-if="!props.showRemainingButtons"
+                t-on-click="applyRounding"
+                type="button">
+                <i class="fa fa-percent me-2" role="img" aria-label="Discount" title="Discount"/>
+                <span>Discount</span>
+            </button>
+        </xpath>
+    </t>
+</templates>
