@@ -79,8 +79,8 @@ function getOrderPricelistName(order, pos) {
 patch(PosStore.prototype, {
     addLineToCurrentOrder(vals, opts = {}, configure = true) {
         const safeVals = vals ? { ...vals } : {};
-        const productModel = this.models["product.product"];
-        const templateModel = this.models["product.template"];
+        const productModel = this.data?.models?.["product.product"];
+        const templateModel = this.data?.models?.["product.template"];
 
         const normalizeId = (value) => {
             if (!value) return null;
@@ -113,14 +113,14 @@ patch(PosStore.prototype, {
         }
 
         if (!safeVals.product_tmpl_id && typeof safeVals.product_id === "number") {
-            const product = this.models["product.product"]?.get(safeVals.product_id);
+            const product = productModel?.get(safeVals.product_id);
             if (product?.product_tmpl_id) {
                 safeVals.product_tmpl_id = product.product_tmpl_id;
             }
         }
 
         if (!safeVals.product_tmpl_id && safeVals.product_id?.id) {
-            const product = this.models["product.product"]?.get(safeVals.product_id.id);
+            const product = productModel?.get(safeVals.product_id.id);
             if (product?.product_tmpl_id) {
                 safeVals.product_tmpl_id = product.product_tmpl_id;
             }
@@ -137,12 +137,9 @@ patch(PosStore.prototype, {
         }
 
         if (!safeVals.product_tmpl_id) {
-            console.warn("[PLEDGE] Skipping line add: product template is not loaded yet.", safeVals);
-            this.notification?.add(
-                _t("Product data is still loading. Please try again."),
-                { type: "warning" }
-            );
-            return null;
+            // Keep non-blocking behavior for flows like Settle Due: if template is still unresolved,
+            // fallback to original payload instead of interrupting the action.
+            return super.addLineToCurrentOrder(vals, opts, configure);
         }
 
         return super.addLineToCurrentOrder(safeVals, opts, configure);
