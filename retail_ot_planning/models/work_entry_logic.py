@@ -1,59 +1,46 @@
-from odoo import models, api
+from odoo import models
 
 
-class RetailOTAutomation(models.Model):
-    _inherit = "hr.work.entry"
+class HrContract(models.Model):
+    _inherit = "hr.contract"
 
-    @api.model
-    def run_planning_ot_logic(self):
+    def _get_work_entries_values(self, date_start, date_stop):
 
-        attendances = self.env['hr.attendance'].search([
-            ('check_out', '!=', False)
-        ])
+        # Get native work entries first
+        res = super()._get_work_entries_values(date_start, date_stop)
 
-        WorkEntry = self.env['hr.work.entry']
         Planning = self.env['planning.slot']
         Holiday = self.env['resource.calendar.leaves']
 
-        for att in attendances:
+        for entry in res:
 
-            employee = att.employee_id
-            start = att.check_in
+            employee_id = entry.get('employee_id')
+            start = entry.get('date_start') or entry.get('date_from')
 
-            # Detect public holiday
+            if not employee_id or not start:
+                continue
+
+            # Detect holiday
             holiday = Holiday.search([
                 ('date_from', '<=', start),
                 ('date_to', '>=', start),
                 ('resource_id', '=', False)
             ], limit=1)
 
-            # Default label
-            name = "Auto OT Entry"
-
             if holiday:
-                name = "PHO Auto Entry"
-            else:
-                slot = Planning.search([
-                    ('employee_id', '=', employee.id),
-                    ('start_datetime', '<=', start),
-                    ('end_datetime', '>=', start),
-                ], limit=1)
+                entry['name'] = "PHO Auto Entry"
+                continue
 
-                if not slot:
-                    # Planned OFF day
-                    name = "OTR Auto Entry"
-                else:
-                    # Planned working day
-                    name = "OTW Auto Entry"
-
-            # SAFE duplicate protection (NO DATE FIELDS)
-            existing = WorkEntry.search([
-                ('employee_id', '=', employee.id),
-                ('name', '=', name),
+            # Detect planning slot
+            slot = Planning.search([
+                ('employee_id', '=', employee_id),
+                ('start_datetime', '<=', start),
+                ('end_datetime', '>=', start),
             ], limit=1)
 
-            if not existing:
-                WorkEntry.create({
-                    'name': name,
-                    'employee_id': employee.id,
-                })
+            if not slot:
+                entry['name'] = "OTR Auto Entry"
+            else:
+                entry['name'] = "OTW Auto Entry"
+
+        return res
