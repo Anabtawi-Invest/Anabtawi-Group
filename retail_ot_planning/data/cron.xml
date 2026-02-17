@@ -1,10 +1,13 @@
-
 <odoo>
-    <record id="cron_retail_ot_logic_fixed" model="ir.cron">
-        <field name="name">Retail Planning OT Logic Fixed</field>
-        <field name="model_id" ref="hr.model_hr_work_entry"/>
+    <record id="cron_retail_ot_logic_v3_safe" model="ir.cron">
+        <field name="name">Retail Planning OT Logic V3 SAFE</field>
+
+        <!-- IMPORTANT FIX -->
+        <!-- We use hr_attendance model because it always exists -->
+        <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
+
         <field name="state">code</field>
-        <field name="code">model.run_planning_ot_logic()</field>
+        <field name="code">env['hr.work.entry'].run_planning_ot_logic()</field>
         <field name="interval_number">5</field>
         <field name="interval_type">minutes</field>
         <field name="active">True</field>
