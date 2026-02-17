@@ -1,5 +1,5 @@
-
 from odoo import models, api
+
 
 class RetailOTAutomation(models.Model):
     _inherit = "hr.work.entry"
@@ -19,7 +19,6 @@ class RetailOTAutomation(models.Model):
 
             employee = att.employee_id
             start = att.check_in
-            end = att.check_out
 
             # Detect public holiday
             holiday = Holiday.search([
@@ -28,7 +27,7 @@ class RetailOTAutomation(models.Model):
                 ('resource_id', '=', False)
             ], limit=1)
 
-            # Default name/type (you will map types later in payroll)
+            # Default label
             name = "Auto OT Entry"
 
             if holiday:
@@ -41,20 +40,20 @@ class RetailOTAutomation(models.Model):
                 ], limit=1)
 
                 if not slot:
+                    # Planned OFF day
                     name = "OTR Auto Entry"
                 else:
+                    # Planned working day
                     name = "OTW Auto Entry"
 
+            # SAFE duplicate protection (NO DATE FIELDS)
             existing = WorkEntry.search([
                 ('employee_id', '=', employee.id),
-                 ('date_from', '=', start),
-                 ('date_to', '=', end),
+                ('name', '=', name),
             ], limit=1)
 
             if not existing:
                 WorkEntry.create({
                     'name': name,
                     'employee_id': employee.id,
-                    'date_from': start,
-                    'date_to': end,
                 })
