@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+
+
+    <!-- Tree View -->
+    <record id="view_pos_advance_discount_tree" model="ir.ui.view">
+        <field name="name">pos.advance.discount.tree</field>
+        <field name="model">pos.advance.discount</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="discount_type"/>
+                <field name="value"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_pos_advance_discount_form" model="ir.ui.view">
+        <field name="name">pos.advance.discount.form</field>
+        <field name="model">pos.advance.discount</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="discount_type"/>
+                        <field name="value"/>
+                        <field name="sequence"/>
+                        <field name="active"/>
+                        <field name="company_id" groups="base.group_multi_company"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+        <!-- Action -->
+    <record id="action_pos_advance_discount" model="ir.actions.act_window">
+        <field name="name">Advance Discounts</field>
+        <field name="res_model">pos.advance.discount</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Menu under POS -->
+    <menuitem
+        id="menu_pos_advance_discount_root"
+        name="Advance Discounts"
+        parent="point_of_sale.menu_point_root"
+        sequence="95"
+        action="action_pos_advance_discount"
+        groups="point_of_sale.group_pos_manager"
+    />
+
+</odoo>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_hr_health_insurance_master"
+              name="Health Insurance"
+              parent="hr.menu_human_resources_configuration"
+              sequence="100"/>
+</odoo>

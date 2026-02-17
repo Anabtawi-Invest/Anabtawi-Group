@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_health_contract_view_form" model="ir.ui.view">
+        <field name="name">hr.health.contract.form.view</field>
+        <field name="model">hr.health.contract</field>
+        <field name="type">form</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="company_id" invisible="1"/>
+                            <field name="name" string="Name"/>
+                            <field name="contract_grade_id" string="Contract Grade"/>
+                            <field name="start_date" string="Start"/>
+                            <field name="end_date" string="End"/>
+                        </group>
+                        <group>
+
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Age Groups">
+                            <field name="age_group_ids">
+                                <list editable="bottom">
+                                    <field name="from_age"/>
+                                    <field name="to_age"/>
+                                    <field name="amount"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="hr_health_contract_list_view" model="ir.ui.view">
+        <field name="name">hr.health.contract.list.view</field>
+        <field name="model">hr.health.contract</field>
+        <field name="type">list</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name" string="Name"/>
+                <field name="contract_grade_id" string="Contract Grade"/>
+                <field name="start_date" string="Start"/>
+                <field name="end_date" string="End"/>
+                <field name="company_id" string="Company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="hr_health_contract_search_view" model="ir.ui.view">
+        <field name="name">hr.health.contract.search.view</field>
+        <field name="model">hr.health.contract</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" string="Grade Name"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hr_health_contract" model="ir.actions.act_window">
+        <field name="name">Insurance Contracts</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">hr.health.contract</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_hr_health_contract"
+              name="Insurance Contracts"
+              parent="menu_hr_health_insurance_master"
+              action="action_hr_health_contract"
+              sequence="20"/>
+</odoo>

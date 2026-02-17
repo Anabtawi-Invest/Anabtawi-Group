@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_scrap.ScrapPopup" owl="1">
+        <Dialog size="'md'" title="'Scrap'">
+            <div class="pos-scrap-popup">
+                <div class="form-group mb-3">
+                    <label>
+                        <strong>Product <span class="text-danger">*</span></strong>
+                    </label>
+
+                    <div class="d-flex gap-2 align-items-center mb-2">
+                        <input
+                            t-ref="productSearch"
+                            type="text"
+                            class="form-control"
+                            placeholder="Search product by name / code / barcode..."
+                            t-att-value="state.productSearch"
+                            t-on-input="onSearchInput"
+                            t-att-disabled="state.loading ? 'disabled' : undefined"
+                        />
+                    </div>
+
+                    <div t-if="selectedProduct" class="alert alert-info py-2 mb-2">
+                        <strong>Selected:</strong>
+                        <span t-esc="selectedProduct.display_name || selectedProduct.name"/>
+                    </div>
+
+                    <div t-if="state.productSearch &amp;&amp; productMatches.length" class="list-group">
+                        <t t-foreach="productMatches" t-as="p" t-key="p.id">
+                            <button type="button" class="list-group-item list-group-item-action"
+                                t-on-click="() => this.selectProduct(p)">
+                                <span t-esc="p.display_name || p.name"/>
+                                <t t-if="p.default_code">
+                                    <span class="text-muted"> (</span><span class="text-muted" t-esc="p.default_code"/><span class="text-muted">)</span>
+                                </t>
+                            </button>
+                        </t>
+                    </div>
+                    <small class="form-text text-muted">
+                        Tip: select an order line first to prefill the product.
+                    </small>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label>
+                        <strong>Quantity <span class="text-danger">*</span></strong>
+                    </label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        class="form-control"
+                        t-att-value="state.qty"
+                        t-on-input="onQtyInput"
+                        t-att-disabled="state.loading ? 'disabled' : undefined"
+                    />
+                </div>
+
+                <div class="form-group mb-3">
+                    <label>
+                        <strong>Source Location <span class="text-danger">*</span></strong>
+                    </label>
+                    <select
+                        class="form-control"
+                        t-att-value="state.locationId"
+                        t-on-change="onSourceLocationChange"
+                        t-att-disabled="state.loading ? 'disabled' : undefined"
+                    >
+                        <option value="">-- Select Source Location --</option>
+                        <t t-foreach="state.sourceLocations" t-as="loc" t-key="loc.id">
+                            <option t-att-value="loc.id" t-esc="loc.display_name"/>
+                        </t>
+                    </select>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label>
+                        <strong>Scrap Location <span class="text-danger">*</span></strong>
+                    </label>
+                    <select
+                        class="form-control"
+                        t-att-value="state.scrapLocationId"
+                        t-on-change="onScrapLocationChange"
+                        t-att-disabled="state.loading ? 'disabled' : undefined"
+                    >
+                        <option value="">-- Select Scrap Location --</option>
+                        <t t-foreach="state.scrapLocations" t-as="loc" t-key="loc.id">
+                            <option t-att-value="loc.id" t-esc="loc.display_name"/>
+                        </t>
+                    </select>
+                </div>
+
+                <div class="form-check mb-2">
+                    <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="pos_scrap_validate"
+                        t-att-checked="state.validate"
+                        t-on-change="onValidateToggle"
+                        t-att-disabled="state.loading ? 'disabled' : undefined"
+                    />
+                    <label class="form-check-label" for="pos_scrap_validate">
+                        Validate now (affect stock immediately)
+                    </label>
+                </div>
+
+                <div class="form-group mt-3">
+                    <label>
+                        <strong>Reason</strong>
+                    </label>
+                    <t t-if="state.reasonTags.length">
+                        <div class="border rounded p-2" style="max-height: 180px; overflow: auto;">
+                            <t t-foreach="state.reasonTags" t-as="tag" t-key="tag.id">
+                                <div class="form-check">
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        t-att-id="'pos_scrap_reason_' + tag.id"
+                                        t-att-checked="(state.selectedReasonTagIds || []).includes(tag.id)"
+                                        t-on-change="(ev) => this.toggleReasonTag(tag.id, ev)"
+                                        t-att-disabled="state.loading ? 'disabled' : undefined"
+                                    />
+                                    <label class="form-check-label" t-att-for="'pos_scrap_reason_' + tag.id">
+                                        <span t-esc="tag.name"/>
+                                    </label>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <small class="form-text text-muted">
+                            No reasons configured.
+                        </small>
+                    </t>
+                </div>
+            </div>
+
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary" t-on-click="cancel">
+                    Cancel
+                </button>
+                <button class="btn btn-primary" t-on-click="confirm" t-att-disabled="state.loading ? 'disabled' : undefined">
+                    Confirm
+                </button>
+            </t>
+        </Dialog>
+    </t>
+</templates>
+
