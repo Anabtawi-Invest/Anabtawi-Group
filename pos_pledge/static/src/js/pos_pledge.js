@@ -127,6 +127,9 @@ patch(PosStore.prototype, {
         }
 
         const productRecord = resolveProductRecord(safeVals.product_id);
+        if (productRecord) {
+            safeVals.product_id = productRecord;
+        }
         if (!safeVals.product_tmpl_id && productRecord?.product_tmpl_id) {
             safeVals.product_tmpl_id = productRecord.product_tmpl_id;
         }
@@ -137,12 +140,27 @@ patch(PosStore.prototype, {
         }
 
         if (!safeVals.product_tmpl_id) {
-            // Keep non-blocking behavior for flows like Settle Due: if template is still unresolved,
-            // fallback to original payload instead of interrupting the action.
-            return super.addLineToCurrentOrder(vals, opts, configure);
+            console.warn("[PLEDGE] addLineToCurrentOrder: unresolved product template.", safeVals);
+            this.notification?.add(
+                _t("Product template is not ready yet. Please retry."),
+                { type: "warning" }
+            );
+            return null;
         }
 
-        return super.addLineToCurrentOrder(safeVals, opts, configure);
+        try {
+            return super.addLineToCurrentOrder(safeVals, opts, configure);
+        } catch (error) {
+            if (String(error?.message || "").includes("sale_line_warn_msg")) {
+                console.error("[PLEDGE] Guarded addLineToCurrentOrder crash:", error, safeVals);
+                this.notification?.add(
+                    _t("Product data is still initializing. Please try again."),
+                    { type: "warning" }
+                );
+                return null;
+            }
+            throw error;
+        }
     },
 });
 
