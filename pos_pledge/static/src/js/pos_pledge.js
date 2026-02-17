@@ -79,6 +79,34 @@ function getOrderPricelistName(order, pos) {
 patch(PosStore.prototype, {
     addLineToCurrentOrder(vals, opts = {}, configure = true) {
         const safeVals = vals ? { ...vals } : {};
+        const productModel = this.models["product.product"];
+        const templateModel = this.models["product.template"];
+
+        const normalizeId = (value) => {
+            if (!value) return null;
+            if (typeof value === "number") return value;
+            if (Array.isArray(value)) return value[0] || null;
+            if (typeof value === "object" && value.id) return value.id;
+            return null;
+        };
+
+        const resolveTemplateRecord = (value) => {
+            if (!value) return null;
+            if (typeof value === "object" && !Array.isArray(value) && ("sale_line_warn_msg" in value || "name" in value)) {
+                return value;
+            }
+            const templateId = normalizeId(value);
+            return templateId ? templateModel?.get(templateId) || null : null;
+        };
+
+        const resolveProductRecord = (value) => {
+            if (!value) return null;
+            if (typeof value === "object" && !Array.isArray(value) && value.id && value.product_tmpl_id) {
+                return value;
+            }
+            const productId = normalizeId(value);
+            return productId ? productModel?.get(productId) || null : null;
+        };
 
         if (!safeVals.product_tmpl_id && safeVals.product_id?.product_tmpl_id) {
             safeVals.product_tmpl_id = safeVals.product_id.product_tmpl_id;
@@ -98,7 +126,17 @@ patch(PosStore.prototype, {
             }
         }
 
-        if (!safeVals.product_tmpl_id && safeVals.product_id) {
+        const productRecord = resolveProductRecord(safeVals.product_id);
+        if (!safeVals.product_tmpl_id && productRecord?.product_tmpl_id) {
+            safeVals.product_tmpl_id = productRecord.product_tmpl_id;
+        }
+
+        const templateRecord = resolveTemplateRecord(safeVals.product_tmpl_id);
+        if (templateRecord) {
+            safeVals.product_tmpl_id = templateRecord;
+        }
+
+        if (!safeVals.product_tmpl_id) {
             console.warn("[PLEDGE] Skipping line add: product template is not loaded yet.", safeVals);
             this.notification?.add(
                 _t("Product data is still loading. Please try again."),
