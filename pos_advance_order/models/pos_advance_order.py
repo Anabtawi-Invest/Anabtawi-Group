@@ -657,7 +657,7 @@ class PosAdvanceOrder(models.Model):
             }
             for line in order.lines
         ]
-        base_lines = order._prepare_tax_base_line_values() or []
+        base_lines = order.with_context(invoicing=True)._prepare_tax_base_line_values() or []
         base_line_dump = []
         for base_line in base_lines:
             tax_ids = (
@@ -687,7 +687,10 @@ class PosAdvanceOrder(models.Model):
             line_dump,
             base_line_dump,
         )
-        order._compute_prices()
+        # `pos_settle_due` filters deposit/settle lines out of tax base lines unless
+        # `invoicing` context is set. Advance flow relies on deposit-like products, so
+        # compute prices with invoicing context to keep totals consistent.
+        order.with_context(invoicing=True)._compute_prices()
         order.invalidate_recordset(["amount_total", "amount_tax", "amount_paid", "amount_difference"])
         _logger.info(
             "[ADV_POS_DEBUG] Post-compute order id=%s advance_order=%s amount_total=%s amount_tax=%s amount_paid=%s amount_difference=%s",
@@ -715,7 +718,7 @@ class PosAdvanceOrder(models.Model):
             "amount": amount,
             "payment_method_id": payment_method.id,
         })
-        order._compute_prices()
+        order.with_context(invoicing=True)._compute_prices()
         order.action_pos_order_paid()
         order._create_order_picking()
         _logger.info(
