@@ -15,7 +15,7 @@
     ],
     "assets": {
         "point_of_sale._assets_pos": [
-            "pos_pricelist/static/src/pos/id_number_validation.js",
+            "pos_pricelist_id/static/src/pos/id_number_validation.js",
         ],
     },
     'installable': True,
