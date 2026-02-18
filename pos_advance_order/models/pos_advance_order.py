@@ -634,7 +634,10 @@ class PosAdvanceOrder(models.Model):
                 "price_extra": spec.get("price_extra", 0.0),
                 "full_product_name": spec.get("full_product_name") or product.display_name,
             })
-
+        # Refresh the order record to ensure one2many lines are visible on this recordset
+        # before computing totals (prevents stale-cache totals staying at 0.0).
+        order = self.env["pos.order"].sudo().browse(order.id)
+        order.invalidate_recordset(["lines"])
         order._compute_prices()
         return order
 
