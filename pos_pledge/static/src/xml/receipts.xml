@@ -172,6 +172,9 @@
             <div t-if="orderPricelistName" class="pos-receipt-order-data text-start pt-1">
                 Pricelist: <t t-esc="orderPricelistName"/>
             </div>
+            <div t-if="props.order and props.order.customer_id_number" class="pos-receipt-order-data text-start pt-1">
+                ID Number: <t t-esc="props.order.customer_id_number"/>
+            </div>
         </xpath>
         
         <!-- Add Pledge Amount section at the end (match any root element) -->
