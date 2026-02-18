@@ -15,7 +15,7 @@ class HrEmployee(models.Model):
         string="Employee Password",
         copy=False,
         help="Auto-generated password, rotated every 24 hours by a scheduled action.",
-        readonly=True,
+        readonly=False,
     )
     employee_password_generated_at = fields.Datetime(
         string="Employee Password Generated At",
