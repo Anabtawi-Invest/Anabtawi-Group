@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
+import logging
 
 from odoo import api, fields, models, _
 from odoo.fields import Domain
 from odoo.exceptions import UserError
 from odoo.fields import Command
+
+_logger = logging.getLogger(__name__)
 
 
 class PosAdvanceOrder(models.Model):
@@ -605,6 +608,7 @@ class PosAdvanceOrder(models.Model):
             "advance_order_id": self.id,
         })
         PosOrderLine = self.env["pos.order.line"].sudo()
+        created_line_ids = []
         for spec in (lines or []):
             product = self.env["product.product"].browse(spec["product_id"])
             qty = spec.get("qty", 1.0)
@@ -621,7 +625,7 @@ class PosAdvanceOrder(models.Model):
                 tax_ids=tax_ids,
             )
 
-            PosOrderLine.create({
+            created_line = PosOrderLine.create({
                 "order_id": order.id,
                 "product_id": product.id,
                 "name": spec.get("name") or product.display_name,
@@ -634,15 +638,78 @@ class PosAdvanceOrder(models.Model):
                 "price_extra": spec.get("price_extra", 0.0),
                 "full_product_name": spec.get("full_product_name") or product.display_name,
             })
+            created_line_ids.append(created_line.id)
         # Refresh the order record to ensure one2many lines are visible on this recordset
         # before computing totals (prevents stale-cache totals staying at 0.0).
         order = self.env["pos.order"].sudo().browse(order.id)
-        order.invalidate_recordset(["lines"])
+        order.invalidate_recordset(["lines", "amount_total", "amount_tax", "amount_paid", "amount_difference"])
+        line_dump = [
+            {
+                "id": line.id,
+                "product_id": line.product_id.id,
+                "product_name": line.product_id.display_name,
+                "qty": line.qty,
+                "price_unit": line.price_unit,
+                "discount": line.discount,
+                "tax_ids": line.tax_ids.ids,
+                "price_subtotal": line.price_subtotal,
+                "price_subtotal_incl": line.price_subtotal_incl,
+            }
+            for line in order.lines
+        ]
+        base_lines = order._prepare_tax_base_line_values() or []
+        base_line_dump = []
+        for base_line in base_lines:
+            tax_ids = (
+                base_line.get("tax_ids").ids
+                if getattr(base_line.get("tax_ids"), "ids", False) is not False
+                else base_line.get("tax_ids")
+            )
+            base_line_dump.append(
+                {
+                    "record_id": base_line.get("id"),
+                    "product_id": getattr(base_line.get("product_id"), "id", False),
+                    "quantity": base_line.get("quantity"),
+                    "price_unit": base_line.get("price_unit"),
+                    "discount": base_line.get("discount"),
+                    "tax_ids": tax_ids,
+                    "sign": base_line.get("sign"),
+                    "rate": base_line.get("rate"),
+                    "special_mode": base_line.get("special_mode"),
+                    "special_type": base_line.get("special_type"),
+                }
+            )
+        _logger.info(
+            "[ADV_POS_DEBUG] Pre-compute order id=%s advance_order=%s created_line_ids=%s line_dump=%s base_lines=%s",
+            order.id,
+            self.id,
+            created_line_ids,
+            line_dump,
+            base_line_dump,
+        )
         order._compute_prices()
+        order.invalidate_recordset(["amount_total", "amount_tax", "amount_paid", "amount_difference"])
+        _logger.info(
+            "[ADV_POS_DEBUG] Post-compute order id=%s advance_order=%s amount_total=%s amount_tax=%s amount_paid=%s amount_difference=%s",
+            order.id,
+            self.id,
+            order.amount_total,
+            order.amount_tax,
+            order.amount_paid,
+            order.amount_difference,
+        )
         return order
 
     def _pay_pos_order(self, order, payment_method, amount):
         """Create pos.payment and mark order as paid."""
+        _logger.info(
+            "[ADV_POS_DEBUG] Payment start order id=%s advance_order=%s payment_method=%s requested_amount=%s current_total=%s",
+            order.id,
+            self.id,
+            payment_method.id,
+            amount,
+            order.amount_total,
+        )
         self.env["pos.payment"].sudo().create({
             "pos_order_id": order.id,
             "amount": amount,
@@ -651,6 +718,14 @@ class PosAdvanceOrder(models.Model):
         order._compute_prices()
         order.action_pos_order_paid()
         order._create_order_picking()
+        _logger.info(
+            "[ADV_POS_DEBUG] Payment done order id=%s advance_order=%s state=%s amount_total=%s amount_paid=%s",
+            order.id,
+            self.id,
+            order.state,
+            order.amount_total,
+            order.amount_paid,
+        )
         return order
 
     @api.constrains("advance_amount")
