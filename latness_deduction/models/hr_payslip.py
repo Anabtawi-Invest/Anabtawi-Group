@@ -17,6 +17,38 @@ class HrPayslip(models.Model):
         store=False,
         help='Remaining balance in hours for the configured Annual Leave type used for lateness coverage.',
     )
+    remaining_annual_leave_balance_hours = fields.Float(
+        string='Remaining Annual Leave Balance (hrs)',
+        compute='_compute_remaining_annual_leave_balance_hours',
+        store=False,
+    )
+
+    @api.depends(
+        'worked_days_line_ids.number_of_hours',
+        'worked_days_line_ids.work_entry_type_id.code',
+        'employee_id',
+        'date_to',
+        'company_id'
+    )
+    def _compute_remaining_annual_leave_balance_hours(self):
+        for slip in self:
+            slip.remaining_annual_leave_balance_hours = 0.0
+
+            # Current balance
+            current_balance = slip.annual_leave_balance_hours or 0.0
+
+            # Get lateness and OT buckets
+            lateness, buckets = slip._get_worked_day_hours_by_code()
+            total_ot = sum(buckets.values())
+
+            # What will actually hit leave?
+            remaining_after_ot = max(lateness - total_ot, 0.0)
+
+            # Remaining balance after deduction
+            slip.remaining_annual_leave_balance_hours = max(
+                current_balance - remaining_after_ot,
+                0.0
+            )
 
     def _get_configured_annual_leave_type(self):
         """Return annual leave type configured in custom lateness settings."""
