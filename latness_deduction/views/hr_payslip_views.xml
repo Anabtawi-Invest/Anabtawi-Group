@@ -1,0 +1,34 @@
+<odoo>
+    <!-- Payslip form: show lateness fields under Other Info -->
+    <record id="hr_payslip_view_form_lateness_action_button" model="ir.ui.view">
+        <field name="name">hr.payslip.form.lateness.action.button</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form/header" position="inside">
+                <button
+                    name="action_reconcile_lateness_no_ot_bank"
+                    type="object"
+                    string="Reconcile Lateness"
+                    class="btn-secondary"
+                    invisible="state != 'draft'"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="hr_payslip_view_tree_lateness_columns" model="ir.ui.view">
+        <field name="name">hr.payslip.tree.lateness.columns</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='account_info']/group" position="inside">
+                <group string="Lateness Summary">
+                    <field name="lateness_hours" readonly="1"/>
+                    <field name="overtime_hours" readonly="1"/>
+                    <field name="remaining_lateness_hours" readonly="1"/>
+                    <field name="annual_leave_balance_hours" readonly="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
