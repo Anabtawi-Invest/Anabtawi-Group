@@ -390,3 +390,28 @@ class HrPayslip(models.Model):
                 'lateness_reconcile_leave_id': False,
             })
         return True
+
+
+class HrEmployee(models.Model):
+    _inherit = 'hr.employee'
+
+    annual_leave_balance_hours = fields.Float(
+        string='Annual Leave Balance (hrs)',
+        compute='_compute_annual_leave_balance_hours',
+        store=False,
+        help='Latest remaining lateness value (REMLATE) from the employee payslips.',
+    )
+
+    def _compute_annual_leave_balance_hours(self):
+        Payslip = self.env['hr.payslip']
+        for employee in self:
+            employee.annual_leave_balance_hours = 0.0
+            slip = Payslip.search(
+                [('employee_id', '=', employee.id)],
+                order='date_to desc, id desc',
+                limit=1,
+            )
+            if not slip:
+                continue
+            remlate_input = slip.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')
+            employee.annual_leave_balance_hours = sum(remlate_input.mapped('amount')) if remlate_input else 0.0
