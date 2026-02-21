@@ -1,14 +1,12 @@
 import logging
 import json
-from datetime import datetime, time, timedelta
-
-import pytz
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.addons.resource.models.utils import HOURS_PER_DAY
 
 OT_PRIORITY_CODES = ['OTR', 'PHO', 'OTW']  # Weekend, Public Holiday, Weekday
+OT_MULTIPLIERS = {'OTW': 1.25, 'OTR': 1.5, 'PHO': 1.5}
 _logger = logging.getLogger(__name__)
 
 class HrPayslip(models.Model):
@@ -17,6 +15,7 @@ class HrPayslip(models.Model):
     # Clean field names (no dashboard_*)
     lateness_hours = fields.Float(string='Lateness (hrs)', compute='_compute_lateness_and_ot', store=False)
     overtime_hours = fields.Float(string='Overtime (hrs)', compute='_compute_lateness_and_ot', store=False)
+    overtime_equivalent_hours = fields.Float(string='Overtime Equivalent (hrs)', compute='_compute_lateness_and_ot', store=False)
     remaining_lateness_hours = fields.Float(string='Remaining Lateness (hrs)', compute='_compute_remaining_lateness', store=False)
     annual_leave_balance_hours = fields.Float(
         string='Annual Leave Balance (hrs)',
@@ -37,11 +36,10 @@ class HrPayslip(models.Model):
         """Capture original worked days and REMLATE before reconciliation."""
         self.ensure_one()
         remlate_input = self.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')[:1]
-        payload = {
+        return {
             'worked_days_hours': {str(line.id): (line.number_of_hours or 0.0) for line in self.worked_days_line_ids},
             'remlate_amount': remlate_input.amount if remlate_input else None,
         }
-        return json.dumps(payload)
 
     def _restore_lateness_snapshot(self):
         """Restore worked days and REMLATE from the stored snapshot."""
@@ -98,8 +96,8 @@ class HrPayslip(models.Model):
 
             # Pre-reconciliation preview only.
             lateness, buckets = slip._get_worked_day_hours_by_code()
-            total_ot = sum(buckets.values())
-            estimated_leave_hours = max(lateness - total_ot, 0.0)
+            total_ot_equiv = slip._get_weighted_ot_hours(buckets)
+            estimated_leave_hours = max(lateness - total_ot_equiv, 0.0)
             slip.remaining_annual_leave_balance_hours = max(current_balance - estimated_leave_hours, 0.0)
 
     def _get_configured_annual_leave_type(self):
@@ -131,39 +129,24 @@ class HrPayslip(models.Model):
         return input_type
 
     def _get_valid_leave_slot(self, remaining_hours, leave_type):
-        """Find a working-day slot within the payslip period that can host remaining_hours."""
+        """Build a single-day leave slot in payslip period for the required hours."""
         self.ensure_one()
         if remaining_hours <= 0 or not self.employee_id or not leave_type:
             return False
-
-        employee = self.employee_id
-        calendar = employee.resource_calendar_id or employee.company_id.resource_calendar_id
-        if not calendar:
+        leave_day = self.date_to or self.date_from or fields.Date.today()
+        leave_preview = self.env['hr.leave'].new({
+            'employee_id': self.employee_id.id,
+            'holiday_status_id': leave_type.id,
+            'request_date_from': leave_day,
+            'request_date_to': leave_day,
+            'request_unit_hours': True,
+        })
+        hour_from, hour_to = leave_preview._get_hour_from_to(leave_day, leave_day)
+        if hour_to <= hour_from:
             return False
-
-        day = self.date_from or self.date_to or fields.Date.today()
-        end_day = self.date_to or day
-        while day <= end_day:
-            start_dt = pytz.utc.localize(datetime.combine(day, time.min))
-            end_dt = pytz.utc.localize(datetime.combine(day, time.max))
-            work_data = employee._get_work_days_data_batch(start_dt, end_dt, calendar=calendar).get(employee.id, {})
-            day_hours = work_data.get('hours', 0.0)
-
-            if day_hours >= remaining_hours and day_hours > 0:
-                leave_preview = self.env['hr.leave'].new({
-                    'employee_id': employee.id,
-                    'holiday_status_id': leave_type.id,
-                    'request_date_from': day,
-                    'request_date_to': day,
-                    'request_unit_hours': True,
-                })
-                hour_from, hour_to = leave_preview._get_hour_from_to(day, day)
-                if hour_to > hour_from and (hour_to - hour_from) >= remaining_hours:
-                    return day, hour_from, hour_from + remaining_hours
-
-            day += timedelta(days=1)
-
-        return False
+        if (hour_to - hour_from) < remaining_hours:
+            return False
+        return leave_day, hour_from, hour_from + remaining_hours
 
     def _get_worked_day_hours_by_code(self):
         self.ensure_one()
@@ -178,12 +161,16 @@ class HrPayslip(models.Model):
                 lateness += line.number_of_hours or 0.0
         return lateness, buckets
 
+    def _get_weighted_ot_hours(self, buckets):
+        return sum((buckets.get(code, 0.0) or 0.0) * OT_MULTIPLIERS.get(code, 1.0) for code in OT_PRIORITY_CODES)
+
     @api.depends('worked_days_line_ids.number_of_hours', 'worked_days_line_ids.work_entry_type_id.code')
     def _compute_lateness_and_ot(self):
         for slip in self:
             lateness, buckets = slip._get_worked_day_hours_by_code()
             slip.lateness_hours = lateness
             slip.overtime_hours = sum(buckets.values())
+            slip.overtime_equivalent_hours = slip._get_weighted_ot_hours(buckets)
 
     @api.depends(
         'worked_days_line_ids.number_of_hours',
@@ -200,7 +187,7 @@ class HrPayslip(models.Model):
                 rem = sum(inp.mapped('amount'))
             else:
                 lateness, buckets = slip._get_worked_day_hours_by_code()
-                rem = max(lateness - sum(buckets.values()), 0.0)
+                rem = max(lateness - slip._get_weighted_ot_hours(buckets), 0.0)
             slip.remaining_lateness_hours = rem
 
     @api.depends('employee_id', 'date_to', 'company_id')
@@ -224,9 +211,8 @@ class HrPayslip(models.Model):
     def action_reconcile_lateness_no_ot_bank(self):
         """Core reconciliation:
         - Consume OT hours in order OTR -> PHO -> OTW by reducing worked days OT hours.
-        - If still remaining, create a Time Off (hr.leave) request in HOURS against configured Annual Leave type,
-          so balance decreases.
-        - If still remaining, store remaining hours into payslip input line code REMLATE (for salary deduction rule).
+        - If still remaining, create a Time Off (hr.leave) request in HOURS against configured Annual Leave type.
+        - If still remaining, store hours into payslip input line code REMLATE (for salary deduction rule).
         """
         Leave = self.env['hr.leave']
         for slip in self:
@@ -238,27 +224,31 @@ class HrPayslip(models.Model):
             lateness, buckets = slip._get_worked_day_hours_by_code()
             remaining = lateness
             created_leave = self.env['hr.leave']
+            weighted_total = slip._get_weighted_ot_hours(buckets)
             _logger.info(
-                "[LatenessReconcile] start slip_id=%s name=%s employee_id=%s lateness=%s buckets=%s",
-                slip.id, slip.name, slip.employee_id.id, lateness, buckets
+                "[LatenessReconcile] start slip_id=%s name=%s employee_id=%s lateness=%s buckets=%s weighted_total=%s",
+                slip.id, slip.name, slip.employee_id.id, lateness, buckets, weighted_total
             )
 
-            # 1) consume OT buckets by reducing worked days lines (number_of_hours)
+            # 1) consume OT buckets by weighted equivalent value, then convert back to raw OT hours.
             for code in OT_PRIORITY_CODES:
                 if remaining <= 0:
                     break
-                available = buckets.get(code, 0.0)
-                if available <= 0:
+                available_raw = buckets.get(code, 0.0)
+                multiplier = OT_MULTIPLIERS.get(code, 1.0)
+                available_equiv = available_raw * multiplier
+                if available_equiv <= 0:
                     continue
-                consume = min(available, remaining)
+                consume_equiv = min(available_equiv, remaining)
+                consume_raw = consume_equiv / multiplier if multiplier else 0.0
                 _logger.info(
-                    "[LatenessReconcile] consume_ot slip_id=%s code=%s available=%s consume=%s remaining_before=%s",
-                    slip.id, code, available, consume, remaining
+                    "[LatenessReconcile] consume_ot slip_id=%s code=%s available_raw=%s available_equiv=%s consume_equiv=%s consume_raw=%s remaining_before=%s",
+                    slip.id, code, available_raw, available_equiv, consume_equiv, consume_raw, remaining
                 )
 
                 # Reduce hours from worked days lines for that code (FIFO)
                 lines = slip.worked_days_line_ids.filtered(lambda l: (l.work_entry_type_id.code or '').strip() == code).sorted('id')
-                to_consume = consume
+                to_consume = consume_raw
                 for line in lines:
                     if to_consume <= 0:
                         break
@@ -269,7 +259,7 @@ class HrPayslip(models.Model):
                     line.number_of_hours = h - cut
                     to_consume -= cut
 
-                remaining -= consume
+                remaining -= consume_equiv
                 _logger.info(
                     "[LatenessReconcile] after_ot slip_id=%s code=%s remaining_after=%s",
                     slip.id, code, remaining
@@ -292,8 +282,6 @@ class HrPayslip(models.Model):
                     slip.id, leave_type.id, leave_type.requires_allocation, has_valid_allocation, remaining
                 )
                 if not (leave_type.requires_allocation and not has_valid_allocation):
-                    # Create a validated leave in hours so balance decreases.
-                    # If leave creation/validation fails (e.g. no valid allocation), keep remaining for REMLATE.
                     try:
                         slip_ref = slip.name or _('Payslip')
                         leave_slot = slip._get_valid_leave_slot(remaining, leave_type)
@@ -333,11 +321,9 @@ class HrPayslip(models.Model):
                             slip.id, leave_vals
                         )
                         leave = Leave.sudo().create(leave_vals)
-                        # Approve directly (Odoo 19 hr.leave does not have action_confirm/action_validate).
                         if hasattr(leave, 'action_approve'):
                             leave.sudo().action_approve(check_state=False)
                         created_leave = leave
-                        print(11111,leave)
                         _logger.info(
                             "[LatenessReconcile] leave_created slip_id=%s leave_id=%s number_of_hours=%s number_of_days=%s state=%s",
                             slip.id, leave.id, leave.number_of_hours, leave.number_of_days, leave.state
@@ -364,7 +350,7 @@ class HrPayslip(models.Model):
                 })
             slip.write({
                 'lateness_reconciled': True,
-                'lateness_reconcile_snapshot': snapshot,
+                'lateness_reconcile_snapshot': json.dumps(snapshot),
                 'lateness_reconcile_leave_id': created_leave.id or False,
             })
             _logger.info(

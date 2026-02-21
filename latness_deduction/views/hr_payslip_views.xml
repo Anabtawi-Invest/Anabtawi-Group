@@ -32,6 +32,7 @@
                     <field name="lateness_reconciled" invisible="1"/>
                     <field name="lateness_hours" readonly="1"/>
                     <field name="overtime_hours" readonly="1"/>
+                    <field name="overtime_equivalent_hours" readonly="1"/>
                     <field name="remaining_lateness_hours" readonly="1"/>
                     <field name="annual_leave_balance_hours" readonly="1"/>
                     <field name="remaining_annual_leave_balance_hours" readonly="1"/>
