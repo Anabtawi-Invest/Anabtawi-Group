@@ -18,6 +18,12 @@
                     string="Reset Reconciliation"
                     class="btn-secondary"
                     invisible="state != 'draft' or not lateness_reconciled"/>
+                <button
+                    name="action_rebuild_ot_wallet"
+                    type="object"
+                    string="Rebuild OT Wallet"
+                    class="btn-secondary"
+                    invisible="state != 'draft'"/>
             </xpath>
         </field>
     </record>
@@ -30,12 +36,20 @@
             <xpath expr="//page[@name='account_info']/group" position="inside">
                 <group string="Lateness Summary">
                     <field name="lateness_reconciled" invisible="1"/>
-                    <field name="lateness_hours" readonly="1"/>
-                    <field name="overtime_hours" readonly="1"/>
-                    <field name="overtime_equivalent_hours" readonly="1"/>
-                    <field name="remaining_lateness_hours" readonly="1"/>
-                    <field name="annual_leave_balance_hours" readonly="1"/>
-                    <field name="remaining_annual_leave_balance_hours" readonly="1"/>
+                    <field name="annual_leave_balance_hours" readonly="1" string="Annual Leave Hours"/>
+                    <field name="ot_wallet_total_before_deduction_equiv" readonly="1" />
+
+                    <field name="overtime_equivalent_hours" readonly="1" invisible="1"/>
+                    <field name="lateness_hours" readonly="1" />
+                    <field name="ot_wallet_consumed_equiv" readonly="1" string="Over Time Hours" invisible="1"/>
+
+                    <field name="overtime_hours" readonly="1" invisible="1" />
+                    <field name="ot_wallet_carry_in_equiv" readonly="1" invisible="1" />
+                    <field name="ot_wallet_earned_equiv" readonly="1" invisible="1"/>
+                    <field name="ot_wallet_carry_out_equiv" readonly="1" invisible="1"/>
+                    <field name="remaining_lateness_hours" readonly="1" invisible="1"/>
+
+                    <field name="remaining_annual_leave_balance_hours" readonly="1" string="Remaining Annual Leave Hours"/>
                 </group>
             </xpath>
         </field>
