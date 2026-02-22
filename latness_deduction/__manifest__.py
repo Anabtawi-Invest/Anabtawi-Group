@@ -10,7 +10,7 @@
         'security/ir.model.access.csv',
         'data/server_actions.xml',
         # 'views/hr_employee_views.xml',
-        'views/hr_leave_views.xml',
+        # 'views/hr_leave_views.xml',
         'views/hr_payslip_views.xml',
         'views/res_config_settings_views.xml',
     ],
