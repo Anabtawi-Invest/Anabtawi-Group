@@ -1,6 +1,8 @@
 import logging
 import json
-from datetime import timedelta
+from datetime import datetime, time, timedelta
+
+import pytz
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
@@ -238,21 +240,57 @@ class HrPayslip(models.Model):
                 day += timedelta(days=1)
                 continue
 
-            leave_preview = self.env['hr.leave'].new({
-                'employee_id': self.employee_id.id,
-                'holiday_status_id': leave_type.id,
-                'request_date_from': day,
-                'request_date_to': day,
-                'request_unit_hours': True,
-            })
-            hour_from, hour_to = leave_preview._get_hour_from_to(day, day)
-            capacity = max(hour_to - hour_from, 0.0)
-            if capacity > 0:
+            for hour_from, hour_to in self._get_day_attendance_hour_ranges(day):
+                if remaining <= 0:
+                    break
+                capacity = max(hour_to - hour_from, 0.0)
+                if capacity <= 0:
+                    continue
                 take = min(capacity, remaining)
-                slots.append((day, hour_from, hour_from + take, take))
+                slot_to = hour_from + take
+                leave_preview = self.env['hr.leave'].new({
+                    'employee_id': self.employee_id.id,
+                    'holiday_status_id': leave_type.id,
+                    'request_date_from': day,
+                    'request_date_to': day,
+                    'request_unit_hours': True,
+                    'request_hour_from': hour_from,
+                    'request_hour_to': slot_to,
+                })
+                leave_preview._compute_date_from_to()
+                if leave_preview.date_from >= leave_preview.date_to:
+                    continue
+                slots.append((day, hour_from, slot_to, take))
                 remaining -= take
             day += timedelta(days=1)
         return slots, remaining
+
+    def _get_day_attendance_hour_ranges(self, day):
+        """Return employee work attendance ranges (hour_from, hour_to) for a given day."""
+        self.ensure_one()
+        employee = self.employee_id
+        calendar = employee.resource_calendar_id or employee.company_id.resource_calendar_id
+        if not calendar:
+            return []
+        employee_tz = pytz.timezone(employee.tz or calendar.tz or 'UTC')
+        start_dt = pytz.utc.localize(datetime.combine(day, time.min))
+        end_dt = pytz.utc.localize(datetime.combine(day, time.max))
+        resource = employee.resource_id
+        intervals = calendar._attendance_intervals_batch(start_dt, end_dt, resources=resource)
+        day_intervals = intervals.get(resource.id if resource else False)
+        if not day_intervals:
+            return []
+        ranges = []
+        for start, end, _attendance in day_intervals._items:
+            local_start = start.astimezone(employee_tz)
+            local_end = end.astimezone(employee_tz)
+            if local_end <= local_start:
+                continue
+            hour_from = local_start.hour + (local_start.minute / 60.0)
+            hour_to = local_end.hour + (local_end.minute / 60.0)
+            if hour_to > hour_from:
+                ranges.append((hour_from, hour_to))
+        return ranges
 
     def _get_worked_day_hours_by_code(self):
         self.ensure_one()
