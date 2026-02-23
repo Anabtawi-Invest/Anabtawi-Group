@@ -19,20 +19,9 @@ action = records._action_mass_reconcile_lateness_no_ot_bank()
         <field name="binding_view_types">list</field>
         <field name="state">code</field>
         <field name="code">
-records.action_reconcile_lateness_no_ot_bank()
+records.with_context(skip_reconciled=True).action_reconcile_lateness_no_ot_bank()
 action = {'type': 'ir.actions.client', 'tag': 'reload'}
         </field>
     </record>
 
-    <record id="action_mass_rebuild_ot_wallet_payslips" model="ir.actions.server">
-        <field name="name">Rebuild OT Wallet</field>
-        <field name="model_id" ref="hr_payroll.model_hr_payslip"/>
-        <field name="binding_model_id" ref="hr_payroll.model_hr_payslip"/>
-        <field name="binding_view_types">list</field>
-        <field name="state">code</field>
-        <field name="code">
-records.action_rebuild_ot_wallet()
-action = {'type': 'ir.actions.client', 'tag': 'reload'}
-        </field>
-    </record>
 </odoo>

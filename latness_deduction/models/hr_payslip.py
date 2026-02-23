@@ -1,5 +1,6 @@
 import logging
 import json
+from datetime import timedelta
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
@@ -43,6 +44,36 @@ class HrPayslip(models.Model):
     )
     ot_wallet_consumed_equiv = fields.Float(copy=False, readonly=True, default=0.0)
     ot_wallet_carry_out_equiv = fields.Float(copy=False, readonly=True, default=0.0)
+    annual_leave_hours_before = fields.Float(
+        string='Annual Leave Hours before',
+        compute='_compute_before_after_reconcile_values',
+        store=False,
+    )
+    ot_balance_before = fields.Float(
+        string='OT balance before',
+        compute='_compute_before_after_reconcile_values',
+        store=False,
+    )
+    lateness_before = fields.Float(
+        string='Lateness before',
+        compute='_compute_before_after_reconcile_values',
+        store=False,
+    )
+    annual_leave_hours_after = fields.Float(
+        string='Annual Leave Hours after',
+        compute='_compute_before_after_reconcile_values',
+        store=False,
+    )
+    ot_balance_after = fields.Float(
+        string='OT balance after',
+        compute='_compute_before_after_reconcile_values',
+        store=False,
+    )
+    lateness_after = fields.Float(
+        string='Lateness after',
+        compute='_compute_before_after_reconcile_values',
+        store=False,
+    )
 
     def _build_lateness_snapshot(self):
         """Capture original worked days and REMLATE before reconciliation."""
@@ -152,24 +183,37 @@ class HrPayslip(models.Model):
         return input_type
 
     def _get_valid_leave_slot(self, remaining_hours, leave_type):
-        """Build a single-day leave slot in payslip period for the required hours."""
+        """Find a valid single-day leave slot within payslip period for required hours."""
         self.ensure_one()
         if remaining_hours <= 0 or not self.employee_id or not leave_type:
             return False
-        leave_day = self.date_to or self.date_from or fields.Date.today()
-        leave_preview = self.env['hr.leave'].new({
-            'employee_id': self.employee_id.id,
-            'holiday_status_id': leave_type.id,
-            'request_date_from': leave_day,
-            'request_date_to': leave_day,
-            'request_unit_hours': True,
-        })
-        hour_from, hour_to = leave_preview._get_hour_from_to(leave_day, leave_day)
-        if hour_to <= hour_from:
-            return False
-        if (hour_to - hour_from) < remaining_hours:
-            return False
-        return leave_day, hour_from, hour_from + remaining_hours
+
+        Leave = self.env['hr.leave']
+        day = self.date_from or self.date_to or fields.Date.today()
+        end_day = self.date_to or day
+        while day <= end_day:
+            overlapping_leave = Leave.sudo().search([
+                ('employee_id', '=', self.employee_id.id),
+                ('state', 'in', ['confirm', 'validate1', 'validate']),
+                ('request_date_from', '<=', day),
+                ('request_date_to', '>=', day),
+            ], limit=1)
+            if overlapping_leave:
+                day += timedelta(days=1)
+                continue
+
+            leave_preview = self.env['hr.leave'].new({
+                'employee_id': self.employee_id.id,
+                'holiday_status_id': leave_type.id,
+                'request_date_from': day,
+                'request_date_to': day,
+                'request_unit_hours': True,
+            })
+            hour_from, hour_to = leave_preview._get_hour_from_to(day, day)
+            if hour_to > hour_from and (hour_to - hour_from) >= remaining_hours:
+                return day, hour_from, hour_from + remaining_hours
+            day += timedelta(days=1)
+        return False
 
     def _get_worked_day_hours_by_code(self):
         self.ensure_one()
@@ -193,6 +237,51 @@ class HrPayslip(models.Model):
             slip.ot_wallet_total_before_deduction_equiv = (
                 (slip.ot_wallet_carry_in_equiv or 0.0) + (slip.ot_wallet_earned_equiv or 0.0)
             )
+
+    @api.depends(
+        'lateness_reconciled',
+        'lateness_reconcile_snapshot',
+        'annual_leave_balance_hours',
+        'remaining_lateness_hours',
+        'worked_days_line_ids.number_of_hours',
+        'worked_days_line_ids.work_entry_type_id.code',
+        'ot_wallet_carry_out_equiv',
+    )
+    def _compute_before_after_reconcile_values(self):
+        for slip in self:
+            lateness, buckets = slip._get_worked_day_hours_by_code()
+            carry_in = slip.ot_wallet_carry_in_equiv or slip._get_previous_ot_wallet_carry_out()
+            current_ot_before = carry_in + slip._get_weighted_ot_hours(buckets)
+            current_annual = slip.annual_leave_balance_hours or 0.0
+            current_lateness = lateness
+
+            if not slip.lateness_reconciled:
+                slip.annual_leave_hours_before = current_annual
+                slip.ot_balance_before = current_ot_before
+                slip.lateness_before = current_lateness
+                slip.annual_leave_hours_after = current_annual
+                slip.ot_balance_after = current_ot_before
+                slip.lateness_after = current_lateness
+                continue
+
+            before_annual = current_annual
+            before_ot = current_ot_before
+            before_lateness = current_lateness
+            if slip.lateness_reconcile_snapshot:
+                try:
+                    payload = json.loads(slip.lateness_reconcile_snapshot)
+                    before_annual = payload.get('annual_leave_hours_before', before_annual)
+                    before_ot = payload.get('ot_balance_before', before_ot)
+                    before_lateness = payload.get('lateness_before', before_lateness)
+                except Exception:
+                    pass
+
+            slip.annual_leave_hours_before = before_annual
+            slip.ot_balance_before = before_ot
+            slip.lateness_before = before_lateness
+            slip.annual_leave_hours_after = current_annual
+            slip.ot_balance_after = slip.ot_wallet_carry_out_equiv or max(before_ot - before_lateness, 0.0)
+            slip.lateness_after = slip.remaining_lateness_hours or 0.0
 
     def _get_previous_ot_wallet_carry_out(self):
         """Compute cumulative OT wallet carry before current slip from all previous months."""
@@ -361,8 +450,18 @@ class HrPayslip(models.Model):
         - If still remaining, store hours into payslip input line code REMLATE (for salary deduction rule).
         """
         Leave = self.env['hr.leave']
+        # Always rebuild wallet chain first so carry values are up-to-date before reconciliation.
+        self.action_rebuild_ot_wallet()
+        skip_reconciled = self.env.context.get('skip_reconciled') or len(self) > 1
         for slip in self:
+            leave_deduction_status = 'not_needed'
             if slip.lateness_reconciled:
+                if skip_reconciled:
+                    _logger.info(
+                        "[LatenessReconcile] skipped_already_reconciled slip_id=%s employee_id=%s",
+                        slip.id, slip.employee_id.id
+                    )
+                    continue
                 raise UserError(_('Lateness reconciliation already applied. Use "Reset Reconciliation" first.'))
 
             snapshot = slip._build_lateness_snapshot()
@@ -372,6 +471,11 @@ class HrPayslip(models.Model):
             created_leave = self.env['hr.leave']
             carry_in = slip._get_previous_ot_wallet_carry_out()
             weighted_total = slip._get_weighted_ot_hours(buckets)
+            snapshot.update({
+                'annual_leave_hours_before': slip.annual_leave_balance_hours or 0.0,
+                'ot_balance_before': carry_in + weighted_total,
+                'lateness_before': lateness,
+            })
             _logger.info(
                 "[LatenessReconcile] start slip_id=%s name=%s employee_id=%s lateness=%s carry_in=%s buckets=%s weighted_total=%s",
                 slip.id, slip.name, slip.employee_id.id, lateness, carry_in, buckets, weighted_total
@@ -432,6 +536,7 @@ class HrPayslip(models.Model):
 
             # 2) if remaining > 0, deduct from Annual Leave in hours (Time Off)
             if remaining > 0:
+                leave_deduction_status = 'pending'
                 leave_type = slip._get_configured_annual_leave_type()
                 if not leave_type:
                     raise UserError(_(
@@ -443,8 +548,9 @@ class HrPayslip(models.Model):
                 # instead of crashing with "There is no valid allocation to cover that request."
                 has_valid_allocation = leave_type.with_context(employee_id=slip.employee_id.id).has_valid_allocation
                 _logger.info(
-                    "[LatenessReconcile] leave_check slip_id=%s leave_type_id=%s requires_allocation=%s has_valid_allocation=%s remaining=%s",
-                    slip.id, leave_type.id, leave_type.requires_allocation, has_valid_allocation, remaining
+                    "[LatenessReconcile] leave_check slip_id=%s leave_type_id=%s leave_type_name=%s request_unit=%s allows_negative=%s requires_allocation=%s has_valid_allocation=%s remaining=%s annual_leave_balance=%s",
+                    slip.id, leave_type.id, leave_type.name, leave_type.request_unit, leave_type.allows_negative,
+                    leave_type.requires_allocation, has_valid_allocation, remaining, slip.annual_leave_balance_hours
                 )
                 if not (leave_type.requires_allocation and not has_valid_allocation):
                     try:
@@ -455,8 +561,13 @@ class HrPayslip(models.Model):
                                 "[LatenessReconcile] no_valid_leave_slot slip_id=%s remaining=%s; fallback to REMLATE",
                                 slip.id, remaining
                             )
+                            leave_deduction_status = 'no_valid_slot'
                             raise ValidationError(_("No valid working slot found for this leave request."))
                         leave_day, start_hour, end_hour = leave_slot
+                        _logger.info(
+                            "[LatenessReconcile] leave_slot_ok slip_id=%s leave_day=%s start_hour=%s end_hour=%s req_hours=%s",
+                            slip.id, leave_day, start_hour, end_hour, remaining
+                        )
 
                         overlapping_leave = Leave.sudo().search([
                             ('employee_id', '=', slip.employee_id.id),
@@ -469,6 +580,7 @@ class HrPayslip(models.Model):
                                 "[LatenessReconcile] overlapping_leave slip_id=%s leave_day=%s existing_leave_id=%s; fallback to REMLATE",
                                 slip.id, leave_day, overlapping_leave.id
                             )
+                            leave_deduction_status = 'overlap'
                             raise ValidationError(_("Overlapping time off exists for this day."))
 
                         leave_vals = {
@@ -492,17 +604,26 @@ class HrPayslip(models.Model):
                         if hasattr(leave, 'action_approve'):
                             leave.sudo().action_approve(check_state=False)
                         created_leave = leave
+                        leave_deduction_status = 'leave_created'
                         _logger.info(
                             "[LatenessReconcile] leave_created slip_id=%s leave_id=%s number_of_hours=%s number_of_days=%s state=%s",
                             slip.id, leave.id, leave.number_of_hours, leave.number_of_days, leave.state
                         )
                         remaining = 0.0
                     except (ValidationError, UserError):
+                        if leave_deduction_status == 'pending':
+                            leave_deduction_status = 'leave_create_failed'
                         _logger.exception(
                             "[LatenessReconcile] leave_create_failed slip_id=%s remaining=%s; fallback to REMLATE",
                             slip.id, remaining
                         )
                         pass
+                else:
+                    leave_deduction_status = 'no_valid_allocation'
+                    _logger.warning(
+                        "[LatenessReconcile] skip_leave_no_valid_allocation slip_id=%s leave_type_id=%s remaining=%s; fallback to REMLATE",
+                        slip.id, leave_type.id, remaining
+                    )
 
             # 3) Store remaining lateness for payroll deduction rule (input line)
             # Always keep input line consistent (even if 0)
@@ -526,9 +647,11 @@ class HrPayslip(models.Model):
                 'ot_wallet_carry_out_equiv': max(carry_in + weighted_total - (consume_wallet_equiv + consumed_current_equiv), 0.0),
             })
             _logger.info(
-                "[LatenessReconcile] end slip_id=%s final_remaining=%s wallet_in=%s wallet_earned=%s wallet_consumed=%s wallet_out=%s remlate_input_exists=%s",
+                "[LatenessReconcile] end slip_id=%s final_remaining=%s leave_deduction_status=%s leave_id=%s wallet_in=%s wallet_earned=%s wallet_consumed=%s wallet_out=%s remlate_input_exists=%s",
                 slip.id,
                 remaining,
+                leave_deduction_status,
+                created_leave.id or False,
                 carry_in,
                 weighted_total,
                 consume_wallet_equiv + consumed_current_equiv,
@@ -538,6 +661,7 @@ class HrPayslip(models.Model):
         return True
 
     def action_reset_lateness_reconciliation(self):
+        reset_done = self.browse()
         for slip in self:
             if not slip.lateness_reconciled:
                 continue
@@ -557,6 +681,10 @@ class HrPayslip(models.Model):
                 'ot_wallet_consumed_equiv': 0.0,
                 'ot_wallet_carry_out_equiv': 0.0,
             })
+            reset_done |= slip
+
+        if reset_done:
+            reset_done.action_rebuild_ot_wallet()
         return True
 
 
