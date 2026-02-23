@@ -86,6 +86,7 @@ class HrPayslip(models.Model):
             'ot_wallet_earned_equiv': self.ot_wallet_earned_equiv,
             'ot_wallet_consumed_equiv': self.ot_wallet_consumed_equiv,
             'ot_wallet_carry_out_equiv': self.ot_wallet_carry_out_equiv,
+            'created_leave_ids': [],
         }
 
     def _restore_lateness_snapshot(self):
@@ -214,6 +215,44 @@ class HrPayslip(models.Model):
                 return day, hour_from, hour_from + remaining_hours
             day += timedelta(days=1)
         return False
+
+    def _get_valid_leave_slots(self, remaining_hours, leave_type):
+        """Build one or more day slots that together can cover remaining_hours."""
+        self.ensure_one()
+        if remaining_hours <= 0 or not self.employee_id or not leave_type:
+            return [], remaining_hours
+
+        Leave = self.env['hr.leave']
+        slots = []
+        remaining = remaining_hours
+        day = self.date_from or self.date_to or fields.Date.today()
+        end_day = self.date_to or day
+        while day <= end_day and remaining > 0:
+            overlapping_leave = Leave.sudo().search([
+                ('employee_id', '=', self.employee_id.id),
+                ('state', 'in', ['confirm', 'validate1', 'validate']),
+                ('request_date_from', '<=', day),
+                ('request_date_to', '>=', day),
+            ], limit=1)
+            if overlapping_leave:
+                day += timedelta(days=1)
+                continue
+
+            leave_preview = self.env['hr.leave'].new({
+                'employee_id': self.employee_id.id,
+                'holiday_status_id': leave_type.id,
+                'request_date_from': day,
+                'request_date_to': day,
+                'request_unit_hours': True,
+            })
+            hour_from, hour_to = leave_preview._get_hour_from_to(day, day)
+            capacity = max(hour_to - hour_from, 0.0)
+            if capacity > 0:
+                take = min(capacity, remaining)
+                slots.append((day, hour_from, hour_from + take, take))
+                remaining -= take
+            day += timedelta(days=1)
+        return slots, remaining
 
     def _get_worked_day_hours_by_code(self):
         self.ensure_one()
@@ -555,59 +594,47 @@ class HrPayslip(models.Model):
                 if not (leave_type.requires_allocation and not has_valid_allocation):
                     try:
                         slip_ref = slip.name or _('Payslip')
-                        leave_slot = slip._get_valid_leave_slot(remaining, leave_type)
-                        if not leave_slot:
+                        leave_slots, uncovered = slip._get_valid_leave_slots(remaining, leave_type)
+                        if not leave_slots or uncovered > 0:
                             _logger.warning(
-                                "[LatenessReconcile] no_valid_leave_slot slip_id=%s remaining=%s; fallback to REMLATE",
-                                slip.id, remaining
+                                "[LatenessReconcile] no_valid_leave_slot slip_id=%s remaining=%s uncovered=%s slots=%s; fallback to REMLATE",
+                                slip.id, remaining, uncovered, leave_slots
                             )
                             leave_deduction_status = 'no_valid_slot'
                             raise ValidationError(_("No valid working slot found for this leave request."))
-                        leave_day, start_hour, end_hour = leave_slot
-                        _logger.info(
-                            "[LatenessReconcile] leave_slot_ok slip_id=%s leave_day=%s start_hour=%s end_hour=%s req_hours=%s",
-                            slip.id, leave_day, start_hour, end_hour, remaining
-                        )
-
-                        overlapping_leave = Leave.sudo().search([
-                            ('employee_id', '=', slip.employee_id.id),
-                            ('state', 'in', ['confirm', 'validate1', 'validate']),
-                            ('request_date_from', '<=', leave_day),
-                            ('request_date_to', '>=', leave_day),
-                        ], limit=1)
-                        if overlapping_leave:
-                            _logger.warning(
-                                "[LatenessReconcile] overlapping_leave slip_id=%s leave_day=%s existing_leave_id=%s; fallback to REMLATE",
-                                slip.id, leave_day, overlapping_leave.id
+                        created_leaves = self.env['hr.leave']
+                        for leave_day, start_hour, end_hour, slot_hours in leave_slots:
+                            _logger.info(
+                                "[LatenessReconcile] leave_slot_ok slip_id=%s leave_day=%s start_hour=%s end_hour=%s slot_hours=%s",
+                                slip.id, leave_day, start_hour, end_hour, slot_hours
                             )
-                            leave_deduction_status = 'overlap'
-                            raise ValidationError(_("Overlapping time off exists for this day."))
-
-                        leave_vals = {
-                            'name': _('Lateness Coverage (%s)') % slip_ref,
-                            'employee_id': slip.employee_id.id,
-                            'holiday_status_id': leave_type.id,
-                            'request_date_from': leave_day,
-                            'request_date_to': leave_day,
-                            'request_unit_hours': True,
-                            'request_hour_from': start_hour,
-                            'request_hour_to': end_hour,
-                            'lateness_reconcile_generated': True,
-                            'lateness_reconcile_reason': _('Generated from Lateness Reconciliation'),
-                            'lateness_reconcile_payslip_id': slip.id,
-                        }
-                        _logger.info(
-                            "[LatenessReconcile] creating_leave slip_id=%s leave_vals=%s",
-                            slip.id, leave_vals
-                        )
-                        leave = Leave.sudo().create(leave_vals)
-                        if hasattr(leave, 'action_approve'):
-                            leave.sudo().action_approve(check_state=False)
-                        created_leave = leave
+                            leave_vals = {
+                                'name': _('Lateness Coverage (%s)') % slip_ref,
+                                'employee_id': slip.employee_id.id,
+                                'holiday_status_id': leave_type.id,
+                                'request_date_from': leave_day,
+                                'request_date_to': leave_day,
+                                'request_unit_hours': True,
+                                'request_hour_from': start_hour,
+                                'request_hour_to': end_hour,
+                                'lateness_reconcile_generated': True,
+                                'lateness_reconcile_reason': _('Generated from Lateness Reconciliation'),
+                                'lateness_reconcile_payslip_id': slip.id,
+                            }
+                            _logger.info(
+                                "[LatenessReconcile] creating_leave slip_id=%s leave_vals=%s",
+                                slip.id, leave_vals
+                            )
+                            leave = Leave.sudo().create(leave_vals)
+                            if hasattr(leave, 'action_approve'):
+                                leave.sudo().action_approve(check_state=False)
+                            created_leaves |= leave
+                        created_leave = created_leaves[:1]
+                        snapshot['created_leave_ids'] = created_leaves.ids
                         leave_deduction_status = 'leave_created'
                         _logger.info(
-                            "[LatenessReconcile] leave_created slip_id=%s leave_id=%s number_of_hours=%s number_of_days=%s state=%s",
-                            slip.id, leave.id, leave.number_of_hours, leave.number_of_days, leave.state
+                            "[LatenessReconcile] leave_created slip_id=%s leave_ids=%s total_hours=%s",
+                            slip.id, created_leaves.ids, sum(created_leaves.mapped('number_of_hours'))
                         )
                         remaining = 0.0
                     except (ValidationError, UserError):
@@ -666,11 +693,22 @@ class HrPayslip(models.Model):
             if not slip.lateness_reconciled:
                 continue
 
+            payload = {}
+            if slip.lateness_reconcile_snapshot:
+                try:
+                    payload = json.loads(slip.lateness_reconcile_snapshot) or {}
+                except Exception:
+                    payload = {}
+
             slip._restore_lateness_snapshot()
 
-            leave = slip.lateness_reconcile_leave_id.sudo().exists()
-            if leave and leave.state in ('confirm', 'validate1', 'validate') and hasattr(leave, 'action_refuse'):
-                leave.action_refuse()
+            leave_ids = payload.get('created_leave_ids') or []
+            leaves = self.env['hr.leave'].sudo().browse(leave_ids).exists()
+            if not leaves and slip.lateness_reconcile_leave_id:
+                leaves = slip.lateness_reconcile_leave_id.sudo().exists()
+            for leave in leaves:
+                if leave.state in ('confirm', 'validate1', 'validate') and hasattr(leave, 'action_refuse'):
+                    leave.action_refuse()
 
             slip.write({
                 'lateness_reconciled': False,
