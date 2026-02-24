@@ -621,74 +621,90 @@ class HrPayslip(models.Model):
                         'Go to Payroll Settings > Lateness Coverage and set Annual Leave Type for Lateness.'
                     ))
 
+                # Never create leave beyond available annual leave balance.
+                # If balance is 0, keep all remaining lateness in REMLATE.
+                annual_leave_available = max(slip.annual_leave_balance_hours or 0.0, 0.0)
+                leave_hours_to_deduct = min(remaining, annual_leave_available)
+                _logger.info(
+                    "[LatenessReconcile] leave_balance_cap slip_id=%s remaining=%s annual_leave_available=%s leave_hours_to_deduct=%s",
+                    slip.id, remaining, annual_leave_available, leave_hours_to_deduct
+                )
+                if leave_hours_to_deduct <= 0:
+                    leave_deduction_status = 'no_leave_balance'
+                    _logger.warning(
+                        "[LatenessReconcile] skip_leave_zero_balance slip_id=%s remaining=%s annual_leave_available=%s; keep REMLATE",
+                        slip.id, remaining, annual_leave_available
+                    )
+
                 # If allocation is required but unavailable, keep remaining for payroll deduction (REMLATE)
                 # instead of crashing with "There is no valid allocation to cover that request."
-                has_valid_allocation = leave_type.with_context(employee_id=slip.employee_id.id).has_valid_allocation
-                _logger.info(
-                    "[LatenessReconcile] leave_check slip_id=%s leave_type_id=%s leave_type_name=%s request_unit=%s allows_negative=%s requires_allocation=%s has_valid_allocation=%s remaining=%s annual_leave_balance=%s",
-                    slip.id, leave_type.id, leave_type.name, leave_type.request_unit, leave_type.allows_negative,
-                    leave_type.requires_allocation, has_valid_allocation, remaining, slip.annual_leave_balance_hours
-                )
-                if not (leave_type.requires_allocation and not has_valid_allocation):
-                    try:
-                        slip_ref = slip.name or _('Payslip')
-                        leave_slots, uncovered = slip._get_valid_leave_slots(remaining, leave_type)
-                        if not leave_slots or uncovered > 0:
-                            _logger.warning(
-                                "[LatenessReconcile] no_valid_leave_slot slip_id=%s remaining=%s uncovered=%s slots=%s; fallback to REMLATE",
-                                slip.id, remaining, uncovered, leave_slots
-                            )
-                            leave_deduction_status = 'no_valid_slot'
-                            raise ValidationError(_("No valid working slot found for this leave request."))
-                        created_leaves = self.env['hr.leave']
-                        for leave_day, start_hour, end_hour, slot_hours in leave_slots:
-                            _logger.info(
-                                "[LatenessReconcile] leave_slot_ok slip_id=%s leave_day=%s start_hour=%s end_hour=%s slot_hours=%s",
-                                slip.id, leave_day, start_hour, end_hour, slot_hours
-                            )
-                            leave_vals = {
-                                'name': _('Lateness Coverage (%s)') % slip_ref,
-                                'employee_id': slip.employee_id.id,
-                                'holiday_status_id': leave_type.id,
-                                'request_date_from': leave_day,
-                                'request_date_to': leave_day,
-                                'request_unit_hours': True,
-                                'request_hour_from': start_hour,
-                                'request_hour_to': end_hour,
-                                'lateness_reconcile_generated': True,
-                                'lateness_reconcile_reason': _('Generated from Lateness Reconciliation'),
-                                'lateness_reconcile_payslip_id': slip.id,
-                            }
-                            _logger.info(
-                                "[LatenessReconcile] creating_leave slip_id=%s leave_vals=%s",
-                                slip.id, leave_vals
-                            )
-                            leave = Leave.sudo().create(leave_vals)
-                            if hasattr(leave, 'action_approve'):
-                                leave.sudo().action_approve(check_state=False)
-                            created_leaves |= leave
-                        created_leave = created_leaves[:1]
-                        snapshot['created_leave_ids'] = created_leaves.ids
-                        leave_deduction_status = 'leave_created'
-                        _logger.info(
-                            "[LatenessReconcile] leave_created slip_id=%s leave_ids=%s total_hours=%s",
-                            slip.id, created_leaves.ids, sum(created_leaves.mapped('number_of_hours'))
-                        )
-                        remaining = 0.0
-                    except (ValidationError, UserError):
-                        if leave_deduction_status == 'pending':
-                            leave_deduction_status = 'leave_create_failed'
-                        _logger.exception(
-                            "[LatenessReconcile] leave_create_failed slip_id=%s remaining=%s; fallback to REMLATE",
-                            slip.id, remaining
-                        )
-                        pass
-                else:
-                    leave_deduction_status = 'no_valid_allocation'
-                    _logger.warning(
-                        "[LatenessReconcile] skip_leave_no_valid_allocation slip_id=%s leave_type_id=%s remaining=%s; fallback to REMLATE",
-                        slip.id, leave_type.id, remaining
+                if leave_hours_to_deduct > 0:
+                    has_valid_allocation = leave_type.with_context(employee_id=slip.employee_id.id).has_valid_allocation
+                    _logger.info(
+                        "[LatenessReconcile] leave_check slip_id=%s leave_type_id=%s leave_type_name=%s request_unit=%s allows_negative=%s requires_allocation=%s has_valid_allocation=%s remaining=%s annual_leave_balance=%s",
+                        slip.id, leave_type.id, leave_type.name, leave_type.request_unit, leave_type.allows_negative,
+                        leave_type.requires_allocation, has_valid_allocation, remaining, slip.annual_leave_balance_hours
                     )
+                    if not (leave_type.requires_allocation and not has_valid_allocation):
+                        try:
+                            slip_ref = slip.name or _('Payslip')
+                            leave_slots, uncovered = slip._get_valid_leave_slots(leave_hours_to_deduct, leave_type)
+                            if not leave_slots or uncovered > 0:
+                                _logger.warning(
+                                    "[LatenessReconcile] no_valid_leave_slot slip_id=%s remaining=%s leave_hours_to_deduct=%s uncovered=%s slots=%s; fallback to REMLATE",
+                                    slip.id, remaining, leave_hours_to_deduct, uncovered, leave_slots
+                                )
+                                leave_deduction_status = 'no_valid_slot'
+                                raise ValidationError(_("No valid working slot found for this leave request."))
+                            created_leaves = self.env['hr.leave']
+                            for leave_day, start_hour, end_hour, slot_hours in leave_slots:
+                                _logger.info(
+                                    "[LatenessReconcile] leave_slot_ok slip_id=%s leave_day=%s start_hour=%s end_hour=%s slot_hours=%s",
+                                    slip.id, leave_day, start_hour, end_hour, slot_hours
+                                )
+                                leave_vals = {
+                                    'name': _('Lateness Coverage (%s)') % slip_ref,
+                                    'employee_id': slip.employee_id.id,
+                                    'holiday_status_id': leave_type.id,
+                                    'request_date_from': leave_day,
+                                    'request_date_to': leave_day,
+                                    'request_unit_hours': True,
+                                    'request_hour_from': start_hour,
+                                    'request_hour_to': end_hour,
+                                    'lateness_reconcile_generated': True,
+                                    'lateness_reconcile_reason': _('Generated from Lateness Reconciliation'),
+                                    'lateness_reconcile_payslip_id': slip.id,
+                                }
+                                _logger.info(
+                                    "[LatenessReconcile] creating_leave slip_id=%s leave_vals=%s",
+                                    slip.id, leave_vals
+                                )
+                                leave = Leave.sudo().create(leave_vals)
+                                if hasattr(leave, 'action_approve'):
+                                    leave.sudo().action_approve(check_state=False)
+                                created_leaves |= leave
+                            created_leave = created_leaves[:1]
+                            snapshot['created_leave_ids'] = created_leaves.ids
+                            leave_deduction_status = 'leave_created'
+                            _logger.info(
+                                "[LatenessReconcile] leave_created slip_id=%s leave_ids=%s total_hours=%s",
+                                slip.id, created_leaves.ids, sum(created_leaves.mapped('number_of_hours'))
+                            )
+                            remaining = max(remaining - leave_hours_to_deduct, 0.0)
+                        except (ValidationError, UserError):
+                            if leave_deduction_status == 'pending':
+                                leave_deduction_status = 'leave_create_failed'
+                            _logger.exception(
+                                "[LatenessReconcile] leave_create_failed slip_id=%s remaining=%s; fallback to REMLATE",
+                                slip.id, remaining
+                            )
+                            pass
+                    else:
+                        leave_deduction_status = 'no_valid_allocation'
+                        _logger.warning(
+                            "[LatenessReconcile] skip_leave_no_valid_allocation slip_id=%s leave_type_id=%s remaining=%s; fallback to REMLATE",
+                            slip.id, leave_type.id, remaining
+                        )
 
             # 3) Store remaining lateness for payroll deduction rule (input line)
             # Always keep input line consistent (even if 0)
