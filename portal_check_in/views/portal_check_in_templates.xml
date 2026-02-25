@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="portal_my_home_menu_check_in" inherit_id="portal.portal_my_home" priority="40">
-        <!-- Hide all default portal home categories -->
+    <template id="portal_my_home_menu_check_in" inherit_id="portal.portal_my_home" priority="90">
+        <!-- Show only Time Off and Attendance cards on portal home. -->
         <xpath expr="//div[@id='portal_alert_category']" position="attributes">
-            <attribute name="t-if">False</attribute>
-        </xpath>
-        <xpath expr="//div[@id='portal_client_category']" position="attributes">
             <attribute name="t-if">False</attribute>
         </xpath>
         <xpath expr="//div[@id='portal_service_category']" position="attributes">
@@ -15,7 +12,19 @@
             <attribute name="t-if">False</attribute>
         </xpath>
 
-        <!-- Replace common category with Attendance card only -->
+        <xpath expr="//div[@id='portal_client_category']" position="replace">
+            <div class="o_portal_category row g-2 mt-3" id="portal_client_category">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="icon" t-value="'/portal_leaves/static/src/img/leaves.svg'"/>
+                    <t t-set="title">Time Off</t>
+                    <t t-set="url" t-value="'/my/leaves'"/>
+                    <t t-set="text">View your time off requests and create new ones</t>
+                    <t t-set="placeholder_count" t-value="'leave_count'"/>
+                    <t t-set="config_card" t-value="True"/>
+                </t>
+            </div>
+        </xpath>
+
         <xpath expr="//div[@id='portal_common_category']" position="replace">
             <div class="o_portal_category row g-2 mt-3" id="portal_common_category">
                 <t t-call="portal.portal_docs_entry">
@@ -27,6 +36,7 @@
                 </t>
             </div>
         </xpath>
+
     </template>
 
     <template id="portal_breadcrumbs_check_in" inherit_id="portal.portal_breadcrumbs">
