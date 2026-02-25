@@ -1,0 +1,28 @@
+<odoo>
+    <record id="hr_leave_view_form_lateness_source" model="ir.ui.view">
+        <field name="name">hr.leave.form.lateness</field>
+        <field name="model">hr.leave</field>
+        <field name="inherit_id" ref="hr_holidays.hr_leave_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='col_left']" position="inside">
+                <field name="lateness_reconcile_generated" readonly="1"/>
+                <field name="lateness_reconcile_reason" readonly="1" invisible="not lateness_reconcile_generated"/>
+                <field name="lateness_reconcile_payslip_id" readonly="1" invisible="not lateness_reconcile_generated"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="hr_leave_view_search_lateness_source" model="ir.ui.view">
+        <field name="name">hr.leave.search.lateness.source</field>
+        <field name="model">hr.leave</field>
+        <field name="inherit_id" ref="hr_holidays.view_hr_holidays_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <filter
+                    string="Lateness Reconciliation"
+                    name="lateness_reconciliation_leaves"
+                    domain="[('lateness_reconcile_generated', '=', True)]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
