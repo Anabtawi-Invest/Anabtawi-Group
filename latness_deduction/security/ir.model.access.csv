@@ -1,2 +1,2 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access.hr_employee_ot_convert_wizard,access_hr_employee_ot_convert_wizard,model_hr_employee_ot_convert_wizard,,1,1,1,1
+access_hr_employee_ot_convert_wizard_user,hr.employee.ot.convert.wizard.user,model_hr_employee_ot_convert_wizard,hr.group_hr_user,1,1,1,1
