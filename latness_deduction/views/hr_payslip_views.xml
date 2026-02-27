@@ -22,34 +22,39 @@
         </field>
     </record>
 
-    <record id="hr_payslip_view_tree_lateness_columns" model="ir.ui.view">
-        <field name="name">hr.payslip.tree.lateness.columns</field>
-        <field name="model">hr.payslip</field>
-        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
-        <field name="arch" type="xml">
-            <xpath expr="//page[@name='account_info']/group" position="inside">
-                <group string="Lateness Summary">
-                    <field name="overtime_hours" readonly="1" string="Monthly OT Hours"/>
-                    <field name="overtime_equivalent_hours" readonly="1" string="Monthly OT Equivalent Hours"/>
-                    <field name="lateness_reconciled" invisible="1"/>
-                    <field name="annual_leave_hours_before" readonly="1"/>
-                    <field name="ot_balance_before" readonly="1"/>
-                    <field name="lateness_before" readonly="1"/>
-                    <field name="annual_leave_hours_after" readonly="1"/>
-                    <field name="ot_balance_after" readonly="1"/>
-                    <field name="lateness_after" readonly="1"/>
-                    <field name="annual_leave_balance_hours" readonly="1" string="Annual Leave Hours" invisible="1"/>
-                    <field name="ot_wallet_total_before_deduction_equiv" readonly="1" invisible="1"/>
-                    <field name="lateness_hours" readonly="1" invisible="1"/>
-                    <field name="ot_wallet_consumed_equiv" readonly="1" string="Over Time Hours" invisible="1"/>
-                    <field name="ot_wallet_carry_in_equiv" readonly="1" invisible="1"/>
-                    <field name="ot_wallet_earned_equiv" readonly="1" invisible="1"/>
-                    <field name="ot_wallet_carry_out_equiv" readonly="1" invisible="1"/>
-                    <field name="remaining_lateness_hours" readonly="1" invisible="1"/>
-                    <field name="remaining_annual_leave_balance_hours" readonly="1"
-                           string="Remaining Annual Leave Hours" invisible="1"/>
-                </group>
-            </xpath>
-        </field>
-    </record>
-</odoo>
+<record id="hr_payslip_view_tree_lateness_columns" model="ir.ui.view">
+    <field name="name">hr.payslip.form.lateness.columns</field>
+    <field name="model">hr.payslip</field>
+    <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+    <field name="arch" type="xml">
+
+        <xpath expr="//page[@name='account_info']/group" position="inside">
+
+            <group string="Lateness Summary" col="3">
+
+                <!-- Header -->
+                <div/>
+                <div><b>Before</b></div>
+                <div><b>After</b></div>
+
+                <!-- Lateness -->
+                <div><b>Lateness (hrs)</b></div>
+                <field name="lateness_before" readonly="1" nolabel="1"/>
+                <field name="lateness_after" readonly="1" nolabel="1"/>
+
+                <!-- OT Balance -->
+                <div><b>OT Balance (hrs)</b></div>
+                <field name="ot_balance_before" readonly="1" nolabel="1"/>
+                <field name="ot_balance_after" readonly="1" nolabel="1"/>
+
+                <!-- Annual Leave -->
+                <div><b>Annual Leave (hrs)</b></div>
+                <field name="annual_leave_hours_before" readonly="1" nolabel="1"/>
+                <field name="annual_leave_hours_after" readonly="1" nolabel="1"/>
+
+            </group>
+
+        </xpath>
+
+    </field>
+</record></odoo>

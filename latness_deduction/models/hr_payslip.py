@@ -128,6 +128,7 @@ class HrPayslip(models.Model):
                     'input_type_id': remlate_input_type.id,
                     'amount': remlate_amount,
                 })
+
         self.write({
             'ot_wallet_carry_in_equiv': payload.get('ot_wallet_carry_in_equiv', 0.0),
             'ot_wallet_earned_equiv': payload.get('ot_wallet_earned_equiv', 0.0),
@@ -1266,24 +1267,47 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
     _description = 'Convert Employee Overtime to Annual Leave Allocation'
 
     employee_id = fields.Many2one('hr.employee', required=True, readonly=True)
+
     payslip_id = fields.Many2one(
         'hr.payslip',
         required=True,
         domain="[('employee_id', '=', employee_id), ('state', '=', 'draft')]",
         help='Overtime is taken from this payslip month.',
     )
+
     overtime_available_hours = fields.Float(
         string='Available Overtime (hrs)',
         compute='_compute_overtime_available_hours',
         readonly=True,
     )
-    overtime_to_convert_hours = fields.Float(string='Overtime to Convert (hrs)', required=True)
+
+    overtime_to_convert_hours = fields.Float(
+        string='Overtime to Convert (hrs)',
+        required=True
+    )
+
     annual_leave_type_id = fields.Many2one(
         'hr.leave.type',
         string='Annual Leave Type',
         compute='_compute_annual_leave_type_id',
         readonly=True,
     )
+
+    allocation_date_from = fields.Date(
+        string='Allocation Date From',
+        required=True,
+        default=lambda self: fields.Date.context_today(self),
+    )
+
+    allocation_date_to = fields.Date(
+        string='Allocation Date To',
+        required=True,
+        default=lambda self: fields.Date.context_today(self),
+    )
+
+    # ---------------------------------------------------------
+    # Default Payslip
+    # ---------------------------------------------------------
 
     @api.model
     def default_get(self, fields_list):
@@ -1294,49 +1318,99 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
             vals['payslip_id'] = employee._get_default_ot_conversion_payslip().id
         return vals
 
+    # ---------------------------------------------------------
+    # Computed Fields
+    # ---------------------------------------------------------
+
     @api.depends('payslip_id')
     def _compute_overtime_available_hours(self):
         for wizard in self:
             wizard.overtime_available_hours = 0.0
             if wizard.payslip_id:
-                wizard.overtime_available_hours = wizard.payslip_id._get_ot_wallet_available_before_lateness()
+                wizard.overtime_available_hours = (
+                    wizard.payslip_id._get_ot_wallet_available_before_lateness()
+                )
 
     @api.depends('payslip_id')
     def _compute_annual_leave_type_id(self):
         for wizard in self:
-            wizard.annual_leave_type_id = wizard.payslip_id._get_configured_annual_leave_type() if wizard.payslip_id else False
+            wizard.annual_leave_type_id = (
+                wizard.payslip_id._get_configured_annual_leave_type()
+                if wizard.payslip_id else False
+            )
+
+    # ---------------------------------------------------------
+    # Main Action
+    # ---------------------------------------------------------
 
     def action_convert(self):
         self.ensure_one()
+
+        _logger.warning("========== OT CONVERSION START ==========")
+        _logger.warning("Employee: %s", self.employee_id.name)
+        _logger.warning("Payslip: %s", self.payslip_id.display_name)
+        _logger.warning("Overtime to convert: %s", self.overtime_to_convert_hours)
+        _logger.warning("Date From: %s", self.allocation_date_from)
+        _logger.warning("Date To: %s", self.allocation_date_to)
+
+        # ---------------------------------------------------------
+        # Basic Validations
+        # ---------------------------------------------------------
+
         if not self.employee_id or not self.payslip_id:
             raise ValidationError(_('Employee and payslip are required.'))
+
         if self.payslip_id.employee_id != self.employee_id:
             raise ValidationError(_('Selected payslip does not belong to this employee.'))
+
         if self.payslip_id.state != 'draft':
             raise ValidationError(_('Payslip must be in Draft state.'))
+
         if self.payslip_id.lateness_reconciled:
-            raise ValidationError(_('Reset reconciliation first, then convert overtime before reconciling again.'))
+            raise ValidationError(
+                _('Reset reconciliation first, then convert overtime before reconciling again.')
+            )
+
         if self.overtime_to_convert_hours <= 0:
             raise ValidationError(_('Overtime to convert must be greater than 0.'))
 
+        if self.allocation_date_from > self.allocation_date_to:
+            raise ValidationError(_('Date From cannot be after Date To.'))
+
+        # ---------------------------------------------------------
+        # Check Available OT
+        # ---------------------------------------------------------
+
         available = self.payslip_id._get_ot_wallet_available_before_lateness()
+        _logger.warning("Available OT: %s", available)
+
         if self.overtime_to_convert_hours > available + 1e-6:
             raise ValidationError(_(
                 'Entered overtime hours (%(entered).2f) exceed available overtime (%(available).2f).'
             ) % {
-                'entered': self.overtime_to_convert_hours,
-                'available': available,
-            })
+                                      'entered': self.overtime_to_convert_hours,
+                                      'available': available,
+                                  })
+
+        # ---------------------------------------------------------
+        # Get Leave Type
+        # ---------------------------------------------------------
 
         leave_type = self.payslip_id._get_configured_annual_leave_type()
+
         if not leave_type:
-            raise ValidationError(_(
-                'Annual Leave Type for lateness coverage is not configured.\n'
-                'Set it in Payroll Settings first.'
-            ))
+            raise ValidationError(_('Annual Leave Type is not configured.'))
+
+        _logger.warning("Leave Type: %s", leave_type.name)
+        _logger.warning("Leave Type request_unit: %s", leave_type.request_unit)
+
+        # ---------------------------------------------------------
+        # 1️⃣ Create OT Deduction Input (Wallet deduction)
+        # ---------------------------------------------------------
 
         conversion_input_type = self.payslip_id._get_ot_leave_conversion_input_type()
-        self.env['hr.payslip.input'].create({
+
+        conversion_input = self.env['hr.payslip.input'].create({
             'payslip_id': self.payslip_id.id,
             'name': _('OT to Annual Leave Conversion'),
             'input_type_id': conversion_input_type.id,
@@ -1344,26 +1418,46 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
             'amount': 0.0,
         })
 
+        # ---------------------------------------------------------
+        # 2️⃣ Create Allocation
+        # ---------------------------------------------------------
+
+        hours_per_day = (
+                self.employee_id._get_hours_per_day(self.allocation_date_from)
+                or HOURS_PER_DAY
+        )
+
         allocation_vals = {
             'employee_id': self.employee_id.id,
-            'holiday_status_id': leave_type.id,
-            'allocation_type': 'regular',
-            'date_from': self.payslip_id.date_from or fields.Date.today(),
-            'date_to': self.payslip_id.date_to or False,
-            'notes': _(
-                'Created from OT conversion wizard for payslip: %(payslip)s. Converted OT hours: %(hours).2f'
-            ) % {
-                'payslip': self.payslip_id.display_name,
-                'hours': self.overtime_to_convert_hours,
-            },
+    'holiday_status_id': leave_type.id,
+    'allocation_type': 'regular',
+    'date_from': self.allocation_date_from,
+    'date_to': False,
+    'number_of_days': self.overtime_to_convert_hours / hours_per_day,
+
+            # 🔥 OT conversion linkage
+            'is_ot_conversion': True,
+            'ot_conversion_payslip_id': self.payslip_id.id,
+            'ot_conversion_input_id': conversion_input.id,
         }
-        if leave_type.request_unit == 'hour':
-            allocation_vals['number_of_hours_display'] = self.overtime_to_convert_hours
-        else:
-            hours_per_day = self.employee_id._get_hours_per_day(allocation_vals['date_from']) or HOURS_PER_DAY
-            allocation_vals['number_of_days_display'] = self.overtime_to_convert_hours / hours_per_day
+
+        _logger.warning("Allocation vals BEFORE create: %s", allocation_vals)
 
         allocation = self.env['hr.leave.allocation'].sudo().create(allocation_vals)
+
+        _logger.warning("Created Allocation ID: %s", allocation.id)
+        _logger.warning("Stored number_of_days_display: %s", allocation.number_of_days_display)
+
         allocation.sudo()._action_validate()
+
+        _logger.warning("After validation number_of_days: %s", allocation.number_of_days)
+
+        # ---------------------------------------------------------
+        # 3️⃣ Rebuild OT Wallet Chain
+        # ---------------------------------------------------------
+
+        self.payslip_id.action_rebuild_ot_wallet()
+
+        _logger.warning("========== OT CONVERSION END ==========")
 
         return {'type': 'ir.actions.client', 'tag': 'reload'}

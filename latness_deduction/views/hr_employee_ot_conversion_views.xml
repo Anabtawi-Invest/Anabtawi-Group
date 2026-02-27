@@ -14,12 +14,12 @@
         <field name="arch" type="xml">
             <xpath expr="//header/button[@type='action'][1]" position="after">
                 <button
-                    name="%(action_hr_employee_ot_convert_wizard)d"
-                    type="action"
-                    string="OT to Leave"
-                    class="btn-secondary"
-                    groups="hr.group_hr_user"
-                    invisible="not active or not id"/>
+                        name="%(action_hr_employee_ot_convert_wizard)d"
+                        type="action"
+                        string="OT to Leave"
+                        class="btn-secondary"
+                        groups="hr.group_hr_user"
+                        invisible="not active or not id"/>
             </xpath>
         </field>
     </record>
@@ -35,6 +35,8 @@
                     <field name="annual_leave_type_id" readonly="1"/>
                     <field name="overtime_available_hours" readonly="1"/>
                     <field name="overtime_to_convert_hours"/>
+                    <field name="allocation_date_from"/>
+                    <field name="allocation_date_to"/>
                 </group>
                 <footer>
                     <button name="action_convert" type="object" string="Convert" class="btn-primary"/>
