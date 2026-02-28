@@ -22,29 +22,76 @@ class HrLeaveAllocation(models.Model):
         digits=(16, 2),
     )
 
-    @api.depends('employee_id', 'date_from')
+    @api.depends(
+        'ot_conversion_payslip_id',
+        'ot_conversion_payslip_id.ot_wallet_carry_out_equiv'
+    )
     def _compute_number_of_day_converted(self):
-        payslip_model = self.env['hr.payslip']
-        print(6666)
         for alloc in self:
             alloc.number_of_day_converted = 0.0
-            if not alloc.employee_id:
+
+            if not alloc.is_ot_conversion or not alloc.ot_conversion_payslip_id:
                 continue
 
-            last_payslip = payslip_model.search(
-                [('employee_id', '=', alloc.employee_id.id)],
-                order='date_to desc, id desc',
-                limit=1,
+            payslip = alloc.ot_conversion_payslip_id
+
+            # Keep wallet value up to date before exposing converted value.
+            payslip.action_rebuild_ot_wallet()
+
+            alloc.number_of_day_converted = (
+                    payslip.ot_wallet_carry_out_equiv or 0.0
             )
-            print(7777,last_payslip)
-            if not last_payslip:
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        allocations = super().create(vals_list)
+        is_deduct_extra_hours_flow = bool(self.env.context.get('deduct_extra_hours'))
+        for alloc, vals in zip(allocations, vals_list):
+            # Skip records already linked by custom OT conversion wizard.
+            if vals.get('is_ot_conversion') or vals.get('ot_conversion_input_id') or alloc.ot_conversion_input_id:
+                continue
+            # Only auto-link allocations created from Odoo "Deduct Extra Hours" flow.
+            if not is_deduct_extra_hours_flow:
+                continue
+            # Only overtime-deductible allocations are relevant.
+            if not alloc.employee_id or not alloc.holiday_status_id.overtime_deductible:
                 continue
 
-            self.number_of_day_converted = last_payslip.ot_balance_after or 0.0
-            print(555,self.number_of_day_converted)
+            converted_hours = alloc.number_of_hours_display or alloc.number_of_hours or 0.0
+            if converted_hours <= 0:
+                continue
+
+            payslip = alloc.employee_id._get_default_ot_conversion_payslip()
+            if not payslip:
+                raise ValidationError(_(
+                    'No payslip found for %(employee)s to register OT conversion input.'
+                ) % {
+                    'employee': alloc.employee_id.display_name,
+                })
+            if payslip.state != 'draft':
+                raise ValidationError(_(
+                    'Payslip %(payslip)s must be in Draft to register OT conversion input.'
+                ) % {
+                    'payslip': payslip.display_name,
+                })
+
+            conversion_input_type = payslip._get_ot_leave_conversion_input_type()
+            conversion_input = self.env['hr.payslip.input'].create({
+                'payslip_id': payslip.id,
+                'name': _('OT to Annual Leave Conversion'),
+                'input_type_id': conversion_input_type.id,
+                'hours': converted_hours,
+                'amount': 0.0,
+            })
+            alloc.write({
+                'is_ot_conversion': True,
+                'ot_conversion_payslip_id': payslip.id,
+                'ot_conversion_input_id': conversion_input.id,
+            })
+            payslip.with_context(skip_reconciled=True).action_reconcile_lateness_no_ot_bank()
+        return allocations
 
     def unlink(self):
-        print(111111)
         for alloc in self:
             if alloc.is_ot_conversion:
                 payslip = alloc.ot_conversion_payslip_id
@@ -65,7 +112,6 @@ class HrLeaveAllocation(models.Model):
         return super().unlink()
 
     def action_refuse(self):
-        print(22222)
         res = super().action_refuse()
 
         for alloc in self:
