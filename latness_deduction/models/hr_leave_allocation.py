@@ -16,6 +16,32 @@ class HrLeaveAllocation(models.Model):
         copy=False,
         ondelete='set null',
     )
+    number_of_day_converted = fields.Float(
+        string='Converted Days from OT Balance',
+        compute='_compute_number_of_day_converted',
+        digits=(16, 2),
+    )
+
+    @api.depends('employee_id', 'date_from')
+    def _compute_number_of_day_converted(self):
+        payslip_model = self.env['hr.payslip']
+        print(6666)
+        for alloc in self:
+            alloc.number_of_day_converted = 0.0
+            if not alloc.employee_id:
+                continue
+
+            last_payslip = payslip_model.search(
+                [('employee_id', '=', alloc.employee_id.id)],
+                order='date_to desc, id desc',
+                limit=1,
+            )
+            print(7777,last_payslip)
+            if not last_payslip:
+                continue
+
+            self.number_of_day_converted = last_payslip.ot_balance_after or 0.0
+            print(555,self.number_of_day_converted)
 
     def unlink(self):
         print(111111)

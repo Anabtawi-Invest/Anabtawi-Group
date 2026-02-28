@@ -1,5 +1,6 @@
 import logging
 import json
+from collections import defaultdict
 from datetime import datetime, time, timedelta
 
 import pytz
@@ -1094,6 +1095,26 @@ class HrEmployee(models.Model):
             remlate_input = slip.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')
             employee.annual_leave_balance_hours = sum(remlate_input.mapped('amount')) if remlate_input else 0.0
 
+    @api.depends('overtime_ids.manual_duration', 'overtime_ids', 'overtime_ids.status')
+    def _compute_total_overtime(self):
+        print(111155555)
+        """Override hr_attendance logic: use latest payslip OT balance as employee overtime."""
+        Payslip = self.env['hr.payslip']
+        for employee in self:
+            employee.total_overtime = 0.0
+            if not employee.id:
+                continue
+            last_payslip = Payslip.search(
+                [
+                    ('employee_id', '=', employee.id),
+                    ('state', '!=', 'cancel'),
+                ],
+                order='date_to desc, id desc',
+                limit=1,
+            )
+            if last_payslip:
+                employee.total_overtime = last_payslip.ot_balance_after or 0.0
+
     def _get_default_ot_conversion_payslip(self):
         self.ensure_one()
         payslip = self.env['hr.payslip'].search([
@@ -1131,6 +1152,25 @@ class HrLeave(models.Model):
         readonly=True,
         index=True,
     )
+
+    @api.model
+    def _get_deductible_employee_overtime(self, employees):
+        """Use OT wallet balance from latest payslip as deductible overtime source."""
+        diff_by_employee = defaultdict(lambda: 0.0)
+        Payslip = self.env['hr.payslip'].sudo()
+        for employee in employees:
+            last_payslip = Payslip.search(
+                [
+                    ('employee_id', '=', employee.id),
+                    ('state', '!=', 'cancel'),
+                ],
+                order='date_to desc, id desc',
+                limit=1,
+            )
+            if not last_payslip:
+                continue
+            diff_by_employee[employee] = last_payslip.ot_balance_after or 0.0
+        return diff_by_employee
 
 
 class HrPayslipInputType(models.Model):
