@@ -7,22 +7,7 @@
         <field name="context">{'default_employee_id': active_id}</field>
     </record>
 
-    <record id="view_employee_form_ot_to_leave_button" model="ir.ui.view">
-        <field name="name">hr.employee.form.ot.to.leave.button</field>
-        <field name="model">hr.employee</field>
-        <field name="inherit_id" ref="hr.view_employee_form"/>
-        <field name="arch" type="xml">
-            <xpath expr="//header/button[@type='action'][1]" position="after">
-                <button
-                        name="%(action_hr_employee_ot_convert_wizard)d"
-                        type="action"
-                        string="OT to Leave"
-                        class="btn-secondary"
-                        groups="hr.group_hr_user"
-                        invisible="not active or not id"/>
-            </xpath>
-        </field>
-    </record>
+
 
     <record id="view_hr_employee_ot_convert_wizard_form" model="ir.ui.view">
         <field name="name">hr.employee.ot.convert.wizard.form</field>

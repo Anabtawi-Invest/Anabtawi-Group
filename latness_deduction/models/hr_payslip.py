@@ -985,16 +985,16 @@ class HrPayslip(models.Model):
 
             # 3) Store remaining lateness for payroll deduction rule (input line)
             # Always keep input line consistent (even if 0)
-            inp = slip.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')
-            if inp:
-                inp.write({'amount': remaining})
-            else:
-                self.env['hr.payslip.input'].create({
-                    'payslip_id': slip.id,
-                    'name': remlate_input_type.name or 'Remaining Lateness (hrs)',
-                    'input_type_id': remlate_input_type.id,
-                    'amount': remaining,
-                })
+            # inp = slip.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')
+            # if inp:
+            #     inp.write({'amount': remaining})
+            # else:
+            #     self.env['hr.payslip.input'].create({
+            #         'payslip_id': slip.id,
+            #         'name': remlate_input_type.name or 'Remaining Lateness (hrs)',
+            #         'input_type_id': remlate_input_type.id,
+            #         'amount': remaining,
+            #     })
             slip.write({
                 'lateness_reconciled': True,
                 'lateness_reconcile_snapshot': json.dumps(snapshot),
@@ -1009,19 +1009,7 @@ class HrPayslip(models.Model):
                     0.0
                 ),
             })
-            _logger.info(
-                "[LatenessReconcile] end slip_id=%s final_remaining=%s leave_deduction_status=%s leave_id=%s wallet_in=%s wallet_earned=%s wallet_payout=%s wallet_consumed=%s wallet_out=%s remlate_input_exists=%s",
-                slip.id,
-                remaining,
-                leave_deduction_status,
-                created_leave.id or False,
-                carry_in,
-                weighted_total,
-                payout_hours,
-                consume_wallet_equiv + consumed_current_equiv + payout_hours,
-                max(carry_in + weighted_total - (consume_wallet_equiv + consumed_current_equiv + payout_hours), 0.0),
-                bool(inp)
-            )
+
         self._recompute_ot_wallet_after_payout()
         return True
 
@@ -1097,12 +1085,23 @@ class HrEmployee(models.Model):
 
     @api.depends('overtime_ids.manual_duration', 'overtime_ids', 'overtime_ids.status')
     def _compute_total_overtime(self):
-        print(111155555)
-        """Override hr_attendance logic: use latest payslip OT balance as employee overtime."""
+        """Use the greater value between approved attendance overtime and last payslip OT balance."""
         Payslip = self.env['hr.payslip']
+        mapped_validated_overtimes = dict(
+            self.env['hr.attendance.overtime.line']._read_group(
+                domain=[
+                    ('status', '=', 'approved'),
+                    ('employee_id', 'in', self.ids),
+                ],
+                groupby=['employee_id'],
+                aggregates=['manual_duration:sum'],
+            )
+        )
         for employee in self:
-            employee.total_overtime = 0.0
+            attendance_overtime = mapped_validated_overtimes.get(employee, 0.0) or 0.0
+            payslip_balance = 0.0
             if not employee.id:
+                employee.total_overtime = attendance_overtime
                 continue
             last_payslip = Payslip.search(
                 [
@@ -1113,7 +1112,8 @@ class HrEmployee(models.Model):
                 limit=1,
             )
             if last_payslip:
-                employee.total_overtime = last_payslip.ot_balance_after or 0.0
+                payslip_balance = last_payslip.ot_balance_after or 0.0
+            employee.total_overtime = max(attendance_overtime, payslip_balance)
 
     def _get_default_ot_conversion_payslip(self):
         self.ensure_one()
@@ -1128,7 +1128,6 @@ class HrEmployee(models.Model):
                 ('state', '!=', 'cancel'),
             ], order='date_to desc, id desc', limit=1)
         return payslip
-
 
 class HrLeave(models.Model):
     _inherit = 'hr.leave'
@@ -1190,7 +1189,11 @@ class HrPayslipInput(models.Model):
     _inherit = 'hr.payslip.input'
 
     is_ot_payout = fields.Boolean(related='input_type_id.is_ot_payout', store=False, readonly=True)
-    is_ot_leave_conversion = fields.Boolean(related='input_type_id.is_ot_leave_conversion', store=False, readonly=True)
+    is_ot_leave_conversion = fields.Boolean(
+        related='input_type_id.is_ot_leave_conversion',
+        store=False,
+        readonly=True,
+    )
     hours = fields.Float(string='Hours', digits='Payroll Rate')
 
     @api.onchange('input_type_id', 'hours', 'payslip_id')
@@ -1233,43 +1236,13 @@ class HrPayslipInput(models.Model):
 
     @api.model
     def _check_ot_payout_create_lock(self, vals_list):
-        for vals in vals_list:
-            if not self._is_ot_wallet_deduction_from_vals(vals):
-                continue
-            payslip_id = vals.get('payslip_id')
-            if not payslip_id:
-                continue
-            payslip = self.env['hr.payslip'].browse(payslip_id)
-            if payslip.lateness_reconciled:
-                raise ValidationError(_(
-                    'OT payout hours are locked after reconciliation on %(payslip)s.\n'
-                    'Use "Reset Reconciliation" before editing OT payout inputs.'
-                ) % {
-                    'payslip': payslip.display_name,
-                })
+        return True
 
     def _check_ot_payout_write_lock(self, vals):
-        for rec in self:
-            if rec.payslip_id.lateness_reconciled and (
-                rec.is_ot_payout or rec.is_ot_leave_conversion
-                or rec._is_ot_wallet_deduction_from_vals(vals, current_input=rec)
-            ):
-                raise ValidationError(_(
-                    'OT payout hours are locked after reconciliation on %(payslip)s.\n'
-                    'Use "Reset Reconciliation" before editing OT payout inputs.'
-                ) % {
-                    'payslip': rec.payslip_id.display_name,
-                })
+        return True
 
     def _check_ot_payout_unlink_lock(self):
-        for rec in self:
-            if rec.payslip_id.lateness_reconciled and (rec.is_ot_payout or rec.is_ot_leave_conversion):
-                raise ValidationError(_(
-                    'OT payout hours are locked after reconciliation on %(payslip)s.\n'
-                    'Use "Reset Reconciliation" before deleting OT payout inputs.'
-                ) % {
-                    'payslip': rec.payslip_id.display_name,
-                })
+        return True
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -1345,10 +1318,6 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
         default=lambda self: fields.Date.context_today(self),
     )
 
-    # ---------------------------------------------------------
-    # Default Payslip
-    # ---------------------------------------------------------
-
     @api.model
     def default_get(self, fields_list):
         vals = super().default_get(fields_list)
@@ -1357,10 +1326,6 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
             employee = self.env['hr.employee'].browse(employee_id)
             vals['payslip_id'] = employee._get_default_ot_conversion_payslip().id
         return vals
-
-    # ---------------------------------------------------------
-    # Computed Fields
-    # ---------------------------------------------------------
 
     @api.depends('payslip_id')
     def _compute_overtime_available_hours(self):
@@ -1379,10 +1344,6 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
                 if wizard.payslip_id else False
             )
 
-    # ---------------------------------------------------------
-    # Main Action
-    # ---------------------------------------------------------
-
     def action_convert(self):
         self.ensure_one()
 
@@ -1392,10 +1353,6 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
         _logger.warning("Overtime to convert: %s", self.overtime_to_convert_hours)
         _logger.warning("Date From: %s", self.allocation_date_from)
         _logger.warning("Date To: %s", self.allocation_date_to)
-
-        # ---------------------------------------------------------
-        # Basic Validations
-        # ---------------------------------------------------------
 
         if not self.employee_id or not self.payslip_id:
             raise ValidationError(_('Employee and payslip are required.'))
@@ -1417,10 +1374,6 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
         if self.allocation_date_from > self.allocation_date_to:
             raise ValidationError(_('Date From cannot be after Date To.'))
 
-        # ---------------------------------------------------------
-        # Check Available OT
-        # ---------------------------------------------------------
-
         available = self.payslip_id._get_ot_wallet_available_before_lateness()
         _logger.warning("Available OT: %s", available)
 
@@ -1428,13 +1381,9 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
             raise ValidationError(_(
                 'Entered overtime hours (%(entered).2f) exceed available overtime (%(available).2f).'
             ) % {
-                                      'entered': self.overtime_to_convert_hours,
-                                      'available': available,
-                                  })
-
-        # ---------------------------------------------------------
-        # Get Leave Type
-        # ---------------------------------------------------------
+                'entered': self.overtime_to_convert_hours,
+                'available': available,
+            })
 
         leave_type = self.payslip_id._get_configured_annual_leave_type()
 
@@ -1443,10 +1392,6 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
 
         _logger.warning("Leave Type: %s", leave_type.name)
         _logger.warning("Leave Type request_unit: %s", leave_type.request_unit)
-
-        # ---------------------------------------------------------
-        # 1️⃣ Create OT Deduction Input (Wallet deduction)
-        # ---------------------------------------------------------
 
         conversion_input_type = self.payslip_id._get_ot_leave_conversion_input_type()
 
@@ -1458,24 +1403,18 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
             'amount': 0.0,
         })
 
-        # ---------------------------------------------------------
-        # 2️⃣ Create Allocation
-        # ---------------------------------------------------------
-
         hours_per_day = (
-                self.employee_id._get_hours_per_day(self.allocation_date_from)
-                or HOURS_PER_DAY
+            self.employee_id._get_hours_per_day(self.allocation_date_from)
+            or HOURS_PER_DAY
         )
 
         allocation_vals = {
             'employee_id': self.employee_id.id,
-    'holiday_status_id': leave_type.id,
-    'allocation_type': 'regular',
-    'date_from': self.allocation_date_from,
-    'date_to': False,
-    'number_of_days': self.overtime_to_convert_hours / hours_per_day,
-
-            # 🔥 OT conversion linkage
+            'holiday_status_id': leave_type.id,
+            'allocation_type': 'regular',
+            'date_from': self.allocation_date_from,
+            'date_to': False,
+            'number_of_days': self.overtime_to_convert_hours / hours_per_day,
             'is_ot_conversion': True,
             'ot_conversion_payslip_id': self.payslip_id.id,
             'ot_conversion_input_id': conversion_input.id,
@@ -1492,12 +1431,9 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
 
         _logger.warning("After validation number_of_days: %s", allocation.number_of_days)
 
-        # ---------------------------------------------------------
-        # 3️⃣ Rebuild OT Wallet Chain
-        # ---------------------------------------------------------
-
         self.payslip_id.action_rebuild_ot_wallet()
 
         _logger.warning("========== OT CONVERSION END ==========")
 
         return {'type': 'ir.actions.client', 'tag': 'reload'}
+
