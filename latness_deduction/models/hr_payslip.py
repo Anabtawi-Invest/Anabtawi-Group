@@ -231,6 +231,49 @@ class HrPayslip(models.Model):
         total_before = (self.ot_wallet_carry_in_equiv or 0.0) + (self.ot_wallet_earned_equiv or 0.0)
         return max(total_before - (self.ot_wallet_lateness_consumed_equiv or 0.0), 0.0)
 
+    def _get_ot_balance_after_value(self):
+        """Return OT balance after using the same functional logic used by `ot_balance_after`."""
+        self.ensure_one()
+        lateness, buckets = self._get_worked_day_hours_by_code()
+        carry_in = self.ot_wallet_carry_in_equiv or self._get_previous_ot_wallet_carry_out()
+        weighted_total = self._get_weighted_ot_hours(buckets)
+        ot_before_payout = max(carry_in + weighted_total, 0.0)
+        payout_hours = self._get_ot_payout_hours_from_inputs()
+        computed_not_reconciled = max(ot_before_payout - payout_hours, 0.0)
+        result = computed_not_reconciled
+        source = 'computed_not_reconciled'
+        if not self.lateness_reconciled:
+            pass
+        else:
+            # Use the stored wallet carry_out as-is (including 0.0), do not fallback with `or`.
+            result = self.ot_wallet_carry_out_equiv
+            source = 'stored_carry_out_reconciled'
+
+        _logger.info(
+            "[OTWallet] ot_balance_after_value slip_id=%s employee_id=%s state=%s reconciled=%s "
+            "date_from=%s date_to=%s lateness=%s buckets=%s carry_in_field=%s carry_in_effective=%s "
+            "earned=%s ot_before_payout=%s payout_input_hours=%s computed_not_reconciled=%s "
+            "stored_carry_out=%s source=%s result=%s",
+            self.id,
+            self.employee_id.id if self.employee_id else False,
+            self.state,
+            self.lateness_reconciled,
+            self.date_from,
+            self.date_to,
+            lateness,
+            buckets,
+            self.ot_wallet_carry_in_equiv,
+            carry_in,
+            weighted_total,
+            ot_before_payout,
+            payout_hours,
+            computed_not_reconciled,
+            self.ot_wallet_carry_out_equiv,
+            source,
+            result,
+        )
+        return result
+
     def _get_ot_wallet_salary_amount(self):
         """Amount = OT wallet equivalent hours x hourly rate, without applying OT multipliers again."""
         self.ensure_one()
@@ -517,7 +560,7 @@ class HrPayslip(models.Model):
                 slip.ot_balance_before = current_ot_before
                 slip.lateness_before = current_lateness
                 slip.annual_leave_hours_after = current_annual
-                slip.ot_balance_after = current_ot_before
+                slip.ot_balance_after = slip._get_ot_balance_after_value()
                 slip.lateness_after = current_lateness
                 continue
 
@@ -537,8 +580,7 @@ class HrPayslip(models.Model):
             slip.ot_balance_before = before_ot
             slip.lateness_before = before_lateness
             slip.annual_leave_hours_after = current_annual
-            # Use the stored wallet carry_out as-is (including 0.0), do not fallback with `or`.
-            slip.ot_balance_after = slip.ot_wallet_carry_out_equiv
+            slip.ot_balance_after = slip._get_ot_balance_after_value()
             slip.lateness_after = slip.remaining_lateness_hours or 0.0
 
     def _get_previous_ot_wallet_carry_out(self):
@@ -1085,7 +1127,7 @@ class HrEmployee(models.Model):
 
     @api.depends('overtime_ids.manual_duration', 'overtime_ids', 'overtime_ids.status')
     def _compute_total_overtime(self):
-        """Use the greater value between approved attendance overtime and last payslip OT balance."""
+        """Use latest payslip OT balance as source of truth for extra-hours availability."""
         Payslip = self.env['hr.payslip']
         mapped_validated_overtimes = dict(
             self.env['hr.attendance.overtime.line']._read_group(
@@ -1112,8 +1154,26 @@ class HrEmployee(models.Model):
                 limit=1,
             )
             if last_payslip:
-                payslip_balance = last_payslip.ot_balance_after or 0.0
-            employee.total_overtime = max(attendance_overtime, payslip_balance)
+                payslip_balance = last_payslip._get_ot_balance_after_value() or 0.0
+                employee.total_overtime = payslip_balance
+            else:
+                # Fallback only when employee has no payslip yet.
+                employee.total_overtime = attendance_overtime
+            _logger.info(
+                "[OTWallet] employee_total_overtime employee_id=%s employee=%s attendance_overtime=%s "
+                "last_payslip_id=%s last_payslip_name=%s last_payslip_state=%s last_payslip_period=%s..%s "
+                "payslip_balance=%s total_overtime=%s",
+                employee.id,
+                employee.display_name,
+                attendance_overtime,
+                last_payslip.id if last_payslip else False,
+                last_payslip.display_name if last_payslip else False,
+                last_payslip.state if last_payslip else False,
+                last_payslip.date_from if last_payslip else False,
+                last_payslip.date_to if last_payslip else False,
+                payslip_balance,
+                employee.total_overtime,
+            )
 
     def _get_default_ot_conversion_payslip(self):
         self.ensure_one()
@@ -1167,8 +1227,26 @@ class HrLeave(models.Model):
                 limit=1,
             )
             if not last_payslip:
+                _logger.info(
+                    "[OTWallet] deductible_overtime employee_id=%s employee=%s last_payslip_id=False result=0.0",
+                    employee.id,
+                    employee.display_name,
+                )
                 continue
-            diff_by_employee[employee] = last_payslip.ot_balance_after or 0.0
+            deductible = last_payslip._get_ot_balance_after_value() or 0.0
+            diff_by_employee[employee] = deductible
+            _logger.info(
+                "[OTWallet] deductible_overtime employee_id=%s employee=%s last_payslip_id=%s "
+                "last_payslip_name=%s last_payslip_state=%s last_payslip_period=%s..%s deductible=%s",
+                employee.id,
+                employee.display_name,
+                last_payslip.id,
+                last_payslip.display_name,
+                last_payslip.state,
+                last_payslip.date_from,
+                last_payslip.date_to,
+                deductible,
+            )
         return diff_by_employee
 
 
