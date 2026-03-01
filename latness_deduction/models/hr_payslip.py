@@ -992,6 +992,17 @@ class HrPayslip(models.Model):
                         slip.id, leave_type.id, leave_type.name, leave_type.request_unit, leave_type.allows_negative,
                         leave_type.requires_allocation, has_valid_allocation, remaining, slip.annual_leave_balance_hours
                     )
+                    # Exact lateness coverage is hour-based. If leave type is day/half-day,
+                    # Odoo may round to full-day deductions (e.g., 3.75h -> 8h), which
+                    # produces incorrect annual leave balances. Keep remaining in REMLATE
+                    # until company config uses an hour-based leave type.
+                    if leave_type.request_unit != 'hour':
+                        leave_deduction_status = 'unsupported_leave_unit'
+                        _logger.warning(
+                            "[LatenessReconcile] skip_leave_non_hour_unit slip_id=%s leave_type_id=%s request_unit=%s leave_hours_to_deduct=%s; fallback to REMLATE",
+                            slip.id, leave_type.id, leave_type.request_unit, leave_hours_to_deduct
+                        )
+                        continue
                     if not (leave_type.requires_allocation and not has_valid_allocation):
                         try:
                             slip_ref = slip.name or _('Payslip')
