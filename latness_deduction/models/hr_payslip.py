@@ -1110,6 +1110,11 @@ class HrEmployee(models.Model):
         store=False,
         help='Latest remaining lateness value (REMLATE) from the employee payslips.',
     )
+    has_non_cancelled_payslip = fields.Boolean(
+        compute='_compute_has_non_cancelled_payslip',
+        store=False,
+        help='Technical field used to control extra-hours deduction button visibility.',
+    )
 
     def _compute_annual_leave_balance_hours(self):
         Payslip = self.env['hr.payslip']
@@ -1124,6 +1129,20 @@ class HrEmployee(models.Model):
                 continue
             remlate_input = slip.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')
             employee.annual_leave_balance_hours = sum(remlate_input.mapped('amount')) if remlate_input else 0.0
+
+    def _compute_has_non_cancelled_payslip(self):
+        payslip_counts = dict(
+            self.env['hr.payslip']._read_group(
+                domain=[
+                    ('employee_id', 'in', self.ids),
+                    ('state', '!=', 'cancel'),
+                ],
+                groupby=['employee_id'],
+                aggregates=['id:count'],
+            )
+        )
+        for employee in self:
+            employee.has_non_cancelled_payslip = bool(employee.id and payslip_counts.get(employee, 0))
 
     @api.depends('overtime_ids.manual_duration', 'overtime_ids', 'overtime_ids.status')
     def _compute_total_overtime(self):
