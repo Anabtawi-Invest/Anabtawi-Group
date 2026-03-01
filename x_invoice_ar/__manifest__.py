@@ -1,5 +1,5 @@
 {
-    "name": "Invoice & Delivery Arabic Reports",
+    "name": "Arabic Reports",
     "version": "1.0",
     "depends": ["account", "stock"],
     "data": [
