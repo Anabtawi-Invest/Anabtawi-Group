@@ -6,7 +6,7 @@
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
                 <t t-set="o" t-value="o.with_context(lang='ar_001')"/>
-                <t t-call="stock.report_deliveryslip"
+                <t t-call="stock.report_delivery_document"
                    t-lang="'ar_001'"/>
             </t>
         </t>
