@@ -1154,15 +1154,46 @@ class HrPayslip(models.Model):
                 except Exception:
                     payload = {}
 
-            slip._restore_lateness_snapshot()
-
-            leave_ids = payload.get('created_leave_ids') or []
-            leaves = self.env['hr.leave'].sudo().browse(leave_ids).exists()
-            if not leaves and slip.lateness_reconcile_leave_id:
-                leaves = slip.lateness_reconcile_leave_id.sudo().exists()
+            leave_model = self.env['hr.leave'].sudo()
+            leave_ids = set(payload.get('created_leave_ids') or [])
+            if slip.lateness_reconcile_leave_id:
+                leave_ids.add(slip.lateness_reconcile_leave_id.id)
+            generated_leaves = leave_model.search([
+                ('employee_id', '=', slip.employee_id.id),
+                ('lateness_reconcile_generated', '=', True),
+                ('lateness_reconcile_payslip_id', '=', slip.id),
+            ])
+            leaves = (leave_model.browse(list(leave_ids)).exists() | generated_leaves).sorted('id')
+            _logger.info(
+                "[LatenessReset] cleanup_leaves slip_id=%s leave_ids=%s",
+                slip.id, leaves.ids
+            )
             for leave in leaves:
-                if leave.state in ('confirm', 'validate1', 'validate') and hasattr(leave, 'action_refuse'):
-                    leave.action_refuse()
+                if leave.state in ('confirm', 'validate1', 'validate', 'draft') and hasattr(leave, 'action_refuse'):
+                    try:
+                        leave.action_refuse()
+                    except Exception as err:
+                        _logger.warning(
+                            "[LatenessReset] refuse_leave_failed slip_id=%s leave_id=%s state=%s error=%s",
+                            slip.id, leave.id, leave.state, err
+                        )
+            # Remove generated leaves from this reconciliation flow so they cannot
+            # affect overlap checks or confuse users after reset.
+            to_unlink = leaves.filtered(
+                lambda l: l.lateness_reconcile_generated
+                and l.lateness_reconcile_payslip_id.id == slip.id
+                and l.state in ('cancel', 'refuse', 'draft')
+            )
+            if to_unlink:
+                try:
+                    to_unlink.unlink()
+                except Exception as err:
+                    _logger.warning(
+                        "[LatenessReset] unlink_generated_leaves_failed slip_id=%s leave_ids=%s error=%s",
+                        slip.id, to_unlink.ids, err
+                    )
+
+            slip._restore_lateness_snapshot()
 
             slip.write({
                 'lateness_reconciled': False,
