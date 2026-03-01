@@ -456,9 +456,10 @@ class HrPayslip(models.Model):
         Leave = self.env['hr.leave']
         slots = []
         remaining = remaining_hours
+        # Start from payslip period and keep searching up to 30 days after period end.
         day = self.date_from or self.date_to or fields.Date.today()
-        end_day = self.date_to or day
-        while day <= end_day and remaining > 0:
+        max_search_date = (self.date_to or day) + timedelta(days=30)
+        while day <= max_search_date and remaining > 0:
             # Use datetime overlap (not request_date_* only) to reliably catch
             # existing validated/confirmed leaves on that day.
             day_start = datetime.combine(day, time.min)
@@ -505,6 +506,11 @@ class HrPayslip(models.Model):
                 slots.append((day, hour_from, slot_to, take))
                 remaining -= take
             day += timedelta(days=1)
+        if remaining > 0:
+            raise UserError(_(
+                "No valid working slot found within 30 days after payslip period "
+                "to cover remaining lateness hours."
+            ))
         return slots, remaining
 
     def _get_valid_leave_days(self, required_days, leave_type):
