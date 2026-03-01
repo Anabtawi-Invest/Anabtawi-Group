@@ -658,15 +658,13 @@ class HrPayslip(models.Model):
     def _get_previous_ot_wallet_carry_out(self):
         """Compute cumulative OT wallet carry before current slip from all previous months."""
         self.ensure_one()
+        if not self.id:
+            return 0.0
         previous_slips = self.search([
             ('employee_id', '=', self.employee_id.id),
-            ('id', '!=', self.id),
             ('state', '!=', 'cancel'),
-            '|',
+            ('id', '!=', self.id),
             ('date_to', '<', self.date_to),
-            '&',
-            ('date_to', '=', self.date_to),
-            ('id', '<', self.id),
         ], order='date_to asc, id asc')
 
         carry = 0.0
