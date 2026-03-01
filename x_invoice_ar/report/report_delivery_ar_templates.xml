@@ -1,1 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
 
+    <!-- ================================= -->
+    <!-- Arabic Delivery Slip Wrapper      -->
+    <!-- ================================= -->
+    <template id="report_delivery_ar_wrapper">
+        <t t-call="web.html_container">
+
+            <t t-foreach="docs" t-as="o">
+                <!-- Force Arabic -->
+                <t t-set="o" t-value="o.with_context(lang='ar_001')"/>
+
+                <!-- Call original delivery slip -->
+                <t t-call="stock.report_delivery_document"
+                   t-lang="'ar_001'"/>
+            </t>
+
+        </t>
+    </template>
+
+    <!-- ================================= -->
+    <!-- Report Action                     -->
+    <!-- ================================= -->
+    <record id="action_report_delivery_ar"
+            model="ir.actions.report">
+
+        <field name="name">Delivery Slip (Arabic)</field>
+        <field name="model">stock.picking</field>
+        <field name="report_type">qweb-pdf</field>
+
+        <!-- IMPORTANT: one line only -->
+        <field name="report_name">
+            x_invoice_ar.report_delivery_ar_wrapper
+        </field>
+
+        <!-- Appear in Print -->
+        <field name="binding_model_id"
+               ref="stock.model_stock_picking"/>
+        <field name="binding_type">report</field>
+
+    </record>
+
+</odoo>
