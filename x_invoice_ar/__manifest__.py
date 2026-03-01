@@ -4,7 +4,7 @@
     "depends": ["account", "stock"],
     "data": [
         "report/report_invoice_ar_templates.xml",
-        
+        "report/report_delivery_ar_templates.xml",
     ],
     "installable": True,
 }
