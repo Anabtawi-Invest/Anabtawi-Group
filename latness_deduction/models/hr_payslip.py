@@ -1029,18 +1029,19 @@ class HrPayslip(models.Model):
                             slip.id, leave_type.id, remaining
                         )
 
-            # 3) Store remaining lateness for payroll deduction rule (input line)
-            # Always keep input line consistent (even if 0)
-            # inp = slip.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')
-            # if inp:
-            #     inp.write({'amount': remaining})
-            # else:
-            #     self.env['hr.payslip.input'].create({
-            #         'payslip_id': slip.id,
-            #         'name': remlate_input_type.name or 'Remaining Lateness (hrs)',
-            #         'input_type_id': remlate_input_type.id,
-            #         'amount': remaining,
-            #     })
+            # 3) Store final remaining lateness for payroll deduction rule (input line)
+            # and as the post-reconciliation source for lateness_after display.
+            remaining = 0.0 if remaining <= 1e-6 else round(remaining, 6)
+            inp = slip.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')
+            if inp:
+                inp.write({'amount': remaining})
+            else:
+                self.env['hr.payslip.input'].create({
+                    'payslip_id': slip.id,
+                    'name': remlate_input_type.name or 'Remaining Lateness (hrs)',
+                    'input_type_id': remlate_input_type.id,
+                    'amount': remaining,
+                })
             carry_out_equiv = max(
                 carry_in + weighted_total - (consume_wallet_equiv + consumed_current_equiv + payout_hours),
                 0.0
