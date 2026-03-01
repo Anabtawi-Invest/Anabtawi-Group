@@ -1362,7 +1362,7 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
     payslip_id = fields.Many2one(
         'hr.payslip',
         required=True,
-        domain="[('employee_id', '=', employee_id), ('state', '=', 'draft')]",
+        domain="[('employee_id', '=', employee_id), ('state', '!=', 'cancel')]",
         help='Overtime is taken from this payslip month.',
     )
 
@@ -1438,13 +1438,8 @@ class HrEmployeeOtConvertWizard(models.TransientModel):
         if self.payslip_id.employee_id != self.employee_id:
             raise ValidationError(_('Selected payslip does not belong to this employee.'))
 
-        if self.payslip_id.state != 'draft':
-            raise ValidationError(_('Payslip must be in Draft state.'))
-
-        if self.payslip_id.lateness_reconciled:
-            raise ValidationError(
-                _('Reset reconciliation first, then convert overtime before reconciling again.')
-            )
+        if self.payslip_id.state == 'cancel':
+            raise ValidationError(_('Cannot convert overtime on a cancelled payslip.'))
 
         if self.overtime_to_convert_hours <= 0:
             raise ValidationError(_('Overtime to convert must be greater than 0.'))

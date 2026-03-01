@@ -71,9 +71,9 @@ class HrLeaveAllocation(models.Model):
                 ) % {
                     'employee': alloc.employee_id.display_name,
                 })
-            if payslip.state != 'draft':
+            if payslip.state == 'cancel':
                 raise ValidationError(_(
-                    'Payslip %(payslip)s must be in Draft to register OT conversion input.'
+                    'Payslip %(payslip)s is cancelled, OT conversion input cannot be registered.'
                 ) % {
                     'payslip': payslip.display_name,
                 })
