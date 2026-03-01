@@ -1,1 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
 
+    <!-- Inherit Original Invoice Template -->
+    <template id="invoice_add_fda"
+              inherit_id="account.report_invoice_document">
+
+        <!-- Add FDA Number after invoice header -->
+        <xpath expr="//div[@id='informations']" position="inside">
+            <div class="mt-2">
+                <strong>FDA Number:</strong>
+                <span>FDA-123456</span>
+            </div>
+        </xpath>
+
+    </template>
+
+</odoo>
