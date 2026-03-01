@@ -12,4 +12,18 @@
             </xpath>
         </field>
     </record>
+
+    <record id="view_employee_form_inherit_deduct_extra_hours_visibility" model="ir.ui.view">
+        <field name="name">hr.employee.form.deduct.extra.hours.visibility</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr_holidays_attendance.hr_employee_view_form_inherit"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <field name="has_non_cancelled_payslip" invisible="1"/>
+            </xpath>
+            <xpath expr="//header/button[@type='action' and contains(@context, 'deduct_extra_hours')]" position="attributes">
+                <attribute name="invisible">total_overtime &lt;= 1 or not active or not has_non_cancelled_payslip</attribute>
+            </xpath>
+        </field>
+    </record>
 </odoo>

@@ -5,6 +5,10 @@ from odoo.exceptions import UserError, ValidationError
 class HrLeaveAllocation(models.Model):
     _inherit = 'hr.leave.allocation'
 
+    employee_overtime = fields.Float(
+        compute='_compute_employee_overtime',
+        groups='base.group_user',
+    )
     is_ot_conversion = fields.Boolean(copy=False)
     ot_conversion_payslip_id = fields.Many2one(
         'hr.payslip',
@@ -21,6 +25,13 @@ class HrLeaveAllocation(models.Model):
         compute='_compute_number_of_day_converted',
         digits=(16, 2),
     )
+
+    @api.depends('employee_id')
+    def _compute_employee_overtime(self):
+        """Keep popup "Extra Hours Available" aligned with OT wallet source of truth."""
+        deductible_by_employee = self.env['hr.leave']._get_deductible_employee_overtime(self.employee_id)
+        for alloc in self:
+            alloc.employee_overtime = deductible_by_employee[alloc.employee_id] if alloc.employee_id else 0.0
 
     @api.depends(
         'ot_conversion_payslip_id',
