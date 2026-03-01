@@ -84,8 +84,13 @@ class HrPayslip(models.Model):
         """Capture original worked days and REMLATE before reconciliation."""
         self.ensure_one()
         remlate_input = self.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')[:1]
+        snapshot_lateness, snapshot_buckets = self._get_worked_day_hours_by_code()
         return {
             'worked_days_hours': {str(line.id): (line.number_of_hours or 0.0) for line in self.worked_days_line_ids},
+            # Keep wallet source totals independent from worked_days line IDs.
+            # Some flows recreate worked day lines after leave creation/approval.
+            'wallet_source_lateness': snapshot_lateness,
+            'wallet_source_buckets': snapshot_buckets,
             'remlate_amount': remlate_input.amount if remlate_input else None,
             'ot_wallet_carry_in_equiv': self.ot_wallet_carry_in_equiv,
             'ot_wallet_earned_equiv': self.ot_wallet_earned_equiv,
@@ -677,6 +682,12 @@ class HrPayslip(models.Model):
             payload = json.loads(self.lateness_reconcile_snapshot)
         except Exception:
             return self._get_worked_day_hours_by_code()
+
+        snapshot_buckets = payload.get('wallet_source_buckets')
+        snapshot_lateness = payload.get('wallet_source_lateness')
+        if isinstance(snapshot_buckets, dict) and snapshot_lateness is not None:
+            buckets = {code: float(snapshot_buckets.get(code, 0.0) or 0.0) for code in OT_PRIORITY_CODES}
+            return float(snapshot_lateness or 0.0), buckets
 
         original_hours = payload.get('worked_days_hours') or {}
         buckets = {code: 0.0 for code in OT_PRIORITY_CODES}
