@@ -27,6 +27,7 @@ class HrLeaveAllocation(models.Model):
         'ot_conversion_payslip_id.ot_wallet_carry_out_equiv'
     )
     def _compute_number_of_day_converted(self):
+        print(545454)
         for alloc in self:
             alloc.number_of_day_converted = 0.0
 
@@ -34,6 +35,7 @@ class HrLeaveAllocation(models.Model):
                 continue
 
             payslip = alloc.ot_conversion_payslip_id
+            print(payslip)
 
             # Keep wallet value up to date before exposing converted value.
             payslip.action_rebuild_ot_wallet()
@@ -62,6 +64,7 @@ class HrLeaveAllocation(models.Model):
                 continue
 
             payslip = alloc.employee_id._get_default_ot_conversion_payslip()
+            print(212121,payslip)
             if not payslip:
                 raise ValidationError(_(
                     'No payslip found for %(employee)s to register OT conversion input.'
