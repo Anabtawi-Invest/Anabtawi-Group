@@ -993,7 +993,38 @@ class HrPayslip(models.Model):
                                 leave_deduction_status = 'no_valid_slot'
                                 raise ValidationError(_("No valid working slot found for this leave request."))
                             created_leaves = self.env['hr.leave']
+                            created_hours = 0.0
                             for leave_day, start_hour, end_hour, slot_hours in leave_slots:
+                                # Re-check overlap at creation time using both business dates and datetimes,
+                                # because timezone conversions can make day-only checks miss collisions.
+                                leave_preview = self.env['hr.leave'].new({
+                                    'employee_id': slip.employee_id.id,
+                                    'holiday_status_id': leave_type.id,
+                                    'request_date_from': leave_day,
+                                    'request_date_to': leave_day,
+                                    'request_unit_hours': True,
+                                    'request_hour_from': start_hour,
+                                    'request_hour_to': end_hour,
+                                })
+                                leave_preview._compute_date_from_to()
+                                overlap_domain = [
+                                    ('employee_id', '=', slip.employee_id.id),
+                                    ('state', 'in', ['confirm', 'validate1', 'validate']),
+                                    '|',
+                                    '&',
+                                    ('request_date_from', '<=', leave_day),
+                                    ('request_date_to', '>=', leave_day),
+                                    '&',
+                                    ('date_from', '<', fields.Datetime.to_string(leave_preview.date_to)),
+                                    ('date_to', '>', fields.Datetime.to_string(leave_preview.date_from)),
+                                ]
+                                overlap_leave = Leave.sudo().search(overlap_domain, limit=1)
+                                if overlap_leave:
+                                    _logger.info(
+                                        "[LatenessReconcile] skip_slot_overlap slip_id=%s leave_day=%s start_hour=%s end_hour=%s overlap_leave_id=%s",
+                                        slip.id, leave_day, start_hour, end_hour, overlap_leave.id
+                                    )
+                                    continue
                                 _logger.info(
                                     "[LatenessReconcile] leave_slot_ok slip_id=%s leave_day=%s start_hour=%s end_hour=%s slot_hours=%s",
                                     slip.id, leave_day, start_hour, end_hour, slot_hours
@@ -1019,6 +1050,14 @@ class HrPayslip(models.Model):
                                 if hasattr(leave, 'action_approve'):
                                     leave.sudo().action_approve(check_state=False)
                                 created_leaves |= leave
+                                created_hours += slot_hours
+                            if not created_leaves:
+                                leave_deduction_status = 'no_valid_slot'
+                                _logger.warning(
+                                    "[LatenessReconcile] no_slot_created_after_overlap_check slip_id=%s remaining=%s leave_hours_to_deduct=%s; fallback to REMLATE",
+                                    slip.id, remaining, leave_hours_to_deduct
+                                )
+                                raise ValidationError(_("No valid working slot found for this leave request."))
                             created_leave = created_leaves[:1]
                             snapshot['created_leave_ids'] = created_leaves.ids
                             leave_deduction_status = 'leave_created'
@@ -1026,7 +1065,7 @@ class HrPayslip(models.Model):
                                 "[LatenessReconcile] leave_created slip_id=%s leave_ids=%s total_hours=%s",
                                 slip.id, created_leaves.ids, sum(created_leaves.mapped('number_of_hours'))
                             )
-                            remaining = max(remaining - leave_hours_to_deduct, 0.0)
+                            remaining = max(remaining - created_hours, 0.0)
                         except (ValidationError, UserError) as err:
                             if leave_deduction_status == 'pending':
                                 leave_deduction_status = 'leave_create_failed'
