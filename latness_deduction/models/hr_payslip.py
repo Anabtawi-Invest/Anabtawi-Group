@@ -855,6 +855,10 @@ class HrPayslip(models.Model):
                 "[LatenessReconcile] payout_first slip_id=%s payout_hours=%s wallet_before_lateness=%s",
                 slip.id, payout_hours, carry_in + weighted_total
             )
+            _logger.info(
+                "[LatenessReconcile] payout_inputs slip_id=%s inputs=%s",
+                slip.id, slip._get_ot_payout_debug_lines(),
+            )
 
             wallet_before_lateness = carry_in + weighted_total
             if payout_hours > wallet_before_lateness + 1e-6:
@@ -1037,6 +1041,27 @@ class HrPayslip(models.Model):
             #         'input_type_id': remlate_input_type.id,
             #         'amount': remaining,
             #     })
+            carry_out_equiv = max(
+                carry_in + weighted_total - (consume_wallet_equiv + consumed_current_equiv + payout_hours),
+                0.0
+            )
+            _logger.info(
+                "[LatenessReconcile] finalize slip_id=%s lateness_before=%s carry_in=%s earned=%s "
+                "consumed_from_carry=%s consumed_from_current=%s consumed_for_lateness_total=%s payout_hours=%s "
+                "leave_deduction_status=%s remaining_after_all=%s carry_out_expected=%s",
+                slip.id,
+                lateness,
+                carry_in,
+                weighted_total,
+                consume_wallet_equiv,
+                consumed_current_equiv,
+                (consume_wallet_equiv + consumed_current_equiv),
+                payout_hours,
+                leave_deduction_status,
+                remaining,
+                carry_out_equiv,
+            )
+
             slip.write({
                 'lateness_reconciled': True,
                 'lateness_reconcile_snapshot': json.dumps(snapshot),
@@ -1046,10 +1071,7 @@ class HrPayslip(models.Model):
                 'ot_wallet_lateness_consumed_equiv': consume_wallet_equiv + consumed_current_equiv,
                 'ot_wallet_payout_equiv': payout_hours,
                 'ot_wallet_consumed_equiv': consume_wallet_equiv + consumed_current_equiv + payout_hours,
-                'ot_wallet_carry_out_equiv': max(
-                    carry_in + weighted_total - (consume_wallet_equiv + consumed_current_equiv + payout_hours),
-                    0.0
-                ),
+                'ot_wallet_carry_out_equiv': carry_out_equiv,
             })
 
         self._recompute_ot_wallet_after_payout()
