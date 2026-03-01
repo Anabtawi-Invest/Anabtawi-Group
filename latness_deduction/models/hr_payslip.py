@@ -100,6 +100,7 @@ class HrPayslip(models.Model):
             'ot_wallet_carry_out_equiv': self.ot_wallet_carry_out_equiv,
             'ot_payout_signature': self._get_ot_payout_snapshot_signature(),
             'created_leave_ids': [],
+            'created_leave_hours': 0.0,
         }
 
     def _restore_lateness_snapshot(self):
@@ -612,21 +613,47 @@ class HrPayslip(models.Model):
             before_annual = current_annual
             before_ot = current_ot_before
             before_lateness = current_lateness
+            created_leave_hours = 0.0
             if slip.lateness_reconcile_snapshot:
                 try:
                     payload = json.loads(slip.lateness_reconcile_snapshot)
                     before_annual = payload.get('annual_leave_hours_before', before_annual)
                     before_ot = payload.get('ot_balance_before', before_ot)
                     before_lateness = payload.get('lateness_before', before_lateness)
+                    created_leave_hours = payload.get('created_leave_hours', 0.0) or 0.0
                 except Exception:
                     pass
 
             slip.annual_leave_hours_before = before_annual
             slip.ot_balance_before = before_ot
             slip.lateness_before = before_lateness
-            slip.annual_leave_hours_after = current_annual
+            # Prefer deterministic post-reconcile annual leave value from reconciliation payload.
+            # This avoids transient UI/cache inconsistencies right after leave creation.
+            # Always trust reconciliation snapshot when reconciled
+            if slip.lateness_reconciled and slip.lateness_reconcile_snapshot:
+                try:
+                    payload = json.loads(slip.lateness_reconcile_snapshot) or {}
+                    created_leave_hours = payload.get('created_leave_hours', 0.0) or 0.0
+                    before_annual = payload.get('annual_leave_hours_before', current_annual)
+                    slip.annual_leave_hours_after = max(before_annual - created_leave_hours, 0.0)
+                except Exception:
+                    slip.annual_leave_hours_after = current_annual
+            else:
+                slip.annual_leave_hours_after = current_annual
             slip.ot_balance_after = slip._get_ot_balance_after_value()
             slip.lateness_after = slip.remaining_lateness_hours or 0.0
+            _logger.info(
+                "[LatenessSummary] slip_id=%s annual_before=%s annual_after=%s created_leave_hours=%s "
+                "lateness_before=%s lateness_after=%s ot_before=%s ot_after=%s",
+                slip.id,
+                slip.annual_leave_hours_before,
+                slip.annual_leave_hours_after,
+                created_leave_hours,
+                slip.lateness_before,
+                slip.lateness_after,
+                slip.ot_balance_before,
+                slip.ot_balance_after,
+            )
 
     def _get_previous_ot_wallet_carry_out(self):
         """Compute cumulative OT wallet carry before current slip from all previous months."""
@@ -1143,6 +1170,7 @@ class HrPayslip(models.Model):
                                 raise ValidationError(_("No valid working slot found for this leave request."))
                             created_leave = created_leaves[:1]
                             snapshot['created_leave_ids'] = created_leaves.ids
+                            snapshot['created_leave_hours'] = round(created_hours, 6)
                             leave_deduction_status = 'leave_created'
                             _logger.info(
                                 "[LatenessReconcile] leave_created slip_id=%s leave_ids=%s total_hours=%s",
@@ -1184,7 +1212,8 @@ class HrPayslip(models.Model):
             _logger.info(
                 "[LatenessReconcile] finalize slip_id=%s lateness_before=%s carry_in=%s earned=%s "
                 "consumed_from_carry=%s consumed_from_current=%s consumed_for_lateness_total=%s payout_hours=%s "
-                "leave_deduction_status=%s remaining_after_all=%s carry_out_expected=%s",
+                "leave_deduction_status=%s annual_before=%s annual_leave_created_hours=%s annual_expected_after=%s "
+                "remaining_after_all=%s carry_out_expected=%s",
                 slip.id,
                 lateness,
                 carry_in,
@@ -1194,6 +1223,9 @@ class HrPayslip(models.Model):
                 (consume_wallet_equiv + consumed_current_equiv),
                 payout_hours,
                 leave_deduction_status,
+                snapshot.get('annual_leave_hours_before', 0.0),
+                snapshot.get('created_leave_hours', 0.0),
+                max((snapshot.get('annual_leave_hours_before', 0.0) or 0.0) - (snapshot.get('created_leave_hours', 0.0) or 0.0), 0.0),
                 remaining,
                 carry_out_equiv,
             )
