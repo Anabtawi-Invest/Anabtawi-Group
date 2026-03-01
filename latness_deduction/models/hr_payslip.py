@@ -1194,6 +1194,27 @@ class HrEmployee(models.Model):
                 employee.total_overtime,
             )
 
+    def get_overtime_data_by_employee(self):
+        """Align Attendance balance widget with OT wallet balance used in payroll."""
+        overtime_data = super().get_overtime_data_by_employee()
+        deductible_by_employee = self.env['hr.leave']._get_deductible_employee_overtime(self)
+        for employee in self:
+            data = overtime_data.setdefault(employee.id, {
+                "compensable_overtime": 0.0,
+                "not_compensable_overtime": 0.0,
+                "unspent_compensable_overtime": 0.0,
+            })
+            data["unspent_compensable_overtime"] = max(deductible_by_employee[employee], 0.0)
+            _logger.info(
+                "[OTWallet] attendance_widget_overtime employee_id=%s employee=%s compensable=%s not_compensable=%s unspent=%s",
+                employee.id,
+                employee.display_name,
+                data.get("compensable_overtime", 0.0),
+                data.get("not_compensable_overtime", 0.0),
+                data.get("unspent_compensable_overtime", 0.0),
+            )
+        return overtime_data
+
     def _get_default_ot_conversion_payslip(self):
         self.ensure_one()
         payslip = self.env['hr.payslip'].search([
