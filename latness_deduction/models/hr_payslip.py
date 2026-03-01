@@ -453,11 +453,15 @@ class HrPayslip(models.Model):
         day = self.date_from or self.date_to or fields.Date.today()
         end_day = self.date_to or day
         while day <= end_day and remaining > 0:
+            # Use datetime overlap (not request_date_* only) to reliably catch
+            # existing validated/confirmed leaves on that day.
+            day_start = datetime.combine(day, time.min)
+            day_end = datetime.combine(day, time.max)
             overlapping_leave = Leave.sudo().search([
                 ('employee_id', '=', self.employee_id.id),
                 ('state', 'in', ['confirm', 'validate1', 'validate']),
-                ('request_date_from', '<=', day),
-                ('request_date_to', '>=', day),
+                ('date_from', '<=', fields.Datetime.to_string(day_end)),
+                ('date_to', '>=', fields.Datetime.to_string(day_start)),
             ], limit=1)
             if overlapping_leave:
                 day += timedelta(days=1)
@@ -482,6 +486,15 @@ class HrPayslip(models.Model):
                 })
                 leave_preview._compute_date_from_to()
                 if leave_preview.date_from >= leave_preview.date_to:
+                    continue
+                # Final guard: avoid proposing a slot that overlaps an existing leave.
+                slot_overlap = Leave.sudo().search([
+                    ('employee_id', '=', self.employee_id.id),
+                    ('state', 'in', ['confirm', 'validate1', 'validate']),
+                    ('date_from', '<', fields.Datetime.to_string(leave_preview.date_to)),
+                    ('date_to', '>', fields.Datetime.to_string(leave_preview.date_from)),
+                ], limit=1)
+                if slot_overlap:
                     continue
                 slots.append((day, hour_from, slot_to, take))
                 remaining -= take
@@ -1014,12 +1027,12 @@ class HrPayslip(models.Model):
                                 slip.id, created_leaves.ids, sum(created_leaves.mapped('number_of_hours'))
                             )
                             remaining = max(remaining - leave_hours_to_deduct, 0.0)
-                        except (ValidationError, UserError):
+                        except (ValidationError, UserError) as err:
                             if leave_deduction_status == 'pending':
                                 leave_deduction_status = 'leave_create_failed'
-                            _logger.exception(
-                                "[LatenessReconcile] leave_create_failed slip_id=%s remaining=%s; fallback to REMLATE",
-                                slip.id, remaining
+                            _logger.warning(
+                                "[LatenessReconcile] leave_create_failed slip_id=%s remaining=%s error=%s; fallback to REMLATE",
+                                slip.id, remaining, err
                             )
                             pass
                     else:
