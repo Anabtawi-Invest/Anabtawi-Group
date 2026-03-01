@@ -39,18 +39,18 @@
 
                 <!-- Lateness -->
                 <div><b>Lateness (hrs)</b></div>
-                <field name="lateness_before" readonly="1" nolabel="1"/>
-                <field name="lateness_after" readonly="1" nolabel="1"/>
+                <field name="lateness_before" readonly="1" nolabel="1" widget="float_time"/>
+                <field name="lateness_after" readonly="1" nolabel="1" widget="float_time"/>
 
                 <!-- OT Balance -->
                 <div><b>OT Balance (hrs)</b></div>
-                <field name="ot_balance_before" readonly="1" nolabel="1"/>
-                <field name="ot_balance_after" readonly="1" nolabel="1"/>
+                <field name="ot_balance_before" readonly="1" nolabel="1" widget="float_time"/>
+                <field name="ot_balance_after" readonly="1" nolabel="1" widget="float_time"/>
 
                 <!-- Annual Leave -->
                 <div><b>Annual Leave (hrs)</b></div>
-                <field name="annual_leave_hours_before" readonly="1" nolabel="1"/>
-                <field name="annual_leave_hours_after" readonly="1" nolabel="1"/>
+                <field name="annual_leave_hours_before" readonly="1" nolabel="1" widget="float_time"/>
+                <field name="annual_leave_hours_after" readonly="1" nolabel="1" widget="float_time"/>
 
             </group>
 
