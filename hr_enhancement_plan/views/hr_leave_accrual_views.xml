@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<odoo>
+    <record id="hr_accrual_plan_view_form_enhancement" model="ir.ui.view">
+        <field name="name">hr.leave.accrual.plan.form.enhancement</field>
+        <field name="model">hr.leave.accrual.plan</field>
+        <field name="inherit_id" ref="hr_holidays.hr_accrual_plan_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='transition_mode']/parent::span" position="after">
+                <label class="fw-bold" for="milestone_reference" string="Milestone reference date:"/>
+                <span>
+                    <field class="ms-1" name="milestone_reference" widget="radio"/>
+                </span>
+            </xpath>
+        </field>
+    </record>
+</odoo>
