@@ -498,6 +498,9 @@ class HrPayslip(models.Model):
                 slot_overlap = Leave.sudo().search([
                     ('employee_id', '=', self.employee_id.id),
                     ('state', 'in', ['confirm', 'validate1', 'validate']),
+                    '|',
+                    ('lateness_reconcile_generated', '=', False),
+                    ('lateness_reconcile_payslip_id', '!=', self.id),
                     ('date_from', '<', fields.Datetime.to_string(leave_preview.date_to)),
                     ('date_to', '>', fields.Datetime.to_string(leave_preview.date_from)),
                 ], limit=1)
