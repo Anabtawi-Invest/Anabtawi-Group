@@ -1,1 +1,17 @@
-
+<odoo>
+    <record id="view_move_form_inherit_xlsx_export" model="ir.ui.view">
+        <field name="name">account.move.form.xlsx.export</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_export_xlsx_en" type="object"
+                        string="Export XLSX (EN)" class="btn-secondary"
+                        invisible="move_type not in ('out_invoice','out_refund')"/>
+                <button name="action_export_xlsx_ar" type="object"
+                        string="Export XLSX (AR)" class="btn-secondary"
+                        invisible="move_type not in ('out_invoice','out_refund')"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
