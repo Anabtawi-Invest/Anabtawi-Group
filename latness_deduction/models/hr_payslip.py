@@ -1112,8 +1112,9 @@ class HrPayslip(models.Model):
                                     leave_deduction_status = 'no_valid_slot'
                                     raise ValidationError(_("No valid working slot found for this leave request."))
                                 for leave_day, start_hour, end_hour, slot_hours in leave_slots:
-                                    # Re-check overlap at creation time using both business dates and datetimes,
-                                    # because timezone conversions can make day-only checks miss collisions.
+                                    # Re-check overlap using datetime bounds only.
+                                    # Day-level request_date overlap would incorrectly block another
+                                    # non-overlapping slot on the same day (e.g. 08:00-12:30 and 13:00-13:45).
                                     leave_preview = self.env['hr.leave'].new({
                                         'employee_id': slip.employee_id.id,
                                         'holiday_status_id': leave_type.id,
@@ -1127,11 +1128,6 @@ class HrPayslip(models.Model):
                                     overlap_domain = [
                                         ('employee_id', '=', slip.employee_id.id),
                                         ('state', 'in', ['confirm', 'validate1', 'validate']),
-                                        '|',
-                                        '&',
-                                        ('request_date_from', '<=', leave_day),
-                                        ('request_date_to', '>=', leave_day),
-                                        '&',
                                         ('date_from', '<', fields.Datetime.to_string(leave_preview.date_to)),
                                         ('date_to', '>', fields.Datetime.to_string(leave_preview.date_from)),
                                     ]
