@@ -15,6 +15,8 @@
         'views/hr_payslip_views.xml',
         'views/hr_payslip_input_views.xml',
         'views/res_config_settings_views.xml',
+        'views/planning_slot.xml',
+
         # 'views/hr_leave_allocation.xml'
     ],
     'installable': True,
