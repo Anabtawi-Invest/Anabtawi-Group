@@ -71,3 +71,16 @@ class HealthInsurance(models.Model):
                 rec.age = today.year - rec.birthdate.year
             else:
                 rec.age = 0
+
+    @api.onchange('relationship')
+    def _onchange_relationship(self):
+        if self.relationship == "employee":
+            self.name = self.employee_id.name
+            self.birthdate = self.employee_id.birthday
+            self.gender = self.employee_id.sex
+            self.employee_contribution = 69.35  # ← هون أضفنا القيمة
+        else:
+            self.name = False
+            self.birthdate = False
+            self.gender = False
+            self.employee_contribution = 100
