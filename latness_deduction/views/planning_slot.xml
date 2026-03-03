@@ -1,0 +1,17 @@
+
+<odoo>
+<record id="planning_slot_form_ot_convert" model="ir.ui.view">
+    <field name="name">planning.slot.form.ot.convert</field>
+    <field name="model">planning.slot</field>
+    <field name="inherit_id" ref="planning.planning_view_form"/>
+    <field name="arch" type="xml">
+        <xpath expr="//sheet/group" position="after">
+            <group string="Overtime Conversion">
+                <field name="ot_balance_display" readonly="1"/>
+                <field name="convert_ot_to_leave"/>
+            </group>
+        </xpath>
+    </field>
+</record>
+
+    </odoo>

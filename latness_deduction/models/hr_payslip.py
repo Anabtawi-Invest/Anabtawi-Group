@@ -10,7 +10,7 @@ from odoo.exceptions import UserError, ValidationError
 from odoo.addons.resource.models.utils import HOURS_PER_DAY
 
 OT_PRIORITY_CODES = ['OTR', 'PHO', 'OTW']  # Weekend, Public Holiday, Weekday
-OT_MULTIPLIERS = {'OTW': 1.25, 'OTR': 1.5, 'PHO': 1.5}
+OT_MULTIPLIERS = {'OTW': 1.25, 'OTR': 1, 'PHO': 1}
 LATENESS_CODES = ('LAT', 'LATE', 'Lateness', 'L')
 _logger = logging.getLogger(__name__)
 
