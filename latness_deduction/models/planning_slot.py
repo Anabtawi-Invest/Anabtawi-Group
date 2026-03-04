@@ -42,9 +42,7 @@ class PlanningSlot(models.Model):
             ], order='date_to desc, id desc', limit=1)
 
             if last_payslip:
-                slot.ot_balance_display = (
-                    last_payslip._get_ot_balance_after_value() or 0.0
-                )
+                slot.ot_balance_display = last_payslip._get_ot_available_for_planning()
 
     # =========================================================
     # Override Publish Button
@@ -89,8 +87,8 @@ class PlanningSlot(models.Model):
             if not last_payslip:
                 raise ValidationError(_("No payslip found for this employee."))
 
-            # Check available OT
-            available = last_payslip._get_ot_balance_after_value()
+            # Check available OT (same source as setting: Overtime for this month or OT Balance)
+            available = last_payslip._get_ot_available_for_planning()
             if hours > available + 1e-6:
                 raise ValidationError(_(
                     "Allocated hours (%.2f) exceed available OT balance (%.2f)."

@@ -31,6 +31,7 @@
         <xpath expr="//page[@name='account_info']/group" position="inside">
 
             <group string="Lateness Summary" col="3">
+                <field name="overtime_equivalent_hours" invisible="1"/>
 
                 <!-- Header -->
                 <div/>
@@ -46,6 +47,11 @@
                 <div><b>OT Balance (hrs)</b></div>
                 <field name="ot_balance_before" readonly="1" nolabel="1" widget="float_time"/>
                 <field name="ot_balance_after" readonly="1" nolabel="1" widget="float_time"/>
+
+                <!-- Overtime for this month -->
+                <div><b>Overtime for this month</b></div>
+                <field name="overtime_equivalent_hours_before" readonly="1" nolabel="1" widget="float_time"/>
+                <field name="overtime_equivalent_hours_after" readonly="1" nolabel="1" widget="float_time"/>
 
                 <!-- Annual Leave -->
                 <div><b>Annual Leave (hrs)</b></div>
