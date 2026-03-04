@@ -1,16 +1,24 @@
 <odoo>
-  <record id="res_config_settings_view_form_lateness_coverage" model="ir.ui.view">
-    <field name="name">res.config.settings.view.form.lateness.coverage</field>
+  <!-- Lateness & OT settings on General Settings (Payroll app). -->
+  <record id="view_res_config_settings_lateness_coverage" model="ir.ui.view">
+    <field name="name">res.config.settings.form.lateness.coverage</field>
     <field name="model">res.config.settings</field>
     <field name="inherit_id" ref="hr_payroll.res_config_settings_view_form"/>
+    <field name="priority" eval="60"/>
     <field name="arch" type="xml">
-      <xpath expr="//app[@name='hr_payroll']" position="inside">
-        <block title="Lateness Coverage" id="lateness_coverage_settings">
-          <setting string="Annual Leave Type for Lateness"
-                   help="Select the hour-based leave type used to cover remaining lateness after consuming overtime buckets.">
-            <field name="annual_leave_type_id"/>
-          </setting>
-        </block>
+      <xpath expr="//app[@name='hr_payroll']/block[@id='hr_payroll_settings']" position="inside">
+        <setting string="Lateness OT Source" help="Choose which OT source to use for lateness, planning, and extra-hours deduction.">
+          <field name="lateness_ot_source" options="{'no_create': True}"/>
+        </setting>
+        <setting string="Lateness Work Entry Codes" help="Comma-separated lateness codes, e.g. LAT,LATE,Lateness,L.">
+          <field name="lateness_work_entry_codes" placeholder="LAT,LATE,Lateness,L"/>
+        </setting>
+        <setting string="OT Priority Codes" help="Comma-separated OT codes by priority, e.g. OTR,PHO,OTW.">
+          <field name="ot_priority_codes" placeholder="OTR,PHO,OTW"/>
+        </setting>
+        <setting string="Annual Leave Type for Lateness" help="Leave type used when OT is not enough to cover lateness.">
+          <field name="lateness_annual_leave_type_id" options="{'no_create': True}"/>
+        </setting>
       </xpath>
     </field>
   </record>
