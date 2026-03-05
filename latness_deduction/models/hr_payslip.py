@@ -134,6 +134,26 @@ class HrPayslip(models.Model):
             if line and line.payslip_id == self:
                 line.number_of_hours = hours or 0.0
 
+        # If worked day lines were regenerated during reconciliation, restoring by line id
+        # may not fully recover OT totals. Re-apply snapshot OT totals by code to keep
+        # "Overtime for this month" consistent after reset.
+        snapshot_buckets = payload.get('wallet_source_buckets') or {}
+        if isinstance(snapshot_buckets, dict):
+            for code in self._get_ot_priority_codes():
+                target_hours = float(snapshot_buckets.get(code, 0.0) or 0.0)
+                code_lines = self.worked_days_line_ids.filtered(
+                    lambda l: (l.work_entry_type_id.code or '').strip() == code
+                )
+                if not code_lines:
+                    continue
+                # Keep one line with the target total and zero the rest to avoid
+                # negative/rounding drift when multiple lines share the same code.
+                first_line = code_lines[:1]
+                other_lines = code_lines - first_line
+                if other_lines:
+                    other_lines.write({'number_of_hours': 0.0})
+                first_line.number_of_hours = target_hours
+
         remlate_amount = payload.get('remlate_amount')
         inp = self.input_line_ids.filtered(lambda l: (l.code or '').strip() == 'REMLATE')
         if remlate_amount is None:
@@ -255,6 +275,7 @@ class HrPayslip(models.Model):
     def _get_ot_balance_after_value(self):
         """Return OT balance after using the same functional logic used by `ot_balance_after`."""
         self.ensure_one()
+        ot_source = self._get_lateness_ot_source()
         lateness, buckets = self._get_worked_day_hours_by_code()
         carry_in = self.ot_wallet_carry_in_equiv or self._get_previous_ot_wallet_carry_out()
         weighted_total = self._get_weighted_ot_hours(buckets)
@@ -274,7 +295,7 @@ class HrPayslip(models.Model):
             "[OTWallet] ot_balance_after_value slip_id=%s employee_id=%s state=%s reconciled=%s "
             "date_from=%s date_to=%s lateness=%s buckets=%s carry_in_field=%s carry_in_effective=%s "
             "earned=%s ot_before_payout=%s payout_input_hours=%s computed_not_reconciled=%s "
-            "stored_carry_out=%s source=%s result=%s",
+            "stored_carry_out=%s source=%s lateness_ot_source=%s result=%s",
             self.id,
             self.employee_id.id if self.employee_id else False,
             self.state,
@@ -291,8 +312,19 @@ class HrPayslip(models.Model):
             computed_not_reconciled,
             self.ot_wallet_carry_out_equiv,
             source,
+            ot_source,
             result,
         )
+        if self.lateness_reconciled and ot_source == 'overtime_this_month':
+            _logger.info(
+                "[OTWallet] ot_balance_after_reason slip_id=%s reason='reconciled uses stored carry_out; lateness does not consume wallet' "
+                "carry_out=%s carry_in=%s earned=%s payout=%s",
+                self.id,
+                self.ot_wallet_carry_out_equiv,
+                self.ot_wallet_carry_in_equiv,
+                self.ot_wallet_earned_equiv,
+                self.ot_wallet_payout_equiv,
+            )
         return result
 
     def _get_ot_wallet_salary_amount(self):
@@ -421,7 +453,6 @@ class HrPayslip(models.Model):
         self.ensure_one()
         company = self.company_id or self.env.company
         raw = (company.sudo().ot_priority_codes or '').strip()
-        print(2121212,raw)
         if not raw:
             return DEFAULT_OT_PRIORITY_CODES
         return [c.strip() for c in raw.split(',') if c.strip()] or DEFAULT_OT_PRIORITY_CODES
@@ -675,6 +706,7 @@ class HrPayslip(models.Model):
     )
     def _compute_before_after_reconcile_values(self):
         for slip in self:
+            ot_source = slip._get_lateness_ot_source()
             lateness, buckets = slip._get_worked_day_hours_by_code()
             carry_in = slip.ot_wallet_carry_in_equiv or slip._get_previous_ot_wallet_carry_out()
             current_ot_before = carry_in + slip._get_weighted_ot_hours(buckets)
@@ -687,10 +719,26 @@ class HrPayslip(models.Model):
                 slip.ot_balance_before = current_ot_before
                 slip.lateness_before = current_lateness
                 slip.overtime_equivalent_hours_before = current_ot_equiv
-                slip.overtime_equivalent_hours_after = max(0.0, current_ot_equiv - current_lateness)
+                # Pre-reconciliation view should be a neutral preview:
+                # "before" and "after" are identical until reconciliation is applied.
+                slip.overtime_equivalent_hours_after = current_ot_equiv
                 slip.annual_leave_hours_after = current_annual
                 slip.ot_balance_after = slip._get_ot_balance_after_value()
                 slip.lateness_after = current_lateness
+                _logger.info(
+                    "[LatenessSummary] pre_reconcile slip_id=%s source=%s lateness_before=%s lateness_after=%s "
+                    "ot_month_before=%s ot_month_after=%s ot_balance_before=%s ot_balance_after=%s annual_before=%s annual_after=%s",
+                    slip.id,
+                    ot_source,
+                    slip.lateness_before,
+                    slip.lateness_after,
+                    slip.overtime_equivalent_hours_before,
+                    slip.overtime_equivalent_hours_after,
+                    slip.ot_balance_before,
+                    slip.ot_balance_after,
+                    slip.annual_leave_hours_before,
+                    slip.annual_leave_hours_after,
+                )
                 continue
 
             before_annual = current_annual
@@ -730,9 +778,10 @@ class HrPayslip(models.Model):
             slip.ot_balance_after = slip._get_ot_balance_after_value()
             slip.lateness_after = slip.remaining_lateness_hours or 0.0
             _logger.info(
-                "[LatenessSummary] slip_id=%s annual_before=%s annual_after=%s created_leave_hours=%s "
-                "lateness_before=%s lateness_after=%s ot_before=%s ot_after=%s",
+                "[LatenessSummary] reconciled slip_id=%s source=%s annual_before=%s annual_after=%s created_leave_hours=%s "
+                "lateness_before=%s lateness_after=%s ot_before=%s ot_after=%s ot_month_before=%s ot_month_after=%s",
                 slip.id,
+                ot_source,
                 slip.annual_leave_hours_before,
                 slip.annual_leave_hours_after,
                 created_leave_hours,
@@ -740,7 +789,23 @@ class HrPayslip(models.Model):
                 slip.lateness_after,
                 slip.ot_balance_before,
                 slip.ot_balance_after,
+                slip.overtime_equivalent_hours_before,
+                slip.overtime_equivalent_hours_after,
             )
+            if ot_source == 'overtime_this_month' and slip.ot_balance_after > (slip.ot_balance_before + 1e-6):
+                _logger.warning(
+                    "[LatenessSummary] ot_balance_increase_with_overtime_month slip_id=%s before=%s after=%s delta=%s "
+                    "wallet_fields(carry_in=%s earned=%s payout=%s carry_out=%s) snapshot_before_ot=%s",
+                    slip.id,
+                    slip.ot_balance_before,
+                    slip.ot_balance_after,
+                    slip.ot_balance_after - slip.ot_balance_before,
+                    slip.ot_wallet_carry_in_equiv,
+                    slip.ot_wallet_earned_equiv,
+                    slip.ot_wallet_payout_equiv,
+                    slip.ot_wallet_carry_out_equiv,
+                    before_ot,
+                )
 
     def _get_previous_ot_wallet_carry_out(self):
         """Compute cumulative OT wallet carry before current slip from all previous months."""
@@ -751,7 +816,11 @@ class HrPayslip(models.Model):
             ('employee_id', '=', self.employee_id.id),
             ('state', '!=', 'cancel'),
             ('id', '!=', self.id),
+            '|',
             ('date_to', '<', self.date_to),
+            '&',
+            ('date_to', '=', self.date_to),
+            ('id', '<', self.id),
         ], order='date_to asc, id asc')
 
         carry = 0.0
@@ -1331,7 +1400,8 @@ class HrPayslip(models.Model):
                     )
 
             slip._restore_lateness_snapshot()
-
+            slip.worked_days_line_ids.invalidate_recordset(['number_of_hours'])
+            slip.write({})
             slip.write({
                 'lateness_reconciled': False,
                 'lateness_reconcile_snapshot': False,
