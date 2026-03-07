@@ -28,45 +28,40 @@ class PosOrder(models.Model):
         copy=False,
     )
 
+class PosOrderLine(models.Model):
+    _inherit = "pos.order.line"
+
     @api.model_create_multi
     def create(self, vals_list):
-        _logger.info("DEBUG REFUND: create called with vals_list = %s", vals_list)
+        lines = super().create(vals_list)
 
-        orders = super().create(vals_list)
-
-        for order in orders:
-            _logger.info(
-                "DEBUG REFUND: created order id=%s name=%s is_refund=%s",
-                order.id, order.name, order.is_refund
-            )
-
-            if order.is_refund:
-                original_orders = order.lines.mapped("refunded_orderline_id.order_id")
+        for line in lines:
+            if line.refunded_orderline_id:
+                original_order = line.refunded_orderline_id.order_id
 
                 _logger.info(
-                    "DEBUG REFUND: original orders detected %s",
-                    original_orders.ids
+                    "DEBUG REFUND: refund line detected. original order %s",
+                    original_order.name
                 )
 
-                for original in original_orders:
-                    advance = original.advance_order_id
+                advance = original_order.advance_order_id
 
-                    if advance:
+                if advance:
+                    _logger.info(
+                        "DEBUG REFUND: advance found %s state=%s",
+                        advance.name, advance.state
+                    )
+
+                    if advance.state != "cancel":
+                        advance.write({"state": "cancel"})
                         _logger.info(
-                            "DEBUG REFUND: advance found %s state=%s",
-                            advance.name, advance.state
+                            "DEBUG REFUND: advance %s cancelled",
+                            advance.name
                         )
+                else:
+                    _logger.info(
+                        "DEBUG REFUND: no advance linked to order %s",
+                        original_order.name
+                    )
 
-                        if advance.state != "cancel":
-                            advance.write({"state": "cancel"})
-                            _logger.info(
-                                "DEBUG REFUND: advance %s cancelled",
-                                advance.name
-                            )
-                    else:
-                        _logger.info(
-                            "DEBUG REFUND: no advance linked to order %s",
-                            original.name
-                        )
-
-        return orders
+        return lines
