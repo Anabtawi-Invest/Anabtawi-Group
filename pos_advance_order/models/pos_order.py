@@ -1,6 +1,7 @@
-# -*- coding: utf-8 -*-
+import logging
+from odoo import models, api,fields
 
-from odoo import fields, models,api
+_logger = logging.getLogger(__name__)
 
 
 class PosOrder(models.Model):
@@ -27,18 +28,29 @@ class PosOrder(models.Model):
         copy=False,
     )
 
-
     @api.model_create_multi
     def create(self, vals_list):
+        _logger.info("DEBUG REFUND: create called with vals_list = %s", vals_list)
+
         orders = super().create(vals_list)
 
         for order in orders:
+            _logger.info("DEBUG REFUND: created order id=%s name=%s is_refund=%s refunded_order_id=%s",
+                         order.id, order.name, order.is_refund, order.refunded_order_id.id)
+
             if order.is_refund and order.refunded_order_id:
                 original_order = order.refunded_order_id
+                _logger.info("DEBUG REFUND: refund detected for original order %s", original_order.name)
 
-                if original_order.advance_order_id:
-                    advance = original_order.advance_order_id
+                advance = original_order.advance_order_id
+                if advance:
+                    _logger.info("DEBUG REFUND: found advance order %s state=%s",
+                                 advance.name, advance.state)
+
                     if advance.state != "cancel":
                         advance.write({"state": "cancel"})
+                        _logger.info("DEBUG REFUND: advance order %s cancelled", advance.name)
+                else:
+                    _logger.info("DEBUG REFUND: no advance order linked")
 
         return orders
