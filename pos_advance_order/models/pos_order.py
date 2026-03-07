@@ -35,22 +35,38 @@ class PosOrder(models.Model):
         orders = super().create(vals_list)
 
         for order in orders:
-            _logger.info("DEBUG REFUND: created order id=%s name=%s is_refund=%s refunded_order_id=%s",
-                         order.id, order.name, order.is_refund, order.refunded_order_id.id)
+            _logger.info(
+                "DEBUG REFUND: created order id=%s name=%s is_refund=%s",
+                order.id, order.name, order.is_refund
+            )
 
-            if order.is_refund and order.refunded_order_id:
-                original_order = order.refunded_order_id
-                _logger.info("DEBUG REFUND: refund detected for original order %s", original_order.name)
+            if order.is_refund:
+                original_orders = order.lines.mapped("refunded_orderline_id.order_id")
 
-                advance = original_order.advance_order_id
-                if advance:
-                    _logger.info("DEBUG REFUND: found advance order %s state=%s",
-                                 advance.name, advance.state)
+                _logger.info(
+                    "DEBUG REFUND: original orders detected %s",
+                    original_orders.ids
+                )
 
-                    if advance.state != "cancel":
-                        advance.write({"state": "cancel"})
-                        _logger.info("DEBUG REFUND: advance order %s cancelled", advance.name)
-                else:
-                    _logger.info("DEBUG REFUND: no advance order linked")
+                for original in original_orders:
+                    advance = original.advance_order_id
+
+                    if advance:
+                        _logger.info(
+                            "DEBUG REFUND: advance found %s state=%s",
+                            advance.name, advance.state
+                        )
+
+                        if advance.state != "cancel":
+                            advance.write({"state": "cancel"})
+                            _logger.info(
+                                "DEBUG REFUND: advance %s cancelled",
+                                advance.name
+                            )
+                    else:
+                        _logger.info(
+                            "DEBUG REFUND: no advance linked to order %s",
+                            original.name
+                        )
 
         return orders
