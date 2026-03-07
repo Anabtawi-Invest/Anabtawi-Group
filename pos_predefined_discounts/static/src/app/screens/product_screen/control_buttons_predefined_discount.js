@@ -1,14 +1,24 @@
+/** @odoo-module **/
+
 import { _t } from "@web/core/l10n/translation";
 import { patch } from "@web/core/utils/patch";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { NumberPopup } from "@point_of_sale/app/components/popups/number_popup/number_popup";
-
+import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+/**
+ * Patch clickDiscount
+ */
 patch(ControlButtons.prototype, {
     async clickDiscount() {
+
+        console.log("========== CLICK DISCOUNT BUTTON ==========");
+
         let allowedPercents = [];
 
         try {
+
             const orm = this.env.services.orm;
+
             const rows = await orm.searchRead(
                 "pos.predefined.discount",
                 [
@@ -18,45 +28,36 @@ patch(ControlButtons.prototype, {
                 ["discount"]
             );
 
+            console.log("ALLOWED DISCOUNTS FROM SERVER:", rows);
+
             allowedPercents = (rows || [])
                 .map((r) => Number(r.discount))
                 .filter((x) => Number.isFinite(x))
                 .map((x) => Math.max(0, Math.min(100, x)));
 
-        } catch {
+        } catch (error) {
+
+            console.error("ERROR FETCHING DISCOUNTS:", error);
             allowedPercents = [];
         }
 
-        const allowedSet = [...new Set(allowedPercents.map((x) => Number(x.toFixed(6))))].sort(
-            (a, b) => a - b
-        );
+        const allowedSet = [...new Set(
+            allowedPercents.map((x) => Number(x.toFixed(6)))
+        )].sort((a, b) => a - b);
+
+        console.log("ALLOWED DISCOUNTS:", allowedSet);
 
         const hasAllowed = allowedSet.length > 0;
 
         const isAllowed = (buffer) => {
-            if (!buffer) {
-                return false;
-            }
 
-            const raw = this.env.utils.parseValidFloat(buffer.toString());
-
-            if (!Number.isFinite(raw)) {
-                return false;
-            }
-
+            const raw = this.env.utils.parseValidFloat(buffer?.toString());
             const safe = Math.max(0, Math.min(100, raw));
 
-            if (!hasAllowed) {
-                return true;
-            }
-
-            return allowedSet.some((x) => Math.abs(x - safe) < 1e-6);
+            return !hasAllowed || allowedSet.some((x) => Math.abs(x - safe) < 1e-6);
         };
 
         const feedback = (buffer) => {
-            if (!hasAllowed) {
-                return false;
-            }
 
             const raw = this.env.utils.parseValidFloat(buffer?.toString());
 
@@ -74,40 +75,85 @@ patch(ControlButtons.prototype, {
         };
 
         this.dialog.add(NumberPopup, {
+
             title: _t("Discount Percentage"),
             startingValue: this.pos.config.discount_pc,
             isValid: isAllowed,
             feedback: feedback,
 
             getPayload: (num) => {
+
                 const percent = Math.max(
                     0,
                     Math.min(100, this.env.utils.parseValidFloat(num.toString()))
                 );
 
+                console.log("DISCOUNT ENTERED:", percent);
+
                 if (!hasAllowed || allowedSet.some((x) => Math.abs(x - percent) < 1e-6)) {
 
-                    const order = this.pos.getOrder();
-                    const discountProductId = this.pos.config.discount_product_id?.[0];
+                    console.log("CALLING applyDiscount()");
+                    this.applyDiscount(percent);
 
-                    if (!order) return;
+                } else {
 
-                    const lines = order.getOrderlines();
+                    console.log("DISCOUNT NOT ALLOWED");
 
-                    lines.forEach((line) => {
-
-                        const productId =
-                            line.product?.id || line.product_id?.id;
-
-                        if (!productId) return;
-
-                        // لا يطبق الخصم على Discount Product
-                        if (productId === discountProductId) return;
-
-                        line.setDiscount(percent);
-                    });
                 }
             },
         });
+    },
+});
+
+
+/**
+ * Patch applyDiscount
+ */
+patch(ControlButtons.prototype, {
+
+    applyDiscount(percent) {
+
+        console.log("========== APPLY DISCOUNT START ==========");
+
+        const order = this.pos.getOrder();
+
+        if (!order) {
+            console.log("NO ORDER FOUND");
+            return;
+        }
+
+        const lines = order.getOrderlines();
+
+        console.log("TOTAL ORDER LINES:", lines.length);
+
+        // تحقق إذا كان يوجد rounding product
+        const hasRoundingProduct = lines.some((line) => {
+            const productId = line.product?.id || line.product_id?.id;
+            return productId === 30;
+        });
+
+       if (hasRoundingProduct) {
+
+    console.log("ROUNDING PRODUCT FOUND → DISCOUNT BLOCKED");
+
+    this.dialog.add(AlertDialog, {
+        title: _t("Discount Not Allowed"),
+        body: _t("Cannot apply discount when rounding product exists."),
+    });
+
+    return;
+}
+
+        // تطبيق الخصم
+        lines.forEach((line) => {
+
+            const productId = line.product?.id || line.product_id?.id;
+
+            console.log("APPLYING DISCOUNT TO:", productId);
+
+            line.setDiscount(percent);
+        });
+
+        console.log("========== APPLY DISCOUNT FINISHED ==========");
     },
 });
