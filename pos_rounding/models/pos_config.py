@@ -23,3 +23,11 @@ class PosConfig(models.Model):
         if "discount_adjustment_product_id" not in fields_to_load:
             fields_to_load.append("discount_adjustment_product_id")
         return fields_to_load
+
+class PosSession(models.Model):
+    _inherit = "pos.session"
+
+    def _loader_params_pos_config(self):
+        res = super()._loader_params_pos_config()
+        res["search_params"]["fields"].append("discount_adjustment_product_id")
+        return res

@@ -742,7 +742,6 @@ class PosAdvanceOrder(models.Model):
             if order.state != "draft":
                 continue
 
-            # --- 1️⃣ حساب الخصم ---
             discount = 0.0
             if order.discount_id:
                 if order.discount_id.discount_type == "percent":
@@ -755,10 +754,8 @@ class PosAdvanceOrder(models.Model):
                 min(discount, order.amount_products or 0.0)
             )
 
-            # --- 2️⃣ إعادة حساب التوتال قبل الفاليديشن ---
             order._compute_amounts()
 
-            # --- 3️⃣ فاليديشن advance ---
             if order.advance_amount < 0:
                 raise UserError(_("Advance amount cannot be negative."))
 
