@@ -2,7 +2,7 @@
 # Part of Softhealer Technologies.
 
 {
-    "name": "POS Analytic Account",
+    "name": "POS Analytic Account-anabtawi",
     "author": "Softhealer Technologies",
     "website": "https://www.softhealer.com",
     "support": "support@softhealer.com",
