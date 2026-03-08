@@ -1,5 +1,5 @@
 {
-    "name": "Stock Qty Done Guard",
+    "name": "Stock Qty Done Guard-anabtawi",
     "version": "19.0.1.0.0",
     "summary": "Block done qty greater than demand in pickings-Ameen",
     "depends": ["stock"],
