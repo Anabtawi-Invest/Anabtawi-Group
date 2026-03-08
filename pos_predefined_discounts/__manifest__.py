@@ -1,7 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 {
-    "name": "POS Predefined Discounts",
+    "name": "POS Predefined Discounts-anabtawi",
     "version": "1.0.0",
     "category": "Sales/Point of Sale",
     "summary": "Select predefined discounts from POS instead of typing a number",
