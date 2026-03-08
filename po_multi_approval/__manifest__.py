@@ -1,5 +1,5 @@
 {
-    "name": "PO Multi Approval",
+    "name": "PO Multi Approval-anabtawi",
     "version": "19.0.1.0.0",
     "category": "Purchase",
     "depends": ["purchase", "mail"],
