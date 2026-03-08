@@ -1,5 +1,5 @@
 {
-    "name": "Arabic Reports",
+    "name": "Arabic Reports-anabtawi",
     "version": "1.0",
     "depends": ["account", "stock"],
     "data": [
