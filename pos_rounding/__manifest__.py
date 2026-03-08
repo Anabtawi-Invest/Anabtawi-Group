@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'POS Rounding',
+    'name': 'POS Rounding-anabtawi',
     'version': '19.0.1.0.0',
     'category': 'Point of Sale',
     'summary': 'Track paid but uncollected POS orders',
