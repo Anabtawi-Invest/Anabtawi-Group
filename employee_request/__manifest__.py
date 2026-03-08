@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "Employee Request",
+    "name": "Employee Request-anabtawi",
     "version": "19.0.1.0.0",
     "category": "Human Resources",
     "summary": "Base module for employee requests (skeleton).",
