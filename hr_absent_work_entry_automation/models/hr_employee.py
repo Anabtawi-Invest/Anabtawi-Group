@@ -46,7 +46,7 @@ class HrEmployee(models.Model):
             ("employee_id", "=", self.id),
             ("date", "=", target_date),
             ("state", "!=", "cancelled"),
-            ("work_entry_type_id.is_work", "=", True),
+            ("work_entry_type_id.is_leave", "=", False),
         ])
 
         if existing_work_entries:
