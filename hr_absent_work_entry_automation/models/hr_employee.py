@@ -2,9 +2,12 @@
 
 from datetime import datetime, time, timedelta
 
+import logging
 import pytz
 
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class HrEmployee(models.Model):
@@ -19,6 +22,10 @@ class HrEmployee(models.Model):
     @api.model
     def _create_absent_work_entries_for_day(self, target_date):
         target_date = fields.Date.to_date(target_date)
+        _logger.info(
+            "Absent automation: start processing date=%s",
+            target_date,
+        )
         absent_type = self.env.ref(
             "hr_absent_work_entry_automation.work_entry_type_absent",
             raise_if_not_found=False,
@@ -26,19 +33,47 @@ class HrEmployee(models.Model):
         if not absent_type:
             absent_type = self.env["hr.work.entry.type"].search([("code", "=", "ABSENT")], limit=1)
         if not absent_type:
+            _logger.warning(
+                "Absent automation: skipped date=%s because ABSENT work entry type was not found",
+                target_date,
+            )
             return
 
         employees = self.search([("active", "=", True)])
+        _logger.info(
+            "Absent automation: evaluating %s active employees for date=%s",
+            len(employees),
+            target_date,
+        )
         for employee in employees:
             employee._apply_absence_for_day(target_date, absent_type)
 
     def _apply_absence_for_day(self, target_date, absent_type):
         self.ensure_one()
-        if not self._has_expected_work_on_day(target_date):
+        expected_hours = self._get_expected_hours_on_day(target_date)
+        if expected_hours <= 0:
+            _logger.info(
+                "Absent automation: skip employee=%s(%s) date=%s reason=no expected work hours",
+                self.name,
+                self.id,
+                target_date,
+            )
             return
         if self._has_checkin_on_day(target_date):
+            _logger.info(
+                "Absent automation: skip employee=%s(%s) date=%s reason=attendance check-in exists",
+                self.name,
+                self.id,
+                target_date,
+            )
             return
         if self._has_leave_work_entry_on_day(target_date):
+            _logger.info(
+                "Absent automation: skip employee=%s(%s) date=%s reason=leave work entry exists",
+                self.name,
+                self.id,
+                target_date,
+            )
             return
 
         work_entry_model = self.env["hr.work.entry"].sudo()
@@ -53,6 +88,20 @@ class HrEmployee(models.Model):
             editable_work_entries = existing_work_entries.filtered(lambda we: we.state != "validated")
             if editable_work_entries:
                 editable_work_entries.write({"work_entry_type_id": absent_type.id})
+                _logger.info(
+                    "Absent automation: updated %s work entries to ABSENT for employee=%s(%s) date=%s",
+                    len(editable_work_entries),
+                    self.name,
+                    self.id,
+                    target_date,
+                )
+            else:
+                _logger.info(
+                    "Absent automation: skip employee=%s(%s) date=%s reason=existing work entries are validated",
+                    self.name,
+                    self.id,
+                    target_date,
+                )
             return
 
         if work_entry_model.search_count([
@@ -61,15 +110,33 @@ class HrEmployee(models.Model):
             ("state", "!=", "cancelled"),
             ("work_entry_type_id", "=", absent_type.id),
         ]):
+            _logger.info(
+                "Absent automation: skip employee=%s(%s) date=%s reason=ABSENT work entry already exists",
+                self.name,
+                self.id,
+                target_date,
+            )
             return
 
-        duration = self._get_expected_hours_on_day(target_date)
+        duration = expected_hours
         if duration <= 0:
+            _logger.info(
+                "Absent automation: skip employee=%s(%s) date=%s reason=duration is zero after evaluation",
+                self.name,
+                self.id,
+                target_date,
+            )
             return
         duration = min(round(duration, 2), 24.0)
 
         version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
         if not version:
+            _logger.info(
+                "Absent automation: skip employee=%s(%s) date=%s reason=no overlapping contract version",
+                self.name,
+                self.id,
+                target_date,
+            )
             return
 
         work_entry_model.create({
@@ -80,6 +147,13 @@ class HrEmployee(models.Model):
             "work_entry_type_id": absent_type.id,
             "company_id": self.company_id.id,
         })
+        _logger.info(
+            "Absent automation: created ABSENT work entry for employee=%s(%s) date=%s duration=%s",
+            self.name,
+            self.id,
+            target_date,
+            duration,
+        )
 
     def _has_expected_work_on_day(self, target_date):
         self.ensure_one()
