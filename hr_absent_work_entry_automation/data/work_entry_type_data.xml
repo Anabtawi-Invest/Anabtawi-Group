@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="work_entry_type_absent" model="hr.work.entry.type">
+            <field name="name">Absent</field>
+            <field name="display_code">ABS</field>
+            <field name="code">ABSENT</field>
+            <field name="color">1</field>
+            <field name="is_leave">False</field>
+        </record>
+    </data>
+</odoo>
