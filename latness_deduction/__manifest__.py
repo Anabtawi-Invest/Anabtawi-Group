@@ -15,6 +15,8 @@
         'views/planning_slot.xml',
         # Company lateness view last so res.company fields are registered first
         'views/res_config_settings_views.xml',
+        'views/hr_employee.xml',
+
     ],
     'installable': True,
     'application': False,

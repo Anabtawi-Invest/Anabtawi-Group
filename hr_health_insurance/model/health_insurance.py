@@ -2,7 +2,8 @@
 
 from odoo import fields, models, api, _
 from datetime import date
-
+import logging
+_logger = logging.getLogger(__name__)
 
 class HealthInsurance(models.Model):
     _name = "health.insurance"
@@ -84,3 +85,29 @@ class HealthInsurance(models.Model):
             self.birthdate = False
             self.gender = False
             self.employee_contribution = 100
+
+    @api.onchange('employee_id', 'relationship')
+    def _onchange_employee_data(self):
+        import logging
+        _logger = logging.getLogger(__name__)
+
+        for rec in self:
+            _logger.warning("Onchange triggered")
+            _logger.warning("Employee: %s", rec.employee_id)
+            _logger.warning("Relationship: %s", rec.relationship)
+
+            if rec.employee_id and rec.relationship == "employee":
+
+                rec.name = rec.employee_id.name
+                rec.birthdate = rec.employee_id.birthday
+                rec.gender = rec.employee_id.sex
+                rec.marital_status_info = rec.employee_id.marital
+                rec.employee_contribution = 69.35
+
+                grade = self.env['hr.health.grade'].search([], order='id', limit=1)
+
+                _logger.warning("Found grade: %s", grade)
+
+                if grade:
+                    rec.grade_id = grade
+                    _logger.warning("Assigned grade_id: %s", rec.grade_id)

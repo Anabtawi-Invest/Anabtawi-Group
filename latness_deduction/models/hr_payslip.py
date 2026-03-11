@@ -11,7 +11,7 @@ from odoo.addons.resource.models.utils import HOURS_PER_DAY
 
 # Defaults when company settings are empty (see res.company lateness_work_entry_codes / ot_priority_codes)
 DEFAULT_OT_PRIORITY_CODES = ['OTR', 'PHO', 'OTW']  # Weekend, Public Holiday, Weekday
-OT_MULTIPLIERS = {'OTW': 1.25, 'OTR': 1, 'PHO': 1}
+OT_MULTIPLIERS = {'OTW': 1.25, 'OTR': 1, 'PHO': 1.5}
 DEFAULT_LATENESS_CODES = ('LAT', 'LATE', 'Lateness', 'L')
 _logger = logging.getLogger(__name__)
 
