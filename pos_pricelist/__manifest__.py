@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'POS Price list enhancement  ',
+    'name': 'POS Pricelist enhancement-anabtawi  ',
     'version': '1.1',
     'category': 'Point of Sale',
     'summary': 'Manage pledge (Rahn) scenarios with employees, delivery, and accounting',
