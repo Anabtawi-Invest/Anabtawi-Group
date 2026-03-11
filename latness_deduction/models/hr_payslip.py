@@ -681,10 +681,22 @@ class HrPayslip(models.Model):
                 lateness += line.number_of_hours or 0.0
         return lateness, buckets
 
+    def _get_otr_multiplier(self):
+        """Return OTR multiplier based on employee work entry source."""
+        self.ensure_one()
+        source = (self.version_id.work_entry_source or '').strip()
+        if source == 'planning':
+            return 1.0
+        if source == 'attendance':
+            return 1.5
+        return OT_MULTIPLIERS.get('OTR', 1.0)
+
     def _get_weighted_ot_hours(self, buckets):
         self.ensure_one()
+        multipliers = dict(OT_MULTIPLIERS)
+        multipliers['OTR'] = self._get_otr_multiplier()
         return sum(
-            (buckets.get(code, 0.0) or 0.0) * OT_MULTIPLIERS.get(code, 1.0)
+            (buckets.get(code, 0.0) or 0.0) * multipliers.get(code, 1.0)
             for code in self._get_ot_priority_codes()
         )
 
