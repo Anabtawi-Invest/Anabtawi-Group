@@ -20,7 +20,7 @@ class HrEmployee(models.Model):
     employee_password_generated_at = fields.Datetime(
         string="Employee Password Generated At",
         copy=False,
-        readonly=True,
+        readonly=False,
     )
 
     @api.model
