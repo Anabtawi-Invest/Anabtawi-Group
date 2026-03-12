@@ -468,10 +468,10 @@ class HrPayslip(models.Model):
         self.ensure_one()
         lateness, buckets = self._get_worked_day_hours_by_code()
         weighted_total = self._get_weighted_ot_hours(buckets)
-        if self._get_lateness_ot_source() == 'overtime_this_month':
-            return weighted_total
-        carry_in = self._get_previous_ot_wallet_carry_out()
         payout = self._get_ot_payout_hours_from_inputs()
+        if self._get_lateness_ot_source() == 'overtime_this_month':
+            return max(weighted_total - payout, 0.0)
+        carry_in = self._get_previous_ot_wallet_carry_out()
         return max((carry_in + weighted_total) - payout, 0.0)
 
     def _get_ot_available_for_planning(self):
@@ -486,7 +486,7 @@ class HrPayslip(models.Model):
         self.ensure_one()
         if self._get_lateness_ot_source() == 'overtime_this_month':
             _lateness, buckets = self._get_worked_day_hours_by_code()
-            return self._get_weighted_ot_hours(buckets)
+            return max(self._get_weighted_ot_hours(buckets) - self._get_ot_payout_hours_from_inputs(), 0.0)
         return self._get_ot_wallet_available_before_lateness()
 
     def _get_remlate_input_type(self):
@@ -731,9 +731,9 @@ class HrPayslip(models.Model):
                 slip.ot_balance_before = current_ot_before
                 slip.lateness_before = current_lateness
                 slip.overtime_equivalent_hours_before = current_ot_equiv
-                # Pre-reconciliation view should be a neutral preview:
-                # "before" and "after" are identical until reconciliation is applied.
-                slip.overtime_equivalent_hours_after = current_ot_equiv
+                # "Overtime for this month (after)" reflects OT payout impact even before reconciliation.
+                payout_preview = slip._get_ot_payout_hours_from_inputs()
+                slip.overtime_equivalent_hours_after = max(current_ot_equiv - payout_preview, 0.0)
                 slip.annual_leave_hours_after = current_annual
                 slip.ot_balance_after = slip._get_ot_balance_after_value()
                 slip.lateness_after = current_lateness
@@ -773,7 +773,11 @@ class HrPayslip(models.Model):
             slip.ot_balance_before = before_ot
             slip.lateness_before = before_lateness
             slip.overtime_equivalent_hours_before = before_ot_equiv
-            slip.overtime_equivalent_hours_after = max(0.0, before_ot_equiv - before_lateness)
+            payout_hours_month = slip._get_ot_payout_hours_from_inputs()
+            if ot_source == 'overtime_this_month':
+                slip.overtime_equivalent_hours_after = max(0.0, before_ot_equiv - before_lateness - payout_hours_month)
+            else:
+                slip.overtime_equivalent_hours_after = max(0.0, before_ot_equiv - before_lateness)
             # Prefer deterministic post-reconcile annual leave value from reconciliation payload.
             # This avoids transient UI/cache inconsistencies right after leave creation.
             # Always trust reconciliation snapshot when reconciled
