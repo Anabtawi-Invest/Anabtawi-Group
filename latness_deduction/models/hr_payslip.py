@@ -481,8 +481,28 @@ class HrPayslip(models.Model):
         self.ensure_one()
         if self._get_lateness_ot_source() == 'overtime_this_month':
             # Planning uses the displayed "Overtime for this month (after)" value.
-            return self.overtime_equivalent_hours_after or 0.0
-        return self._get_ot_balance_after_value() or 0.0
+            result = self.overtime_equivalent_hours_after or 0.0
+            _logger.info(
+                "[PlanningOT] source=overtime_this_month slip_id=%s reconciled=%s "
+                "ot_month_before=%s ot_month_after=%s payout_input_hours=%s returned_available=%s",
+                self.id,
+                self.lateness_reconciled,
+                self.overtime_equivalent_hours_before,
+                self.overtime_equivalent_hours_after,
+                self._get_ot_payout_hours_from_inputs(),
+                result,
+            )
+            return result
+        result = self._get_ot_balance_after_value() or 0.0
+        _logger.info(
+            "[PlanningOT] source=ot_balance slip_id=%s reconciled=%s ot_balance_after=%s payout_input_hours=%s returned_available=%s",
+            self.id,
+            self.lateness_reconciled,
+            self.ot_balance_after,
+            self._get_ot_payout_hours_from_inputs(),
+            result,
+        )
+        return result
 
     def _get_ot_available_for_deduction(self):
         """OT hours available for deduct-extra-hours / conversion from this payslip. Depends on company setting."""
@@ -741,6 +761,14 @@ class HrPayslip(models.Model):
                 slip.annual_leave_hours_after = current_annual
                 slip.ot_balance_after = slip._get_ot_balance_after_value()
                 slip.lateness_after = current_lateness
+                _logger.info(
+                    "[PlanningOT] pre_reconcile_month_values slip_id=%s reconciled=%s "
+                    "ot_month_before=%s ot_month_after=%s reason='before/after are equal until reconciliation'",
+                    slip.id,
+                    slip.lateness_reconciled,
+                    slip.overtime_equivalent_hours_before,
+                    slip.overtime_equivalent_hours_after,
+                )
                 _logger.info(
                     "[LatenessSummary] pre_reconcile slip_id=%s source=%s lateness_before=%s lateness_after=%s "
                     "ot_month_before=%s ot_month_after=%s ot_balance_before=%s ot_balance_after=%s annual_before=%s annual_after=%s",

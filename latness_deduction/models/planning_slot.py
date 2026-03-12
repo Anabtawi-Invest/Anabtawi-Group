@@ -1,6 +1,10 @@
+import logging
+
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 from datetime import timedelta
+
+_logger = logging.getLogger(__name__)
 
 
 class PlanningSlot(models.Model):
@@ -43,6 +47,18 @@ class PlanningSlot(models.Model):
 
             if last_payslip:
                 slot.ot_balance_display = last_payslip._get_ot_available_for_planning()
+                _logger.info(
+                    "[PlanningOT] slot_available_ot slot_id=%s employee_id=%s payslip_id=%s "
+                    "ot_month_before=%s ot_month_after=%s ot_balance_after=%s reconciled=%s available_display=%s",
+                    slot.id,
+                    employee.id,
+                    last_payslip.id,
+                    last_payslip.overtime_equivalent_hours_before,
+                    last_payslip.overtime_equivalent_hours_after,
+                    last_payslip.ot_balance_after,
+                    last_payslip.lateness_reconciled,
+                    slot.ot_balance_display,
+                )
 
     # =========================================================
     # Override Publish Button
