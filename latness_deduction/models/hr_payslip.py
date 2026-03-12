@@ -280,7 +280,8 @@ class HrPayslip(models.Model):
         carry_in = self.ot_wallet_carry_in_equiv or self._get_previous_ot_wallet_carry_out()
         weighted_total = self._get_weighted_ot_hours(buckets)
         ot_before_payout = max(carry_in + weighted_total, 0.0)
-        payout_hours = self._get_ot_payout_hours_from_inputs()
+        # Payout impact is applied only after reconciliation.
+        payout_hours = self._get_ot_payout_hours_from_inputs() if self.lateness_reconciled else 0.0
         computed_not_reconciled = max(ot_before_payout - payout_hours, 0.0)
         result = computed_not_reconciled
         source = 'computed_not_reconciled'
