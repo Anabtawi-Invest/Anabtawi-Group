@@ -7,7 +7,7 @@
     <field name="arch" type="xml">
         <xpath expr="//sheet/group" position="after">
             <group string="Overtime Conversion">
-                <field name="ot_balance_display" readonly="1"/>
+                <field name="ot_balance_display" readonly="1" widget="float_time"/>
                 <field name="convert_ot_to_leave"/>
             </group>
         </xpath>
