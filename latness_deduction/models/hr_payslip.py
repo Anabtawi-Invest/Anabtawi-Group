@@ -470,7 +470,8 @@ class HrPayslip(models.Model):
         weighted_total = self._get_weighted_ot_hours(buckets)
         payout = self._get_ot_payout_hours_from_inputs()
         if self._get_lateness_ot_source() == 'overtime_this_month':
-            return max(weighted_total - payout, 0.0)
+            payout_month = payout if self.lateness_reconciled else 0.0
+            return max(weighted_total - payout_month, 0.0)
         carry_in = self._get_previous_ot_wallet_carry_out()
         return max((carry_in + weighted_total) - payout, 0.0)
 
@@ -486,7 +487,8 @@ class HrPayslip(models.Model):
         self.ensure_one()
         if self._get_lateness_ot_source() == 'overtime_this_month':
             _lateness, buckets = self._get_worked_day_hours_by_code()
-            return max(self._get_weighted_ot_hours(buckets) - self._get_ot_payout_hours_from_inputs(), 0.0)
+            payout_month = self._get_ot_payout_hours_from_inputs() if self.lateness_reconciled else 0.0
+            return max(self._get_weighted_ot_hours(buckets) - payout_month, 0.0)
         return self._get_ot_wallet_available_before_lateness()
 
     def _get_remlate_input_type(self):
@@ -731,9 +733,9 @@ class HrPayslip(models.Model):
                 slip.ot_balance_before = current_ot_before
                 slip.lateness_before = current_lateness
                 slip.overtime_equivalent_hours_before = current_ot_equiv
-                # "Overtime for this month (after)" reflects OT payout impact even before reconciliation.
-                payout_preview = slip._get_ot_payout_hours_from_inputs()
-                slip.overtime_equivalent_hours_after = max(current_ot_equiv - payout_preview, 0.0)
+                # Pre-reconciliation view should be a neutral preview:
+                # "before" and "after" are identical until reconciliation is applied.
+                slip.overtime_equivalent_hours_after = current_ot_equiv
                 slip.annual_leave_hours_after = current_annual
                 slip.ot_balance_after = slip._get_ot_balance_after_value()
                 slip.lateness_after = current_lateness
