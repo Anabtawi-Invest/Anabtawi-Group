@@ -480,9 +480,8 @@ class HrPayslip(models.Model):
         """OT hours to show as 'Available OT' in planning (and for conversion check). Depends on company setting."""
         self.ensure_one()
         if self._get_lateness_ot_source() == 'overtime_this_month':
-            # Planning should use post-reconciliation monthly OT only.
-            # Before reconciliation, do not expose "before" OT as available.
-            return (self.overtime_equivalent_hours_after or 0.0) if self.lateness_reconciled else 0.0
+            # Planning uses the displayed "Overtime for this month (after)" value.
+            return self.overtime_equivalent_hours_after or 0.0
         return self._get_ot_balance_after_value() or 0.0
 
     def _get_ot_available_for_deduction(self):
