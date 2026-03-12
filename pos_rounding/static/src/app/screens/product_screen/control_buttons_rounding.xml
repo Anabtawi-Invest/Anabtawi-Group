@@ -7,8 +7,7 @@
                 t-if="!props.showRemainingButtons"
                 t-on-click="applyRounding"
                 type="button">
-                <i class="fa fa-percent me-2" role="img" aria-label="Discount" title="Discount"/>
-                <span>Discount</span>
+                <span>Open Amount</span>
             </button>
         </xpath>
     </t>
