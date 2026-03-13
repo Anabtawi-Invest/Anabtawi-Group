@@ -1,0 +1,15 @@
+<odoo>
+    <!-- Payslip tree: add columns (no dashboard names) -->
+    <record id="hr_payslip_view_tree_lateness_columns" model="ir.ui.view">
+        <field name="name">hr.payslip.tree.lateness.columns</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//tree" position="inside">
+                <field name="lateness_hours" optional="show"/>
+                <field name="overtime_hours" optional="show"/>
+                <field name="remaining_lateness_hours" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
