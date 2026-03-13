@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record model="ir.ui.view" id="view_hr_employee_form">
+        <field name="name">hr.employee.form.view</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <page name="personal_information" position="inside">
+                <separator string="Health Insurance"/>
+                <field name="health_insurance_ids">
+                    <list editable="bottom" string="Health Insurance">
+                        <field name="relationship"/>
+                        <field style="width:250px;" name="name" force_save="1"
+                               attrs="{'readonly':[('relationship','=','employee')]}"/>
+                        <field name="marital_status_info"/>
+                        <field name="grade_id"/>
+                        <field name="effective_date"/>
+                        <field name="birthdate" force_save="1"
+                               attrs="{'readonly':[('relationship','=','employee')]}"/>
+                        <field style="width:70px;" name="gender" force_save="1"
+                               attrs="{'readonly':[('relationship','=','employee')]}"/>
+                        <field name="employee_contribution" string="Employee Contribution (%)"/>
+                        <field name="policy_full_amount"/>
+                        <field name="monthly_contribution"/>
+                        <field name="manual_contribution"/>
+                        <field name="age"/>
+                        <field style="width:250px;" name="notes"/>
+                    </list>
+                </field>
+            </page>
+        </field>
+    </record>
+</odoo>
