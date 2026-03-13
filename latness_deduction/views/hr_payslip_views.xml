@@ -1,0 +1,66 @@
+<odoo>
+    <!-- Payslip form: show lateness fields under Other Info -->
+    <record id="hr_payslip_view_form_lateness_action_button" model="ir.ui.view">
+        <field name="name">hr.payslip.form.lateness.action.button</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form/header" position="inside">
+                <button
+                        name="action_reconcile_lateness_no_ot_bank"
+                        type="object"
+                        string="Reconcile Lateness"
+                        class="btn-secondary"
+                        invisible="state != 'draft' or lateness_reconciled"/>
+                <button
+                        name="action_reset_lateness_reconciliation"
+                        type="object"
+                        string="Reset Reconciliation"
+                        class="btn-secondary"
+                        invisible="state != 'draft' or not lateness_reconciled"/>
+            </xpath>
+        </field>
+    </record>
+
+<record id="hr_payslip_view_tree_lateness_columns" model="ir.ui.view">
+    <field name="name">hr.payslip.form.lateness.columns</field>
+    <field name="model">hr.payslip</field>
+    <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+    <field name="arch" type="xml">
+
+        <xpath expr="//page[@name='account_info']/group" position="inside">
+
+            <group string="Lateness Summary" col="3">
+                <field name="overtime_equivalent_hours" invisible="1"/>
+
+                <!-- Header -->
+                <div/>
+                <div><b>Before</b></div>
+                <div><b>After</b></div>
+
+                <!-- Lateness -->
+                <div><b>Lateness (hrs)</b></div>
+                <field name="lateness_before" readonly="1" nolabel="1" widget="float_time"/>
+                <field name="lateness_after" readonly="1" nolabel="1" widget="float_time"/>
+
+                <!-- OT Balance -->
+                <div><b>OT Balance (hrs)</b></div>
+                <field name="ot_balance_before" readonly="1" nolabel="1" widget="float_time"/>
+                <field name="ot_balance_after" readonly="1" nolabel="1" widget="float_time"/>
+
+                <!-- Overtime for this month -->
+                <div><b>Overtime for this month</b></div>
+                <field name="overtime_equivalent_hours_before" readonly="1" nolabel="1" widget="float_time"/>
+                <field name="overtime_equivalent_hours_after" readonly="1" nolabel="1" widget="float_time"/>
+
+                <!-- Annual Leave -->
+                <div><b>Annual Leave (hrs)</b></div>
+                <field name="annual_leave_hours_before" readonly="1" nolabel="1" widget="float_time"/>
+                <field name="annual_leave_hours_after" readonly="1" nolabel="1" widget="float_time"/>
+
+            </group>
+
+        </xpath>
+
+    </field>
+</record></odoo>

@@ -1,0 +1,33 @@
+<odoo>
+    <record id="action_hr_employee_ot_convert_wizard" model="ir.actions.act_window">
+        <field name="name">Convert Overtime to Annual Leave</field>
+        <field name="res_model">hr.employee.ot.convert.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_employee_id': active_id}</field>
+    </record>
+
+
+
+    <record id="view_hr_employee_ot_convert_wizard_form" model="ir.ui.view">
+        <field name="name">hr.employee.ot.convert.wizard.form</field>
+        <field name="model">hr.employee.ot.convert.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Convert Overtime to Annual Leave">
+                <group>
+                    <field name="employee_id" readonly="1"/>
+                    <field name="payslip_id" options="{'no_create': True}"/>
+                    <field name="annual_leave_type_id" readonly="1"/>
+                    <field name="overtime_available_hours" readonly="1"/>
+                    <field name="overtime_to_convert_hours"/>
+                    <field name="allocation_date_from"/>
+                    <field name="allocation_date_to"/>
+                </group>
+                <footer>
+                    <button name="action_convert" type="object" string="Convert" class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

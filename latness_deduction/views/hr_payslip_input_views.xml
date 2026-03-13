@@ -1,0 +1,43 @@
+<odoo>
+    <record id="hr_payslip_view_form_ot_payout_input_hours" model="ir.ui.view">
+        <field name="name">hr.payslip.form.ot.payout.input.hours</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='input_line_ids']/list/field[@name='amount']" position="before">
+                <field name="is_ot_payout" column_invisible="True"/>
+                <field name="is_ot_leave_conversion" column_invisible="True"/>
+                <field name="hours" optional="show" invisible="not is_ot_payout and not is_ot_leave_conversion"/>
+            </xpath>
+            <xpath expr="//field[@name='input_line_ids']/form/group/field[@name='amount']" position="before">
+                <field name="is_ot_payout" invisible="1"/>
+                <field name="is_ot_leave_conversion" invisible="1"/>
+                <field name="hours" invisible="not is_ot_payout and not is_ot_leave_conversion"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="hr_payslip_input_type_view_form_ot_payout" model="ir.ui.view">
+        <field name="name">hr.payslip.input.type.view.form.ot.payout</field>
+        <field name="model">hr.payslip.input.type</field>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_input_type_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='code']" position="after">
+                <field name="is_ot_payout"/>
+                <field name="is_ot_leave_conversion"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="hr_payslip_input_type_view_tree_ot_payout" model="ir.ui.view">
+        <field name="name">hr.payslip.input.type.view.list.ot.payout</field>
+        <field name="model">hr.payslip.input.type</field>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_input_type_view_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list/field[@name='code']" position="after">
+                <field name="is_ot_payout" optional="show"/>
+                <field name="is_ot_leave_conversion" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

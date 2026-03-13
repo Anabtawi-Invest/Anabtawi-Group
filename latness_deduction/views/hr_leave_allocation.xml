@@ -1,0 +1,12 @@
+<odoo>
+    <record id="hr_leave_view_form_allocation" model="ir.ui.view">
+        <field name="name">hr.allocation</field>
+        <field name="model">hr.leave.allocation</field>
+        <field name="inherit_id" ref="hr_holidays_attendance.hr_leave_allocation_overtime_manager_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <field name="number_of_day_converted" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
