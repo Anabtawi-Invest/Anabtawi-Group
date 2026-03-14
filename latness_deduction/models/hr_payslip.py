@@ -93,6 +93,11 @@ class HrPayslip(models.Model):
         store=False,
         help='Current month overtime equivalent hours after lateness deduction.',
     )
+    absent_days_count = fields.Integer(
+        string='Absent Days',
+        compute='_compute_absent_days_count',
+        store=False,
+    )
 
 
     def _build_lateness_snapshot(self):
@@ -1083,6 +1088,21 @@ class HrPayslip(models.Model):
             if leave_type.request_unit in ('day', 'half_day'):
                 remaining *= slip.employee_id.resource_calendar_id.hours_per_day or HOURS_PER_DAY
             slip.annual_leave_balance_hours = remaining
+
+    @api.depends('employee_id', 'date_from', 'date_to')
+    def _compute_absent_days_count(self):
+        work_entry_model = self.env['hr.work.entry'].sudo()
+        for slip in self:
+            slip.absent_days_count = 0
+            if not slip.employee_id or not slip.date_from or not slip.date_to:
+                continue
+
+            absent_entries = work_entry_model.search([
+                ('employee_id', '=', slip.employee_id.id),
+                ('state', '!=', 'cancelled'),
+                ('work_entry_type_id.code', '=', 'ABSENT'),
+            ])
+            slip.absent_days_count = len(set(absent_entries.mapped('date')))
 
     def action_reconcile_lateness_no_ot_bank(self):
         """Core reconciliation:
