@@ -17,8 +17,6 @@
           _ Manual Contribution ( to manage cases with manual fixed amounts that override the current contract amounts on the set insurance contract)
       * Payroll Integration –  A salary rule is added on salary structure creation to automatically deduct the applicable monthly amount when generating employee payslips.
       """,
-    'author': 'Smart Way Business Solutions',
-    'website': 'https://www.smartway.co',
     'depends': ['base', 'hr_payroll_account', 'hr', 'mail', 'base_payroll_account'],
     'license': "Other proprietary",
     'data': [
