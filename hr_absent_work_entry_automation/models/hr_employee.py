@@ -161,10 +161,8 @@ class HrEmployee(models.Model):
 
     def _get_expected_hours_on_day(self, target_date):
         self.ensure_one()
-        planning_hours = self._get_planning_hours_on_day(target_date)
-        if planning_hours > 0:
-            return planning_hours
-        return self._get_calendar_hours_on_day(target_date)
+        # Planning-only absence logic: ignore calendar working schedules.
+        return self._get_planning_hours_on_day(target_date)
 
     def _get_day_utc_bounds(self, target_date):
         self.ensure_one()
