@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
@@ -113,15 +114,20 @@ class HrLeaveAllocation(models.Model):
         try:
             allocations = super().create(vals_list)
         except ValidationError as err:
-            if 'enough overtime hours' in (str(err) or '').lower():
-                employee_ids = [vals.get('employee_id') for vals in vals_list if vals.get('employee_id')]
-                employees = self.env['hr.employee'].browse(employee_ids)
-                self._log_ot_diagnostics(
-                    employees=employees,
-                    vals_list=vals_list,
-                    phase='allocation_create',
-                    error_message=str(err),
-                )
+            employee_ids = [vals.get('employee_id') for vals in vals_list if vals.get('employee_id')]
+            employees = self.env['hr.employee'].browse(employee_ids)
+            self._log_ot_diagnostics(
+                employees=employees,
+                vals_list=vals_list,
+                phase='allocation_create',
+                error_message=str(err),
+            )
+            _logger.warning(
+                "[OT DEBUG TRACE] phase=allocation_create error=%s vals_list=%s\n%s",
+                str(err),
+                vals_list,
+                traceback.format_exc(),
+            )
             raise
         is_deduct_extra_hours_flow = bool(self.env.context.get('deduct_extra_hours'))
         for alloc, vals in zip(allocations, vals_list):
@@ -174,13 +180,19 @@ class HrLeaveAllocation(models.Model):
         try:
             return super().write(vals)
         except ValidationError as err:
-            if 'enough overtime hours' in (str(err) or '').lower():
-                self._log_ot_diagnostics(
-                    employees=self.employee_id,
-                    vals_list=[vals],
-                    phase='allocation_write',
-                    error_message=str(err),
-                )
+            self._log_ot_diagnostics(
+                employees=self.employee_id,
+                vals_list=[vals],
+                phase='allocation_write',
+                error_message=str(err),
+            )
+            _logger.warning(
+                "[OT DEBUG TRACE] phase=allocation_write error=%s vals=%s ids=%s\n%s",
+                str(err),
+                vals,
+                self.ids,
+                traceback.format_exc(),
+            )
             raise
 
     def unlink(self):
