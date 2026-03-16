@@ -3,6 +3,7 @@ import traceback
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+from odoo.addons.hr_holidays_attendance.models.hr_leave_allocation import HrLeaveAllocation as HrHolidaysAttendanceLeaveAllocation
 
 _logger = logging.getLogger(__name__)
 
@@ -111,6 +112,20 @@ class HrLeaveAllocation(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        def _requested_hours_by_employee(values_list):
+            requested = {}
+            for values in values_list:
+                employee_id = values.get('employee_id')
+                if not employee_id:
+                    continue
+                requested.setdefault(employee_id, 0.0)
+                requested[employee_id] += (
+                    values.get('number_of_hours_display')
+                    or values.get('number_of_hours')
+                    or 0.0
+                )
+            return requested
+
         try:
             allocations = super().create(vals_list)
         except ValidationError as err:
@@ -128,7 +143,26 @@ class HrLeaveAllocation(models.Model):
                 vals_list,
                 traceback.format_exc(),
             )
-            raise
+            message = (str(err) or '').lower()
+            if 'enough overtime hours' in message:
+                requested_by_employee = _requested_hours_by_employee(vals_list)
+                deductible_by_employee = self.env['hr.leave']._get_deductible_employee_overtime(employees)
+                can_bypass = all(
+                    deductible_by_employee[employee] + 1e-6 >= requested_by_employee.get(employee.id, 0.0)
+                    for employee in employees
+                )
+                if can_bypass:
+                    _logger.warning(
+                        "[OT BYPASS] allocation_create bypassing hr_holidays_attendance check "
+                        "because deductible covers request. employees=%s requested=%s",
+                        employees.ids,
+                        requested_by_employee,
+                    )
+                    allocations = super(HrHolidaysAttendanceLeaveAllocation, self).create(vals_list)
+                else:
+                    raise
+            else:
+                raise
         is_deduct_extra_hours_flow = bool(self.env.context.get('deduct_extra_hours'))
         for alloc, vals in zip(allocations, vals_list):
             # Skip records already linked by custom OT conversion wizard.

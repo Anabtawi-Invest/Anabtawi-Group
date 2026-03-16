@@ -1536,7 +1536,7 @@ class HrEmployee(models.Model):
         for employee in self:
             employee.has_non_cancelled_payslip = bool(employee.id and payslip_counts.get(employee, 0))
 
-    @api.depends('overtime_ids.manual_duration', 'overtime_ids', 'overtime_ids.status')
+    @api.depends('overtime_ids.manual_duration', 'overtime_ids', 'overtime_ids.status', 'overtime_ids.compensable_as_leave')
     def _compute_total_overtime(self):
         """Use latest payslip OT balance as source of truth for extra-hours availability."""
         Payslip = self.env['hr.payslip']
@@ -1544,6 +1544,7 @@ class HrEmployee(models.Model):
             self.env['hr.attendance.overtime.line']._read_group(
                 domain=[
                     ('status', '=', 'approved'),
+                    ('compensable_as_leave', '=', True),
                     ('employee_id', 'in', self.ids),
                 ],
                 groupby=['employee_id'],
@@ -1646,9 +1647,10 @@ class HrLeave(models.Model):
 
     @api.model
     def _get_deductible_employee_overtime(self, employees):
-        """Use OT wallet balance from latest payslip as deductible overtime source."""
+        """Use OT wallet balance from latest payslip; fallback to compensable attendance overtime if no payslip exists."""
         diff_by_employee = defaultdict(lambda: 0.0)
         Payslip = self.env['hr.payslip'].sudo()
+        employees_without_payslip = self.env['hr.employee']
         for employee in employees:
             last_payslip = Payslip.search(
                 [
@@ -1659,11 +1661,7 @@ class HrLeave(models.Model):
                 limit=1,
             )
             if not last_payslip:
-                _logger.info(
-                    "[OTWallet] deductible_overtime employee_id=%s employee=%s last_payslip_id=False result=0.0",
-                    employee.id,
-                    employee.display_name,
-                )
+                employees_without_payslip |= employee
                 continue
             deductible = last_payslip._get_ot_available_for_planning()
             diff_by_employee[employee] = deductible
@@ -1679,6 +1677,50 @@ class HrLeave(models.Model):
                 last_payslip.date_to,
                 deductible,
             )
+
+        if employees_without_payslip:
+            for employee, hours in self.env['hr.attendance.overtime.line'].sudo()._read_group(
+                domain=[
+                    ('compensable_as_leave', '=', True),
+                    ('employee_id', 'in', employees_without_payslip.ids),
+                    ('status', '=', 'approved'),
+                ],
+                groupby=['employee_id'],
+                aggregates=['manual_duration:sum'],
+            ):
+                diff_by_employee[employee] += hours
+
+            for employee, hours in self._read_group(
+                domain=[
+                    ('holiday_status_id.overtime_deductible', '=', True),
+                    ('holiday_status_id.requires_allocation', '=', False),
+                    ('employee_id', 'in', employees_without_payslip.ids),
+                    ('state', 'not in', ['refuse', 'cancel']),
+                ],
+                groupby=['employee_id'],
+                aggregates=['number_of_hours:sum'],
+            ):
+                diff_by_employee[employee] -= hours
+
+            for employee, hours in self.env['hr.leave.allocation']._read_group(
+                domain=[
+                    ('holiday_status_id.overtime_deductible', '=', True),
+                    ('employee_id', 'in', employees_without_payslip.ids),
+                    ('state', '=', 'confirm'),
+                ],
+                groupby=['employee_id'],
+                aggregates=['number_of_hours_display:sum'],
+            ):
+                diff_by_employee[employee] -= hours
+
+            for employee in employees_without_payslip:
+                _logger.info(
+                    "[OTWallet] deductible_overtime_fallback employee_id=%s employee=%s "
+                    "last_payslip_id=False result=%s",
+                    employee.id,
+                    employee.display_name,
+                    diff_by_employee[employee],
+                )
         return diff_by_employee
 
 
