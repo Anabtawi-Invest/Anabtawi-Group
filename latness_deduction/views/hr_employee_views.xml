@@ -22,7 +22,7 @@
                 <field name="has_non_cancelled_payslip" invisible="1"/>
             </xpath>
             <xpath expr="//header/button[@type='action' and contains(@context, 'deduct_extra_hours')]" position="attributes">
-                <attribute name="invisible">1</attribute>
+                <attribute name="invisible">0</attribute>
             </xpath>
         </field>
     </record>
