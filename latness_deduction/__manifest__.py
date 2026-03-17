@@ -23,6 +23,7 @@
         # Company lateness view last so res.company fields are registered first
         'views/res_config_settings_views.xml',
         'views/hr_employee.xml',
+        'views/hr_employee_views.xml',
 
     ],
     'installable': True,
