@@ -13,7 +13,7 @@ class InternalTransferReportWizard(models.TransientModel):
         ('last_month', 'Last Month'),
         ('custom', 'Custom'),
         ('today','Today'),
-    ], default='today', required=True)
+    ], default='week', required=True)
 
     date_from = fields.Date()
     date_to = fields.Date()
