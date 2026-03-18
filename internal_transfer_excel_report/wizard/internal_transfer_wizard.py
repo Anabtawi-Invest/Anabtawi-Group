@@ -28,7 +28,7 @@ class InternalTransferReportWizard(models.TransientModel):
 
         if self.filter_type=='today'
             start=today
-            end =start+timedelta(date.today)
+            end =today
         
         elif self.filter_type == 'week':
             start = today - timedelta(days=today.weekday())
