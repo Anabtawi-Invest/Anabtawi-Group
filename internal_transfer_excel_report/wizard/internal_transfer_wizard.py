@@ -13,7 +13,7 @@ class InternalTransferReportWizard(models.TransientModel):
         ('last_month', 'Last Month'),
         ('custom', 'Custom'),
         ('today','Today'),
-    ], default='week', required=True)
+    ], default='today', required=True)
 
     date_from = fields.Date()
     date_to = fields.Date()
@@ -26,7 +26,11 @@ class InternalTransferReportWizard(models.TransientModel):
     def _compute_dates(self):
         today = fields.Date.today()
 
-        if self.filter_type == 'week':
+        if self.filter_type=='today'
+            start=today
+            end =start+timedelta(date.today)
+        
+        elif self.filter_type == 'week':
             start = today - timedelta(days=today.weekday())
             end = start + timedelta(days=6)
 
