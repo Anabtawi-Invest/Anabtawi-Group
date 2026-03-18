@@ -63,6 +63,8 @@ class InternalTransferReportWizard(models.TransientModel):
             ('picking_id.picking_type_code', '=', 'internal'),
             ('picking_id', 'in', picking_ids),
             ('state', '!=', 'cancel'),
+            # Keep only terminal moves to avoid double counting in transit chains.
+            ('move_dest_ids', '=', False),
         ]
         if self.category_id:
             move_domain.append(('product_id.categ_id', 'child_of', self.category_id.id))
@@ -83,13 +85,9 @@ class InternalTransferReportWizard(models.TransientModel):
                 'total_delivered_qty': 0.0,
             })
 
-            branch_name = (
-                move.picking_id.partner_id.display_name
-                or move.picking_id.location_dest_id.display_name
-                or _('Undefined')
-            )
-            row_data = group['rows'].setdefault(branch_name, {
-                'branch_contact': branch_name,
+            requested_by = move.picking_id.create_uid.display_name or _('Undefined')
+            row_data = group['rows'].setdefault(requested_by, {
+                'requested_by': requested_by,
                 'product_name': product.display_name,
                 'quantity': 0.0,
                 'actual_quantity': 0.0,
@@ -137,7 +135,7 @@ class InternalTransferReportWizard(models.TransientModel):
         })
 
         headers = [
-            _('Branch Contact'),
+            _('Requested by'),
             _('Products'),
             _('Quantity'),
             _('Actual Quantity'),
@@ -167,7 +165,7 @@ class InternalTransferReportWizard(models.TransientModel):
                 row += 1
 
                 for detail in group['rows']:
-                    sheet.write(row, 0, detail['branch_contact'], text_style)
+                    sheet.write(row, 0, detail['requested_by'], text_style)
                     sheet.write(row, 1, detail['product_name'], text_style)
                     sheet.write_number(row, 2, detail['quantity'], number_style)
                     sheet.write_number(row, 3, detail['actual_quantity'], number_style)
