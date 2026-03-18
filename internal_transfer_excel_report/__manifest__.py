@@ -1,5 +1,5 @@
 {
-    'name': 'Internal Transfer Excel Report',
+    'name': 'Internal Transfer Excel Report-Anabtawi',
     'version': '1.0',
     'depends': ['stock'],
     'data': [
