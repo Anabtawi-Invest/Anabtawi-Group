@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <record id="group_branch_restricted_product_selection" model="res.groups">
-        <field name="name">Branch: Restricted Product Selection</field>
-    </record>
-</odoo>
