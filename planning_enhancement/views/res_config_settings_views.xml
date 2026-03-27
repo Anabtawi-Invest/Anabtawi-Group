@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_inherit_planning_extra_hours_limit" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.planning.extra.hours.limit</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="planning.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@name='planning']" position="inside">
+                <setting
+                    string="Maximum Extra Hours for New Shift Assignment"
+                    help="Block assigning new shifts when employee extra hours exceed this value. Set 0 to disable."
+                >
+                    <field name="planning_max_extra_hours" widget="float_time"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>
