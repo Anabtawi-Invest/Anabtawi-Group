@@ -6,6 +6,7 @@
     "depends": ["stock"],
     "data": [
         "security/ir.model.access.csv",
+        "data/stock_transfer_discrepancy_cron.xml",
         "reports/stock_transfer_discrepancy_report.xml",
         "views/stock_location_views.xml",
         "views/stock_picking_views.xml",
@@ -16,4 +17,3 @@
     "application": False,
     "installable": True,
 }
-
