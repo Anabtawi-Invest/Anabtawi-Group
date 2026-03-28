@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_inherit_hr_leave_fallback" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.hr.leave.fallback</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app string="Time Off Fallback" name="hr_leave_fallback" groups="hr_holidays.group_hr_holidays_manager">
+                    <block title="Leave Type Fallback Configuration" name="leave_fallback_configuration">
+                        <setting string="Extra Hours Leave Type">
+                            <field name="extra_hours_leave_type_id" domain="[('time_type', '=', 'leave')]"/>
+                        </setting>
+                        <setting string="Annual Leave Type">
+                            <field name="annual_leave_type_id" domain="[('time_type', '=', 'leave')]"/>
+                        </setting>
+                        <setting string="Unpaid Leave Type">
+                            <field name="unpaid_leave_type_id" domain="[('time_type', '=', 'leave')]"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

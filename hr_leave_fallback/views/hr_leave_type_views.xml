@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="hr_leave_type_view_form_fallback" model="ir.ui.view">
+        <field name="name">hr.leave.type.view.form.fallback</field>
+        <field name="model">hr.leave.type</field>
+        <field name="inherit_id" ref="hr_holidays.edit_holiday_status_form"/>
+        <field name="arch" type="xml">
+            <label for="support_document" position="after">
+                <label for="use_sick_fallback" class="fw-bold me-4"/>
+            </label>
+            <field name="support_document" nolabel="1" position="after">
+                <field name="use_sick_fallback" nolabel="1"/>
+            </field>
+        </field>
+    </record>
+</odoo>
