@@ -48,13 +48,27 @@ class StockTransferDiscrepancy(models.Model):
         ondelete="restrict",
         domain=[("usage", "=", "internal")],
     )
+
+    # New flow:
+    # - under_investigation: created at picking validation time, truck is still allowed
+    # - open: investigation window expired, truck will be blocked by existing logic
+    # - settled: fully resolved
     state = fields.Selection(
-        [("open", "Open"), ("settled", "Settled")],
+        [
+            ("under_investigation", "Under Investigation"),
+            ("open", "Open"),
+            ("settled", "Settled"),
+        ],
         string="State",
-        default="open",
+        default="under_investigation",
         required=True,
         index=True,
     )
+
+    # Set at picking validation time (wizard confirm) and used for 48-hour grace window.
+    validated_at = fields.Datetime(string="Validated At", index=True)
+    investigation_deadline = fields.Datetime(string="Investigation Deadline", index=True)
+
     responsible_user_id = fields.Many2one(
         "res.users",
         string="Responsible User",
@@ -77,8 +91,40 @@ class StockTransferDiscrepancy(models.Model):
             rec.difference_qty = (rec.expected_qty or 0.0) - (rec.actual_qty or 0.0)
 
     @api.model
-    def apply_resolution(self, truck_location, product, qty_in_product_uom, stage=None, exclude_picking_ids=None):
-        """Apply a settlement quantity on open discrepancies for a truck/product.
+    def _cron_expire_investigations(self):
+        """Move discrepancies from under_investigation to open after deadline.
+
+        We intentionally keep the existing 'truck blocking' logic unchanged:
+        stock.location.has_open_discrepancy checks only state='open'.
+        So, once a discrepancy becomes 'open', the truck will be blocked as before.
+        """
+        now = fields.Datetime.now()
+        recs = self.search(
+            [
+                ("state", "=", "under_investigation"),
+                ("investigation_deadline", "!=", False),
+                ("investigation_deadline", "<=", now),
+            ]
+        )
+        # Only escalate to OPEN if still not fully resolved.
+        to_open = recs.filtered(lambda r: (r.difference_qty or 0.0) > (r.resolved_qty or 0.0))
+        if not to_open:
+            return
+
+        to_open.write({"state": "open"})
+        # Ensure the computed flag is updated for selection domain / constraints
+        to_open.mapped("truck_location_id")._compute_has_open_discrepancy()
+
+    @api.model
+    def apply_resolution(
+        self,
+        truck_location,
+        product,
+        qty_in_product_uom,
+        stage=None,
+        exclude_picking_ids=None,
+    ):
+        """Apply a settlement quantity on (open/under_investigation) discrepancies for a truck/product.
 
         - qty_in_product_uom: quantity expressed in product default UoM.
         - stage: optional ('dispatch'/'receipt') to resolve only that stage.
@@ -87,51 +133,20 @@ class StockTransferDiscrepancy(models.Model):
         if not truck_location or not product:
             return
         if not qty_in_product_uom:
-            print(222,qty_in_product_uom)
             return
 
         domain = [
             ("truck_location_id", "=", truck_location.id),
             ("product_id", "=", product.id),
-            ("state", "=", "open"),
+            ("state", "in", ("open", "under_investigation")),
         ]
         if stage:
             domain.append(("stage", "=", stage))
         if exclude_picking_ids:
             domain.append(("picking_id", "not in", exclude_picking_ids))
 
-        # Debug: Check all open discrepancies for this truck/product
-        all_open = self.sudo().search([
-            ("truck_location_id", "=", truck_location.id),
-            ("product_id", "=", product.id),
-            ("state", "=", "open"),
-        ])
-        
-        # Debug: Check ALL open discrepancies in database (for debugging)
-        all_open_all = self.sudo().search([("state", "=", "open")])
-        
-        print("=== DEBUG apply_resolution ===")
-        print(f"Truck Location ID: {truck_location.id}, Name: {truck_location.name}")
-        print(f"Product ID: {product.id}, Name: {product.name}")
-        print(f"Stage filter: {stage}")
-        print(f"Qty to resolve: {qty_in_product_uom}")
-        print(f"All open discrepancies (no stage filter): {len(all_open)}")
-        for disc in all_open:
-            print(f"  - Disc ID {disc.id}: stage={disc.stage}, truck={disc.truck_location_id.name}, product={disc.product_id.name}, state={disc.state}")
-        print(f"Domain: {domain}")
-        print(f"\n=== ALL OPEN DISCREPANCIES IN DB (for debugging) ===")
-        print(f"Total open discrepancies: {len(all_open_all)}")
-        for disc in all_open_all:
-            print(f"  - Disc ID {disc.id}: stage={disc.stage}, truck={disc.truck_location_id.name if disc.truck_location_id else 'EMPTY'}, product={disc.product_id.name}, state={disc.state}, expected={disc.expected_qty}, actual={disc.actual_qty}, diff={disc.difference_qty}")
-        print("=== END DEBUG ===")
-
         # Oldest first
         discrepancies = self.sudo().search(domain, order="date asc, id asc")
-        print(f"Found discrepancies after search: {len(discrepancies)}")
-        for disc in discrepancies:
-            print(f"  - Matched Disc ID {disc.id}: stage={disc.stage}")
-        print("=== END DEBUG ===")
-        
         remaining_qty = qty_in_product_uom
         for disc in discrepancies:
             before = disc.resolved_qty
@@ -147,12 +162,13 @@ class StockTransferDiscrepancy(models.Model):
 
     def _apply_resolution(self, qty_in_product_uom, skip_recompute=False):
         """Allocate resolution quantity to this discrepancy and update state.
-        
+
         - skip_recompute: if True, don't trigger recompute (will be done in batch at the end).
         """
         self.ensure_one()
-        if self.state != "open":
+        if self.state == "settled":
             return
+
         rounding = self.product_id.uom_id.rounding
         remaining = max((self.difference_qty or 0.0) - (self.resolved_qty or 0.0), 0.0)
         if float_compare(remaining, 0.0, precision_rounding=rounding) <= 0:
@@ -164,11 +180,12 @@ class StockTransferDiscrepancy(models.Model):
         to_apply = min(qty_in_product_uom, remaining)
         if float_compare(to_apply, 0.0, precision_rounding=rounding) <= 0:
             return
+
         new_resolved = (self.resolved_qty or 0.0) + to_apply
         vals = {"resolved_qty": new_resolved}
         if float_compare(new_resolved, self.difference_qty, precision_rounding=rounding) >= 0:
             vals["state"] = "settled"
+
         self.sudo().write(vals)
         if not skip_recompute and self.truck_location_id:
             self.truck_location_id._compute_has_open_discrepancy()
-
