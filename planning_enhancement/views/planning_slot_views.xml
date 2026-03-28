@@ -11,6 +11,14 @@
                     <field name="extra_hours_display" widget="float_time" class="oe_inline" readonly="1"/>
                 </div>
             </xpath>
+            <xpath expr="//sheet/group" position="after">
+                <group string="Extra Hours Conversion">
+                    <field name="convert_ot_to_leave"/>
+                    <field
+                        name="ot_leave_id" invisible="not convert_ot_to_leave"
+                    />
+                </group>
+            </xpath>
         </field>
     </record>
 </odoo>
