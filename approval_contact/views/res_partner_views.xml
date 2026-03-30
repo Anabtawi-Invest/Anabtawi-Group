@@ -10,11 +10,11 @@
                         type="object"
                         string="Approval Request"
                         class="oe_stat_button"
-                        attrs="{'invisible': [('x_approval_request_id','=',False)]}"/>
+                        invisible="not x_approval_request_id"/>
             </xpath>
 
             <xpath expr="//sheet" position="inside">
-                <group string="Approval Link">
+                <group string="Approval Link" invisible="not x_approval_request_id">
                     <field name="x_approval_request_id" readonly="1"/>
                 </group>
             </xpath>
