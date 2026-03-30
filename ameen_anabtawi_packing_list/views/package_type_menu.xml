@@ -1,4 +1,3 @@
-<!-- views/package_type_menu.xml -->
 <odoo>
   <record id="action_packing_package_type" model="ir.actions.act_window">
     <field name="name">Package Types</field>
@@ -6,7 +5,9 @@
     <field name="view_mode">tree,form</field>
   </record>
 
-  <menuitem id="menu_packing_root" name="Packing" parent="stock.menu_stock_config_settings" sequence="90"/>
-  <menuitem id="menu_packing_package_type" name="Package Types" parent="menu_packing_root"
-            action="action_packing_package_type" sequence="10"/>
+  <menuitem id="menu_packing_root" name="Packing"
+            parent="stock.menu_stock_config_settings" sequence="90"/>
+
+  <menuitem id="menu_packing_package_type" name="Package Types"
+            parent="menu_packing_root" action="action_packing_package_type" sequence="10"/>
 </odoo>
