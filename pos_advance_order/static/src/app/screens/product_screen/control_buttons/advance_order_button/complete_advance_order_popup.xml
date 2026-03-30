@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_advance_order.CompleteAdvanceOrderPopup" owl="1">
+        <Dialog size="'lg'" title="'Complete Advance Order'">
+            <div class="o_pos_complete_advance_popup">
+                <div class="form-group mb-3">
+                    <label><strong>Search by Customer Name or Phone</strong></label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        placeholder="Type customer name or phone..."
+                        t-att-value="state.search"
+                        t-on-input="onSearchInput"
+                        t-att-disabled="state.loading ? 'disabled' : undefined"
+                    />
+                </div>
+
+                <div class="table-responsive border rounded" style="max-height: 360px; overflow: auto;">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 32px;"></th>
+                                <th>Advance</th>
+                                <th>Customer</th>
+                                <th>Phone</th>
+                                <th>Total</th>
+                                <th>Advance Paid</th>
+                                <th>Remaining</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-if="!filteredOrders.length">
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-3">
+                                        No advance orders found for this Picking POS.
+                                    </td>
+                                </tr>
+                            </t>
+                            <t t-foreach="filteredOrders" t-as="order" t-key="order.id">
+                                <tr t-on-click="() => this.selectOrder(order.id)" style="cursor: pointer;">
+                                    <td>
+                                        <input
+                                            type="radio"
+                                            name="selected_advance_order"
+                                            t-att-checked="state.selected_order_id === order.id"
+                                            t-on-click.stop="() => this.selectOrder(order.id)"
+                                        />
+                                    </td>
+                                    <td t-esc="order.name"/>
+                                    <td t-esc="order.partner_id?.[1] || ''"/>
+                                    <td t-esc="order.partner_phone || ''"/>
+                                    <td t-esc="order.amount_total"/>
+                                    <td t-esc="order.advance_amount"/>
+                                    <td t-esc="order.amount_remaining"/>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary" t-on-click="cancel">Cancel</button>
+                <button class="btn btn-primary" t-on-click="confirm" t-att-disabled="state.loading ? 'disabled' : undefined">
+                    Complete
+                </button>
+            </t>
+        </Dialog>
+    </t>
+</templates>
