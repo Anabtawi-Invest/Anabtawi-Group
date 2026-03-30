@@ -1,1 +1,24 @@
+<odoo>
+    <record id="view_res_partner_form_inherit_approval_link" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.approval.link</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
 
+            <xpath expr="//header" position="inside">
+                <button name="action_open_source_approval"
+                        type="object"
+                        string="Approval Request"
+                        class="oe_stat_button"
+                        attrs="{'invisible': [('x_approval_request_id','=',False)]}"/>
+            </xpath>
+
+            <xpath expr="//sheet" position="inside">
+                <group string="Approval Link">
+                    <field name="x_approval_request_id" readonly="1"/>
+                </group>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>
