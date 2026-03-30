@@ -1,11 +1,10 @@
-<!-- views/product_template_view.xml -->
 <odoo>
   <record id="view_product_template_form_packing_list" model="ir.ui.view">
     <field name="name">product.template.form.packing.list</field>
     <field name="model">product.template</field>
     <field name="inherit_id" ref="product.product_template_form_view"/>
     <field name="arch" type="xml">
-      <!-- نحاول ندخل داخل تبويب Inventory -->
+
       <xpath expr="//page[@name='inventory']" position="inside">
         <group string="Packing List">
           <field name="x_net_weight_kg"/>
@@ -14,6 +13,7 @@
           <field name="x_qty_per_carton"/>
         </group>
       </xpath>
+
     </field>
   </record>
 </odoo>
