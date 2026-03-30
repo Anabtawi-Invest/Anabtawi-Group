@@ -1,1 +1,13 @@
-
+<!-- views/sale_order_view.xml -->
+<odoo>
+  <record id="view_sale_order_form_packing_list" model="ir.ui.view">
+    <field name="name">sale.order.form.packing.list</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='order_line']/tree//field[@name='product_uom_qty']" position="after">
+        <field name="x_qty_per_carton" optional="show"/>
+      </xpath>
+    </field>
+  </record>
+</odoo>
