@@ -5,24 +5,28 @@
         <field name="inherit_id" ref="approvals.approval_request_view_form"/>
         <field name="arch" type="xml">
 
+            <!-- Add Contact Fields -->
             <xpath expr="//sheet" position="inside">
                 <group string="New Contact Data"
-                       attrs="{'invisible': [('category_id.x_create_contact_on_approve','=',False)]}">
-                    <field name="x_contact_type" required="1"/>
-                    <field name="x_contact_name" required="1"/>
-                    <field name="x_contact_phone" required="1"/>
+                       invisible="not category_id.x_create_contact_on_approve">
+
+                    <field name="x_contact_type" required="category_id.x_create_contact_on_approve"/>
+                    <field name="x_contact_name" required="category_id.x_create_contact_on_approve"/>
+                    <field name="x_contact_phone" required="category_id.x_create_contact_on_approve"/>
                     <field name="x_contact_email"/>
-                    <field name="x_contact_vat" required="1"/>
+                    <field name="x_contact_vat" required="category_id.x_create_contact_on_approve"/>
+
                     <field name="x_created_partner_id" readonly="1"/>
                 </group>
             </xpath>
 
+            <!-- Smart Button to open created contact -->
             <xpath expr="//header" position="inside">
                 <button name="action_open_created_contact"
                         type="object"
                         string="Created Contact"
                         class="oe_stat_button"
-                        attrs="{'invisible': [('x_created_partner_id','=',False)]}"/>
+                        invisible="not x_created_partner_id"/>
             </xpath>
 
         </field>
