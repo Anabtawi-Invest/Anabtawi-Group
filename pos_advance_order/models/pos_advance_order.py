@@ -52,6 +52,11 @@ class PosAdvanceOrder(models.Model):
     )
     picking_date = fields.Datetime(string="Picking Date", required=True, default=fields.Datetime.now)
     pos_config_id = fields.Many2one("pos.config", string="Picking POS", required=True)
+    pos_config_enable_advance_order = fields.Boolean(
+        string="Picking POS Enable Advance Order",
+        related="pos_config_id.enable_advance_order",
+        readonly=True,
+    )
     pricelist_id = fields.Many2one(
         "product.pricelist",
         string="Pricelist",
@@ -115,6 +120,18 @@ class PosAdvanceOrder(models.Model):
     pledge_pos_order_id = fields.Many2one("pos.order", string="Pledge POS Order", readonly=True, copy=False)
     refund_advance_pos_order_id = fields.Many2one("pos.order", string="Refund Advance POS Order", readonly=True, copy=False)
     return_pledge_pos_order_id = fields.Many2one("pos.order", string="Return Pledge POS Order", readonly=True, copy=False)
+    advance_account_payment_id = fields.Many2one(
+        "account.payment",
+        string="Advance Account Payment",
+        readonly=True,
+        copy=False,
+    )
+    advance_liability_move_id = fields.Many2one(
+        "account.move",
+        string="Advance Liability Move",
+        readonly=True,
+        copy=False,
+    )
     # Kept for UI (can be removed later). Now computed from POS orders rather than account.payment.
     payment_progress = fields.Selection(
         [("no_payment", "No Payment"), ("advance_paid", "Advance Paid"), ("fully_paid", "Fully Paid")],
@@ -806,7 +823,10 @@ class PosAdvanceOrder(models.Model):
         return pm.journal_id
 
     def _get_inbound_payment_method_line(self, journal):
-        line = journal.inbound_payment_method_line_ids[:1]
+        # Prefer a method line that has an explicit outstanding/payment account.
+        line = journal.inbound_payment_method_line_ids.filtered(lambda l: l.payment_account_id)[:1]
+        if not line:
+            line = journal.inbound_payment_method_line_ids[:1]
         if not line:
             raise UserError(_("Please define an inbound payment method on journal %s.") % journal.display_name)
         return line
@@ -817,16 +837,150 @@ class PosAdvanceOrder(models.Model):
             raise UserError(_("Please define an outbound payment method on journal %s.") % journal.display_name)
         return line
 
+    def _create_advance_account_payment(self):
+        """Create posted account.payment and transfer its receivable impact to liability."""
+        self.ensure_one()
+        pos_config = self.from_pos_config_id or self.pos_config_id
+        liability_account = pos_config.pos_advance_account_id
+        _logger.info(
+            "[ADV_RECON] Start advance account payment creation: advance=%s partner=%s amount=%s pos=%s from_pos=%s liability=%s",
+            self.name,
+            self.partner_id.id,
+            self.advance_amount,
+            self.pos_config_id.id,
+            self.from_pos_config_id.id if self.from_pos_config_id else False,
+            liability_account.id if liability_account else False,
+        )
+        if not liability_account:
+            raise UserError(_("Please set 'POS Advance Account' on the POS configuration first."))
+
+        journal = self._get_payment_journal()
+        if not journal:
+            raise UserError(_("Please configure a payment journal on the POS first."))
+        payment_method_line = self._get_inbound_payment_method_line(journal)
+        _logger.info(
+            "[ADV_RECON] Using journal/payment method line: journal=%s method_line=%s",
+            journal.id,
+            payment_method_line.id,
+        )
+
+        payment = self.env["account.payment"].sudo().with_context(force_payment_move=True).create({
+            "payment_type": "inbound",
+            "partner_type": "customer",
+            "partner_id": self.partner_id.id,
+            "amount": self.advance_amount,
+            "currency_id": self.currency_id.id,
+            "date": fields.Date.context_today(self),
+            "journal_id": journal.id,
+            "payment_method_line_id": payment_method_line.id,
+            "memo": _("Advance Payment - %s") % self.name,
+        })
+        payment.action_post()
+        _logger.info(
+            "[ADV_RECON] account.payment posted: payment_id=%s move_id=%s state=%s method_line=%s method_line_account=%s",
+            payment.id,
+            payment.move_id.id if payment.move_id else False,
+            payment.state,
+            payment.payment_method_line_id.id if payment.payment_method_line_id else False,
+            payment.payment_method_line_id.payment_account_id.id if payment.payment_method_line_id and payment.payment_method_line_id.payment_account_id else False,
+        )
+        if not payment.move_id:
+            raise UserError(
+                _(
+                    "Advance account payment did not create a journal entry. "
+                    "Please configure an inbound payment method/account on journal '%s'."
+                )
+                % (journal.display_name,)
+            )
+
+        receivable_account = self.partner_id.with_company(self.company_id).property_account_receivable_id
+        if not receivable_account:
+            raise UserError(_("Please configure receivable account on the customer."))
+        _logger.info(
+            "[ADV_RECON] receivable/liability accounts: receivable=%s liability=%s",
+            receivable_account.id,
+            liability_account.id,
+        )
+
+        transfer_move = self.env["account.move"].sudo().create({
+            "journal_id": journal.id,
+            "date": fields.Date.context_today(self),
+            "ref": _("Advance Liability Transfer - %s") % self.name,
+            "line_ids": [
+                Command.create({
+                    "name": _("Advance transfer %s") % self.name,
+                    "account_id": receivable_account.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": self.advance_amount,
+                    "credit": 0.0,
+                }),
+                Command.create({
+                    "name": _("Advance transfer %s") % self.name,
+                    "account_id": liability_account.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": 0.0,
+                    "credit": self.advance_amount,
+                }),
+            ],
+        })
+        transfer_move.action_post()
+        _logger.info(
+            "[ADV_RECON] transfer move posted: move_id=%s line_ids=%s",
+            transfer_move.id,
+            transfer_move.line_ids.ids,
+        )
+
+        payment_receivable_lines = payment.move_id.line_ids.filtered(
+            lambda l: l.account_id == receivable_account and not l.reconciled
+        )
+        transfer_receivable_lines = transfer_move.line_ids.filtered(
+            lambda l: l.account_id == receivable_account and not l.reconciled
+        )
+        _logger.info(
+            "[ADV_RECON] Pre-reconcile payment vs transfer: payment_lines=%s transfer_lines=%s payment_balances=%s transfer_balances=%s",
+            payment_receivable_lines.ids,
+            transfer_receivable_lines.ids,
+            payment_receivable_lines.mapped("balance"),
+            transfer_receivable_lines.mapped("balance"),
+        )
+        try:
+            (payment_receivable_lines | transfer_receivable_lines).sudo().reconcile()
+            _logger.info(
+                "[ADV_RECON] Reconcile payment vs transfer done: payment_lines_reconciled=%s transfer_lines_reconciled=%s",
+                payment_receivable_lines.mapped("reconciled"),
+                transfer_receivable_lines.mapped("reconciled"),
+            )
+        except Exception as e:
+            _logger.exception(
+                "[ADV_RECON] Reconcile payment vs transfer failed: advance=%s payment_lines=%s transfer_lines=%s error=%s",
+                self.name,
+                payment_receivable_lines.ids,
+                transfer_receivable_lines.ids,
+                e,
+            )
+            raise
+
+        self.advance_account_payment_id = payment.id
+        self.advance_liability_move_id = transfer_move.id
+        _logger.info(
+            "[ADV_RECON] Advance payment flow complete: advance=%s payment_id=%s liability_move_id=%s",
+            self.name,
+            payment.id,
+            transfer_move.id,
+        )
+        return payment
+
     def action_create_payment(self):
         for order in self:
             order.ensure_one()
             if order.state != "confirmed":
                 raise UserError(_("You can only create a payment on a Confirmed advance order."))
-            if order.advance_pos_order_id:
+            if order.advance_account_payment_id or order.advance_pos_order_id:
                 raise UserError(_("A payment is already created for this advance order."))
             if not order.advance_amount or order.advance_amount <= 0:
                 raise UserError(_("Advance amount must be greater than zero to create a payment."))
 
+            # 1) Keep POS technical flow: create POS order + POS payment for advance.
             pos_config = order.from_pos_config_id or order.pos_config_id
             if not pos_config.advance_deposit_product_id:
                 raise UserError(_("Please set 'Advance Deposit Product' on the POS configuration first."))
@@ -847,7 +1001,17 @@ class PosAdvanceOrder(models.Model):
             pos_order = order._create_pos_order(session, lines)
             order._pay_pos_order(pos_order, pm, pos_order.amount_total)
             order.advance_pos_order_id = pos_order.id
+
+            # 2) Additionally create account.payment + liability transfer for compliance flow.
+            order._create_advance_account_payment()
             order.state = "advance_paid"
+            _logger.info(
+                "[ADV_RECON] action_create_payment completed: advance=%s state=%s pos_order=%s account_payment=%s",
+                order.name,
+                order.state,
+                order.advance_pos_order_id.id if order.advance_pos_order_id else False,
+                order.advance_account_payment_id.id if order.advance_account_payment_id else False,
+            )
             # Notify manager on Picking POS
             order._send_create_payment_email_to_manager()
             # Notify configured users (inbox + email)
@@ -866,7 +1030,7 @@ class PosAdvanceOrder(models.Model):
             order.ensure_one()
             if order.state != "advance_paid":
                 raise UserError(_("You can only create remaining payment after the advance is paid."))
-            if not order.advance_pos_order_id:
+            if not order.advance_account_payment_id and not order.advance_pos_order_id:
                 raise UserError(_("Please create the advance payment first."))
             if order.remaining_pos_order_id:
                 raise UserError(_("Remaining/reversal payments are already created for this order."))
@@ -936,6 +1100,10 @@ class PosAdvanceOrder(models.Model):
                     })
 
         return True
+
+    def action_create_remaining_amount(self):
+        """Alias for POS button flow."""
+        return self.action_create_remaining_payment()
 
     def action_refund_advance_payment(self):
         for order in self:

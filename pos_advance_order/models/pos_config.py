@@ -6,6 +6,7 @@ from odoo import fields, models
 class PosConfig(models.Model):
     _inherit = "pos.config"
 
+    enable_advance_order = fields.Boolean(string="Enable Advance Order")
     advance_order_manager_id = fields.Many2one(
         "res.users",
         string="Advance Orders Manager",
