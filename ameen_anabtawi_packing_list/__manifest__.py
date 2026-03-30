@@ -6,7 +6,7 @@
     "summary": "Packing List PDF from Customer Invoices + product logistics fields",
     "depends": ["account", "sale", "stock", "product"],
     "data": [
-        "security/ir.model.access.csv",
+        
         "views/package_type_menu.xml",
         "views/product_template_view.xml",
         "views/sale_order_view.xml",
