@@ -5,7 +5,6 @@
     <field name="inherit_id" ref="sale.view_order_form"/>
     <field name="arch" type="xml">
 
-      <!-- إدخال العمود داخل LIST (وليس TREE) -->
       <xpath expr="//page[@name='order_lines']//field[@name='order_line']/list//field[@name='product_uom_qty']" position="after">
         <field name="x_qty_per_carton" optional="show"/>
       </xpath>
