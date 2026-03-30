@@ -1,13 +1,15 @@
-<!-- report/packing_list_report.xml -->
 <odoo>
   <record id="action_report_packing_list" model="ir.actions.report">
     <field name="name">Packing List</field>
     <field name="model">account.move</field>
     <field name="report_type">qweb-pdf</field>
-    <field name="report_name">softobia_packing_list.packing_list_template</field>
-    <field name="report_file">softobia_packing_list.packing_list_template</field>
+    <field name="report_name">ameen_anabtawi_packing_list.packing_list_template</field>
+    <field name="report_file">ameen_anabtawi_packing_list.packing_list_template</field>
     <field name="print_report_name">'Packing List - %s' % (object.name or '')</field>
+
     <field name="binding_model_id" ref="account.model_account_move"/>
     <field name="binding_type">report</field>
+
+    <!-- لا Groups هنا -> الجميع يراه (حسب صلاحية رؤية الفاتورة) -->
   </record>
 </odoo>
