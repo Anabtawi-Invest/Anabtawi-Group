@@ -1,9 +1,10 @@
-<!-- report/packing_list_template.xml -->
 <odoo>
   <template id="packing_list_template">
     <t t-call="web.external_layout">
-      <t t-foreach="docs" t-as="d">
-        <t t-set="o" t-value="d['move']"/>
+      <t t-foreach="docs" t-as="o">
+        <t t-set="lines" t-value="lines_map.get(o.id, [])"/>
+        <t t-set="tot" t-value="totals_map.get(o.id, {})"/>
+        <t t-set="terms" t-value="terms_map.get(o.id, '')"/>
 
         <div class="page">
           <h2 style="text-align:center;">Packing List</h2>
@@ -43,7 +44,7 @@
             </thead>
             <tbody>
               <t t-set="i" t-value="0"/>
-              <t t-foreach="d['lines']" t-as="l">
+              <t t-foreach="lines" t-as="l">
                 <t t-set="i" t-value="i + 1"/>
                 <tr>
                   <td t-esc="i"/>
@@ -64,20 +65,20 @@
             <tfoot>
               <tr>
                 <th colspan="6" style="text-align:right;">Totals</th>
-                <th t-esc="d['tot_units']"/>
-                <th t-esc="d['tot_cartons']"/>
+                <th t-esc="tot.get('tot_units', 0.0)"/>
+                <th t-esc="tot.get('tot_cartons', 0.0)"/>
                 <th></th>
                 <th></th>
-                <th t-esc="d['tot_net']"/>
-                <th t-esc="d['tot_gross']"/>
+                <th t-esc="tot.get('tot_net', 0.0)"/>
+                <th t-esc="tot.get('tot_gross', 0.0)"/>
               </tr>
             </tfoot>
           </table>
 
-          <t t-if="d['terms']">
+          <t t-if="terms">
             <br/>
             <strong>Terms &amp; Conditions</strong>
-            <pre style="white-space:pre-wrap;" t-esc="d['terms']"/>
+            <pre style="white-space:pre-wrap;" t-esc="terms"/>
           </t>
         </div>
       </t>
