@@ -5,11 +5,12 @@
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
 
-            <xpath expr="//header" position="inside">
+            <xpath expr="//sheet//div[@name='button_box']" position="inside">
                 <button name="action_open_source_approval"
                         type="object"
-                        string="Approval Request"
                         class="oe_stat_button"
+                        icon="fa-check-square"
+                        string="Approval Request"
                         invisible="not x_approval_request_id"/>
             </xpath>
 
