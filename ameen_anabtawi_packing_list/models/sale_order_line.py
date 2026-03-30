@@ -1,4 +1,3 @@
-# models/sale_order_line.py
 from odoo import models, fields, api
 
 class SaleOrderLine(models.Model):
