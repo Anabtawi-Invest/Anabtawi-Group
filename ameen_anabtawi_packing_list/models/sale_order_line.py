@@ -5,7 +5,7 @@ class SaleOrderLine(models.Model):
 
     x_qty_per_carton = fields.Integer(string="Qty per Carton", default=0)
 
-    # NEW: production & expiry on SO line
+    # NEW fields
     x_production_date = fields.Date(string="Production Date")
     x_expiry_date = fields.Date(string="Expiry Date")
 
