@@ -8,9 +8,9 @@
         <t t-call="web.external_layout">
           <div class="page">
 
-            <h2 style="text-align:center;">Packing List</h2>
+            <h2 style="text-align:center; margin-bottom:12px;">Packing List</h2>
 
-            <!-- ORIGINAL alignment kept -->
+            <!-- Keep header original alignment (left/right) -->
             <div class="row">
               <div class="col-6">
                 <strong t-esc="o.company_id.name"/>
@@ -27,45 +27,67 @@
 
             <br/>
 
-            <!-- TABLE ONLY centered -->
-            <table class="table table-sm table-bordered" style="text-align:center;">
+            <!-- TABLE: fit + centered -->
+            <table class="table table-sm table-bordered"
+                   style="
+                     width:100%;
+                     margin:0 auto;                 /* center table */
+                     table-layout:fixed;             /* force columns to fit */
+                     text-align:center;              /* center cells */
+                     font-size:10.5px;               /* smaller text to fit */
+                   ">
               <thead>
                 <tr>
-                  <th>Barcode</th>
-                  <th>HS Code</th>
+                  <th style="width:12%;">Barcode</th>
+                  <th style="width:6%;">HS<br/>Code</th>
 
                   <t t-if="show_dates">
-                    <th>Production Date</th>
-                    <th>Expiry Date</th>
+                    <th style="width:9%;">Production<br/>Date</th>
+                    <th style="width:9%;">Expiry<br/>Date</th>
                   </t>
 
-                  <th>Product</th>
-                  <th>Net Wt/Kg</th>
-                  <th>Gross Wt/Kg</th>
-                  <th>Pack Type</th>
-                  <th>Total Invoiced Units</th>
-                  <th>Qty/Carton</th>
-                  <th>Total Cartons</th>
-                  <th>Total Net Wt/Kg</th>
-                  <th>Total Gross Wt/Kg</th>
+                  <th style="width:14%;">Product</th>
+                  <th style="width:6%;">Net<br/>Wt/Kg</th>
+                  <th style="width:6%;">Gross<br/>Wt/Kg</th>
+                  <th style="width:7%;">Pack<br/>Type</th>
+                  <th style="width:9%;">Total Invoiced<br/>Units</th>
+                  <th style="width:8%;">Qty/Carton</th>
+                  <th style="width:7%;">Total<br/>Cartons</th>
+                  <th style="width:8%;">Total Net<br/>Wt/Kg</th>
+                  <th style="width:9%;">Total Gross<br/>Wt/Kg</th>
                 </tr>
               </thead>
 
               <tbody>
                 <t t-foreach="lines" t-as="l">
                   <tr>
-                    <td><t t-esc="l.get('barcode','')"/></td>
-                    <td><t t-esc="l.get('hs_code','')"/></td>
+                    <td style="word-break:break-all; white-space:normal;">
+                      <t t-esc="l.get('barcode','')"/>
+                    </td>
+                    <td style="word-break:break-word; white-space:normal;">
+                      <t t-esc="l.get('hs_code','')"/>
+                    </td>
 
                     <t t-if="show_dates">
-                      <td><t t-esc="l.get('production_date') or ''"/></td>
-                      <td><t t-esc="l.get('expiry_date') or ''"/></td>
+                      <td style="word-break:break-word; white-space:normal;">
+                        <t t-esc="l.get('production_date') or ''"/>
+                      </td>
+                      <td style="word-break:break-word; white-space:normal;">
+                        <t t-esc="l.get('expiry_date') or ''"/>
+                      </td>
                     </t>
 
-                    <td><t t-esc="l.get('product_name','')"/></td>
+                    <td style="word-break:break-word; white-space:normal;">
+                      <t t-esc="l.get('product_name','')"/>
+                    </td>
+
                     <td><t t-esc="'%.2f' % (l.get('net_w',0.0) or 0.0)"/></td>
                     <td><t t-esc="'%.2f' % (l.get('gross_w',0.0) or 0.0)"/></td>
-                    <td><t t-esc="l.get('package_type','')"/></td>
+
+                    <td style="word-break:break-word; white-space:normal;">
+                      <t t-esc="l.get('package_type','')"/>
+                    </td>
+
                     <td><t t-esc="'%.2f' % (l.get('units',0.0) or 0.0)"/></td>
                     <td><t t-esc="l.get('qty_per_carton',0)"/></td>
                     <td><t t-esc="'%.2f' % (l.get('cartons',0.0) or 0.0)"/></td>
@@ -77,12 +99,11 @@
 
               <tfoot>
                 <tr>
-                  <!-- Colspan depends on show_dates -->
                   <t t-if="show_dates">
-                    <th colspan="7">Totals</th>
+                    <th colspan="7" style="text-align:left;">Totals</th>
                   </t>
                   <t t-else="">
-                    <th colspan="5">Totals</th>
+                    <th colspan="5" style="text-align:left;">Totals</th>
                   </t>
 
                   <th><t t-esc="'%.2f' % (tot.get('tot_units',0.0) or 0.0)"/></th>
