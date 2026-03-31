@@ -35,21 +35,24 @@ class ApprovalRequest(models.Model):
     # -------------------------
     # Helpers
     # -------------------------
-    def _count_attachments(self):
-        self.ensure_one()
-        return self.env["ir.attachment"].sudo().search_count([
-            ("res_model", "=", "approval.request"),
-            ("res_id", "=", self.id),
-        ])
-
     def _must_require_contact_fields(self):
         self.ensure_one()
         return bool(self.x_is_contact_creation_category)
 
+    def _get_request_attachments(self):
+        """Return all ir.attachment linked to this approval.request."""
+        self.ensure_one()
+        return self.env["ir.attachment"].sudo().search([
+            ("res_model", "=", "approval.request"),
+            ("res_id", "=", self.id),
+        ])
+
+    def _count_attachments(self):
+        self.ensure_one()
+        return len(self._get_request_attachments())
+
     # -------------------------
-    # CONDITIONAL REQUIRED FIELDS (OK on Save)
-    # NOTE: This constraint will run on save, but it checks only fields,
-    # NOT attachments, so user can save then add attachment.
+    # Conditional required fields (OK on Save)
     # -------------------------
     @api.constrains("x_is_contact_creation_category", "x_contact_type", "x_contact_name", "x_contact_phone", "x_contact_vat")
     def _constrains_contact_fields_when_enabled(self):
@@ -73,20 +76,41 @@ class ApprovalRequest(models.Model):
                 )
 
     # -------------------------
-    # Submission/Approval validation (Attachments enforced here)
+    # Submit/Approve validation (Attachments enforced here)
     # -------------------------
     def _validate_before_submit_or_approve(self):
-        """
-        Enforce attachments ONLY at submit/approve time (NOT at save).
-        This matches Odoo logic: save first, then attach, then submit/approve.
-        """
         for rec in self:
             if not rec._must_require_contact_fields():
                 continue
 
-            # Attachments required here
             if rec._count_attachments() < 1:
                 raise ValidationError(_("At least one attachment is required before submitting/approving."))
+
+    # -------------------------
+    # Copy attachments to Contact
+    # -------------------------
+    def _copy_attachments_to_partner(self, partner):
+        """
+        Copy ALL approval.request attachments to the created partner as new attachments.
+        (Copy, not move) => keeps evidence on approval and also attaches to contact.
+        """
+        self.ensure_one()
+        Attachment = self.env["ir.attachment"].sudo()
+        attachments = self._get_request_attachments()
+
+        for att in attachments:
+            # Create a new attachment referencing res.partner
+            Attachment.create({
+                "name": att.name,
+                "type": att.type,
+                "mimetype": att.mimetype,
+                "datas": att.datas,          # binary content
+                "url": att.url,              # for url-type attachments
+                "res_model": "res.partner",
+                "res_id": partner.id,
+                "description": att.description,
+                "public": att.public,
+            })
 
     # -------------------------
     # Contact creation logic (on Approved)
@@ -107,6 +131,10 @@ class ApprovalRequest(models.Model):
             "company_type": company_type,
             "x_approval_request_id": self.id,
         })
+
+        # Copy attachments from approval to partner
+        self._copy_attachments_to_partner(partner)
+
         self.x_created_partner_id = partner.id
         return partner
 
@@ -120,12 +148,8 @@ class ApprovalRequest(models.Model):
 
     # -------------------------
     # Submit trigger (Pending)
-    # Odoo approvals usually has action_confirm to submit
     # -------------------------
     def action_confirm(self):
-        """
-        Allow save without attachment, but block submit if attachment missing.
-        """
         for rec in self:
             if rec._must_require_contact_fields():
                 rec._validate_before_submit_or_approve()
@@ -135,10 +159,6 @@ class ApprovalRequest(models.Model):
     # Approve trigger
     # -------------------------
     def action_approve(self, approver=None):
-        """
-        Block approve if no attachment, then proceed.
-        After approve, if request_status becomes 'approved' -> create contact.
-        """
         for rec in self:
             if rec._must_require_contact_fields():
                 rec._validate_before_submit_or_approve()
@@ -152,7 +172,6 @@ class ApprovalRequest(models.Model):
         going_approved = ("request_status" in vals and vals["request_status"] == "approved")
         res = super().write(vals)
         if going_approved:
-            # At this point, ensure attachments exist for enabled category
             for rec in self:
                 if rec._must_require_contact_fields():
                     rec._validate_before_submit_or_approve()
