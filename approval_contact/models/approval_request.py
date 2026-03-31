@@ -39,27 +39,27 @@ class ApprovalRequest(models.Model):
         self.ensure_one()
         return bool(self.x_is_contact_creation_category)
 
-    def _get_request_attachments(self):
-        """
-        Robust attachment collector for Odoo 19:
-        - Direct attachments on approval.request (res_model/res_id)
-        - Chatter attachments stored on mail.message (message_ids.attachment_ids)
-        """
+    def _get_direct_attachments(self):
+        """Attachments directly linked to approval.request (res_model/res_id)."""
         self.ensure_one()
-        Attachment = self.env["ir.attachment"].sudo()
-
-        direct = Attachment.search([
+        return self.env["ir.attachment"].sudo().search([
             ("res_model", "=", "approval.request"),
             ("res_id", "=", self.id),
         ])
 
-        chatter = self.message_ids.mapped("attachment_ids").sudo()
+    def _get_chatter_attachments(self):
+        """Attachments linked to chatter messages (mail.message)."""
+        self.ensure_one()
+        return self.message_ids.mapped("attachment_ids").sudo()
 
-        return (direct | chatter)
+    def _get_all_request_attachments(self):
+        """Union of direct + chatter attachments."""
+        self.ensure_one()
+        return (self._get_direct_attachments() | self._get_chatter_attachments())
 
     def _count_attachments(self):
         self.ensure_one()
-        return len(self._get_request_attachments())
+        return len(self._get_all_request_attachments())
 
     # -------------------------
     # Conditional required fields (OK on Save)
@@ -92,32 +92,51 @@ class ApprovalRequest(models.Model):
         for rec in self:
             if not rec._must_require_contact_fields():
                 continue
+
             if rec._count_attachments() < 1:
                 raise ValidationError(_("At least one attachment is required before submitting/approving."))
 
     # -------------------------
-    # Copy attachments to Contact (VISIBLE in Contact chatter)
+    # MOVE attachments to Contact (NO duplicates)
     # -------------------------
-    def _copy_attachments_to_partner_chatter(self, partner):
+    def _move_attachments_to_partner(self, partner):
         """
-        Copy attachments from approval request to partner AND post them in partner chatter.
-        This guarantees they appear to users exactly like approval chatter attachments (thumbnail + download).
+        Move (not copy) attachments from approval.request to res.partner:
+        - Remove attachments from approval chatter messages (so they disappear from approval)
+        - Re-link the same ir.attachment to partner (res_model/res_id)
+        - Post them into partner chatter (without copying) so user sees them on contact
         """
         self.ensure_one()
-        attachments = self._get_request_attachments()
-        if not attachments:
+        Attachment = self.env["ir.attachment"].sudo()
+
+        # 1) Collect attachments
+        direct_attachments = self._get_direct_attachments()
+        chatter_attachments = self._get_chatter_attachments()
+        all_attachments = (direct_attachments | chatter_attachments)
+
+        if not all_attachments:
             return
 
-        new_attachment_ids = []
-        for att in attachments:
-            # Create a true copy (new ir.attachment record)
-            new_att = att.copy()
-            new_attachment_ids.append(new_att.id)
+        # 2) Detach chatter attachments from approval messages (remove relation)
+        # This ensures they won't still appear in the approval chatter after move.
+        if chatter_attachments:
+            for msg in self.message_ids.sudo():
+                if msg.attachment_ids:
+                    # remove only the ones we are moving
+                    to_remove = msg.attachment_ids & chatter_attachments
+                    if to_remove:
+                        msg.write({"attachment_ids": [(3, att_id) for att_id in to_remove.ids]})
 
-        # Post message on partner with those copied attachments
+        # 3) Re-link attachments to partner (MOVE)
+        all_attachments.write({
+            "res_model": "res.partner",
+            "res_id": partner.id,
+        })
+
+        # 4) Post a message on partner chatter with the SAME attachments (no copy)
         partner.sudo().message_post(
-            body=_("Attachments copied automatically from Approval Request: %s") % (self.display_name,),
-            attachment_ids=new_attachment_ids,
+            body=_("Documents moved automatically from Approval Request: %s") % (self.display_name,),
+            attachment_ids=all_attachments.ids,
         )
 
     # -------------------------
@@ -140,8 +159,8 @@ class ApprovalRequest(models.Model):
             "x_approval_request_id": self.id,
         })
 
-        # Copy attachments into partner chatter (guaranteed visible)
-        self._copy_attachments_to_partner_chatter(partner)
+        # ✅ MOVE attachments (no duplicates)
+        self._move_attachments_to_partner(partner)
 
         self.x_created_partner_id = partner.id
         return partner
