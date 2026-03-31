@@ -8,13 +8,13 @@
             <!-- Add Contact Fields -->
             <xpath expr="//sheet" position="inside">
                 <group string="New Contact Data"
-                       invisible="not category_id.x_create_contact_on_approve">
+                       invisible="not x_is_contact_creation_category">
 
-                    <field name="x_contact_type" required="category_id.x_create_contact_on_approve"/>
-                    <field name="x_contact_name" required="category_id.x_create_contact_on_approve"/>
-                    <field name="x_contact_phone" required="category_id.x_create_contact_on_approve"/>
+                    <field name="x_contact_type" required="x_is_contact_creation_category"/>
+                    <field name="x_contact_name" required="x_is_contact_creation_category"/>
+                    <field name="x_contact_phone" required="x_is_contact_creation_category"/>
                     <field name="x_contact_email"/>
-                    <field name="x_contact_vat" required="category_id.x_create_contact_on_approve"/>
+                    <field name="x_contact_vat" required="x_is_contact_creation_category"/>
 
                     <field name="x_created_partner_id" readonly="1"/>
                 </group>
