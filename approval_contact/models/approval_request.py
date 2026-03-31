@@ -7,18 +7,28 @@ class ApprovalRequest(models.Model):
     _inherit = "approval.request"
 
     # =========================
+    # Safe boolean for UI + logic (NO dotted traversal in views)
+    # =========================
+    x_is_contact_creation_category = fields.Boolean(
+        string="Is Contact Creation Category",
+        related="category_id.x_create_contact_on_approve",
+        store=True,
+        readonly=True,
+    )
+
+    # =========================
     # Fields (Approval Request)
+    # IMPORTANT: NOT required=True at model level
     # =========================
     x_contact_type = fields.Selection(
         [("person", "Individual"), ("company", "Company")],
         string="Contact Type",
-        required=True,
         default="person",
     )
-    x_contact_name = fields.Char(string="New Contact Name", required=True)
-    x_contact_phone = fields.Char(string="Phone", required=True)
+    x_contact_name = fields.Char(string="New Contact Name")
+    x_contact_phone = fields.Char(string="Phone")
     x_contact_email = fields.Char(string="Email")  # optional
-    x_contact_vat = fields.Char(string="Tax ID (VAT)", required=True)
+    x_contact_vat = fields.Char(string="Tax ID (VAT)")
 
     # One contact per request
     x_created_partner_id = fields.Many2one(
@@ -34,7 +44,7 @@ class ApprovalRequest(models.Model):
     def _is_contact_creation_category(self):
         """Run logic only for categories where checkbox is enabled."""
         self.ensure_one()
-        return bool(self.category_id and self.category_id.x_create_contact_on_approve)
+        return bool(self.x_is_contact_creation_category)
 
     def _count_attachments(self):
         """Count attachments linked to this approval.request record."""
@@ -46,25 +56,22 @@ class ApprovalRequest(models.Model):
 
     def _validate_before_approved(self):
         """
-        Strict validation (no assumptions):
-        - name required
-        - phone required
-        - VAT required
-        - contact type required
-        - at least 1 attachment required
+        Conditional requirement (SAFE):
+        Enforced only when x_is_contact_creation_category is True,
+        and only when going to approved.
         """
         for rec in self:
             if not rec._is_contact_creation_category():
                 continue
 
+            if not rec.x_contact_type:
+                raise ValidationError(_("Contact Type (Individual/Company) is mandatory."))
             if not rec.x_contact_name:
                 raise ValidationError(_("New Contact Name is mandatory."))
             if not rec.x_contact_phone:
                 raise ValidationError(_("Phone is mandatory."))
             if not rec.x_contact_vat:
                 raise ValidationError(_("Tax ID (VAT) is mandatory."))
-            if not rec.x_contact_type:
-                raise ValidationError(_("Contact Type (Individual/Company) is mandatory."))
 
             if rec._count_attachments() < 1:
                 raise ValidationError(_("At least one attachment is required before approval."))
@@ -96,8 +103,8 @@ class ApprovalRequest(models.Model):
 
     def _post_approval_create_contact_if_needed(self):
         """
-        Single place to create contact after request is fully approved.
-        This is called from action_approve (main) and write() (fallback).
+        Create contact only after request is fully approved.
+        Called from action_approve (main) and write() (fallback).
         """
         for rec in self:
             if not rec._is_contact_creation_category():
@@ -130,7 +137,7 @@ class ApprovalRequest(models.Model):
         """
         going_approved = ("request_status" in vals and vals["request_status"] == "approved")
 
-        # validate BEFORE moving to approved
+        # validate BEFORE moving to approved (conditional)
         if going_approved:
             self._validate_before_approved()
 
