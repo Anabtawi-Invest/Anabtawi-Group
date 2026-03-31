@@ -1,5 +1,5 @@
 <odoo>
-  <!-- Report 1: NO Dates -->
+  <!-- Report 1: Packing List (NO dates) -->
   <record id="action_report_packing_list" model="ir.actions.report">
     <field name="name">Packing List</field>
     <field name="model">account.move</field>
@@ -11,7 +11,7 @@
     <field name="binding_type">report</field>
   </record>
 
-  <!-- Report 2: WITH Dates -->
+  <!-- Report 2: Packing List (WITH dates) -->
   <record id="action_report_packing_list_with_dates" model="ir.actions.report">
     <field name="name">Packing List (With Dates)</field>
     <field name="model">account.move</field>
