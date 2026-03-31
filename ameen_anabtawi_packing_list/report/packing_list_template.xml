@@ -33,12 +33,14 @@
                   <th style="text-align:center;">Product</th>
                   <th style="text-align:center;">Barcode</th>
                   <th style="text-align:center;">HS Code</th>
-                  <th style="text-align:center;">Package Type</th>
-                  <th style="text-align:center;">Qty/Carton</th>
-                  <th style="text-align:center;">Units</th>
-                  <th style="text-align:center;">Total Cartons</th>
+
+                  <!-- Requested sequence -->
                   <th style="text-align:center;">Net Wt/Kg</th>
                   <th style="text-align:center;">Gross Wt/Kg</th>
+                  <th style="text-align:center;">Pack Type</th>
+                  <th style="text-align:center;">Total Invoiced Units</th>
+                  <th style="text-align:center;">Qty/Carton</th>
+                  <th style="text-align:center;">Total Cartons</th>
                   <th style="text-align:center;">Total Net Wt/Kg</th>
                   <th style="text-align:center;">Total Gross Wt/Kg</th>
                 </tr>
@@ -53,20 +55,21 @@
                     <td style="text-align:center;" t-esc="l.get('product_name', '')"/>
                     <td style="text-align:center;" t-esc="l.get('barcode', '')"/>
                     <td style="text-align:center;" t-esc="l.get('hs_code', '')"/>
-                    <td style="text-align:center;" t-esc="l.get('package_type', '')"/>
-                    <td style="text-align:center;" t-esc="l.get('qty_per_carton', 0)"/>
 
-                    <td style="text-align:center;">
-                      <t t-esc="'%.2f' % (l.get('units', 0.0) or 0.0)"/>
-                    </td>
-                    <td style="text-align:center;">
-                      <t t-esc="'%.2f' % (l.get('cartons', 0.0) or 0.0)"/>
-                    </td>
+                    <!-- Requested sequence -->
                     <td style="text-align:center;">
                       <t t-esc="'%.2f' % (l.get('net_w', 0.0) or 0.0)"/>
                     </td>
                     <td style="text-align:center;">
                       <t t-esc="'%.2f' % (l.get('gross_w', 0.0) or 0.0)"/>
+                    </td>
+                    <td style="text-align:center;" t-esc="l.get('package_type', '')"/>
+                    <td style="text-align:center;">
+                      <t t-esc="'%.2f' % (l.get('units', 0.0) or 0.0)"/>
+                    </td>
+                    <td style="text-align:center;" t-esc="l.get('qty_per_carton', 0)"/>
+                    <td style="text-align:center;">
+                      <t t-esc="'%.2f' % (l.get('cartons', 0.0) or 0.0)"/>
                     </td>
                     <td style="text-align:center;">
                       <t t-esc="'%.2f' % (l.get('net_total', 0.0) or 0.0)"/>
@@ -80,21 +83,27 @@
 
               <tfoot>
                 <tr style="text-align:center;">
-                  <th colspan="6" style="text-align:center;">Totals</th>
+                  <th colspan="7" style="text-align:center;">Totals</th>
 
+                  <!-- Total Invoiced Units -->
                   <th style="text-align:center;">
                     <t t-esc="'%.2f' % (tot.get('tot_units', 0.0) or 0.0)"/>
                   </th>
+
+                  <!-- Qty/Carton total not meaningful -->
+                  <th></th>
+
+                  <!-- Total Cartons -->
                   <th style="text-align:center;">
                     <t t-esc="'%.2f' % (tot.get('tot_cartons', 0.0) or 0.0)"/>
                   </th>
 
-                  <th></th>
-                  <th></th>
-
+                  <!-- Total Net -->
                   <th style="text-align:center;">
                     <t t-esc="'%.2f' % (tot.get('tot_net', 0.0) or 0.0)"/>
                   </th>
+
+                  <!-- Total Gross -->
                   <th style="text-align:center;">
                     <t t-esc="'%.2f' % (tot.get('tot_gross', 0.0) or 0.0)"/>
                   </th>
