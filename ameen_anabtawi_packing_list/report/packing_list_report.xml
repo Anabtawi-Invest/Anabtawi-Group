@@ -11,13 +11,13 @@
     <field name="binding_type">report</field>
   </record>
 
-  <!-- Report 2: Packing List (WITH dates) -->
+  <!-- Report 2: Packing List (WITH dates) - SHORT TEMPLATE ID -->
   <record id="action_report_packing_list_with_dates" model="ir.actions.report">
     <field name="name">Packing List (With Dates)</field>
     <field name="model">account.move</field>
     <field name="report_type">qweb-pdf</field>
-    <field name="report_name">ameen_anabtawi_packing_list.packing_list_template_with_dates</field>
-    <field name="report_file">ameen_anabtawi_packing_list.packing_list_template_with_dates</field>
+    <field name="report_name">ameen_anabtawi_packing_list.pl_date_tmpl</field>
+    <field name="report_file">ameen_anabtawi_packing_list.pl_date_tmpl</field>
     <field name="print_report_name">'Packing List With Dates - %s' % (object.name or '')</field>
     <field name="binding_model_id" ref="account.model_account_move"/>
     <field name="binding_type">report</field>
