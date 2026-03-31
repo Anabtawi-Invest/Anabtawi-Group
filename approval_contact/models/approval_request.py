@@ -43,19 +43,16 @@ class ApprovalRequest(models.Model):
         ])
 
     def _must_require_contact_fields(self):
-        """Only require fields when category checkbox is True."""
         self.ensure_one()
         return bool(self.x_is_contact_creation_category)
 
     # -------------------------
-    # CONDITIONAL ORM REQUIRED (hard guarantee)
+    # CONDITIONAL REQUIRED FIELDS (OK on Save)
+    # NOTE: This constraint will run on save, but it checks only fields,
+    # NOT attachments, so user can save then add attachment.
     # -------------------------
     @api.constrains("x_is_contact_creation_category", "x_contact_type", "x_contact_name", "x_contact_phone", "x_contact_vat")
     def _constrains_contact_fields_when_enabled(self):
-        """
-        This makes fields REQUIRED only when the checkbox is enabled.
-        It will NOT block other categories.
-        """
         for rec in self:
             if not rec._must_require_contact_fields():
                 continue
@@ -75,17 +72,21 @@ class ApprovalRequest(models.Model):
                     _("Missing mandatory fields for this Approval Category:\n- %s") % "\n- ".join(missing)
                 )
 
-    @api.constrains("x_is_contact_creation_category")
-    def _constrains_attachment_when_enabled(self):
+    # -------------------------
+    # Submission/Approval validation (Attachments enforced here)
+    # -------------------------
+    def _validate_before_submit_or_approve(self):
         """
-        Require at least 1 attachment only when checkbox enabled.
-        This runs on save.
+        Enforce attachments ONLY at submit/approve time (NOT at save).
+        This matches Odoo logic: save first, then attach, then submit/approve.
         """
         for rec in self:
             if not rec._must_require_contact_fields():
                 continue
+
+            # Attachments required here
             if rec._count_attachments() < 1:
-                raise ValidationError(_("At least one attachment is required for this Approval Category."))
+                raise ValidationError(_("At least one attachment is required before submitting/approving."))
 
     # -------------------------
     # Contact creation logic (on Approved)
@@ -117,15 +118,44 @@ class ApprovalRequest(models.Model):
                 continue
             rec._create_contact_sudo_once()
 
+    # -------------------------
+    # Submit trigger (Pending)
+    # Odoo approvals usually has action_confirm to submit
+    # -------------------------
+    def action_confirm(self):
+        """
+        Allow save without attachment, but block submit if attachment missing.
+        """
+        for rec in self:
+            if rec._must_require_contact_fields():
+                rec._validate_before_submit_or_approve()
+        return super().action_confirm()
+
+    # -------------------------
+    # Approve trigger
+    # -------------------------
     def action_approve(self, approver=None):
+        """
+        Block approve if no attachment, then proceed.
+        After approve, if request_status becomes 'approved' -> create contact.
+        """
+        for rec in self:
+            if rec._must_require_contact_fields():
+                rec._validate_before_submit_or_approve()
+
         res = super().action_approve(approver=approver)
         self._post_approval_create_contact_if_needed()
         return res
 
+    # Fallback: if request_status set to approved by another flow
     def write(self, vals):
         going_approved = ("request_status" in vals and vals["request_status"] == "approved")
         res = super().write(vals)
         if going_approved:
+            # At this point, ensure attachments exist for enabled category
+            for rec in self:
+                if rec._must_require_contact_fields():
+                    rec._validate_before_submit_or_approve()
             self._post_approval_create_contact_if_needed()
         return res
 
