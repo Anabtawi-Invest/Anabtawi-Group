@@ -1,0 +1,102 @@
+<odoo>
+  <template id="packing_list_body">
+    <t t-call="web.html_container">
+      <t t-foreach="docs" t-as="o">
+        <t t-set="lines" t-value="lines_map.get(o.id, [])"/>
+        <t t-set="tot" t-value="totals_map.get(o.id, {})"/>
+
+        <t t-call="web.external_layout">
+          <div class="page">
+
+            <h2 style="text-align:center;">Packing List</h2>
+
+            <!-- ORIGINAL alignment: left/right -->
+            <div class="row">
+              <div class="col-6">
+                <strong t-esc="o.company_id.name"/>
+                <div>Invoice No: <span t-esc="o.name"/></div>
+                <div t-if="o.invoice_date">Date: <span t-esc="o.invoice_date"/></div>
+              </div>
+              <div class="col-6" style="text-align:right;">
+                <div>Customer: <span t-esc="o.partner_id.name"/></div>
+                <div t-if="o.partner_id.vat">VAT: <span t-esc="o.partner_id.vat"/></div>
+                <div t-if="o.partner_id.phone">Tel: <span t-esc="o.partner_id.phone"/></div>
+                <div t-if="o.partner_id.email">Email: <span t-esc="o.partner_id.email"/></div>
+              </div>
+            </div>
+
+            <br/>
+
+            <!-- TABLE ONLY centered -->
+            <table class="table table-sm table-bordered" style="text-align:center;">
+              <thead>
+                <tr>
+                  <th>Barcode</th>
+                  <th>HS Code</th>
+
+                  <t t-if="show_dates">
+                    <th>Production Date</th>
+                    <th>Expiry Date</th>
+                  </t>
+
+                  <th>Product</th>
+                  <th>Net Wt/Kg</th>
+                  <th>Gross Wt/Kg</th>
+                  <th>Pack Type</th>
+                  <th>Total Invoiced Units</th>
+                  <th>Qty/Carton</th>
+                  <th>Total Cartons</th>
+                  <th>Total Net Wt/Kg</th>
+                  <th>Total Gross Wt/Kg</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <t t-foreach="lines" t-as="l">
+                  <tr>
+                    <td><t t-esc="l.get('barcode','')"/></td>
+                    <td><t t-esc="l.get('hs_code','')"/></td>
+
+                    <t t-if="show_dates">
+                      <td><t t-esc="l.get('production_date') or ''"/></td>
+                      <td><t t-esc="l.get('expiry_date') or ''"/></td>
+                    </t>
+
+                    <td><t t-esc="l.get('product_name','')"/></td>
+                    <td><t t-esc="'%.2f' % (l.get('net_w',0.0) or 0.0)"/></td>
+                    <td><t t-esc="'%.2f' % (l.get('gross_w',0.0) or 0.0)"/></td>
+                    <td><t t-esc="l.get('package_type','')"/></td>
+                    <td><t t-esc="'%.2f' % (l.get('units',0.0) or 0.0)"/></td>
+                    <td><t t-esc="l.get('qty_per_carton',0)"/></td>
+                    <td><t t-esc="'%.2f' % (l.get('cartons',0.0) or 0.0)"/></td>
+                    <td><t t-esc="'%.2f' % (l.get('net_total',0.0) or 0.0)"/></td>
+                    <td><t t-esc="'%.2f' % (l.get('gross_total',0.0) or 0.0)"/></td>
+                  </tr>
+                </t>
+              </tbody>
+
+              <tfoot>
+                <tr>
+                  <!-- colspans depend on show_dates -->
+                  <t t-if="show_dates">
+                    <th colspan="7">Totals</th>
+                  </t>
+                  <t t-else="">
+                    <th colspan="5">Totals</th>
+                  </t>
+
+                  <th><t t-esc="'%.2f' % (tot.get('tot_units',0.0) or 0.0)"/></th>
+                  <th></th>
+                  <th><t t-esc="'%.2f' % (tot.get('tot_cartons',0.0) or 0.0)"/></th>
+                  <th><t t-esc="'%.2f' % (tot.get('tot_net',0.0) or 0.0)"/></th>
+                  <th><t t-esc="'%.2f' % (tot.get('tot_gross',0.0) or 0.0)"/></th>
+                </tr>
+              </tfoot>
+            </table>
+
+          </div>
+        </t>
+      </t>
+    </t>
+  </template>
+</odoo>
