@@ -2,7 +2,7 @@ from odoo import models
 
 
 class ReportPackingListBase(models.AbstractModel):
-    _name = "report.ameen_anabtawi_packing_list.packing_list_base"
+    _name = "report.ameen_anabtawi_packing_list.pl_base"
     _description = "Packing List Base Logic"
 
     def _get_hs_code(self, product_tmpl):
@@ -13,12 +13,10 @@ class ReportPackingListBase(models.AbstractModel):
         return ""
 
     def _get_qty_per_carton_from_invoice_line(self, inv_line):
-        # Prefer SO line value
         if inv_line.sale_line_ids:
             v = int(inv_line.sale_line_ids[0].x_qty_per_carton or 0)
             if v:
                 return v
-        # Fallback product default
         return int(inv_line.product_id.product_tmpl_id.x_qty_per_carton or 0)
 
     def _get_dates_from_invoice_line(self, inv_line):
@@ -84,13 +82,20 @@ class ReportPackingListBase(models.AbstractModel):
         }
 
 
+# ==========================================================
+# IMPORTANT:
+# The AbstractModel name MUST be: report.<QWeb External ID>
+# To avoid "table name too long", we shorten the SECOND template
+# external id to: ameen_anabtawi_packing_list.pl_date_tmpl
+# ==========================================================
+
 class ReportPackingListNoDates(models.AbstractModel):
     _name = "report.ameen_anabtawi_packing_list.packing_list_template"
     _description = "Packing List (No Dates)"
 
     def _get_report_values(self, docids, data=None):
         docs = self.env["account.move"].browse(docids)
-        base = self.env["report.ameen_anabtawi_packing_list.packing_list_base"]
+        base = self.env["report.ameen_anabtawi_packing_list.pl_base"]
 
         lines_map, totals_map = {}, {}
         for move in docs:
@@ -109,12 +114,13 @@ class ReportPackingListNoDates(models.AbstractModel):
 
 
 class ReportPackingListWithDates(models.AbstractModel):
-    _name = "report.ameen_anabtawi_packing_list.packing_list_template_with_dates"
+    # MUST match QWeb template external id: ameen_anabtawi_packing_list.pl_date_tmpl
+    _name = "report.ameen_anabtawi_packing_list.pl_date_tmpl"
     _description = "Packing List (With Dates)"
 
     def _get_report_values(self, docids, data=None):
         docs = self.env["account.move"].browse(docids)
-        base = self.env["report.ameen_anabtawi_packing_list.packing_list_base"]
+        base = self.env["report.ameen_anabtawi_packing_list.pl_base"]
 
         lines_map, totals_map = {}, {}
         for move in docs:
