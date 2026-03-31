@@ -42,22 +42,19 @@ class ApprovalRequest(models.Model):
     def _get_request_attachments(self):
         """
         Robust attachment collector for Odoo 19:
-        1) Attachments directly linked to approval.request (res_model/res_id)
-        2) Attachments linked to chatter messages (message_ids.attachment_ids)
+        - Direct attachments on approval.request (res_model/res_id)
+        - Chatter attachments stored on mail.message (message_ids.attachment_ids)
         """
         self.ensure_one()
         Attachment = self.env["ir.attachment"].sudo()
 
-        # A) Direct attachments on the business record
         direct = Attachment.search([
             ("res_model", "=", "approval.request"),
             ("res_id", "=", self.id),
         ])
 
-        # B) Chatter attachments often stored on mail.message
         chatter = self.message_ids.mapped("attachment_ids").sudo()
 
-        # Union without duplicates
         return (direct | chatter)
 
     def _count_attachments(self):
@@ -95,27 +92,33 @@ class ApprovalRequest(models.Model):
         for rec in self:
             if not rec._must_require_contact_fields():
                 continue
-
             if rec._count_attachments() < 1:
                 raise ValidationError(_("At least one attachment is required before submitting/approving."))
 
     # -------------------------
-    # Copy attachments to Contact (robust)
+    # Copy attachments to Contact (VISIBLE in Contact chatter)
     # -------------------------
-    def _copy_attachments_to_partner(self, partner):
+    def _copy_attachments_to_partner_chatter(self, partner):
         """
-        Copy attachments from approval.request to partner.
-        Uses attachment.copy() to preserve binary/url metadata correctly.
+        Copy attachments from approval request to partner AND post them in partner chatter.
+        This guarantees they appear to users exactly like approval chatter attachments (thumbnail + download).
         """
         self.ensure_one()
         attachments = self._get_request_attachments()
+        if not attachments:
+            return
 
+        new_attachment_ids = []
         for att in attachments:
-            # Copy the attachment to res.partner
-            att.copy({
-                "res_model": "res.partner",
-                "res_id": partner.id,
-            })
+            # Create a true copy (new ir.attachment record)
+            new_att = att.copy()
+            new_attachment_ids.append(new_att.id)
+
+        # Post message on partner with those copied attachments
+        partner.sudo().message_post(
+            body=_("Attachments copied automatically from Approval Request: %s") % (self.display_name,),
+            attachment_ids=new_attachment_ids,
+        )
 
     # -------------------------
     # Contact creation logic (on Approved)
@@ -137,8 +140,8 @@ class ApprovalRequest(models.Model):
             "x_approval_request_id": self.id,
         })
 
-        # Copy attachments from approval to partner
-        self._copy_attachments_to_partner(partner)
+        # Copy attachments into partner chatter (guaranteed visible)
+        self._copy_attachments_to_partner_chatter(partner)
 
         self.x_created_partner_id = partner.id
         return partner
