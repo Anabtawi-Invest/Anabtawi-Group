@@ -10,7 +10,7 @@
 
             <h2 style="text-align:center;">Packing List</h2>
 
-            <!-- ORIGINAL alignment: left/right -->
+            <!-- ORIGINAL alignment kept -->
             <div class="row">
               <div class="col-6">
                 <strong t-esc="o.company_id.name"/>
@@ -77,7 +77,7 @@
 
               <tfoot>
                 <tr>
-                  <!-- colspans depend on show_dates -->
+                  <!-- Colspan depends on show_dates -->
                   <t t-if="show_dates">
                     <th colspan="7">Totals</th>
                   </t>
