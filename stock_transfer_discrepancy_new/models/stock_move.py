@@ -32,21 +32,22 @@ class StockMove(models.Model):
             if float_compare(qty, 0.0, precision_rounding=move.product_id.uom_id.rounding) <= 0:
                 continue
 
-            open_discrepancies = Discrepancy.search(
+            discrepancies = Discrepancy.search(
                 [
                     ("truck_location_id", "=", truck_loc.id),
                     ("product_id", "=", move.product_id.id),
-                    ("state", "=", "open"),
+                    ("state", "in", ("open", "under_investigation")),
                 ],
                 order="date asc, id asc",
             )
+
             remaining = qty
-            for disc in open_discrepancies:
+            for disc in discrepancies:
                 if float_compare(remaining, 0.0, precision_rounding=move.product_id.uom_id.rounding) <= 0:
                     break
-                before = remaining
+                before = disc.resolved_qty
                 disc._apply_resolution(remaining)
-                # decrease remaining by what was actually applied
-                remaining -= min(before, max((disc.difference_qty or 0.0) - (disc.resolved_qty or 0.0), 0.0))
-        return res
+                applied = (disc.resolved_qty or 0.0) - (before or 0.0)
+                remaining -= applied
 
+        return res

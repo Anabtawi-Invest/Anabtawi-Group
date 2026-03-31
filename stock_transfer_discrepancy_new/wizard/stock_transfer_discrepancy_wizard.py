@@ -1,3 +1,5 @@
+from dateutil.relativedelta import relativedelta
+
 from odoo import api, fields, models
 
 
@@ -43,6 +45,10 @@ class StockTransferDiscrepancyWizard(models.TransientModel):
 
     def action_confirm(self):
         self.ensure_one()
+
+        now = fields.Datetime.now()  # This is the picking validation time
+        deadline = now + relativedelta(hours=48)
+
         discrepancies = []
         for line in self.line_ids:
             # Only create if there is an actual difference (safety)
@@ -57,10 +63,13 @@ class StockTransferDiscrepancyWizard(models.TransientModel):
                         "stage": line.stage,
                         "truck_location_id": line.truck_location_id.id,
                         "responsible_user_id": self.env.user.id,
-                        "date": fields.Datetime.now(),
-                        "state": "open",
+                        "date": now,
+                        "validated_at": now,
+                        "investigation_deadline": deadline,
+                        "state": "under_investigation",
                     }
                 )
+
         if discrepancies:
             self.env["stock.transfer.discrepancy"].create(discrepancies)
 
@@ -93,4 +102,3 @@ class StockTransferDiscrepancyWizardLine(models.TransientModel):
         string="Stage",
         required=True,
     )
-
