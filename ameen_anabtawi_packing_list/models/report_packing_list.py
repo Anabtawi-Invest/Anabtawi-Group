@@ -3,7 +3,7 @@ from odoo import models
 
 class ReportPackingListBase(models.AbstractModel):
     _name = "report.ameen_anabtawi_packing_list.packing_list_base"
-    _description = "Packing List Report Base (Shared Logic)"
+    _description = "Packing List Base Logic"
 
     def _get_hs_code(self, product_tmpl):
         if "hs_code" in product_tmpl._fields:
@@ -13,16 +13,15 @@ class ReportPackingListBase(models.AbstractModel):
         return ""
 
     def _get_qty_per_carton_from_invoice_line(self, inv_line):
-        # prefer SO line value
+        # Prefer SO line value
         if inv_line.sale_line_ids:
             v = int(inv_line.sale_line_ids[0].x_qty_per_carton or 0)
             if v:
                 return v
-        # fallback product
+        # Fallback product default
         return int(inv_line.product_id.product_tmpl_id.x_qty_per_carton or 0)
 
     def _get_dates_from_invoice_line(self, inv_line):
-        # from SO line if exists
         prod = exp = False
         if inv_line.sale_line_ids:
             sl = inv_line.sale_line_ids[0]
@@ -105,7 +104,7 @@ class ReportPackingListNoDates(models.AbstractModel):
             "docs": docs,
             "lines_map": lines_map,
             "totals_map": totals_map,
-            "show_dates": False,  # IMPORTANT
+            "show_dates": False,
         }
 
 
@@ -129,5 +128,5 @@ class ReportPackingListWithDates(models.AbstractModel):
             "docs": docs,
             "lines_map": lines_map,
             "totals_map": totals_map,
-            "show_dates": True,  # IMPORTANT
+            "show_dates": True,
         }
