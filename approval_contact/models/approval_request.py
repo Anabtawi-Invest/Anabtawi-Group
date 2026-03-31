@@ -40,12 +40,25 @@ class ApprovalRequest(models.Model):
         return bool(self.x_is_contact_creation_category)
 
     def _get_request_attachments(self):
-        """Return all ir.attachment linked to this approval.request."""
+        """
+        Robust attachment collector for Odoo 19:
+        1) Attachments directly linked to approval.request (res_model/res_id)
+        2) Attachments linked to chatter messages (message_ids.attachment_ids)
+        """
         self.ensure_one()
-        return self.env["ir.attachment"].sudo().search([
+        Attachment = self.env["ir.attachment"].sudo()
+
+        # A) Direct attachments on the business record
+        direct = Attachment.search([
             ("res_model", "=", "approval.request"),
             ("res_id", "=", self.id),
         ])
+
+        # B) Chatter attachments often stored on mail.message
+        chatter = self.message_ids.mapped("attachment_ids").sudo()
+
+        # Union without duplicates
+        return (direct | chatter)
 
     def _count_attachments(self):
         self.ensure_one()
@@ -87,29 +100,21 @@ class ApprovalRequest(models.Model):
                 raise ValidationError(_("At least one attachment is required before submitting/approving."))
 
     # -------------------------
-    # Copy attachments to Contact
+    # Copy attachments to Contact (robust)
     # -------------------------
     def _copy_attachments_to_partner(self, partner):
         """
-        Copy ALL approval.request attachments to the created partner as new attachments.
-        (Copy, not move) => keeps evidence on approval and also attaches to contact.
+        Copy attachments from approval.request to partner.
+        Uses attachment.copy() to preserve binary/url metadata correctly.
         """
         self.ensure_one()
-        Attachment = self.env["ir.attachment"].sudo()
         attachments = self._get_request_attachments()
 
         for att in attachments:
-            # Create a new attachment referencing res.partner
-            Attachment.create({
-                "name": att.name,
-                "type": att.type,
-                "mimetype": att.mimetype,
-                "datas": att.datas,          # binary content
-                "url": att.url,              # for url-type attachments
+            # Copy the attachment to res.partner
+            att.copy({
                 "res_model": "res.partner",
                 "res_id": partner.id,
-                "description": att.description,
-                "public": att.public,
             })
 
     # -------------------------
