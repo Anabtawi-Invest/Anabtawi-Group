@@ -139,6 +139,49 @@ class PosOrder(models.Model):
                 )
                 continue
             receivable_account = order.partner_id.with_company(order.company_id).property_account_receivable_id
+            _logger.info(
+                "[ADV_RECON][INV_DEBUG] Context: order=%s partner=%s receivable_account=%s/%s invoice_partner=%s payment_partner=%s advance=%s",
+                order.id,
+                order.partner_id.id,
+                receivable_account.id if receivable_account else False,
+                receivable_account.display_name if receivable_account else False,
+                invoice.partner_id.id if invoice and invoice.partner_id else False,
+                payment.partner_id.id if payment and payment.partner_id else False,
+                advance.id if advance else False,
+            )
+            _logger.info(
+                "[ADV_RECON][INV_DEBUG] payment_move_lines=%s",
+                [
+                    {
+                        "id": l.id,
+                        "account_id": l.account_id.id,
+                        "account": l.account_id.display_name,
+                        "partner_id": l.partner_id.id if l.partner_id else False,
+                        "debit": l.debit,
+                        "credit": l.credit,
+                        "balance": l.balance,
+                        "reconciled": l.reconciled,
+                    }
+                    for l in payment.move_id.line_ids
+                ],
+            )
+            _logger.info(
+                "[ADV_RECON][INV_DEBUG] invoice_move_lines=%s",
+                [
+                    {
+                        "id": l.id,
+                        "account_id": l.account_id.id,
+                        "account": l.account_id.display_name,
+                        "account_type": l.account_id.account_type,
+                        "partner_id": l.partner_id.id if l.partner_id else False,
+                        "debit": l.debit,
+                        "credit": l.credit,
+                        "balance": l.balance,
+                        "reconciled": l.reconciled,
+                    }
+                    for l in invoice.line_ids
+                ],
+            )
             payment_lines = payment.move_id.line_ids.filtered(
                 lambda l: l.account_id == receivable_account and not l.reconciled
             )
@@ -184,12 +227,44 @@ class PosOrder(models.Model):
                     if advance and advance.advance_liability_move_id
                     else (advance.from_pos_config_id or advance.pos_config_id).pos_advance_account_id if advance else False
                 )
+                _logger.info(
+                    "[ADV_RECON][INV_DEBUG] liability source: advance_liability_move=%s liability_account=%s/%s liability_move_lines=%s",
+                    advance.advance_liability_move_id.id if advance and advance.advance_liability_move_id else False,
+                    liability_account.id if liability_account else False,
+                    liability_account.display_name if liability_account else False,
+                    [
+                        {
+                            "id": l.id,
+                            "account_id": l.account_id.id,
+                            "account": l.account_id.display_name,
+                            "partner_id": l.partner_id.id if l.partner_id else False,
+                            "debit": l.debit,
+                            "credit": l.credit,
+                            "balance": l.balance,
+                            "reconciled": l.reconciled,
+                        }
+                        for l in (advance.advance_liability_move_id.line_ids if advance and advance.advance_liability_move_id else self.env["account.move.line"])
+                    ],
+                )
                 if not liability_account or not invoice_lines:
                     _logger.warning(
-                        "[ADV_RECON] Liability settlement skipped: order=%s liability=%s invoice_lines=%s",
+                        "[ADV_RECON] Liability settlement skipped: order=%s liability=%s invoice_lines=%s invoice_line_candidates=%s",
                         order.id,
                         liability_account.id if liability_account else False,
                         invoice_lines.ids,
+                        [
+                            {
+                                "id": l.id,
+                                "account_id": l.account_id.id,
+                                "account": l.account_id.display_name,
+                                "account_type": l.account_id.account_type,
+                                "partner_id": l.partner_id.id if l.partner_id else False,
+                                "balance": l.balance,
+                                "reconciled": l.reconciled,
+                            }
+                            for l in invoice.line_ids
+                            if l.account_id.account_type in ("asset_receivable", "liability_payable")
+                        ],
                     )
                     continue
                 settlement_amount = min(
