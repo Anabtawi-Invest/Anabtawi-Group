@@ -35,5 +35,27 @@ class HrPayslipInput(models.Model):
         for line in self:
             if not line.overtime_quantity_type:
                 continue
-            hourly_amount = line.payslip_id.company_id.overtime_hourly_amount
-            line.amount = line.quantity * hourly_amount
+            line.amount = line.quantity * line._get_employee_hourly_rate()
+
+    def _get_employee_hourly_rate(self):
+        self.ensure_one()
+        payslip = self.payslip_id
+        version = payslip.version_id
+        if not version:
+            return 0.0
+        if payslip.wage_type == "hourly":
+            return version.hourly_wage
+
+        attendance_hours = sum(
+            worked_days.number_of_hours
+            for worked_days in payslip.worked_days_line_ids
+            if not worked_days.work_entry_type_id.is_extra_hours
+        )
+        if not attendance_hours:
+            attendance_hours = payslip.sum_worked_hours or 0.0
+        if not attendance_hours:
+            calendar_hours = (version.resource_calendar_id.hours_per_week or 0.0) * 52.0 / 12.0
+            attendance_hours = calendar_hours
+        if not attendance_hours:
+            return 0.0
+        return version.contract_wage / attendance_hours
