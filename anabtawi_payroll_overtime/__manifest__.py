@@ -11,7 +11,6 @@
         "hr_holidays_attendance",
     ],
     "data": [
-        "views/res_config_settings_views.xml",
         "views/hr_payslip_views.xml",
         "views/hr_payslip_input_type_views.xml",
     ],
