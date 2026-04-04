@@ -3,6 +3,7 @@ from odoo import api, fields, models
 
 class HrPayslipInput(models.Model):
     _inherit = "hr.payslip.input"
+    _OVERTIME_FIXED_HOURS = 48.0
 
     quantity = fields.Float(
         string="Quantity",
@@ -45,17 +46,4 @@ class HrPayslipInput(models.Model):
             return 0.0
         if payslip.wage_type == "hourly":
             return version.hourly_wage
-
-        attendance_hours = sum(
-            worked_days.number_of_hours
-            for worked_days in payslip.worked_days_line_ids
-            if not worked_days.work_entry_type_id.is_extra_hours
-        )
-        if not attendance_hours:
-            attendance_hours = payslip.sum_worked_hours or 0.0
-        if not attendance_hours:
-            calendar_hours = (version.resource_calendar_id.hours_per_week or 0.0) * 52.0 / 12.0
-            attendance_hours = calendar_hours
-        if not attendance_hours:
-            return 0.0
-        return version.contract_wage / attendance_hours
+        return version.contract_wage / self._OVERTIME_FIXED_HOURS
