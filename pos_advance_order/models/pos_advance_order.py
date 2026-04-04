@@ -838,7 +838,7 @@ class PosAdvanceOrder(models.Model):
         return line
 
     def _create_advance_account_payment(self):
-        """Create posted account.payment and transfer its receivable impact to liability."""
+        """Create posted account.payment and transfer its receivable impact to payment method outstanding account."""
         self.ensure_one()
         _logger.info(
             "[ADV_RECON] Start advance account payment creation: advance=%s partner=%s amount=%s pos=%s from_pos=%s",
@@ -887,23 +887,23 @@ class PosAdvanceOrder(models.Model):
                 )
                 % (journal.display_name,)
             )
-
-        pos_config = self.from_pos_config_id or self.pos_config_id
-        liability_account = pos_config.pos_advance_account_id
-        if not liability_account:
-            raise UserError(_("Please set 'POS Advance Account' on the POS configuration first."))
+        outstanding_account = payment.payment_method_line_id.payment_account_id
+        if not outstanding_account:
+            raise UserError(
+                _("Please configure Outstanding Receipts Account on payment method '%s'.")
+                % (payment.payment_method_line_id.display_name,)
+            )
 
         receivable_account = self.partner_id.with_company(self.company_id).property_account_receivable_id
         if not receivable_account:
             raise UserError(_("Please configure receivable account on the customer."))
         _logger.info(
-            "[ADV_RECON] receivable/liability accounts: receivable=%s liability=%s",
+            "[ADV_RECON] receivable/outstanding accounts: receivable=%s outstanding=%s",
             receivable_account.id,
-            liability_account.id,
+            outstanding_account.id,
         )
 
-        # Move receivable impact of account.payment to liability.
-        liability_transfer_move = self.env["account.move"].sudo().create({
+        transfer_move = self.env["account.move"].sudo().create({
             "journal_id": journal.id,
             "date": fields.Date.context_today(self),
             "ref": _("Advance Liability Transfer - %s") % self.name,
@@ -917,28 +917,28 @@ class PosAdvanceOrder(models.Model):
                 }),
                 Command.create({
                     "name": _("Advance transfer %s") % self.name,
-                    "account_id": liability_account.id,
+                    "account_id": outstanding_account.id,
                     "partner_id": self.partner_id.id,
                     "debit": 0.0,
                     "credit": self.advance_amount,
                 }),
             ],
         })
-        liability_transfer_move.action_post()
+        transfer_move.action_post()
         _logger.info(
-            "[ADV_RECON] liability transfer move posted: move_id=%s line_ids=%s",
-            liability_transfer_move.id,
-            liability_transfer_move.line_ids.ids,
+            "[ADV_RECON] transfer move posted: move_id=%s line_ids=%s",
+            transfer_move.id,
+            transfer_move.line_ids.ids,
         )
 
         payment_receivable_lines = payment.move_id.line_ids.filtered(
             lambda l: l.account_id == receivable_account and not l.reconciled
         )
-        transfer_receivable_lines = liability_transfer_move.line_ids.filtered(
+        transfer_receivable_lines = transfer_move.line_ids.filtered(
             lambda l: l.account_id == receivable_account and not l.reconciled
         )
         _logger.info(
-            "[ADV_RECON] Pre-reconcile payment vs liability-transfer: payment_lines=%s transfer_lines=%s payment_balances=%s transfer_balances=%s",
+            "[ADV_RECON] Pre-reconcile payment vs transfer: payment_lines=%s transfer_lines=%s payment_balances=%s transfer_balances=%s",
             payment_receivable_lines.ids,
             transfer_receivable_lines.ids,
             payment_receivable_lines.mapped("balance"),
@@ -947,13 +947,13 @@ class PosAdvanceOrder(models.Model):
         try:
             (payment_receivable_lines | transfer_receivable_lines).sudo().reconcile()
             _logger.info(
-                "[ADV_RECON] Reconcile payment vs liability-transfer done: payment_lines_reconciled=%s transfer_lines_reconciled=%s",
+                "[ADV_RECON] Reconcile payment vs transfer done: payment_lines_reconciled=%s transfer_lines_reconciled=%s",
                 payment_receivable_lines.mapped("reconciled"),
                 transfer_receivable_lines.mapped("reconciled"),
             )
         except Exception as e:
             _logger.exception(
-                "[ADV_RECON] Reconcile payment vs liability-transfer failed: advance=%s payment_lines=%s transfer_lines=%s error=%s",
+                "[ADV_RECON] Reconcile payment vs transfer failed: advance=%s payment_lines=%s transfer_lines=%s error=%s",
                 self.name,
                 payment_receivable_lines.ids,
                 transfer_receivable_lines.ids,
@@ -961,81 +961,13 @@ class PosAdvanceOrder(models.Model):
             )
             raise
 
-        # Immediate bank transfer at collection time: Outstanding -> Bank
-        outstanding_account = payment.outstanding_account_id
-        bank_account = journal.default_account_id
-        if not outstanding_account:
-            raise UserError(_("Outstanding account is missing on the created account payment."))
-        if not bank_account:
-            raise UserError(_("Please configure Default Account on journal %s.") % journal.display_name)
-
-        bank_transfer_move = self.env["account.move"].sudo().create({
-            "journal_id": journal.id,
-            "date": fields.Date.context_today(self),
-            "ref": _("Advance Bank Transfer - %s") % self.name,
-            "line_ids": [
-                Command.create({
-                    "name": _("Advance bank transfer %s") % self.name,
-                    "account_id": bank_account.id,
-                    "partner_id": False,
-                    "debit": self.advance_amount,
-                    "credit": 0.0,
-                }),
-                Command.create({
-                    "name": _("Advance bank transfer %s") % self.name,
-                    "account_id": outstanding_account.id,
-                    "partner_id": self.partner_id.id,
-                    "debit": 0.0,
-                    "credit": self.advance_amount,
-                }),
-            ],
-        })
-        bank_transfer_move.action_post()
-        _logger.info(
-            "[ADV_RECON] bank transfer move posted: move_id=%s line_ids=%s outstanding=%s bank=%s",
-            bank_transfer_move.id,
-            bank_transfer_move.line_ids.ids,
-            outstanding_account.id,
-            bank_account.id,
-        )
-
-        payment_outstanding_lines = payment.move_id.line_ids.filtered(
-            lambda l: l.account_id == outstanding_account and not l.reconciled
-        )
-        transfer_outstanding_lines = bank_transfer_move.line_ids.filtered(
-            lambda l: l.account_id == outstanding_account and not l.reconciled
-        )
-        _logger.info(
-            "[ADV_RECON] Pre-reconcile outstanding vs bank-transfer: payment_lines=%s transfer_lines=%s payment_balances=%s transfer_balances=%s",
-            payment_outstanding_lines.ids,
-            transfer_outstanding_lines.ids,
-            payment_outstanding_lines.mapped("balance"),
-            transfer_outstanding_lines.mapped("balance"),
-        )
-        try:
-            (payment_outstanding_lines | transfer_outstanding_lines).sudo().reconcile()
-            _logger.info(
-                "[ADV_RECON] Reconcile outstanding vs bank-transfer done: payment_lines_reconciled=%s transfer_lines_reconciled=%s",
-                payment_outstanding_lines.mapped("reconciled"),
-                transfer_outstanding_lines.mapped("reconciled"),
-            )
-        except Exception as e:
-            _logger.exception(
-                "[ADV_RECON] Reconcile outstanding vs bank-transfer failed: advance=%s payment_lines=%s transfer_lines=%s error=%s",
-                self.name,
-                payment_outstanding_lines.ids,
-                transfer_outstanding_lines.ids,
-                e,
-            )
-            raise
-
         self.advance_account_payment_id = payment.id
-        self.advance_liability_move_id = liability_transfer_move.id
+        self.advance_liability_move_id = transfer_move.id
         _logger.info(
             "[ADV_RECON] Advance payment flow complete: advance=%s payment_id=%s liability_move_id=%s",
             self.name,
             payment.id,
-            liability_transfer_move.id,
+            transfer_move.id,
         )
         return payment
 
