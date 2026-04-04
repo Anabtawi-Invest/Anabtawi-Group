@@ -840,19 +840,14 @@ class PosAdvanceOrder(models.Model):
     def _create_advance_account_payment(self):
         """Create posted account.payment and transfer its receivable impact to liability."""
         self.ensure_one()
-        pos_config = self.from_pos_config_id or self.pos_config_id
-        liability_account = pos_config.pos_advance_account_id
         _logger.info(
-            "[ADV_RECON] Start advance account payment creation: advance=%s partner=%s amount=%s pos=%s from_pos=%s liability=%s",
+            "[ADV_RECON] Start advance account payment creation: advance=%s partner=%s amount=%s pos=%s from_pos=%s",
             self.name,
             self.partner_id.id,
             self.advance_amount,
             self.pos_config_id.id,
             self.from_pos_config_id.id if self.from_pos_config_id else False,
-            liability_account.id if liability_account else False,
         )
-        if not liability_account:
-            raise UserError(_("Please set 'POS Advance Account' on the POS configuration first."))
 
         journal = self._get_payment_journal()
         if not journal:
@@ -893,13 +888,29 @@ class PosAdvanceOrder(models.Model):
                 % (journal.display_name,)
             )
 
+        # Use the outstanding receipts account from the payment method used for this advance.
+        advance_account = (
+            payment.payment_method_line_id.payment_account_id
+            or payment.outstanding_account_id
+            or payment.move_id.line_ids.filtered(
+                lambda l: l.account_id.account_type == "asset_cash" and not l.display_type
+            )[:1].account_id
+        )
+        if not advance_account:
+            raise UserError(
+                _(
+                    "No Outstanding Receipts account found on the selected payment method for journal '%s'."
+                )
+                % (journal.display_name,)
+            )
+
         receivable_account = self.partner_id.with_company(self.company_id).property_account_receivable_id
         if not receivable_account:
             raise UserError(_("Please configure receivable account on the customer."))
         _logger.info(
-            "[ADV_RECON] receivable/liability accounts: receivable=%s liability=%s",
+            "[ADV_RECON] receivable/advance accounts: receivable=%s advance_account=%s",
             receivable_account.id,
-            liability_account.id,
+            advance_account.id,
         )
 
         transfer_move = self.env["account.move"].sudo().create({
@@ -916,7 +927,7 @@ class PosAdvanceOrder(models.Model):
                 }),
                 Command.create({
                     "name": _("Advance transfer %s") % self.name,
-                    "account_id": liability_account.id,
+                    "account_id": advance_account.id,
                     "partner_id": self.partner_id.id,
                     "debit": 0.0,
                     "credit": self.advance_amount,
