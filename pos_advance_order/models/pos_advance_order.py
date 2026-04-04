@@ -822,39 +822,11 @@ class PosAdvanceOrder(models.Model):
         pm = pos_config.payment_method_ids.filtered(lambda m: m.type == "bank" and m.journal_id)[:1]
         return pm.journal_id
 
-    def _get_inbound_payment_method_line(self, journal, pos_payment_method=False):
+    def _get_inbound_payment_method_line(self, journal):
         # Prefer a method line that has an explicit outstanding/payment account.
-        candidate_lines = journal.inbound_payment_method_line_ids
-        _logger.info(
-            "[ADV_RECON][ACCOUNT_SOURCE] inbound candidates for journal=%s -> %s",
-            journal.id,
-            [
-                {
-                    "line_id": line.id,
-                    "line_name": line.name,
-                    "payment_account_id": line.payment_account_id.id if line.payment_account_id else False,
-                    "payment_account_code": line.payment_account_id.code if line.payment_account_id else False,
-                    "payment_account_name": line.payment_account_id.display_name if line.payment_account_id else False,
-                }
-                for line in candidate_lines
-            ],
-        )
-        if pos_payment_method:
-            # Best effort: align incoming payment method line with the POS payment method used.
-            named_lines = candidate_lines.filtered(
-                lambda l: (l.name or "").strip().lower() == (pos_payment_method.name or "").strip().lower()
-            )
-            _logger.info(
-                "[ADV_RECON][ACCOUNT_SOURCE] filter by POS method name: pos_method_id=%s pos_method_name=%s matched_lines=%s",
-                pos_payment_method.id,
-                pos_payment_method.name,
-                named_lines.ids,
-            )
-            if named_lines:
-                candidate_lines = named_lines
-        line = candidate_lines.filtered(lambda l: l.payment_account_id)[:1]
+        line = journal.inbound_payment_method_line_ids.filtered(lambda l: l.payment_account_id)[:1]
         if not line:
-            line = candidate_lines[:1] or journal.inbound_payment_method_line_ids[:1]
+            line = journal.inbound_payment_method_line_ids[:1]
         if not line:
             raise UserError(_("Please define an inbound payment method on journal %s.") % journal.display_name)
         return line
@@ -865,36 +837,31 @@ class PosAdvanceOrder(models.Model):
             raise UserError(_("Please define an outbound payment method on journal %s.") % journal.display_name)
         return line
 
-    def _create_advance_account_payment(self, pos_payment_method=False):
-        """Create posted account.payment and transfer its receivable impact to payment method outstanding account."""
+    def _create_advance_account_payment(self):
+        """Create posted account.payment and transfer its receivable impact to liability."""
         self.ensure_one()
+        pos_config = self.from_pos_config_id or self.pos_config_id
+        liability_account = pos_config.pos_advance_account_id
         _logger.info(
-            "[ADV_RECON] Start advance account payment creation: advance=%s partner=%s amount=%s pos=%s from_pos=%s pos_payment_method=%s",
+            "[ADV_RECON] Start advance account payment creation: advance=%s partner=%s amount=%s pos=%s from_pos=%s liability=%s",
             self.name,
             self.partner_id.id,
             self.advance_amount,
             self.pos_config_id.id,
             self.from_pos_config_id.id if self.from_pos_config_id else False,
-            pos_payment_method.id if pos_payment_method else False,
+            liability_account.id if liability_account else False,
         )
+        if not liability_account:
+            raise UserError(_("Please set 'POS Advance Account' on the POS configuration first."))
 
-        journal = (pos_payment_method.journal_id if pos_payment_method and pos_payment_method.journal_id else False) or self._get_payment_journal()
+        journal = self._get_payment_journal()
         if not journal:
             raise UserError(_("Please configure a payment journal on the POS first."))
-        payment_method_line = self._get_inbound_payment_method_line(journal, pos_payment_method=pos_payment_method)
+        payment_method_line = self._get_inbound_payment_method_line(journal)
         _logger.info(
-            "[ADV_RECON] Using journal/payment method line: journal=%s pos_payment_method=%s method_line=%s",
+            "[ADV_RECON] Using journal/payment method line: journal=%s method_line=%s",
             journal.id,
-            pos_payment_method.id if pos_payment_method else False,
             payment_method_line.id,
-        )
-        _logger.info(
-            "[ADV_RECON][ACCOUNT_SOURCE] selected method line details: line_id=%s line_name=%s payment_account_id=%s payment_account_code=%s payment_account_name=%s",
-            payment_method_line.id,
-            payment_method_line.name,
-            payment_method_line.payment_account_id.id if payment_method_line.payment_account_id else False,
-            payment_method_line.payment_account_id.code if payment_method_line.payment_account_id else False,
-            payment_method_line.payment_account_id.display_name if payment_method_line.payment_account_id else False,
         )
 
         payment = self.env["account.payment"].sudo().create({
@@ -917,16 +884,6 @@ class PosAdvanceOrder(models.Model):
             payment.payment_method_line_id.id if payment.payment_method_line_id else False,
             payment.payment_method_line_id.payment_account_id.id if payment.payment_method_line_id and payment.payment_method_line_id.payment_account_id else False,
         )
-        _logger.info(
-            "[ADV_RECON][ACCOUNT_SOURCE] payment computed accounts: payment_id=%s outstanding_account_id=%s outstanding_code=%s outstanding_name=%s destination_account_id=%s destination_code=%s destination_name=%s",
-            payment.id,
-            payment.outstanding_account_id.id if payment.outstanding_account_id else False,
-            payment.outstanding_account_id.code if payment.outstanding_account_id else False,
-            payment.outstanding_account_id.display_name if payment.outstanding_account_id else False,
-            payment.destination_account_id.id if payment.destination_account_id else False,
-            payment.destination_account_id.code if payment.destination_account_id else False,
-            payment.destination_account_id.display_name if payment.destination_account_id else False,
-        )
         if not payment.move_id:
             raise UserError(
                 _(
@@ -935,20 +892,14 @@ class PosAdvanceOrder(models.Model):
                 )
                 % (journal.display_name,)
             )
-        outstanding_account = payment.payment_method_line_id.payment_account_id
-        if not outstanding_account:
-            raise UserError(
-                _("Please configure Outstanding Receipts Account on payment method '%s'.")
-                % (payment.payment_method_line_id.display_name,)
-            )
 
         receivable_account = self.partner_id.with_company(self.company_id).property_account_receivable_id
         if not receivable_account:
             raise UserError(_("Please configure receivable account on the customer."))
         _logger.info(
-            "[ADV_RECON] receivable/outstanding accounts: receivable=%s outstanding=%s",
+            "[ADV_RECON] receivable/liability accounts: receivable=%s liability=%s",
             receivable_account.id,
-            outstanding_account.id,
+            liability_account.id,
         )
 
         transfer_move = self.env["account.move"].sudo().create({
@@ -965,7 +916,7 @@ class PosAdvanceOrder(models.Model):
                 }),
                 Command.create({
                     "name": _("Advance transfer %s") % self.name,
-                    "account_id": outstanding_account.id,
+                    "account_id": liability_account.id,
                     "partner_id": self.partner_id.id,
                     "debit": 0.0,
                     "credit": self.advance_amount,
@@ -1052,7 +1003,7 @@ class PosAdvanceOrder(models.Model):
             order.advance_pos_order_id = pos_order.id
 
             # 2) Additionally create account.payment + liability transfer for compliance flow.
-            order._create_advance_account_payment(pm)
+            order._create_advance_account_payment()
             order.state = "advance_paid"
             _logger.info(
                 "[ADV_RECON] action_create_payment completed: advance=%s state=%s pos_order=%s account_payment=%s",
