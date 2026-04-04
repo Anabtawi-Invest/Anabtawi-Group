@@ -180,9 +180,9 @@ class PosOrder(models.Model):
                     invoice_lines.ids,
                 )
                 liability_account = (
-                    (advance.from_pos_config_id or advance.pos_config_id).pos_advance_account_id
-                    if advance
-                    else False
+                    advance.advance_liability_move_id.line_ids.filtered(lambda l: l.credit > 0 and not l.display_type)[:1].account_id
+                    if advance and advance.advance_liability_move_id
+                    else (advance.from_pos_config_id or advance.pos_config_id).pos_advance_account_id if advance else False
                 )
                 if not liability_account or not invoice_lines:
                     _logger.warning(
