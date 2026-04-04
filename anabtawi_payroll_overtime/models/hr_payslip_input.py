@@ -3,7 +3,7 @@ from odoo import api, fields, models
 
 class HrPayslipInput(models.Model):
     _inherit = "hr.payslip.input"
-    _OVERTIME_FIXED_HOURS = 48.0
+    _OVERTIME_FIXED_HOURS = 240
 
     quantity = fields.Float(
         string="Quantity",
