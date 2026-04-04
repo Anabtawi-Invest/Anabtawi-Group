@@ -40,7 +40,7 @@ class StockMove(models.Model):
                 available_qty_product_uom, move.product_uom, round=False
             )
 
-            qty_after = available_qty - done_qty
+            qty_after = available_qty
 
             # 6️⃣ In "No Backorder" flow, trim done qty to available qty.
             # This keeps negative stock blocked while allowing validation without creating backorder.
