@@ -897,7 +897,7 @@ class PosAdvanceOrder(models.Model):
             payment_method_line.payment_account_id.display_name if payment_method_line.payment_account_id else False,
         )
 
-        payment = self.env["account.payment"].sudo().with_context(force_payment_move=True).create({
+        payment = self.env["account.payment"].sudo().create({
             "payment_type": "inbound",
             "partner_type": "customer",
             "partner_id": self.partner_id.id,
