@@ -825,10 +825,30 @@ class PosAdvanceOrder(models.Model):
     def _get_inbound_payment_method_line(self, journal, pos_payment_method=False):
         # Prefer a method line that has an explicit outstanding/payment account.
         candidate_lines = journal.inbound_payment_method_line_ids
+        _logger.info(
+            "[ADV_RECON][ACCOUNT_SOURCE] inbound candidates for journal=%s -> %s",
+            journal.id,
+            [
+                {
+                    "line_id": line.id,
+                    "line_name": line.name,
+                    "payment_account_id": line.payment_account_id.id if line.payment_account_id else False,
+                    "payment_account_code": line.payment_account_id.code if line.payment_account_id else False,
+                    "payment_account_name": line.payment_account_id.display_name if line.payment_account_id else False,
+                }
+                for line in candidate_lines
+            ],
+        )
         if pos_payment_method:
             # Best effort: align incoming payment method line with the POS payment method used.
             named_lines = candidate_lines.filtered(
                 lambda l: (l.name or "").strip().lower() == (pos_payment_method.name or "").strip().lower()
+            )
+            _logger.info(
+                "[ADV_RECON][ACCOUNT_SOURCE] filter by POS method name: pos_method_id=%s pos_method_name=%s matched_lines=%s",
+                pos_payment_method.id,
+                pos_payment_method.name,
+                named_lines.ids,
             )
             if named_lines:
                 candidate_lines = named_lines
@@ -868,6 +888,14 @@ class PosAdvanceOrder(models.Model):
             pos_payment_method.id if pos_payment_method else False,
             payment_method_line.id,
         )
+        _logger.info(
+            "[ADV_RECON][ACCOUNT_SOURCE] selected method line details: line_id=%s line_name=%s payment_account_id=%s payment_account_code=%s payment_account_name=%s",
+            payment_method_line.id,
+            payment_method_line.name,
+            payment_method_line.payment_account_id.id if payment_method_line.payment_account_id else False,
+            payment_method_line.payment_account_id.code if payment_method_line.payment_account_id else False,
+            payment_method_line.payment_account_id.display_name if payment_method_line.payment_account_id else False,
+        )
 
         payment = self.env["account.payment"].sudo().with_context(force_payment_move=True).create({
             "payment_type": "inbound",
@@ -888,6 +916,16 @@ class PosAdvanceOrder(models.Model):
             payment.state,
             payment.payment_method_line_id.id if payment.payment_method_line_id else False,
             payment.payment_method_line_id.payment_account_id.id if payment.payment_method_line_id and payment.payment_method_line_id.payment_account_id else False,
+        )
+        _logger.info(
+            "[ADV_RECON][ACCOUNT_SOURCE] payment computed accounts: payment_id=%s outstanding_account_id=%s outstanding_code=%s outstanding_name=%s destination_account_id=%s destination_code=%s destination_name=%s",
+            payment.id,
+            payment.outstanding_account_id.id if payment.outstanding_account_id else False,
+            payment.outstanding_account_id.code if payment.outstanding_account_id else False,
+            payment.outstanding_account_id.display_name if payment.outstanding_account_id else False,
+            payment.destination_account_id.id if payment.destination_account_id else False,
+            payment.destination_account_id.code if payment.destination_account_id else False,
+            payment.destination_account_id.display_name if payment.destination_account_id else False,
         )
         if not payment.move_id:
             raise UserError(
