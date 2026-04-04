@@ -222,14 +222,22 @@ class PosOrder(models.Model):
                     payment_lines.ids,
                     invoice_lines.ids,
                 )
-                liability_account = (
-                    advance.advance_liability_move_id.line_ids.filtered(lambda l: l.credit > 0 and not l.display_type)[:1].account_id
+                liability_line = (
+                    advance.advance_liability_move_id.line_ids.filtered(
+                        lambda l: l.credit > 0 and l.account_id != receivable_account
+                    )[:1]
                     if advance and advance.advance_liability_move_id
+                    else False
+                )
+                liability_account = (
+                    liability_line.account_id
+                    if liability_line
                     else (advance.from_pos_config_id or advance.pos_config_id).pos_advance_account_id if advance else False
                 )
                 _logger.info(
-                    "[ADV_RECON][INV_DEBUG] liability source: advance_liability_move=%s liability_account=%s/%s liability_move_lines=%s",
+                    "[ADV_RECON][INV_DEBUG] liability source: advance_liability_move=%s liability_line=%s liability_account=%s/%s liability_move_lines=%s",
                     advance.advance_liability_move_id.id if advance and advance.advance_liability_move_id else False,
+                    liability_line.id if liability_line else False,
                     liability_account.id if liability_account else False,
                     liability_account.display_name if liability_account else False,
                     [
