@@ -1,1 +1,5 @@
-
+<odoo>
+  <template id="pl_date_tmpl">
+    <t t-call="ameen_anabtawi_packing_list.packing_list_body"/>
+  </template>
+</odoo>
