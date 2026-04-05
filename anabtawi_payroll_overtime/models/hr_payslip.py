@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta
+import logging
 
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class HrPayslip(models.Model):
@@ -14,6 +17,18 @@ class HrPayslip(models.Model):
     )
     overtime_hours_deducted = fields.Float(
         string="Deducted Overtime Hours",
+        readonly=True,
+        copy=False,
+    )
+    overtime_deduction_line_id = fields.Many2one(
+        "hr.attendance.overtime.line",
+        string="Overtime Deduction Entry",
+        readonly=True,
+        copy=False,
+    )
+    overtime_restore_line_id = fields.Many2one(
+        "hr.attendance.overtime.line",
+        string="Overtime Restore Entry",
         readonly=True,
         copy=False,
     )
@@ -39,15 +54,15 @@ class HrPayslip(models.Model):
             self.input_line_ids.filtered("overtime_quantity_type").mapped("quantity")
         )
 
-    def _prepare_overtime_deduction_vals(self, quantity):
+    def _prepare_overtime_balance_line_vals(self, quantity_signed):
         self.ensure_one()
         date_value = self.date_to or fields.Date.context_today(self)
         date_dt = datetime.combine(date_value, datetime.min.time())
         return {
             "employee_id": self.employee_id.id,
             "date": date_value,
-            "duration": -quantity,
-            "manual_duration": -quantity,
+            "duration": quantity_signed,
+            "manual_duration": quantity_signed,
             "time_start": date_dt,
             "time_stop": date_dt + timedelta(minutes=1),
             "amount_rate": 1.0,
@@ -58,10 +73,15 @@ class HrPayslip(models.Model):
     def _deduct_extra_hours_balance(self):
         overtime_line_model = self.env["hr.attendance.overtime.line"].sudo()
         for slip in self:
-            if slip.overtime_hours_deducted:
+            if slip.overtime_deduction_line_id:
+                _logger.info(
+                    "Payslip %s skipped overtime deduction: already linked to line %s",
+                    slip.id, slip.overtime_deduction_line_id.id,
+                )
                 continue
             quantity = slip._get_overtime_quantity_to_deduct()
             if quantity <= 0:
+                _logger.info("Payslip %s skipped overtime deduction: overtime quantity is %s", slip.id, quantity)
                 continue
             current_balance = slip._get_employee_extra_hours_balance()
             if quantity > current_balance:
@@ -71,9 +91,64 @@ class HrPayslip(models.Model):
                     balance=current_balance,
                     employee=slip.employee_id.name,
                 ))
-            overtime_line_model.create(slip._prepare_overtime_deduction_vals(quantity))
-            slip.overtime_hours_deducted = quantity
+            _logger.info(
+                "Payslip %s overtime deduction start: employee=%s quantity=%s balance_before=%s",
+                slip.id, slip.employee_id.id, quantity, current_balance,
+            )
+            deduction_line = overtime_line_model.create(
+                slip._prepare_overtime_balance_line_vals(-quantity)
+            )
+            slip.write({
+                "overtime_hours_deducted": quantity,
+                "overtime_deduction_line_id": deduction_line.id,
+                "overtime_restore_line_id": False,
+            })
+            _logger.info(
+                "Payslip %s overtime deduction line created: line_id=%s manual_duration=%s",
+                slip.id, deduction_line.id, deduction_line.manual_duration,
+            )
+
+    def _restore_extra_hours_balance(self):
+        overtime_line_model = self.env["hr.attendance.overtime.line"].sudo()
+        for slip in self:
+            if slip.state != "cancel":
+                _logger.info("Payslip %s skipped overtime restore: state is %s", slip.id, slip.state)
+                continue
+            if not slip.overtime_deduction_line_id:
+                _logger.info("Payslip %s skipped overtime restore: no deduction line linked", slip.id)
+                continue
+            if slip.overtime_restore_line_id:
+                _logger.info(
+                    "Payslip %s skipped overtime restore: already linked to restore line %s",
+                    slip.id, slip.overtime_restore_line_id.id,
+                )
+                continue
+            quantity = abs(slip.overtime_deduction_line_id.manual_duration or 0.0) or slip.overtime_hours_deducted
+            if quantity <= 0:
+                _logger.info("Payslip %s skipped overtime restore: quantity is %s", slip.id, quantity)
+                continue
+            _logger.info(
+                "Payslip %s overtime restore start: employee=%s quantity=%s deduction_line=%s",
+                slip.id, slip.employee_id.id, quantity, slip.overtime_deduction_line_id.id,
+            )
+            restore_line = overtime_line_model.create(
+                slip._prepare_overtime_balance_line_vals(quantity)
+            )
+            slip.write({
+                "overtime_hours_deducted": 0.0,
+                "overtime_restore_line_id": restore_line.id,
+                "overtime_deduction_line_id": False,
+            })
+            _logger.info(
+                "Payslip %s overtime restore line created: line_id=%s manual_duration=%s",
+                slip.id, restore_line.id, restore_line.manual_duration,
+            )
 
     def action_payslip_done(self):
         self._deduct_extra_hours_balance()
         return super().action_payslip_done()
+
+    def action_payslip_cancel(self):
+        res = super().action_payslip_cancel()
+        self._restore_extra_hours_balance()
+        return res
