@@ -6,7 +6,7 @@
     "summary": "Two Packing List reports (with & without dates) + logistics fields + XLSX export (Action menu)",
     "depends": ["account", "sale", "stock", "product", "web"],
     "data": [
-        "security/ir.model.access.csv",
+       
 
         "views/package_type_menu.xml",
         "views/product_template_view.xml",
