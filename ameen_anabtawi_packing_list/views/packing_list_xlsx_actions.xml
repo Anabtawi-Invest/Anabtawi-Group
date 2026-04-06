@@ -23,7 +23,8 @@ action = {
     <field name="code">
 action = {
   "type": "ir.actions.act_url",
-  "url": "/packing_list/xlsx/%s/date" % (record.id,),
+  "url": "/packing_list/xlsx/%s/nodate" % (record.id,)
+  "url": "/packing_list/xlsx/%s/date" % (record.id,)
   "target": "self"
 }
     </field>
