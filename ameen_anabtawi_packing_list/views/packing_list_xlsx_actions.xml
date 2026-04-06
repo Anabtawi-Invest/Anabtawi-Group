@@ -1,5 +1,4 @@
 <odoo>
-  <!-- Action 1: XLSX (No dates) -->
   <record id="server_action_packing_list_xlsx" model="ir.actions.server">
     <field name="name">Packing List XLSX</field>
     <field name="model_id" ref="account.model_account_move"/>
@@ -9,13 +8,12 @@
     <field name="code"><![CDATA[
 action = {
     'type': 'ir.actions.act_url',
-    'url': '/packing_list/xlsx/%s/nodate' % (record.id,),
+    'url': '/web/packing_list/xlsx/%s/nodate' % (record.id,),
     'target': 'self',
 }
     ]]></field>
   </record>
 
-  <!-- Action 2: XLSX (With dates) -->
   <record id="server_action_packing_list_xlsx_dates" model="ir.actions.server">
     <field name="name">Packing List XLSX (With Dates)</field>
     <field name="model_id" ref="account.model_account_move"/>
@@ -25,7 +23,7 @@ action = {
     <field name="code"><![CDATA[
 action = {
     'type': 'ir.actions.act_url',
-    'url': '/packing_list/xlsx/%s/date' % (record.id,),
+    'url': '/web/packing_list/xlsx/%s/date' % (record.id,),
     'target': 'self',
 }
     ]]></field>
