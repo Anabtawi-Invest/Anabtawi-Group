@@ -2,8 +2,8 @@
     "name": "Ameen Packing List",
     "version": "19.0.1.0.0",
     "category": "Accounting",
-    "summary": "Two Packing List reports (with & without dates) + logistics fields",
-    "depends": ["account", "sale", "stock", "product"],
+    "summary": "Packing List PDF + XLSX export from Action menu",
+    "depends": ["account", "sale", "stock", "product", "web"],
     "data": [
         "security/ir.model.access.csv",
 
@@ -15,6 +15,9 @@
         "report/packing_list_body.xml",
         "report/packing_list_template.xml",
         "report/packing_list_template_with_dates.xml",
+
+        # NEW: Action menu XLSX
+        "views/packing_list_xlsx_actions.xml",
     ],
     "installable": True,
     "application": False,
