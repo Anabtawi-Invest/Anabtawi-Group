@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="portal_record_sidebar" name="My Portal Record Sidebar">
+        <div t-attf-class="#{classes}">
+            <div class="card bg-white mb-4 sticky-top" id="sidebar_content">
+                <div t-if="title" class="card-body text-center pb-2 pt-3">
+                    <t t-out="title"/>
+                </div>
+                <t t-if="entries" t-out="entries"/>
+            </div>
+        </div>
+    </template>
+
+    <template id="portal_layout" inherit_id="portal.side_content">
+        <xpath expr="//div[@t-if='sales_user']" position="before">
+            <br/>
+            <a role="button" href="/my/profile" class="btn btn-link p-0 mt-3"><i class="fa fa-user"/> My Profile</a>
+        </xpath>
+    </template>
+
+    <template id="portal_table" name="My Portal Table">
+        <div t-attf-class="table-responsive border-0 #{classes if classes else ''}" >
+            <table class="o_list_table position-relative table table-sm o_list_table_ungrouped table-striped o_portal_my_doc_table mb-0">
+                <t t-out="0"/>
+            </table>
+        </div>
+        <div t-if="pager" class="o_portal_pager d-flex justify-content-center my-3">
+            <t t-call="portal.pager"/>
+        </div>
+    </template>
+
+    <template id="portal_my_employee_details">
+        <t t-call="portal.portal_layout">
+            <t t-set="additional_title">Contact Details</t>
+            <div class="row o_portal_details">
+                <div class="col-lg-8">
+                    <div class="row">
+                        <t t-call="base_portal.portal_my_employee_details_fields"/>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_my_employee_details_fields">
+        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+        <div t-if="error_message" class="alert alert-danger" role="alert">
+            <div class="col-lg-12">
+                <t t-foreach="error_message" t-as="err">
+                    <t t-esc="err"/>
+                    <br/>
+                </t>
+            </div>
+        </div>
+        <div t-if="employee.name" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <h1>
+                <t t-esc="employee.name"/>
+            </h1>
+            <t t-esc="employee.job_title"/>
+        </div>
+        <div class="clearfix"/>
+        <div t-if="employee.mobile_phone" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Mobile Phone:</label>
+            <t t-esc="employee.mobile_phone"/>
+        </div>
+        <div t-if="employee.department_id" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Department:</label>
+            <t t-esc="employee.department_id.name"/>
+        </div>
+        <div t-if="employee.work_phone" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Work Phone:</label>
+            <t t-esc="employee.work_phone"/>
+        </div>
+        <div t-if="employee.contract_id" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Current Contract:</label>
+            <t t-esc="employee.contract_id.name"/>
+        </div>
+        <div t-if="employee.work_email" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Work Email:</label>
+            <t t-esc="employee.work_email"/>
+        </div>
+        <div t-if="employee.job_id" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Job Position:</label>
+            <t t-esc="employee.job_id.name"/>
+        </div>
+        <div t-if="employee.registration_number"
+             t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">GOSI Number:</label>
+            <t t-esc="employee.registration_number"/>
+        </div>
+        <div t-if="employee.parent_id" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Manager:</label>
+            <t t-esc="employee.parent_id.name"/>
+        </div>
+        <div t-if="employee.coach_id" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Coach:</label>
+            <t t-esc="employee.coach_id.name"/>
+        </div>
+        <div class="clearfix"/>
+
+        <div t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <h3>Work Information</h3>
+        </div>
+        <div class="clearfix"/>
+        <div t-if="employee.address_id or employee.work_location_id"
+             t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <h5>LOCATION</h5>
+        </div>
+        <div class="clearfix"/>
+        <div t-if="employee.address_id" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Work Address:</label>
+            <t t-esc="employee.address_id.name"/>
+        </div>
+        <div t-if="employee.work_location_id" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Work Location:</label>
+            <t t-esc="employee.work_location_id.name"/>
+        </div>
+        <div class="clearfix"/>
+        <div t-if="employee.leave_manager_id"
+             t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <h5>APPROVERS</h5>
+        </div>
+        <div class="clearfix"/>
+        <div t-if="employee.leave_manager_id" t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Time Off:</label>
+            <t t-esc="employee.leave_manager_id.name"/>
+        </div>
+        <div class="clearfix"/>
+        <div t-if="employee.resource_calendar_id or employee.tz"
+             t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <h5>SCHEDULE</h5>
+        </div>
+        <div class="clearfix"/>
+        <div t-if="employee.resource_calendar_id"
+             t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Working Hours:</label>
+            <t t-esc="employee.resource_calendar_id.name"/>
+        </div>
+        <div t-if="employee.tz"
+             t-attf-class="mb-3 #{error.get('name') and 'o_has_error' or ''} col-xl-6">
+            <label class="col-form-label" for="name">Timezone:</label>
+            <t t-esc="employee.tz"/>
+        </div>
+    </template>
+
+    <template id="totp_portal_hook" name="TOTP Portal hook" inherit_id="portal.portal_my_security">
+        <xpath expr="//section[@name='portal_deactivate_account']" position="replace"/>
+    </template>
+</odoo>
