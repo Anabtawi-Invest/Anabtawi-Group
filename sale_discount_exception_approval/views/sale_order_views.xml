@@ -26,15 +26,19 @@
                 />
             </xpath>
 
-            <!-- Warning banners (using Odoo 19 python-expression modifiers) -->
+            <!-- Warning banners -->
             <xpath expr="//sheet" position="before">
                 <div class="alert alert-danger" role="alert"
                      invisible="not discount_approval_required or (commercial_approved and (not discount_gt_5_required or accounting_approved))">
                     <strong>Discount Approval Required:</strong>
                     This order cannot be confirmed until required approvals are granted.
                     <ul>
-                        <li invisible="not discount_exception_required">Some lines exceed the allowed discount ceiling for their quantity tier.</li>
-                        <li invisible="not discount_gt_5_required">At least one line has Discount (%) &gt; 5% and requires Commercial + Accounting approval.</li>
+                        <li invisible="not discount_exception_required">
+                            Some lines exceed the allowed discount ceiling for their quantity tier.
+                        </li>
+                        <li invisible="not discount_gt_5_required">
+                            At least one line has Discount (%) &gt; 5% and requires Commercial + Accounting approval.
+                        </li>
                     </ul>
                 </div>
 
@@ -45,7 +49,7 @@
                 </div>
             </xpath>
 
-            <!-- Approval fields (read-only status) -->
+            <!-- Approval fields -->
             <xpath expr="//sheet//group" position="after">
                 <group string="Discount Approvals">
                     <group>
@@ -66,13 +70,14 @@
                 </group>
             </xpath>
 
-            <!-- Line indicators -->
-            <xpath expr="//field[@name='order_line']/tree" position="attributes">
+            <!-- Line indicators: tree OR list depending on build -->
+            <xpath expr="//field[@name='order_line']//tree | //field[@name='order_line']//list" position="attributes">
                 <attribute name="decoration-danger">discount_exceeds_limit</attribute>
                 <attribute name="decoration-warning">discount_gt_5</attribute>
             </xpath>
 
-            <xpath expr="//field[@name='order_line']/tree//field[@name='discount']" position="after">
+            <!-- Add helper fields next to Discount column: tree OR list -->
+            <xpath expr="//field[@name='order_line']//tree//field[@name='discount'] | //field[@name='order_line']//list//field[@name='discount']" position="after">
                 <field name="allowed_discount_limit" readonly="1"/>
                 <field name="discount_exceeds_limit" invisible="1"/>
                 <field name="discount_gt_5" invisible="1"/>
