@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_order_form_discount_approval_v19" model="ir.ui.view">
+        <field name="name">sale.order.form.discount.approval.v19</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Header buttons -->
+            <xpath expr="//header" position="inside">
+                <button
+                    name="action_approve_discount_commercial"
+                    type="object"
+                    string="Approve (Commercial)"
+                    class="btn-primary"
+                    groups="sale_discount_exception_approval.group_discount_approver_commercial"
+                    invisible="not discount_approval_required or commercial_approved"
+                />
+                <button
+                    name="action_approve_discount_accounting"
+                    type="object"
+                    string="Approve (Accounting)"
+                    class="btn-primary"
+                    groups="sale_discount_exception_approval.group_discount_approver_accounting"
+                    invisible="not discount_gt_5_required or accounting_approved"
+                />
+            </xpath>
+
+            <!-- Warning banners (using Odoo 19 python-expression modifiers) -->
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-danger" role="alert"
+                     invisible="not discount_approval_required or (commercial_approved and (not discount_gt_5_required or accounting_approved))">
+                    <strong>Discount Approval Required:</strong>
+                    This order cannot be confirmed until required approvals are granted.
+                    <ul>
+                        <li invisible="not discount_exception_required">Some lines exceed the allowed discount ceiling for their quantity tier.</li>
+                        <li invisible="not discount_gt_5_required">At least one line has Discount (%) &gt; 5% and requires Commercial + Accounting approval.</li>
+                    </ul>
+                </div>
+
+                <div class="alert alert-success" role="alert"
+                     invisible="not discount_approval_required or not commercial_approved or (discount_gt_5_required and not accounting_approved)">
+                    <strong>Discount Approved:</strong>
+                    All required approvals are completed. You can confirm the order.
+                </div>
+            </xpath>
+
+            <!-- Approval fields (read-only status) -->
+            <xpath expr="//sheet//group" position="after">
+                <group string="Discount Approvals">
+                    <group>
+                        <field name="discount_exception_required" readonly="1"/>
+                        <field name="discount_gt_5_required" readonly="1"/>
+                        <field name="exception_line_count" readonly="1"/>
+                        <field name="discount_approval_required" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="commercial_approved" readonly="1"/>
+                        <field name="commercial_approved_by" readonly="1" invisible="not commercial_approved"/>
+                        <field name="commercial_approved_date" readonly="1" invisible="not commercial_approved"/>
+
+                        <field name="accounting_approved" readonly="1" invisible="not discount_gt_5_required"/>
+                        <field name="accounting_approved_by" readonly="1" invisible="not accounting_approved"/>
+                        <field name="accounting_approved_date" readonly="1" invisible="not accounting_approved"/>
+                    </group>
+                </group>
+            </xpath>
+
+            <!-- Line indicators -->
+            <xpath expr="//field[@name='order_line']/tree" position="attributes">
+                <attribute name="decoration-danger">discount_exceeds_limit</attribute>
+                <attribute name="decoration-warning">discount_gt_5</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/tree//field[@name='discount']" position="after">
+                <field name="allowed_discount_limit" readonly="1"/>
+                <field name="discount_exceeds_limit" invisible="1"/>
+                <field name="discount_gt_5" invisible="1"/>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>
