@@ -27,10 +27,6 @@ class AccountMove(models.Model):
 
     @api.onchange("partner_id", "move_type")
     def _onchange_partner_vendor_customer_flags(self):
-        """
-        UI-friendly: if the user selects a wrong partner, clear it and show warning.
-        The constraint above is still the real enforcement (imports/API/etc.).
-        """
         for move in self:
             if not move.partner_id:
                 continue
@@ -40,7 +36,7 @@ class AccountMove(models.Model):
                 return {
                     "warning": {
                         "title": _("Not allowed"),
-                        "message": _("This document is a Vendor Bill/Credit. Please select a contact marked as 'Is Vendor'."),
+                        "message": _("This is a Vendor Bill/Credit. Please select a contact marked as 'Is Vendor'."),
                     }
                 }
 
@@ -49,6 +45,6 @@ class AccountMove(models.Model):
                 return {
                     "warning": {
                         "title": _("Not allowed"),
-                        "message": _("This document is a Customer Invoice/Credit. Please select a contact marked as 'Is Customer'."),
+                        "message": _("This is a Customer Invoice/Credit. Please select a contact marked as 'Is Customer'."),
                     }
                 }
