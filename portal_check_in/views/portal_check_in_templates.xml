@@ -192,15 +192,17 @@
                 </div>
             </div>
             <script type="text/javascript">
-                document.addEventListener('DOMContentLoaded', function () {
+                (function () {
+                    function initPortalCheckInForm() {
                     var locationBlockedAlert = document.querySelector('.o_portal_location_restricted_alert');
                     if (locationBlockedAlert) {
                         window.alert(locationBlockedAlert.textContent.trim());
                     }
                     var form = document.querySelector('.o_portal_check_in_form');
-                    if (!form) {
+                    if (!form || form.dataset.portalCheckInBound === '1') {
                         return;
                     }
+                    form.dataset.portalCheckInBound = '1';
                     var button = form.querySelector('button[type="submit"]');
                     var latitudeInput = form.querySelector('.o_portal_check_latitude');
                     var longitudeInput = form.querySelector('.o_portal_check_longitude');
@@ -247,7 +249,16 @@
                             }
                         );
                     });
-                });
+                    }
+
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', initPortalCheckInForm);
+                    } else {
+                        initPortalCheckInForm();
+                    }
+
+                    window.addEventListener('pageshow', initPortalCheckInForm);
+                })();
             </script>
         </t>
     </template>
