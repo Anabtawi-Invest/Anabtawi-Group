@@ -1,0 +1,22 @@
+<odoo>
+    <record id="view_move_form_vendor_customer_hint" model="ir.ui.view">
+        <field name="name">account.move.form.vendor.customer.flags.hint</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <div class="text-muted"
+                     invisible="move_type not in ('in_invoice','in_refund','in_receipt','out_invoice','out_refund','out_receipt')">
+                    <span invisible="move_type not in ('in_invoice','in_refund','in_receipt')">
+                        Vendor must be marked as "Is Vendor".
+                    </span>
+                    <span invisible="move_type not in ('out_invoice','out_refund','out_receipt')">
+                        Customer must be marked as "Is Customer".
+                    </span>
+                </div>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>
