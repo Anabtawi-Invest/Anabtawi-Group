@@ -117,11 +117,16 @@
                                 <div t-if="show_no_employee or not employee" class="alert alert-warning py-2" role="alert">
                                     Your user is not linked to an employee profile.
                                 </div>
+                                <div t-if="show_location_restricted" class="alert alert-danger py-2 o_portal_location_restricted_alert" role="alert">
+                                    <t t-esc="location_restricted_message or 'لا يمكنك تسجيل الحضور من هذا الموقع.'"/>
+                                </div>
 
                                 <t t-if="employee">
                                     <div class="pc-check-circle-wrap">
-                                        <form action="/my/check-in/toggle" method="post">
+                                        <form action="/my/check-in/toggle" method="post" class="o_portal_check_in_form" t-att-data-device-tracking-enabled="'1' if device_tracking_enabled else '0'">
                                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                            <input type="hidden" name="latitude" class="o_portal_check_latitude"/>
+                                            <input type="hidden" name="longitude" class="o_portal_check_longitude"/>
                                             <button type="submit" class="pc-check-circle-btn">
                                                 <i class="fa fa-hand-pointer-o"/>
                                                 <t t-if="state == 'checked_in'">CHECK OUT</t>
@@ -186,6 +191,64 @@
                     </div>
                 </div>
             </div>
+            <script type="text/javascript">
+                document.addEventListener('DOMContentLoaded', function () {
+                    var locationBlockedAlert = document.querySelector('.o_portal_location_restricted_alert');
+                    if (locationBlockedAlert) {
+                        window.alert(locationBlockedAlert.textContent.trim());
+                    }
+                    var form = document.querySelector('.o_portal_check_in_form');
+                    if (!form) {
+                        return;
+                    }
+                    var button = form.querySelector('button[type="submit"]');
+                    var latitudeInput = form.querySelector('.o_portal_check_latitude');
+                    var longitudeInput = form.querySelector('.o_portal_check_longitude');
+                    var trackingEnabled = form.dataset.deviceTrackingEnabled === '1';
+                    var isSubmitting = false;
+
+                    form.addEventListener('submit', function (ev) {
+                        if (isSubmitting) {
+                            ev.preventDefault();
+                            return;
+                        }
+                        if (!trackingEnabled || !navigator.geolocation || !navigator.onLine) {
+                            ev.preventDefault();
+                            isSubmitting = true;
+                            if (button) {
+                                button.disabled = true;
+                            }
+                            form.submit();
+                            return;
+                        }
+
+                        ev.preventDefault();
+                        navigator.geolocation.getCurrentPosition(
+                            function (position) {
+                                latitudeInput.value = String(position.coords.latitude || '');
+                                longitudeInput.value = String(position.coords.longitude || '');
+                                isSubmitting = true;
+                                if (button) {
+                                    button.disabled = true;
+                                }
+                                form.submit();
+                            },
+                            function () {
+                                // Continue without GPS if user blocks permission or lookup fails.
+                                isSubmitting = true;
+                                if (button) {
+                                    button.disabled = true;
+                                }
+                                form.submit();
+                            },
+                            {
+                                enableHighAccuracy: true,
+                                timeout: 10000,
+                            }
+                        );
+                    });
+                });
+            </script>
         </t>
     </template>
 </odoo>
