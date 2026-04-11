@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="extra_hours_enhancement_overtime_rule_form" model="ir.ui.view">
+        <field name="name">extra.hours.enhancement.overtime.rule.form</field>
+        <field name="model">hr.attendance.overtime.rule</field>
+        <field name="inherit_id" ref="hr_attendance.hr_attendance_overtime_rule_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='amount_rate']" position="after">
+                <field name="work_entry_type_id" invisible="not paid"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="extra_hours_enhancement_overtime_rule_list" model="ir.ui.view">
+        <field name="name">extra.hours.enhancement.overtime.rule.list</field>
+        <field name="model">hr.attendance.overtime.rule</field>
+        <field name="inherit_id" ref="hr_attendance.hr_attendance_overtime_rule_view_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='resource_calendar_id']" position="after">
+                <field name="work_entry_type_id" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="extra_hours_enhancement_ruleset_form" model="ir.ui.view">
+        <field name="name">extra.hours.enhancement.ruleset.form</field>
+        <field name="model">hr.attendance.overtime.ruleset</field>
+        <field name="inherit_id" ref="hr_attendance.hr_attendance_overtime_ruleset_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='rule_ids']/list/field[@name='amount_rate']" position="after">
+                <field name="work_entry_type_id" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -123,14 +123,17 @@
 
                                 <t t-if="employee">
                                     <div class="pc-check-circle-wrap">
-                                        <form action="/my/check-in/toggle" method="post" class="o_portal_check_in_form" t-att-data-device-tracking-enabled="'1' if device_tracking_enabled else '0'">
+                                        <form id="checkin_form" action="/my/check-in/toggle" method="post" class="o_portal_check_in_form" t-att-data-device-tracking-enabled="'1' if device_tracking_enabled else '0'">
                                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                            <input type="hidden" name="latitude" class="o_portal_check_latitude"/>
-                                            <input type="hidden" name="longitude" class="o_portal_check_longitude"/>
-                                            <button type="submit" class="pc-check-circle-btn">
+                                            <input type="hidden" name="latitude" id="lat" class="o_portal_check_latitude"/>
+                                            <input type="hidden" name="longitude" id="lon" class="o_portal_check_longitude"/>
+                                            <button type="button" class="pc-check-circle-btn" onclick="window.alert('clicked'); submitCheckIn();" ontouchstart="window.alert('touchstart detected')">
                                                 <i class="fa fa-hand-pointer-o"/>
-                                                <t t-if="state == 'checked_in'">CHECK OUT</t>
-                                                <t t-else="">CHECK IN</t>
+                                                <t t-if="state == 'checked_in'">CHECK OUT DEBUG</t>
+                                                <t t-else="">CHECK IN DEBUG</t>
+                                            </button>
+                                            <button type="submit" class="btn btn-outline-secondary w-100 mt-3">
+                                                PLAIN SUBMIT TEST
                                             </button>
                                         </form>
                                     </div>
@@ -192,62 +195,74 @@
                 </div>
             </div>
             <script type="text/javascript">
-                document.addEventListener('DOMContentLoaded', function () {
-                    var locationBlockedAlert = document.querySelector('.o_portal_location_restricted_alert');
-                    if (locationBlockedAlert) {
-                        window.alert(locationBlockedAlert.textContent.trim());
-                    }
-                    var form = document.querySelector('.o_portal_check_in_form');
-                    if (!form) {
-                        return;
-                    }
-                    var button = form.querySelector('button[type="submit"]');
-                    var latitudeInput = form.querySelector('.o_portal_check_latitude');
-                    var longitudeInput = form.querySelector('.o_portal_check_longitude');
-                    var trackingEnabled = form.dataset.deviceTrackingEnabled === '1';
+                (function () {
                     var isSubmitting = false;
 
-                    form.addEventListener('submit', function (ev) {
+                    function showLocationBlockedAlert() {
+                        window.alert('portal_check_in JS loaded');
+                        var locationBlockedAlert = document.querySelector('.o_portal_location_restricted_alert');
+                        if (locationBlockedAlert) {
+                            window.alert(locationBlockedAlert.textContent.trim());
+                        }
+                    }
+
+                    window.submitCheckIn = function () {
+                        window.alert('submitCheckIn started');
                         if (isSubmitting) {
-                            ev.preventDefault();
                             return;
                         }
-                        if (!trackingEnabled || !navigator.geolocation || !navigator.onLine) {
-                            ev.preventDefault();
+
+                        var form = document.getElementById('checkin_form');
+                        if (!form) {
+                            return;
+                        }
+
+                        var button = form.querySelector('button');
+                        var latitudeInput = document.getElementById('lat');
+                        var longitudeInput = document.getElementById('lon');
+                        var trackingEnabled = form.dataset.deviceTrackingEnabled === '1';
+
+                        function submitForm() {
                             isSubmitting = true;
                             if (button) {
                                 button.disabled = true;
                             }
                             form.submit();
+                        }
+
+                        if (!trackingEnabled) {
+                            submitForm();
                             return;
                         }
 
-                        ev.preventDefault();
+                        if (!navigator.geolocation || !navigator.onLine) {
+                            window.alert('Location permission required');
+                            return;
+                        }
+
                         navigator.geolocation.getCurrentPosition(
                             function (position) {
                                 latitudeInput.value = String(position.coords.latitude || '');
                                 longitudeInput.value = String(position.coords.longitude || '');
-                                isSubmitting = true;
-                                if (button) {
-                                    button.disabled = true;
-                                }
-                                form.submit();
+                                submitForm();
                             },
                             function () {
-                                // Continue without GPS if user blocks permission or lookup fails.
-                                isSubmitting = true;
-                                if (button) {
-                                    button.disabled = true;
-                                }
-                                form.submit();
+                                window.alert('Location permission required');
                             },
                             {
                                 enableHighAccuracy: true,
                                 timeout: 10000,
+                                maximumAge: 0,
                             }
                         );
-                    });
-                });
+                    };
+
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', showLocationBlockedAlert);
+                    } else {
+                        showLocationBlockedAlert();
+                    }
+                })();
             </script>
         </t>
     </template>
