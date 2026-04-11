@@ -209,13 +209,16 @@
 
                     form.addEventListener('submit', function (ev) {
                         if (isSubmitting) {
+                            ev.preventDefault();
                             return;
                         }
                         if (!trackingEnabled || !navigator.geolocation || !navigator.onLine) {
+                            ev.preventDefault();
                             isSubmitting = true;
                             if (button) {
                                 button.disabled = true;
                             }
+                            form.submit();
                             return;
                         }
 
