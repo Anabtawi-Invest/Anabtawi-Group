@@ -4,7 +4,6 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
-            <!-- Place the flags after Tags -->
             <xpath expr="//field[@name='category_id']" position="after">
                 <group string="Accounting Classification" col="2">
                     <field name="x_is_vendor"/>
