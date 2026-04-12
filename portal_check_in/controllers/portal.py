@@ -153,12 +153,6 @@ class PortalCheckInController(http.Controller):
         csrf=True,
     )
     def portal_toggle_check_in(self, **kwargs):
-        _logger.warning(
-            "PORTAL CHECK IN ROUTE HIT: user_id=%s user_agent=%s kwargs=%s",
-            request.env.user.id,
-            request.httprequest.headers.get('User-Agent'),
-            kwargs,
-        )
         _logger.info(
             "portal_check_in: toggle requested by user_id=%s with raw kwargs keys=%s",
             request.env.user.id,

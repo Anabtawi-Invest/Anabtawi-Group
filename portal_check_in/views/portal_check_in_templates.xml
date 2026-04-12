@@ -127,13 +127,10 @@
                                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                             <input type="hidden" name="latitude" id="lat" class="o_portal_check_latitude"/>
                                             <input type="hidden" name="longitude" id="lon" class="o_portal_check_longitude"/>
-                                            <button type="button" class="pc-check-circle-btn" onclick="window.alert('clicked'); submitCheckIn();" ontouchstart="window.alert('touchstart detected')">
+                                            <button type="button" class="pc-check-circle-btn" onclick="submitCheckIn()">
                                                 <i class="fa fa-hand-pointer-o"/>
-                                                <t t-if="state == 'checked_in'">CHECK OUT DEBUG</t>
-                                                <t t-else="">CHECK IN DEBUG</t>
-                                            </button>
-                                            <button type="submit" class="btn btn-outline-secondary w-100 mt-3">
-                                                PLAIN SUBMIT TEST
+                                                <t t-if="state == 'checked_in'">CHECK OUT</t>
+                                                <t t-else="">CHECK IN</t>
                                             </button>
                                         </form>
                                     </div>
@@ -199,7 +196,6 @@
                     var isSubmitting = false;
 
                     function showLocationBlockedAlert() {
-                        window.alert('portal_check_in JS loaded');
                         var locationBlockedAlert = document.querySelector('.o_portal_location_restricted_alert');
                         if (locationBlockedAlert) {
                             window.alert(locationBlockedAlert.textContent.trim());
@@ -207,7 +203,6 @@
                     }
 
                     window.submitCheckIn = function () {
-                        window.alert('submitCheckIn started');
                         if (isSubmitting) {
                             return;
                         }
