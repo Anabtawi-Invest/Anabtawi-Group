@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="print_engine_client_tree_view" model="ir.ui.view">
+        <field name="name">print.engine.client.list.view</field>
+        <field name="model">print.engine.client</field>
+        <field name="arch" type="xml">
+            <list string="Print Engine Clients" 
+                  sample="1" 
+                  multi_edit="1"
+                  decoration-muted="not active"
+                  decoration-success="active ">
+                
+                 
+                <field name="name" string="Host System"/>
+                <field name="display_name" column_invisible="1"/>
+                <field name="active" widget="boolean_toggle"/>
+                <field name="print_engine_key" password="True" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="print_engine_client_form_view" model="ir.ui.view">
+        <field name="name">print.engine.client.form.view</field>
+        <field name="model">print.engine.client</field>
+        <field name="arch" type="xml">
+            <form string="Print Engine Client"> 
+                
+                <sheet>
+                   
+                    
+                    <widget name="web_ribbon" title="Inactive" bg_color="text-bg-danger" invisible="active"/>
+                    
+                    <div class="oe_title">
+                        <label for="name" string="Host System Name"/>
+                        <h1>
+                            <field name="name"  />
+                        </h1>
+                    </div>
+                    
+                    <!-- Main Content -->
+                    <group>
+                        <group string="Basic Information">
+                            <field name="active" widget="boolean_toggle"/>   
+                        </group>
+                        
+                        <group string="Print Engine Configuration">
+                            <field name="print_engine_key" 
+                                   password="True" 
+                                   readonly="1"
+                                   widget="CopyClipboardChar"/>
+                            
+                        </group>
+                    </group>
+                     
+                    <!-- Notebook with Tabs -->
+                    <notebook>
+                        <!-- Printers Tab -->
+                        <page id="printers" string="Printers" name="printers">
+                            <field name="printer_ids"
+                               readonly="1"
+                               context="{'list_view_ref': 'cr_all_in_one_direct_print.printer_tree_view'}"/>
+                        </page>
+
+                        <!-- Print Jobs Tab -->
+                        <page id="print_jobs" string="Print Jobs" name="print_jobs">
+                            <field name="print_job_ids"
+                                   readonly="1"
+                                   context="{'list_view_ref': 'cr_all_in_one_direct_print.print_job_list_view'}"/>
+                        </page>
+
+
+<!--                        <page id="conf" string="Configuration" name="conf"> -->
+<!--&lt;!&ndash;                            <group string="Print Job Priority">&ndash;&gt;-->
+<!--&lt;!&ndash;                            <field name="default_priority" widget="radio"/>&ndash;&gt;-->
+<!--&lt;!&ndash;                            <div colspan="2" class="alert alert-info" role="alert">&ndash;&gt;-->
+<!--&lt;!&ndash;                                <strong>Priority Levels:</strong><br/>&ndash;&gt;-->
+<!--&lt;!&ndash;                                • <strong>Low (0):</strong> Non-urgent documents, printed when queue is empty<br/>&ndash;&gt;-->
+<!--&lt;!&ndash;                                • <strong>Normal (1):</strong> Standard priority for most documents<br/>&ndash;&gt;-->
+<!--&lt;!&ndash;                                • <strong>High (2):</strong> Important documents, printed before normal priority<br/>&ndash;&gt;-->
+<!--&lt;!&ndash;                                • <strong>Urgent (3):</strong> Critical documents, printed immediately&ndash;&gt;-->
+<!--&lt;!&ndash;                            </div>&ndash;&gt;-->
+<!--&lt;!&ndash;                        </group>&ndash;&gt;-->
+
+<!--                        </page>-->
+                         
+                         
+                    </notebook>
+                </sheet>
+
+                <chatter/>
+            </form>
+        </field>
+    </record>
+   <record id="action_print_engine_client" model="ir.actions.act_window">
+    <field name="name">Print Engine Clients</field>
+    <field name="res_model">print.engine.client</field>
+    <field name="view_mode">list,form</field>
+    <field name="help" type="html">
+
+        <p class="o_view_nocontent_smiling_face">
+            Create your first Print Engine Client
+        </p>
+        <p>
+            Print Engine Clients are computers or systems where the print engine software is installed.
+            Each client can manage multiple printers and handle print jobs from Odoo.
+        </p>
+        <p>
+            <strong>To get started:</strong>
+        </p>
+        <ol>
+            <li>Create a new Print Engine Client</li>
+            <li>Copy the generated Print Engine Key</li>
+            <li>Install and configure the print engine software on your computer</li>
+            <li>Add printers to this client</li>
+        </ol>
+
+    </field>
+</record>
+
+
+    
+    <!-- Root Menu - Top Level -->
+    <menuitem id="menu_printing_root"
+              name="Print Engine"
+              sequence="100"
+              web_icon="cr_all_in_one_direct_print,static/description/icon.png"/>
+    
+    <!-- Single Configuration Menu -->
+    <menuitem id="menu_printing_configuration"
+              parent="menu_printing_root"
+              name="Configuration"
+              action="action_print_engine_client"
+              sequence="4"/>
+    <menuitem id="menu_print_reports"
+              parent="menu_printing_configuration"
+              name="Reports"
+              action="base.ir_action_report"
+              sequence="2"/>
+    <menuitem id="menu_print_clients"
+              parent="menu_printing_root"
+              name="Print Engine Clients"
+              action="action_print_engine_client"
+              sequence="1"/>
+</odoo>
