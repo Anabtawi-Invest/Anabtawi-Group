@@ -1,7 +1,8 @@
 {
-    "name": "Ameen Arabiyat Stock Transfer Discrepancy for truck-anabtawi",
+    "name": "Stock Transfer Discrepancy for truck Approved",
     "version": "19.0.1.0.0",
     "category": "Inventory/Inventory",
+    "author:"Ameen_Arabiyat
     "summary": "download this one Require reason when validated quantities are lower than expected",
     "depends": ["stock"],
     "data": [
