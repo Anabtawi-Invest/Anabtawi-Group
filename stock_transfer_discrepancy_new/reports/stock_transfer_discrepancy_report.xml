@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Report Action -->
+        <record id="action_report_stock_transfer_discrepancy" model="ir.actions.report">
+            <field name="name">Transfer Discrepancy Report</field>
+            <field name="model">stock.transfer.discrepancy</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">stock_transfer_discrepancy_new.report_transfer_discrepancy</field>
+            <field name="report_file">stock_transfer_discrepancy_new.report_transfer_discrepancy</field>
+            <field name="print_report_name">'Transfer Discrepancy - %s' % (object.picking_id.name or '')</field>
+            <field name="binding_model_id" ref="model_stock_transfer_discrepancy"/>
+            <field name="binding_type">report</field>
+        </record>
+
+        <!-- Report Template -->
+        <template id="report_transfer_discrepancy">
+            <t t-call="web.report_layout">
+                <div class="article o_report_layout_standard">
+                    <t t-foreach="docs" t-as="doc">
+                        <div class="page">
+                            <!-- Header -->
+                            <div class="row mb-4">
+                                <div class="col-12 text-center">
+                                    <h2 class="text-primary">Transfer Discrepancy Report</h2>
+                                    <p class="text-muted">
+                                        <strong>Date:</strong> <span t-esc="doc.date.strftime('%Y-%m-%d %H:%M:%S') if doc.date else ''"/>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Basic Information Section -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="border border-primary rounded p-3 mb-3">
+                                        <h4 class="bg-primary text-white p-2 mb-3" style="margin: -12px -12px 12px -12px;">Basic Information</h4>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <table class="table table-sm table-borderless mb-0">
+                                                    <tr>
+                                                        <td class="font-weight-bold" style="width: 40%;">Transfer:</td>
+                                                        <td><span t-esc="doc.picking_id.name or ''"/></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">Truck Location:</td>
+                                                        <td><span t-esc="doc.truck_location_id.name or ''"/></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">Stage:</td>
+                                                        <td>
+                                                            <span t-if="doc.stage == 'dispatch'" class="badge badge-warning">Dispatch</span>
+                                                            <span t-if="doc.stage == 'receipt'" class="badge badge-info">Receipt</span>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">State:</td>
+                                                        <td>
+                                                            <span t-if="doc.state == 'open'" class="badge badge-danger">Open</span>
+                                                            <span t-if="doc.state == 'settled'" class="badge badge-success">Settled</span>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <table class="table table-sm table-borderless mb-0">
+                                                    <tr>
+                                                        <td class="font-weight-bold" style="width: 40%;">Product:</td>
+                                                        <td>
+                                                            <span t-esc="doc.product_id.default_code or ''"/>
+                                                            <span t-if="doc.product_id.default_code"> - </span>
+                                                            <span t-esc="doc.product_id.name or ''"/>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">Responsible User:</td>
+                                                        <td><span t-esc="doc.responsible_user_id.name or ''"/></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">Company:</td>
+                                                        <td><span t-esc="doc.company_id.name or ''"/></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">Date:</td>
+                                                        <td><span t-esc="doc.date.strftime('%Y-%m-%d %H:%M:%S') if doc.date else ''"/></td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Quantities Section -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="border border-info rounded p-3 mb-3">
+                                        <h4 class="bg-info text-white p-2 mb-3" style="margin: -12px -12px 12px -12px;">Quantities Information</h4>
+                                        <div class="row">
+                                            <div class="col-md-3 text-center">
+                                                <div class="p-3 bg-light rounded mb-2">
+                                                    <h5 class="text-muted mb-2" style="font-size: 14px;">Expected Quantity</h5>
+                                                    <h3 class="text-primary mb-0" style="font-size: 24px;">
+                                                        <span t-field="doc.expected_qty" t-options="{'widget': 'float', 'decimal_precision': 'Product Unit'}"/>
+                                                    </h3>
+                                                    <small class="text-muted"><span t-esc="doc.product_id.uom_id.name or ''"/></small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 text-center">
+                                                <div class="p-3 bg-light rounded mb-2">
+                                                    <h5 class="text-muted mb-2" style="font-size: 14px;">Actual Quantity</h5>
+                                                    <h3 class="text-warning mb-0" style="font-size: 24px;">
+                                                        <span t-field="doc.actual_qty" t-options="{'widget': 'float', 'decimal_precision': 'Product Unit'}"/>
+                                                    </h3>
+                                                    <small class="text-muted"><span t-esc="doc.product_id.uom_id.name or ''"/></small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 text-center">
+                                                <div class="p-3 bg-light rounded mb-2">
+                                                    <h5 class="text-muted mb-2" style="font-size: 14px;">Difference Quantity</h5>
+                                                    <h3 class="text-danger mb-0" style="font-size: 24px;">
+                                                        <span t-field="doc.difference_qty" t-options="{'widget': 'float', 'decimal_precision': 'Product Unit'}"/>
+                                                    </h3>
+                                                    <small class="text-muted"><span t-esc="doc.product_id.uom_id.name or ''"/></small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3 text-center">
+                                                <div class="p-3 bg-light rounded mb-2">
+                                                    <h5 class="text-muted mb-2" style="font-size: 14px;">Resolved Quantity</h5>
+                                                    <h3 class="text-success mb-0" style="font-size: 24px;">
+                                                        <span t-field="doc.resolved_qty" t-options="{'widget': 'float', 'decimal_precision': 'Product Unit'}"/>
+                                                    </h3>
+                                                    <small class="text-muted"><span t-esc="doc.product_id.uom_id.name or ''"/></small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Reason Section -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="border border-warning rounded p-3 mb-3">
+                                        <h4 class="bg-warning text-dark p-2 mb-3" style="margin: -12px -12px 12px -12px;">Reason for Discrepancy</h4>
+                                        <p class="mb-0" style="white-space: pre-wrap;"><span t-esc="doc.reason or ''"/></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Additional Information Section -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="border border-secondary rounded p-3 mb-3">
+                                        <h4 class="bg-secondary text-white p-2 mb-3" style="margin: -12px -12px 12px -12px;">Additional Information</h4>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <table class="table table-sm table-borderless mb-0">
+                                                    <tr>
+                                                        <td class="font-weight-bold" style="width: 50%;">Transfer Reference:</td>
+                                                        <td><span t-esc="doc.picking_id.name or ''"/></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">Transfer Type:</td>
+                                                        <td><span t-esc="doc.picking_id.picking_type_id.name or ''"/></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">Source Location:</td>
+                                                        <td><span t-esc="doc.picking_id.location_id.complete_name or ''"/></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">Destination Location:</td>
+                                                        <td><span t-esc="doc.picking_id.location_dest_id.complete_name or ''"/></td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <table class="table table-sm table-borderless mb-0">
+                                                    <tr>
+                                                        <td class="font-weight-bold" style="width: 50%;">Product Code:</td>
+                                                        <td><span t-esc="doc.product_id.default_code or 'N/A'"/></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">Product Barcode:</td>
+                                                        <td><span t-esc="doc.product_id.barcode or 'N/A'"/></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">Product Category:</td>
+                                                        <td><span t-esc="doc.product_id.categ_id.name or 'N/A'"/></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td class="font-weight-bold">Remaining to Resolve:</td>
+                                                        <td>
+                                                            <strong>
+                                                                <t t-set="remaining_qty" t-value="doc.difference_qty - doc.resolved_qty"/>
+                                                                <span t-out="remaining_qty" t-options="{'widget': 'float', 'decimal_precision': 'Product Unit'}"/>
+                                                                <span t-esc="' ' + (doc.product_id.uom_id.name or '')"/>
+                                                            </strong>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Footer -->
+                            <div class="row mt-4">
+                                <div class="col-12 text-center">
+                                    <p class="text-muted">
+                                        <small>Generated on <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M:%S')"/> by <span t-esc="user.name or ''"/></small>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+            </t>
+        </template>
+    </data>
+</odoo>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Block selecting trucks with open discrepancies on INTERNAL transfers (Source AND Destination Locations). -->
+    <record id="stock_picking_view_form_inherit_truck_discrepancy" model="ir.ui.view">
+        <field name="name">stock.picking.form.inherit.truck.discrepancy</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <!-- Replace the source location field (multi-location variant) with two variants:
+                 - Internal picking: apply our restrictive domain
+                 - Other pickings: keep default behavior
+            -->
+            <xpath expr="//field[@name='location_id' and contains(@groups, 'stock.group_stock_multi_locations')][1]" position="replace">
+                <field
+                    name="location_id"
+                    options="{'no_create': True}"
+                    string="From"
+                    groups="stock.group_stock_multi_locations"
+                    readonly="state == 'done'"
+                    invisible="picking_type_code != 'internal'"
+                    domain="[
+                        ('usage', '=', 'internal'),
+                        '|', ('is_truck', '=', False), ('has_open_discrepancy', '=', False)
+                    ]"
+                />
+                <field
+                    name="location_id"
+                    options="{'no_create': True}"
+                    string="From"
+                    groups="stock.group_stock_multi_locations"
+                    readonly="state == 'done'"
+                    invisible="picking_type_code in ('incoming', 'internal')"
+                />
+            </xpath>
+            <!-- Also block destination location for internal transfers -->
+            <xpath expr="//sheet//field[@name='location_dest_id' and @groups='stock.group_stock_multi_locations']" position="attributes">
+                <attribute name="domain">[
+                    ('usage', '=', 'internal'),
+                    '|', ('is_truck', '=', False), ('has_open_discrepancy', '=', False)
+                ]</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+
