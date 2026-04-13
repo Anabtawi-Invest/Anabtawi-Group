@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+print_job.access_print_job,access_print_job,model_print_job,base.group_user,1,1,1,1
+print_engine_client.access_print_engine_client,access_print_engine_client,model_print_engine_client,base.group_user,1,1,1,1
+printer_printer.access_printer_printer,access_printer_printer,model_printer_printer,base.group_user,1,1,1,1
+report_print_wizard.access_report_print_wizard,access_report_print_wizard,model_report_print_wizard,base.group_user,1,1,1,1

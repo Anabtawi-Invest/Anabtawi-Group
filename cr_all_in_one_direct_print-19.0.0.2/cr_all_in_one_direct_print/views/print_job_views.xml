@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ========== list VIEW ========== -->
+    <record id="print_job_list_view" model="ir.ui.view">
+        <field name="name">print.job.list.view</field>
+        <field name="model">print.job</field>
+        <field name="arch" type="xml">
+            <list string="Print Jobs" 
+                  create="0" 
+                  multi_edit="1"
+                  sample="1"
+                  decoration-info="state == 'draft'"
+                  decoration-warning="state == 'printing'"
+                  decoration-success="state == 'done'"
+                  decoration-danger="state == 'error'"
+                  decoration-muted="state == 'cancelled'">
+                
+                <!-- Priority Indicator -->
+<!--                <field name="priority" widget="priority" nolabel="1"/>-->
+
+                <field name="name" string="Job Name"/>
+                <field name="printer_name"/>
+                <field name="print_type"/>
+                <field name="create_uid" optional="show" widget="many2one_avatar_user"/>
+                <field name="state"
+                       decoration-info="state == 'draft'"
+                       decoration-warning="state == 'printing'"
+                       decoration-success="state == 'done'"
+                       decoration-danger="state == 'error'"
+                       decoration-muted="state == 'cancelled'"
+                       widget="badge"/>
+
+                <field name="error_message" optional="hide"/>
+                <field name="error_code" optional="hide"/>
+
+            </list>
+        </field>
+    </record>
+ 
+    <!-- ========== FORM VIEW ========== -->
+    <record id="print_job_form_view" model="ir.ui.view">
+        <field name="name">print.job.form.view</field>
+        <field name="model">print.job</field>
+        <field name="arch" type="xml">
+            <form string="Print Job" >
+                <header>
+                    <!-- Status Bar -->
+                    <field name="state" widget="statusbar" statusbar_visible="draft,printing,done"/>
+                    
+                    <button name="action_reprint"
+                            type="object"
+                            string="Reprint"
+                            class="btn-secondary"
+                            invisible="state != 'done'"/>
+                </header>
+                
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Job Name"/>
+                        <h1>
+                            <field name="name" placeholder="Print Job Name" class="o_text_overflow" readonly="1"/>
+                        </h1>
+                    </div>
+
+                    <widget name="web_ribbon" title="Completed" bg_color="bg-success" invisible="state != 'done'"/>
+                    <widget name="web_ribbon" title="Failed" bg_color="bg-danger" invisible="state != 'error'"/>
+                    <widget name="web_ribbon" title="Cancelled" bg_color="bg-secondary" invisible="state != 'cancelled'"/>
+                    <widget name="web_ribbon" title="Printing" bg_color="bg-warning" invisible="state != 'printing'"/>
+                    
+                    <group>
+                        <group string="Printer Information">
+                            <field name="printer_id" options="{'no_create': True}"/>
+                            <field name="printer_name"/>
+                            <field name="print_type"/>
+                        </group>
+                    </group>
+
+                    
+                    <notebook>
+                        <page string="Error" name="error_retry" invisible="state not in ['error', 'cancelled']">
+                            <group>
+                                <group string="Error Information">
+                                    <field name="error_code" readonly="1"/>
+                                    <field name="error_message" readonly="1" widget="text"/>
+                                </group>
+                                
+
+                            </group>
+                        </page>
+
+                        <page string="Print Data" name="print_data">
+                            <group>
+                                <group string="Preview">
+                                    <field name="image_data" widget="image" options="{'size': [400, 400]}" readonly="1"/>
+                                </group>
+                                <br/>
+                                <group string="Data">
+                                    <field name="image_data" filename="print_data.pdf"/>
+                                </group>
+                            </group>
+                        </page>
+
+                    </notebook>
+                </sheet>
+
+                 <chatter reload_on_follower="True"/>
+            </form>
+        </field>
+    </record>   
+
+    <!-- ========== ACTION WINDOW ========== -->
+    <record id="action_print_job" model="ir.actions.act_window">
+        <field name="name">Print Jobs</field>
+        <field name="res_model">print.job</field>
+        <field name="view_mode">list,form</field> 
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No print jobs found
+            </p>
+            <p>
+                Print jobs will appear here automatically when documents are printed.<br/>
+                You can monitor their status and view print history.
+            </p>
+        </field>
+    </record>
+
+    <!-- ========== SERVER ACTION FOR MASS REPRINT ========== -->
+    <record id="action_server_reprint_jobs" model="ir.actions.server">
+        <field name="name">Reprint Jobs</field>
+        <field name="model_id" ref="model_print_job"/>
+        <field name="binding_model_id" ref="model_print_job"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+if records:
+    action = records.action_reprint()
+        </field>
+    </record>
+
+  <!-- ========== MENU ITEMS ========== -->
+    <menuitem id="menu_printing_jobs"
+              parent="menu_printing_root"
+              name="Print Jobs"
+              action="action_print_job"
+              sequence="3"/>
+
+
+</odoo>
+
