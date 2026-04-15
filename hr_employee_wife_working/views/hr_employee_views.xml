@@ -4,9 +4,11 @@
         <field name="name">hr.employee.form.inherit.wife.is.working</field>
         <field name="model">hr.employee</field>
         <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="priority" eval="99"/>
         <field name="arch" type="xml">
-            <xpath expr="//field[@name='spouse_birthdate']" position="after">
-                <field name="wife_is_working"/>
+            <xpath expr="//group[@name='hr_family_group']" position="inside">
+                <field name="wife_is_working"
+                       invisible="marital not in ['married', 'cohabitant']"/>
             </xpath>
         </field>
     </record>
