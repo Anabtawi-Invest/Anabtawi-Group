@@ -20,6 +20,14 @@
                 />
             </xpath>
 
+            <xpath expr="//field[@name='order_line']/form//field[@name='discount']" position="replace">
+                <field name="discount_ui" class="oe_inline"/>
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/form//label[@for='discount']" position="attributes">
+                <attribute name="for">discount_ui</attribute>
+            </xpath>
+
             <xpath expr="//field[@name='order_line']/form//div[@name='discount']" position="inside">
                 <span class="ms-2" invisible="not has_requested_discount_change">Requested:</span>
                 <field
@@ -35,7 +43,7 @@
                 <attribute name="readonly">qty_invoiced &gt; 0 or (approval_request_id and approval_request_status in ['new', 'pending'])</attribute>
             </xpath>
 
-            <xpath expr="//field[@name='order_line']/form//field[@name='discount']" position="attributes">
+            <xpath expr="//field[@name='order_line']/form//field[@name='discount_ui']" position="attributes">
                 <attribute name="readonly">approval_request_id and approval_request_status in ['new', 'pending']</attribute>
             </xpath>
 
@@ -66,7 +74,17 @@
                 />
             </xpath>
 
-            <xpath expr="//field[@name='order_line']/list/field[@name='discount']" position="after">
+            <xpath expr="//field[@name='order_line']/list/field[@name='discount']" position="replace">
+                <field
+                    name="discount_ui"
+                    string="Disc.%"
+                    groups="sale.group_discount_per_so_line"
+                    width="50px"
+                    optional="show"
+                />
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/list/field[@name='discount_ui']" position="after">
                 <field
                     name="requested_discount"
                     string="Requested Disc.%"
@@ -97,7 +115,7 @@
                 <attribute name="readonly">qty_invoiced &gt; 0 or (approval_request_id and approval_request_status in ['new', 'pending'])</attribute>
             </xpath>
 
-            <xpath expr="//field[@name='order_line']/list/field[@name='discount']" position="attributes">
+            <xpath expr="//field[@name='order_line']/list/field[@name='discount_ui']" position="attributes">
                 <attribute name="readonly">approval_request_id and approval_request_status in ['new', 'pending']</attribute>
             </xpath>
 

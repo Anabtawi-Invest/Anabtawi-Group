@@ -22,6 +22,10 @@
                         invisible="not sale_line_approval_enabled or sale_line_approval_type != 'discount'"
                         required="sale_line_approval_enabled and sale_line_approval_type == 'discount'"
                     />
+                    <field
+                        name="sale_min_quantity"
+                        invisible="not sale_line_approval_enabled"
+                    />
                 </group>
             </xpath>
         </field>

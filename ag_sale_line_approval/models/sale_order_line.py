@@ -36,6 +36,11 @@ class SaleOrderLine(models.Model):
     requested_price_unit = fields.Float(string="Requested Unit Price", copy=False)
     has_requested_discount_change = fields.Boolean(copy=False)
     has_requested_price_change = fields.Boolean(copy=False)
+    discount_ui = fields.Float(
+        string="Discount (%)",
+        compute="_compute_discount_ui",
+        inverse="_inverse_discount_ui",
+    )
     approval_required = fields.Boolean(
         string="Approval Required",
         compute="_compute_approval_state",
@@ -65,8 +70,25 @@ class SaleOrderLine(models.Model):
                 line.approval_state = "not_needed"
                 line.approval_required = False
 
+    @api.depends(
+        "discount",
+        "requested_discount",
+        "has_requested_discount_change",
+        "approval_request_status",
+    )
+    def _compute_discount_ui(self):
+        for line in self:
+            if line.has_requested_discount_change and line.approval_request_status in ("new", "pending"):
+                line.discount_ui = line.requested_discount
+            else:
+                line.discount_ui = line.discount
+
+    def _inverse_discount_ui(self):
+        for line in self:
+            line.write({"discount": line.discount_ui})
+
     @api.model
-    def _find_sale_approval_category(self, company, change_type, discount_value=0.0):
+    def _find_sale_approval_categories(self, company, change_type, discount_value=0.0):
         domain = [
             ("sale_line_approval_enabled", "=", True),
             ("sale_line_approval_type", "=", change_type),
@@ -79,7 +101,40 @@ class SaleOrderLine(models.Model):
                 ("sale_discount_max", ">=", discount_value),
             ]
             order = "sale_discount_min desc, sequence, id"
-        return self.env["approval.category"].search(domain, order=order, limit=1)
+        return self.env["approval.category"].search(domain, order=order)
+
+    @api.model
+    def _select_sale_approval_category(
+        self,
+        company,
+        change_type,
+        quantity,
+        discount_value=0.0,
+        quantity_rounding=0.01,
+        raise_on_qty=False,
+    ):
+        categories = self._find_sale_approval_categories(company, change_type, discount_value)
+        if not categories:
+            return self.env["approval.category"]
+
+        matching_categories = categories.filtered(
+            lambda category: not category.sale_min_quantity
+            or float_compare(quantity, category.sale_min_quantity, precision_rounding=quantity_rounding) >= 0
+        )
+        if matching_categories:
+            return matching_categories[0]
+
+        if raise_on_qty:
+            required_qty = categories[0].sale_min_quantity
+            raise UserError(
+                _(
+                    "You cannot request this %(change_type)s because the line quantity must be at least %(required_qty)s.",
+                    change_type="discount" if change_type == "discount" else "price override",
+                    required_qty=required_qty,
+                )
+            )
+
+        return self.env["approval.category"]
 
     def _needs_discount_approval(self, target_discount):
         self.ensure_one()
@@ -87,7 +142,16 @@ class SaleOrderLine(models.Model):
             return False
         if float_compare(target_discount, self.discount, precision_digits=2) == 0:
             return False
-        return bool(self._find_sale_approval_category(self.order_id.company_id, "discount", target_discount))
+        return bool(
+            self._select_sale_approval_category(
+                self.order_id.company_id,
+                "discount",
+                self.product_uom_qty,
+                target_discount,
+                quantity_rounding=self.product_uom_id.rounding,
+                raise_on_qty=True,
+            )
+        )
 
     def _needs_price_approval(self, target_price):
         self.ensure_one()
@@ -95,7 +159,15 @@ class SaleOrderLine(models.Model):
             return False
         if float_compare(target_price, self.price_unit, precision_rounding=self.currency_id.rounding) == 0:
             return False
-        return bool(self._find_sale_approval_category(self.order_id.company_id, "price_override"))
+        return bool(
+            self._select_sale_approval_category(
+                self.order_id.company_id,
+                "price_override",
+                self.product_uom_qty,
+                quantity_rounding=self.product_uom_id.rounding,
+                raise_on_qty=True,
+            )
+        )
 
     def _get_sale_change_type(self):
         self.ensure_one()
@@ -115,15 +187,38 @@ class SaleOrderLine(models.Model):
             and (self.has_requested_discount_change or self.has_requested_price_change)
         )
 
-    def _get_requested_category(self):
+    def _get_active_requested_category(self):
         self.ensure_one()
+        if not self._has_active_approval_lock():
+            return self.env["approval.category"]
         if self.has_requested_price_change:
-            return self._find_sale_approval_category(self.order_id.company_id, "price_override")
+            return self._find_sale_approval_categories(self.order_id.company_id, "price_override")[:1]
         if self.has_requested_discount_change:
-            return self._find_sale_approval_category(
+            return self._find_sale_approval_categories(
                 self.order_id.company_id,
                 "discount",
                 self.requested_discount,
+            )[:1]
+        return self.env["approval.category"]
+
+    def _get_requested_category(self):
+        self.ensure_one()
+        if self.has_requested_price_change:
+            return self._select_sale_approval_category(
+                self.order_id.company_id,
+                "price_override",
+                self.product_uom_qty,
+                quantity_rounding=self.product_uom_id.rounding,
+                raise_on_qty=True,
+            )
+        if self.has_requested_discount_change:
+            return self._select_sale_approval_category(
+                self.order_id.company_id,
+                "discount",
+                self.product_uom_qty,
+                self.requested_discount,
+                quantity_rounding=self.product_uom_id.rounding,
+                raise_on_qty=True,
             )
         return self.env["approval.category"]
 
@@ -198,15 +293,31 @@ class SaleOrderLine(models.Model):
             routed_payload = {}
             order = self.env["sale.order"].browse(vals["order_id"]) if vals.get("order_id") else self.env["sale.order"]
             company = order.company_id if order else self.env.company
+            product_uom = self.env["uom.uom"].browse(vals["product_uom_id"]) if vals.get("product_uom_id") else self.env["uom.uom"]
+            quantity_rounding = product_uom.rounding if product_uom else 0.01
+            quantity = vals.get("product_uom_qty", 0.0)
 
-            if vals.get("discount") and order and self._find_sale_approval_category(company, "discount", vals["discount"]):
+            if vals.get("discount") and order and self._select_sale_approval_category(
+                company,
+                "discount",
+                quantity,
+                vals["discount"],
+                quantity_rounding=quantity_rounding,
+                raise_on_qty=True,
+            ):
                 routed_payload.update({
                     "requested_discount": vals["discount"],
                     "has_requested_discount_change": True,
                 })
                 vals["discount"] = 0.0
 
-            if vals.get("price_unit") and order and self._find_sale_approval_category(company, "price_override"):
+            if vals.get("price_unit") and order and self._select_sale_approval_category(
+                company,
+                "price_override",
+                quantity,
+                quantity_rounding=quantity_rounding,
+                raise_on_qty=True,
+            ):
                 routed_payload.update({
                     "requested_price_unit": vals["price_unit"],
                     "has_requested_price_change": True,
@@ -238,6 +349,22 @@ class SaleOrderLine(models.Model):
                         lines=line_names,
                     )
                 )
+
+        if "product_uom_qty" in vals:
+            for line in self.filtered(lambda record: record._has_active_approval_lock()):
+                category = line._get_active_requested_category()
+                if category and category.sale_min_quantity and float_compare(
+                    vals["product_uom_qty"],
+                    category.sale_min_quantity,
+                    precision_rounding=line.product_uom_id.rounding,
+                ) < 0:
+                    raise UserError(
+                        _(
+                            "You cannot reduce the quantity below %(required_qty)s while approval is pending for %(product)s.",
+                            required_qty=category.sale_min_quantity,
+                            product=line.product_id.display_name,
+                        )
+                    )
 
         if "discount" not in vals and "price_unit" not in vals:
             return super().write(vals)

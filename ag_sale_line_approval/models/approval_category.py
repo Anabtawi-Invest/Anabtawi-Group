@@ -18,12 +18,17 @@ class ApprovalCategory(models.Model):
     )
     sale_discount_min = fields.Float(string="Discount From (%)")
     sale_discount_max = fields.Float(string="Discount To (%)")
+    sale_min_quantity = fields.Float(
+        string="Minimum Quantity",
+        help="Minimum sale order line quantity required before this approval rule can be used.",
+    )
 
     @api.constrains(
         "sale_line_approval_enabled",
         "sale_line_approval_type",
         "sale_discount_min",
         "sale_discount_max",
+        "sale_min_quantity",
     )
     def _check_sale_discount_range(self):
         for category in self.filtered(
@@ -33,3 +38,6 @@ class ApprovalCategory(models.Model):
                 raise ValidationError(_("The discount upper bound must be greater than zero."))
             if category.sale_discount_max < category.sale_discount_min:
                 raise ValidationError(_("The discount upper bound must be greater than or equal to the lower bound."))
+        for category in self.filtered("sale_line_approval_enabled"):
+            if category.sale_min_quantity < 0.0:
+                raise ValidationError(_("Minimum quantity cannot be negative."))
