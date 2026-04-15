@@ -1,6 +1,6 @@
 {
     "name": "HR Employee Wife Working",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "summary": "Add a checkbox to employee form for wife working status",
     "category": "Human Resources",
     "author": "Your Company",
