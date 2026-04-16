@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-   <record id="view_employee_form_inherit_spouse_employed" model="ir.ui.view">
+ <record id="view_employee_form_inherit_spouse_employed" model="ir.ui.view">
     <field name="name">hr.employee.form.inherit.spouse.employed</field>
     <field name="model">hr.employee</field>
     <field name="inherit_id" ref="hr.view_employee_form"/>
     <field name="priority" eval="99"/>
     <field name="arch" type="xml">
         <xpath expr="//group[@name='hr_family_group']" position="inside">
-            <field name="wife_is_working"
+            <field name="spouse_employed"
                    invisible="marital not in ['married', 'cohabitant']"/>
         </xpath>
     </field>
-</record>
+    </record>
 </odoo>
