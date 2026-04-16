@@ -1,7 +1,7 @@
 {
-    "name": "HR Employee Wife Working",
+    "name": "HR Employee Spouse Employed",
     "version": "19.0.1.0.1",
-    "summary": "Add a checkbox to employee form for wife working status",
+    "summary": "Add a checkbox to employee form for spouse employment status",
     "category": "Human Resources",
     "author": "Your Company",
     "license": "LGPL-3",
