@@ -1,7 +1,0 @@
-from odoo import fields, models
-
-
-class HrEmployee(models.Model):
-    _inherit = "hr.employee"
-
-    wife_is_working = fields.Boolean(string="Wife Is Working")
