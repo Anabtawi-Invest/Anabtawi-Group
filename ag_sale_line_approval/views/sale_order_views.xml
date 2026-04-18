@@ -1,0 +1,136 @@
+<odoo>
+    <record id="sale_order_view_form_inherit_line_approval" model="ir.ui.view">
+        <field name="name">sale.order.view.form.inherit.line.approval</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='order_line']/form/field[@name='technical_price_unit']" position="after">
+                <field name="approval_request_id" invisible="1"/>
+                <field name="approval_request_status" invisible="1"/>
+                <field name="has_requested_discount_change" invisible="1"/>
+                <field name="has_requested_price_change" invisible="1"/>
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/form//field[@name='price_unit']" position="after">
+                <field
+                    name="requested_price_unit"
+                    string="Requested Unit Price"
+                    invisible="display_type"
+                    readonly="1"
+                />
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/form//field[@name='discount']" position="replace">
+                <field name="discount_ui" class="oe_inline"/>
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/form//label[@for='discount']" position="attributes">
+                <attribute name="for">discount_ui</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/form//div[@name='discount']" position="inside">
+                <span class="ms-2" invisible="not has_requested_discount_change">Requested:</span>
+                <field
+                    name="requested_discount"
+                    class="oe_inline"
+                    invisible="not has_requested_discount_change"
+                    readonly="1"
+                />
+                <span invisible="not has_requested_discount_change">%</span>
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/form//field[@name='price_unit']" position="attributes">
+                <attribute name="readonly">qty_invoiced &gt; 0 or (approval_request_id and approval_request_status in ['new', 'pending'])</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/form//field[@name='discount_ui']" position="attributes">
+                <attribute name="readonly">approval_request_id and approval_request_status in ['new', 'pending']</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/form//field[@name='analytic_distribution']" position="after">
+                <field name="approval_state" readonly="1"/>
+                <button
+                    name="action_open_or_create_approval"
+                    type="object"
+                    string="Approval"
+                    class="btn btn-secondary"
+                    invisible="display_type or (not approval_request_id and not has_requested_discount_change and not has_requested_price_change)"
+                />
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/list/field[@name='customer_lead']" position="after">
+                <field name="approval_request_id" column_invisible="True"/>
+                <field name="approval_request_status" column_invisible="True"/>
+                <field name="has_requested_discount_change" column_invisible="True"/>
+                <field name="has_requested_price_change" column_invisible="True"/>
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="after">
+                <field
+                    name="requested_price_unit"
+                    string="Requested Price"
+                    optional="show"
+                    readonly="1"
+                />
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/list/field[@name='discount']" position="replace">
+                <field
+                    name="discount_ui"
+                    string="Disc.%"
+                    groups="sale.group_discount_per_so_line"
+                    width="50px"
+                    optional="show"
+                />
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/list/field[@name='discount_ui']" position="after">
+                <field
+                    name="requested_discount"
+                    string="Requested Disc.%"
+                    groups="sale.group_discount_per_so_line"
+                    optional="show"
+                    readonly="1"
+                />
+                <field
+                    name="approval_state"
+                    string="Approval"
+                    widget="badge"
+                    decoration-info="approval_state in ['to_request', 'new']"
+                    decoration-warning="approval_state == 'pending'"
+                    decoration-success="approval_state == 'approved'"
+                    decoration-danger="approval_state in ['refused', 'cancel']"
+                    optional="show"
+                />
+                <button
+                    name="action_open_or_create_approval"
+                    type="object"
+                    string="Approval"
+                    class="btn-link"
+                    invisible="display_type or (not approval_request_id and not has_requested_discount_change and not has_requested_price_change)"
+                />
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/list/field[@name='price_unit']" position="attributes">
+                <attribute name="readonly">qty_invoiced &gt; 0 or (approval_request_id and approval_request_status in ['new', 'pending'])</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='order_line']/list/field[@name='discount_ui']" position="attributes">
+                <attribute name="readonly">approval_request_id and approval_request_status in ['new', 'pending']</attribute>
+            </xpath>
+
+            <xpath expr="//div[@name='so_button_below_order_lines']" position="after">
+                <div class="alert alert-warning mb-2" role="alert" invisible="pending_approval_line_count == 0">
+                    <strong>Pending approvals:</strong>
+                    <field name="pending_approval_line_count" class="oe_inline" readonly="1"/>
+                    <span> sale order line(s) still need approval before confirmation.</span>
+                </div>
+                <group col="3">
+                    <field name="approval_line_count" readonly="1"/>
+                    <field name="pending_approval_line_count" readonly="1"/>
+                    <field name="all_lines_approved" readonly="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

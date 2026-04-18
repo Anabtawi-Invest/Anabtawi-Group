@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'POS Rounding',
+    'name': 'POS Rounding-anabtawi',
     'version': '19.0.1.0.0',
     'category': 'Point of Sale',
     'summary': 'Track paid but uncollected POS orders',
@@ -24,13 +24,18 @@ Features:
     'license': 'LGPL-3',
     'depends': ['point_of_sale', 'account', 'sale', 'pos_sale'],
     'data': [
-"views/pos_config_views.xml",
+        "views/pos_config_views.xml",
+        "views/report_invoice.xml",
     ],
     'assets': {
         'point_of_sale._assets_pos': [
-
+            'pos_rounding/static/src/app/models/pos_order.js',
+            'pos_rounding/static/src/app/components/order_display/open_amount.xml',
             'pos_rounding/static/src/app/screens/product_screen/control_buttons_rounding.xml',
             'pos_rounding/static/src/app/screens/product_screen/control_buttons_rounding.js',
+        ],
+        'web.assets_backend': [
+            'pos_rounding/static/src/components/tax_totals/tax_totals.xml',
         ],
     },
     'installable': True,

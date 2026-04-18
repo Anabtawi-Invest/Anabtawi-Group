@@ -1,0 +1,33 @@
+<odoo>
+    <record id="approval_category_view_form_inherit_sale_line_approval" model="ir.ui.view">
+        <field name="name">approval.category.view.form.inherit.sale.line.approval</field>
+        <field name="model">approval.category</field>
+        <field name="inherit_id" ref="approvals.approval_category_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='options']/group" position="inside">
+                <group string="Sale Line Approval">
+                    <field name="sale_line_approval_enabled"/>
+                    <field
+                        name="sale_line_approval_type"
+                        invisible="not sale_line_approval_enabled"
+                        required="sale_line_approval_enabled"
+                    />
+                    <field
+                        name="sale_discount_min"
+                        invisible="not sale_line_approval_enabled or sale_line_approval_type != 'discount'"
+                        required="sale_line_approval_enabled and sale_line_approval_type == 'discount'"
+                    />
+                    <field
+                        name="sale_discount_max"
+                        invisible="not sale_line_approval_enabled or sale_line_approval_type != 'discount'"
+                        required="sale_line_approval_enabled and sale_line_approval_type == 'discount'"
+                    />
+                    <field
+                        name="sale_min_quantity"
+                        invisible="not sale_line_approval_enabled"
+                    />
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

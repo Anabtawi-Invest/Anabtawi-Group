@@ -10,7 +10,7 @@ class PosConfig(models.Model):
         "product.product",
         string="Rounding Adjustment",
         domain=[("sale_ok", "=", True)],
-        help="Product used to record pledge amount as a POS sale line. Its income account should be a liability.",
+        help="Product used to determine the account for Open Amount adjustments. Its income account should point to the target liability/adjustment account.",
     )
 
     @api.model
@@ -23,11 +23,3 @@ class PosConfig(models.Model):
         if "discount_adjustment_product_id" not in fields_to_load:
             fields_to_load.append("discount_adjustment_product_id")
         return fields_to_load
-
-class PosSession(models.Model):
-    _inherit = "pos.session"
-
-    def _loader_params_pos_config(self):
-        res = super()._loader_params_pos_config()
-        res["search_params"]["fields"].append("discount_adjustment_product_id")
-        return res

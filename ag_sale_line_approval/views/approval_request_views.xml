@@ -1,0 +1,36 @@
+<odoo>
+    <record id="approval_request_view_form_inherit_sale_line_approval" model="ir.ui.view">
+        <field name="name">approval.request.view.form.inherit.sale.line.approval</field>
+        <field name="model">approval.request</field>
+        <field name="inherit_id" ref="approvals.approval_request_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button
+                    name="action_open_sale_order"
+                    type="object"
+                    string="Sale Order"
+                    invisible="not sale_order_id"
+                />
+            </xpath>
+
+            <xpath expr="//group[@name='request_details']" position="after">
+                <group string="Sale Line Approval" invisible="not sale_order_line_id">
+                    <field name="sale_order_id" readonly="1"/>
+                    <field name="sale_order_line_id" readonly="1"/>
+                    <field name="sale_line_change_type" readonly="1"/>
+                    <field
+                        name="sale_line_requested_discount"
+                        readonly="1"
+                        invisible="sale_line_change_type not in ['discount', 'mixed']"
+                    />
+                    <field
+                        name="sale_line_requested_price_unit"
+                        readonly="1"
+                        invisible="sale_line_change_type not in ['price_override', 'mixed']"
+                    />
+                    <field name="sale_line_changes_applied" readonly="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
