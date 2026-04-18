@@ -2,6 +2,7 @@
 
 import { patch } from "@web/core/utils/patch";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
+import { formatCurrency } from "@web/core/currency";
 
 patch(PosOrder.prototype, {
     setup(vals) {
@@ -14,7 +15,7 @@ patch(PosOrder.prototype, {
     },
 
     get currencyOpenAmount() {
-        return this.currency.format(this.getOpenAmount());
+        return formatCurrency(this.getOpenAmount(), this.currency.id);
     },
 
     setOpenAmount(value) {
