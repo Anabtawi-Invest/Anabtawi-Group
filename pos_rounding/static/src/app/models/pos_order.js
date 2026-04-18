@@ -18,6 +18,14 @@ patch(PosOrder.prototype, {
         return formatCurrency(this.getOpenAmount(), this.currency.id);
     },
 
+    get displayedTotalWithoutOpenAmount() {
+        return this.priceIncl - this.getOpenAmount();
+    },
+
+    get currencyDisplayedTotalWithoutOpenAmount() {
+        return formatCurrency(this.displayedTotalWithoutOpenAmount, this.currency.id);
+    },
+
     setOpenAmount(value) {
         this.update({ open_amount: Math.max(Number(value) || 0, 0) });
         this.trigger?.("change", this);
