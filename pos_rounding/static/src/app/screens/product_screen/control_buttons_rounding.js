@@ -92,9 +92,9 @@ if (isNaN(amountWithTax) || amountWithTax <= 0) {
 }
 
 // 🔒 Restrict to maximum 0.09
-if (amountWithTax > 0.09) {
+if (amountWithTax > 0.099) {
     this.notification.add(
-        _t("Maximum allowed rounding amount is 0.09."),
+        _t("Maximum allowed rounding amount is 0.099."),
         { type: "warning" }
     );
     return;
