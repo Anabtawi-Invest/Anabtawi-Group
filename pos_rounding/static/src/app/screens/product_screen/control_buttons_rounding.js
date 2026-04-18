@@ -18,41 +18,6 @@ patch(ControlButtons.prototype, {
             return;
         }
 
-        const extractId = (value) => {
-            if (Array.isArray(value)) {
-                return value[0] ?? null;
-            }
-            if (typeof value === "number") {
-                return value;
-            }
-            if (value && typeof value === "object") {
-                return value.id ?? null;
-            }
-            return null;
-        };
-
-        let adjustmentProductId = extractId(this.pos.config?.discount_adjustment_product_id);
-
-        // Fallback for stale frontend cache: fetch config value directly from backend.
-        if (!adjustmentProductId && this.pos.config?.id) {
-            try {
-                const configData = await this.pos.data.call("pos.config", "read", [
-                    [this.pos.config.id],
-                    ["discount_adjustment_product_id"],
-                ]);
-                adjustmentProductId = extractId(configData?.[0]?.discount_adjustment_product_id);
-            } catch {
-                // Keep silent; user-facing message below is enough.
-            }
-        }
-
-        if (!adjustmentProductId) {
-            this.notification.add(_t("Please configure Discount Adjustment Product in POS settings."), {
-                type: "danger",
-            });
-            return;
-        }
-
         const payload = await makeAwaitable(this.dialog, NumberPopup, {
             title: _t("Enter Rounding Amount"),
             startingValue: order.getOpenAmount?.() || 0,

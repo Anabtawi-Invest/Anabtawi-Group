@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="point_of_sale.OrderDisplay" t-inherit-mode="extension" owl="1">
+        <xpath expr="//div[@id='order-widget-taxes']/.." position="after">
+            <div t-if="order.getOpenAmount()" class="tax-info subentry d-flex justify-content-between w-100 fs-6 text-muted">
+                <span>Open Amount</span>
+                <div id="order-widget-open-amount">
+                    <span t-esc="order.currencyOpenAmount" class="tax"/>
+                </div>
+            </div>
+        </xpath>
+    </t>
+</templates>
