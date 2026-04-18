@@ -10,7 +10,7 @@ class PosConfig(models.Model):
         "product.product",
         string="Rounding Adjustment",
         domain=[("sale_ok", "=", True)],
-        help="Product used to record pledge amount as a POS sale line. Its income account should be a liability.",
+        help="Product used to determine the account for Open Amount adjustments. Its income account should point to the target liability/adjustment account.",
     )
 
     @api.model

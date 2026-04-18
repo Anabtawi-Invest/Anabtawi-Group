@@ -9,8 +9,5 @@
                 </div>
             </div>
         </xpath>
-        <xpath expr="//span[@class='total']" position="replace">
-            <span t-esc="order.currencyDisplayedTotalWithoutOpenAmount" class="total"/>
-        </xpath>
     </t>
 </templates>

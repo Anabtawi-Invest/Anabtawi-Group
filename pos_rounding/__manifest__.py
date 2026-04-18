@@ -25,6 +25,7 @@ Features:
     'depends': ['point_of_sale', 'account', 'sale', 'pos_sale'],
     'data': [
         "views/pos_config_views.xml",
+        "views/report_invoice.xml",
     ],
     'assets': {
         'point_of_sale._assets_pos': [
@@ -32,6 +33,9 @@ Features:
             'pos_rounding/static/src/app/components/order_display/open_amount.xml',
             'pos_rounding/static/src/app/screens/product_screen/control_buttons_rounding.xml',
             'pos_rounding/static/src/app/screens/product_screen/control_buttons_rounding.js',
+        ],
+        'web.assets_backend': [
+            'pos_rounding/static/src/components/tax_totals/tax_totals.xml',
         ],
     },
     'installable': True,

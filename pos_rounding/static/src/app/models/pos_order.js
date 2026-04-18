@@ -18,22 +18,27 @@ patch(PosOrder.prototype, {
         return formatCurrency(this.getOpenAmount(), this.currency.id);
     },
 
-    get displayedTotalWithoutOpenAmount() {
-        return this.priceIncl - this.getOpenAmount();
-    },
-
-    get currencyDisplayedTotalWithoutOpenAmount() {
-        return formatCurrency(this.displayedTotalWithoutOpenAmount, this.currency.id);
-    },
-
     setOpenAmount(value) {
         this.update({ open_amount: Math.max(Number(value) || 0, 0) });
+        this.triggerRecomputeAllPrices();
         this.trigger?.("change", this);
     },
 
     serializeForORM(opts = {}) {
         const data = super.serializeForORM(opts);
         data.open_amount = this.getOpenAmount();
+        return data;
+    },
+
+    _constructPriceData(opts = {}) {
+        const data = super._constructPriceData(opts);
+        const openAmount = this.getOpenAmount();
+        if (!openAmount) {
+            return data;
+        }
+
+        data.taxDetails.total_amount_no_rounding -= openAmount;
+        data.taxDetails.total_amount -= openAmount;
         return data;
     },
 });
