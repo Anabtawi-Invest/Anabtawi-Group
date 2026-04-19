@@ -70,7 +70,7 @@
                         string="Create Payment"
                         class="btn-primary"
                         groups="point_of_sale.group_pos_manager"
-                        invisible="state in ('cancel','fully_paid') or state != 'confirmed' or advance_pos_order_id or advance_amount &lt;= 0"
+                        invisible="state in ('cancel','fully_paid') or state != 'confirmed' or advance_pos_order_id or advance_amount &lt;= 0 or pos_config_enable_advance_order"
                     />
                     <button
                         name="action_print_receipt"

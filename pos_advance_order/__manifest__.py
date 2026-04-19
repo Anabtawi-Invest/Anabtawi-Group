@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "POS Advance Order-anabtawi-Approved Module",
+    "name": "POS Advance Order-two cashiers ",
+    "author":"Anabtawi",
     "version": "19.0.1.0.0",
     "category": "Point of Sale",
     "summary": "Create and manage advance orders for POS pickup",
@@ -30,6 +31,17 @@
         "report/pos_advance_order_full_receipt.xml",
 
     ],
+    "assets": {
+        "point_of_sale._assets_pos": [
+            "pos_advance_order/static/src/app/screens/product_screen/payment_button_visibility.xml",
+            "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_form_popup.js",
+            "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_form_popup.xml",
+            "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/complete_advance_order_popup.js",
+            "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/complete_advance_order_popup.xml",
+            "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_button.js",
+            "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_button.xml",
+        ],
+    },
     "installable": True,
     "application": False,
     "auto_install": False,
