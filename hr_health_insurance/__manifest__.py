@@ -4,6 +4,7 @@
     'version': '1.0',
     'category': 'Human Resources',
     'summary': 'Employee health insurance management.',
+    "author":"Anabtawi",
     'description': """
       * This module helps track detailed health insurance policies for employees and their dependents, with dynamic computation of policy amounts based on:
          - Insurance Grades
