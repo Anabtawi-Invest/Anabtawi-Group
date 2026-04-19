@@ -4,7 +4,7 @@
     "version": "19.0.1.0.0",
     "summary": "Auto-create absent work entries when no check in exists",
     "category": "Human Resources",
-    "author": "Custom",
+    "author":"Anabtawi",
     "license": "LGPL-3",
     "depends": [
         "hr_attendance",
