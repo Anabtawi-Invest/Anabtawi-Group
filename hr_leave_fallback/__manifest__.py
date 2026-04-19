@@ -3,7 +3,7 @@
     "version": "19.0.1.0.0",
     "summary": "Fallback leave requests to Sick, Annual, then Unpaid",
     "category": "Human Resources/Time Off",
-    "author": "Anabtawi Group",
+    "author":"Anabtawi",
     "license": "LGPL-3",
     "depends": [
         "hr_holidays",
