@@ -1,0 +1,128 @@
+<odoo>
+  <template id="packing_list_body">
+    <t t-call="web.html_container">
+      <t t-foreach="docs" t-as="o">
+        <t t-set="lines" t-value="lines_map.get(o.id, [])"/>
+        <t t-set="tot" t-value="totals_map.get(o.id, {})"/>
+
+        <t t-call="web.external_layout">
+          <div class="page">
+
+            <!-- Center title -->
+            <h2 style="text-align:center; margin-bottom:12px;">Packing List</h2>
+
+            <!-- Keep header original alignment (left/right) -->
+            <div class="row">
+              <div class="col-6">
+                <strong t-esc="o.company_id.name"/>
+                <div>Invoice No: <span t-esc="o.name"/></div>
+                <div t-if="o.invoice_date">Date: <span t-esc="o.invoice_date"/></div>
+              </div>
+              <div class="col-6" style="text-align:right;">
+                <div>Customer: <span t-esc="o.partner_id.name"/></div>
+                <div t-if="o.partner_id.vat">VAT: <span t-esc="o.partner_id.vat"/></div>
+                <div t-if="o.partner_id.phone">Tel: <span t-esc="o.partner_id.phone"/></div>
+                <div t-if="o.partner_id.email">Email: <span t-esc="o.partner_id.email"/></div>
+              </div>
+            </div>
+
+            <br/>
+
+            <!-- TABLE centered + fit -->
+            <div style="width:100%; text-align:center;">
+              <table class="table table-sm table-bordered"
+                     style="
+                       display:inline-table;
+                       width:98%;
+                       table-layout:fixed;
+                       text-align:center;
+                       font-size:10.5px;
+                       margin:0 auto;
+                     ">
+                <thead>
+                  <tr>
+                    <th style="width:12%;">Barcode</th>
+                    <th style="width:6%;">HS<br/>Code</th>
+
+                    <t t-if="show_dates">
+                      <th style="width:9%;">Production<br/>Date</th>
+                      <th style="width:9%;">Expiry<br/>Date</th>
+                    </t>
+
+                    <th style="width:14%;">Product</th>
+                    <th style="width:6%;">Net<br/>Wt/Kg</th>
+                    <th style="width:6%;">Gross<br/>Wt/Kg</th>
+                    <th style="width:7%;">Pack<br/>Type</th>
+                    <th style="width:8%;">Units</th>
+                    <th style="width:8%;">Qty/Carton</th>
+                    <th style="width:7%;">Total<br/>Cartons</th>
+                    <th style="width:8%;">Total Net<br/>Wt/Kg</th>
+                    <th style="width:10%;">Total Gross<br/>Wt/Kg</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <t t-foreach="lines" t-as="l">
+                    <tr>
+                      <td style="word-break:break-all; white-space:normal;">
+                        <t t-esc="l.get('barcode','')"/>
+                      </td>
+                      <td style="word-break:break-word; white-space:normal;">
+                        <t t-esc="l.get('hs_code','')"/>
+                      </td>
+
+                      <t t-if="show_dates">
+                        <td style="word-break:break-word; white-space:normal;">
+                          <t t-esc="l.get('production_date') or ''"/>
+                        </td>
+                        <td style="word-break:break-word; white-space:normal;">
+                          <t t-esc="l.get('expiry_date') or ''"/>
+                        </td>
+                      </t>
+
+                      <td style="word-break:break-word; white-space:normal;">
+                        <t t-esc="l.get('product_name','')"/>
+                      </td>
+
+                      <td><t t-esc="'%.2f' % (l.get('net_w',0.0) or 0.0)"/></td>
+                      <td><t t-esc="'%.2f' % (l.get('gross_w',0.0) or 0.0)"/></td>
+
+                      <td style="word-break:break-word; white-space:normal;">
+                        <t t-esc="l.get('package_type','')"/>
+                      </td>
+
+                      <td><t t-esc="'%.2f' % (l.get('units',0.0) or 0.0)"/></td>
+                      <td><t t-esc="l.get('qty_per_carton',0)"/></td>
+                      <td><t t-esc="'%.2f' % (l.get('cartons',0.0) or 0.0)"/></td>
+                      <td><t t-esc="'%.2f' % (l.get('net_total',0.0) or 0.0)"/></td>
+                      <td><t t-esc="'%.2f' % (l.get('gross_total',0.0) or 0.0)"/></td>
+                    </tr>
+                  </t>
+                </tbody>
+
+                <tfoot>
+                  <tr>
+                    <!-- Totals label colspan must match number of columns before Units -->
+                    <t t-if="show_dates">
+                      <th colspan="8" style="text-align:left;">Totals</th>
+                    </t>
+                    <t t-else="">
+                      <th colspan="6" style="text-align:left;">Totals</th>
+                    </t>
+
+                    <th><t t-esc="'%.2f' % (tot.get('tot_units',0.0) or 0.0)"/></th>
+                    <th></th>
+                    <th><t t-esc="'%.2f' % (tot.get('tot_cartons',0.0) or 0.0)"/></th>
+                    <th><t t-esc="'%.2f' % (tot.get('tot_net',0.0) or 0.0)"/></th>
+                    <th><t t-esc="'%.2f' % (tot.get('tot_gross',0.0) or 0.0)"/></th>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+          </div>
+        </t>
+      </t>
+    </t>
+  </template>
+</odoo>
