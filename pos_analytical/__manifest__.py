@@ -3,7 +3,7 @@
 
 {
     "name": "POS Analytic Account",
-    "author": "Softhealer Technologies",
+    "author":"Anabtawi",
     "website": "https://www.softhealer.com",
     "support": "support@softhealer.com",
     "category": "Point Of Sale",
