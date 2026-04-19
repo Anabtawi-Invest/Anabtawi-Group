@@ -3,6 +3,7 @@
     'name': 'POS Price list enhancement  ',
     'version': '1.1',
     'category': 'Point of Sale',
+    "author":"Anabtawi",
     'summary': 'Manage pledge (Rahn) scenarios with employees, delivery, and accounting',
     'description': """
    
