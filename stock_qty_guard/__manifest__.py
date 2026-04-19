@@ -3,7 +3,7 @@
     "version": "19.0.1.0.0",
     "summary": "Block done qty greater than demand in pickings-Ameen",
     "depends": ["stock"],
-    "author":"Ameen_Arabiyat",
+    "author":"Anabtawi",
     "data": [],
     "installable": True,
     "application": False,
