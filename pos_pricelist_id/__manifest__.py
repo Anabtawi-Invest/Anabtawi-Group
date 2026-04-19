@@ -4,6 +4,7 @@
     'version': '1.1',
     'category': 'Point of Sale',
     'summary': 'Manage pledge (Rahn) scenarios with employees, delivery, and accounting',
+    "author":"Anabtawi",
     'description': """
    
     """,
