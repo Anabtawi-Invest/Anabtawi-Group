@@ -3,7 +3,7 @@
     'version': '19.0.1.0.4',
     'summary': 'Cover lateness using OT buckets then Annual Leave (hours) then remaining lateness for payroll deduction. No OT Bank.',
     'category': 'Human Resources/Payroll',
-    'author': 'Rana Faris',
+    "author":"Anabtawi",
     'license': 'LGPL-3',
     'depends': [
         'hr_payroll',
