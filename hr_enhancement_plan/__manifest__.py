@@ -4,6 +4,7 @@
     'version': '1.0',
     'category': 'Human Resources',
     'summary': 'Accrual plan milestone from contract start and other HR enhancements',
+    "author":"Anabtawi",
     'description': """
         Adds option to base leave accrual plan milestones on employee contract start date
         instead of allocation start date (e.g. "After 4 years" = 4 years from contract start).
