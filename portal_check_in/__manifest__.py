@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': "SW - check in",
+    "author":"Anabtawi",
     'summary': "",
     'description': """
     """,
