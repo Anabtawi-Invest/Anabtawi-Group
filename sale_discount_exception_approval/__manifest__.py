@@ -5,7 +5,7 @@
     "version": "19.0.2.0.0",
     "category": "Sales/Sales",
     "license": "LGPL-3",
-    "author": "Softobia",
+    "author":"Anabtawi",
     "depends": ["sale", "mail"],
     "data": [
         "security/security.xml",
