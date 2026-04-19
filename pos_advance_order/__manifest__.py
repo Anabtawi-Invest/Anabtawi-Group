@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Advance Order",
+    "author":"Anabtawi",
     "version": "19.0.1.0.0",
     "category": "Point of Sale",
     "summary": "Create and manage advance orders for POS pickup",
