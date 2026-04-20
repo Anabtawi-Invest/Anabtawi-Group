@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <record id="zk_bridge_attendance_log_view_list" model="ir.ui.view">
+        <field name="name">zk.bridge.attendance.log.view.list</field>
+        <field name="model">zk.bridge.attendance.log</field>
+        <field name="arch" type="xml">
+            <list create="false" delete="false" decoration-danger="state == 'error'" decoration-warning="state == 'unmatched'">
+                <field name="punch_time"/>
+                <field name="device_id"/>
+                <field name="device_user_id"/>
+                <field name="employee_id"/>
+                <field name="punch_type"/>
+                <field name="state"/>
+                <field name="hr_attendance_id"/>
+                <field name="source"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="zk_bridge_attendance_log_view_form" model="ir.ui.view">
+        <field name="name">zk.bridge.attendance.log.view.form</field>
+        <field name="model">zk.bridge.attendance.log</field>
+        <field name="arch" type="xml">
+            <form create="false" delete="false" edit="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="device_id"/>
+                            <field name="company_id"/>
+                            <field name="employee_id"/>
+                            <field name="hr_attendance_id"/>
+                        </group>
+                        <group>
+                            <field name="device_user_id"/>
+                            <field name="punch_time"/>
+                            <field name="punch_type"/>
+                            <field name="state"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="source"/>
+                        <field name="import_key"/>
+                        <field name="error_message"/>
+                    </group>
+                    <group>
+                        <field name="raw_payload" widget="text"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="zk_bridge_attendance_log_search_view" model="ir.ui.view">
+        <field name="name">zk.bridge.attendance.log.search</field>
+        <field name="model">zk.bridge.attendance.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="device_id"/>
+                <field name="device_user_id"/>
+                <field name="employee_id"/>
+                <field name="state"/>
+                <filter string="Imported" name="imported" domain="[('state', '=', 'imported')]"/>
+                <filter string="Unmatched" name="unmatched" domain="[('state', '=', 'unmatched')]"/>
+                <filter string="Errors" name="errors" domain="[('state', '=', 'error')]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="zk_bridge_attendance_log_action" model="ir.actions.act_window">
+        <field name="name">Bridge Attendance Logs</field>
+        <field name="res_model">zk.bridge.attendance.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
