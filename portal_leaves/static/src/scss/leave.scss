@@ -1,0 +1,47 @@
+.cancel-draft, .cancel-request {
+    cursor: pointer;
+    color: white;
+    background-color: gray;
+    font-size: 10px;
+    padding: 2px 12px;
+}
+
+.cancel-sent {
+    font-size: 12px;
+}
+
+.o_timeoff_big {
+    font-size: 22px;
+}
+
+.state.refuse .badge, .state-big.refuse {
+    background-color: #e6729f !important;
+}
+
+select[readonly=readonly], 
+input[readonly=readonly],
+textarea[readonly=readonly]{
+    border: none;
+    pointer-events: none;
+    background-color: transparent !important;
+}
+
+select[readonly=readonly], 
+input[readonly=readonly]:not([type=checkbox]),
+textarea[readonly=readonly]{
+   appearance: none;
+}
+
+.dates { 
+    input {
+        text-align: left;
+        padding-left: 0;
+    }
+}
+
+input[type="time"] {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+}

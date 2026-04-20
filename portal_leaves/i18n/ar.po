@@ -1,0 +1,464 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* portal_leaves
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0+e\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-07-31 08:26+0000\n"
+"PO-Revision-Date: 2025-07-31 11:33+0300\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5);\n"
+"X-Generator: Poedit 3.5\n"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+msgid ""
+"&amp;nbsp;&amp;nbsp;&amp;nbsp; - &amp;nbsp;\n"
+"                                &amp;nbsp;\n"
+"                                &amp;nbsp;"
+msgstr ""
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid ""
+"<select name=\"request_date_from_period\" class=\"ml8 form-control\">\n"
+"                                    <option value=\"am\">Morning</option>\n"
+"                                    <option value=\"pm\">Afternoon</option>\n"
+"                                </select>"
+msgstr ""
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+msgid "<small class=\"text-end\">Stage:</small>"
+msgstr "<small class=\"text-end\">الحالة:</small>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "<span class=\"ml8 mr8 from\">From</span>"
+msgstr "<span class=\"ml8 mr8 from\">من</span>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "<span class=\"ml8 mr8 to\">From</span>"
+msgstr "<span class=\"ml8 mr8 to\">من</span>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "<span class=\"ml8 mr8 to\">To</span>"
+msgstr "<span class=\"ml8 mr8 to\">إلى</span>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid ""
+"<span id=\"file-label-text\" style=\"font-size: 14px; color: #555;\">Drag and drop files\n"
+"                                        here or click to browse\n"
+"                                    </span>"
+msgstr ""
+"<span id=\"file-label-text\" style=\"font-size: 14px; color: #555;\">قم بإرفاق الملفات هنا\n"
+"                                        أو أضغط  للتصفح\n"
+"                                    </span>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+msgid "<span>Time Off</span>"
+msgstr "<span>الإجازة</span>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+msgid "<strong class=\"col-lg-2\">Dates</strong>"
+msgstr "<strong class=\"col-lg-2\">التاريخ</strong>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+msgid "<strong class=\"col-lg-2\">Description</strong>"
+msgstr "<strong class=\"col-lg-2\">الوصف</strong>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+msgid "<strong class=\"col-lg-2\">Documents</strong>"
+msgstr "<strong class=\"col-lg-2\">المستندات</strong>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+msgid "<strong class=\"col-lg-2\">Duration</strong>"
+msgstr "<strong class=\"col-lg-2\">المدة</strong>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+msgid "<strong class=\"col-lg-2\">Time Off Type</strong>"
+msgstr "<strong class=\"col-lg-2\">نوع الإجازة</strong>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+msgid "<strong>Message and communication history</strong>"
+msgstr "<strong>سجل الرسائل والاتصالات</strong>"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+msgid "<strong>Waiting Approval</strong>"
+msgstr "<strong>بانتظار الموافقة</strong>"
+
+#. module: portal_leaves
+#: model:ir.model.fields,field_description:portal_leaves.field_hr_leave__access_warning
+msgid "Access warning"
+msgstr ""
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "All"
+msgstr "الجميع"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_request_page
+msgid "Approve"
+msgstr "موافقة"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Approved"
+msgstr "موافق عليها"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+msgid "Approver"
+msgstr "مانح الموافقة"
+
+#. module: portal_leaves
+#: model:ir.model,name:portal_leaves.model_hr_employee_base
+msgid "Basic Employee"
+msgstr "الموظف العادي "
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Confirmed"
+msgstr "موافق"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+msgid "Contact"
+msgstr "جهة الاتصال"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+msgid "Create New Request"
+msgstr "إنشاء طلب جدبد"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "Create Time Off Request"
+msgstr "إنشاء طلب إجازة"
+
+#. module: portal_leaves
+#: model:ir.model.fields,field_description:portal_leaves.field_hr_leave__current_approver
+msgid "Current Approver"
+msgstr "المعتَمِد الحالي"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
+msgid "Current stage of this leave"
+msgstr "المرحلة الحالية لهذه الإجازة"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "Custom Hours"
+msgstr "ساعات مخصصة"
+
+#. module: portal_leaves
+#: model:ir.model.fields,help:portal_leaves.field_hr_leave__access_url
+msgid "Customer Portal URL"
+msgstr ""
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "Dates"
+msgstr "التاريخ"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+msgid "Days"
+msgstr "الأيام"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_requests
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "Description"
+msgstr "الوصف"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Draft"
+msgstr "مسودة"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_requests
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "Duration"
+msgstr "المدة"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_requests
+msgid "Employee"
+msgstr "الموظف"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_requests
+msgid "End Date"
+msgstr "إلى"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "Half Day"
+msgstr "نصف يوم"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+msgid "Hours"
+msgstr "الساعات"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Last month"
+msgstr "اخر شهر"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Last week"
+msgstr "اخر اسبوع"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Last year"
+msgstr "اخر سنة"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_home_menu_leave
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_requests
+msgid "Leave Requests"
+msgstr "طلبات الإجازة"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Leave Type"
+msgstr "نوع الإجازة"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_home_menu_leave
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+msgid "Leaves"
+msgstr "الإجازات"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_requests
+msgid "Mode"
+msgstr "الوضعية"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_home_menu_leave
+msgid "New Time off Request"
+msgstr "إجازة جديدة"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Newest"
+msgstr "الأحدث"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "None"
+msgstr "لا شيء"
+
+#. module: portal_leaves
+#: model:ir.model.fields,field_description:portal_leaves.field_hr_leave__access_url
+msgid "Portal Access URL"
+msgstr ""
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_request_page
+msgid "Refuse"
+msgstr "رفض"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Refused"
+msgstr "مرفوضة"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Search In Description"
+msgstr ""
+
+#. module: portal_leaves
+#: model:ir.model.fields,field_description:portal_leaves.field_hr_leave__access_token
+msgid "Security Token"
+msgstr ""
+
+#. module: portal_leaves
+#: model:ir.model.fields,help:portal_leaves.field_hr_employee__leave_manager_id
+#: model:ir.model.fields,help:portal_leaves.field_hr_employee_base__leave_manager_id
+#: model:ir.model.fields,help:portal_leaves.field_hr_employee_public__leave_manager_id
+msgid ""
+"Select the user responsible for approving \"Time Off\" of this employee.\n"
+"If empty, the approval is done by an Administrator or Approver (determined in settings/users)."
+msgstr ""
+"قم بتحديد المستخدم المسؤول عن الموافقة على \"إجازات\" هذا الموظف. \n"
+"إذا كان فارغاً، تتم الموافقة بواسطة مدير أو مانح الموافقة (يحدد في الإعدادات/المستخدمين). "
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Stage"
+msgstr "الحالة"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_requests
+msgid "Start Date"
+msgstr "من"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "State"
+msgstr ""
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_requests
+msgid "Status"
+msgstr "الحالة"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "Submit"
+msgstr "إرسال"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Submitted!"
+msgstr "تم الإرسال"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "The field '%s' does not exist in the targeted model"
+msgstr ""
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "The start date must be anterior to the end date"
+msgstr ""
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_requests
+msgid "There are currently no leaves for your account."
+msgstr "لا يوجد حاليا أي إجازات لحسابك."
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "There is no time-off types for portal"
+msgstr ""
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "This Quarter"
+msgstr ""
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "This month"
+msgstr "هذه الشهر"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "This week"
+msgstr "هذه الاسبوع"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "This year"
+msgstr "هذه السنة"
+
+#. module: portal_leaves
+#: model:ir.model,name:portal_leaves.model_hr_leave
+#: model:ir.model.fields,field_description:portal_leaves.field_hr_employee__leave_manager_id
+#: model:ir.model.fields,field_description:portal_leaves.field_hr_employee_base__leave_manager_id
+#: model:ir.model.fields,field_description:portal_leaves.field_hr_employee_public__leave_manager_id
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_home_leave
+msgid "Time Off"
+msgstr "الإجازات "
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_home_menu_leave
+msgid "Time Off ("
+msgstr "الإجازات ("
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_home_request
+msgid "Time Off To Approve"
+msgstr "بانتظار الموافقة"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+#: model:ir.model,name:portal_leaves.model_hr_leave_type
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_requests
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "Time Off Type"
+msgstr "نوع الإجازة "
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Today"
+msgstr "اليوم"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "Upload Document:"
+msgstr "تحميل المرفق:"
+
+#. module: portal_leaves
+#: model:ir.model,name:portal_leaves.model_res_users
+msgid "User"
+msgstr "المستخدم"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_request_page
+msgid "Validate"
+msgstr "تحقق"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_home_leave
+msgid "View your time off requests and create new ones"
+msgstr "قم بمراجعة طلبات الإجازة الخاصة بك أو انشاء طلبات جديدة"
