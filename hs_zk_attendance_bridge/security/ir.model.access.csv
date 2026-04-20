@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_biometric_device_bridge_user,access.biometric.device.bridge.user,model_biometric_device_bridge,hr_attendance.group_hr_attendance_officer,1,1,1,1
+access_zk_bridge_attendance_log_user,access.zk.bridge.attendance.log.user,model_zk_bridge_attendance_log,hr_attendance.group_hr_attendance_officer,1,0,0,0

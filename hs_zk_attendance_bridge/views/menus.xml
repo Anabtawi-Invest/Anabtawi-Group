@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <menuitem
+        id="menu_hs_zk_attendance_bridge_root"
+        name="Biometric Bridge"
+        parent="hr_attendance.menu_hr_attendance_root"
+        sequence="25"
+        groups="hr_attendance.group_hr_attendance_officer"
+    />
+
+    <menuitem
+        id="menu_hs_zk_attendance_bridge_devices"
+        name="Bridge Devices"
+        parent="menu_hs_zk_attendance_bridge_root"
+        action="biometric_device_bridge_action"
+        sequence="10"
+        groups="hr_attendance.group_hr_attendance_officer"
+    />
+
+    <menuitem
+        id="menu_hs_zk_attendance_bridge_logs"
+        name="Attendance Logs"
+        parent="menu_hs_zk_attendance_bridge_root"
+        action="zk_bridge_attendance_log_action"
+        sequence="20"
+        groups="hr_attendance.group_hr_attendance_officer"
+    />
+</odoo>
