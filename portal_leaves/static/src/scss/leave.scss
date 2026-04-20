@@ -14,6 +14,95 @@
     font-size: 22px;
 }
 
+.o_leave_balance_cards {
+    --leave-card-shadow: 0 18px 45px rgba(42, 28, 72, 0.08);
+}
+
+.o_leave_balance_card {
+    height: 100%;
+    padding: 22px 24px;
+    border-radius: 18px;
+    color: #2b2238;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f3ff 100%);
+    border: 1px solid rgba(118, 78, 160, 0.12);
+    box-shadow: var(--leave-card-shadow);
+}
+
+.o_leave_balance_card--annual {
+    background: linear-gradient(135deg, #fffaf1 0%, #fff1da 100%);
+    border-color: rgba(210, 156, 72, 0.18);
+}
+
+.o_leave_balance_card--extra {
+    background: linear-gradient(135deg, #f4f8ff 0%, #e9f1ff 100%);
+    border-color: rgba(92, 127, 196, 0.18);
+}
+
+.o_leave_balance_card__header,
+.o_leave_balance_card__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.o_leave_balance_card__label {
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8c729d;
+}
+
+.o_leave_balance_card__title {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.o_leave_balance_card__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 58px;
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.7);
+    color: #684382;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.o_leave_balance_card__value {
+    margin: 18px 0 14px;
+    font-size: 40px;
+    line-height: 1;
+    font-weight: 800;
+    color: #5f2d83;
+}
+
+.o_leave_balance_card__value small {
+    font-size: 15px;
+    font-weight: 600;
+    color: #6c6181;
+}
+
+.o_leave_balance_card__meta {
+    padding-top: 14px;
+    border-top: 1px solid rgba(101, 78, 132, 0.12);
+    font-size: 14px;
+    color: #62576f;
+}
+
+.o_leave_balance_card__hint {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #85778f;
+}
+
 .state.refuse .badge, .state-big.refuse {
     background-color: #e6729f !important;
 }

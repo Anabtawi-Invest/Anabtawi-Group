@@ -47,34 +47,37 @@
                 <t t-set="title">Leaves</t>
             </t>
             <a type="button" class="btn btn-primary mt16 mb16" href="/my/leaves/request">Create New Request</a>
-            <div class="o_timeoff_container d-flex mb32 bg-white py-2 px-3">
-                <t t-foreach="timeoff_types" t-as="timeoff">
-                    <div class="o_timeoff_card flex-grow-1 d-flex flex-column">
-                        <t t-set="need_allocation" t-value="not timeoff[2] == 'no'"/>
-                        <t t-set="cl" t-value="'text-muted'"/>
-                        <t t-if="need_allocation and timeoff[1]['virtual_remaining_leaves']">
-                            <t t-set="cl" t-value="'o_timeoff_green'"/>
-                        </t>
-                        <div class="mt-2">
-                            <t t-if="need_allocation">
-                                <span t-esc="timeoff[1]['virtual_remaining_leaves']"
-                                      class="o_timeoff_big o_timeoff_purple"/>
-                                /
-                                <span t-esc="timeoff[1]['max_leaves']"/>
-                                <t t-if="timeoff[1]['request_unit'] == 'hour'">Hours</t>
-                                <t t-else="">Days</t>
-                            </t>
-                            <t t-else="">
-                                <span t-esc="timeoff[1]['virtual_leaves_taken']"
-                                      class="o_timeoff_big o_timeoff_purple"/>
-                                <t t-if="timeoff[1]['request_unit'] == 'hour'">Hours</t>
-                                <t t-else="">Days</t>
-                            </t>
+            <div class="o_leave_balance_cards row g-3 mb32">
+                <t t-foreach="featured_timeoff_balances" t-as="balance">
+                    <div class="col-12 col-md-6">
+                        <div t-attf-class="o_leave_balance_card o_leave_balance_card--#{balance['theme']}">
+                            <div class="o_leave_balance_card__header">
+                                <div>
+                                    <div class="o_leave_balance_card__label">
+                                        <t t-esc="balance['label']"/>
+                                    </div>
+                                    <h4 class="o_leave_balance_card__title mb-0">
+                                        <t t-esc="balance['display_name']"/>
+                                    </h4>
+                                </div>
+                                <span class="o_leave_balance_card__badge">
+                                    <t t-esc="balance['unit_short']"/>
+                                </span>
+                            </div>
+                            <div class="o_leave_balance_card__value">
+                                <t t-esc="balance['available']"/>
+                                <small>
+                                    <t t-esc="balance['unit_label']"/>
+                                </small>
+                            </div>
+                            <div class="o_leave_balance_card__meta">
+                                <span>Total: <t t-esc="balance['total']"/> <t t-esc="balance['unit_label']"/></span>
+                                <span>Used: <t t-esc="balance['used']"/> <t t-esc="balance['unit_label']"/></span>
+                            </div>
+                            <div t-if="balance['missing']" class="o_leave_balance_card__hint">
+                                No allocated balance available yet.
+                            </div>
                         </div>
-                        <b>
-                            <span t-esc="timeoff[0]" class="o_timeoff_name"/>
-                        </b>
-
                     </div>
                 </t>
             </div>

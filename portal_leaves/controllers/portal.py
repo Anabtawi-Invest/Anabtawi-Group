@@ -174,6 +174,55 @@ class EmployeePortal(CustomerPortal):
             'holiday_status_id': 'holiday_status_id',
         }
 
+    def _get_portal_timeoff_types(self, employee):
+        if not employee:
+            return []
+        return request.env['hr.leave.type'].sudo().with_company(employee.company_id).with_context(
+            employee_id=employee.id,
+            allowed_company_ids=[employee.company_id.id],
+        ).get_allocation_data_request(hidden_allocations=False)
+
+    def _prepare_featured_timeoff_balances(self, timeoff_types):
+        def _normalize_name(name):
+            return (name or '').strip().lower()
+
+        def _match_timeoff(keywords, *, request_unit=None):
+            for timeoff in timeoff_types:
+                name = _normalize_name(timeoff[0])
+                data = timeoff[1]
+                if request_unit and data.get('request_unit') != request_unit:
+                    continue
+                if any(keyword in name for keyword in keywords):
+                    return timeoff
+            return None
+
+        def _serialize_balance(default_title, theme, timeoff):
+            data = timeoff[1] if timeoff else {}
+            request_unit = data.get('request_unit') or 'day'
+            unit_label = _('Hours') if request_unit == 'hour' else _('Days')
+            unit_short = _('Hrs') if request_unit == 'hour' else _('Days')
+            return {
+                'label': default_title,
+                'display_name': timeoff[0] if timeoff else default_title,
+                'available': round(data.get('virtual_remaining_leaves', 0.0), 2),
+                'total': round(data.get('max_leaves', 0.0), 2),
+                'used': round(data.get('virtual_leaves_taken', 0.0), 2),
+                'unit_label': unit_label,
+                'unit_short': unit_short,
+                'theme': theme,
+                'missing': not bool(timeoff),
+            }
+
+        annual_leave = _match_timeoff(['annual', 'vacation'], request_unit='day')
+        extra_hours = _match_timeoff(['extra', 'overtime'], request_unit='hour')
+        if not extra_hours:
+            extra_hours = _match_timeoff(['extra', 'overtime', 'hour'], request_unit='hour')
+
+        return [
+            _serialize_balance(_('Annual Leave'), 'annual', annual_leave),
+            _serialize_balance(_('Extra Hours'), 'extra', extra_hours),
+        ]
+
     @http.route(['/my/leaves', '/my/leaves/page/<int:page>'], type='http', auth="user", website=True)
     def portal_my_leaves(self, sortby=None, groupby='none', filterby='all', search=None, search_in='content', page=1, **kwargs):
         values = self._prepare_leaves_portal_rendering_values(sortby, groupby, filterby, search,
@@ -182,8 +231,9 @@ class EmployeePortal(CustomerPortal):
         timeoffs = request.env['hr.leave.type'].sudo()
         timeoff_types = []
         if employee:
-            timeoffs = timeoffs.search([('virtual_remaining_leaves', '>', 0)])
-            timeoff_types = timeoffs.with_company(employee.company_id).with_context(employee_id=employee.id).get_allocation_data_request()
+            timeoff_types = self._get_portal_timeoff_types(employee)
+            timeoffs = request.env['hr.leave.type'].sudo().browse([timeoff[3] for timeoff in timeoff_types])
+        featured_timeoff_balances = self._prepare_featured_timeoff_balances(timeoff_types)
         _logger.info(
             "Portal my leaves page: user_id=%s employee_id=%s employee_company_id=%s leaves_count=%s "
             "raw_timeoff_type_ids=%s rendered_timeoff_types_count=%s rendered_timeoff_type_names=%s",
@@ -211,6 +261,7 @@ class EmployeePortal(CustomerPortal):
                 timeoffs.ids,
             )
         values['timeoff_types'] = timeoff_types
+        values['featured_timeoff_balances'] = featured_timeoff_balances
         leaves = values['leaves']
         request.session['my_leaves_history'] = leaves.ids[:100]
         return request.render("portal_leaves.portal_my_leaves", values)
@@ -241,35 +292,20 @@ class EmployeePortal(CustomerPortal):
             sorted(post.keys()),
         )
         if employee:
-            timeoff_domain = [
-                '|',
-                ('requires_allocation', '=', 'no'),
-                '&',
-                ('has_valid_allocation', '=', True),
-                '&',
-                ('max_leaves', '>', '0'),
-                '|',
-                ('allows_negative', '=', True),
-                '&',
-                ('virtual_remaining_leaves', '>', 0),
-                ('allows_negative', '=', False),
-                '|',
-                ('company_id', '=', employee.company_id.id),
-                ('company_id', '=', False),
-            ]
-            timeoffs = request.env['hr.leave.type'].sudo().search(timeoff_domain)
+            timeoff_data = self._get_portal_timeoff_types(employee)
+            timeoffs = request.env['hr.leave.type'].sudo().browse([timeoff[3] for timeoff in timeoff_data])
             timeoff_types = self.request_name_get(timeoffs)
             day_hours = employee.resource_calendar_id.hours_per_day / 2 if employee.resource_calendar_id else 0
             _logger.info(
                 "Portal leave request form options: user_id=%s employee_id=%s company_id=%s calendar_id=%s "
-                "timeoff_domain=%s matched_timeoff_type_ids=%s matched_timeoff_type_names=%s half_day_hours=%s",
+                "matched_timeoff_type_ids=%s matched_timeoff_type_names=%s hidden_filter=%s half_day_hours=%s",
                 request.env.user.id,
                 employee.id,
                 employee.company_id.id,
                 employee.resource_calendar_id.id if employee.resource_calendar_id else False,
-                timeoff_domain,
                 timeoffs.ids,
                 timeoffs.mapped('name'),
+                "hide_on_dashboard=False",
                 day_hours,
             )
             if not timeoff_types:
