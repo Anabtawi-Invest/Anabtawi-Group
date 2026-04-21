@@ -7,19 +7,19 @@
         <field name="priority" eval="1000"/>
         <field name="arch" type="xml">
             <xpath expr="//setting[field[@name='attendance_device_tracking']]" position="after">
-                <setting string="Restrict Attendance by Employee Work Location"
+                <setting string="Restrict Attendance by Company Location"
                     company_dependent="1"
-                    help="Allow check-in only when employees are inside their assigned work location radius. Employees without a work location fall back to the company coordinates below.">
+                    help="Allow check-in only when employees are inside the configured company radius.">
                     <field name="attendance_geo_enforce"/>
                     <div class="mt-2" invisible="not attendance_geo_enforce">
                         <div class="o_row mb-2">
-                            <span class="me-2">Fallback Company Coordinates</span>
+                            <span class="me-2">Company Coordinates</span>
                             <field name="attendance_geo_latitude" class="oe_inline"/>
                             <span class="mx-1">,</span>
                             <field name="attendance_geo_longitude" class="oe_inline"/>
                         </div>
                         <div class="o_row">
-                            <span class="me-2">Fallback Radius</span>
+                            <span class="me-2">Allowed Radius</span>
                             <field name="attendance_geo_radius_m" class="oe_inline" style="width: 8rem;"/>
                             <span class="ms-2">meters</span>
                         </div>
@@ -46,22 +46,4 @@
         </field>
     </record>
 
-    <record id="hr_work_location_form_view_geofence" model="ir.ui.view">
-        <field name="name">hr.work.location.form.geofence</field>
-        <field name="model">hr.work.location</field>
-        <field name="inherit_id" ref="hr.hr_work_location_form_view"/>
-        <field name="priority" eval="1000"/>
-        <field name="arch" type="xml">
-            <field name="address_id" position="after">
-                <label for="attendance_geo_latitude" string="Attendance Coordinates"
-                    groups="hr_attendance.group_hr_attendance_manager"/>
-                <div class="o_row" groups="hr_attendance.group_hr_attendance_manager">
-                    <field name="attendance_geo_latitude" class="oe_inline"/>
-                    <span class="mx-1">,</span>
-                    <field name="attendance_geo_longitude" class="oe_inline"/>
-                </div>
-                <field name="attendance_geo_radius_m" groups="hr_attendance.group_hr_attendance_manager"/>
-            </field>
-        </field>
-    </record>
 </odoo>

@@ -36,28 +36,6 @@ class HrEmployee(models.Model):
         c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
         return radius_earth_m * c
 
-    def _get_attendance_geofence_target(self):
-        self.ensure_one()
-
-        if self.work_location_id:
-            return {
-                'name': self.work_location_id.display_name,
-                'kind': 'work_location',
-                'latitude': self._safe_float(self.work_location_id.attendance_geo_latitude),
-                'longitude': self._safe_float(self.work_location_id.attendance_geo_longitude),
-                'radius_m': self._safe_float(self.work_location_id.attendance_geo_radius_m)
-                    or self._safe_float(self.company_id.attendance_geo_radius_m)
-                    or 0.0,
-            }
-
-        return {
-            'name': self.company_id.display_name,
-            'kind': 'company',
-            'latitude': self._safe_float(self.company_id.attendance_geo_latitude),
-            'longitude': self._safe_float(self.company_id.attendance_geo_longitude),
-            'radius_m': self._safe_float(self.company_id.attendance_geo_radius_m) or 0.0,
-        }
-
     def _attendance_action_change(self, geo_information=None):
         self.ensure_one()
 
@@ -67,20 +45,15 @@ class HrEmployee(models.Model):
             if company.attendance_geo_enforce and not self.allow_remote_attendance:
                 if not company.attendance_device_tracking:
                     raise UserError(_(
-                        "تقييد الحضور حسب موقع العمل يتطلب تفعيل خيار تتبع الجهاز والموقع."
+                        "تقييد الحضور حسب موقع الشركة يتطلب تفعيل خيار تتبع الجهاز والموقع."
                     ))
 
-                geofence_target = self._get_attendance_geofence_target()
-                target_lat = geofence_target['latitude']
-                target_lon = geofence_target['longitude']
-                radius_m = geofence_target['radius_m']
-                if target_lat is None or target_lon is None:
-                    if geofence_target['kind'] == 'work_location':
-                        raise UserError(_(
-                            "تم تفعيل نطاق الحضور، لكن إحداثيات موقع العمل المحدد للموظف غير مضبوطة."
-                        ))
+                company_lat = self._safe_float(company.attendance_geo_latitude)
+                company_lon = self._safe_float(company.attendance_geo_longitude)
+                radius_m = self._safe_float(company.attendance_geo_radius_m) or 0.0
+                if company_lat is None or company_lon is None:
                     raise UserError(_(
-                        "تم تفعيل نطاق الحضور، لكن إحداثيات الشركة الاحتياطية غير مضبوطة."
+                        "تم تفعيل نطاق موقع الشركة، لكن إحداثيات الشركة (خط العرض/خط الطول) غير مضبوطة."
                     ))
 
                 payload = geo_information or {}
@@ -92,13 +65,12 @@ class HrEmployee(models.Model):
                     ))
 
                 distance_m = self._haversine_distance_m(
-                    employee_lat, employee_lon, target_lat, target_lon
+                    employee_lat, employee_lon, company_lat, company_lon
                 )
                 if distance_m > radius_m:
-                    location_label = _("موقع العمل") if geofence_target['kind'] == 'work_location' else _("موقع الشركة")
                     raise UserError(_(
-                        "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لـ %s. "
+                        "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لموقع الشركة. "
                         "المسافة الحالية %.0f متر، والنطاق المسموح %.0f متر."
-                    ) % (location_label, distance_m, radius_m))
+                    ) % (distance_m, radius_m))
 
         return super()._attendance_action_change(geo_information=geo_information)

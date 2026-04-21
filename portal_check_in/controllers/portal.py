@@ -5,20 +5,10 @@ from datetime import datetime, timedelta
 import pytz
 
 from odoo import http
-from odoo.addons.hr_attendance.controllers.main import HrAttendance
 from odoo.http import request
 
 
 class PortalCheckInController(http.Controller):
-
-    @staticmethod
-    def _safe_float(value):
-        try:
-            if value in (False, None, ''):
-                return False
-            return float(value)
-        except (TypeError, ValueError):
-            return False
 
     @staticmethod
     def _format_hours(hours_value):
@@ -54,16 +44,6 @@ class PortalCheckInController(http.Controller):
         start_utc = start_local.astimezone(pytz.utc).replace(tzinfo=None)
         end_utc = end_local.astimezone(pytz.utc).replace(tzinfo=None)
         return start_utc, end_utc
-
-    def _get_geo_information(self, employee, kwargs):
-        latitude = self._safe_float(kwargs.get('latitude'))
-        longitude = self._safe_float(kwargs.get('longitude'))
-        return HrAttendance._get_geoip_response(
-            mode='portal',
-            latitude=latitude,
-            longitude=longitude,
-            device_tracking_enabled=employee.company_id.attendance_device_tracking,
-        )
 
     @http.route(['/my/check-in'], type='http', auth='user', website=True)
     def portal_my_check_in(self, **kwargs):
@@ -112,5 +92,5 @@ class PortalCheckInController(http.Controller):
             return request.redirect('/my/check-in?error=no_employee')
 
         # Attendance is always toggled for the current user's own employee only.
-        employee._attendance_action_change(self._get_geo_information(employee, kwargs))
+        employee._attendance_action_change()
         return request.redirect('/my/check-in?success=1')
