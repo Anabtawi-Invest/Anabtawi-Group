@@ -34,6 +34,8 @@
     "assets": {
         "point_of_sale._assets_pos": [
             "pos_advance_order/static/src/app/screens/product_screen/payment_button_visibility.xml",
+            "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_receipt.js",
+            "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_receipt.xml",
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_form_popup.js",
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_form_popup.xml",
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/complete_advance_order_popup.js",

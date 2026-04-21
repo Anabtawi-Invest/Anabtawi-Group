@@ -8,6 +8,7 @@ import { ControlButtons } from "@point_of_sale/app/screens/product_screen/contro
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { rpc } from "@web/core/network/rpc";
 import { AdvanceOrderFormPopup } from "./advance_order_form_popup";
+import { AdvanceOrderReceipt } from "./advance_order_receipt";
 import { CompleteAdvanceOrderPopup } from "./complete_advance_order_popup";
 
 function toNumber(value, fallback = 0) {
@@ -20,6 +21,7 @@ patch(ControlButtons.prototype, {
         super.setup();
         this.pos = usePos();
         this.orm = useService("orm");
+        this.printer = useService("printer");
     },
 
     _getCurrentOrder() {
@@ -43,11 +45,36 @@ patch(ControlButtons.prototype, {
                 }
                 return {
                     product_id: productId,
+                    product_name: product?.display_name || product?.name || "",
                     qty: qty,
                     price_unit: priceUnit,
                 };
             })
             .filter(Boolean);
+    },
+
+    _buildAdvanceReceiptData({ result, partner, payload }) {
+        const total = toNumber(result?.amount_total, 0);
+        const advanceAmount = toNumber(result?.advance_amount, payload.advance_amount || 0);
+        return {
+            companyName: this.pos.company?.name || "",
+            posName: this.pos.config?.name || "",
+            reference: result?.name || "",
+            date: new Date().toLocaleString(),
+            customerName: partner?.name || "",
+            customerPhone: partner?.phone || partner?.mobile || "",
+            paymentMethod: payload.payment_method,
+            currencyId: this.pos.currency?.id,
+            total: total,
+            advanceAmount: advanceAmount,
+            remainingAmount: Math.max(total - advanceAmount, 0),
+            lines: (payload.lines || []).map((line) => ({
+                product_id: line.product_id,
+                name: line.product_name || line.full_product_name || "",
+                qty: line.qty,
+                subtotal: toNumber(line.qty, 0) * toNumber(line.price_unit, 0),
+            })),
+        };
     },
 
     async onClickAdvanceOrder() {
@@ -97,6 +124,19 @@ patch(ControlButtons.prototype, {
         try {
             const result = await rpc("/pos/create_advance_order", payload);
             this.notification.add(_t("Advance order created: %s", result?.name || ""), { type: "success" });
+            try {
+                await this.printer.print(
+                    AdvanceOrderReceipt,
+                    {
+                        receipt: this._buildAdvanceReceiptData({ result, partner, payload }),
+                    },
+                    this.pos.printOptions
+                );
+            } catch (printError) {
+                const printMessage =
+                    printError?.body || printError?.message || _t("Advance order created but receipt printing failed.");
+                this.notification.add(printMessage, { type: "warning" });
+            }
             // Reset the POS cart after successful advance creation.
             const currentOrder = this._getCurrentOrder();
             if (currentOrder) {
