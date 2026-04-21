@@ -5,7 +5,6 @@
     'version': '19.0.1.0',
     'summary': 'Face Recognition for HR Attendance',
     'category': 'Human Resources',
-    "author":"Anabtawi",
     'depends': ['hr_attendance', 'hr'],
     'description':
     '''
