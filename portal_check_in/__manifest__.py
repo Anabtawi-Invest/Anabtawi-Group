@@ -7,7 +7,7 @@
     """,
     'category': 'Portal',
     'author': "enbtawi",
-    'version': '1.2',
+    'version': '1.3',
     'depends': ['base', 'hr', 'hr_payroll', 'base_portal', 'hr_holidays', 'resource', 'portal', 'hr_attendance', 'hr_attendance_geofence_config'],
     'data': [
         'security/ir.model.access.csv',
