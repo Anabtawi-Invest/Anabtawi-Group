@@ -120,8 +120,10 @@
 
                                 <t t-if="employee">
                                     <div class="pc-check-circle-wrap">
-                                        <form action="/my/check-in/toggle" method="post">
+                                        <form action="/my/check-in/toggle" method="post" class="pc-check-form">
                                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                            <input type="hidden" name="latitude"/>
+                                            <input type="hidden" name="longitude"/>
                                             <button type="submit" class="pc-check-circle-btn">
                                                 <i class="fa fa-hand-pointer-o"/>
                                                 <t t-if="state == 'checked_in'">CHECK OUT</t>
@@ -186,6 +188,52 @@
                     </div>
                 </div>
             </div>
+            <script type="text/javascript">
+                document.addEventListener('DOMContentLoaded', function () {
+                    const forms = document.querySelectorAll('.pc-check-form');
+                    if (!forms.length || !navigator.geolocation) {
+                        return;
+                    }
+
+                    const applyCoords = function (position, form) {
+                        form.querySelector('[name="latitude"]').value = position.coords.latitude;
+                        form.querySelector('[name="longitude"]').value = position.coords.longitude;
+                    };
+
+                    forms.forEach(function (form) {
+                        navigator.geolocation.getCurrentPosition(
+                            function (position) {
+                                applyCoords(position, form);
+                            },
+                            function () {},
+                            {enableHighAccuracy: true, timeout: 10000, maximumAge: 0}
+                        );
+
+                        form.addEventListener('submit', function (ev) {
+                            const latitudeInput = form.querySelector('[name="latitude"]');
+                            const longitudeInput = form.querySelector('[name="longitude"]');
+                            if (form.dataset.geoReady === '1' || (latitudeInput.value && longitudeInput.value)) {
+                                form.dataset.geoReady = '1';
+                                return;
+                            }
+
+                            ev.preventDefault();
+                            navigator.geolocation.getCurrentPosition(
+                                function (position) {
+                                    applyCoords(position, form);
+                                    form.dataset.geoReady = '1';
+                                    form.submit();
+                                },
+                                function () {
+                                    form.dataset.geoReady = '1';
+                                    form.submit();
+                                },
+                                {enableHighAccuracy: true, timeout: 10000, maximumAge: 0}
+                            );
+                        });
+                    });
+                });
+            </script>
         </t>
     </template>
 </odoo>
