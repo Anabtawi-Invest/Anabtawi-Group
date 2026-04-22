@@ -91,6 +91,10 @@ class PortalCheckInController(http.Controller):
         if not employee:
             return request.redirect('/my/check-in?error=no_employee')
 
+        geo_information = {
+            'latitude': kwargs.get('latitude'),
+            'longitude': kwargs.get('longitude'),
+        }
         # Attendance is always toggled for the current user's own employee only.
-        employee._attendance_action_change()
+        employee._attendance_action_change(geo_information=geo_information)
         return request.redirect('/my/check-in?success=1')

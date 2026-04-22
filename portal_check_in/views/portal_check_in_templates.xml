@@ -120,8 +120,10 @@
 
                                 <t t-if="employee">
                                     <div class="pc-check-circle-wrap">
-                                        <form action="/my/check-in/toggle" method="post">
+                                        <form action="/my/check-in/toggle" method="post" class="js_portal_checkin_form" t-att-data-require-geo="'1' if state != 'checked_in' else '0'">
                                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                            <input type="hidden" name="latitude" class="js_portal_checkin_latitude"/>
+                                            <input type="hidden" name="longitude" class="js_portal_checkin_longitude"/>
                                             <button type="submit" class="pc-check-circle-btn">
                                                 <i class="fa fa-hand-pointer-o"/>
                                                 <t t-if="state == 'checked_in'">CHECK OUT</t>
@@ -186,6 +188,43 @@
                     </div>
                 </div>
             </div>
+            <script type="text/javascript">
+                document.addEventListener('DOMContentLoaded', function () {
+                    var form = document.querySelector('.js_portal_checkin_form');
+                    if (!form) {
+                        return;
+                    }
+                    form.addEventListener('submit', function (event) {
+                        if (form.dataset.requireGeo !== '1') {
+                            return;
+                        }
+                        if (form.dataset.geoReady === '1') {
+                            return;
+                        }
+                        if (!navigator.geolocation) {
+                            return;
+                        }
+                        event.preventDefault();
+                        navigator.geolocation.getCurrentPosition(function (position) {
+                            var latInput = form.querySelector('.js_portal_checkin_latitude');
+                            var lonInput = form.querySelector('.js_portal_checkin_longitude');
+                            if (latInput &amp;&amp; lonInput) {
+                                latInput.value = position.coords.latitude;
+                                lonInput.value = position.coords.longitude;
+                            }
+                            form.dataset.geoReady = '1';
+                            form.submit();
+                        }, function () {
+                            form.dataset.geoReady = '1';
+                            form.submit();
+                        }, {
+                            enableHighAccuracy: true,
+                            timeout: 8000,
+                            maximumAge: 0
+                        });
+                    });
+                });
+            </script>
         </t>
     </template>
 </odoo>

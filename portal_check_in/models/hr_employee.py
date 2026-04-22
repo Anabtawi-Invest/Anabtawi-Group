@@ -48,12 +48,18 @@ class HrEmployee(models.Model):
                         "تقييد الحضور حسب موقع الشركة يتطلب تفعيل خيار تتبع الجهاز والموقع."
                     ))
 
-                company_lat = self._safe_float(company.attendance_geo_latitude)
-                company_lon = self._safe_float(company.attendance_geo_longitude)
-                radius_m = self._safe_float(company.attendance_geo_radius_m) or 0.0
-                if company_lat is None or company_lon is None:
+                work_location = self.work_location_id
+                work_location_address = work_location.address_id
+                if not work_location or not work_location_address:
                     raise UserError(_(
-                        "تم تفعيل نطاق موقع الشركة، لكن إحداثيات الشركة (خط العرض/خط الطول) غير مضبوطة."
+                        "تم تفعيل نطاق موقع الدوام، لكن الموظف لا يملك موقع دوام/عنوان دوام محدد."
+                    ))
+                work_location_lat = self._safe_float(work_location.geo_latitude)
+                work_location_lon = self._safe_float(work_location.geo_longitude)
+                radius_m = self._safe_float(company.attendance_geo_radius_m) or 0.0
+                if work_location_lat is None or work_location_lon is None:
+                    raise UserError(_(
+                        "تم تفعيل نطاق موقع الدوام، لكن إحداثيات موقع الدوام (خط العرض/خط الطول) غير مضبوطة."
                     ))
 
                 payload = geo_information or {}
@@ -65,11 +71,11 @@ class HrEmployee(models.Model):
                     ))
 
                 distance_m = self._haversine_distance_m(
-                    employee_lat, employee_lon, company_lat, company_lon
+                    employee_lat, employee_lon, work_location_lat, work_location_lon
                 )
                 if distance_m > radius_m:
                     raise UserError(_(
-                        "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لموقع الشركة. "
+                        "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لموقع الدوام. "
                         "المسافة الحالية %.0f متر، والنطاق المسموح %.0f متر."
                     ) % (distance_m, radius_m))
 

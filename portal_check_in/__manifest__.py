@@ -13,6 +13,7 @@
         'security/ir.model.access.csv',
         'views/res_users_portal_employee.xml',
         'views/hr_employee_user_link.xml',
+        'views/hr_work_location_geofence_views.xml',
         'views/portal_check_in_templates.xml',
     ],
 
