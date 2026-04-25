@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 
@@ -6,6 +7,8 @@ from pytz import UTC, UnknownTimeZoneError, timezone
 from odoo import api, fields, models
 from odoo.tools.float_utils import float_compare
 
+
+_logger = logging.getLogger(__name__)
 
 CONFIG_PARAM_KEY = "hr_attendance_weekly_overtime_eligibility.required_weekly_hours"
 
@@ -67,6 +70,14 @@ class HrEmployee(models.Model):
         attendance_model = self.env["hr.attendance"].sudo()
         for tz_name, employees in employees_by_tz.items():
             week_start_utc, next_week_start_utc = self._get_current_week_utc_bounds(tz_name)
+            _logger.info(
+                "[weekly_overtime_eligibility] Computing weekly worked hours for timezone=%s, "
+                "week_start_utc=%s, week_end_utc=%s, employee_ids=%s",
+                tz_name,
+                week_start_utc,
+                next_week_start_utc,
+                employees.ids,
+            )
             attendance_data = attendance_model._read_group(
                 [
                     ("employee_id", "in", employees.ids),
@@ -78,6 +89,24 @@ class HrEmployee(models.Model):
             )
             for employee, worked_hours in attendance_data:
                 hours_by_employee[employee.id] = worked_hours
+                _logger.info(
+                    "[weekly_overtime_eligibility] Weekly worked hours aggregated for employee_id=%s, "
+                    "employee_name=%s, timezone=%s, week_start_utc=%s, week_end_utc=%s, worked_hours=%s",
+                    employee.id,
+                    employee.display_name,
+                    tz_name,
+                    week_start_utc,
+                    next_week_start_utc,
+                    worked_hours,
+                )
 
         for employee in self:
             employee.weekly_worked_hours = hours_by_employee[employee.id]
+            _logger.info(
+                "[weekly_overtime_eligibility] Final weekly worked hours set for employee_id=%s, "
+                "employee_name=%s, timezone=%s, weekly_worked_hours=%s",
+                employee.id,
+                employee.display_name,
+                employee._get_attendance_timezone(),
+                employee.weekly_worked_hours,
+            )
