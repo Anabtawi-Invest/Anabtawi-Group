@@ -6,15 +6,19 @@ from odoo import fields, models
 class HrWorkLocation(models.Model):
     _inherit = "hr.work.location"
 
-    geo_latitude = fields.Float(
+    attendance_geo_enforce = fields.Boolean(
+        string="Enforce Attendance Geofence",
+        help="If enabled, portal check-in is allowed only within the configured radius for this work location.",
+    )
+    attendance_geo_latitude = fields.Float(
         string="Latitude",
         digits=(10, 7),
-        related="address_id.partner_latitude",
-        readonly=False,
     )
-    geo_longitude = fields.Float(
+    attendance_geo_longitude = fields.Float(
         string="Longitude",
         digits=(10, 7),
-        related="address_id.partner_longitude",
-        readonly=False,
+    )
+    attendance_geo_radius_m = fields.Float(
+        string="Allowed Radius (m)",
+        help="Maximum allowed distance in meters from this work location for portal check-in.",
     )

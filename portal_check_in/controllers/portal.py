@@ -77,16 +77,19 @@ class PortalCheckInController(http.Controller):
         geo_information = {
             'mode': 'systray',
         }
-        tracking_enabled = bool(employee.company_id.attendance_device_tracking)
+        tracking_enabled = bool(
+            employee
+            and hasattr(employee, "_is_portal_geo_tracking_required")
+            and employee._is_portal_geo_tracking_required()
+        )
         _logger.info(
-            "portal_check_in: employee_id=%s company_id=%s company=%s tracking_enabled=%s",
+            "portal_check_in: employee_id=%s work_location_id=%s tracking_enabled=%s",
             employee.id,
-            employee.company_id.id,
-            employee.company_id.name,
+            employee.work_location_id.id if employee.work_location_id else False,
             tracking_enabled,
         )
         if not tracking_enabled:
-            # Keep the mode explicit (systray) like native Odoo flow, but skip device/location data.
+            # Keep the mode explicit (systray) like native Odoo flow, but skip location data.
             return geo_information
 
         geo_information.update({
@@ -158,7 +161,11 @@ class PortalCheckInController(http.Controller):
             'page_name': 'my_check_in',
             'employee': employee,
             'state': employee.attendance_state if employee else False,
-            'device_tracking_enabled': employee.company_id.attendance_device_tracking if employee else False,
+            'device_tracking_enabled': (
+                employee._is_portal_geo_tracking_required()
+                if employee and hasattr(employee, "_is_portal_geo_tracking_required")
+                else False
+            ),
             'hours_today_display': self._format_hours(employee.hours_today) if employee else "0 hrs 0 min",
             'recent_attendances': recent_attendances,
             'today_check_in': self._format_datetime_to_user_time(today_check_in),

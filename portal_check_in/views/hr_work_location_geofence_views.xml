@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="hr_work_location_form_view_geofence_coords" model="ir.ui.view">
-        <field name="name">hr.work.location.form.geofence.coords</field>
+    <record id="hr_work_location_form_view_attendance_geofence" model="ir.ui.view">
+        <field name="name">hr.work.location.form.attendance.geofence</field>
         <field name="model">hr.work.location</field>
         <field name="inherit_id" ref="hr.hr_work_location_form_view"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='address_id']" position="after">
-                <label for="geo_latitude" string="Coordinates"/>
-                <div class="o_row">
-                    <field name="geo_latitude" class="oe_inline" nolabel="1"/>
-                    <span class="mx-1">,</span>
-                    <field name="geo_longitude" class="oe_inline" nolabel="1"/>
-                </div>
+                <group string="Attendance Geofence">
+                    <field name="attendance_geo_enforce"/>
+                    <field name="attendance_geo_latitude" invisible="not attendance_geo_enforce"/>
+                    <field name="attendance_geo_longitude" invisible="not attendance_geo_enforce"/>
+                    <field name="attendance_geo_radius_m" invisible="not attendance_geo_enforce"/>
+                </group>
             </xpath>
         </field>
     </record>
