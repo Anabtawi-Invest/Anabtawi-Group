@@ -9,7 +9,7 @@
     'version': '1.4',
     'depends': [
         'base', 'hr', 'hr_payroll', 'base_portal', 'hr_holidays',
-        'resource', 'portal', 'hr_attendance',
+        'resource', 'portal', 'hr_attendance','hr_attendance_overtime_approval_bridge'
     ],
     'data': [
         'views/res_users_portal_employee.xml',
