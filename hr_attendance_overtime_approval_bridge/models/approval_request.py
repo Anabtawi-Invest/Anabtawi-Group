@@ -1,7 +1,14 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import logging
+
 from odoo import Command, _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools.float_utils import float_compare
+
+_logger = logging.getLogger(__name__)
+
+CONFIG_PARAM_KEY = "hr_attendance_weekly_overtime_eligibility.required_weekly_hours"
 
 
 class ApprovalRequest(models.Model):
@@ -47,6 +54,33 @@ class ApprovalRequest(models.Model):
         compute="_compute_overtime_data",
         store=True,
     )
+    overtime_preauthorization = fields.Boolean(
+        string="Overtime Preauthorization",
+        copy=False,
+        readonly=True,
+        help="Technical flag indicating that this request authorizes a future overtime session before attendance overtime lines exist.",
+    )
+    overtime_authorized_attendance_id = fields.Many2one(
+        "hr.attendance",
+        string="Authorized Attendance",
+        copy=False,
+        readonly=True,
+    )
+    overtime_authorization_consumed = fields.Boolean(
+        string="Authorization Consumed",
+        copy=False,
+        readonly=True,
+    )
+    overtime_authorization_state = fields.Selection(
+        [
+            ("waiting_approval", "Waiting Approval"),
+            ("available", "Available"),
+            ("reserved", "Reserved"),
+            ("consumed", "Consumed"),
+        ],
+        string="Authorization Status",
+        compute="_compute_overtime_authorization_state",
+    )
 
     @api.onchange("request_owner_id", "category_id")
     def _onchange_overtime_defaults(self):
@@ -83,19 +117,43 @@ class ApprovalRequest(models.Model):
             ):
                 request.overtime_line_ids = False
                 continue
-            request.overtime_line_ids = overtime_line_model.search(
+            domain = [
+                ("employee_id", "=", request.overtime_employee_id.id),
+                ("date", ">=", request.overtime_date_from),
+                ("date", "<=", request.overtime_date_to),
+                # Portal and backend users may request approval after attendance overtime
+                # has already been marked approved in Attendances.
+                ("status", "in", ["to_approve", "refused", "approved"]),
+            ]
+            request.overtime_line_ids = overtime_line_model.search(domain)
+            all_lines = overtime_line_model.search(
                 [
                     ("employee_id", "=", request.overtime_employee_id.id),
                     ("date", ">=", request.overtime_date_from),
                     ("date", "<=", request.overtime_date_to),
-                    ("status", "in", ["to_approve", "refused"]),
                 ]
+            )
+            _logger.warning(
+                "Overtime request %s line lookup employee=%s period=%s..%s domain=%s matched_ids=%s matched_statuses=%s matched_hours=%s all_ids=%s all_statuses=%s all_hours=%s",
+                request.id or "new",
+                request.overtime_employee_id.id,
+                request.overtime_date_from,
+                request.overtime_date_to,
+                domain,
+                request.overtime_line_ids.ids,
+                request.overtime_line_ids.mapped("status"),
+                request.overtime_line_ids.mapped("manual_duration"),
+                all_lines.ids,
+                all_lines.mapped("status"),
+                all_lines.mapped("manual_duration"),
             )
 
     @api.depends("overtime_line_ids", "quantity", "is_overtime_category")
     def _compute_overtime_data(self):
         for request in self:
-            request.is_overtime_request = bool(request.overtime_line_ids)
+            request.is_overtime_request = bool(
+                request.is_overtime_category or request.overtime_line_ids
+            )
             if not request.is_overtime_category:
                 request.overtime_total_hours = sum(request.overtime_line_ids.mapped("manual_duration"))
                 continue
@@ -112,6 +170,26 @@ class ApprovalRequest(models.Model):
                 total += approved_chunk
                 remaining -= approved_chunk
             request.overtime_total_hours = total
+
+    @api.depends(
+        "is_overtime_category",
+        "overtime_preauthorization",
+        "request_status",
+        "overtime_authorized_attendance_id",
+        "overtime_authorization_consumed",
+    )
+    def _compute_overtime_authorization_state(self):
+        for request in self:
+            if not request.is_overtime_category or not request.overtime_preauthorization:
+                request.overtime_authorization_state = False
+            elif request.overtime_authorization_consumed:
+                request.overtime_authorization_state = "consumed"
+            elif request.overtime_authorized_attendance_id:
+                request.overtime_authorization_state = "reserved"
+            elif request.request_status == "approved":
+                request.overtime_authorization_state = "available"
+            else:
+                request.overtime_authorization_state = "waiting_approval"
 
     @api.constrains("overtime_line_ids")
     def _check_overtime_lines_same_employee(self):
@@ -142,12 +220,32 @@ class ApprovalRequest(models.Model):
             if request.overtime_date_to < request.overtime_date_from:
                 raise ValidationError(_("Overtime Date To must be on or after Overtime Date From."))
 
-    @api.constrains("is_overtime_category", "quantity", "overtime_line_ids")
-    def _check_requested_hours(self):
+    @api.model
+    def _get_required_weekly_hours(self):
+        value = self.env["ir.config_parameter"].sudo().get_param(
+            CONFIG_PARAM_KEY, default="0.0"
+        )
+        return float(value or 0.0)
+
+    def _check_requested_overtime_hours_limit(self):
         for request in self.filtered("is_overtime_category"):
             if request.quantity <= 0:
                 raise ValidationError(_("Requested Overtime Hours must be greater than zero."))
+            if not request.overtime_line_ids:
+                continue
             available_hours = sum(request.overtime_line_ids.mapped("manual_duration"))
+            _logger.warning(
+                "Overtime request %s requested_hours=%s available_hours=%s overtime_line_ids=%s statuses=%s durations=%s employee=%s period=%s..%s",
+                request.id or "new",
+                request.quantity,
+                available_hours,
+                request.overtime_line_ids.ids,
+                request.overtime_line_ids.mapped("status"),
+                request.overtime_line_ids.mapped("manual_duration"),
+                request.overtime_employee_id.id,
+                request.overtime_date_from,
+                request.overtime_date_to,
+            )
             if request.quantity > available_hours:
                 raise ValidationError(
                     _(
@@ -156,6 +254,85 @@ class ApprovalRequest(models.Model):
                         available=available_hours,
                     )
                 )
+
+    def _check_weekly_worked_hours_eligibility(self):
+        required_weekly_hours = self._get_required_weekly_hours()
+        if required_weekly_hours <= 0:
+            return
+
+        for request in self.filtered("is_overtime_category"):
+            employee = request.overtime_employee_id
+            if not employee:
+                continue
+            if "weekly_worked_hours" not in employee._fields:
+                raise ValidationError(
+                    _(
+                        "Weekly worked hours eligibility is not available. "
+                        "Please install the weekly overtime eligibility module first."
+                    )
+                )
+            weekly_worked_hours = employee.weekly_worked_hours
+            if float_compare(
+                weekly_worked_hours, required_weekly_hours, precision_digits=2
+            ) < 0:
+                raise ValidationError(
+                    _(
+                        "Employee %(employee)s cannot submit the overtime approval request "
+                        "because Weekly Worked Hours (%(worked)s) did not reach the "
+                        "required weekly hours (%(required)s).",
+                        employee=employee.display_name,
+                        worked=weekly_worked_hours,
+                        required=required_weekly_hours,
+                    )
+                )
+
+    @api.model
+    def _get_available_preauthorized_request(self, employee, target_date=None):
+        target_date = target_date or fields.Date.context_today(employee)
+        domain = [
+            ("is_overtime_category", "=", True),
+            ("overtime_employee_id", "=", employee.id),
+            ("overtime_preauthorization", "=", True),
+            ("request_status", "=", "approved"),
+            ("overtime_authorization_consumed", "=", False),
+            ("overtime_authorized_attendance_id", "=", False),
+            ("overtime_date_from", "<=", target_date),
+            ("overtime_date_to", ">=", target_date),
+        ]
+        return self.search(domain, order="overtime_date_from asc, create_date asc, id asc", limit=1)
+
+    def _reserve_preauthorized_attendance(self, attendance):
+        self.ensure_one()
+        if not self.overtime_preauthorization:
+            raise ValidationError(_("This overtime request cannot be used as a preauthorized overtime session."))
+        if self.request_status != "approved":
+            raise ValidationError(_("Only approved overtime requests can unlock overtime check-in."))
+        if self.overtime_authorization_consumed or self.overtime_authorized_attendance_id:
+            raise ValidationError(_("This overtime authorization has already been used."))
+        self.write({"overtime_authorized_attendance_id": attendance.id})
+
+    def _sync_authorized_attendance_overtime(self):
+        for request in self.filtered(
+            lambda req: req.overtime_preauthorization
+            and req.request_status == "approved"
+            and req.overtime_authorized_attendance_id
+            and not req.overtime_authorization_consumed
+        ):
+            attendance = request.overtime_authorized_attendance_id
+            if not attendance.check_out:
+                continue
+
+            overtime_lines = attendance.linked_overtime_ids
+            if overtime_lines:
+                overtime_lines.write(
+                    {"approval_request_ids": [Command.link(request.id)]}
+                )
+                overtime_lines.with_context(skip_overtime_approval_gate=True).action_approve()
+            request.write({"overtime_authorization_consumed": True})
+
+    @api.constrains("is_overtime_category", "quantity", "overtime_line_ids")
+    def _check_requested_hours(self):
+        self._check_requested_overtime_hours_limit()
 
     @api.constrains("overtime_line_ids", "request_status")
     def _check_single_open_overtime_request(self):
@@ -172,7 +349,7 @@ class ApprovalRequest(models.Model):
                 )
 
     def _ensure_overtime_manager_approver(self):
-        for request in self.filtered("overtime_line_ids"):
+        for request in self.filtered(lambda req: req.is_overtime_category and req.overtime_employee_id):
             manager_user = request.overtime_employee_id.attendance_manager_id
             if not manager_user:
                 raise UserError(
@@ -199,6 +376,12 @@ class ApprovalRequest(models.Model):
             )
 
     def action_confirm(self):
+        overtime_requests = self.filtered("is_overtime_category")
+        preauthorized_requests = overtime_requests.filtered(lambda req: not req.overtime_line_ids)
+        preauthorized_requests.write({"overtime_preauthorization": True})
+        (overtime_requests - preauthorized_requests).write({"overtime_preauthorization": False})
+        (overtime_requests - preauthorized_requests)._check_requested_overtime_hours_limit()
+        overtime_requests._check_weekly_worked_hours_eligibility()
         self._ensure_overtime_manager_approver()
         return super().action_confirm()
 
@@ -219,7 +402,10 @@ class ApprovalRequest(models.Model):
                             {
                                 "duration": original_duration - approved_chunk,
                                 "manual_duration": original_duration - approved_chunk,
-                                "status": "to_approve",
+                                # The approval request becomes the final decision source.
+                                # Any remaining hours beyond the approved quantity should
+                                # not stay pending in Attendances.
+                                "status": "refused",
                             }
                         )
                     overtime_line.write({"duration": approved_chunk, "manual_duration": approved_chunk})

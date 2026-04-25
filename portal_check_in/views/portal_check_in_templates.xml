@@ -34,6 +34,13 @@
                     <t t-set="url" t-value="'/my/check-in'"/>
                     <t t-set="config_card" t-value="True"/>
                 </t>
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="icon" t-value="'/portal/static/src/img/portal-connection.svg'"/>
+                    <t t-set="title">Overtime Approvals</t>
+                    <t t-set="text">Request approval for your overtime hours</t>
+                    <t t-set="url" t-value="'/my/overtime_approvals'"/>
+                    <t t-set="config_card" t-value="True"/>
+                </t>
             </div>
         </xpath>
 
@@ -111,20 +118,53 @@
                                     <t t-esc="employee.name if employee else request.env.user.name"/>
                                 </div>
 
+                                <div class="mb-3 text-end">
+                                    <a href="/my/overtime_approvals" class="btn btn-outline-primary btn-sm">
+                                        Overtime Approvals
+                                    </a>
+                                </div>
+
                                 <div t-if="show_success" class="alert alert-success py-2" role="alert">
                                     Attendance updated successfully.
                                 </div>
                                 <div t-if="show_no_employee or not employee" class="alert alert-warning py-2" role="alert">
                                     Your user is not linked to an employee profile.
                                 </div>
+                                <div t-if="show_location_restricted" class="alert alert-danger py-2 o_portal_location_restricted_alert" role="alert">
+                                    <t t-esc="location_restricted_message or 'لا يمكنك تسجيل الحضور من هذا الموقع.'"/>
+                                </div>
+                                <div
+                                    t-if="employee and weekly_gate_reached and state != 'checked_in' and not available_overtime_authorization"
+                                    class="alert alert-warning py-2"
+                                    role="alert"
+                                >
+                                    You reached the weekly worked hours threshold
+                                    (<t t-esc="'%0.2f' % (weekly_worked_hours or 0.0)"/> /
+                                    <t t-esc="'%0.2f' % (required_weekly_hours or 0.0)"/>).
+                                    Check-in is locked until one overtime request is approved.
+                                </div>
+                                <div
+                                    t-if="employee and weekly_gate_reached and state != 'checked_in' and available_overtime_authorization"
+                                    class="alert alert-success py-2"
+                                    role="status"
+                                >
+                                    An approved overtime authorization is available for one session.
+                                    Maximum authorized hours:
+                                    <t t-esc="'%0.2f' % (available_overtime_authorization.quantity or 0.0)"/>.
+                                </div>
 
                                 <t t-if="employee">
                                     <div class="pc-check-circle-wrap">
-                                        <form action="/my/check-in/toggle" method="post" class="js_portal_checkin_form" t-att-data-require-geo="'1' if state != 'checked_in' else '0'">
+                                        <form id="checkin_form" action="/my/check-in/toggle" method="post" class="o_portal_check_in_form" t-att-data-device-tracking-enabled="'1' if device_tracking_enabled else '0'">
                                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                            <input type="hidden" name="latitude" class="js_portal_checkin_latitude"/>
-                                            <input type="hidden" name="longitude" class="js_portal_checkin_longitude"/>
-                                            <button type="submit" class="pc-check-circle-btn">
+                                            <input type="hidden" name="latitude" id="lat" class="o_portal_check_latitude"/>
+                                            <input type="hidden" name="longitude" id="lon" class="o_portal_check_longitude"/>
+                                            <button
+                                                type="button"
+                                                class="pc-check-circle-btn"
+                                                onclick="submitCheckIn()"
+                                                t-att-disabled="'disabled' if (weekly_gate_reached and state != 'checked_in' and not available_overtime_authorization) else None"
+                                            >
                                                 <i class="fa fa-hand-pointer-o"/>
                                                 <t t-if="state == 'checked_in'">CHECK OUT</t>
                                                 <t t-else="">CHECK IN</t>
@@ -154,6 +194,28 @@
                                                 <t t-esc="hours_today_display"/>
                                             </div>
                                             <div class="pc-check-stat-label">Working Hours</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="pc-check-stats mb-3">
+                                        <div>
+                                            <div class="pc-check-stat-value">
+                                                <t t-esc="'%0.2f' % (weekly_worked_hours or 0.0)"/>
+                                            </div>
+                                            <div class="pc-check-stat-label">Weekly Worked</div>
+                                        </div>
+                                        <div>
+                                            <div class="pc-check-stat-value">
+                                                <t t-esc="'%0.2f' % (required_weekly_hours or 0.0)"/>
+                                            </div>
+                                            <div class="pc-check-stat-label">Weekly Limit</div>
+                                        </div>
+                                        <div>
+                                            <div class="pc-check-stat-value">
+                                                <span t-if="available_overtime_authorization">Approved</span>
+                                                <span t-else="">None</span>
+                                            </div>
+                                            <div class="pc-check-stat-label">OT Approval</div>
                                         </div>
                                     </div>
 
@@ -189,41 +251,72 @@
                 </div>
             </div>
             <script type="text/javascript">
-                document.addEventListener('DOMContentLoaded', function () {
-                    var form = document.querySelector('.js_portal_checkin_form');
-                    if (!form) {
-                        return;
+                (function () {
+                    var isSubmitting = false;
+
+                    function showLocationBlockedAlert() {
+                        var locationBlockedAlert = document.querySelector('.o_portal_location_restricted_alert');
+                        if (locationBlockedAlert) {
+                            window.alert(locationBlockedAlert.textContent.trim());
+                        }
                     }
-                    form.addEventListener('submit', function (event) {
-                        if (form.dataset.requireGeo !== '1') {
+
+                    window.submitCheckIn = function () {
+                        if (isSubmitting) {
                             return;
                         }
-                        if (form.dataset.geoReady === '1') {
+
+                        var form = document.getElementById('checkin_form');
+                        if (!form) {
                             return;
                         }
-                        if (!navigator.geolocation) {
-                            return;
-                        }
-                        event.preventDefault();
-                        navigator.geolocation.getCurrentPosition(function (position) {
-                            var latInput = form.querySelector('.js_portal_checkin_latitude');
-                            var lonInput = form.querySelector('.js_portal_checkin_longitude');
-                            if (latInput &amp;&amp; lonInput) {
-                                latInput.value = position.coords.latitude;
-                                lonInput.value = position.coords.longitude;
+
+                        var button = form.querySelector('button');
+                        var latitudeInput = document.getElementById('lat');
+                        var longitudeInput = document.getElementById('lon');
+                        var trackingEnabled = form.dataset.deviceTrackingEnabled === '1';
+
+                        function submitForm() {
+                            isSubmitting = true;
+                            if (button) {
+                                button.disabled = true;
                             }
-                            form.dataset.geoReady = '1';
                             form.submit();
-                        }, function () {
-                            form.dataset.geoReady = '1';
-                            form.submit();
-                        }, {
-                            enableHighAccuracy: true,
-                            timeout: 8000,
-                            maximumAge: 0
-                        });
-                    });
-                });
+                        }
+
+                        if (!trackingEnabled) {
+                            submitForm();
+                            return;
+                        }
+
+                        if (!navigator.geolocation || !navigator.onLine) {
+                            window.alert('Location permission required');
+                            return;
+                        }
+
+                        navigator.geolocation.getCurrentPosition(
+                            function (position) {
+                                latitudeInput.value = String(position.coords.latitude || '');
+                                longitudeInput.value = String(position.coords.longitude || '');
+                                submitForm();
+                            },
+                            function () {
+                                window.alert('Location permission required');
+                            },
+                            {
+                                enableHighAccuracy: true,
+                                timeout: 10000,
+                                maximumAge: 0,
+                            }
+                        );
+                    };
+
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', showLocationBlockedAlert);
+                    } else {
+                        showLocationBlockedAlert();
+                    }
+                })();
             </script>
         </t>
     </template>

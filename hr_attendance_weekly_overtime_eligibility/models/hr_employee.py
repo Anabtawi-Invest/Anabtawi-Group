@@ -33,7 +33,9 @@ class HrEmployee(models.Model):
     @api.model
     def _get_current_week_utc_bounds(self, tz_name):
         today = fields.Date.context_today(self)
-        week_start = today - timedelta(days=today.weekday())
+        # Weekly eligibility follows the business week: Saturday to Friday.
+        days_since_week_start = (today.weekday() - 5) % 7
+        week_start = today - timedelta(days=days_since_week_start)
         next_week_start = week_start + timedelta(days=7)
         try:
             tz = timezone(tz_name or "UTC")
@@ -48,6 +50,15 @@ class HrEmployee(models.Model):
     def _get_required_weekly_hours(self):
         value = self.env["ir.config_parameter"].sudo().get_param(CONFIG_PARAM_KEY, default="0.0")
         return float(value or 0.0)
+
+    def _is_weekly_hours_threshold_reached(self):
+        self.ensure_one()
+        required_weekly_hours = self._get_required_weekly_hours()
+        if required_weekly_hours <= 0:
+            return False
+        return float_compare(
+            self.weekly_worked_hours, required_weekly_hours, precision_digits=2
+        ) >= 0
 
     def _get_overtime_eligibility_map(self):
         required_weekly_hours = self._get_required_weekly_hours()
