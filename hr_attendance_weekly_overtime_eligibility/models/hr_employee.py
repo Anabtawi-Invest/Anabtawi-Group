@@ -33,7 +33,9 @@ class HrEmployee(models.Model):
     @api.model
     def _get_current_week_utc_bounds(self, tz_name):
         today = fields.Date.context_today(self)
-        week_start = today - timedelta(days=today.weekday())
+        # Weekly eligibility follows the business week: Saturday to Friday.
+        days_since_week_start = (today.weekday() - 5) % 7
+        week_start = today - timedelta(days=days_since_week_start)
         next_week_start = week_start + timedelta(days=7)
         try:
             tz = timezone(tz_name or "UTC")
