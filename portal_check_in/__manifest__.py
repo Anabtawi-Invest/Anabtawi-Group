@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    'name': "SW - check in",
+    'name': "check in",
     'summary': "",
     'description': """
     """,
