@@ -6,7 +6,7 @@
     """,
     'category': 'Portal',
     'author': "enbtawi",
-    'version': '1.3',
+    'version': '1.4',
     'depends': [
         'base', 'hr', 'hr_payroll', 'base_portal', 'hr_holidays',
         'resource', 'portal', 'hr_attendance',
