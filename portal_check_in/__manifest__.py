@@ -13,7 +13,6 @@
         'hr_attendance_overtime_approval_bridge',
     ],
     'data': [
-        'security/ir.model.access.csv',
         'views/res_users_portal_employee.xml',
         'views/hr_employee_user_link.xml',
         'views/hr_employee_attendance_location.xml',
