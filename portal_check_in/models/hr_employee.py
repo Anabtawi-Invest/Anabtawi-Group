@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import math
+from datetime import timedelta
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
@@ -36,41 +37,115 @@ class HrEmployee(models.Model):
         c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
         return radius_earth_m * c
 
+    def _check_portal_geo_restriction(self, geo_information=None):
+        self.ensure_one()
+        # Restrict only check-in; check-out remains unchanged.
+        company = self.company_id
+        if company.attendance_geo_enforce and not self.allow_remote_attendance:
+            if not company.attendance_device_tracking:
+                raise UserError(_(
+                    "تقييد الحضور حسب موقع الشركة يتطلب تفعيل خيار تتبع الجهاز والموقع."
+                ))
+
+            company_lat = self._safe_float(company.attendance_geo_latitude)
+            company_lon = self._safe_float(company.attendance_geo_longitude)
+            radius_m = self._safe_float(company.attendance_geo_radius_m) or 0.0
+            if company_lat is None or company_lon is None:
+                raise UserError(_(
+                    "تم تفعيل نطاق موقع الشركة، لكن إحداثيات الشركة (خط العرض/خط الطول) غير مضبوطة."
+                ))
+
+            payload = geo_information or {}
+            employee_lat = self._safe_float(payload.get('latitude'))
+            employee_lon = self._safe_float(payload.get('longitude'))
+            if employee_lat is None or employee_lon is None:
+                raise UserError(_(
+                    "تعذر التحقق من موقعك. يرجى تفعيل إذن الموقع ثم المحاولة مرة أخرى."
+                ))
+
+            distance_m = self._haversine_distance_m(
+                employee_lat, employee_lon, company_lat, company_lon
+            )
+            if distance_m > radius_m:
+                raise UserError(_(
+                    "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لموقع الشركة. "
+                    "المسافة الحالية %.0f متر، والنطاق المسموح %.0f متر."
+                ) % (distance_m, radius_m))
+
+    def _get_available_overtime_authorization_request(self):
+        self.ensure_one()
+        approval_model = self.env["approval.request"]
+        if not hasattr(type(approval_model), "_get_available_preauthorized_request"):
+            return self.env["approval.request"]
+        target_date = fields.Date.context_today(self)
+        return approval_model._get_available_preauthorized_request(
+            self, target_date=target_date
+        )
+
+    def _create_authorized_attendance(self, action_date, geo_information, approval_request):
+        self.ensure_one()
+        vals = {
+            "employee_id": self.id,
+            "check_in": action_date,
+            "overtime_authorization_request_id": approval_request.id,
+            "overtime_authorization_deadline": action_date + timedelta(hours=approval_request.quantity),
+        }
+        if geo_information:
+            vals.update(
+                {"in_%s" % key: geo_information[key] for key in geo_information}
+            )
+        attendance = self.env["hr.attendance"].create(vals)
+        approval_request._reserve_preauthorized_attendance(attendance)
+        return attendance
+
+    def _check_overtime_gate_before_check_in(self):
+        self.ensure_one()
+        if not hasattr(type(self), "_is_weekly_hours_threshold_reached"):
+            return False
+        if not self._is_weekly_hours_threshold_reached():
+            return False
+
+        approval_request = self._get_available_overtime_authorization_request()
+        if approval_request:
+            return approval_request
+
+        raise UserError(
+            _(
+                "You reached the weekly worked hours limit. You must obtain an approved overtime request before checking in again."
+            )
+        )
+
+    def _apply_authorized_check_out(self, attendance, action_date, geo_information):
+        self.ensure_one()
+        check_out_date = action_date
+        if attendance.overtime_authorization_deadline:
+            check_out_date = min(action_date, attendance.overtime_authorization_deadline)
+
+        vals = {"check_out": check_out_date}
+        if geo_information:
+            vals.update({"out_%s" % key: geo_information[key] for key in geo_information})
+        attendance.write(vals)
+        attendance._finalize_overtime_authorization()
+        return attendance
+
     def _attendance_action_change(self, geo_information=None):
         self.ensure_one()
 
-        # Restrict only check-in; check-out remains unchanged.
         if self.attendance_state != 'checked_in':
-            company = self.company_id
-            if company.attendance_geo_enforce and not self.allow_remote_attendance:
-                if not company.attendance_device_tracking:
-                    raise UserError(_(
-                        "تقييد الحضور حسب موقع الشركة يتطلب تفعيل خيار تتبع الجهاز والموقع."
-                    ))
-
-                company_lat = self._safe_float(company.attendance_geo_latitude)
-                company_lon = self._safe_float(company.attendance_geo_longitude)
-                radius_m = self._safe_float(company.attendance_geo_radius_m) or 0.0
-                if company_lat is None or company_lon is None:
-                    raise UserError(_(
-                        "تم تفعيل نطاق موقع الشركة، لكن إحداثيات الشركة (خط العرض/خط الطول) غير مضبوطة."
-                    ))
-
-                payload = geo_information or {}
-                employee_lat = self._safe_float(payload.get('latitude'))
-                employee_lon = self._safe_float(payload.get('longitude'))
-                if employee_lat is None or employee_lon is None:
-                    raise UserError(_(
-                        "تعذر التحقق من موقعك. يرجى تفعيل إذن الموقع ثم المحاولة مرة أخرى."
-                    ))
-
-                distance_m = self._haversine_distance_m(
-                    employee_lat, employee_lon, company_lat, company_lon
+            self._check_portal_geo_restriction(geo_information=geo_information)
+            approval_request = self._check_overtime_gate_before_check_in()
+            if approval_request:
+                return self._create_authorized_attendance(
+                    fields.Datetime.now(), geo_information, approval_request
                 )
-                if distance_m > radius_m:
-                    raise UserError(_(
-                        "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لموقع الشركة. "
-                        "المسافة الحالية %.0f متر، والنطاق المسموح %.0f متر."
-                    ) % (distance_m, radius_m))
+            return super()._attendance_action_change(geo_information=geo_information)
+
+        attendance = self.env['hr.attendance'].search(
+            [('employee_id', '=', self.id), ('check_out', '=', False)], limit=1
+        )
+        if attendance and attendance.overtime_authorization_request_id:
+            return self._apply_authorized_check_out(
+                attendance, fields.Datetime.now(), geo_information
+            )
 
         return super()._attendance_action_change(geo_information=geo_information)

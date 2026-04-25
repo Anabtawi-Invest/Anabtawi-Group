@@ -22,6 +22,9 @@
                 <a href="/my/overtime_approvals/new" class="btn btn-primary">New request</a>
                 <a href="/my" class="btn btn-link">My account</a>
             </div>
+            <div class="alert alert-info" role="status">
+                Approved overtime requests unlock one overtime attendance session only.
+            </div>
             <div t-if="success_message" class="alert alert-success" role="status">
                 <span t-out="success_message"/>
             </div>
@@ -81,6 +84,10 @@
             </div>
             <div t-if="not categories" class="alert alert-warning" role="alert">
                 No overtime approval type is configured. Ask your administrator to enable an approval category as “Overtime Category”.
+            </div>
+            <div t-if="categories" class="alert alert-info" role="status">
+                Once approved by your manager, this request unlocks one overtime check-in session.
+                The requested hours become the maximum allowed duration for that overtime session.
             </div>
             <form t-if="categories" action="/my/overtime_approvals/new" method="post" class="o_portal_wrap">
                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
@@ -148,6 +155,8 @@
                         <dd class="col-sm-8"><span t-field="approval.quantity"/></dd>
                         <dt class="col-sm-4">Matched overtime (hours)</dt>
                         <dd class="col-sm-8"><span t-field="approval.overtime_total_hours"/></dd>
+                        <dt class="col-sm-4" t-if="approval.overtime_preauthorization">Authorization status</dt>
+                        <dd class="col-sm-8" t-if="approval.overtime_preauthorization"><span t-field="approval.overtime_authorization_state"/></dd>
                     </dl>
                 </div>
             </div>

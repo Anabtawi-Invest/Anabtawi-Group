@@ -13,6 +13,9 @@
                 <field name="overtime_date_to" readonly="request_status != 'new'" invisible="not is_overtime_category"/>
                 <field name="quantity" string="Requested Overtime Hours" readonly="request_status != 'new'" invisible="not is_overtime_category"/>
                 <field name="overtime_total_hours" readonly="1" invisible="not is_overtime_category" widget="float_time"/>
+                <field name="overtime_preauthorization" readonly="1" invisible="not is_overtime_category"/>
+                <field name="overtime_authorization_state" readonly="1" invisible="not overtime_preauthorization"/>
+                <field name="overtime_authorized_attendance_id" readonly="1" invisible="not overtime_preauthorization"/>
             </xpath>
             <xpath expr="//page[@name='description']" position="before">
                 <page string="Overtime Lines" name="overtime_lines" invisible="not is_overtime_category">
@@ -39,6 +42,7 @@
             <xpath expr="//field[@name='request_status']" position="before">
                 <field name="overtime_employee_id" optional="hide"/>
                 <field name="overtime_total_hours" optional="hide" widget="float_time"/>
+                <field name="overtime_authorization_state" optional="hide"/>
             </xpath>
         </field>
     </record>
@@ -49,7 +53,7 @@
         <field name="inherit_id" ref="approvals.approval_search_view_search"/>
         <field name="arch" type="xml">
             <xpath expr="//filter[@name='filter_approved_requests']" position="before">
-                <filter string="Overtime Requests" name="filter_overtime_requests" domain="[('overtime_line_ids', '!=', False)]"/>
+                <filter string="Overtime Requests" name="filter_overtime_requests" domain="[('category_id.is_overtime_category', '=', True)]"/>
             </xpath>
         </field>
     </record>

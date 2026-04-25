@@ -51,6 +51,15 @@ class HrEmployee(models.Model):
         value = self.env["ir.config_parameter"].sudo().get_param(CONFIG_PARAM_KEY, default="0.0")
         return float(value or 0.0)
 
+    def _is_weekly_hours_threshold_reached(self):
+        self.ensure_one()
+        required_weekly_hours = self._get_required_weekly_hours()
+        if required_weekly_hours <= 0:
+            return False
+        return float_compare(
+            self.weekly_worked_hours, required_weekly_hours, precision_digits=2
+        ) >= 0
+
     def _get_overtime_eligibility_map(self):
         required_weekly_hours = self._get_required_weekly_hours()
         return {

@@ -6,7 +6,7 @@ from urllib.parse import quote, unquote
 
 import pytz
 
-from odoo import http, _
+from odoo import http, _, fields
 from odoo.exceptions import UserError
 from odoo.http import request
 from requests.exceptions import RequestException
@@ -46,6 +46,14 @@ class PortalCheckInController(http.Controller):
             employee.id if employee else False,
         )
         return employee
+
+    def _get_available_overtime_authorization(self, employee):
+        approval_model = request.env["approval.request"].sudo()
+        if not employee or not hasattr(approval_model, "_get_available_preauthorized_request"):
+            return request.env["approval.request"]
+        return approval_model._get_available_preauthorized_request(
+            employee, target_date=fields.Date.context_today(employee)
+        )
 
     def _get_today_bounds_utc(self):
         """Return today's [start, end) bounds in UTC based on user timezone."""
@@ -128,6 +136,24 @@ class PortalCheckInController(http.Controller):
                 today_check_in = recent_attendances[-1].check_in
                 checkout_candidates = recent_attendances.filtered(lambda a: a.check_out)
                 today_check_out = checkout_candidates[0].check_out if checkout_candidates else False
+        required_weekly_hours = (
+            employee._get_required_weekly_hours()
+            if employee and hasattr(employee, "_get_required_weekly_hours")
+            else 0.0
+        )
+        weekly_worked_hours = (
+            employee.weekly_worked_hours
+            if employee and "weekly_worked_hours" in employee._fields
+            else 0.0
+        )
+        weekly_gate_reached = (
+            employee._is_weekly_hours_threshold_reached()
+            if employee and hasattr(employee, "_is_weekly_hours_threshold_reached")
+            else False
+        )
+        available_overtime_authorization = (
+            self._get_available_overtime_authorization(employee) if employee else request.env["approval.request"]
+        )
         values = {
             'page_name': 'my_check_in',
             'employee': employee,
@@ -141,6 +167,10 @@ class PortalCheckInController(http.Controller):
             'show_no_employee': kwargs.get('error') == 'no_employee',
             'show_location_restricted': kwargs.get('error') == 'location_restricted',
             'location_restricted_message': unquote(kwargs.get('message', '')) if kwargs.get('message') else False,
+            'weekly_worked_hours': weekly_worked_hours,
+            'required_weekly_hours': required_weekly_hours,
+            'weekly_gate_reached': weekly_gate_reached,
+            'available_overtime_authorization': available_overtime_authorization,
         }
         return request.render('portal_check_in.portal_my_check_in', values)
 

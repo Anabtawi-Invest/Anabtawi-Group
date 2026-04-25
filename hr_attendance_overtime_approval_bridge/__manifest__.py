@@ -6,6 +6,7 @@
     "license": "LGPL-3",
     "depends": [
         "hr_attendance",
+        "hr_attendance_weekly_overtime_eligibility",
         "approvals",
         "portal",
         "website",
