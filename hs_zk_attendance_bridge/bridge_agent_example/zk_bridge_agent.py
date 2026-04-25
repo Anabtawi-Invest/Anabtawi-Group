@@ -29,6 +29,7 @@ def main() -> int:
     device_ip = getenv("DEVICE_IP", required=True)
     device_port = int(getenv("DEVICE_PORT", "4370"))
     device_identifier = getenv("DEVICE_IDENTIFIER", device_ip)
+    device_timezone = getenv("DEVICE_TIMEZONE", "")
     device_password = int(getenv("DEVICE_PASSWORD", "0"))
     timeout = int(getenv("DEVICE_TIMEOUT", "30"))
 
@@ -54,6 +55,7 @@ def main() -> int:
                     "device_user_id": str(attendance.user_id),
                     "punch_time": punch_time.isoformat(),
                     "punch_type": "",
+                    "device_timezone": device_timezone,
                 }
             )
     finally:

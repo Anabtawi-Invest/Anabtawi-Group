@@ -40,6 +40,7 @@
                         <group>
                             <field name="name"/>
                             <field name="device_identifier"/>
+                            <field name="device_timezone"/>
                             <field name="company_id"/>
                             <field name="active"/>
                         </group>
