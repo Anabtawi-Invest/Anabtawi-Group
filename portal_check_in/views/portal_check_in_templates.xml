@@ -34,6 +34,13 @@
                     <t t-set="url" t-value="'/my/check-in'"/>
                     <t t-set="config_card" t-value="True"/>
                 </t>
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="icon" t-value="'/portal/static/src/img/portal-connection.svg'"/>
+                    <t t-set="title">Overtime Approvals</t>
+                    <t t-set="text">Request approval for your overtime hours</t>
+                    <t t-set="url" t-value="'/my/overtime_approvals'"/>
+                    <t t-set="config_card" t-value="True"/>
+                </t>
             </div>
         </xpath>
 
@@ -109,6 +116,12 @@
                                 <div class="text-muted">Hello</div>
                                 <div class="pc-check-head mb-2">
                                     <t t-esc="employee.name if employee else request.env.user.name"/>
+                                </div>
+
+                                <div class="mb-3 text-end">
+                                    <a href="/my/overtime_approvals" class="btn btn-outline-primary btn-sm">
+                                        Overtime Approvals
+                                    </a>
                                 </div>
 
                                 <div t-if="show_success" class="alert alert-success py-2" role="alert">
