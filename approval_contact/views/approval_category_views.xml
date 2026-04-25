@@ -1,0 +1,12 @@
+<odoo>
+    <record id="view_approval_category_form_inherit_create_contact" model="ir.ui.view">
+        <field name="name">approval.category.form.inherit.create.contact</field>
+        <field name="model">approval.category</field>
+        <field name="inherit_id" ref="approvals.approval_category_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet//group" position="inside">
+                <field name="x_create_contact_on_approve"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
