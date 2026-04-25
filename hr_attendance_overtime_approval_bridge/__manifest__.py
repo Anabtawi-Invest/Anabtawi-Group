@@ -11,7 +11,11 @@
         "portal",
         "website",
     ],
-    "data": [],
+    "data": [
+        "views/approval_request_views.xml",
+        "views/hr_attendance_views.xml",
+        "views/portal_templates.xml",
+    ],
     "installable": True,
     "application": False,
 }

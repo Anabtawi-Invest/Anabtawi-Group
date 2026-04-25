@@ -7,7 +7,11 @@
     "depends": [
         "hr_attendance",
     ],
-    "data": [],
+    "data": [
+        "security/ir.model.access.csv",
+        "views/res_config_settings_views.xml",
+        "views/hr_attendance_views.xml",
+    ],
     "installable": True,
     "application": False,
 }
