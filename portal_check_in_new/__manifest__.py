@@ -16,7 +16,8 @@
         # 'views/hr_work_location_geofence_views.xml',
         # 'views/portal_check_in_templates.xml',
     ],
-
+    'installable': True,
+    'application': False,
 
     'license': "Other proprietary",
 }
