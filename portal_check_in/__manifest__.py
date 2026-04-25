@@ -18,6 +18,7 @@
         'views/portal_check_in_templates.xml',
     ],
 
+    "installable": True,
 
     'license': "Other proprietary",
 }
