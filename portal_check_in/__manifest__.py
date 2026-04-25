@@ -12,7 +12,13 @@
         'resource', 'portal', 'hr_attendance', 'hr_attendance_geofence_config',
         'hr_attendance_overtime_approval_bridge',
     ],
-    'data': [],
+    'data': [
+        'security/ir.model.access.csv',
+        'views/res_users_portal_employee.xml',
+        'views/hr_employee_user_link.xml',
+        'views/hr_employee_attendance_location.xml',
+        'views/portal_check_in_templates.xml',
+    ],
 
 
     'license': "Other proprietary",

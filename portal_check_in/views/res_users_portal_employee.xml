@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_users_view_form_show_create_employee_for_portal" model="ir.ui.view">
+        <field name="name">res.users.form.show.create.employee.for.portal</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="hr.res_users_view_form"/>
+        <field name="priority" eval="95"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='action_create_employee']" position="attributes">
+                <attribute name="invisible">not id or employee_id</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='action_create_employee']" position="after">
+                <button string="Create employee"
+                        type="object"
+                        name="action_create_employee"
+                        invisible="not id or not share or employee_id"
+                        groups="hr.group_hr_user"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
