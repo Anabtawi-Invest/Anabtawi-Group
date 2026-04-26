@@ -10,3 +10,4 @@ class ApprovalCategory(models.Model):
         string="Overtime Category",
         help="Use this category for overtime requests linked to attendance extra hours.",
     )
+

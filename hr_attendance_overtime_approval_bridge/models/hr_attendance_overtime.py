@@ -42,3 +42,4 @@ class HrAttendanceOvertimeLine(models.Model):
         if not self.env.context.get("skip_overtime_approval_gate"):
             self._check_overtime_approval_gate()
         return super().action_approve()
+
