@@ -1,6 +1,7 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import logging
+from datetime import timedelta
 
 from odoo import Command, _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
@@ -311,6 +312,24 @@ class ApprovalRequest(models.Model):
             raise ValidationError(_("This overtime authorization has already been used."))
         self.write({"overtime_authorized_attendance_id": attendance.id})
 
+    def _prepare_authorized_overtime_line_vals(self, attendance, approved_hours):
+        self.ensure_one()
+        time_stop = attendance.check_out or attendance.check_in
+        if attendance.check_in and attendance.check_out and approved_hours and attendance.worked_hours:
+            attended_seconds = max((attendance.check_out - attendance.check_in).total_seconds(), 0.0)
+            if attended_seconds and approved_hours < attendance.worked_hours:
+                ratio = approved_hours / attendance.worked_hours
+                time_stop = attendance.check_in + timedelta(seconds=attended_seconds * ratio)
+        return {
+            "employee_id": attendance.employee_id.id,
+            "date": attendance.date,
+            "time_start": attendance.check_in,
+            "time_stop": time_stop,
+            "duration": approved_hours,
+            "manual_duration": approved_hours,
+            "approval_request_ids": [Command.link(self.id)],
+        }
+
     def _sync_authorized_attendance_overtime(self):
         for request in self.filtered(
             lambda req: req.overtime_preauthorization
@@ -322,12 +341,49 @@ class ApprovalRequest(models.Model):
             if not attendance.check_out:
                 continue
 
-            overtime_lines = attendance.linked_overtime_ids
-            if overtime_lines:
-                overtime_lines.write(
+            approved_hours = min(attendance.worked_hours or 0.0, request.quantity or 0.0)
+            overtime_lines = attendance.linked_overtime_ids.sorted(
+                lambda line: (line.time_start or attendance.check_in, line.id)
+            )
+            remaining = approved_hours
+
+            for overtime_line in overtime_lines:
+                original_duration = overtime_line.manual_duration
+                approved_chunk = min(original_duration, remaining)
+                overtime_line.write(
                     {"approval_request_ids": [Command.link(request.id)]}
                 )
-                overtime_lines.with_context(skip_overtime_approval_gate=True).action_approve()
+                if approved_chunk > 0:
+                    if approved_chunk < original_duration:
+                        overtime_line.copy(
+                            {
+                                "duration": original_duration - approved_chunk,
+                                "manual_duration": original_duration - approved_chunk,
+                                "status": "refused",
+                            }
+                        )
+                    overtime_line.write(
+                        {
+                            "duration": approved_chunk,
+                            "manual_duration": approved_chunk,
+                        }
+                    )
+                    overtime_line.with_context(
+                        skip_overtime_approval_gate=True
+                    ).action_approve()
+                    remaining -= approved_chunk
+                else:
+                    overtime_line.action_refuse()
+
+            if remaining > 0:
+                created_line = self.env["hr.attendance.overtime.line"].create(
+                    request._prepare_authorized_overtime_line_vals(
+                        attendance, remaining
+                    )
+                )
+                created_line.with_context(
+                    skip_overtime_approval_gate=True
+                ).action_approve()
             request.write({"overtime_authorization_consumed": True})
 
     @api.constrains("is_overtime_category", "quantity", "overtime_line_ids")

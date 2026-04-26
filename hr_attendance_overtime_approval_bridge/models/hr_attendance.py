@@ -36,3 +36,11 @@ class HrAttendance(models.Model):
             lambda att: att.overtime_authorization_request_id and att.check_out
         ):
             attendance.overtime_authorization_request_id._sync_authorized_attendance_overtime()
+
+    def write(self, vals):
+        result = super().write(vals)
+        if any(field in vals for field in ("employee_id", "check_in", "check_out")):
+            self.filtered(
+                lambda att: att.overtime_authorization_request_id and att.check_out
+            )._finalize_overtime_authorization()
+        return result
