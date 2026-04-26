@@ -37,22 +37,28 @@ class HrEmployee(models.Model):
         c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
         return radius_earth_m * c
 
+    def _get_portal_geofence_work_location(self):
+        self.ensure_one()
+        work_location = self.work_location_id
+        if not work_location or self.allow_remote_attendance:
+            return self.env["hr.work.location"]
+        return work_location if work_location.attendance_geo_enforce else self.env["hr.work.location"]
+
+    def _is_portal_geo_tracking_required(self):
+        self.ensure_one()
+        return bool(self._get_portal_geofence_work_location())
+
     def _check_portal_geo_restriction(self, geo_information=None):
         self.ensure_one()
         # Restrict only check-in; check-out remains unchanged.
-        company = self.company_id
-        if company.attendance_geo_enforce and not self.allow_remote_attendance:
-            if not company.attendance_device_tracking:
+        work_location = self._get_portal_geofence_work_location()
+        if work_location:
+            location_lat = self._safe_float(work_location.attendance_geo_latitude)
+            location_lon = self._safe_float(work_location.attendance_geo_longitude)
+            radius_m = self._safe_float(work_location.attendance_geo_radius_m) or 0.0
+            if location_lat is None or location_lon is None:
                 raise UserError(_(
-                    "تقييد الحضور حسب موقع الشركة يتطلب تفعيل خيار تتبع الجهاز والموقع."
-                ))
-
-            company_lat = self._safe_float(company.attendance_geo_latitude)
-            company_lon = self._safe_float(company.attendance_geo_longitude)
-            radius_m = self._safe_float(company.attendance_geo_radius_m) or 0.0
-            if company_lat is None or company_lon is None:
-                raise UserError(_(
-                    "تم تفعيل نطاق موقع الشركة، لكن إحداثيات الشركة (خط العرض/خط الطول) غير مضبوطة."
+                    "تم تفعيل نطاق موقع الدوام، لكن إحداثيات موقع الدوام (خط العرض/خط الطول) غير مضبوطة."
                 ))
 
             payload = geo_information or {}
@@ -64,11 +70,11 @@ class HrEmployee(models.Model):
                 ))
 
             distance_m = self._haversine_distance_m(
-                employee_lat, employee_lon, company_lat, company_lon
+                employee_lat, employee_lon, location_lat, location_lon
             )
             if distance_m > radius_m:
                 raise UserError(_(
-                    "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لموقع الشركة. "
+                    "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لموقع الدوام. "
                     "المسافة الحالية %.0f متر، والنطاق المسموح %.0f متر."
                 ) % (distance_m, radius_m))
 
