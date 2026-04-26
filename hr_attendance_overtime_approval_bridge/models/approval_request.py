@@ -232,29 +232,8 @@ class ApprovalRequest(models.Model):
         for request in self.filtered("is_overtime_category"):
             if request.quantity <= 0:
                 raise ValidationError(_("Requested Overtime Hours must be greater than zero."))
-            if not request.overtime_line_ids:
-                continue
-            available_hours = sum(request.overtime_line_ids.mapped("manual_duration"))
-            _logger.warning(
-                "Overtime request %s requested_hours=%s available_hours=%s overtime_line_ids=%s statuses=%s durations=%s employee=%s period=%s..%s",
-                request.id or "new",
-                request.quantity,
-                available_hours,
-                request.overtime_line_ids.ids,
-                request.overtime_line_ids.mapped("status"),
-                request.overtime_line_ids.mapped("manual_duration"),
-                request.overtime_employee_id.id,
-                request.overtime_date_from,
-                request.overtime_date_to,
-            )
-            if request.quantity > available_hours:
-                raise ValidationError(
-                    _(
-                        "Requested Overtime Hours cannot exceed available overtime in the selected period. "
-                        "Available: %(available)s",
-                        available=available_hours,
-                    )
-                )
+            # Overtime requests in this customization are always preauthorized
+            # before check-in, so existing overtime lines must not limit creation.
 
     def _check_weekly_worked_hours_eligibility(self):
         required_weekly_hours = self._get_required_weekly_hours()
@@ -393,7 +372,13 @@ class ApprovalRequest(models.Model):
     @api.constrains("overtime_line_ids", "request_status")
     def _check_single_open_overtime_request(self):
         open_statuses = ("new", "pending")
-        for request in self.filtered(lambda req: req.overtime_line_ids and req.request_status in open_statuses):
+        for request in self.filtered(
+            lambda req: (
+                req.overtime_line_ids
+                and req.request_status in open_statuses
+                and not req.overtime_preauthorization
+            )
+        ):
             conflict_domain = [
                 ("id", "!=", request.id),
                 ("request_status", "in", open_statuses),
@@ -433,16 +418,15 @@ class ApprovalRequest(models.Model):
 
     def action_confirm(self):
         overtime_requests = self.filtered("is_overtime_category")
-        preauthorized_requests = overtime_requests.filtered(lambda req: not req.overtime_line_ids)
-        preauthorized_requests.write({"overtime_preauthorization": True})
-        (overtime_requests - preauthorized_requests).write({"overtime_preauthorization": False})
-        (overtime_requests - preauthorized_requests)._check_requested_overtime_hours_limit()
+        overtime_requests.write({"overtime_preauthorization": True})
         overtime_requests._check_weekly_worked_hours_eligibility()
         self._ensure_overtime_manager_approver()
         return super().action_confirm()
 
     def _sync_overtime_lines_with_status(self):
-        overtime_requests = self.filtered("overtime_line_ids")
+        overtime_requests = self.filtered(
+            lambda req: req.overtime_line_ids and not req.overtime_preauthorization
+        )
         for request in overtime_requests:
             if request.request_status == "approved":
                 remaining = request.quantity
