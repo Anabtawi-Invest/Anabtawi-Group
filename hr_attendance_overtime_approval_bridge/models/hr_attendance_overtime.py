@@ -42,17 +42,18 @@ class HrAttendanceOvertimeLine(models.Model):
         attendances = self._linked_attendances()
         if not attendances:
             return
-        self.env.add_to_compute(
-            attendances._fields["overtime_hours"],
-            attendances,
-        )
-        self.env.add_to_compute(
-            attendances._fields["validated_overtime_hours"],
-            attendances,
-        )
-        self.env.add_to_compute(
-            attendances._fields["overtime_status"],
-            attendances,
+        field_names = [
+            "overtime_hours",
+            "validated_overtime_hours",
+            "overtime_status",
+        ]
+        for field_name in field_names:
+            self.env.add_to_compute(
+                attendances._fields[field_name],
+                attendances,
+            )
+        attendances._recompute_recordset(
+            fnames=field_names,
         )
 
     @api.model_create_multi
