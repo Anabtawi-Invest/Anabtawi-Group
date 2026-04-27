@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import logging
 import math
 from datetime import timedelta
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class HrEmployee(models.Model):
@@ -102,6 +105,18 @@ class HrEmployee(models.Model):
             )
         attendance = self.env["hr.attendance"].create(vals)
         approval_request._reserve_preauthorized_attendance(attendance)
+        _logger.warning(
+            "portal_check_in authorized check-in: employee_id=%s attendance_id=%s request_id=%s "
+            "request_status=%s quantity=%s check_in=%s deadline=%s geo_keys=%s",
+            self.id,
+            attendance.id,
+            approval_request.id,
+            approval_request.request_status,
+            approval_request.quantity,
+            attendance.check_in,
+            attendance.overtime_authorization_deadline,
+            sorted(geo_information.keys()) if geo_information else [],
+        )
         return attendance
 
     def _check_overtime_gate_before_check_in(self):
@@ -126,12 +141,42 @@ class HrEmployee(models.Model):
         check_out_date = action_date
         if attendance.overtime_authorization_deadline:
             check_out_date = min(action_date, attendance.overtime_authorization_deadline)
+        _logger.warning(
+            "portal_check_in authorized check-out start: employee_id=%s attendance_id=%s request_id=%s "
+            "action_date=%s deadline=%s final_check_out=%s current_worked_hours=%s geo_keys=%s",
+            self.id,
+            attendance.id,
+            attendance.overtime_authorization_request_id.id,
+            action_date,
+            attendance.overtime_authorization_deadline,
+            check_out_date,
+            attendance.worked_hours,
+            sorted(geo_information.keys()) if geo_information else [],
+        )
 
         vals = {"check_out": check_out_date}
         if geo_information:
             vals.update({"out_%s" % key: geo_information[key] for key in geo_information})
         attendance.write(vals)
         attendance._finalize_overtime_authorization()
+        attendance.invalidate_recordset(
+            ["worked_hours", "linked_overtime_ids", "overtime_hours", "validated_overtime_hours", "overtime_status"]
+        )
+        _logger.warning(
+            "portal_check_in authorized check-out done: employee_id=%s attendance_id=%s request_id=%s "
+            "check_in=%s check_out=%s worked_hours=%s linked_overtime_ids=%s overtime_hours=%s "
+            "validated_overtime_hours=%s overtime_status=%s",
+            self.id,
+            attendance.id,
+            attendance.overtime_authorization_request_id.id,
+            attendance.check_in,
+            attendance.check_out,
+            attendance.worked_hours,
+            attendance.linked_overtime_ids.ids,
+            attendance.overtime_hours,
+            attendance.validated_overtime_hours,
+            attendance.overtime_status,
+        )
         return attendance
 
     def _attendance_action_change(self, geo_information=None):

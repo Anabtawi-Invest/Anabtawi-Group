@@ -306,6 +306,7 @@ class ApprovalRequest(models.Model):
             "time_stop": time_stop,
             "duration": approved_hours,
             "manual_duration": approved_hours,
+            "compensable_as_leave": True,
             "approval_request_ids": [Command.link(self.id)],
         }
 
@@ -317,7 +318,25 @@ class ApprovalRequest(models.Model):
             and not req.overtime_authorization_consumed
         ):
             attendance = request.overtime_authorized_attendance_id
+            _logger.warning(
+                "Authorized overtime sync start: request_id=%s employee_id=%s attendance_id=%s "
+                "quantity=%s consumed=%s check_in=%s check_out=%s worked_hours=%s linked_overtime_ids=%s",
+                request.id,
+                request.overtime_employee_id.id,
+                attendance.id,
+                request.quantity,
+                request.overtime_authorization_consumed,
+                attendance.check_in,
+                attendance.check_out,
+                attendance.worked_hours,
+                attendance.linked_overtime_ids.ids,
+            )
             if not attendance.check_out:
+                _logger.warning(
+                    "Authorized overtime sync skipped: request_id=%s attendance_id=%s reason=no_check_out",
+                    request.id,
+                    attendance.id,
+                )
                 continue
 
             approved_hours = min(attendance.worked_hours or 0.0, request.quantity or 0.0)
@@ -325,15 +344,44 @@ class ApprovalRequest(models.Model):
                 lambda line: (line.time_start or attendance.check_in, line.id)
             )
             remaining = approved_hours
+            _logger.warning(
+                "Authorized overtime sync computed hours: request_id=%s attendance_id=%s approved_hours=%s "
+                "existing_line_ids=%s existing_manual_durations=%s existing_statuses=%s",
+                request.id,
+                attendance.id,
+                approved_hours,
+                overtime_lines.ids,
+                overtime_lines.mapped("manual_duration"),
+                overtime_lines.mapped("status"),
+            )
 
             for overtime_line in overtime_lines:
                 original_duration = overtime_line.manual_duration
                 approved_chunk = min(original_duration, remaining)
+                _logger.warning(
+                    "Authorized overtime sync processing line: request_id=%s attendance_id=%s line_id=%s "
+                    "original_duration=%s approved_chunk=%s remaining_before=%s status=%s",
+                    request.id,
+                    attendance.id,
+                    overtime_line.id,
+                    original_duration,
+                    approved_chunk,
+                    remaining,
+                    overtime_line.status,
+                )
                 overtime_line.write(
                     {"approval_request_ids": [Command.link(request.id)]}
                 )
                 if approved_chunk > 0:
                     if approved_chunk < original_duration:
+                        _logger.warning(
+                            "Authorized overtime sync splitting line: request_id=%s line_id=%s "
+                            "approved_chunk=%s refused_remainder=%s",
+                            request.id,
+                            overtime_line.id,
+                            approved_chunk,
+                            original_duration - approved_chunk,
+                        )
                         overtime_line.copy(
                             {
                                 "duration": original_duration - approved_chunk,
@@ -351,7 +399,18 @@ class ApprovalRequest(models.Model):
                         skip_overtime_approval_gate=True
                     ).action_approve()
                     remaining -= approved_chunk
+                    _logger.warning(
+                        "Authorized overtime sync approved line: request_id=%s line_id=%s remaining_after=%s",
+                        request.id,
+                        overtime_line.id,
+                        remaining,
+                    )
                 else:
+                    _logger.warning(
+                        "Authorized overtime sync refusing line: request_id=%s line_id=%s reason=no_remaining_hours",
+                        request.id,
+                        overtime_line.id,
+                    )
                     overtime_line.action_refuse()
 
             if remaining > 0:
@@ -363,7 +422,37 @@ class ApprovalRequest(models.Model):
                 created_line.with_context(
                     skip_overtime_approval_gate=True
                 ).action_approve()
+                _logger.warning(
+                    "Authorized overtime sync created line: request_id=%s attendance_id=%s line_id=%s "
+                    "created_hours=%s time_start=%s time_stop=%s",
+                    request.id,
+                    attendance.id,
+                    created_line.id,
+                    remaining,
+                    created_line.time_start,
+                    created_line.time_stop,
+                )
+            else:
+                _logger.warning(
+                    "Authorized overtime sync no new line needed: request_id=%s attendance_id=%s",
+                    request.id,
+                    attendance.id,
+                )
             request.write({"overtime_authorization_consumed": True})
+            attendance.invalidate_recordset(
+                ["linked_overtime_ids", "overtime_status", "overtime_hours", "validated_overtime_hours"]
+            )
+            _logger.warning(
+                "Authorized overtime sync done: request_id=%s attendance_id=%s consumed=%s linked_overtime_ids=%s "
+                "overtime_hours=%s validated_overtime_hours=%s overtime_status=%s",
+                request.id,
+                attendance.id,
+                request.overtime_authorization_consumed,
+                attendance.linked_overtime_ids.ids,
+                attendance.overtime_hours,
+                attendance.validated_overtime_hours,
+                attendance.overtime_status,
+            )
 
     @api.constrains("is_overtime_category", "quantity", "overtime_line_ids")
     def _check_requested_hours(self):
