@@ -1,6 +1,11 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+from datetime import timedelta
+import logging
+
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class HrAttendance(models.Model):
@@ -35,12 +40,74 @@ class HrAttendance(models.Model):
         for attendance in self.filtered(
             lambda att: att.overtime_authorization_request_id and att.check_out
         ):
+            _logger.warning(
+                "Overtime authorization finalize: attendance_id=%s employee_id=%s request_id=%s "
+                "check_in=%s check_out=%s worked_hours=%s linked_overtime_ids=%s validated_overtime_hours=%s",
+                attendance.id,
+                attendance.employee_id.id,
+                attendance.overtime_authorization_request_id.id,
+                attendance.check_in,
+                attendance.check_out,
+                attendance.worked_hours,
+                attendance.linked_overtime_ids.ids,
+                attendance.validated_overtime_hours,
+            )
             attendance.overtime_authorization_request_id._sync_authorized_attendance_overtime()
 
+    def _cron_auto_check_out_overtime_authorizations(self):
+        deadline_now = fields.Datetime.now()
+        attendances = self.search(
+            [
+                ("overtime_authorization_request_id", "!=", False),
+                ("overtime_authorization_deadline", "!=", False),
+                ("check_out", "=", False),
+                ("overtime_authorization_deadline", "<=", deadline_now),
+            ]
+        )
+        _logger.warning(
+            "Overtime authorization auto check-out cron: now=%s attendance_ids=%s",
+            deadline_now,
+            attendances.ids,
+        )
+        for attendance in attendances:
+            deadline = attendance.overtime_authorization_deadline
+            if deadline and attendance.check_in and deadline <= attendance.check_in:
+                deadline = attendance.check_in + timedelta(seconds=1)
+            _logger.warning(
+                "Overtime authorization auto check-out: attendance_id=%s employee_id=%s request_id=%s "
+                "check_in=%s deadline=%s final_check_out=%s",
+                attendance.id,
+                attendance.employee_id.id,
+                attendance.overtime_authorization_request_id.id,
+                attendance.check_in,
+                attendance.overtime_authorization_deadline,
+                deadline,
+            )
+            attendance.write(
+                {
+                    "check_out": deadline,
+                    "out_mode": "auto_check_out",
+                }
+            )
+
     def write(self, vals):
+        authorized_before = self.filtered("overtime_authorization_request_id")
         result = super().write(vals)
         if any(field in vals for field in ("employee_id", "check_in", "check_out")):
-            self.filtered(
+            authorized_after = self.filtered(
                 lambda att: att.overtime_authorization_request_id and att.check_out
-            )._finalize_overtime_authorization()
+            )
+            for attendance in authorized_before:
+                _logger.warning(
+                    "Overtime authorization attendance write: attendance_id=%s request_id=%s vals=%s "
+                    "check_in=%s check_out=%s worked_hours=%s out_mode=%s",
+                    attendance.id,
+                    attendance.overtime_authorization_request_id.id,
+                    vals,
+                    attendance.check_in,
+                    attendance.check_out,
+                    attendance.worked_hours,
+                    attendance.out_mode,
+                )
+            authorized_after._finalize_overtime_authorization()
         return result
