@@ -306,6 +306,7 @@ class ApprovalRequest(models.Model):
             "time_stop": time_stop,
             "duration": approved_hours,
             "manual_duration": approved_hours,
+            "compensable_as_leave": True,
             "approval_request_ids": [Command.link(self.id)],
         }
 
