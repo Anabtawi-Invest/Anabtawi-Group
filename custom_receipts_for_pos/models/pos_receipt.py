@@ -1,47 +1,20 @@
 # -*- coding: utf-8 -*-
-################################################################################
-#
-#    Cybrosys Technologies Pvt. Ltd.
-#
-#    Copyright (C) 2025-TODAY Cybrosys Technologies(<https://www.cybrosys.com>).
-#    Author: Sreerag PM (<https://www.cybrosys.com>)
-#
-#    This program is free software: you can modify
-#    it under the terms of the GNU Affero General Public License (AGPL) as
-#    published by the Free Software Foundation, either version 3 of the
-#    License, or (at your option) any later version.
-#
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU Affero General Public License for more details.
-#
-#    You should have received a copy of the GNU Affero General Public License
-#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-################################################################################
 from odoo import api, fields, models
 
 
 class PosReceipt(models.Model):
-    """
-        This is an Odoo model for Point of Sale (POS).
-        It creates a new model of pos.receipt for providing different types of
-        receipt design.
-    """
-    _name = 'pos.receipt'
-    _description = 'POS Receipts'
+    _name = "pos.receipt"
+    _description = "POS Receipts"
 
-    name = fields.Char(string='Name', help='Name of the pos receipt')
-    design_receipt = fields.Text(string='Receipt XML',
-                                 help='Add your customised receipts for pos')
+    name = fields.Char(string="Name", help="Name of the pos receipt")
+    design_receipt = fields.Text(string="Receipt XML", help="Add your customised receipts for pos")
 
     @api.model
-    def _load_pos_data_domain(self, data, config):
-        """Load all receipt designs to the POS UI."""
-        return []
-
-    @api.model
-    def _load_pos_data_fields(self, config):
-        """Fields needed on the POS UI."""
-        return ["id", "name", "design_receipt"]
+    def _load_pos_data(self, data, config):
+        """
+        Odoo 19 POS expects each loaded model to provide a loader method that returns
+        JSON-serializable data (usually list of dicts).
+        We explicitly implement it to avoid relying on mixins/signatures.
+        """
+        receipts = self.search([])  # load all designs
+        return receipts.read(["id", "name", "design_receipt"])
