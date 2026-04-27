@@ -21,15 +21,13 @@ patch(OrderReceipt.prototype, {
     },
 
     get customReceiptProps() {
-        const order = this.props.order;
-
         return {
-            order: order,
+            order: this.props.order,
             pos: this.pos,
             paymentLines: this.paymentLines || [],
             header: this.header || {},
+            vatText: this.vatText || "",
             formatCurrency: this.formatCurrency.bind(this),
-            vatText: this.vatText,
         };
     },
 
@@ -38,14 +36,42 @@ patch(OrderReceipt.prototype, {
 
         return class CustomPosReceipt extends Component {
             static template = xml`${design}`;
+
             static props = {
                 order: { type: Object, optional: true },
                 pos: { type: Object, optional: true },
                 paymentLines: { type: Array, optional: true },
                 header: { type: Object, optional: true },
-                formatCurrency: { type: Function, optional: true },
                 vatText: { type: String, optional: true },
+                formatCurrency: { type: Function, optional: true },
             };
+
+            get order() {
+                return this.props.order;
+            }
+
+            get pos() {
+                return this.props.pos;
+            }
+
+            get paymentLines() {
+                return this.props.paymentLines || [];
+            }
+
+            get header() {
+                return this.props.header || {};
+            }
+
+            get vatText() {
+                return this.props.vatText || "";
+            }
+
+            formatCurrency(amount) {
+                if (this.props.formatCurrency) {
+                    return this.props.formatCurrency(amount);
+                }
+                return amount;
+            }
         };
     },
 });
