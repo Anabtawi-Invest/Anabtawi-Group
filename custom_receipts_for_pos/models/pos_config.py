@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models
+from odoo import fields, models
 
 
 class PosConfig(models.Model):
@@ -8,7 +8,7 @@ class PosConfig(models.Model):
     receipt_design_id = fields.Many2one(
         comodel_name="pos.receipt",
         string="Receipt Design",
-        help="Choose the custom POS receipt design used by this Point of Sale.",
+        help="Choose any receipt design.",
     )
 
     design_receipt = fields.Text(
@@ -18,14 +18,41 @@ class PosConfig(models.Model):
     )
 
     is_custom_receipt = fields.Boolean(
-        string="Custom Receipt",
-        help="Enable this option to replace the default Odoo POS receipt with the selected custom design.",
+        string="Is Custom Receipt",
+        help="Enable this option to use a custom POS receipt design.",
     )
 
-    @api.model
-    def _load_pos_data_fields(self, config):
-        fields_to_load = super()._load_pos_data_fields(config)
-        for field_name in ["is_custom_receipt", "receipt_design_id", "design_receipt"]:
-            if field_name not in fields_to_load:
-                fields_to_load.append(field_name)
-        return fields_to_load
+    def _load_pos_data_read(self, records, config):
+        """
+        Odoo 19 POS loads pos.config with an empty fields list from the core loader.
+        Empty fields means Odoo keeps the normal POS config payload.
+
+        Do not override _load_pos_data_fields for pos.config here,
+        because returning only custom fields removes important fields such as:
+        currency_id, company_id, payment_method_ids, pricelist_id, etc.
+        That is what caused:
+        Cannot read properties of undefined reading currency_id
+
+        This method safely injects only our custom values after Odoo loads
+        the original POS config data.
+        """
+        result = super()._load_pos_data_read(records, config)
+
+        for config_data in result:
+            current_config = self.browse(config_data.get("id")).exists()
+
+            if not current_config:
+                config_data.update({
+                    "is_custom_receipt": False,
+                    "receipt_design_id": False,
+                    "design_receipt": False,
+                })
+                continue
+
+            config_data.update({
+                "is_custom_receipt": bool(current_config.is_custom_receipt),
+                "receipt_design_id": current_config.receipt_design_id.id or False,
+                "design_receipt": current_config.design_receipt or False,
+            })
+
+        return result
