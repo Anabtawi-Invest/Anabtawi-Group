@@ -5,47 +5,46 @@ import { patch } from "@web/core/utils/patch";
 import { Component, xml } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
-/**
- * Odoo 19: OrderReceipt props changed to { order, basic_receipt }.
- * This patch lets you render a custom QWeb/OWL template saved in
- * pos.config.design_receipt (Text field).
- */
 patch(OrderReceipt.prototype, {
     setup() {
         super.setup(...arguments);
         this.pos = useService("pos");
     },
 
-    // Keep the original name used in your XML (isTrue)
-    get isTrue() {
-        return Boolean(this.pos?.config?.is_custom_receipt && this.pos?.config?.design_receipt);
+    get isCustomReceipt() {
+        return Boolean(
+            this.pos &&
+            this.pos.config &&
+            this.pos.config.is_custom_receipt &&
+            this.pos.config.design_receipt
+        );
     },
 
-    get templateProps() {
+    get customReceiptProps() {
         const order = this.props.order;
 
-        // Some custom templates (from v18) expect a `receipt` structure.
-        // In v19, `export_for_printing` may or may not exist depending on the POS build.
-        const exportedReceipt = order?.export_for_printing ? order.export_for_printing() : {};
-
         return {
-            order,
-            receipt: exportedReceipt,
-            paymentLines: this.paymentLines || [],
+            order: order,
             pos: this.pos,
+            paymentLines: this.paymentLines || [],
+            header: this.header || {},
+            formatCurrency: this.formatCurrency.bind(this),
+            vatText: this.vatText,
         };
     },
 
-    get templateComponent() {
-        const design = this.pos?.config?.design_receipt || "<div class='pos-receipt p-2'/>";
+    get customReceiptComponent() {
+        const design = this.pos.config.design_receipt || "<div class='pos-receipt p-2'></div>";
 
-        return class CustomReceipt extends Component {
+        return class CustomPosReceipt extends Component {
             static template = xml`${design}`;
             static props = {
                 order: { type: Object, optional: true },
-                receipt: { type: Object, optional: true },
-                paymentLines: { type: Array, optional: true },
                 pos: { type: Object, optional: true },
+                paymentLines: { type: Array, optional: true },
+                header: { type: Object, optional: true },
+                formatCurrency: { type: Function, optional: true },
+                vatText: { type: String, optional: true },
             };
         };
     },
