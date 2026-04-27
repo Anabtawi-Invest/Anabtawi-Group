@@ -5,6 +5,7 @@ from odoo import api, fields, models
 class PosReceipt(models.Model):
     _name = "pos.receipt"
     _description = "POS Receipt Design"
+    _inherit = "pos.load.mixin"
 
     name = fields.Char(
         string="Name",
@@ -15,7 +16,7 @@ class PosReceipt(models.Model):
     design_receipt = fields.Text(
         string="Receipt XML",
         required=True,
-        help="OWL/QWeb receipt template used in the POS frontend.",
+        help="Custom OWL/QWeb receipt template used in the POS frontend.",
     )
 
     @api.model
@@ -24,4 +25,8 @@ class PosReceipt(models.Model):
 
     @api.model
     def _load_pos_data_fields(self, config):
-        return ["id", "name", "design_receipt"]
+        return [
+            "id",
+            "name",
+            "design_receipt",
+        ]
