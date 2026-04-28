@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pos_receipt_design1" model="pos.receipt">
+        <field name="name">Design 1</field>
+        <field name="design_receipt"><![CDATA[
+<div class="pos-receipt p-2">
+    <div class="text-center">
+        <t t-if="order.config.logo">
+            <img t-att-src="'data:image/png;base64,' + order.config.logo" class="pos-receipt-logo" alt="Logo"/>
+        </t>
+        <div class="fw-bolder" t-esc="order.company.name"/>
+        <div t-if="order.company.phone">Tel: <span t-esc="order.company.phone"/></div>
+        <div t-if="order.company.vat" t-esc="vatText"/>
+        <div t-if="header.cashier" t-esc="header.cashier"/>
+    </div>
+
+    <div class="pt-3">
+        <div>Order: <span t-esc="order.name"/></div>
+        <div>Date: <span t-esc="order.formatDateOrTime('date_order')"/></div>
+    </div>
+
+    <table class="receipt-orderlines w-100 mt-3">
+        <thead>
+            <tr>
+                <th class="text-start">Product</th>
+                <th class="text-end">Qty</th>
+                <th class="text-end">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr t-foreach="order.lines" t-as="line" t-key="line.uuid">
+                <td>
+                    <div t-esc="line.product_id.display_name"/>
+                    <div t-if="line.discount" class="small">
+                        Discount: <span t-esc="line.discount"/>%
+                    </div>
+                    <div t-if="line.customerNote" class="small" t-esc="line.customerNote"/>
+                </td>
+                <td class="text-end" t-esc="line.qty"/>
+                <td class="text-end" t-esc="formatCurrency(line.price_display)"/>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="pt-3">
+        <div class="d-flex">
+            <span>Subtotal</span>
+            <span class="ms-auto" t-esc="formatCurrency(order.priceExcl)"/>
+        </div>
+        <div class="d-flex fw-bolder">
+            <span>Total</span>
+            <span class="ms-auto" t-esc="order.currencyDisplayPriceIncl"/>
+        </div>
+    </div>
+
+    <div class="pt-2" t-foreach="paymentLines" t-as="line" t-key="line.uuid">
+        <div class="d-flex">
+            <span t-esc="line.payment_method_id.name"/>
+            <span class="ms-auto" t-esc="formatCurrency(line.getAmount())"/>
+        </div>
+    </div>
+
+    <div t-if="order.showChange" class="d-flex">
+        <span>Change</span>
+        <span class="ms-auto" t-esc="formatCurrency(order.change)"/>
+    </div>
+
+    <div t-if="order.config.receipt_footer" class="text-center pt-3" style="white-space:pre-line">
+        <t t-esc="order.config.receipt_footer"/>
+    </div>
+
+    <div class="text-center pt-3">
+        Thank You... Please Visit Again
+    </div>
+</div>
+        ]]></field>
+    </record>
+</odoo>
