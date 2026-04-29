@@ -5,6 +5,7 @@ from . import pos_config
 from . import res_partner
 from . import pos_order
 from . import pos_session
+from . import report_sale_details
 from . import product_template
 from . import pos_pledge
 from . import pos_advance_discount
