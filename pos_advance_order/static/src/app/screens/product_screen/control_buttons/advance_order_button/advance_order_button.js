@@ -5,6 +5,7 @@ import { patch } from "@web/core/utils/patch";
 import { useService } from "@web/core/utils/hooks";
 import { usePos } from "@point_of_sale/app/hooks/pos_hook";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
+import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { rpc } from "@web/core/network/rpc";
 import { AdvanceOrderFormPopup } from "./advance_order_form_popup";
@@ -15,6 +16,8 @@ function toNumber(value, fallback = 0) {
     const num = Number(value);
     return Number.isFinite(num) ? num : fallback;
 }
+
+ClosePosPopup.props = [...ClosePosPopup.props, "advance_summary?"];
 
 patch(ControlButtons.prototype, {
     setup() {

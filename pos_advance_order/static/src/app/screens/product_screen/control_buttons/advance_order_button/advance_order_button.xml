@@ -38,4 +38,30 @@
             </button>
         </xpath>
     </t>
+    <t t-name="pos_advance_order.ClosePosPopupPatchInline" t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension" owl="1">
+        <xpath expr="//div[hasclass('payment-methods-overview')]" position="inside">
+            <div
+                class="w-100 mb-3"
+                t-if="props.advance_summary and (props.advance_summary.cash or props.advance_summary.bank)"
+            >
+                <div class="d-flex align-items-center justify-content-between fs-5">
+                    <span>Advance Totals</span>
+                </div>
+                <div
+                    class="d-flex align-items-center justify-content-between text-muted border-start ps-2"
+                    t-if="props.advance_summary.cash"
+                >
+                    <span>Cash Advance</span>
+                    <span t-esc="env.utils.formatCurrency(props.advance_summary.cash)" />
+                </div>
+                <div
+                    class="d-flex align-items-center justify-content-between text-muted border-start ps-2"
+                    t-if="props.advance_summary.bank"
+                >
+                    <span>Bank Advance</span>
+                    <span t-esc="env.utils.formatCurrency(props.advance_summary.bank)" />
+                </div>
+            </div>
+        </xpath>
+    </t>
 </templates>
