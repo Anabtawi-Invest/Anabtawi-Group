@@ -793,7 +793,8 @@ class PosAdvanceOrder(models.Model):
             if order.advance_amount > order.amount_grand_total:
                 raise UserError(_("Advance amount cannot be greater than the total."))
 
-            order.from_pos_config_id = order.pos_config_id
+            if not order.from_pos_config_id:
+                order.from_pos_config_id = order.pos_config_id
             order.state = "confirmed"
 
         return True
@@ -942,7 +943,7 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_payment(self):
+    def action_create_remaining_payment(self, current_pos_config_id=False):
         """Create the final POS order for the full amount and settle the advance via pay later."""
         for order in self:
             order.ensure_one()
@@ -956,6 +957,11 @@ class PosAdvanceOrder(models.Model):
                 raise UserError(_("Pledge payment order is already created for this advance order."))
             if not order.amount_grand_total or order.amount_grand_total <= 0:
                 raise UserError(_("Total amount must be greater than zero."))
+            if current_pos_config_id and int(current_pos_config_id) != order.pos_config_id.id:
+                raise UserError(
+                    _("This advance order can only be completed from the Picking POS '%s'.")
+                    % order.pos_config_id.display_name
+                )
 
             pos_config = order.pos_config_id
             session = order._get_open_session(pos_config)
@@ -1012,9 +1018,9 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_amount(self):
+    def action_create_remaining_amount(self, current_pos_config_id=False):
         """Alias for POS button flow."""
-        return self.action_create_remaining_payment()
+        return self.action_create_remaining_payment(current_pos_config_id=current_pos_config_id)
 
     def action_refund_advance_payment(self):
         for order in self:

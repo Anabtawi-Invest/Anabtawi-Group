@@ -22,15 +22,16 @@ export class AdvanceOrderFormPopup extends Component {
             loading: true,
             advance_amount: 0,
             payment_method: "cash",
-            pos_config_id: this.props.posConfigId || null,
-            pos_config_name: "",
-            pos_config_pricelist: null,
+            current_pos_config_id: this.props.posConfigId || null,
+            current_pos_config_name: "",
+            picking_pos_config_id: this.props.posConfigId || null,
             pricelist_name: "",
             with_employee: false,
             employee_id: null,
             discount_id: null,
             employees: [],
             discounts: [],
+            pos_configs: [],
         });
 
         onMounted(async () => {
@@ -49,7 +50,7 @@ export class AdvanceOrderFormPopup extends Component {
             discountDomain.push(["company_id", "=", companyId]);
         }
         try {
-            const [employees, discounts, posConfig] = await Promise.all([
+            const [employees, discounts, posConfig, posConfigs] = await Promise.all([
                 this.orm.searchRead("hr.employee", employeeDomain, ["id", "name"], { limit: 200 }),
                 this.orm.searchRead(
                     "pos.advance.discount",
@@ -58,13 +59,25 @@ export class AdvanceOrderFormPopup extends Component {
                     { limit: 200 }
                 ),
                 this.orm.read("pos.config", [this.props.posConfigId], ["id", "name", "pricelist_id"]),
+                this.orm.searchRead(
+                    "pos.config",
+                    [],
+                    ["id", "name", "pricelist_id", "enable_advance_order"],
+                    { limit: 200 }
+                ),
             ]);
             this.state.employees = employees || [];
             this.state.discounts = discounts || [];
             const currentConfig = (posConfig || [])[0];
-            this.state.pos_config_id = currentConfig?.id || this.props.posConfigId || null;
-            this.state.pos_config_name = currentConfig?.name || "";
-            this.state.pos_config_pricelist = currentConfig?.pricelist_id || null;
+            this.state.current_pos_config_id = currentConfig?.id || this.props.posConfigId || null;
+            this.state.current_pos_config_name = currentConfig?.name || "";
+            this.state.pos_configs = (posConfigs || []).filter((cfg) => cfg.enable_advance_order);
+            if (
+                !this.state.pos_configs.some((cfg) => cfg.id === this.state.picking_pos_config_id)
+                && this.state.pos_configs.length
+            ) {
+                this.state.picking_pos_config_id = this.state.pos_configs[0].id;
+            }
             this._syncPricelistName();
         } catch (error) {
             this.notification.add(
@@ -75,7 +88,10 @@ export class AdvanceOrderFormPopup extends Component {
     }
 
     _syncPricelistName() {
-        this.state.pricelist_name = this.state.pos_config_pricelist?.[1] || "";
+        const picked = (this.state.pos_configs || []).find(
+            (cfg) => cfg.id === this.state.picking_pos_config_id
+        );
+        this.state.pricelist_name = picked?.pricelist_id?.[1] || "";
     }
 
     onAdvanceAmountInput(ev) {
@@ -85,6 +101,11 @@ export class AdvanceOrderFormPopup extends Component {
 
     onPaymentMethodChange(ev) {
         this.state.payment_method = ev.target.value || "cash";
+    }
+
+    onPickingPosChange(ev) {
+        this.state.picking_pos_config_id = ev.target.value ? parseInt(ev.target.value, 10) : null;
+        this._syncPricelistName();
     }
 
     onWithEmployeeChange(ev) {
@@ -114,8 +135,12 @@ export class AdvanceOrderFormPopup extends Component {
             this.notification.add(_t("Advance amount must be greater than zero."), { type: "warning" });
             return;
         }
-        if (!this.state.pos_config_id) {
+        if (!this.state.current_pos_config_id) {
             this.notification.add(_t("Current POS configuration is missing."), { type: "warning" });
+            return;
+        }
+        if (!this.state.picking_pos_config_id) {
+            this.notification.add(_t("Please select Picking POS."), { type: "warning" });
             return;
         }
         if (this.state.with_employee && !this.state.employee_id) {
@@ -125,7 +150,8 @@ export class AdvanceOrderFormPopup extends Component {
         this.props.getPayload({
             advance_amount: this.state.advance_amount,
             payment_method: this.state.payment_method,
-            pos_config_id: this.state.pos_config_id,
+            from_pos_config_id: this.state.current_pos_config_id,
+            pos_config_id: this.state.picking_pos_config_id,
             employee_id: this.state.with_employee ? this.state.employee_id : false,
             discount_id: this.state.discount_id || false,
         });

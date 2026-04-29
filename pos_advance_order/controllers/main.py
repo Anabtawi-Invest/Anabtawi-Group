@@ -12,6 +12,7 @@ class PosAdvanceOrderController(http.Controller):
 
         partner_id = payload.get("partner_id")
         pos_config_id = payload.get("pos_config_id")
+        from_pos_config_id = payload.get("from_pos_config_id")
         lines = payload.get("lines") or []
         advance_amount = float(payload.get("advance_amount") or 0.0)
         payment_method = payload.get("payment_method") or "cash"
@@ -30,6 +31,11 @@ class PosAdvanceOrderController(http.Controller):
         pos_config = request.env["pos.config"].sudo().browse(int(pos_config_id)).exists()
         if not pos_config:
             raise ValidationError("Invalid POS configuration.")
+        from_pos_config = request.env["pos.config"].sudo().browse(
+            int(from_pos_config_id or pos_config.id)
+        ).exists()
+        if not from_pos_config:
+            raise ValidationError("Invalid current POS configuration.")
 
         partner = request.env["res.partner"].sudo().browse(int(partner_id)).exists()
         if not partner:
@@ -61,13 +67,13 @@ class PosAdvanceOrderController(http.Controller):
         if not line_vals:
             raise ValidationError("Order lines are required.")
 
-        if not pos_config.enable_advance_order:
+        if not from_pos_config.enable_advance_order:
             raise UserError("Advance order is not enabled on this POS.")
 
         create_vals = {
             "partner_id": partner.id,
             "pos_config_id": pos_config.id,
-            "from_pos_config_id": pos_config.id,
+            "from_pos_config_id": from_pos_config.id,
             "picking_date": fields.Datetime.now(),
             "payment_method": payment_method if payment_method in ("cash", "bank") else "cash",
             "advance_amount": advance_amount,
