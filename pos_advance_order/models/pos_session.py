@@ -8,6 +8,12 @@ from odoo import _, models
 class PosSession(models.Model):
     _inherit = "pos.session"
 
+    def _get_receivable_account(self, payment_method):
+        self.ensure_one()
+        if payment_method.type == "pay_later" and self.config_id.pos_advance_receivable_account_id:
+            return self.config_id.pos_advance_receivable_account_id
+        return super()._get_receivable_account(payment_method)
+
     def get_session_orders(self):
         orders = super().get_session_orders()
         # Do not aggregate technical advance helper orders on session closing.
@@ -63,7 +69,10 @@ class PosSession(models.Model):
             if not liability_account:
                 continue
             pay_later_payment = pos_order.payment_ids.filtered(lambda p: p.payment_method_id.type == "pay_later")[:1]
-            receivable_account = self._get_receivable_account(pay_later_payment.payment_method_id)
+            receivable_account = (
+                advance_order.pos_config_id.pos_advance_receivable_account_id
+                or self._get_receivable_account(pay_later_payment.payment_method_id)
+            )
             amounts_by_accounts[(liability_account.id, receivable_account.id)] += applied_amount
 
         if not amounts_by_accounts:
