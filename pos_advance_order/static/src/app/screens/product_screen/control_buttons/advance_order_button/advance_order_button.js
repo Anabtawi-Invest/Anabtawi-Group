@@ -163,7 +163,7 @@ patch(ControlButtons.prototype, {
             await this.orm.call(
                 "pos.advance.order",
                 "action_create_remaining_amount",
-                [[popupPayload.advance_order_id], this.pos.config.id]
+                [[popupPayload.advance_order_id], this.pos.config.id, popupPayload.payment_method || "cash"]
             );
             this.notification.add(_t("Advance order completed successfully."), { type: "success" });
         } catch (error) {

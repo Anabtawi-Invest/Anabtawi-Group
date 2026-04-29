@@ -943,7 +943,7 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_payment(self, current_pos_config_id=False):
+    def action_create_remaining_payment(self, current_pos_config_id=False, payment_method=False):
         """Create the final POS order for the full amount and settle the advance via pay later."""
         for order in self:
             order.ensure_one()
@@ -965,7 +965,15 @@ class PosAdvanceOrder(models.Model):
 
             pos_config = order.pos_config_id
             session = order._get_open_session(pos_config)
-            actual_pm = order._get_pos_payment_method(session)
+            remaining_payment_method = payment_method if payment_method in ("cash", "bank") else order.payment_method
+            actual_pm = (
+                session.payment_method_ids.filtered(lambda m: m.type == remaining_payment_method)[:1]
+            )
+            if not actual_pm:
+                raise UserError(
+                    _("No %s payment method is configured on the opened POS session.")
+                    % ("cash" if remaining_payment_method == "cash" else "bank")
+                )
             pay_later_pm = order._get_pay_later_payment_method(session)
 
             # Build POS order lines
@@ -1018,9 +1026,12 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_amount(self, current_pos_config_id=False):
+    def action_create_remaining_amount(self, current_pos_config_id=False, payment_method=False):
         """Alias for POS button flow."""
-        return self.action_create_remaining_payment(current_pos_config_id=current_pos_config_id)
+        return self.action_create_remaining_payment(
+            current_pos_config_id=current_pos_config_id,
+            payment_method=payment_method,
+        )
 
     def action_refund_advance_payment(self):
         for order in self:
