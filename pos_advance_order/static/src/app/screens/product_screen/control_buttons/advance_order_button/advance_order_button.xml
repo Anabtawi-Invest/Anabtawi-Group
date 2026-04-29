@@ -11,7 +11,7 @@
                 <span>Advance Order</span>
             </button>
             <button
-                t-if="!props.showRemainingButtons and !pos.config.enable_advance_order"
+                t-if="!props.showRemainingButtons and pos.config.enable_advance_order"
                 t-att-class="buttonClass"
                 t-on-click="onClickCompleteAdvanceOrder"
                 type="button">
@@ -29,7 +29,7 @@
                 <span>Advance Order</span>
             </button>
             <button
-                t-if="!pos.config.enable_advance_order"
+                t-if="pos.config.enable_advance_order"
                 t-att-class="buttonClass"
                 t-on-click="onClickCompleteAdvanceOrder"
                 type="button">
