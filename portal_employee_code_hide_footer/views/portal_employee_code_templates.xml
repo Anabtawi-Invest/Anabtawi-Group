@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <template
+        id="portal_layout_hide_footer_on_my_pages"
+        inherit_id="portal.portal_layout"
+        priority="100"
+    >
+        <xpath expr="//t[@t-call='portal.frontend_layout']" position="before">
+            <t t-set="no_footer" t-value="1 if request and request.httprequest.path.startswith('/my/') else 0"/>
+        </xpath>
+    </template>
+
+    <template
         id="portal_my_employee_code_hide_footer_from_app"
         inherit_id="pos_predefined_discounts.portal_my_employee_code"
         priority="100"
