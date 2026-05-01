@@ -50,6 +50,14 @@ function describePricelistValue(value) {
     };
 }
 
+function logJson(label, payload) {
+    try {
+        console.log(`${label} ${JSON.stringify(payload)}`);
+    } catch {
+        console.log(label, payload);
+    }
+}
+
 function resolvePricelist(order, pos) {
     const pricelistValue =
         (typeof order?.get_pricelist === "function" && order.get_pricelist()) ||
@@ -58,7 +66,7 @@ function resolvePricelist(order, pos) {
         pos?.config?.pricelist_id;
 
     const pricelistId = extractPricelistId(pricelistValue);
-    console.log("[POS_PRICELIST_ID] resolvePricelist input details", {
+    logJson("[POS_PRICELIST_ID] resolvePricelist input details", {
         hasGetPricelist: typeof order?.get_pricelist === "function",
         orderPricelistRaw: describePricelistValue(order?.raw?.pricelist_id),
         orderPricelist: describePricelistValue(order?.pricelist_id),
@@ -79,7 +87,7 @@ function resolvePricelist(order, pos) {
         pos.models["product.pricelist"]?.find((p) => p.id === pricelistId) ||
         null;
 
-    console.log("[POS_PRICELIST_ID] resolvePricelist output details", {
+    logJson("[POS_PRICELIST_ID] resolvePricelist output details", {
         id: resolved?.id,
         name: resolved?.name || resolved?.display_name,
         required_id_number: resolved?.required_id_number,
@@ -116,7 +124,7 @@ patch(OrderPaymentValidation.prototype, {
                     ["required_id_number"],
                 ]);
                 requiredFromServer = Boolean(rows?.[0]?.required_id_number);
-                console.log("[POS_PRICELIST_ID] Server read result", {
+                logJson("[POS_PRICELIST_ID] Server read result", {
                     pricelistId,
                     rows,
                     requiredFromServer,
@@ -130,7 +138,7 @@ patch(OrderPaymentValidation.prototype, {
         }
 
         const isRequired = Boolean(pricelist?.required_id_number || requiredFromServer);
-        console.log("[POS_PRICELIST_ID] Required check details", {
+        logJson("[POS_PRICELIST_ID] Required check details", {
             pricelistId,
             pricelistName: pricelist?.name || pricelist?.display_name || null,
             requiredFromModel: pricelist?.required_id_number,
