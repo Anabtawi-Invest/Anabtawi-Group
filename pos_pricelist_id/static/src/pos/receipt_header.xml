@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t
+        t-name="pos_pricelist_id.ReceiptHeaderExtension"
+        t-inherit="point_of_sale.ReceiptHeader"
+        t-inherit-mode="extension"
+    >
+        <xpath expr="//div[contains(@class, 'pos-receipt-customer')]" position="after">
+            <div t-if="order.pricelist_id?.name or order.customer_id_number" class="pos-receipt-customer mt-1">
+                <div t-if="order.pricelist_id?.name">
+                    Pricelist: <t t-esc="order.pricelist_id.name"/>
+                </div>
+                <div t-if="order.customer_id_number">
+                    ID Number: <t t-esc="order.customer_id_number"/>
+                </div>
+            </div>
+        </xpath>
+    </t>
+</templates>
