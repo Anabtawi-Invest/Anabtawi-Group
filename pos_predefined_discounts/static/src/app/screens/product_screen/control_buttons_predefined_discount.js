@@ -1,11 +1,15 @@
+/** @odoo-module **/
+
 import { _t } from "@web/core/l10n/translation";
 import { patch } from "@web/core/utils/patch";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
+import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { NumberPopup } from "@point_of_sale/app/components/popups/number_popup/number_popup";
+import { PredefinedDiscountAuthPopup } from "./predefined_discount_auth_popup";
 
 patch(ControlButtons.prototype, {
     async clickDiscount() {
-        let allowedPercents = [];
+        let discounts = [];
         try {
             const orm = this.env.services.orm;
             const rows = await orm.searchRead(
@@ -14,10 +18,54 @@ patch(ControlButtons.prototype, {
                     ["pos_config_id", "=", this.pos.config.id],
                     ["active", "=", true],
                 ],
-                ["discount"]
+                ["id", "name", "discount", "is_employee_discount"]
             );
-            allowedPercents = (rows || [])
-                .map((r) => Number(r.discount))
+            discounts = (rows || []).map((row) => ({
+                ...row,
+                discount: Math.max(0, Math.min(100, Number(row.discount) || 0)),
+            }));
+        } catch {
+            discounts = [];
+        }
+
+        if (discounts.length) {
+            try {
+                const orm = this.env.services.orm;
+                const employees = await orm.call(
+                    "hr.employee",
+                    "pos_employee_request_get_employees",
+                    [this.pos.config.id, false, 200]
+                );
+                const payload = await makeAwaitable(this.dialog, PredefinedDiscountAuthPopup, {
+                    title: _t("Discount Authorization"),
+                    discounts,
+                    employees: employees || [],
+                });
+                if (!payload?.discountId) {
+                    return;
+                }
+                await orm.call(
+                    "pos.predefined.discount",
+                    "pos_validate_discount_authorization",
+                    [payload.discountId, payload.password, payload.employeeId || false]
+                );
+                const selectedDiscount = discounts.find((discount) => discount.id === payload.discountId);
+                if (selectedDiscount) {
+                    this.applyDiscount(selectedDiscount.discount);
+                }
+                return;
+            } catch (error) {
+                const message =
+                    error?.data?.message || error?.message || _t("Discount authorization failed.");
+                this.env.services.notification.add(message, { type: "danger" });
+                return;
+            }
+        }
+
+        let allowedPercents = [];
+        try {
+            allowedPercents = discounts
+                .map((discount) => Number(discount.discount))
                 .filter((x) => Number.isFinite(x))
                 .map((x) => Math.max(0, Math.min(100, x)));
         } catch {
