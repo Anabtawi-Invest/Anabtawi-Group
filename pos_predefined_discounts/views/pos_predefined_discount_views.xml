@@ -8,6 +8,7 @@
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
                 <field name="discount"/>
+                <field name="is_employee_discount"/>
                 <field name="active" widget="boolean_toggle"/>
                 <field name="pos_config_id"/>
             </list>
@@ -26,6 +27,7 @@
                         <field name="pos_config_id" required="1"/>
                         <field name="name" required="1"/>
                         <field name="discount" required="1"/>
+                        <field name="is_employee_discount"/>
                     </group>
                 </sheet>
             </form>
