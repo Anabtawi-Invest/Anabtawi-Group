@@ -1,7 +1,5 @@
 /** @odoo-module **/
 
-/** @odoo-module **/
-
 import { _t } from "@web/core/l10n/translation";
 import { Component, onMounted, useRef, useState } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
@@ -31,7 +29,13 @@ export class PredefinedDiscountAuthPopup extends Component {
             search: "",
         });
         this.passwordRef = useRef("password");
-        onMounted(() => this.passwordRef.el?.focus?.());
+        onMounted(() => {
+            this.state.password = "";
+            if (this.passwordRef.el) {
+                this.passwordRef.el.value = "";
+                this.passwordRef.el.focus?.();
+            }
+        });
     }
 
     get selectedDiscount() {

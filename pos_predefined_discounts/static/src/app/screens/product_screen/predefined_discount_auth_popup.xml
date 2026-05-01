@@ -50,7 +50,12 @@
                     class="form-control"
                     type="password"
                     inputmode="numeric"
-                    autocomplete="off"
+                    autocomplete="new-password"
+                    autocapitalize="off"
+                    autocorrect="off"
+                    spellcheck="false"
+                    name="pos_discount_auth_password"
+                    value=""
                     t-model="state.password"
                     t-ref="password"
                 />
