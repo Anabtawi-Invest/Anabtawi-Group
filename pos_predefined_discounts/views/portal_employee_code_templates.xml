@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="portal_my_home_menu_employee_code" inherit_id="portal.portal_my_home" priority="95">
+        <xpath expr="//div[@id='portal_common_category']" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="icon" t-value="'/portal/static/src/img/portal-connection.svg'"/>
+                <t t-set="title">Employee Code</t>
+                <t t-set="text">View your employee password code</t>
+                <t t-set="url" t-value="'/my/employee-code'"/>
+                <t t-set="config_card" t-value="True"/>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="portal_breadcrumbs_employee_code" inherit_id="portal.portal_breadcrumbs">
+        <xpath expr="//ol" position="inside">
+            <li t-if="page_name == 'my_employee_code'" class="breadcrumb-item">Employee Code</li>
+        </xpath>
+    </template>
+
+    <template id="portal_my_employee_code" name="Portal Employee Code">
+        <t t-call="portal.portal_layout">
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-12 col-lg-6">
+                        <div class="card shadow-sm border-0 rounded-4">
+                            <div class="card-body p-4">
+                                <div class="text-muted">Hello</div>
+                                <h2 class="mb-3">
+                                    <t t-esc="employee.name if employee else request.env.user.name"/>
+                                </h2>
+
+                                <div t-if="not employee" class="alert alert-warning py-2" role="alert">
+                                    Your user is not linked to an employee profile.
+                                </div>
+
+                                <t t-if="employee">
+                                    <div class="mb-2 text-muted">Employee Code</div>
+                                    <div class="border rounded-3 px-4 py-3 fs-2 fw-bold text-center bg-light">
+                                        <t t-esc="employee_password or 'Not Available'"/>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+</odoo>

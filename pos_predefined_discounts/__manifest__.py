@@ -5,12 +5,13 @@
     "version": "1.0.0",
     "category": "Sales/Point of Sale",
     "summary": "Select predefined discounts from POS instead of typing a number",
-    "depends": ["point_of_sale", "pos_discount", "employee_request", "pos_advance_order"],
+    "depends": ["point_of_sale", "pos_discount", "employee_request", "pos_advance_order", "portal", "portal_check_in"],
     "data": [
         "security/ir.model.access.csv",
         "views/pos_predefined_discount_views.xml",
         "views/pos_predefined_discount_menu.xml",
         "views/res_config_settings_views.xml",
+        "views/portal_employee_code_templates.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [
