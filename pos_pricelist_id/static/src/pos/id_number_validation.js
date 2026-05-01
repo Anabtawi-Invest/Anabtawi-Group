@@ -23,6 +23,41 @@ function extractPricelistId(value) {
     return value;
 }
 
+function describePricelistValue(value) {
+    if (!value) {
+        return null;
+    }
+    if (Array.isArray(value)) {
+        return {
+            type: "array",
+            raw: value,
+            id: value[0] || null,
+            label: value[1] || null,
+        };
+    }
+    if (typeof value === "object") {
+        return {
+            type: "object",
+            id: value.id || null,
+            name: value.name || value.display_name || null,
+            required_id_number:
+                value.required_id_number !== undefined ? Boolean(value.required_id_number) : "missing",
+        };
+    }
+    return {
+        type: typeof value,
+        value,
+    };
+}
+
+function logJson(label, payload) {
+    try {
+        console.log(`${label} ${JSON.stringify(payload)}`);
+    } catch {
+        console.log(label, payload);
+    }
+}
+
 function resolvePricelist(order, pos) {
     const pricelistValue =
         (typeof order?.get_pricelist === "function" && order.get_pricelist()) ||
@@ -31,11 +66,12 @@ function resolvePricelist(order, pos) {
         pos?.config?.pricelist_id;
 
     const pricelistId = extractPricelistId(pricelistValue);
-    console.log("[POS_PRICELIST_ID] resolvePricelist input", {
+    logJson("[POS_PRICELIST_ID] resolvePricelist input details", {
         hasGetPricelist: typeof order?.get_pricelist === "function",
-        orderPricelistRaw: order?.raw?.pricelist_id,
-        orderPricelist: order?.pricelist_id,
-        configPricelist: pos?.config?.pricelist_id,
+        orderPricelistRaw: describePricelistValue(order?.raw?.pricelist_id),
+        orderPricelist: describePricelistValue(order?.pricelist_id),
+        configPricelist: describePricelistValue(pos?.config?.pricelist_id),
+        selectedPricelist: describePricelistValue(pricelistValue),
         resolvedPricelistId: pricelistId,
     });
     if (!pricelistId) {
@@ -51,7 +87,7 @@ function resolvePricelist(order, pos) {
         pos.models["product.pricelist"]?.find((p) => p.id === pricelistId) ||
         null;
 
-    console.log("[POS_PRICELIST_ID] resolvePricelist output", {
+    logJson("[POS_PRICELIST_ID] resolvePricelist output details", {
         id: resolved?.id,
         name: resolved?.name || resolved?.display_name,
         required_id_number: resolved?.required_id_number,
@@ -88,6 +124,11 @@ patch(OrderPaymentValidation.prototype, {
                     ["required_id_number"],
                 ]);
                 requiredFromServer = Boolean(rows?.[0]?.required_id_number);
+                logJson("[POS_PRICELIST_ID] Server read result", {
+                    pricelistId,
+                    rows,
+                    requiredFromServer,
+                });
             } catch (error) {
                 console.warn("[POS_PRICELIST_ID] Failed to read required_id_number from server", {
                     pricelistId,
@@ -97,8 +138,9 @@ patch(OrderPaymentValidation.prototype, {
         }
 
         const isRequired = Boolean(pricelist?.required_id_number || requiredFromServer);
-        console.log("[POS_PRICELIST_ID] Required check", {
+        logJson("[POS_PRICELIST_ID] Required check details", {
             pricelistId,
+            pricelistName: pricelist?.name || pricelist?.display_name || null,
             requiredFromModel: pricelist?.required_id_number,
             requiredFromServer,
             isRequired,

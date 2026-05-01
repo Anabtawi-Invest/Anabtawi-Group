@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'POS Pricelist  id enhancement  ',
+    'name': 'POS Pricelist  id enhancement-anabtawi  ',
     'version': '1.1',
     'category': 'Point of Sale',
     'summary': 'Manage pledge (Rahn) scenarios with employees, delivery, and accounting',
-    "author":"Anabtawi",
     'description': """
    
     """,
@@ -17,6 +16,7 @@
     "assets": {
         "point_of_sale._assets_pos": [
             "pos_pricelist_id/static/src/pos/id_number_validation.js",
+            "pos_pricelist_id/static/src/pos/receipt_header.xml",
         ],
     },
     'installable': True,
