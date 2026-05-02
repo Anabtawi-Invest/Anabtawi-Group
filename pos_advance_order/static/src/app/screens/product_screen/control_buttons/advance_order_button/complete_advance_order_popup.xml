@@ -11,7 +11,7 @@
                         placeholder="Type customer name or phone..."
                         t-att-value="state.search"
                         t-on-input="onSearchInput"
-                        t-att-disabled="state.loading ? 'disabled' : undefined"
+                        t-att-disabled="state.loading"
                     />
                 </div>
 
@@ -29,7 +29,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <t t-if="!filteredOrders.length">
+                            <t t-if="filteredOrders.length == 0">
                                 <tr>
                                     <td colspan="7" class="text-center text-muted py-3">
                                         No advance orders found for this Picking POS.
@@ -47,7 +47,7 @@
                                         />
                                     </td>
                                     <td t-esc="order.name"/>
-                                    <td t-esc="order.partner_id?.[1] || ''"/>
+                                    <td t-esc="order.partner_id and order.partner_id[1] or ''"/>
                                     <td t-esc="order.partner_phone || ''"/>
                                     <td t-esc="order.amount_total"/>
                                     <td t-esc="order.advance_amount"/>
@@ -61,7 +61,7 @@
 
             <t t-set-slot="footer">
                 <button class="btn btn-secondary" t-on-click="cancel">Cancel</button>
-                <button class="btn btn-primary" t-on-click="confirm" t-att-disabled="state.loading ? 'disabled' : undefined">
+                                <button class="btn btn-primary" t-on-click="confirm" t-att-disabled="state.loading">
                     Complete
                 </button>
             </t>
