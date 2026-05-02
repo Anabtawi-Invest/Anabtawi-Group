@@ -587,6 +587,25 @@ class PosAdvanceOrder(models.Model):
             raise UserError(_("No compatible POS payment method found on the opened session."))
         return pm
 
+    def _resolve_remaining_payment_method(self, session, pos_payment_method_id=None):
+        """POS payment method for completing advance: explicit choice from cashier, else advance order fallback."""
+        self.ensure_one()
+        if pos_payment_method_id:
+            pm = self.env["pos.payment.method"].sudo().browse(int(pos_payment_method_id))
+            if not pm.exists():
+                raise UserError(_("Invalid POS payment method."))
+            methods = session.payment_method_ids
+            if pm.id not in methods.ids:
+                raise UserError(_("This payment method is not available on the opened POS session."))
+            if pm.type == "pay_later":
+                raise UserError(_("Customer account payments cannot be used to complete advances."))
+            if pm.payment_method_type and pm.payment_method_type != "none":
+                raise UserError(
+                    _("Integrated POS payment methods (terminal / QR) are not supported for completing advances.")
+                )
+            return pm
+        return self._get_pos_payment_method(session)
+
     def _normalize_tax_ids(self, tax_value):
         """Normalize tax_ids input (either [Command/set], [(6,0,ids)], ids list) -> ids list."""
         if not tax_value:
@@ -1079,7 +1098,7 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_payment(self):
+    def action_create_remaining_payment(self, pos_payment_method_id=None):
         """After confirm:
         Create a POS sale order in the Picking POS session:
         - Products lines (income)
@@ -1104,7 +1123,7 @@ class PosAdvanceOrder(models.Model):
                 raise UserError(_("Please set 'Advance Deposit Product' on the Picking POS configuration first."))
 
             session = order._get_open_session(pos_config)
-            pm = order._get_pos_payment_method(session)
+            pm = order._resolve_remaining_payment_method(session, pos_payment_method_id)
 
             # Build POS order lines
             lines = []
@@ -1161,9 +1180,9 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_amount(self):
+    def action_create_remaining_amount(self, pos_payment_method_id=None):
         """Alias for POS button flow."""
-        return self.action_create_remaining_payment()
+        return self.action_create_remaining_payment(pos_payment_method_id=pos_payment_method_id)
 
     def action_refund_advance_payment(self):
         for order in self:

@@ -173,6 +173,7 @@ patch(ControlButtons.prototype, {
     async onClickCompleteAdvanceOrder() {
         const popupPayload = await makeAwaitable(this.dialog, CompleteAdvanceOrderPopup, {
             posConfigId: this.pos.config.id,
+            pos: this.pos,
         });
         if (!popupPayload?.advance_order_id) {
             return;
@@ -181,7 +182,8 @@ patch(ControlButtons.prototype, {
             await this.orm.call(
                 "pos.advance.order",
                 "action_create_remaining_amount",
-                [[popupPayload.advance_order_id]]
+                [[popupPayload.advance_order_id]],
+                { pos_payment_method_id: popupPayload.payment_method_id }
             );
             this.notification.add(_t("Advance order completed successfully."), { type: "success" });
         } catch (error) {

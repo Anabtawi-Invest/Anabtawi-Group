@@ -7,7 +7,7 @@ import { useService } from "@web/core/utils/hooks";
 import { formatCurrency } from "@web/core/currency";
 
 /** Same filtering idea as PaymentScreen (minimal + pay_later) plus exclusions for advances. */
-function getAdvanceEligiblePaymentMethods(pos) {
+export function getAdvanceEligiblePaymentMethods(pos) {
     if (!pos?.config?.payment_method_ids) {
         return [];
     }
