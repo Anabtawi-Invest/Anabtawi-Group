@@ -58,18 +58,27 @@ function logJson(label, payload) {
     }
 }
 
+function getActivePricelistValue(order, pos) {
+    if (order?.pricelist_id) {
+        return order.pricelist_id;
+    }
+    if (order?.raw?.pricelist_id) {
+        return order.raw.pricelist_id;
+    }
+    if (pos?.getOrder?.()?.pricelist_id) {
+        return pos.getOrder().pricelist_id;
+    }
+    return pos?.config?.pricelist_id || null;
+}
+
 function resolvePricelist(order, pos) {
-    const pricelistValue =
-        (typeof order?.get_pricelist === "function" && order.get_pricelist()) ||
-        order?.pricelist_id ||
-        order?.raw?.pricelist_id ||
-        pos?.config?.pricelist_id;
+    const pricelistValue = getActivePricelistValue(order, pos);
 
     const pricelistId = extractPricelistId(pricelistValue);
     logJson("[POS_PRICELIST_ID] resolvePricelist input details", {
-        hasGetPricelist: typeof order?.get_pricelist === "function",
         orderPricelistRaw: describePricelistValue(order?.raw?.pricelist_id),
         orderPricelist: describePricelistValue(order?.pricelist_id),
+        posCurrentOrderPricelist: describePricelistValue(pos?.getOrder?.()?.pricelist_id),
         configPricelist: describePricelistValue(pos?.config?.pricelist_id),
         selectedPricelist: describePricelistValue(pricelistValue),
         resolvedPricelistId: pricelistId,
@@ -109,12 +118,7 @@ patch(OrderPaymentValidation.prototype, {
         }
 
         const pricelist = resolvePricelist(this.order, this.pos);
-        const pricelistId = extractPricelistId(
-            (typeof this.order?.get_pricelist === "function" && this.order.get_pricelist()) ||
-                this.order?.pricelist_id ||
-                this.order?.raw?.pricelist_id ||
-                this.pos?.config?.pricelist_id
-        );
+        const pricelistId = extractPricelistId(getActivePricelistValue(this.order, this.pos));
 
         let requiredFromServer = false;
         if (pricelistId) {
