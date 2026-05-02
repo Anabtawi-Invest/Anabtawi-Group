@@ -24,6 +24,25 @@ patch(ControlButtons.prototype, {
         this.printer = useService("printer");
     },
 
+    /** Same breakpoints as POS `buttonClass`, but distinct hue for Advance vs default grey controls. */
+    advanceOrderButtonClass() {
+        if (this.props.showRemainingButtons) {
+            return this.ui.isSmall
+                ? "btn btn-primary btn-md py-2 text-start"
+                : "btn btn-primary btn-lg py-5";
+        }
+        return "btn btn-primary btn-lg lh-lg";
+    },
+
+    completeAdvanceOrderButtonClass() {
+        if (this.props.showRemainingButtons) {
+            return this.ui.isSmall
+                ? "btn btn-success btn-md py-2 text-start"
+                : "btn btn-success btn-lg py-5";
+        }
+        return "btn btn-success btn-lg lh-lg";
+    },
+
     _getCurrentOrder() {
         return this.currentOrder || this.pos.getOrder?.();
     },

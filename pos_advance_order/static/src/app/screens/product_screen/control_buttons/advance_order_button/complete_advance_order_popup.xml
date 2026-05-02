@@ -3,6 +3,10 @@
     <t t-name="pos_advance_order.CompleteAdvanceOrderPopup" owl="1">
         <Dialog size="'lg'" title="'Complete Advance Order'">
             <div class="o_pos_complete_advance_popup">
+                <div class="rounded-top px-3 py-2 mb-3 bg-success text-white">
+                    <span class="fw-bold">Complete Advance Order</span>
+                    <small class="d-block opacity-75">Pick an advance paid order to finish settlement</small>
+                </div>
                 <div class="form-group mb-3">
                     <label><strong>Search by Customer Name or Phone</strong></label>
                     <input
@@ -11,7 +15,7 @@
                         placeholder="Type customer name or phone..."
                         t-att-value="state.search"
                         t-on-input="onSearchInput"
-                        t-att-disabled="state.loading"
+                        t-att-disabled="state.loading ? 'disabled' : undefined"
                     />
                 </div>
 
@@ -29,7 +33,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <t t-if="filteredOrders.length == 0">
+                            <t t-if="!filteredOrders.length">
                                 <tr>
                                     <td colspan="7" class="text-center text-muted py-3">
                                         No advance orders found for this Picking POS.
@@ -48,7 +52,7 @@
                                     </td>
                                     <td t-esc="order.name"/>
                                     <td t-esc="order.partner_id and order.partner_id[1] or ''"/>
-                                    <td t-esc="order.partner_phone or ''"/>
+                                    <td t-esc="order.partner_phone || ''"/>
                                     <td t-esc="order.amount_total"/>
                                     <td t-esc="order.advance_amount"/>
                                     <td t-esc="order.amount_remaining"/>
@@ -61,7 +65,7 @@
 
             <t t-set-slot="footer">
                 <button class="btn btn-secondary" t-on-click="cancel">Cancel</button>
-                <button class="btn btn-primary" t-on-click="confirm" t-att-disabled="state.loading">
+                <button class="btn btn-primary" t-on-click="confirm" t-att-disabled="state.loading ? 'disabled' : undefined">
                     Complete
                 </button>
             </t>

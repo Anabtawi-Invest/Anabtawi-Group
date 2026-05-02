@@ -843,12 +843,26 @@ class PosAdvanceOrder(models.Model):
             vals["payment_method"] = self._payment_method_selection_from_pos_pm(pm)
         return super().write(vals)
 
+    def _get_advance_pos_config(self):
+        """POS config governing advance payment (deposit taken on From POS, else Picking POS)."""
+        self.ensure_one()
+        return self.from_pos_config_id or self.pos_config_id
+
+    def _get_advance_receivable_account(self):
+        """AR for advance reconciliation: POS setting if set, else partner property."""
+        self.ensure_one()
+        pos_cfg = self._get_advance_pos_config()
+        return (
+            pos_cfg.pos_advance_receivable_account_id
+            or self.partner_id.with_company(self.company_id).property_account_receivable_id
+        )
+
     def _get_payment_journal(self):
-        """Select the journal to use based on POS payment method, then fallback to config."""
+        """Select journal: POS payment method journal first (same as normal POS payments), then From/Picking POS fallback."""
         self.ensure_one()
         if self.pos_payment_method_id and self.pos_payment_method_id.journal_id:
             return self.pos_payment_method_id.journal_id
-        pos_config = self.pos_config_id
+        pos_config = self.from_pos_config_id or self.pos_config_id
         if self.payment_method == "cash":
             journal = pos_config.pos_cash_journal_id
             if journal:
@@ -881,7 +895,7 @@ class PosAdvanceOrder(models.Model):
     def _create_advance_account_payment(self):
         """Create posted account.payment and transfer its receivable impact to liability."""
         self.ensure_one()
-        pos_config = self.from_pos_config_id or self.pos_config_id
+        pos_config = self._get_advance_pos_config()
         liability_account = pos_config.pos_advance_account_id
         _logger.info(
             "[ADV_RECON] Start advance account payment creation: advance=%s partner=%s amount=%s pos=%s from_pos=%s liability=%s",
@@ -934,9 +948,14 @@ class PosAdvanceOrder(models.Model):
                 % (journal.display_name,)
             )
 
-        receivable_account = self.partner_id.with_company(self.company_id).property_account_receivable_id
+        receivable_account = self._get_advance_receivable_account()
         if not receivable_account:
-            raise UserError(_("Please configure receivable account on the customer."))
+            raise UserError(
+                _(
+                    "Please set 'POS Advance Receivable Account' on the POS configuration "
+                    "or configure the customer's receivable account."
+                )
+            )
         _logger.info(
             "[ADV_RECON] receivable/liability accounts: receivable=%s liability=%s",
             receivable_account.id,

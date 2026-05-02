@@ -138,7 +138,7 @@ class PosOrder(models.Model):
                     invoice.state if invoice else False,
                 )
                 continue
-            receivable_account = order.partner_id.with_company(order.company_id).property_account_receivable_id
+            receivable_account = advance._get_advance_receivable_account()
             _logger.info(
                 "[ADV_RECON][INV_DEBUG] Context: order=%s partner=%s receivable_account=%s/%s invoice_partner=%s payment_partner=%s advance=%s",
                 order.id,
