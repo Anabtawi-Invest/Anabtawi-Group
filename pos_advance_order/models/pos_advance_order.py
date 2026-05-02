@@ -1140,13 +1140,25 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_payment(self, pos_payment_method_id=None):
+    def action_create_remaining_payment(self, pos_payment_method_id=None, pos_config_id=None):
         """Create a full POS sale with product lines only; pay cash/bank for remainder and Customer Account for the prepaid amount.
 
         Accounting: apply advance via _post_advance_completion_settlement_move (Dr liability / Cr receivable).
+        Pass ``pos_config_id`` when calling from POS so completion is enforced on the Picking POS only.
         """
         for order in self:
             order.ensure_one()
+            if pos_config_id:
+                cid = pos_config_id
+                if hasattr(cid, "id"):
+                    cid = cid.id
+                if int(cid) != order.pos_config_id.id:
+                    raise UserError(
+                        _(
+                            "Complete this advance order from the Picking POS (%s) only.",
+                        )
+                        % order.pos_config_id.display_name
+                    )
             if order.state != "advance_paid":
                 raise UserError(_("You can only create remaining payment after the advance is paid."))
             if (
@@ -1226,9 +1238,12 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_amount(self, pos_payment_method_id=None):
+    def action_create_remaining_amount(self, pos_payment_method_id=None, pos_config_id=None):
         """Alias for POS button flow."""
-        return self.action_create_remaining_payment(pos_payment_method_id=pos_payment_method_id)
+        return self.action_create_remaining_payment(
+            pos_payment_method_id=pos_payment_method_id,
+            pos_config_id=pos_config_id,
+        )
 
     def action_refund_advance_payment(self):
         for order in self:

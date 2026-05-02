@@ -183,7 +183,10 @@ patch(ControlButtons.prototype, {
                 "pos.advance.order",
                 "action_create_remaining_amount",
                 [[popupPayload.advance_order_id]],
-                { pos_payment_method_id: popupPayload.payment_method_id }
+                {
+                    pos_payment_method_id: popupPayload.payment_method_id,
+                    pos_config_id: this.pos.config.id,
+                }
             );
             this.notification.add(_t("Advance order completed successfully."), { type: "success" });
         } catch (error) {
