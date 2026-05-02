@@ -47,7 +47,7 @@
                                         />
                                     </td>
                                     <td t-esc="order.name"/>
-                                    <td t-esc="order.partner_id?.[1] || ''"/>
+                                    <td t-esc="order.partner_id and order.partner_id[1] or ''"/>
                                     <td t-esc="order.partner_phone || ''"/>
                                     <td t-esc="order.amount_total"/>
                                     <td t-esc="order.advance_amount"/>
