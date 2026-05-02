@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <!--
+      Default POS Actions dialog attaches t-on-click="props.close" on the Dialog root.
+      Nested dialogs (advance / complete) bubble clicks here, closing Actions and destroying
+      the inner ControlButtons before orm.call runs → "Component is destroyed".
+      Close Actions via Escape / header ✕ instead of clicking the backdrop.
+    -->
+    <t t-inherit="point_of_sale.ControlButtonsPopup" t-inherit-mode="extension" owl="1">
+        <xpath expr="//t[@t-name='point_of_sale.ControlButtonsPopup']/Dialog" position="replace">
+            <Dialog bodyClass="'d-flex flex-column'" footer="false" title.translate="Actions">
+                <ControlButtons showRemainingButtons="true" close="props.close"/>
+            </Dialog>
+        </xpath>
+    </t>
+</templates>
