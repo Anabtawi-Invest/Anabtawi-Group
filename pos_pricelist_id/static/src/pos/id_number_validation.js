@@ -187,4 +187,22 @@ patch(PosOrder.prototype, {
         this.customer_id_number = vals?.customer_id_number || this.customer_id_number || "";
         console.log("[POS_PRICELIST_ID] PosOrder.setup customer_id_number", this.customer_id_number);
     },
+
+    updatePricelistAndFiscalPosition(newPartner) {
+        const lockedPricelist = this.pricelist_id || this.config?.pricelist_id || false;
+        super.updatePricelistAndFiscalPosition(newPartner);
+
+        if (!lockedPricelist) {
+            return;
+        }
+
+        if (extractPricelistId(this.pricelist_id) !== extractPricelistId(lockedPricelist)) {
+            this.setPricelist(lockedPricelist);
+            logJson("[POS_PRICELIST_ID] Restored session/order pricelist after partner change", {
+                partnerId: newPartner?.id || null,
+                lockedPricelist: describePricelistValue(lockedPricelist),
+                currentPricelist: describePricelistValue(this.pricelist_id),
+            });
+        }
+    },
 });
