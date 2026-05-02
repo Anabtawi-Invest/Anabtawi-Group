@@ -10,6 +10,7 @@ import { rpc } from "@web/core/network/rpc";
 import { AdvanceOrderFormPopup } from "./advance_order_form_popup";
 import { AdvanceOrderReceipt } from "./advance_order_receipt";
 import { CompleteAdvanceOrderPopup } from "./complete_advance_order_popup";
+import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
 
 function toNumber(value, fallback = 0) {
     const num = Number(value);
@@ -193,5 +194,27 @@ patch(ControlButtons.prototype, {
             const msg = error?.data?.message || error?.message || _t("Failed to complete advance order.");
             this.notification.add(msg, { type: "danger" });
         }
+    },
+});
+
+patch(ClosePosPopup.prototype, {
+    advanceCashLineLabel() {
+        return _t("Advance deposits");
+    },
+
+    advanceBankLineLabel(pm) {
+        const name = pm?.name || "";
+        return name ? `${_t("Advance deposits")}: ${name}` : _t("Advance deposits");
+    },
+
+    shouldShowAdvanceCashLine() {
+        const dc = this.props.default_cash_details || {};
+        const amt = dc.advance_payment_amount ?? 0;
+        return !!(amt && this.pos.currency && !this.pos.currency.isZero(amt));
+    },
+
+    shouldShowAdvanceBankLine(pm) {
+        const amt = pm?.advance_payment_amount ?? 0;
+        return !!(amt && this.pos.currency && !this.pos.currency.isZero(amt));
     },
 });
