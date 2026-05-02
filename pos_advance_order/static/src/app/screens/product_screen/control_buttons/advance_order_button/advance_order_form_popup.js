@@ -201,6 +201,8 @@ export class AdvanceOrderFormPopup extends Component {
             "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration."
         );
     }
+
+    confirm() {
         if (!this.state.advance_amount || this.state.advance_amount <= 0) {
             this.notification.add(_t("Advance amount must be greater than zero."), { type: "warning" });
             return;
