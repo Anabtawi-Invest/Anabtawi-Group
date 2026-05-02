@@ -154,8 +154,7 @@ export class AdvanceOrderFormPopup extends Component {
         const picked = (this.state.pos_configs || []).find(
             (cfg) => cfg.id === this.state.picking_pos_config_id
         );
-        const plist = picked && picked.pricelist_id;
-        this.state.pricelist_name = (plist && plist[1]) || "";
+        this.state.pricelist_name = picked?.pricelist_id?.[1] || "";
     }
 
     get currentFromPosName() {
@@ -202,8 +201,6 @@ export class AdvanceOrderFormPopup extends Component {
             "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration."
         );
     }
-
-    confirm() {
         if (!this.state.advance_amount || this.state.advance_amount <= 0) {
             this.notification.add(_t("Advance amount must be greater than zero."), { type: "warning" });
             return;
@@ -231,7 +228,7 @@ export class AdvanceOrderFormPopup extends Component {
         this.props.getPayload({
             advance_amount: this.state.advance_amount,
             payment_method_id: this.state.selected_payment_method_id,
-            payment_method_name: (selectedPm && selectedPm.name) || "",
+            payment_method_name: selectedPm?.name || "",
             from_pos_config_id: currentFromPosId,
             pos_config_id: this.state.picking_pos_config_id,
             employee_id: this.state.with_employee ? this.state.employee_id : false,
