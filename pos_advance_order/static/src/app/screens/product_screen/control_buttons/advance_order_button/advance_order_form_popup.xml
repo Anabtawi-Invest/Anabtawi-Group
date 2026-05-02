@@ -2,7 +2,7 @@
 <templates xml:space="preserve">
     <t t-name="pos_advance_order.AdvanceOrderFormPopup" owl="1">
         <Dialog size="'md'" title="'Advance Order Details'">
-            <div class="o_pos_advance_popup">
+            <div class="o_pos_advance_popup" t-on-click.stop="">
                 <div class="rounded-top px-3 py-2 mb-3 bg-primary text-white">
                     <span class="fw-bold">Advance Order Details</span>
                     <small class="d-block opacity-75">Deposit and picking configuration</small>
@@ -137,8 +137,8 @@
             </div>
 
             <t t-set-slot="footer">
-                <button class="btn btn-secondary" t-on-click="cancel">Cancel</button>
-                <button class="btn btn-primary" t-on-click="confirm" t-att-disabled="state.loading ? 'disabled' : undefined">
+                <button class="btn btn-secondary" t-on-click.stop="cancel">Cancel</button>
+                <button class="btn btn-primary" t-on-click.stop="confirm" t-att-disabled="state.loading ? 'disabled' : undefined">
                     Confirm
                 </button>
             </t>
