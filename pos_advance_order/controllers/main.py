@@ -19,7 +19,7 @@ class PosAdvanceOrderController(http.Controller):
                 _("Integrated POS payment methods (terminal / QR) are not supported for advance deposits.")
             )
 
-    @http.route("/pos/create_advance_order", type="json", auth="user")
+    @http.route("/pos/create_advance_order", type="jsonrpc", auth="user")
     def create_advance_order(self, data=None, **kwargs):
         """Create POS advance order from Product Screen flow."""
         payload = data if isinstance(data, dict) else kwargs
