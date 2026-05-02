@@ -2,11 +2,38 @@
 
 from collections import defaultdict
 
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class PosSession(models.Model):
     _inherit = "pos.session"
+
+    @api.depends(
+        "payment_method_ids",
+        "order_ids",
+        "cash_register_balance_start",
+        "cash_register_balance_end_real",
+        "statement_line_ids.amount",
+    )
+    def _compute_cash_balance(self):
+        """Theoretical drawer cash must include cash-type advance deposits attributed to this
+        session. Those deposits post Dr liquidity / Cr liability without ``pos.payment``; without
+        this adjustment `_post_statement_difference` posts spurious "(Profit)" on close.
+        """
+        super()._compute_cash_balance()
+        for session in self:
+            if not session.config_id.enable_advance_order:
+                continue
+            summary = session._get_advance_summary()
+            extra = summary["cash"]
+            if session.currency_id.is_zero(extra):
+                continue
+            session.cash_register_balance_end = session.currency_id.round(
+                session.cash_register_balance_end + extra
+            )
+            session.cash_register_difference = session.currency_id.round(
+                session.cash_register_balance_end_real - session.cash_register_balance_end
+            )
 
     def get_session_orders(self):
         orders = super().get_session_orders()

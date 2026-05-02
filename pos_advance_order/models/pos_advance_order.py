@@ -1111,6 +1111,22 @@ class PosAdvanceOrder(models.Model):
         )
         return move
 
+    def _invalidate_open_sessions_cash_balance(self):
+        """Recompute theoretical cash balance when advance JE changes (not wired to POS orders)."""
+        for order in self:
+            cfg = order.from_pos_config_id or order.pos_config_id
+            if not cfg:
+                continue
+            sessions = order.env["pos.session"].sudo().search(
+                [
+                    ("config_id", "=", cfg.id),
+                    ("company_id", "=", order.company_id.id),
+                    ("state", "in", ("opened", "closing_control")),
+                ]
+            )
+            if sessions:
+                sessions.invalidate_recordset(["cash_register_balance_end", "cash_register_difference"])
+
     def action_create_payment(self):
         for order in self:
             order.ensure_one()
@@ -1137,6 +1153,7 @@ class PosAdvanceOrder(models.Model):
             order._send_create_payment_email_to_manager()
             # Notify configured users (inbox + email)
             order._send_advance_notifications()
+            order._invalidate_open_sessions_cash_balance()
 
         return True
 
@@ -1263,6 +1280,7 @@ class PosAdvanceOrder(models.Model):
                     cancel=True,
                 )
                 order.state = "cancel"
+                order._invalidate_open_sessions_cash_balance()
                 continue
 
             if not order.advance_pos_order_id:
