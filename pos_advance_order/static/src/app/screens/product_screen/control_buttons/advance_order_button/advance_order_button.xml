@@ -1,51 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension" owl="1">
-        <xpath expr="//t[@t-if='props.showRemainingButtons']/div/NoteButton" position="after">
+        <xpath expr="//button[hasclass('more-btn')]" position="before">
             <button
-                t-if="pos.config.enable_advance_order"
-                t-attf-class="{{ buttonClass }} text-white"
-                style="background-color: #875A7B; border-color: #875A7B;"
+                t-if="!props.showRemainingButtons and pos.config.enable_advance_order"
+                t-att-class="buttonClass"
                 t-on-click="onClickAdvanceOrder"
                 type="button">
                 <i class="fa fa-calendar-check-o me-2" role="img" aria-label="Advance Order" title="Advance Order"/>
                 <span>Advance Order</span>
             </button>
             <button
-                t-if="pos.config.enable_advance_order"
-                t-attf-class="{{ buttonClass }} text-white"
-                style="background-color: #2C7A7B; border-color: #2C7A7B;"
+                t-if="!props.showRemainingButtons and !pos.config.enable_advance_order"
+                t-att-class="buttonClass"
                 t-on-click="onClickCompleteAdvanceOrder"
                 type="button">
                 <i class="fa fa-check-square-o me-2" role="img" aria-label="Complete Advance Order" title="Complete Advance Order"/>
                 <span>Complete Advance Order</span>
             </button>
         </xpath>
-    </t>
-    <t t-name="pos_advance_order.ClosePosPopupPatchInline" t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension" owl="1">
-        <xpath expr="//div[hasclass('payment-methods-overview')]" position="inside">
-            <div
-                class="w-100 mb-3"
-                t-if="props.advance_summary and (props.advance_summary.cash or props.advance_summary.bank)"
-            >
-                <div class="d-flex align-items-center justify-content-between fs-5">
-                    <span>Advance Totals</span>
-                </div>
-                <div
-                    class="d-flex align-items-center justify-content-between text-muted border-start ps-2"
-                    t-if="props.advance_summary.cash"
-                >
-                    <span>Cash Advance</span>
-                    <span t-esc="env.utils.formatCurrency(props.advance_summary.cash)" />
-                </div>
-                <div
-                    class="d-flex align-items-center justify-content-between text-muted border-start ps-2"
-                    t-if="props.advance_summary.bank"
-                >
-                    <span>Bank Advance</span>
-                    <span t-esc="env.utils.formatCurrency(props.advance_summary.bank)" />
-                </div>
-            </div>
+        <xpath expr="//t[@t-if='props.showRemainingButtons']/div/NoteButton" position="after">
+            <button
+                t-if="pos.config.enable_advance_order"
+                t-att-class="buttonClass"
+                t-on-click="onClickAdvanceOrder"
+                type="button">
+                <i class="fa fa-calendar-check-o me-2" role="img" aria-label="Advance Order" title="Advance Order"/>
+                <span>Advance Order</span>
+            </button>
+            <button
+                t-if="!pos.config.enable_advance_order"
+                t-att-class="buttonClass"
+                t-on-click="onClickCompleteAdvanceOrder"
+                type="button">
+                <i class="fa fa-check-square-o me-2" role="img" aria-label="Complete Advance Order" title="Complete Advance Order"/>
+                <span>Complete Advance Order</span>
+            </button>
         </xpath>
     </t>
 </templates>

@@ -13,7 +13,6 @@
                             <field name="advance_order_manager_id" options="{'no_create': True}"/>
                             <field name="advance_notification_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
                             <field name="pos_advance_account_id" options="{'no_create': True}"/>
-                            <field name="pos_advance_receivable_account_id" options="{'no_create': True}"/>
                             <field name="pos_cash_journal_id" options="{'no_create': True}"/>
                             <field name="pos_card_journal_id" options="{'no_create': True}"/>
                             <field name="pos_profit_account_id" options="{'no_create': True}"/>

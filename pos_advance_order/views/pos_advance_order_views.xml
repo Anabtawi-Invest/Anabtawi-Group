@@ -35,7 +35,7 @@
                 <field name="user_id"/>
                 <field name="picking_date"/>
                 <field name="pos_config_id"/>
-                <field name="payment_method"/>
+                <field name="pos_payment_method_id"/>
                 <field name="payment_progress"/>
                 <field name="state"/>
                 <field name="amount_total" widget="monetary"/>
@@ -70,14 +70,14 @@
                         string="Create Payment"
                         class="btn-primary"
                         groups="point_of_sale.group_pos_manager"
-                        invisible="state in ('cancel','fully_paid') or state != 'confirmed' or advance_move_id or advance_amount &lt;= 0"
+                        invisible="state in ('cancel','fully_paid') or state != 'confirmed' or advance_pos_order_id or advance_amount &lt;= 0 or pos_config_enable_advance_order"
                     />
                     <button
                         name="action_print_receipt"
                         type="object"
                         string="Print Receipt"
                         class="btn-secondary"
-                        invisible="state == 'cancel' or state == 'draft'"
+                        invisible="state in ('cancel','fully_paid') or not advance_pos_order_id or remaining_pos_order_id"
                     />
                     <button
                         name="action_print_full_receipt"
@@ -100,21 +100,21 @@
                         string="Create Remaining Payment"
                         class="btn-primary"
                         groups="point_of_sale.group_pos_manager"
-                        invisible="state in ('cancel','fully_paid') or state != 'advance_paid' or not advance_move_id or remaining_pos_order_id"
+                        invisible="state in ('cancel','fully_paid') or state != 'advance_paid' or not advance_pos_order_id or remaining_pos_order_id"
                     />
                     <button
                         name="action_set_to_draft"
                         type="object"
                         string="Set to Draft"
                         class="btn-secondary"
-                        invisible="state == 'draft' or state in ('cancel','advance_paid','fully_paid')"
+                        invisible="state == 'draft' or state in ('cancel','fully_paid')"
                     />
                     <button
                         name="action_cancel"
                         type="object"
                         string="Cancel"
                         class="btn-secondary"
-                        invisible="state in ('cancel','advance_paid','fully_paid')"
+                        invisible="state in ('cancel','fully_paid')"
                     />
                     <button
                         name="action_add_from_catalog"
@@ -136,7 +136,8 @@
                         <group>
                             <field name="partner_id" required="1" readonly="state != 'draft'"/>
                             <field name="user_id" required="1" readonly="state != 'draft'"/>
-                            <field name="payment_method" required="1" readonly="state != 'draft'"/>
+                            <field name="pos_payment_method_id" required="1" readonly="state != 'draft'"/>
+                            <field name="payment_method" invisible="1"/>
                             <field name="advance_amount" widget="monetary" readonly="state != 'draft'"/>
                             <field name="is_employee_pricelist" readonly="state != 'draft'"/>
                             <field name="employee_pricelist_employee_id" readonly="1" invisible="not employee_pricelist_employee_id"/>
@@ -146,6 +147,7 @@
                         </group>
                         <group>
                             <field name="picking_date" required="1" readonly="state != 'draft'"/>
+                            <field name="from_pos_config_id" readonly="state != 'draft'"/>
                             <field name="pos_config_id" required="1" readonly="state != 'draft'"/>
                             <field name="pricelist_id" readonly="1"/>
                             <field name="with_employee" readonly="state != 'draft'"/>
@@ -205,9 +207,7 @@
                         <field name="discount_amount" widget="monetary" readonly="1"/>
 
                         <field name="amount_remaining" widget="monetary" readonly="1"/>
-                        <field name="advance_session_id" readonly="1" invisible="not advance_session_id"/>
-                        <field name="advance_move_id" readonly="1" invisible="not advance_move_id"/>
-                        <field name="advance_reverse_move_id" readonly="1" invisible="not advance_reverse_move_id"/>
+                        <field name="from_pos_config_id" readonly="state != 'draft'"/>
                         <field name="advance_pos_order_id" readonly="1" invisible="not advance_pos_order_id"/>
                         <field name="remaining_pos_order_id" readonly="1" invisible="not remaining_pos_order_id"/>
                         <field name="pledge_pos_order_id" readonly="1" invisible="not pledge_pos_order_id"/>

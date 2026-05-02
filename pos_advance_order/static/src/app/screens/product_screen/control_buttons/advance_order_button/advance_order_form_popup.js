@@ -4,6 +4,31 @@ import { Component, onMounted, useState } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
+import { formatCurrency } from "@web/core/currency";
+
+/** Same filtering idea as PaymentScreen (minimal + pay_later) plus exclusions for advances. */
+function getAdvanceEligiblePaymentMethods(pos) {
+    if (!pos?.config?.payment_method_ids) {
+        return [];
+    }
+    const cashier = pos.cashier;
+    const role = cashier?._role;
+    const list = [...pos.config.payment_method_ids]
+        .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+        .filter((pm) => {
+            if (role === "minimal" && pm.type === "pay_later") {
+                return false;
+            }
+            if (pm.type === "pay_later") {
+                return false;
+            }
+            if (pm.payment_method_type && pm.payment_method_type !== "none") {
+                return false;
+            }
+            return true;
+        });
+    return list;
+}
 
 export class AdvanceOrderFormPopup extends Component {
     static template = "pos_advance_order.AdvanceOrderFormPopup";
@@ -11,6 +36,7 @@ export class AdvanceOrderFormPopup extends Component {
     static props = {
         close: Function,
         getPayload: Function,
+        pos: Object,
         posConfigId: { type: Number, optional: true },
         companyId: { type: Number, optional: true },
     };
@@ -18,12 +44,14 @@ export class AdvanceOrderFormPopup extends Component {
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
+        const paymentMethods = getAdvanceEligiblePaymentMethods(this.props.pos);
+        const defaultPmId = paymentMethods.length ? paymentMethods[0].id : null;
+
         this.state = useState({
             loading: true,
             advance_amount: 0,
-            payment_method: "cash",
-            current_pos_config_id: this.props.posConfigId || null,
-            current_pos_config_name: "",
+            selected_payment_method_id: defaultPmId,
+            from_pos_config_id: this.props.posConfigId || null,
             picking_pos_config_id: this.props.posConfigId || null,
             pricelist_name: "",
             with_employee: false,
@@ -32,12 +60,47 @@ export class AdvanceOrderFormPopup extends Component {
             employees: [],
             discounts: [],
             pos_configs: [],
+            payment_methods: paymentMethods,
         });
 
         onMounted(async () => {
             await this._loadPopupData();
             this.state.loading = false;
         });
+    }
+
+    paymentMethodIconSrc(pm) {
+        if (!pm) {
+            return "";
+        }
+        if (pm.image) {
+            return `/web/image/pos.payment.method/${pm.id}/image`;
+        }
+        if (pm.type === "cash") {
+            return "/point_of_sale/static/src/img/money.png";
+        }
+        return "/point_of_sale/static/src/img/card-bank.png";
+    }
+
+    advanceAmountFmt() {
+        const currencyId = this.props.pos?.currency?.id;
+        const amount = Number(this.state.advance_amount) || 0;
+        return formatCurrency(amount, currencyId);
+    }
+
+    isPaymentSelected(pm) {
+        return pm.id === this.state.selected_payment_method_id;
+    }
+
+    paymentMethodRowClass(pm) {
+        const selected = this.isPaymentSelected(pm);
+        return (
+            `button paymentmethod btn btn-secondary btn-lg lh-lg d-flex justify-content-between align-items-center flex-fill text-start ${selected ? "border border-3 border-primary" : "opacity-75"}`
+        );
+    }
+
+    selectPaymentMethod(pm) {
+        this.state.selected_payment_method_id = pm.id;
     }
 
     async _loadPopupData() {
@@ -50,7 +113,7 @@ export class AdvanceOrderFormPopup extends Component {
             discountDomain.push(["company_id", "=", companyId]);
         }
         try {
-            const [employees, discounts, posConfig, posConfigs] = await Promise.all([
+            const [employees, discounts, posConfigs] = await Promise.all([
                 this.orm.searchRead("hr.employee", employeeDomain, ["id", "name"], { limit: 200 }),
                 this.orm.searchRead(
                     "pos.advance.discount",
@@ -58,7 +121,6 @@ export class AdvanceOrderFormPopup extends Component {
                     ["id", "name", "discount_type", "value"],
                     { limit: 200 }
                 ),
-                this.orm.read("pos.config", [this.props.posConfigId], ["id", "name", "pricelist_id"]),
                 this.orm.searchRead(
                     "pos.config",
                     [],
@@ -68,13 +130,14 @@ export class AdvanceOrderFormPopup extends Component {
             ]);
             this.state.employees = employees || [];
             this.state.discounts = discounts || [];
-            const currentConfig = (posConfig || [])[0];
-            this.state.current_pos_config_id = currentConfig?.id || this.props.posConfigId || null;
-            this.state.current_pos_config_name = currentConfig?.name || "";
-            this.state.pos_configs = (posConfigs || []).filter((cfg) => cfg.enable_advance_order);
+            this.state.pos_configs = posConfigs || [];
+            this.state.from_pos_config_id = this.props.posConfigId || this.state.from_pos_config_id;
+            if (!this.state.from_pos_config_id && this.state.pos_configs.length) {
+                this.state.from_pos_config_id = this.state.pos_configs[0].id;
+            }
             if (
+                this.state.pos_configs.length &&
                 !this.state.pos_configs.some((cfg) => cfg.id === this.state.picking_pos_config_id)
-                && this.state.pos_configs.length
             ) {
                 this.state.picking_pos_config_id = this.state.pos_configs[0].id;
             }
@@ -94,13 +157,16 @@ export class AdvanceOrderFormPopup extends Component {
         this.state.pricelist_name = picked?.pricelist_id?.[1] || "";
     }
 
+    get currentFromPosName() {
+        const fromPos = (this.state.pos_configs || []).find(
+            (cfg) => cfg.id === this.state.from_pos_config_id
+        );
+        return fromPos?.name || "";
+    }
+
     onAdvanceAmountInput(ev) {
         const value = Number(ev.target.value || 0);
         this.state.advance_amount = Number.isFinite(value) ? value : 0;
-    }
-
-    onPaymentMethodChange(ev) {
-        this.state.payment_method = ev.target.value || "cash";
     }
 
     onPickingPosChange(ev) {
@@ -130,27 +196,40 @@ export class AdvanceOrderFormPopup extends Component {
                 : `${discount.value}`;
     }
 
-    confirm() {
+    get noEligiblePaymentMethodsText() {
+        return _t(
+            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration."
+        );
+    }
         if (!this.state.advance_amount || this.state.advance_amount <= 0) {
             this.notification.add(_t("Advance amount must be greater than zero."), { type: "warning" });
             return;
         }
-        if (!this.state.current_pos_config_id) {
-            this.notification.add(_t("Current POS configuration is missing."), { type: "warning" });
+        const currentFromPosId = this.props.posConfigId || this.state.from_pos_config_id;
+        if (!currentFromPosId) {
+            this.notification.add(_t("Please select From POS."), { type: "warning" });
             return;
         }
         if (!this.state.picking_pos_config_id) {
             this.notification.add(_t("Please select Picking POS."), { type: "warning" });
             return;
         }
+        if (!this.state.selected_payment_method_id) {
+            this.notification.add(_t("Please select a payment method."), { type: "warning" });
+            return;
+        }
         if (this.state.with_employee && !this.state.employee_id) {
             this.notification.add(_t("Please select an employee."), { type: "warning" });
             return;
         }
+        const selectedPm = this.state.payment_methods.find(
+            (pm) => pm.id === this.state.selected_payment_method_id
+        );
         this.props.getPayload({
             advance_amount: this.state.advance_amount,
-            payment_method: this.state.payment_method,
-            from_pos_config_id: this.state.current_pos_config_id,
+            payment_method_id: this.state.selected_payment_method_id,
+            payment_method_name: selectedPm?.name || "",
+            from_pos_config_id: currentFromPosId,
             pos_config_id: this.state.picking_pos_config_id,
             employee_id: this.state.with_employee ? this.state.employee_id : false,
             discount_id: this.state.discount_id || false,
@@ -162,4 +241,3 @@ export class AdvanceOrderFormPopup extends Component {
         this.props.close();
     }
 }
-

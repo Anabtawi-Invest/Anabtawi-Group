@@ -4,11 +4,11 @@
         <Dialog size="'md'" title="'Advance Order Details'">
             <div class="o_pos_advance_popup">
                 <div class="form-group mb-3">
-                    <label><strong>POS</strong></label>
+                    <label><strong>From POS</strong></label>
                     <input
                         type="text"
                         class="form-control"
-                        t-att-value="state.current_pos_config_name"
+                        t-att-value="currentFromPosName"
                         readonly="readonly"
                     />
                 </div>
@@ -54,16 +54,34 @@
                 </div>
 
                 <div class="form-group mb-3">
-                    <label><strong>Payment Method</strong></label>
-                    <select
-                        class="form-control"
-                        t-att-value="state.payment_method"
-                        t-on-change="onPaymentMethodChange"
-                        t-att-disabled="state.loading ? 'disabled' : undefined"
+                    <label><strong>Payment method</strong></label>
+                    <div
+                        t-if="!state.payment_methods.length"
+                        class="alert alert-warning mb-0"
                     >
-                        <option value="cash">Cash</option>
-                        <option value="bank">Card/Bank</option>
-                    </select>
+                        <span t-esc="noEligiblePaymentMethodsText"/>
+                    </div>
+                    <div t-else="" class="paymentmethods-container mb-0">
+                        <div class="paymentmethods d-flex flex-column gap-2">
+                            <t t-foreach="state.payment_methods" t-as="pm" t-key="pm.id">
+                                <div
+                                    role="button"
+                                    t-att-class="paymentMethodRowClass(pm)"
+                                    t-on-click="() => this.selectPaymentMethod(pm)"
+                                >
+                                    <div class="payment-method-display d-flex align-items-center gap-2 text-wrap lh-sm">
+                                        <img
+                                            class="payment-method-icon"
+                                            t-att-src="paymentMethodIconSrc(pm)"
+                                            alt=""
+                                        />
+                                        <span class="payment-name" t-esc="pm.name"/>
+                                    </div>
+                                    <span class="text-muted" t-esc="advanceAmountFmt()"/>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-check mb-2">

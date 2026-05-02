@@ -21,7 +21,6 @@ export class CompleteAdvanceOrderPopup extends Component {
             loading: true,
             search: "",
             selected_order_id: null,
-            payment_method: "cash",
             advance_orders: [],
         });
 
@@ -97,10 +96,6 @@ export class CompleteAdvanceOrderPopup extends Component {
         this.state.selected_order_id = orderId;
     }
 
-    onPaymentMethodChange(ev) {
-        this.state.payment_method = ev.target.value || "cash";
-    }
-
     confirm() {
         if (!this.state.selected_order_id) {
             this.notification.add(_t("Please select an advance order."), { type: "warning" });
@@ -108,7 +103,6 @@ export class CompleteAdvanceOrderPopup extends Component {
         }
         this.props.getPayload({
             advance_order_id: this.state.selected_order_id,
-            payment_method: this.state.payment_method,
         });
         this.props.close();
     }

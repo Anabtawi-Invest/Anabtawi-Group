@@ -5,7 +5,6 @@ import { patch } from "@web/core/utils/patch";
 import { useService } from "@web/core/utils/hooks";
 import { usePos } from "@point_of_sale/app/hooks/pos_hook";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
-import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { rpc } from "@web/core/network/rpc";
 import { AdvanceOrderFormPopup } from "./advance_order_form_popup";
@@ -16,8 +15,6 @@ function toNumber(value, fallback = 0) {
     const num = Number(value);
     return Number.isFinite(num) ? num : fallback;
 }
-
-ClosePosPopup.props = [...ClosePosPopup.props, "advance_summary?"];
 
 patch(ControlButtons.prototype, {
     setup() {
@@ -66,7 +63,7 @@ patch(ControlButtons.prototype, {
             date: new Date().toLocaleString(),
             customerName: partner?.name || "",
             customerPhone: partner?.phone || partner?.mobile || "",
-            paymentMethod: payload.payment_method,
+            paymentMethod: payload.payment_method_name || payload.payment_method,
             currencyId: this.pos.currency?.id,
             total: total,
             advanceAmount: advanceAmount,
@@ -100,6 +97,7 @@ patch(ControlButtons.prototype, {
         }
 
         const popupPayload = await makeAwaitable(this.dialog, AdvanceOrderFormPopup, {
+            pos: this.pos,
             posConfigId: this.pos.config.id,
             companyId: this.pos.company?.id,
         });
@@ -118,7 +116,8 @@ patch(ControlButtons.prototype, {
             pos_config_id: popupPayload.pos_config_id || this.pos.config.id,
             from_pos_config_id: popupPayload.from_pos_config_id || this.pos.config.id,
             advance_amount: advanceAmount,
-            payment_method: popupPayload.payment_method || "cash",
+            payment_method_id: popupPayload.payment_method_id,
+            payment_method_name: popupPayload.payment_method_name || "",
             employee_id: popupPayload.employee_id || false,
             discount_id: popupPayload.discount_id || false,
             lines: lines,
@@ -163,7 +162,7 @@ patch(ControlButtons.prototype, {
             await this.orm.call(
                 "pos.advance.order",
                 "action_create_remaining_amount",
-                [[popupPayload.advance_order_id], this.pos.config.id, popupPayload.payment_method || "cash"]
+                [[popupPayload.advance_order_id]]
             );
             this.notification.add(_t("Advance order completed successfully."), { type: "success" });
         } catch (error) {
