@@ -76,33 +76,40 @@ class PosSession(models.Model):
         return outcome
 
     def get_closing_control_data(self):
+        """Inject advance liquidity for closing (expected totals + breakdown for the UI).
+
+        ``default_cash_details.advance_payment_amount``: cash-like advance deposits attributed
+        to this session (separate row in the Closing Register popup; not merged into POS
+        payment_amount). Expected cash ``amount`` still includes this so counts reconcile.
+
+        Each non-cash row gets ``advance_payment_amount`` where bank deposits matched that pm.
+        """
         data = super().get_closing_control_data()
         if not self.config_id.enable_advance_order:
             return data
+
         summary = self._get_advance_summary()
         cur = self.currency_id
-        if cur.is_zero(summary["cash"]) and not summary["by_payment_method"]:
-            return data
+        cash_adv = cur.round(summary["cash"])
+        by_pm = summary["by_payment_method"]
 
         data = dict(data)
-
-        cash_extra = summary["cash"]
-        if not cur.is_zero(cash_extra) and data.get("default_cash_details"):
+        if data.get("default_cash_details"):
             dc = dict(data["default_cash_details"])
-            dc["amount"] = cur.round(dc["amount"] + cash_extra)
-            dc["payment_amount"] = cur.round(dc["payment_amount"] + cash_extra)
+            dc["advance_payment_amount"] = cash_adv
+            if not cur.is_zero(cash_adv):
+                dc["amount"] = cur.round(dc["amount"] + cash_adv)
             data["default_cash_details"] = dc
 
-        pm_extra = summary["by_payment_method"]
-        if pm_extra:
-            patched = []
-            for row in data.get("non_cash_payment_methods") or []:
-                row_copy = dict(row)
-                pid = row_copy["id"]
-                extra = pm_extra.get(pid, 0.0)
-                if not cur.is_zero(extra):
-                    row_copy["amount"] = cur.round(row_copy["amount"] + extra)
-                patched.append(row_copy)
-            data["non_cash_payment_methods"] = patched
+        patched = []
+        for row in data.get("non_cash_payment_methods") or []:
+            r = dict(row)
+            pid = r["id"]
+            adv_amt = cur.round(by_pm.get(pid, 0.0))
+            r["advance_payment_amount"] = adv_amt
+            if not cur.is_zero(adv_amt):
+                r["amount"] = cur.round(r["amount"] + adv_amt)
+            patched.append(r)
+        data["non_cash_payment_methods"] = patched
 
         return data
