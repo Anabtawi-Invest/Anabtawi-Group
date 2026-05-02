@@ -12,7 +12,6 @@
                 <span>Advance Order</span>
             </button>
             <button
-                t-if="!pos.config.enable_advance_order"
                 t-att-class="completeAdvanceOrderButtonClass()"
                 t-on-click="onClickCompleteAdvanceOrder"
                 type="button">
