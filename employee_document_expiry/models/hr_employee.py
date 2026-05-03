@@ -70,6 +70,13 @@ class HrEmployee(models.Model):
         copy=False,
     )
 
+    jo_dependant_line_ids = fields.One2many(
+        "employee.jo.dependant.line",
+        "employee_id",
+        string="Dependant children",
+        groups="hr_payroll.group_hr_payroll_user",
+    )
+
     @api.constrains("name", "company_id")
     def _check_unique_employee_name(self):
         for emp in self:
