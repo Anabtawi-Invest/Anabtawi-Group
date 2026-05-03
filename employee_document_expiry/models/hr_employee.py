@@ -77,6 +77,34 @@ class HrEmployee(models.Model):
         groups="hr_payroll.group_hr_payroll_user",
     )
 
+    national_id = fields.Char(string="National ID", groups="hr.group_hr_user", tracking=True)
+    blood_type = fields.Selection(
+        selection=[
+            ("a_pos", "A+"),
+            ("a_neg", "A-"),
+            ("b_pos", "B+"),
+            ("b_neg", "B-"),
+            ("ab_pos", "AB+"),
+            ("ab_neg", "AB-"),
+            ("o_pos", "O+"),
+            ("o_neg", "O-"),
+        ],
+        string="Blood Type",
+        groups="hr.group_hr_user",
+    )
+    identification_place_of_issue = fields.Char(
+        string="ID Place of Issue",
+        groups="hr.group_hr_user",
+        tracking=True,
+        help="Place of issue as stated on the national ID.",
+    )
+    identification_expiry_date = fields.Date(
+        string="ID Expiry Date",
+        groups="hr.group_hr_user",
+        tracking=True,
+        help="Expiry date shown on the national ID.",
+    )
+
     @api.constrains("name", "company_id")
     def _check_unique_employee_name(self):
         for emp in self:

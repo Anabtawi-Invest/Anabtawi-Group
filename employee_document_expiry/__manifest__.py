@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Employee Document Expiry & HR Email",
-    "version": "19.0.2.3.0",
+    "version": "19.0.2.6.0",
     "category": "Human Resources",
     "summary": "Expiry dates beside HR documents, HR email when overdue; unique employee name / ID per company.",
     "license": "LGPL-3",
@@ -11,6 +11,7 @@
         "security/ir.model.access.csv",
         "data/document_expiry_cron.xml",
         "views/hr_employee_document_expiry_views.xml",
+        "views/hr_employee_identification_extra_views.xml",
         "views/hr_employee_jo_dependant_views.xml",
     ],
     "installable": True,
