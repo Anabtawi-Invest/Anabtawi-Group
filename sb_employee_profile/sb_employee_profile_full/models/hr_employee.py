@@ -36,15 +36,18 @@ class HrEmployee(models.Model):
 
     company_currency_id = fields.Many2one(related="company_id.currency_id", readonly=True, store=False)
 
-    def _sb_active_contract(self):
-        self.ensure_one()
-        # hr_contract provides hr.contract
-        contract = self.env["hr.contract"].search(
-            [("employee_id", "=", self.id), ("state", "in", ("open", "draft"))],
-            order="state asc, date_start desc, id desc",
-            limit=1,
-        )
-        return contract
+   def _sb_active_contract(self):
+    """Return active contract if hr_contract is installed, else False."""
+    self.ensure_one()
+    if not self.env.registry.get("hr.contract"):
+        return False
+
+    contract = self.env["hr.contract"].search(
+        [("employee_id", "=", self.id), ("state", "in", ("open", "draft"))],
+        order="state asc, date_start desc, id desc",
+        limit=1,
+    )
+    return contract
 
     def sb_profile_payload(self):
         """Payload for Employee Profile PDF."""
