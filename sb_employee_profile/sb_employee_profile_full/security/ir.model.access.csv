@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sb_hr_dependent,sb.hr.dependent,model_sb_hr_dependent,hr.group_hr_user,1,1,1,1
+access_sb_hr_warning,sb.hr.warning,model_sb_hr_warning,hr.group_hr_user,1,1,1,1
+access_sb_hr_previous_job,sb.hr.previous.job,model_sb_hr_previous_job,hr.group_hr_user,1,1,1,1
+access_sb_hr_education,sb.hr.education,model_sb_hr_education,hr.group_hr_user,1,1,1,1
+access_sb_hr_official_document,sb.hr.official.document,model_sb_hr_official_document,hr.group_hr_user,1,1,1,1
+access_sb_hr_career_movement,sb.hr.career.movement,model_sb_hr_career_movement,hr.group_hr_user,1,1,1,1
