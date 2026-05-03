@@ -6,12 +6,12 @@
     "author": "Softobia",
     "license": "LGPL-3",
     "depends": ["hr"],
-    "data": [
-        "security/ir.model.access.csv",
-        "views/hr_employee_profile_views.xml",
-        "report/employee_profile_template.xml",
-        "report/employee_profile_report.xml"
-    ],
+   "data": [
+    "security/ir.model.access.csv",
+    "report/employee_profile_template.xml",
+    "report/employee_profile_report.xml",
+    "views/hr_employee_profile_views.xml",
+],
     "installable": True,
     "application": False
 }
