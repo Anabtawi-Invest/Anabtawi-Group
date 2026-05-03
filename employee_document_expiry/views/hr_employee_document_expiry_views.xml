@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Replace Documents group so each upload has Expires on beside it (like passport layout). -->
+    <record id="hr_employee_view_document_expiry_builtin" model="ir.ui.view">
+        <field name="name">hr.employee.form.document.expiry.builtin</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='hr_document_group']" position="replace">
+                <group string="Documents" name="hr_document_group">
+                    <label for="id_card"/>
+                    <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                        <field name="id_card"/>
+                        <label for="id_card_expiry_date" string="Expires on" class="flex-shrink-0"/>
+                        <field name="id_card_expiry_date"/>
+                    </div>
+                    <label for="driving_license"/>
+                    <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                        <field name="driving_license"/>
+                        <label for="driving_license_expiry_date" string="Expires on" class="flex-shrink-0"/>
+                        <field name="driving_license_expiry_date"/>
+                    </div>
+                    <label for="sim_card"/>
+                    <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                        <field name="sim_card"/>
+                        <label for="sim_card_copy_expiry_date" string="Expires on" class="flex-shrink-0"/>
+                        <field name="sim_card_copy_expiry_date"/>
+                    </div>
+                    <label for="internet_invoice"/>
+                    <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                        <field name="internet_invoice"/>
+                        <label for="internet_subscription_invoice_expiry_date" string="Expires on" class="flex-shrink-0"/>
+                        <field name="internet_subscription_invoice_expiry_date"/>
+                    </div>
+                    <field name="id_card_expiry_mail_sent" invisible="1"/>
+                    <field name="driving_license_expiry_mail_sent" invisible="1"/>
+                    <field name="sim_card_copy_expiry_mail_sent" invisible="1"/>
+                    <field name="internet_subscription_invoice_expiry_mail_sent" invisible="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
