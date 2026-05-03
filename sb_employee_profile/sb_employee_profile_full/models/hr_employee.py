@@ -1,146 +1,156 @@
+# -*- coding: utf-8 -*-
 from odoo import api, fields, models
 
 
 class HrEmployee(models.Model):
     _inherit = "hr.employee"
 
-    # Missing single fields for report
-    sb_alternate_name = fields.Char(string="Alternate Name")
-    sb_birth_place = fields.Char(string="Place of Birth")
-    sb_mother_name = fields.Char(string="Mother Name")
-    sb_ss_number = fields.Char(string="Social Security Number")
-    sb_income_tax_number = fields.Char(string="Income Tax Number")
-    sb_bank_branch = fields.Char(string="Bank Branch")
-    sb_blood_type = fields.Selection([
-        ("a_plus", "A+"), ("a_minus", "A-"),
-        ("b_plus", "B+"), ("b_minus", "B-"),
-        ("ab_plus", "AB+"), ("ab_minus", "AB-"),
-        ("o_plus", "O+"), ("o_minus", "O-"),
-    ], string="Blood Type")
-    sb_employee_number = fields.Char(string="Employee Number")
-    sb_start_date = fields.Date(string="Start Date")
+    # --- Safe helpers -------------------------------------------------
+    def _sb_has_field(self, field_name: str) -> bool:
+        return field_name in self._fields
 
-    # Salary extras
-    sb_basic_salary = fields.Float(string="Basic Salary")
-    sb_ss_salary = fields.Float(string="SS Salary")
-    sb_service_charge = fields.Float(string="Service Charge")
-    sb_points = fields.Float(string="Points")
+    def _sb_get(self, field_name: str, default=""):
+        """Safe getter for standard/custom fields."""
+        if self._sb_has_field(field_name):
+            val = self[field_name]
+            return val if val not in (False, None) else default
+        return default
 
-    # One2many tables
-    sb_dependent_ids = fields.One2many("sb.hr.dependent", "employee_id", string="Dependents")
-    sb_warning_ids = fields.One2many("sb.hr.warning", "employee_id", string="Warnings")
-    sb_previous_job_ids = fields.One2many("sb.hr.previous.job", "employee_id", string="Previous Jobs")
-    sb_education_ids = fields.One2many("sb.hr.education", "employee_id", string="Education")
-    sb_official_document_ids = fields.One2many("sb.hr.official.document", "employee_id", string="Official Documents")
-    sb_career_movement_ids = fields.One2many("sb.hr.career.movement", "employee_id", string="Career Movements")
+    def _sb_active_contract(self):
+        """
+        Return active contract if hr_contract is installed, else False.
+        IMPORTANT: do NOT import or depend on hr_contract.
+        """
+        self.ensure_one()
+        if not self.env.registry.get("hr.contract"):
+            return False
 
-    company_currency_id = fields.Many2one(related="company_id.currency_id", readonly=True, store=False)
+        contract = self.env["hr.contract"].search(
+            [("employee_id", "=", self.id), ("state", "in", ("open", "draft"))],
+            order="state asc, date_start desc, id desc",
+            limit=1,
+        )
+        return contract
 
-   def _sb_active_contract(self):
-    """Return active contract if hr_contract is installed, else False."""
-    self.ensure_one()
-    if not self.env.registry.get("hr.contract"):
-        return False
-
-    contract = self.env["hr.contract"].search(
-        [("employee_id", "=", self.id), ("state", "in", ("open", "draft"))],
-        order="state asc, date_start desc, id desc",
-        limit=1,
-    )
-    return contract
-
+    # --- Payload for QWeb report --------------------------------------
     def sb_profile_payload(self):
-        """Payload for Employee Profile PDF."""
+        """Return a dict used by the QWeb PDF report."""
         self.ensure_one()
 
-        # Contracts may not be installed in all databases; keep it optional.
+        # Salary: use contract wage if available, otherwise employee field
         contract = self._sb_active_contract()
-        wage = 0.0
-        start_date = self.sb_start_date or getattr(self, "first_contract_date", False) or False
-        if contract:
-            # If contracts exist, prefer their wage/start date
-            wage = getattr(contract, "wage", 0.0) or 0.0
-            start_date = getattr(contract, "date_start", False) or start_date
+        wage = ""
+        if contract and hasattr(contract, "wage"):
+            wage = contract.wage
 
-        # Map fields with fallback to standard fields when relevant
         payload = {
-            "number": self.sb_employee_number or self.barcode or self.pin or "",
+            "number": self._sb_get("sb_employee_number") or self._sb_get("barcode") or self._sb_get("pin"),
             "name": self.name or "",
-            "alt_name": self.sb_alternate_name or "",
-            "start_date": start_date,
-            "job": self.job_title or (self.job_id.name if self.job_id else ""),
-            "type": self.employee_type or "",
-            "religion": "",
+            "alt_name": self._sb_get("sb_alternate_name"),
+            "start_date": self._sb_get("sb_start_date"),
+            "job": self._sb_get("job_title") or (self.job_id.name if self.job_id else ""),
+            "type": self._sb_get("employee_type"),
+            "religion": self._sb_get("religion"),
 
-            "gender": self.gender or "",
-            "marital": self.marital or "",
+            "gender": self._sb_get("gender"),
+            "marital": self._sb_get("marital"),
             "nationality": self.country_id.name if self.country_id else "",
-            "national_number": self.identification_id or "",
-            "ss_number": self.sb_ss_number or "",
-            "mother_name": self.sb_mother_name or "",
-            "medical_insurance": "",
+            "national_number": self._sb_get("identification_id"),
+            "ss_number": self._sb_get("sb_ss_number"),
+            "mother_name": self._sb_get("sb_mother_name"),
+            "medical_insurance": self._sb_get("medical_insurance"),
+
             "bank": (self.bank_account_id.bank_id.name if self.bank_account_id and self.bank_account_id.bank_id else ""),
-            "bank_branch": self.sb_bank_branch or "",
-            "income_tax_number": self.sb_income_tax_number or "",
+            "bank_branch": self._sb_get("sb_bank_branch"),
+            "income_tax_number": self._sb_get("sb_income_tax_number"),
 
-            "birth_date": self.birthday or False,
-            "birth_place": self.sb_birth_place or "",
-            "home_phone": self.private_phone or "",
-            "mobile": self.mobile_phone or "",
+            "birth_date": self._sb_get("birthday"),
+            "birth_place": self._sb_get("sb_birth_place"),
+            "home_phone": self._sb_get("private_phone"),
+            "mobile": self._sb_get("mobile_phone"),
             "status": "Current" if self.active else "Inactive",
-            "termination_date": self.departure_date or False,
-            "city": self.private_city or "",
-            "address": " ".join([p for p in [self.private_street, self.private_street2] if p]).strip(),
-            "email": self.work_email or self.private_email or "",
-            "blood_type": dict(self._fields["sb_blood_type"].selection).get(self.sb_blood_type, "") if self.sb_blood_type else "",
+            "termination_date": self._sb_get("departure_date"),
 
-            "basic_salary": (wage or self.sb_basic_salary or 0.0),
-            "ss_salary": self.sb_ss_salary if self.sb_ss_salary else wage,
-            "service_charge": self.sb_service_charge or 0.0,
-            "points": self.sb_points or 0.0,
+            "city": self._sb_get("private_city") or self._sb_get("city"),
+            "address": " ".join([p for p in [self._sb_get("private_street"), self._sb_get("private_street2")] if p]).strip(),
+            "email": self._sb_get("work_email") or self._sb_get("private_email"),
+            "blood_type": self._sb_get("sb_blood_type"),
 
-            "dependants": [{
-                "name": d.name,
-                "birth_date": d.birth_date,
-                "birth_place": d.birth_place,
-                "medical_ins": d.medical_insurance,
-                "cover": d.cover,
-            } for d in self.sb_dependent_ids],
+            # Salaries on employee (fallback if no contract)
+            "basic_salary": wage or self._sb_get("sb_basic_salary") or "",
+            "ss_salary": self._sb_get("sb_ss_salary") or (wage or self._sb_get("sb_basic_salary") or ""),
+            "service_charge": self._sb_get("sb_service_charge") or 0.0,
+            "points": self._sb_get("sb_points") or 0.0,
 
-            "warnings": [{
-                "date": w.date,
-                "type": dict(w._fields["warning_type"].selection).get(w.warning_type, ""),
-                "reason": w.reason,
-            } for w in self.sb_warning_ids],
-
-            "previous_jobs": [{
-                "employer": j.employer,
-                "start_date": j.start_date,
-                "end_date": j.end_date,
-                "occupation": j.occupation,
-                "termination_reason": j.termination_reason,
-            } for j in self.sb_previous_job_ids],
-
-            "education": [{
-                "year": e.year,
-                "degree": e.degree,
-                "specialty": e.specialty,
-                "institute": e.institute,
-            } for e in self.sb_education_ids],
-
-            "official_docs": [{
-                "type": dict(d._fields["doc_type"].selection).get(d.doc_type, ""),
-                "number": d.number,
-                "issue_place": d.issue_place,
-                "issue_date": d.issue_date,
-                "expiry_date": d.expiry_date,
-            } for d in self.sb_official_document_ids],
-
-            "career_moves": [{
-                "type": dict(m._fields["movement_type"].selection).get(m.movement_type, ""),
-                "date": m.date,
-                "old": m.old,
-                "new": m.new,
-            } for m in self.sb_career_movement_ids],
+            # Tables (these fields must exist in your module)
+            "dependants": [],
+            "warnings": [],
+            "previous_jobs": [],
+            "education": [],
+            "official_docs": [],
+            "career_moves": [],
         }
+
+        # Dependents
+        if self._sb_has_field("sb_dependent_ids"):
+            for d in self.sb_dependent_ids:
+                payload["dependants"].append({
+                    "name": d.name or "",
+                    "birth_date": d.birth_date or "",
+                    "birth_place": d.birth_place or "",
+                    "medical_ins": d.medical_insurance or "",
+                    "cover": bool(d.cover),
+                })
+
+        # Warnings
+        if self._sb_has_field("sb_warning_ids"):
+            for w in self.sb_warning_ids:
+                payload["warnings"].append({
+                    "date": w.date or "",
+                    "type": w.warning_type or "",
+                    "reason": w.reason or "",
+                })
+
+        # Previous Jobs
+        if self._sb_has_field("sb_previous_job_ids"):
+            for j in self.sb_previous_job_ids:
+                payload["previous_jobs"].append({
+                    "employer": j.employer or "",
+                    "start_date": j.start_date or "",
+                    "end_date": j.end_date or "",
+                    "occupation": j.occupation or "",
+                    "termination_reason": j.termination_reason or "",
+                })
+
+        # Education
+        if self._sb_has_field("sb_education_ids"):
+            for e in self.sb_education_ids:
+                payload["education"].append({
+                    "year": e.year or "",
+                    "degree": e.degree or "",
+                    "specialty": e.specialty or "",
+                    "institute": e.institute or "",
+                })
+
+        # Official Documents
+        if self._sb_has_field("sb_official_document_ids"):
+            for doc in self.sb_official_document_ids:
+                payload["official_docs"].append({
+                    "type": doc.doc_type or "",
+                    "number": doc.number or "",
+                    "issue_place": doc.issue_place or "",
+                    "issue_date": doc.issue_date or "",
+                    "expiry_date": doc.expiry_date or "",
+                })
+
+        # Career Movements
+        if self._sb_has_field("sb_career_movement_ids"):
+            for m in self.sb_career_movement_ids:
+                payload["career_moves"].append({
+                    "type": m.movement_type or "",
+                    "date": m.date or "",
+                    "old": m.old or "",
+                    "new": m.new or "",
+                })
+
         return payload
