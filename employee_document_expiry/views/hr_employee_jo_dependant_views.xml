@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_employee_view_jo_dependants_table" model="ir.ui.view">
+        <field name="name">hr.employee.form.jo.dependants.table</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="l10n_jo_hr_payroll.hr_employee_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='l10n_jo_has_dependants']" position="after">
+                <field
+                    name="jo_dependant_line_ids"
+                    colspan="2"
+                    nolabel="1"
+                    invisible="not l10n_jo_has_dependants or company_country_code != 'JO'"
+                    groups="hr_payroll.group_hr_payroll_user">
+                    <list editable="bottom">
+                        <field name="name" string="Child's Name"/>
+                        <field name="place_of_birth" string="Place of Birth"/>
+                        <field name="birthdate" string="Date of Birth"/>
+                        <field name="national_number" string="National Number"/>
+                    </list>
+                </field>
+            </xpath>
+        </field>
+    </record>
+</odoo>
