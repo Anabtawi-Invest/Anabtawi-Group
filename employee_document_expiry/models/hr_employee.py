@@ -1,6 +1,13 @@
 # -*- coding: utf-8 -*-
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
+
+
+def _normalized_employee_name(name):
+    if not name or not isinstance(name, str):
+        return ""
+    return " ".join(name.split())
 
 
 _EXPIRY_FLAGS = {
@@ -62,6 +69,47 @@ class HrEmployee(models.Model):
         default=False,
         copy=False,
     )
+
+    @api.constrains("name", "company_id")
+    def _check_unique_employee_name(self):
+        for emp in self:
+            normalized = _normalized_employee_name(emp.name)
+            if not normalized:
+                continue
+            dup = self.search(
+                [
+                    ("id", "!=", emp.id),
+                    ("company_id", "=", emp.company_id.id),
+                    ("name", "=ilike", normalized),
+                    ("active", "=", True),
+                ],
+                limit=1,
+            )
+            if dup:
+                raise ValidationError(
+                    _('An employee named "%s" already exists in this company (%s).')
+                    % (normalized, dup.display_name)
+                )
+
+    @api.constrains("identification_id", "company_id")
+    def _check_unique_identification_id(self):
+        for emp in self:
+            nid = (emp.identification_id or "").strip()
+            if not nid:
+                continue
+            dup = self.search(
+                [
+                    ("id", "!=", emp.id),
+                    ("company_id", "=", emp.company_id.id),
+                    ("identification_id", "=ilike", nid),
+                ],
+                limit=1,
+            )
+            if dup:
+                raise ValidationError(
+                    _('Identification number "%s" is already assigned to employee %s in this company.')
+                    % (nid, dup.display_name)
+                )
 
     def write(self, vals):
         vals = dict(vals or {})
