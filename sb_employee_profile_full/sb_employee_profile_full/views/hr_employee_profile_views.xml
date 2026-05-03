@@ -1,0 +1,162 @@
+<odoo>
+  <record id="view_employee_form_inherit_sb_profile" model="ir.ui.view">
+    <field name="name">hr.employee.form.sb.profile</field>
+    <field name="model">hr.employee</field>
+    <field name="inherit_id" ref="hr.view_employee_form"/>
+    <field name="arch" type="xml">
+
+      <!-- Add print button -->
+      <xpath expr="//header" position="inside">
+        <button name="%(sb_employee_profile_full.action_employee_profile_pdf)d"
+                type="action"
+                string="Print Employee Profile"
+                icon="fa-print"
+                class="btn-primary"/>
+      </xpath>
+
+      <!-- Add missing single fields in Private/Personal tab areas (best effort) -->
+      <xpath expr="//page[@name='personal_information']" position="inside">
+        <group string="Profile Extras" col="4">
+          <field name="sb_employee_number"/>
+          <field name="sb_alternate_name"/>
+          <field name="sb_birth_place"/>
+          <field name="sb_mother_name"/>
+          <field name="sb_ss_number"/>
+          <field name="sb_income_tax_number"/>
+          <field name="sb_bank_branch"/>
+          <field name="sb_blood_type"/>
+        </group>
+
+        <group string="Salary Extras" col="4">
+          <field name="sb_ss_salary"/>
+          <field name="sb_service_charge"/>
+          <field name="sb_points"/>
+        </group>
+      </xpath>
+
+      <!-- Add new notebook pages for tables -->
+      <xpath expr="//notebook" position="inside">
+
+        <page string="Dependents" name="sb_dependents">
+          <field name="sb_dependent_ids">
+            <tree editable="bottom">
+              <field name="name"/>
+              <field name="birth_date"/>
+              <field name="birth_place"/>
+              <field name="medical_insurance"/>
+              <field name="cover"/>
+            </tree>
+            <form>
+              <group col="4">
+                <field name="name"/>
+                <field name="birth_date"/>
+                <field name="birth_place"/>
+                <field name="medical_insurance"/>
+                <field name="cover"/>
+              </group>
+            </form>
+          </field>
+        </page>
+
+        <page string="Warnings" name="sb_warnings">
+          <field name="sb_warning_ids">
+            <tree editable="bottom">
+              <field name="date"/>
+              <field name="warning_type"/>
+              <field name="reason"/>
+            </tree>
+            <form>
+              <group col="4">
+                <field name="date"/>
+                <field name="warning_type"/>
+                <field name="reason"/>
+              </group>
+            </form>
+          </field>
+        </page>
+
+        <page string="Previous Jobs" name="sb_previous_jobs">
+          <field name="sb_previous_job_ids">
+            <tree editable="bottom">
+              <field name="employer"/>
+              <field name="start_date"/>
+              <field name="end_date"/>
+              <field name="occupation"/>
+              <field name="termination_reason"/>
+            </tree>
+            <form>
+              <group col="4">
+                <field name="employer"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <field name="occupation"/>
+                <field name="termination_reason"/>
+              </group>
+            </form>
+          </field>
+        </page>
+
+        <page string="Education (Table)" name="sb_education">
+          <field name="sb_education_ids">
+            <tree editable="bottom">
+              <field name="year"/>
+              <field name="degree"/>
+              <field name="specialty"/>
+              <field name="institute"/>
+            </tree>
+            <form>
+              <group col="4">
+                <field name="year"/>
+                <field name="degree"/>
+                <field name="specialty"/>
+                <field name="institute"/>
+              </group>
+            </form>
+          </field>
+        </page>
+
+        <page string="Official Documents (Table)" name="sb_official_docs">
+          <field name="sb_official_document_ids">
+            <tree editable="bottom">
+              <field name="doc_type"/>
+              <field name="number"/>
+              <field name="issue_place"/>
+              <field name="issue_date"/>
+              <field name="expiry_date"/>
+            </tree>
+            <form>
+              <group col="4">
+                <field name="doc_type"/>
+                <field name="number"/>
+                <field name="issue_place"/>
+                <field name="issue_date"/>
+                <field name="expiry_date"/>
+              </group>
+            </form>
+          </field>
+        </page>
+
+        <page string="Career Movements" name="sb_career_moves">
+          <field name="sb_career_movement_ids">
+            <tree editable="bottom">
+              <field name="movement_type"/>
+              <field name="date"/>
+              <field name="old"/>
+              <field name="new"/>
+            </tree>
+            <form>
+              <group col="4">
+                <field name="movement_type"/>
+                <field name="date"/>
+                <field name="old"/>
+                <field name="new"/>
+              </group>
+            </form>
+          </field>
+        </page>
+
+      </xpath>
+    </field>
+  </record>
+
+</odoo>
