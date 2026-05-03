@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_employee_form_citizenship_identification_extra" model="ir.ui.view">
+        <field name="name">hr.employee.form.citizenship.identification.extra</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='identification_id']" position="after">
+                <field name="national_id"/>
+                <field name="blood_type"/>
+                <field name="identification_place_of_issue"/>
+                <field name="identification_expiry_date"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
