@@ -39,18 +39,24 @@
           <field name="sb_points"/>
         </group>
 
+        <!-- IMPORTANT:
+             DO NOT use <field name="birthday"/> anywhere for hr.employee.
+             hr.employee birth date field is: birthday
+             (We are not inserting employee birthday here because it's already in Odoo standard fields.)
+        -->
+
       </xpath>
 
       <!-- Add new notebook pages for the tables -->
       <xpath expr="//notebook" position="inside">
 
-        <!-- Dependents -->
+        <!-- Dependents (sb.hr.dependent) -->
         <page string="Dependents" name="sb_dependents">
           <field name="sb_dependent_ids">
             <tree editable="bottom">
               <field name="name"/>
-              <!-- ✅ Dependent model uses birth_date -->
-              <field name="birth_date"/>
+              <!-- ✅ Dependent model uses birthday -->
+              <field name="birthday"/>
               <field name="birth_place"/>
               <field name="medical_insurance"/>
               <field name="cover"/>
@@ -58,8 +64,8 @@
             <form>
               <group col="4">
                 <field name="name"/>
-                <!-- ✅ Dependent model uses birth_date -->
-                <field name="birth_date"/>
+                <!-- ✅ Dependent model uses birthday -->
+                <field name="birthday"/>
                 <field name="birth_place"/>
                 <field name="medical_insurance"/>
                 <field name="cover"/>
@@ -68,7 +74,7 @@
           </field>
         </page>
 
-        <!-- Warnings -->
+        <!-- Warnings (sb.hr.warning) -->
         <page string="Warnings" name="sb_warnings">
           <field name="sb_warning_ids">
             <tree editable="bottom">
@@ -86,7 +92,7 @@
           </field>
         </page>
 
-        <!-- Previous Jobs -->
+        <!-- Previous Jobs (sb.hr.previous.job) -->
         <page string="Previous Jobs" name="sb_previous_jobs">
           <field name="sb_previous_job_ids">
             <tree editable="bottom">
@@ -108,7 +114,7 @@
           </field>
         </page>
 
-        <!-- Education -->
+        <!-- Education (sb.hr.education) -->
         <page string="Education (Table)" name="sb_education">
           <field name="sb_education_ids">
             <tree editable="bottom">
@@ -128,7 +134,7 @@
           </field>
         </page>
 
-        <!-- Official Documents -->
+        <!-- Official Documents (sb.hr.official.document) -->
         <page string="Official Documents (Table)" name="sb_official_docs">
           <field name="sb_official_document_ids">
             <tree editable="bottom">
@@ -150,7 +156,7 @@
           </field>
         </page>
 
-        <!-- Career Movements -->
+        <!-- Career Movements (sb.hr.career.movement) -->
         <page string="Career Movements" name="sb_career_moves">
           <field name="sb_career_movement_ids">
             <tree editable="bottom">
@@ -171,11 +177,6 @@
         </page>
 
       </xpath>
-
-      <!-- OPTIONAL: if you added employee birth date anywhere in this view, it MUST be birthday -->
-      <!-- Example:
-      <field name="birthday"/>
-      -->
 
     </field>
   </record>
