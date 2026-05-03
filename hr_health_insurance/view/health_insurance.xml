@@ -6,6 +6,8 @@
         <field name="inherit_id" ref="hr.view_employee_form"/>
         <field name="arch" type="xml">
             <page name="personal_information" position="inside">
+                <field name="health_insurance_eligible" invisible="1"/>
+                <group invisible="not health_insurance_eligible" colspan="4">
                 <separator string="Health Insurance"/>
                 <field name="health_insurance_ids">
                     <list editable="bottom" string="Health Insurance">
@@ -27,6 +29,7 @@
                         <field style="width:250px;" name="notes"/>
                     </list>
                 </field>
+                </group>
             </page>
         </field>
     </record>

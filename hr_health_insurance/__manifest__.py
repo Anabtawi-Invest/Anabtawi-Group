@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'SW - Health Insurance',
-    'version': '1.0',
+    'version': '1.1',
     'category': 'Human Resources',
     'summary': 'Employee health insurance management.',
     'description': """
