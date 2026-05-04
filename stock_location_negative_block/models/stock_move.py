@@ -48,14 +48,6 @@ class StockMove(models.Model):
 
             qty_after = on_hand_qty - done_qty
 
-            # 6️⃣ In "No Backorder" flow, trim done qty to available qty.
-            # This keeps negative stock blocked while allowing validation without creating backorder.
-            if qty_after < 0 and cancel_backorder:
-                allowed_qty = max(on_hand_qty, 0.0)
-                if move.product_uom.compare(allowed_qty, move.quantity) < 0:
-                    move.quantity = allowed_qty
-                continue
-
             if qty_after < 0:
                 raise UserError(_(
                     "You cannot validate this Internal Transfer.\n\n"
