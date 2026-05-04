@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_employee_form_employee_profile" model="ir.ui.view">
+        <field name="name">hr.employee.form.inherit.anabtawi.employee.profile</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_print_employee_profile_pdf" type="object" string="Employee Profile PDF"
+                        class="btn-secondary" groups="hr.group_hr_user" invisible="not id"/>
+            </xpath>
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="name_arabic" placeholder="الاسم بالعربية" class="w-100"/>
+            </xpath>
+            <xpath expr="//group[@name='hr_birth_group']" position="inside">
+                <field name="religion"/>
+                <field name="mother_name"/>
+                <field name="medical_insurance_ref"/>
+                <field name="blood_type"/>
+                <field name="profile_employment_status"/>
+            </xpath>
+            <xpath expr="//page[@name='personal_information']" position="after">
+                <page name="profile_warnings" string="Warnings" groups="hr.group_hr_user">
+                    <field name="warning_line_ids" context="{'default_employee_id': id}" widget="one2many" nolabel="1">
+                        <list editable="bottom">
+                            <field name="warning_date"/>
+                            <field name="warning_type_id"/>
+                            <field name="reason"/>
+                        </list>
+                    </field>
+                </page>
+                <page name="profile_previous_jobs" string="Previous Jobs" groups="hr.group_hr_user">
+                    <field name="previous_job_line_ids" context="{'default_employee_id': id}" widget="one2many" nolabel="1">
+                        <list editable="bottom">
+                            <field name="employer"/>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="occupation"/>
+                            <field name="termination_reason"/>
+                        </list>
+                    </field>
+                </page>
+                <page name="profile_education" string="Education" groups="hr.group_hr_user">
+                    <field name="education_line_ids" context="{'default_employee_id': id}" widget="one2many" nolabel="1">
+                        <list editable="bottom">
+                            <field name="year"/>
+                            <field name="degree"/>
+                            <field name="specialty"/>
+                            <field name="institute"/>
+                        </list>
+                    </field>
+                </page>
+                <page name="profile_official_documents" string="Official Documents" groups="hr.group_hr_user">
+                    <field name="official_document_line_ids" context="{'default_employee_id': id}" widget="one2many" nolabel="1">
+                        <list editable="bottom">
+                            <field name="document_type_id"/>
+                            <field name="number"/>
+                            <field name="issue_place"/>
+                            <field name="issue_date"/>
+                            <field name="expiry_date"/>
+                        </list>
+                    </field>
+                </page>
+                <page name="profile_career_movements" string="Career Movements" groups="hr.group_hr_user">
+                    <field name="career_movement_line_ids" context="{'default_employee_id': id}" widget="one2many" nolabel="1">
+                        <list editable="bottom">
+                            <field name="movement_type_id"/>
+                            <field name="movement_date"/>
+                            <field name="old_value"/>
+                            <field name="new_value"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

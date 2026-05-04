@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hr_employee_warning_line,hr.employee.warning.line user,model_hr_employee_warning_line,hr.group_hr_user,1,1,1,1
+access_hr_employee_warning_type,hr.employee.warning.type user,model_hr_employee_warning_type,hr.group_hr_user,1,1,1,1
+access_hr_employee_previous_job_line,hr.employee.previous.job.line user,model_hr_employee_previous_job_line,hr.group_hr_user,1,1,1,1
+access_hr_employee_education_line,hr.employee.education.line user,model_hr_employee_education_line,hr.group_hr_user,1,1,1,1
+access_hr_employee_official_document_line,hr.employee.official.document.line user,model_hr_employee_official_document_line,hr.group_hr_user,1,1,1,1
+access_hr_employee_official_document_type,hr.employee.official.document.type user,model_hr_employee_official_document_type,hr.group_hr_user,1,1,1,1
+access_hr_employee_career_movement_line,hr.employee.career.movement.line user,model_hr_employee_career_movement_line,hr.group_hr_user,1,1,1,1
+access_hr_employee_career_movement_type,hr.employee.career.movement.type user,model_hr_employee_career_movement_type,hr.group_hr_user,1,1,1,1

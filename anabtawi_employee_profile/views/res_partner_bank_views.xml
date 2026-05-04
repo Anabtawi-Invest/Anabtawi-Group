@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_bank_form_inherit_employee_profile" model="ir.ui.view">
+        <field name="name">res.partner.bank.form.inherit.anabtawi.employee.profile</field>
+        <field name="model">res.partner.bank</field>
+        <field name="inherit_id" ref="hr.view_partner_bank_form_inherit_hr"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@string='Bank Information']//group[@name='communication_details']" position="inside">
+                <field name="salary_bank_branch" groups="hr.group_hr_user"/>
+                <field name="salary_income_tax_number" groups="hr.group_hr_user"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

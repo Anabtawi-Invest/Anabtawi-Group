@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_employee_profile_document">
+        <t t-call="web.basic_layout">
+            <t t-foreach="docs" t-as="o">
+                <div class="page" style="font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #222;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 10px;">
+                        <div style="font-size: 16pt; font-weight: bold; color: #c0392b;">Employee Profile</div>
+                        <div>
+                            <t t-if="o.company_id.logo">
+                                <img t-att-src="image_data_uri(o.company_id.logo)" style="max-height: 40px; max-width: 180px;" alt="Logo"/>
+                            </t>
+                        </div>
+                    </div>
+
+                    <t t-set="bank" t-value="o.profile_primary_bank_account()"/>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+                        <tr>
+                            <td style="width: 33%; vertical-align: top; padding-right: 6px;">
+                                <table style="width: 100%; font-size: 8.5pt;">
+                                    <tr><td style="width: 38%; font-weight:bold;">Number</td><td t-out="o.id"/></tr>
+                                    <tr><td style="font-weight:bold;">Name</td><td t-out="o.display_name"/></tr>
+                                    <tr><td style="font-weight:bold;">Alternate Name</td><td dir="rtl" style="text-align:right;" t-out="o.name_arabic or ''"/></tr>
+                                    <tr><td style="font-weight:bold;">Start Date</td><td><span t-if="o.contract_date_start" t-field="o.contract_date_start"/></td></tr>
+                                    <tr><td style="font-weight:bold;">دائرة</td><td><span t-out="o.department_id.name or ''"/></td></tr>
+                                    <tr><td style="font-weight:bold;">قسم</td><td><span t-out="o.job_id.name or ''"/></td></tr>
+                                    <tr><td style="font-weight:bold;">فرع</td><td><span t-out="o.job_title or ''"/></td></tr>
+                                    <tr><td style="font-weight:bold;">Occupation</td><td><span t-out="o.job_title or ''"/></td></tr>
+                                    <tr><td style="font-weight:bold;">Type</td><td><span t-out="o.structure_type_id.name or ''"/></td></tr>
+                                    <tr><td style="font-weight:bold;">Religion</td><td><span t-out="o.religion or ''"/></td></tr>
+                                </table>
+                            </td>
+                            <td style="width: 33%; vertical-align: top; padding: 0 6px; border-left: 1px solid #ddd; border-right: 1px solid #ddd;">
+                                <table style="width: 100%; font-size: 8.5pt;">
+                                    <tr><td style="width: 40%; font-weight:bold;">Gender</td><td t-out="o.profile_sex_display()"/></tr>
+                                    <tr><td style="font-weight:bold;">Marital Status</td><td t-out="o.profile_marital_display()"/></tr>
+                                    <tr><td style="font-weight:bold;">Nationality</td><td><span t-out="o.country_id.name or ''"/></td></tr>
+                                    <tr><td style="font-weight:bold;">National Number</td><td><span t-out="o.identification_id or ''"/></td></tr>
+                                    <tr><td style="font-weight:bold;">SS Number</td><td><span t-out="o.ssnid or ''"/></td></tr>
+                                    <tr><td style="font-weight:bold;">Mother Name</td><td><span t-out="o.mother_name or ''"/></td></tr>
+                                    <tr><td style="font-weight:bold;">Medical Insurance</td><td><span t-out="o.profile_health_insurance_header_display()"/></td></tr>
+                                    <tr><td style="font-weight:bold;">Bank</td><td><span t-out="bank.bank_id.name if bank and bank.bank_id else ''"/></td></tr>
+                                    <tr><td style="font-weight:bold;">Bank Branch</td><td><span t-out="bank.salary_bank_branch if bank else ''"/></td></tr>
+                                    <tr><td style="font-weight:bold;">Income Tax Number</td><td><span t-out="bank.salary_income_tax_number if bank else ''"/></td></tr>
+                                </table>
+                            </td>
+                            <td style="width: 33%; vertical-align: top; padding-left: 6px;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 8.5pt;">
+                                    <tr>
+                                        <td style="vertical-align: top;">
+                                            <table style="width: 100%;">
+                                                <tr><td style="width: 42%; font-weight:bold;">Birth Date</td><td><span t-if="o.birthday" t-field="o.birthday"/></td></tr>
+                                                <tr><td style="font-weight:bold;">Birth Place</td><td><span t-out="o.place_of_birth or ''"/></td></tr>
+                                                <tr><td style="font-weight:bold;">Home Phone</td><td><span t-out="o.emergency_phone or ''"/></td></tr>
+                                                <tr><td style="font-weight:bold;">Mobile No.</td><td><span t-out="o.private_phone or ''"/></td></tr>
+                                                <tr><td style="font-weight:bold;">Status</td><td t-out="o.profile_status_display()"/></tr>
+                                                <tr><td style="font-weight:bold;">Termination Date</td><td><span t-if="o.departure_date" t-field="o.departure_date"/></td></tr>
+                                                <tr><td style="font-weight:bold;">City</td><td><span t-out="o.private_city or ''"/></td></tr>
+                                                <tr><td style="font-weight:bold;">Address</td><td><span t-out="o.private_street or ''"/></td></tr>
+                                                <tr><td style="font-weight:bold;">Email</td><td><span t-out="o.email or o.private_email or ''"/></td></tr>
+                                                <tr><td style="font-weight:bold;">Blood Type</td><td t-out="o.profile_blood_type_display()"/></tr>
+                                            </table>
+                                        </td>
+                                        <td style="width: 90px; vertical-align: top; text-align: center; padding-left: 6px;">
+                                            <t t-if="o.avatar_1920">
+                                                <img t-att-src="image_data_uri(o.avatar_1920)" style="width: 84px; height: 84px; object-fit: cover; border: 1px solid #ccc;" alt=""/>
+                                            </t>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <table style="width: 100%; background: #e8e8e8; border: 1px solid #ccc; margin: 10px 0; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 33%; padding: 6px; text-align: center; font-weight: bold;">
+                                Basic Salary<br/>
+                                <span t-if="o.currency_id and o.wage is not None">
+                                    <span t-field="o.wage" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                </span>
+                            </td>
+                            <td style="width: 33%; padding: 6px; text-align: center; font-weight: bold; border-left: 1px solid #ccc; border-right: 1px solid #ccc;">
+                                SS Salary<br/><span style="font-weight:normal;">—</span>
+                            </td>
+                            <td style="width: 33%; padding: 6px; text-align: center; font-weight: bold;">
+                                Service Charge Points<br/><span style="font-weight:normal;">—</span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 50%; vertical-align: top; padding-right: 5px;">
+                                <div style="font-weight:bold; margin: 4px 0 2px;">Dependants</div>
+                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc; padding:3px;">No.</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Name</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Birth Date</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Birth Place</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Med. Ins.</th>
+                                    </tr>
+                                    <t t-foreach="dep_map.get(o.id, [])" t-as="dep">
+                                        <tr>
+                                            <td style="border:1px solid #ccc; padding:2px; text-align:center;" t-out="dep_index + 1"/>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="dep.name or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="dep.birthdate" t-field="dep.birthdate"/></td>
+                                            <td style="border:1px solid #ccc; padding:2px;"><span t-out="dep.notes or ''"/></td>
+                                            <td style="border:1px solid #ccc; padding:2px; text-align:center;">
+                                                <t t-if="dep.grade_id">☑</t>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not len(dep_map.get(o.id, []))">
+                                        <tr><td colspan="5" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+
+                                <div style="font-weight:bold; margin: 8px 0 2px;">Previous Jobs</div>
+                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc; padding:3px;">Employer</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Start</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">End</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Occupation</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Termination</th>
+                                    </tr>
+                                    <t t-foreach="o.previous_job_line_ids" t-as="pj">
+                                        <tr>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="pj.employer or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="pj.date_start" t-field="pj.date_start"/></td>
+                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="pj.date_end" t-field="pj.date_end"/></td>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="pj.occupation or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="pj.termination_reason or ''"/>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not o.previous_job_line_ids">
+                                        <tr><td colspan="5" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+
+                                <div style="font-weight:bold; margin: 8px 0 2px;">Official Documents</div>
+                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc; padding:3px;">Type</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Number</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Issue Place</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Issue Date</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Expiry</th>
+                                    </tr>
+                                    <t t-foreach="o.official_document_line_ids" t-as="doc">
+                                        <tr>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="doc.document_type_id.name or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="doc.number or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="doc.issue_place or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="doc.issue_date" t-field="doc.issue_date"/></td>
+                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="doc.expiry_date" t-field="doc.expiry_date"/></td>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not o.official_document_line_ids">
+                                        <tr><td colspan="5" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+                            </td>
+                            <td style="width: 50%; vertical-align: top; padding-left: 5px;">
+                                <div style="font-weight:bold; margin: 4px 0 2px;">Warnings</div>
+                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc; padding:3px;">Date</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Warning Type</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Reason</th>
+                                    </tr>
+                                    <t t-foreach="o.warning_line_ids" t-as="w">
+                                        <tr>
+                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="w.warning_date" t-field="w.warning_date"/></td>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="w.warning_type_id.name or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="w.reason or ''"/>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not o.warning_line_ids">
+                                        <tr><td colspan="3" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+
+                                <div style="font-weight:bold; margin: 8px 0 2px;">Education</div>
+                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc; padding:3px;">Year</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Degree</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Specialty</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Institute</th>
+                                    </tr>
+                                    <t t-foreach="o.education_line_ids" t-as="ed">
+                                        <tr>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="ed.year or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="ed.degree or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="ed.specialty or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="ed.institute or ''"/>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not o.education_line_ids">
+                                        <tr><td colspan="4" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+
+                                <div style="font-weight:bold; margin: 8px 0 2px;">Career Movements</div>
+                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc; padding:3px;">Type</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Date</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">Old</th>
+                                        <th style="border:1px solid #ccc; padding:3px;">New</th>
+                                    </tr>
+                                    <t t-foreach="o.career_movement_line_ids" t-as="cm">
+                                        <tr>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="cm.movement_type_id.name or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="cm.movement_date" t-field="cm.movement_date"/></td>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="cm.old_value or ''"/>
+                                            <td style="border:1px solid #ccc; padding:2px;" t-out="cm.new_value or ''"/>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not o.career_movement_line_ids">
+                                        <tr><td colspan="4" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div style="margin-top: 14px; font-size: 7.5pt; color: #555; display: flex; justify-content: space-between;">
+                        <div>
+                            Printed by <t t-out="print_user.name"/> —
+                            <t t-out="print_time.strftime('%Y-%m-%d %H:%M')"/>
+                        </div>
+                        <div>
+                            Licensed To: <t t-out="o.company_id.name"/>
+                        </div>
+                        <div>Page 1 of 1</div>
+                    </div>
+                </div>
+                <p t-if="not o_last" style="page-break-after: always;"/>
+            </t>
+        </t>
+    </template>
+</odoo>
