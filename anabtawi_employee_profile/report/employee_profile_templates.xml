@@ -3,21 +3,36 @@
     <template id="emp_profile_pdf">
         <t t-call="web.basic_layout">
             <t t-foreach="docs" t-as="o">
-                <div class="page" style="font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #222;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 10px;">
-                        <div style="font-size: 16pt; font-weight: bold; color: #c0392b;">Employee Profile</div>
-                        <div>
-                            <t t-if="o.company_id.logo">
-                                <img t-att-src="image_data_uri(o.company_id.logo)" style="max-height: 40px; max-width: 180px;" alt="Logo"/>
-                            </t>
-                        </div>
-                    </div>
+                <div class="page" style="font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; color: #222;">
+                    <style type="text/css">
+                        .aep-header { width: 100%; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 12px; border-collapse: collapse; }
+                        .aep-header td { vertical-align: middle; }
+                        .aep-main-col table td { padding: 6px 9px !important; font-size: 10pt !important; line-height: 1.4; vertical-align: top; }
+                        .aep-section-title { font-weight: bold; margin: 6px 0 4px; font-size: 11pt; }
+                        .aep-data-table { font-size: 9.5pt !important; }
+                        .aep-data-table th { padding: 7px 6px !important; }
+                        .aep-data-table td { padding: 6px 7px !important; }
+                        .aep-salary-bar td { padding: 12px 10px !important; font-size: 10.5pt !important; }
+                        .aep-footer { font-size: 9pt !important; }
+                    </style>
+                    <table class="aep-header">
+                        <tr>
+                            <td style="text-align: left; width: 58%;">
+                                <div style="font-size: 18pt; font-weight: bold; color: #c0392b; line-height: 1.2;">Employee Profile</div>
+                            </td>
+                            <td style="text-align: right; width: 42%;">
+                                <t t-if="o.company_id.logo">
+                                    <img t-att-src="image_data_uri(o.company_id.logo)" style="max-height: 52px; max-width: 240px;" alt="Logo"/>
+                                </t>
+                            </td>
+                        </tr>
+                    </table>
 
                     <t t-set="bank" t-value="o.profile_primary_bank_account()"/>
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
                         <tr>
-                            <td style="width: 33%; vertical-align: top; padding-right: 6px;">
-                                <table style="width: 100%; font-size: 8.5pt;">
+                            <td class="aep-main-col" style="width: 33%; vertical-align: top; padding-right: 8px;">
+                                <table style="width: 100%; border-collapse: collapse;">
                                     <tr><td style="width: 38%; font-weight:bold;">Number</td><td t-out="o.id"/></tr>
                                     <tr><td style="font-weight:bold;">Name</td><td t-out="o.display_name"/></tr>
                                     <tr><td style="font-weight:bold;">Alternate Name</td><td dir="rtl" style="text-align:right;" t-out="o.name_arabic or ''"/></tr>
@@ -30,8 +45,8 @@
                                     <tr><td style="font-weight:bold;">Religion</td><td><span t-out="o.religion or ''"/></td></tr>
                                 </table>
                             </td>
-                            <td style="width: 33%; vertical-align: top; padding: 0 6px; border-left: 1px solid #ddd; border-right: 1px solid #ddd;">
-                                <table style="width: 100%; font-size: 8.5pt;">
+                            <td class="aep-main-col" style="width: 33%; vertical-align: top; padding: 0 8px; border-left: 1px solid #ddd; border-right: 1px solid #ddd;">
+                                <table style="width: 100%; border-collapse: collapse;">
                                     <tr><td style="width: 40%; font-weight:bold;">Gender</td><td t-out="o.profile_sex_display()"/></tr>
                                     <tr><td style="font-weight:bold;">Marital Status</td><td t-out="o.profile_marital_display()"/></tr>
                                     <tr><td style="font-weight:bold;">Nationality</td><td><span t-out="o.country_id.name or ''"/></td></tr>
@@ -44,8 +59,8 @@
                                     <tr><td style="font-weight:bold;">Income Tax Number</td><td><span t-out="bank.salary_income_tax_number if bank else ''"/></td></tr>
                                 </table>
                             </td>
-                            <td style="width: 33%; vertical-align: top; padding-left: 6px;">
-                                <table style="width: 100%; border-collapse: collapse; font-size: 8.5pt;">
+                            <td class="aep-main-col" style="width: 33%; vertical-align: top; padding-left: 8px;">
+                                <table style="width: 100%; border-collapse: collapse;">
                                     <tr>
                                         <td style="vertical-align: top;">
                                             <table style="width: 100%;">
@@ -61,9 +76,9 @@
                                                 <tr><td style="font-weight:bold;">Blood Type</td><td t-out="o.profile_blood_type_display()"/></tr>
                                             </table>
                                         </td>
-                                        <td style="width: 90px; vertical-align: top; text-align: center; padding-left: 6px;">
+                                        <td style="width: 100px; vertical-align: top; text-align: center; padding-left: 8px;">
                                             <t t-if="o.avatar_1920">
-                                                <img t-att-src="image_data_uri(o.avatar_1920)" style="width: 84px; height: 84px; object-fit: cover; border: 1px solid #ccc;" alt=""/>
+                                                <img t-att-src="image_data_uri(o.avatar_1920)" style="width: 92px; height: 92px; object-fit: cover; border: 1px solid #ccc;" alt=""/>
                                             </t>
                                         </td>
                                     </tr>
@@ -72,18 +87,18 @@
                         </tr>
                     </table>
 
-                    <table style="width: 100%; background: #e8e8e8; border: 1px solid #ccc; margin: 10px 0; border-collapse: collapse;">
+                    <table class="aep-salary-bar" style="width: 100%; background: #e8e8e8; border: 1px solid #ccc; margin: 12px 0; border-collapse: collapse;">
                         <tr>
-                            <td style="width: 33%; padding: 6px; text-align: center; font-weight: bold;">
+                            <td style="width: 33%; text-align: center; font-weight: bold;">
                                 Basic Salary<br/>
                                 <span t-if="o.currency_id and o.wage is not None">
                                     <span t-field="o.wage" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
                                 </span>
                             </td>
-                            <td style="width: 33%; padding: 6px; text-align: center; font-weight: bold; border-left: 1px solid #ccc; border-right: 1px solid #ccc;">
+                            <td style="width: 33%; text-align: center; font-weight: bold; border-left: 1px solid #ccc; border-right: 1px solid #ccc;">
                                 SS Salary<br/><span style="font-weight:normal;">—</span>
                             </td>
-                            <td style="width: 33%; padding: 6px; text-align: center; font-weight: bold;">
+                            <td style="width: 33%; text-align: center; font-weight: bold;">
                                 Service Charge Points<br/><span style="font-weight:normal;">—</span>
                             </td>
                         </tr>
@@ -91,144 +106,144 @@
 
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr>
-                            <td style="width: 50%; vertical-align: top; padding-right: 5px;">
-                                <div style="font-weight:bold; margin: 4px 0 2px;">Dependants</div>
-                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                            <td style="width: 50%; vertical-align: top; padding-right: 8px;">
+                                <div class="aep-section-title">Dependants</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
                                     <tr style="background:#e8e8e8;">
-                                        <th style="border:1px solid #ccc; padding:3px;">No.</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Name</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Birth Date</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Birth Place</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Med. Ins.</th>
+                                        <th style="border:1px solid #ccc;">No.</th>
+                                        <th style="border:1px solid #ccc;">Name</th>
+                                        <th style="border:1px solid #ccc;">Birth Date</th>
+                                        <th style="border:1px solid #ccc;">Birth Place</th>
+                                        <th style="border:1px solid #ccc;">Med. Ins.</th>
                                     </tr>
                                     <t t-foreach="dep_map.get(o.id, [])" t-as="dep">
                                         <tr>
-                                            <td style="border:1px solid #ccc; padding:2px; text-align:center;" t-out="dep_index + 1"/>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="dep.name or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="dep.birthdate" t-field="dep.birthdate"/></td>
-                                            <td style="border:1px solid #ccc; padding:2px;"><span t-out="dep.notes or ''"/></td>
-                                            <td style="border:1px solid #ccc; padding:2px; text-align:center;">
+                                            <td style="border:1px solid #ccc; text-align:center;" t-out="dep_index + 1"/>
+                                            <td style="border:1px solid #ccc;" t-out="dep.name or ''"/>
+                                            <td style="border:1px solid #ccc;"><span t-if="dep.birthdate" t-field="dep.birthdate"/></td>
+                                            <td style="border:1px solid #ccc;"><span t-out="dep.notes or ''"/></td>
+                                            <td style="border:1px solid #ccc; text-align:center;">
                                                 <t t-if="dep.grade_id">☑</t>
                                             </td>
                                         </tr>
                                     </t>
                                     <t t-if="not len(dep_map.get(o.id, []))">
-                                        <tr><td colspan="5" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                        <tr><td colspan="5" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
                                     </t>
                                 </table>
 
-                                <div style="font-weight:bold; margin: 8px 0 2px;">Previous Jobs</div>
-                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                                <div class="aep-section-title">Previous Jobs</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
                                     <tr style="background:#e8e8e8;">
-                                        <th style="border:1px solid #ccc; padding:3px;">Employer</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Start</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">End</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Occupation</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Termination</th>
+                                        <th style="border:1px solid #ccc;">Employer</th>
+                                        <th style="border:1px solid #ccc;">Start</th>
+                                        <th style="border:1px solid #ccc;">End</th>
+                                        <th style="border:1px solid #ccc;">Occupation</th>
+                                        <th style="border:1px solid #ccc;">Termination</th>
                                     </tr>
                                     <t t-foreach="o.previous_job_line_ids" t-as="pj">
                                         <tr>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="pj.employer or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="pj.date_start" t-field="pj.date_start"/></td>
-                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="pj.date_end" t-field="pj.date_end"/></td>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="pj.occupation or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="pj.termination_reason or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="pj.employer or ''"/>
+                                            <td style="border:1px solid #ccc;"><span t-if="pj.date_start" t-field="pj.date_start"/></td>
+                                            <td style="border:1px solid #ccc;"><span t-if="pj.date_end" t-field="pj.date_end"/></td>
+                                            <td style="border:1px solid #ccc;" t-out="pj.occupation or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="pj.termination_reason or ''"/>
                                         </tr>
                                     </t>
                                     <t t-if="not o.previous_job_line_ids">
-                                        <tr><td colspan="5" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                        <tr><td colspan="5" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
                                     </t>
                                 </table>
 
-                                <div style="font-weight:bold; margin: 8px 0 2px;">Official Documents</div>
-                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                                <div class="aep-section-title">Official Documents</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
                                     <tr style="background:#e8e8e8;">
-                                        <th style="border:1px solid #ccc; padding:3px;">Type</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Number</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Issue Place</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Issue Date</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Expiry</th>
+                                        <th style="border:1px solid #ccc;">Type</th>
+                                        <th style="border:1px solid #ccc;">Number</th>
+                                        <th style="border:1px solid #ccc;">Issue Place</th>
+                                        <th style="border:1px solid #ccc;">Issue Date</th>
+                                        <th style="border:1px solid #ccc;">Expiry</th>
                                     </tr>
                                     <t t-foreach="o.official_document_line_ids" t-as="doc">
                                         <tr>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="doc.document_type_id.name or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="doc.number or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="doc.issue_place or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="doc.issue_date" t-field="doc.issue_date"/></td>
-                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="doc.expiry_date" t-field="doc.expiry_date"/></td>
+                                            <td style="border:1px solid #ccc;" t-out="doc.document_type_id.name or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="doc.number or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="doc.issue_place or ''"/>
+                                            <td style="border:1px solid #ccc;"><span t-if="doc.issue_date" t-field="doc.issue_date"/></td>
+                                            <td style="border:1px solid #ccc;"><span t-if="doc.expiry_date" t-field="doc.expiry_date"/></td>
                                         </tr>
                                     </t>
                                     <t t-if="not o.official_document_line_ids">
-                                        <tr><td colspan="5" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                        <tr><td colspan="5" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
                                     </t>
                                 </table>
                             </td>
-                            <td style="width: 50%; vertical-align: top; padding-left: 5px;">
-                                <div style="font-weight:bold; margin: 4px 0 2px;">Warnings</div>
-                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                            <td style="width: 50%; vertical-align: top; padding-left: 8px;">
+                                <div class="aep-section-title">Warnings</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
                                     <tr style="background:#e8e8e8;">
-                                        <th style="border:1px solid #ccc; padding:3px;">Date</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Warning Type</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Reason</th>
+                                        <th style="border:1px solid #ccc;">Date</th>
+                                        <th style="border:1px solid #ccc;">Warning Type</th>
+                                        <th style="border:1px solid #ccc;">Reason</th>
                                     </tr>
                                     <t t-foreach="o.warning_line_ids" t-as="w">
                                         <tr>
-                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="w.warning_date" t-field="w.warning_date"/></td>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="w.warning_type_id.name or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="w.reason or ''"/>
+                                            <td style="border:1px solid #ccc;"><span t-if="w.warning_date" t-field="w.warning_date"/></td>
+                                            <td style="border:1px solid #ccc;" t-out="w.warning_type_id.name or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="w.reason or ''"/>
                                         </tr>
                                     </t>
                                     <t t-if="not o.warning_line_ids">
-                                        <tr><td colspan="3" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                        <tr><td colspan="3" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
                                     </t>
                                 </table>
 
-                                <div style="font-weight:bold; margin: 8px 0 2px;">Education</div>
-                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                                <div class="aep-section-title">Education</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
                                     <tr style="background:#e8e8e8;">
-                                        <th style="border:1px solid #ccc; padding:3px;">Year</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Degree</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Specialty</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Institute</th>
+                                        <th style="border:1px solid #ccc;">Year</th>
+                                        <th style="border:1px solid #ccc;">Degree</th>
+                                        <th style="border:1px solid #ccc;">Specialty</th>
+                                        <th style="border:1px solid #ccc;">Institute</th>
                                     </tr>
                                     <t t-foreach="o.education_line_ids" t-as="ed">
                                         <tr>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="ed.year or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="ed.degree or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="ed.specialty or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="ed.institute or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="ed.year or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="ed.degree or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="ed.specialty or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="ed.institute or ''"/>
                                         </tr>
                                     </t>
                                     <t t-if="not o.education_line_ids">
-                                        <tr><td colspan="4" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                        <tr><td colspan="4" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
                                     </t>
                                 </table>
 
-                                <div style="font-weight:bold; margin: 8px 0 2px;">Career Movements</div>
-                                <table style="width:100%; border:1px solid #ccc; border-collapse:collapse; font-size:8pt;">
+                                <div class="aep-section-title">Career Movements</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
                                     <tr style="background:#e8e8e8;">
-                                        <th style="border:1px solid #ccc; padding:3px;">Type</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Date</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">Old</th>
-                                        <th style="border:1px solid #ccc; padding:3px;">New</th>
+                                        <th style="border:1px solid #ccc;">Type</th>
+                                        <th style="border:1px solid #ccc;">Date</th>
+                                        <th style="border:1px solid #ccc;">Old</th>
+                                        <th style="border:1px solid #ccc;">New</th>
                                     </tr>
                                     <t t-foreach="o.career_movement_line_ids" t-as="cm">
                                         <tr>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="cm.movement_type_id.name or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;"><span t-if="cm.movement_date" t-field="cm.movement_date"/></td>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="cm.old_value or ''"/>
-                                            <td style="border:1px solid #ccc; padding:2px;" t-out="cm.new_value or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="cm.movement_type_id.name or ''"/>
+                                            <td style="border:1px solid #ccc;"><span t-if="cm.movement_date" t-field="cm.movement_date"/></td>
+                                            <td style="border:1px solid #ccc;" t-out="cm.old_value or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="cm.new_value or ''"/>
                                         </tr>
                                     </t>
                                     <t t-if="not o.career_movement_line_ids">
-                                        <tr><td colspan="4" style="border:1px solid #ccc; height:18px;">&#160;</td></tr>
+                                        <tr><td colspan="4" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
                                     </t>
                                 </table>
                             </td>
                         </tr>
                     </table>
 
-                    <div style="margin-top: 14px; font-size: 7.5pt; color: #555; display: flex; justify-content: space-between;">
+                    <div class="aep-footer" style="margin-top: 16px; color: #555; display: flex; justify-content: space-between;">
                         <div>
                             Printed by <t t-out="print_user.name"/> —
                             <t t-out="print_time.strftime('%Y-%m-%d %H:%M')"/>
