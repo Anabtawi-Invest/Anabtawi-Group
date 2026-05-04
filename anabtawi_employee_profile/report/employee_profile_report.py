@@ -3,7 +3,7 @@ from odoo import api, fields, models
 
 
 class ReportEmployeeProfileDocument(models.AbstractModel):
-    _name = 'report.anabtawi_employee_profile.report_employee_profile_document'
+    _name = 'report.anabtawi_employee_profile.emp_profile_pdf'
     _description = 'Employee Profile PDF'
 
     @api.model

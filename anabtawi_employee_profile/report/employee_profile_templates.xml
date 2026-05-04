@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="report_employee_profile_document">
+    <template id="emp_profile_pdf">
         <t t-call="web.basic_layout">
             <t t-foreach="docs" t-as="o">
                 <div class="page" style="font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #222;">
