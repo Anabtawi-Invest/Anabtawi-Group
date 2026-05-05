@@ -62,6 +62,7 @@ class StockTransferDiscrepancyWizard(models.TransientModel):
                         "reason": self.reason,
                         "stage": line.stage,
                         "truck_location_id": line.truck_location_id.id,
+                        "driver_id": line.driver_id.id if line.driver_id else False,
                         "responsible_user_id": self.env.user.id,
                         "date": now,
                         "validated_at": now,
@@ -94,6 +95,7 @@ class StockTransferDiscrepancyWizardLine(models.TransientModel):
     actual_qty = fields.Float(string="Actual Qty", required=True, digits="Product Unit")
     difference_qty = fields.Float(string="Difference Qty", required=True, digits="Product Unit")
     truck_location_id = fields.Many2one("stock.location", string="Truck Location", required=True)
+    driver_id = fields.Many2one("stock.transfer.driver", string="Driver")
     stage = fields.Selection(
         [
             ("dispatch", "Dispatch"),

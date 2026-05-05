@@ -1,3 +1,4 @@
+from . import stock_transfer_driver
 from . import stock_transfer_discrepancy
 from . import stock_picking
 from . import stock_location

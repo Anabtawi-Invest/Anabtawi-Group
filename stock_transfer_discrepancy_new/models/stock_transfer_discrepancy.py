@@ -48,6 +48,12 @@ class StockTransferDiscrepancy(models.Model):
         ondelete="restrict",
         domain=[("usage", "=", "internal")],
     )
+    driver_id = fields.Many2one(
+        "stock.transfer.driver",
+        string="Driver",
+        index=True,
+        ondelete="set null",
+    )
 
     # New flow:
     # - under_investigation: created at picking validation time, truck is still allowed
@@ -94,9 +100,8 @@ class StockTransferDiscrepancy(models.Model):
     def _cron_expire_investigations(self):
         """Move discrepancies from under_investigation to open after deadline.
 
-        We intentionally keep the existing 'truck blocking' logic unchanged:
-        stock.location.has_open_discrepancy checks only state='open'.
-        So, once a discrepancy becomes 'open', the truck will be blocked as before.
+        Once a discrepancy becomes 'open', stock.transfer.driver.is_blocked is updated;
+        stock.location.has_open_discrepancy is still recomputed for reporting.
         """
         now = fields.Datetime.now()
         recs = self.search(
@@ -112,8 +117,10 @@ class StockTransferDiscrepancy(models.Model):
             return
 
         to_open.write({"state": "open"})
-        # Ensure the computed flag is updated for selection domain / constraints
         to_open.mapped("truck_location_id")._compute_has_open_discrepancy()
+        drivers = to_open.mapped("driver_id").filtered(lambda d: d)
+        if drivers:
+            drivers._compute_is_blocked()
 
     @api.model
     def apply_resolution(
@@ -159,6 +166,9 @@ class StockTransferDiscrepancy(models.Model):
         # Trigger recompute once at the end for better performance
         if discrepancies:
             truck_location._compute_has_open_discrepancy()
+            drivers = discrepancies.mapped("driver_id").filtered(lambda d: d)
+            if drivers:
+                drivers._compute_is_blocked()
 
     def _apply_resolution(self, qty_in_product_uom, skip_recompute=False):
         """Allocate resolution quantity to this discrepancy and update state.
@@ -173,8 +183,11 @@ class StockTransferDiscrepancy(models.Model):
         remaining = max((self.difference_qty or 0.0) - (self.resolved_qty or 0.0), 0.0)
         if float_compare(remaining, 0.0, precision_rounding=rounding) <= 0:
             self.sudo().write({"state": "settled"})
-            if not skip_recompute and self.truck_location_id:
-                self.truck_location_id._compute_has_open_discrepancy()
+            if not skip_recompute:
+                if self.truck_location_id:
+                    self.truck_location_id._compute_has_open_discrepancy()
+                if self.driver_id:
+                    self.driver_id._compute_is_blocked()
             return
 
         to_apply = min(qty_in_product_uom, remaining)
@@ -187,5 +200,8 @@ class StockTransferDiscrepancy(models.Model):
             vals["state"] = "settled"
 
         self.sudo().write(vals)
-        if not skip_recompute and self.truck_location_id:
-            self.truck_location_id._compute_has_open_discrepancy()
+        if not skip_recompute:
+            if self.truck_location_id:
+                self.truck_location_id._compute_has_open_discrepancy()
+            if self.driver_id:
+                self.driver_id._compute_is_blocked()
