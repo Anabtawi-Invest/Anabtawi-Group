@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Add expiry rows next to core binaries when those fields exist; append further documents at the end. -->
+    <record id="hr_employee_ae_documents_form" model="ir.ui.view">
+        <field name="name">hr.employee.form.ae.documents</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//group[@name='hr_document_group']/field[@name='id_card'][1]" position="after">
+                <label for="ae_doc_id_expiry" string="Expires on"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_id_expiry"/>
+                </div>
+            </xpath>
+
+            <xpath expr="//group[@name='hr_document_group']/field[@name='driving_license'][1]" position="after">
+                <label for="ae_doc_driving_license_expiry" string="Expires on"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_driving_license_expiry"/>
+                </div>
+            </xpath>
+
+            <xpath expr="//group[@name='hr_document_group']" position="inside">
+
+                <label for="ae_doc_health_certificate"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_health_certificate" filename="ae_doc_health_certificate_filename"/>
+                    <label for="ae_doc_health_certificate_expiry" string="Expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_health_certificate_expiry"/>
+                </div>
+
+                <label for="ae_doc_non_conviction"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_non_conviction" filename="ae_doc_non_conviction_filename"/>
+                    <label for="ae_doc_non_conviction_expiry" string="Expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_non_conviction_expiry"/>
+                </div>
+
+                <label for="ae_doc_probation_end"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_probation_end" filename="ae_doc_probation_end_filename"/>
+                    <label for="ae_doc_probation_end_expiry" string="Expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_probation_end_expiry"/>
+                </div>
+
+                <label for="ae_doc_children_gaza"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_children_gaza" filename="ae_doc_children_gaza_filename"/>
+                    <label for="ae_doc_children_gaza_expiry" string="Expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_children_gaza_expiry"/>
+                </div>
+
+                <label for="ae_doc_children_jordanian_mother"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_children_jordanian_mother" filename="ae_doc_children_jordanian_mother_filename"/>
+                    <label for="ae_doc_children_jordanian_mother_expiry" string="Expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_children_jordanian_mother_expiry"/>
+                </div>
+
+                <label for="ae_doc_work_permit"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_work_permit" filename="ae_doc_work_permit_filename"/>
+                    <label for="ae_doc_work_permit_expiry" string="Expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_work_permit_expiry"/>
+                </div>
+
+                <label for="ae_doc_passport"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_passport" filename="ae_doc_passport_filename"/>
+                    <label for="ae_doc_passport_expiry" string="Expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_passport_expiry"/>
+                </div>
+
+                <label for="ae_doc_family_book"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_family_book" filename="ae_doc_family_book_filename"/>
+                    <label for="ae_doc_family_book_expiry" string="Expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_family_book_expiry"/>
+                </div>
+
+                <label for="ae_doc_permit_general"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_permit_general" filename="ae_doc_permit_general_filename"/>
+                    <label for="ae_doc_permit_general_expiry" string="Expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_permit_general_expiry"/>
+                </div>
+
+                <label for="ae_doc_engineers_syndicate"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <field name="ae_doc_engineers_syndicate" filename="ae_doc_engineers_syndicate_filename"/>
+                    <label for="ae_doc_engineers_syndicate_expiry" string="Expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_engineers_syndicate_expiry"/>
+                </div>
+
+                <field name="ae_doc_id_expiry_notify" invisible="1"/>
+                <field name="ae_doc_driving_license_expiry_notify" invisible="1"/>
+                <field name="ae_doc_health_certificate_notify" invisible="1"/>
+                <field name="ae_doc_non_conviction_notify" invisible="1"/>
+                <field name="ae_doc_probation_end_notify" invisible="1"/>
+                <field name="ae_doc_children_gaza_notify" invisible="1"/>
+                <field name="ae_doc_children_jordanian_mother_notify" invisible="1"/>
+                <field name="ae_doc_work_permit_notify" invisible="1"/>
+                <field name="ae_doc_passport_notify" invisible="1"/>
+                <field name="ae_doc_family_book_notify" invisible="1"/>
+                <field name="ae_doc_permit_general_notify" invisible="1"/>
+                <field name="ae_doc_engineers_syndicate_notify" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
