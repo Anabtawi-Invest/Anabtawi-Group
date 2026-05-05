@@ -81,7 +81,7 @@ class PurchaseConfirmApprovalRuleLine(models.Model):
     def _check_specific_users_in_group(self):
         for line in self:
             if line.specific_user_ids and line.group_id:
-                invalid_users = line.specific_user_ids.filtered(lambda user: line.group_id not in user.groups_id)
+                invalid_users = line.specific_user_ids.filtered(lambda user: line.group_id not in user.group_ids)
                 if invalid_users:
                     raise ValidationError(_(
                         'These specific users are not members of the approval group "%(group)s": %(users)s'
