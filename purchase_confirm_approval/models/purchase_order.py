@@ -17,15 +17,15 @@ class PurchaseOrder(models.Model):
     current_approval_id = fields.Many2one(
         "purchase.confirm.approval",
         string="Current Approval",
-        compute="_compute_confirm_approval_state",
-        store=False,
+        copy=False,
+        readonly=True,
     )
 
     current_approval_group_id = fields.Many2one(
         "res.groups",
         string="Current Approval Group",
-        compute="_compute_confirm_approval_state",
-        store=False,
+        copy=False,
+        readonly=True,
     )
 
     confirm_approval_status = fields.Selection(
@@ -37,55 +37,16 @@ class PurchaseOrder(models.Model):
             ("cancelled", "Cancelled"),
         ],
         string="Confirmation Approval Status",
-        compute="_compute_confirm_approval_state",
-        store=False,
+        default="no_rule",
+        copy=False,
+        readonly=True,
     )
 
     confirm_approval_status_text = fields.Char(
         string="Confirmation Now",
-        compute="_compute_confirm_approval_state",
-        store=False,
+        copy=False,
+        readonly=True,
     )
-
-    @api.depends(
-        "state",
-        "confirm_approval_ids.state",
-        "confirm_approval_ids.sequence",
-        "confirm_approval_ids.group_id",
-        "confirm_approval_ids.required",
-    )
-    def _compute_confirm_approval_state(self):
-        for order in self:
-            approvals = order.confirm_approval_ids.sorted(
-                lambda approval: (approval.sequence, approval.id)
-            )
-
-            current = approvals.filtered(
-                lambda approval: approval.required and approval.state == "pending"
-            )[:1]
-
-            order.current_approval_id = current if current else False
-            order.current_approval_group_id = current.group_id if current else False
-
-            if order.state == "cancel":
-                order.confirm_approval_status = "cancelled"
-                order.confirm_approval_status_text = _("Cancelled")
-
-            elif order.state in ["purchase", "done"]:
-                order.confirm_approval_status = "confirmed"
-                order.confirm_approval_status_text = _("Confirmed")
-
-            elif current:
-                order.confirm_approval_status = "waiting"
-                order.confirm_approval_status_text = _("Waiting for: %s") % current.group_id.display_name
-
-            elif approvals:
-                order.confirm_approval_status = "ready"
-                order.confirm_approval_status_text = _("Ready to Confirm")
-
-            else:
-                order.confirm_approval_status = "no_rule"
-                order.confirm_approval_status_text = _("No Approval Required")
 
     def _get_confirm_approval_rule(self):
         self.ensure_one()
@@ -93,31 +54,90 @@ class PurchaseOrder(models.Model):
 
     def _get_current_pending_approval(self):
         self.ensure_one()
-
         return self.confirm_approval_ids.sorted(
             lambda approval: (approval.sequence, approval.id)
         ).filtered(
             lambda approval: approval.required and approval.state == "pending"
         )[:1]
 
+    def _get_approval_display_values(self):
+        self.ensure_one()
+
+        current = self._get_current_pending_approval()
+        approvals = self.confirm_approval_ids
+
+        if self.state == "cancel":
+            return {
+                "current_approval_id": False,
+                "current_approval_group_id": False,
+                "confirm_approval_status": "cancelled",
+                "confirm_approval_status_text": _("Cancelled"),
+            }
+
+        if self.state in ["purchase", "done"]:
+            return {
+                "current_approval_id": False,
+                "current_approval_group_id": False,
+                "confirm_approval_status": "confirmed",
+                "confirm_approval_status_text": _("Confirmed"),
+            }
+
+        if current:
+            return {
+                "current_approval_id": current.id,
+                "current_approval_group_id": current.group_id.id,
+                "confirm_approval_status": "waiting",
+                "confirm_approval_status_text": _("Waiting for: %s") % current.group_id.display_name,
+            }
+
+        if approvals:
+            return {
+                "current_approval_id": False,
+                "current_approval_group_id": False,
+                "confirm_approval_status": "ready",
+                "confirm_approval_status_text": _("Ready to Confirm"),
+            }
+
+        return {
+            "current_approval_id": False,
+            "current_approval_group_id": False,
+            "confirm_approval_status": "no_rule",
+            "confirm_approval_status_text": _("No Approval Required"),
+        }
+
+    def _update_approval_display_values(self):
+        for order in self:
+            vals = order._get_approval_display_values()
+
+            changed_vals = {}
+            for field_name, value in vals.items():
+                current_value = order[field_name]
+
+                if hasattr(current_value, "id"):
+                    current_value = current_value.id or False
+
+                if current_value != value:
+                    changed_vals[field_name] = value
+
+            if changed_vals:
+                order.with_context(skip_confirm_approval_sync=True).write(changed_vals)
+
     @api.model_create_multi
     def create(self, vals_list):
         orders = super().create(vals_list)
         orders.with_context(skip_confirm_approval_sync=True)._sync_confirm_approval_steps()
+        orders._update_approval_display_values()
         return orders
 
     def write(self, vals):
         res = super().write(vals)
 
         if not self.env.context.get("skip_confirm_approval_sync"):
-            draft_orders = self.filtered(
-                lambda order: order.state in ["draft", "sent"]
-            )
+            orders = self.filtered(lambda order: order.state in ["draft", "sent"])
+            if orders:
+                orders.with_context(skip_confirm_approval_sync=True)._sync_confirm_approval_steps()
 
-            if draft_orders:
-                draft_orders.with_context(
-                    skip_confirm_approval_sync=True
-                )._sync_confirm_approval_steps()
+            self._update_approval_display_values()
 
         return res
 
@@ -163,6 +183,8 @@ class PurchaseOrder(models.Model):
                             "state": "pending",
                         }
                     )
+
+        self._update_approval_display_values()
 
     def _user_can_approve_step(self, approval):
         self.ensure_one()
@@ -223,6 +245,7 @@ class PurchaseOrder(models.Model):
             current = order._get_current_pending_approval()
 
             if not current:
+                order._update_approval_display_values()
                 return True
 
             if not order._user_can_approve_step(current):
@@ -249,6 +272,8 @@ class PurchaseOrder(models.Model):
                 }
             )
 
+            order._update_approval_display_values()
+
             if order._get_current_pending_approval():
                 order._notify_current_approval_users()
 
@@ -263,6 +288,7 @@ class PurchaseOrder(models.Model):
                 continue
 
             order.with_context(skip_confirm_approval_sync=True)._sync_confirm_approval_steps()
+            order._update_approval_display_values()
 
             current = order._get_current_pending_approval()
 
@@ -270,11 +296,15 @@ class PurchaseOrder(models.Model):
                 order._approve_current_step()
 
                 if order._get_current_pending_approval():
+                    order._update_approval_display_values()
                     continue
 
             orders_to_confirm |= order
 
-        if orders_to_confirm:
-            return super(PurchaseOrder, orders_to_confirm).button_confirm()
+        result = True
 
-        return True
+        if orders_to_confirm:
+            result = super(PurchaseOrder, orders_to_confirm).button_confirm()
+            orders_to_confirm._update_approval_display_values()
+
+        return result
