@@ -9,9 +9,9 @@
     <menuitem
         id="menu_stock_transfer_driver_config"
         name="Truck Drivers"
-        parent="stock.menu_stock_config_settings"
+        parent="stock.menu_warehouse_config"
         action="stock_transfer_driver_action"
-        sequence="35"
+        sequence="9"
         groups="stock.group_stock_manager"
     />
 
