@@ -1,1 +1,10 @@
-
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <menuitem
+        id="menu_purchase_confirm_approval_rule"
+        name="Purchase Confirm Approvals"
+        parent="purchase.menu_purchase_config"
+        action="action_purchase_confirm_approval_rule"
+        sequence="80"
+        groups="purchase_confirm_approval.group_purchase_confirm_approval_manager"/>
+</odoo>
