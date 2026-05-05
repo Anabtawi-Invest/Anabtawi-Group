@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_employee_ae_personal_non_resident_form" model="ir.ui.view">
+        <field name="name">hr.employee.form.ae.personal.non.resident</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='citizenship']" position="after">
+                <group string="Non-Resident">
+                    <field name="ae_is_non_resident"/>
+                    <field name="ae_children_of_jordanian_mother"
+                           invisible="not ae_is_non_resident"/>
+                    <field name="ae_gaza_resident"
+                           invisible="not ae_is_non_resident"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
