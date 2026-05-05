@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "HR Enhancement",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.2",
     "category": "Human Resources",
     "summary": "Time off dashboard: show hour balance with equivalent days",
     "depends": ["hr_holidays"],

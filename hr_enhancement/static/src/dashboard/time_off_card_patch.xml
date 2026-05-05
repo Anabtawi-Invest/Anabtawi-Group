@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-inherit="hr_holidays.TimeOffCard" t-inherit-mode="extension">
-        <xpath expr="//span[hasclass('o_timeoff_details')]" position="after">
+        <!-- o_timeoff_details uses t-att-class (no static @class), so hasclass('o_timeoff_details') fails in inheritance. -->
+        <!-- o_timeoff_duration has a static class; the next span is the "hours available" row. -->
+        <xpath expr="//span[hasclass('o_timeoff_duration')]/following-sibling::span[1]" position="after">
             <span
                 t-if="data.request_unit == 'hour' and data.hours_per_day"
                 class="text-uppercase small text-muted o_timeoff_equivalent_days d-block mt-1">
