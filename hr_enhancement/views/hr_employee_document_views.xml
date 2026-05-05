@@ -1,28 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Add expiry rows next to core binaries when those fields exist; append further documents at the end. -->
+    <!-- Appends inside hr_document_group only (Studio/custom views may remove field[@name=id_card]). -->
     <record id="hr_employee_ae_documents_form" model="ir.ui.view">
         <field name="name">hr.employee.form.ae.documents</field>
         <field name="model">hr.employee</field>
         <field name="inherit_id" ref="hr.view_employee_form"/>
         <field name="arch" type="xml">
-
-            <xpath expr="//group[@name='hr_document_group']/field[@name='id_card'][1]" position="after">
-                <label for="ae_doc_id_expiry" string="Expires on"/>
-                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
-                    <field name="ae_doc_id_expiry"/>
-                </div>
-            </xpath>
-
-            <xpath expr="//group[@name='hr_document_group']/field[@name='driving_license'][1]" position="after">
-                <label for="ae_doc_driving_license_expiry" string="Expires on"/>
-                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
-                    <field name="ae_doc_driving_license_expiry"/>
-                </div>
-            </xpath>
-
             <xpath expr="//group[@name='hr_document_group']" position="inside">
 
+                <separator string="National ID card / driving license expiry" colspan="2"/>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <label for="ae_doc_id_expiry" string="National ID expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_id_expiry"/>
+                </div>
+                <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
+                    <label for="ae_doc_driving_license_expiry" string="Driving license expires on" class="flex-shrink-0"/>
+                    <field name="ae_doc_driving_license_expiry"/>
+                </div>
+
+                <separator string="Additional documents" colspan="2"/>
                 <label for="ae_doc_health_certificate"/>
                 <div class="o_wrap_label d-flex flex-row gap-3 align-items-baseline flex-wrap">
                     <field name="ae_doc_health_certificate" filename="ae_doc_health_certificate_filename"/>
