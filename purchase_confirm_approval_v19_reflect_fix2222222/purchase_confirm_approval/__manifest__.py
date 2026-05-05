@@ -1,6 +1,7 @@
 {
     'name': 'Purchase Confirm Dynamic Approval',
     'version': '19.0.1.0.1',
+    "by": "Anabtawi Group",
     'category': 'Purchase',
     'summary': 'Dynamic approval stages for Purchase Order confirmation',
     'depends': ['purchase', 'mail'],
