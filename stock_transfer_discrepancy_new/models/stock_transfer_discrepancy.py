@@ -1,5 +1,9 @@
+import logging
+
 from odoo import api, fields, models
 from odoo.tools.float_utils import float_compare
+
+_logger = logging.getLogger(__name__)
 
 
 class StockTransferDiscrepancy(models.Model):
@@ -104,6 +108,10 @@ class StockTransferDiscrepancy(models.Model):
         stock.location.has_open_discrepancy is still recomputed for reporting.
         """
         now = fields.Datetime.now()
+        _logger.info(
+            "[DISCREPANCY_CRON] _cron_expire_investigations started, server_now=%s",
+            now,
+        )
         recs = self.search(
             [
                 ("state", "=", "under_investigation"),
@@ -111,16 +119,84 @@ class StockTransferDiscrepancy(models.Model):
                 ("investigation_deadline", "<=", now),
             ]
         )
+        _logger.info(
+            "[DISCREPANCY_CRON] candidates (under_investigation, deadline passed): count=%s ids=%s",
+            len(recs),
+            recs.ids,
+        )
+        for r in recs:
+            _logger.info(
+                "[DISCREPANCY_CRON]   id=%s picking=%s driver_id=%s driver=%s deadline=%s "
+                "diff_qty=%s resolved_qty=%s state=%s",
+                r.id,
+                r.picking_id.display_name,
+                r.driver_id.id if r.driver_id else None,
+                r.driver_id.display_name if r.driver_id else None,
+                r.investigation_deadline,
+                r.difference_qty,
+                r.resolved_qty,
+                r.state,
+            )
+
         # Only escalate to OPEN if still not fully resolved.
-        to_open = recs.filtered(lambda r: (r.difference_qty or 0.0) > (r.resolved_qty or 0.0))
+        to_open = recs.filtered(
+            lambda r: float_compare(
+                (r.difference_qty or 0.0),
+                (r.resolved_qty or 0.0),
+                precision_rounding=r.product_id.uom_id.rounding,
+            )
+            > 0
+        )
+        skipped_resolved = recs - to_open
+        if skipped_resolved:
+            _logger.info(
+                "[DISCREPANCY_CRON] skipped (already fully resolved vs difference): ids=%s",
+                skipped_resolved.ids,
+            )
+
         if not to_open:
+            all_ui = self.search([("state", "=", "under_investigation")])
+            still_future = all_ui.filtered(
+                lambda r: r.investigation_deadline and r.investigation_deadline > now
+            )
+            no_deadline = all_ui.filtered(lambda r: not r.investigation_deadline)
+            _logger.warning(
+                "[DISCREPANCY_CRON] nothing to escalate to open. to_open=0. "
+                "all_under_investigation=%s still_future_deadline_ids=%s "
+                "missing_investigation_deadline_ids=%s",
+                len(all_ui),
+                still_future.ids,
+                no_deadline.ids,
+            )
             return
 
+        _logger.info(
+            "[DISCREPANCY_CRON] escalating to state=open: ids=%s",
+            to_open.ids,
+        )
         to_open.write({"state": "open"})
         to_open.mapped("truck_location_id")._compute_has_open_discrepancy()
         drivers = to_open.mapped("driver_id").filtered(lambda d: d)
+        missing_driver = to_open.filtered(lambda r: not r.driver_id)
+        if missing_driver:
+            _logger.warning(
+                "[DISCREPANCY_CRON] escalated rows have NO driver_id — is_blocked will NOT update "
+                "for any driver. discrepancy_ids=%s pickings=%s",
+                missing_driver.ids,
+                missing_driver.mapped("picking_id.name"),
+            )
+        _logger.info(
+            "[DISCREPANCY_CRON] drivers to recompute is_blocked: ids=%s names=%s",
+            drivers.ids,
+            drivers.mapped("display_name"),
+        )
         if drivers:
             drivers._compute_is_blocked()
+        else:
+            _logger.warning(
+                "[DISCREPANCY_CRON] no driver records on escalated discrepancies; "
+                "_compute_is_blocked not called",
+            )
 
     @api.model
     def apply_resolution(

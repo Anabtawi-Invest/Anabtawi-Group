@@ -1,4 +1,8 @@
+import logging
+
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class StockTransferDriver(models.Model):
@@ -45,11 +49,32 @@ class StockTransferDriver(models.Model):
             for rec in self:
                 rec.is_blocked = False
             return
+        for rec in self:
+            open_disc = self.env["stock.transfer.discrepancy"].search_count(
+                [("driver_id", "=", rec.id), ("state", "=", "open")]
+            )
+            _logger.info(
+                "[DRIVER_BLOCK] compute is_blocked driver_id=%s name=%s open_discrepancy_count=%s "
+                "discrepancy_states=%s",
+                rec.id,
+                rec.display_name,
+                open_disc,
+                rec.discrepancy_ids.mapped("state"),
+            )
         data = self.env["stock.transfer.discrepancy"]._read_group(
             [("driver_id", "in", self.ids), ("state", "=", "open")],
             ["driver_id"],
             ["__count"],
         )
+        _logger.info("[DRIVER_BLOCK] read_group (driver_id, count): %s", data)
         blocked_map = {drv.id: count for drv, count in data}
         for rec in self:
+            prev = rec.is_blocked
             rec.is_blocked = bool(blocked_map.get(rec.id))
+            _logger.info(
+                "[DRIVER_BLOCK] driver_id=%s is_blocked %s -> %s (read_group count=%s)",
+                rec.id,
+                prev,
+                rec.is_blocked,
+                blocked_map.get(rec.id, 0),
+            )
