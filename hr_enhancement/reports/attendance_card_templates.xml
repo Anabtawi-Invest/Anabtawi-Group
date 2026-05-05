@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_attendance_card">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div class="page mt-8" style="font-family: Helvetica, Arial, sans-serif;">
+                    <div style="margin-bottom: 12px;">
+                        <div style="overflow: hidden; margin-bottom: 8px;">
+                            <span style="display: inline-block; vertical-align: middle;">
+                                <img t-if="company.logo"
+                                     style="max-height: 54px;"
+                                     t-att-alt="company.name"
+                                     t-att-src="image_data_uri(company.logo)"/>
+                            </span>
+                            <span style="display: inline-block; vertical-align: middle; padding-left: 12px;">
+                                <strong style="font-size: 22px;"><span t-out="company.name"/></strong><br/>
+                                <span style="font-size: 13px;"><span t-out="employee.name"/></span>
+                            </span>
+                            <span style="float:right; text-align: right;">
+                                <strong style="font-size: 18px;"><t t-out="title"/></strong><br/>
+                                <span style="font-size: 12px;">
+                                    <span t-out="lbl_from"/><span>, </span>
+                                    <span t-out="period_from_fmt"/>
+                                    <span> </span><span t-out="lbl_to"/><span> </span>
+                                    <span t-out="period_to_fmt"/>
+                                </span>
+                            </span>
+                        </div>
+                        <hr style="border: none; border-top: 1px solid #ccc;"/>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;"
+                           cellpadding="4" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th style="border: 1px solid #000;"><t t-out="h_emp_no"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_emp_name"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_week_day"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_date_in"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_time_in"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_date_out"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_time_out"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_vacation"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_leave"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_attendance"/></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="report_lines" t-as="row">
+                                <td t-if="row_first" style="vertical-align:middle;text-align:center;border:1px solid #000;"
+                                    t-att-rowspan="rowspan">
+                                    <t t-out="employee.identification_id or employee.barcode or employee.id"/>
+                                </td>
+                                <td t-if="row_first" style="vertical-align:middle;text-align:center;border:1px solid #000;"
+                                    t-att-rowspan="rowspan">
+                                    <t t-out="employee.name"/>
+                                </td>
+                                <td style="vertical-align:middle;text-align:center;border:1px solid #000;">
+                                    <t t-out="row['weekday']"/>
+                                    <t t-if="row['weekday_note']"><br/><t t-out="row['weekday_note']"/></t>
+                                </td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['date_in']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['time_in']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['date_out']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['time_out']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['vacation']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['leave']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['attendance']"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
