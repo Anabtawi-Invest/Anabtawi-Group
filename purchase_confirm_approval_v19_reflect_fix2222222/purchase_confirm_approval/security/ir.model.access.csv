@@ -1,6 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_purchase_confirm_approval_rule_manager,purchase.confirm.approval.rule manager,model_purchase_confirm_approval_rule,group_purchase_confirm_approval_manager,1,1,1,1
-access_purchase_confirm_approval_rule_line_manager,purchase.confirm.approval.rule.line manager,model_purchase_confirm_approval_rule_line,group_purchase_confirm_approval_manager,1,1,1,1
-access_purchase_confirm_approval_rule_user_read,purchase.confirm.approval.rule user read,model_purchase_confirm_approval_rule,purchase.group_purchase_user,1,0,0,0
-access_purchase_confirm_approval_rule_line_user_read,purchase.confirm.approval.rule.line user read,model_purchase_confirm_approval_rule_line,purchase.group_purchase_user,1,0,0,0
-access_purchase_confirm_approval_user,purchase.confirm.approval user,model_purchase_confirm_approval,purchase.group_purchase_user,1,1,1,0
