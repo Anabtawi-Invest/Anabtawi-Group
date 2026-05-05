@@ -155,19 +155,38 @@ class StockTransferDiscrepancy(models.Model):
             )
 
         if not to_open:
-            all_ui = self.search([("state", "=", "under_investigation")])
-            still_future = all_ui.filtered(
-                lambda r: r.investigation_deadline and r.investigation_deadline > now
-            )
-            no_deadline = all_ui.filtered(lambda r: not r.investigation_deadline)
-            _logger.warning(
-                "[DISCREPANCY_CRON] nothing to escalate to open. to_open=0. "
-                "all_under_investigation=%s still_future_deadline_ids=%s "
-                "missing_investigation_deadline_ids=%s",
-                len(all_ui),
-                still_future.ids,
-                no_deadline.ids,
-            )
+            if not recs:
+                all_ui = self.search([("state", "=", "under_investigation")])
+                still_future = all_ui.filtered(
+                    lambda r: r.investigation_deadline and r.investigation_deadline > now
+                )
+                no_deadline = all_ui.filtered(lambda r: not r.investigation_deadline)
+                for r in still_future:
+                    _logger.warning(
+                        "[DISCREPANCY_CRON] NOT escalating id=%s: investigation_deadline=%s is AFTER "
+                        "server_now=%s (wait until deadline in UTC, or shorten deadline for testing). "
+                        "picking=%s driver_id=%s",
+                        r.id,
+                        r.investigation_deadline,
+                        now,
+                        r.picking_id.display_name,
+                        r.driver_id.id if r.driver_id else None,
+                    )
+                _logger.warning(
+                    "[DISCREPANCY_CRON] nothing to escalate: no under_investigation row has "
+                    "investigation_deadline <= server_now. counts: all_under_investigation=%s "
+                    "still_future_deadline=%s missing_deadline=%s server_now=%s",
+                    len(all_ui),
+                    len(still_future),
+                    len(no_deadline),
+                    now,
+                )
+            else:
+                _logger.info(
+                    "[DISCREPANCY_CRON] deadline passed for ids=%s but none escalated: "
+                    "all already fully resolved (difference_qty <= resolved_qty)",
+                    recs.ids,
+                )
             return
 
         _logger.info(
