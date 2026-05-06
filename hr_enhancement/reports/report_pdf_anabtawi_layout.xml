@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Reusable Anabtawi PDF chrome: call from any qweb-pdf report in this module. -->
+    <template id="ae_pdf_header">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+            <div style="text-align: left; flex: 1; padding-right: 12px;">
+                <div style="font-size: 22px; font-weight: bold;">
+                    <t t-out="ae_report_title"/>
+                </div>
+                <div t-if="ae_report_subtitle" style="font-size: 13px; margin-top: 4px;">
+                    <t t-out="ae_report_subtitle"/>
+                </div>
+                <div t-if="ae_report_header_note" style="font-size: 11px; margin-top: 6px;">
+                    <t t-out="ae_report_header_note"/>
+                </div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+                <img t-if="company and company.logo"
+                     t-att-src="image_data_uri(company.logo)"
+                     style="max-height: 54px;"
+                     t-att-alt="company.name"/>
+            </div>
+        </div>
+        <hr style="border: none; border-top: 1px solid #ccc; margin: 0 0 12px 0;"/>
+    </template>
+
+    <template id="ae_pdf_footer">
+        <div class="o_ae_pdf_footer"
+             style="position: fixed; bottom: 3mm; left: 0; right: 0; padding: 0 6mm; font-size: 9px; color: #222; font-family: Helvetica, Arial, sans-serif;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 62%; text-align: left; vertical-align: top; white-space: nowrap;">
+                        <span>Printed by </span>
+                        <t t-out="ae_print_id"/><span>|</span><t t-out="ae_print_name"/>
+                        <span> </span>
+                        <t t-out="ae_print_date"/>
+                        <span> </span>
+                        <t t-out="ae_print_time"/>
+                    </td>
+                    <td style="width: 38%; text-align: right; vertical-align: top;">
+                        <t t-if="report_type == 'pdf'">
+                            <span>Page </span><span class="page"/><span> of </span><span class="topage"/>
+                        </t>
+                        <t t-else="">
+                            <span>Page —</span>
+                        </t>
+                    </td>
+                </tr>
+            </table>
+            <div style="text-align: center; margin-top: 4px;">
+                <t t-out="ae_licensed_line"/>
+            </div>
+        </div>
+    </template>
+</odoo>

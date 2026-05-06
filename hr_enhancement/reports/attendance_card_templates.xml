@@ -3,32 +3,9 @@
     <template id="report_attendance_card">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
-                <div class="page mt-8" style="font-family: Helvetica, Arial, sans-serif;">
-                    <div style="margin-bottom: 12px;">
-                        <div style="overflow: hidden; margin-bottom: 8px;">
-                            <span style="display: inline-block; vertical-align: middle;">
-                                <img t-if="company.logo"
-                                     style="max-height: 54px;"
-                                     t-att-alt="company.name"
-                                     t-att-src="image_data_uri(company.logo)"/>
-                            </span>
-                            <span style="display: inline-block; vertical-align: middle; padding-left: 12px;">
-                                <strong style="font-size: 22px;"><span t-out="company.name"/></strong><br/>
-                                <span style="font-size: 13px;"><span t-out="employee.name"/></span>
-                            </span>
-                            <span style="float:right; text-align: right;">
-                                <strong style="font-size: 18px;"><t t-out="title"/></strong><br/>
-                                <span style="font-size: 12px;">
-                                    <span t-out="lbl_from"/><span>, </span>
-                                    <span t-out="period_from_fmt"/>
-                                    <span> </span><span t-out="lbl_to"/><span> </span>
-                                    <span t-out="period_to_fmt"/>
-                                </span>
-                            </span>
-                        </div>
-                        <hr style="border: none; border-top: 1px solid #ccc;"/>
-                    </div>
-
+                <div class="page o_ae_attendance_card"
+                     style="font-family: Helvetica, Arial, sans-serif; position: relative; padding-bottom: 20mm;">
+                    <t t-call="hr_enhancement.ae_pdf_header"/>
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px;"
                            cellpadding="4" cellspacing="0">
                         <thead>
@@ -69,6 +46,7 @@
                             </tr>
                         </tbody>
                     </table>
+                    <t t-call="hr_enhancement.ae_pdf_footer"/>
                 </div>
             </t>
         </t>

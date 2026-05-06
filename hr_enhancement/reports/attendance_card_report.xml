@@ -8,7 +8,7 @@
         <field name="page_width">0</field>
         <field name="orientation">Landscape</field>
         <field name="margin_top">8</field>
-        <field name="margin_bottom">8</field>
+        <field name="margin_bottom">18</field>
         <field name="margin_left">6</field>
         <field name="margin_right">6</field>
         <field name="header_line" eval="False"/>

@@ -166,10 +166,39 @@ class HrEnhancementAttendanceCardWizard(models.TransientModel):
 
         return lines
 
+    def _pdf_header_note(self):
+        """Optional second line under the title (e.g. contract labels). Empty by default."""
+        self.ensure_one()
+        return ''
+
 
 class ReportHrEnhancementAttendanceCard(models.AbstractModel):
     _name = 'report.hr_enhancement.report_attendance_card'
     _description = 'Attendance Card PDF Report'
+
+    @api.model
+    def _standard_anabtawi_banner_values(self):
+        """Shared footer (and helpers) for all qweb-pdf reports using ae_pdf_* templates."""
+        user = self.env.user
+        emp = user.employee_id
+        raw_id = ''
+        if emp:
+            raw_id = (emp.identification_id or emp.barcode or '').strip()
+        if not raw_id:
+            raw_id = str(user.id)
+        if raw_id.isdigit():
+            disp_id = raw_id.zfill(6)
+        else:
+            disp_id = raw_id
+        now_utc = fields.Datetime.now()
+        now_local = fields.Datetime.context_timestamp(user, now_utc)
+        return {
+            'ae_print_id': disp_id,
+            'ae_print_name': (user.name or '').upper(),
+            'ae_print_date': now_local.strftime('%d/%m/%Y'),
+            'ae_print_time': now_local.strftime('%H:%M:%S'),
+            'ae_licensed_line': _('Licensed To: Anabtawi Sweets'),
+        }
 
     @api.model
     def _get_report_values(self, docids, data=None):
@@ -179,7 +208,13 @@ class ReportHrEnhancementAttendanceCard(models.AbstractModel):
             return {}
         company = wiz.employee_id.company_id or self.env.company
         lines = wiz._get_report_lines()
-        return {
+        period_from_fmt = wiz.date_from.strftime('%d/%m/%Y')
+        period_to_fmt = wiz.date_to.strftime('%d/%m/%Y')
+        subtitle = _('From %(df)s To %(dt)s') % {'df': period_from_fmt, 'dt': period_to_fmt}
+        banner = dict(self._standard_anabtawi_banner_values())
+        merged = dict(data or {})
+        ret = {
+            **merged,
             'doc_ids': docids,
             'doc_model': 'hr.enhancement.attendance.card.wizard',
             'docs': wizard,
@@ -187,8 +222,8 @@ class ReportHrEnhancementAttendanceCard(models.AbstractModel):
             'employee': wiz.employee_id,
             'period_from': wiz.date_from,
             'period_to': wiz.date_to,
-            'period_from_fmt': wiz.date_from.strftime('%d/%m/%Y'),
-            'period_to_fmt': wiz.date_to.strftime('%d/%m/%Y'),
+            'period_from_fmt': period_from_fmt,
+            'period_to_fmt': period_to_fmt,
             'report_lines': lines,
             'rowspan': len(lines) or 1,
             'image_data_uri': image_data_uri,
@@ -205,4 +240,9 @@ class ReportHrEnhancementAttendanceCard(models.AbstractModel):
             'h_vacation': _('Vacation'),
             'h_leave': _('Leave'),
             'h_attendance': _('Attendance'),
+            'ae_report_title': _('Attendance Cards'),
+            'ae_report_subtitle': subtitle,
+            'ae_report_header_note': wiz._pdf_header_note(),
         }
+        ret.update(banner)
+        return ret
