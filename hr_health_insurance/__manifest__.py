@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'SW - Health Insurance',
-    'version': '1.1',
+    'version': '1.2',
     'category': 'Human Resources',
     'summary': 'Employee health insurance management.',
     'description': """
@@ -19,7 +19,7 @@
       """,
     'author': 'Smart Way Business Solutions',
     'website': 'https://www.smartway.co',
-    'depends': ['base', 'hr_payroll_account', 'hr', 'mail', 'base_payroll_account'],
+    'depends': ['base', 'hr_payroll_account', 'hr', 'hr_holidays', 'mail', 'base_payroll_account'],
     'license': "Other proprietary",
     'data': [
         "security/ir.model.access.csv",
@@ -30,4 +30,10 @@
         "view/hr_health_contract_view.xml",
         "view/res_config.xml"
     ],
+    'assets': {
+        'web.assets_backend': [
+            'hr_health_insurance/static/src/dashboard/time_off_card_patch.js',
+            'hr_health_insurance/static/src/dashboard/time_off_card_patch.xml',
+        ],
+    },
 }
