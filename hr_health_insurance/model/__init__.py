@@ -7,3 +7,4 @@ from . import hr_health_contract
 from . import hr_employee
 from . import payroll_structure
 from . import payslip
+from . import hr_leave_type

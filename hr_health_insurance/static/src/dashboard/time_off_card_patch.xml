@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="hr_holidays.TimeOffCard" t-inherit-mode="extension">
+        <xpath expr="//span[hasclass('o_timeoff_duration')]/following-sibling::span[1]" position="after">
+            <span
+                t-if="data.request_unit == 'hour' and data.hours_per_day"
+                class="text-uppercase small text-muted o_timeoff_equivalent_days d-block mt-1">
+                <span t-att-style="data.holds_changes ? 'color: #B6D369;' : ''" t-esc="getEquivalentDaysDisplay()"/>
+                days
+                <t t-if="props.requires_allocation"> available</t>
+                <t t-else=""> taken</t>
+            </span>
+        </xpath>
+    </t>
+    <t t-inherit="hr_holidays.TimeOffCardMobile" t-inherit-mode="extension">
+        <xpath expr="//span[hasclass('o_timeoff_card_mobile')]" position="after">
+            <div
+                t-if="data.request_unit == 'hour' and data.hours_per_day"
+                class="text-muted small mt-1 w-100 text-end o_timeoff_equivalent_days_mobile">
+                <span t-esc="getEquivalentDaysDisplay()"/> days
+                <t t-if="props.requires_allocation"> available</t>
+                <t t-else=""> taken</t>
+            </div>
+        </xpath>
+    </t>
+</templates>
