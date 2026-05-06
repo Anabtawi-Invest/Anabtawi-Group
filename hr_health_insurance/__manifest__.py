@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'SW - Health Insurance',
-    'version': '1.2',
+    'version': '1.3',
     'category': 'Human Resources',
     'summary': 'Employee health insurance management.',
     'description': """
@@ -30,10 +30,4 @@
         "view/hr_health_contract_view.xml",
         "view/res_config.xml"
     ],
-    'assets': {
-        'web.assets_backend': [
-            'hr_health_insurance/static/src/dashboard/time_off_card_patch.js',
-            'hr_health_insurance/static/src/dashboard/time_off_card_patch.xml',
-        ],
-    },
 }
