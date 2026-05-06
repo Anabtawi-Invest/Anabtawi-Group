@@ -167,11 +167,9 @@ class HrEnhancementAttendanceCardWizard(models.TransientModel):
         return lines
 
     def _pdf_header_note(self):
-        """Second line under the title on the PDF (contract / employment categories)."""
+        """Extra header line when not using the standard contract legend (see QWeb/XML)."""
         self.ensure_one()
-        return _(
-            "مياومة، عقد غير محدد المدة، عقد وزارة العمل، متدرب، عقد محدد المدة"
-        )
+        return ''
 
 
 class ReportHrEnhancementAttendanceCard(models.AbstractModel):
@@ -244,6 +242,7 @@ class ReportHrEnhancementAttendanceCard(models.AbstractModel):
             'h_attendance': _('Attendance'),
             'ae_report_title': _('Attendance Cards'),
             'ae_report_subtitle': subtitle,
+            'ae_show_contract_type_legend': True,
             'ae_report_header_note': wiz._pdf_header_note(),
         }
         ret.update(banner)

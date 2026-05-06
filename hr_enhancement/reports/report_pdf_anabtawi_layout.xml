@@ -10,7 +10,14 @@
                 <div t-if="ae_report_subtitle" style="font-size: 13px; margin-top: 4px;">
                     <t t-out="ae_report_subtitle"/>
                 </div>
-                <div t-if="ae_report_header_note" style="font-size: 11px; margin-top: 6px;">
+                <!-- Arabic legend: keep literals in UTF-8 XML so PDF/wkhtml does not mangle encoding from gettext. -->
+                <div t-if="ae_show_contract_type_legend"
+                     dir="rtl"
+                     lang="ar"
+                     style="font-size: 11px; margin-top: 6px; text-align: right; font-family: 'DejaVu Sans', Tahoma, Arial, sans-serif;">
+                    مياومة، عقد غير محدد المدة، عقد وزارة العمل، متدرب، عقد محدد المدة
+                </div>
+                <div t-elif="ae_report_header_note" style="font-size: 11px; margin-top: 6px;">
                     <t t-out="ae_report_header_note"/>
                 </div>
             </div>

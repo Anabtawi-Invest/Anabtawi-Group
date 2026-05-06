@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "HR Enhancement",
-    "version": "19.0.1.2.6",
+    "version": "19.0.1.2.7",
     "category": "Human Resources",
     "summary": "Time off, attendance card PDF, regulated employee documents",
     "depends": ["hr_holidays", "hr_attendance", "mail"],
