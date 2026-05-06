@@ -46,8 +46,9 @@ class StockTransferDiscrepancyWizard(models.TransientModel):
     def action_confirm(self):
         self.ensure_one()
 
-        now = fields.Datetime.now()  # This is the picking validation time
-        deadline = now + relativedelta(hours=48)
+        now = fields.Datetime.now()  # Picking validation time
+        # Grace before cron moves discrepancy to "open" (driver block). 1 minute for staging/QA; use hours=48 in production.
+        deadline = now + relativedelta(minutes=1)
 
         discrepancies = []
         for line in self.line_ids:

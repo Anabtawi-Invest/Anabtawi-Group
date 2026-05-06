@@ -75,7 +75,7 @@ class StockTransferDiscrepancy(models.Model):
         index=True,
     )
 
-    # Set at picking validation time (wizard confirm) and used for 48-hour grace window.
+    # Set at picking validation time (wizard confirm); length of grace window is set in the wizard (e.g. 1 min for tests, 48h prod).
     validated_at = fields.Datetime(string="Validated At", index=True)
     investigation_deadline = fields.Datetime(string="Investigation Deadline", index=True)
 
