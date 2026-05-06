@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import base64
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 
@@ -8,10 +9,9 @@ from babel.dates import format_date as babel_format_date
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.fields import Datetime as DatetimeFN
+from odoo.tools import file_path
 from odoo.tools.float_utils import float_round
 from odoo.tools.image import image_data_uri
-
-from markupsafe import Markup
 
 try:
     from babel.core import Locale, UnknownLocaleError
@@ -19,13 +19,22 @@ except ImportError:  # pragma: no cover
     Locale = None
     UnknownLocaleError = Exception
 
-# ASCII-only Python source → HTML numeric char refs survive broken UTF-8 edges in PDF HTML.
-_ARABIC_CONTRACT_LEGEND_CHARS = (
-    "\u0645\u064a\u0627\u0648\u0645\u0629\u060c \u0639\u0642\u062f \u063a\u064a\u0631 "
-    "\u0645\u062d\u062f\u062f \u0627\u0644\u0645\u062f\u0629\u060c \u0639\u0642\u062f "
-    "\u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u0639\u0645\u0644\u060c \u0645\u062a\u062f\u0631\u0628\u060c "
-    "\u0639\u0642\u062f \u0645\u062d\u062f\u062f \u0627\u0644\u0645\u062f\u0629"
-)
+
+def _arabic_contract_legend_png_data_uri():
+    """PNG data URI: Arabic as pixels avoids wkhtml/Qt mangling UTF-8/HTML for this line."""
+    try:
+        path = file_path(
+            'hr_enhancement/static/src/img/ae_pdf_contract_type_legend.png',
+            filter_ext=('.png',),
+        )
+    except (FileNotFoundError, ValueError):
+        return ''
+    try:
+        with open(path, 'rb') as fh:
+            raw = fh.read()
+    except OSError:
+        return ''
+    return 'data:image/png;base64,' + base64.b64encode(raw).decode('ascii')
 
 
 class HrEnhancementAttendanceCardWizard(models.TransientModel):
@@ -209,13 +218,8 @@ class ReportHrEnhancementAttendanceCard(models.AbstractModel):
             'ae_print_time': now_local.strftime('%H:%M:%S'),
             'ae_licensed_line': _('Licensed To: Anabtawi Sweets'),
             'ae_show_contract_type_legend': False,
-            'ae_contract_legend_markup': Markup(),
+            'ae_contract_legend_src': '',
         }
-
-    @api.model
-    def _ae_contract_legend_markup(self):
-        refs = ''.join(f'&#x{ord(ch):04x};' for ch in _ARABIC_CONTRACT_LEGEND_CHARS)
-        return Markup(refs)
 
     @api.model
     def _get_report_values(self, docids, data=None):
@@ -263,5 +267,5 @@ class ReportHrEnhancementAttendanceCard(models.AbstractModel):
         }
         ret.update(banner)
         ret['ae_show_contract_type_legend'] = True
-        ret['ae_contract_legend_markup'] = self._ae_contract_legend_markup()
+        ret['ae_contract_legend_src'] = _arabic_contract_legend_png_data_uri()
         return ret

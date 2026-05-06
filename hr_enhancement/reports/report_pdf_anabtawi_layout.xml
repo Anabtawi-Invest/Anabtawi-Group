@@ -10,12 +10,14 @@
                 <div t-if="ae_report_subtitle" style="font-size: 13px; margin-top: 4px;">
                     <t t-out="ae_report_subtitle"/>
                 </div>
-                <!-- Arabic via HTML numeric refs (Markup) avoids broken UTF-8 in wkhtmltopdf/HTML pipeline -->
-                <div t-if="ae_show_contract_type_legend and ae_contract_legend_markup"
+                <!-- Arabic contract legend: raster image (PNG+data URI) — wkhtmltopdf often mangles Arabic text in HTML -->
+                <div t-if="ae_show_contract_type_legend and ae_contract_legend_src"
                      dir="rtl"
                      lang="ar"
-                     style="font-size: 11px; margin-top: 6px; text-align: right; font-family: 'DejaVu Sans', Tahoma, Arial, sans-serif;">
-                    <t t-out="ae_contract_legend_markup"/>
+                     style="margin-top: 8px; text-align: right;">
+                    <img t-att-src="ae_contract_legend_src"
+                         alt=""
+                         style="display: inline-block; height: 22px; width: auto; max-width: 100%;"/>
                 </div>
                 <div t-elif="ae_report_header_note" style="font-size: 11px; margin-top: 6px;">
                     <t t-out="ae_report_header_note"/>
