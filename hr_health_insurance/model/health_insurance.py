@@ -79,7 +79,7 @@ class HealthInsurance(models.Model):
             self.name = self.employee_id.name
             self.birthdate = self.employee_id.birthday
             self.gender = self.employee_id.sex
-            self.employee_contribution = 69.35  # ← هون أضفنا القيمة
+            self.employee_contribution = 69.18  # ← هون أضفنا القيمة
         else:
             self.name = False
             self.birthdate = False
@@ -102,7 +102,7 @@ class HealthInsurance(models.Model):
                 rec.birthdate = rec.employee_id.birthday
                 rec.gender = rec.employee_id.sex
                 rec.marital_status_info = rec.employee_id.marital
-                rec.employee_contribution = 69.35
+                rec.employee_contribution = 69.18
 
                 grade = self.env['hr.health.grade'].search([], order='id', limit=1)
 
