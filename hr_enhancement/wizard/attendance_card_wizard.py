@@ -167,9 +167,11 @@ class HrEnhancementAttendanceCardWizard(models.TransientModel):
         return lines
 
     def _pdf_header_note(self):
-        """Optional second line under the title (e.g. contract labels). Empty by default."""
+        """Second line under the title on the PDF (contract / employment categories)."""
         self.ensure_one()
-        return ''
+        return _(
+            "مياومة، عقد غير محدد المدة، عقد وزارة العمل، متدرب، عقد محدد المدة"
+        )
 
 
 class ReportHrEnhancementAttendanceCard(models.AbstractModel):
