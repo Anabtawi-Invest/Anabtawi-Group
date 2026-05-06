@@ -11,11 +11,21 @@ from odoo.fields import Datetime as DatetimeFN
 from odoo.tools.float_utils import float_round
 from odoo.tools.image import image_data_uri
 
+from markupsafe import Markup
+
 try:
     from babel.core import Locale, UnknownLocaleError
 except ImportError:  # pragma: no cover
     Locale = None
     UnknownLocaleError = Exception
+
+# ASCII-only Python source → HTML numeric char refs survive broken UTF-8 edges in PDF HTML.
+_ARABIC_CONTRACT_LEGEND_CHARS = (
+    "\u0645\u064a\u0627\u0648\u0645\u0629\u060c \u0639\u0642\u062f \u063a\u064a\u0631 "
+    "\u0645\u062d\u062f\u062f \u0627\u0644\u0645\u062f\u0629\u060c \u0639\u0642\u062f "
+    "\u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u0639\u0645\u0644\u060c \u0645\u062a\u062f\u0631\u0628\u060c "
+    "\u0639\u0642\u062f \u0645\u062d\u062f\u062f \u0627\u0644\u0645\u062f\u0629"
+)
 
 
 class HrEnhancementAttendanceCardWizard(models.TransientModel):
@@ -198,7 +208,14 @@ class ReportHrEnhancementAttendanceCard(models.AbstractModel):
             'ae_print_date': now_local.strftime('%d/%m/%Y'),
             'ae_print_time': now_local.strftime('%H:%M:%S'),
             'ae_licensed_line': _('Licensed To: Anabtawi Sweets'),
+            'ae_show_contract_type_legend': False,
+            'ae_contract_legend_markup': Markup(),
         }
+
+    @api.model
+    def _ae_contract_legend_markup(self):
+        refs = ''.join(f'&#x{ord(ch):04x};' for ch in _ARABIC_CONTRACT_LEGEND_CHARS)
+        return Markup(refs)
 
     @api.model
     def _get_report_values(self, docids, data=None):
@@ -242,8 +259,9 @@ class ReportHrEnhancementAttendanceCard(models.AbstractModel):
             'h_attendance': _('Attendance'),
             'ae_report_title': _('Attendance Cards'),
             'ae_report_subtitle': subtitle,
-            'ae_show_contract_type_legend': True,
             'ae_report_header_note': wiz._pdf_header_note(),
         }
         ret.update(banner)
+        ret['ae_show_contract_type_legend'] = True
+        ret['ae_contract_legend_markup'] = self._ae_contract_legend_markup()
         return ret
