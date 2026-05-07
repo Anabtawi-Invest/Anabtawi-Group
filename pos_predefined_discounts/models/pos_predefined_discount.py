@@ -88,7 +88,15 @@ class PosPredefinedDiscount(models.Model):
             }
 
         def _compact_diag(rec):
-            d = hr_employee_model._pos_employee_password_auth_diag(rec.id, password) if rec else {}
+            if not rec:
+                return {}
+            diag = getattr(hr_employee_model, "_pos_employee_password_auth_diag", None)
+            if not diag:
+                return {
+                    "code": "employee_request_upgrade_required",
+                    "hint": "Deploy/upgrade employee_request with _pos_employee_password_auth_diag or rely on POS employee password check logs.",
+                }
+            d = diag(rec.id, password) or {}
             return {k: v for k, v in d.items() if k != "ok"}
 
         manager_pw_diag = _compact_diag(manager_employee)
