@@ -1,7 +1,12 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import logging
+
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
+
 
 class PosPredefinedDiscount(models.Model):
     _name = "pos.predefined.discount"
@@ -68,11 +73,36 @@ class PosPredefinedDiscount(models.Model):
             )
 
         if manager_valid or employee_valid:
+            _logger.debug(
+                "POS predefined discount auth OK: discount_id=%s manager_valid=%s employee_valid=%s",
+                discount.id,
+                manager_valid,
+                employee_valid,
+            )
             return {
                 "authorized": True,
                 "manager_override": manager_valid,
                 "employee_authorized": employee_valid,
             }
+
+        _logger.warning(
+            "POS predefined discount auth FAILED: discount_id=%s pos_config=%s "
+            "manager_user=%s (%s) manager_employee=%s (%s) "
+            "is_employee_discount=%s selected_employee_id=%s pw_len=%s pw_isdigit=%s "
+            "manager_valid=%s employee_valid=%s (details: preceding POS employee password check logs)",
+            discount.id,
+            discount.pos_config_id.id,
+            manager_user.id if manager_user else None,
+            manager_user.login if manager_user else None,
+            manager_employee.id if manager_employee else None,
+            manager_employee.name if manager_employee else None,
+            discount.is_employee_discount,
+            employee_id or None,
+            len(password),
+            password.isdigit(),
+            manager_valid,
+            employee_valid,
+        )
 
         if discount.is_employee_discount:
             raise UserError(
