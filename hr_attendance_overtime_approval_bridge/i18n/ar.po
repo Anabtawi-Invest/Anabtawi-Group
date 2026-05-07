@@ -1,0 +1,219 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+#	* hr_attendance_overtime_approval_bridge
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5);\n"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_detail
+msgid "Authorization status"
+msgstr "حالة الاعتماد"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "Approval type"
+msgstr "نوع الموافقة"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_list
+msgid "Approved overtime requests unlock one overtime attendance session only."
+msgstr "طلبات العمل الإضافي المعتمدة تفتح جلسة حضور إضافية واحدة فقط."
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_no_employee
+msgid "Back to My Account"
+msgstr "العودة إلى حسابي"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_detail
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "Back to list"
+msgstr "العودة للقائمة"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "Choose…"
+msgstr "اختر…"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_detail
+msgid "Date"
+msgstr "التاريخ"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_detail
+msgid "Duration"
+msgstr "المدة"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_detail
+msgid "Extra hours lines"
+msgstr "بنود الساعات الإضافية"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "From"
+msgstr "من"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "Matched overtime (hours)"
+msgstr "العمل الإضافي المطابق (ساعات)"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_list
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "My account"
+msgstr "حسابي"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "New overtime approval"
+msgstr "طلب موافقة عمل إضافي جديد"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_list
+msgid "New request"
+msgstr "طلب جديد"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "No overtime approval type is configured. Ask your administrator to enable an approval category as \"Overtime Category\"."
+msgstr "لم يُضبط أي نوع موافقة على العمل الإضافي. اطلب من المسؤول تفعيل فئة موافقات كـ «فئة العمل الإضافي»."
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_list
+msgid "Overtime approval"
+msgstr "موافقة العمل الإضافي"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_list
+msgid "Overtime approvals"
+msgstr "موافقات العمل الإضافي"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_list
+msgid "Period"
+msgstr "الفترة"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "Requested overtime hours"
+msgstr "ساعات العمل الإضافي المطلوبة"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_list
+msgid "Requested hours"
+msgstr "الساعات المطلوبة"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "Save draft"
+msgstr "حفظ كمسودة"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_detail
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_list
+msgid "Status"
+msgstr "الحالة"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "Subject (optional)"
+msgstr "الموضوع (اختياري)"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_list
+msgid "Subject"
+msgstr "الموضوع"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_detail
+msgid "Submit to manager"
+msgstr "إرسال إلى المدير"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_detail
+msgid "Type"
+msgstr "النوع"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "To"
+msgstr "إلى"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "Once approved by your manager, this request unlocks one overtime check-in session. The requested hours become the maximum allowed duration for that overtime session."
+msgstr "بعد موافقة المدير، يفتح هذا الطلب جلسة تسجيل حضور إضافية واحدة. تصبح الساعات المطلوبة هي أقصى مدة مسموحة لتلك الجلسة."
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_new
+msgid "e.g. Overtime for project rollout"
+msgstr "مثال: عمل إضافي لإطلاق المشروع"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_list
+msgid "You have no overtime approval requests yet."
+msgstr "لا توجد لديك طلبات موافقة على العمل الإضافي بعد."
+
+#. module: hr_attendance_overtime_approval_bridge
+#. odoo-python
+#: code:addons/hr_attendance_overtime_approval_bridge/controllers/portal_overtime.py:0
+msgid "Invalid dates."
+msgstr "تواريخ غير صالحة."
+
+#. module: hr_attendance_overtime_approval_bridge
+#. odoo-python
+#: code:addons/hr_attendance_overtime_approval_bridge/controllers/portal_overtime.py:0
+msgid "No employee is linked to your user account."
+msgstr "لا يوجد موظف مرتبط بحساب المستخدم."
+
+#. module: hr_attendance_overtime_approval_bridge
+#. odoo-python
+#: code:addons/hr_attendance_overtime_approval_bridge/controllers/portal_overtime.py:0
+msgid "Overtime approval — %(employee)s"
+msgstr "موافقة عمل إضافي — %(employee)s"
+
+#. module: hr_attendance_overtime_approval_bridge
+#. odoo-python
+#: code:addons/hr_attendance_overtime_approval_bridge/controllers/portal_overtime.py:0
+msgid "Please choose a valid overtime approval type."
+msgstr "يرجى اختيار نوع موافقة صالح على العمل الإضافي."
+
+#. module: hr_attendance_overtime_approval_bridge
+#. odoo-python
+#: code:addons/hr_attendance_overtime_approval_bridge/controllers/portal_overtime.py:0
+msgid "Requested hours must be greater than zero."
+msgstr "يجب أن تكون الساعات المطلوبة أكبر من صفر."
+
+#. module: hr_attendance_overtime_approval_bridge
+#. odoo-python
+#: code:addons/hr_attendance_overtime_approval_bridge/controllers/portal_overtime.py:0
+msgid "This approval type is not available for your company."
+msgstr "نوع الموافقة هذا غير متاح لشركتك."
+
+#. module: hr_attendance_overtime_approval_bridge
+#. odoo-python
+#: code:addons/hr_attendance_overtime_approval_bridge/controllers/portal_overtime.py:0
+msgid "This request can no longer be submitted from the portal."
+msgstr "لم يعد بإمكان إرسال هذا الطلب من البورتال."
+
+#. module: hr_attendance_overtime_approval_bridge
+#. odoo-python
+#: code:addons/hr_attendance_overtime_approval_bridge/controllers/portal_overtime.py:0
+msgid "Your request was saved. Submit it when you are ready."
+msgstr "تم حفظ طلبك. أرسله عندما تكون جاهزاً."
+
+#. module: hr_attendance_overtime_approval_bridge
+#. odoo-python
+#: code:addons/hr_attendance_overtime_approval_bridge/controllers/portal_overtime.py:0
+msgid "Your request was sent to your attendance manager for approval."
+msgstr "أُرسل طلبك إلى مسؤول الحضور للاعتماد."

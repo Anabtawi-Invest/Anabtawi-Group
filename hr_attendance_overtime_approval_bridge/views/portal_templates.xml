@@ -83,11 +83,10 @@
                 <span t-out="error_message"/>
             </div>
             <div t-if="not categories" class="alert alert-warning" role="alert">
-                No overtime approval type is configured. Ask your administrator to enable an approval category as “Overtime Category”.
+                No overtime approval type is configured. Ask your administrator to enable an approval category as "Overtime Category".
             </div>
             <div t-if="categories" class="alert alert-info" role="status">
-                Once approved by your manager, this request unlocks one overtime check-in session.
-                The requested hours become the maximum allowed duration for that overtime session.
+                Once approved by your manager, this request unlocks one overtime check-in session. The requested hours become the maximum allowed duration for that overtime session.
             </div>
             <form t-if="categories" action="/my/overtime_approvals/new" method="post" class="o_portal_wrap">
                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>

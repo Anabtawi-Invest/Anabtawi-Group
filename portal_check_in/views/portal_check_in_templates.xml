@@ -105,38 +105,39 @@
                 }
             </style>
             <div class="container">
+                <input type="hidden" id="o_portal_location_permission_msg" t-att-value="location_permission_required"/>
                 <div class="row justify-content-center">
                     <div class="col-12 col-lg-6">
                         <div class="card pc-check-card">
                             <div class="card-body p-4">
-                                <div class="text-muted">Hello</div>
+                                <div class="text-muted" t-esc="txt_hello"/>
                                 <div class="pc-check-head mb-2">
                                     <t t-esc="employee.name if employee else request.env.user.name"/>
                                 </div>
                                 <div class="mb-3 text-end">
                                     <a href="/my/overtime_approvals" class="btn btn-outline-primary btn-sm">
-                                        Overtime Approvals
+                                        <t t-esc="txt_overtime_approvals_btn"/>
                                     </a>
                                 </div>
                                 <div t-if="show_success" class="alert alert-success py-2" role="alert">
-                                    Attendance updated successfully.
+                                    <t t-esc="txt_attendance_updated"/>
                                 </div>
                                 <div t-if="show_no_employee or not employee" class="alert alert-warning py-2" role="alert">
-                                    Your user is not linked to an employee profile.
+                                    <t t-esc="txt_no_employee"/>
                                 </div>
                                 <div t-if="show_location_restricted" class="alert alert-danger py-2 o_portal_location_restricted_alert" role="alert">
-                                    <t t-esc="location_restricted_message or 'لا يمكنك تسجيل الحضور من هذا الموقع.'"/>
+                                    <t t-esc="location_restricted_message or txt_location_default"/>
                                 </div>
                                 <div t-if="employee and weekly_gate_reached and state != 'checked_in' and not available_overtime_authorization" class="alert alert-warning py-2" role="alert">
-                                    You reached the weekly worked hours threshold
+                                    <span><t t-esc="txt_weekly_threshold"/> </span>
                                     (<t t-esc="'%0.2f' % (weekly_worked_hours or 0.0)"/> /
                                     <t t-esc="'%0.2f' % (required_weekly_hours or 0.0)"/>).
-                                    Check-in is locked until one overtime request is approved.
+                                    <span> <t t-esc="txt_checkin_locked_ot"/></span>
                                 </div>
                                 <div t-if="employee and weekly_gate_reached and state != 'checked_in' and available_overtime_authorization" class="alert alert-success py-2" role="status">
-                                    An approved overtime authorization is available for one session.
-                                    Maximum authorized hours:
-                                    <t t-esc="'%0.2f' % (available_overtime_authorization.quantity or 0.0)"/>.
+                                    <span><t t-esc="txt_ot_auth_session"/> </span>
+                                    <span><t t-esc="txt_max_auth_hours"/> </span>
+                                    <span><t t-esc="'%0.2f' % (available_overtime_authorization.quantity or 0.0)"/>.</span>
                                 </div>
                                 <t t-if="employee">
                                     <div class="pc-check-circle-wrap">
@@ -146,8 +147,8 @@
                                             <input type="hidden" name="longitude" id="lon" class="o_portal_check_longitude"/>
                                             <button type="button" class="pc-check-circle-btn" onclick="submitCheckIn()" t-att-disabled="'disabled' if (weekly_gate_reached and state != 'checked_in' and not available_overtime_authorization) else None">
                                                 <i class="fa fa-hand-pointer-o"/>
-                                                <t t-if="state == 'checked_in'">CHECK OUT</t>
-                                                <t t-else="">CHECK IN</t>
+                                                <t t-if="state == 'checked_in'"><t t-esc="txt_check_out_btn"/></t>
+                                                <t t-else=""><t t-esc="txt_check_in_btn"/></t>
                                             </button>
                                         </form>
                                     </div>
@@ -157,20 +158,20 @@
                                                 <span t-if="today_check_in" t-esc="today_check_in"/>
                                                 <span t-else="">-/-</span>
                                             </div>
-                                            <div class="pc-check-stat-label">Check In</div>
+                                            <div class="pc-check-stat-label"><t t-esc="txt_stat_check_in"/></div>
                                         </div>
                                         <div>
                                             <div class="pc-check-stat-value">
                                                 <span t-if="today_check_out" t-esc="today_check_out"/>
                                                 <span t-else="">-/-</span>
                                             </div>
-                                            <div class="pc-check-stat-label">Check Out</div>
+                                            <div class="pc-check-stat-label"><t t-esc="txt_stat_check_out"/></div>
                                         </div>
                                         <div>
                                             <div class="pc-check-stat-value">
                                                 <t t-esc="hours_today_display"/>
                                             </div>
-                                            <div class="pc-check-stat-label">Working Hours</div>
+                                            <div class="pc-check-stat-label"><t t-esc="txt_working_hours"/></div>
                                         </div>
                                     </div>
                                     <div class="pc-check-stats mb-3">
@@ -178,29 +179,29 @@
                                             <div class="pc-check-stat-value">
                                                 <t t-esc="'%0.2f' % (weekly_worked_hours or 0.0)"/>
                                             </div>
-                                            <div class="pc-check-stat-label">Weekly Worked</div>
+                                            <div class="pc-check-stat-label"><t t-esc="txt_weekly_worked"/></div>
                                         </div>
                                         <div>
                                             <div class="pc-check-stat-value">
                                                 <t t-esc="'%0.2f' % (required_weekly_hours or 0.0)"/>
                                             </div>
-                                            <div class="pc-check-stat-label">Weekly Limit</div>
+                                            <div class="pc-check-stat-label"><t t-esc="txt_weekly_limit"/></div>
                                         </div>
                                         <div>
                                             <div class="pc-check-stat-value">
-                                                <span t-if="available_overtime_authorization">Approved</span>
-                                                <span t-else="">None</span>
+                                                <span t-if="available_overtime_authorization"><t t-esc="txt_approved"/></span>
+                                                <span t-else=""><t t-esc="txt_none"/></span>
                                             </div>
-                                            <div class="pc-check-stat-label">OT Approval</div>
+                                            <div class="pc-check-stat-label"><t t-esc="txt_ot_approval"/></div>
                                         </div>
                                     </div>
                                     <div class="table-responsive">
                                         <table class="table table-sm mb-0 pc-check-history">
                                             <thead>
                                                 <tr>
-                                                    <th>Check In</th>
-                                                    <th>Check Out</th>
-                                                    <th>Hours</th>
+                                                    <th><t t-esc="txt_hist_check_in"/></th>
+                                                    <th><t t-esc="txt_hist_check_out"/></th>
+                                                    <th><t t-esc="txt_hist_hours"/></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -260,8 +261,11 @@
                             return;
                         }
 
+                        var locationMsgEl = document.getElementById('o_portal_location_permission_msg');
+                        var locationMsg = locationMsgEl &amp;&amp; locationMsgEl.value ? locationMsgEl.value : 'Location permission required';
+
                         if (!navigator.geolocation || !navigator.onLine) {
-                            window.alert('Location permission required');
+                            window.alert(locationMsg);
                             return;
                         }
 
@@ -272,7 +276,7 @@
                                 submitForm();
                             },
                             function () {
-                                window.alert('Location permission required');
+                                window.alert(locationMsg);
                             },
                             {
                                 enableHighAccuracy: true,

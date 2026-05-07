@@ -4,7 +4,7 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 18.0+e\n"
+"Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2025-07-31 08:26+0000\n"
 "PO-Revision-Date: 2025-07-31 11:33+0300\n"
@@ -24,6 +24,9 @@ msgid ""
 "                                &amp;nbsp;\n"
 "                                &amp;nbsp;"
 msgstr ""
+"&amp;nbsp;&amp;nbsp;&amp;nbsp; - &amp;nbsp;\n"
+"                                &amp;nbsp;\n"
+"                                &amp;nbsp;"
 
 #. module: portal_leaves
 #: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
@@ -33,6 +36,10 @@ msgid ""
 "                                    <option value=\"pm\">Afternoon</option>\n"
 "                                </select>"
 msgstr ""
+"<select name=\"request_date_from_period\" class=\"ml8 form-control\">\n"
+"                                    <option value=\"am\">صباحاً</option>\n"
+"                                    <option value=\"pm\">بعد الظهر</option>\n"
+"                                </select>"
 
 #. module: portal_leaves
 #: model_terms:ir.ui.view,arch_db:portal_leaves.portal_leave_page
@@ -108,7 +115,7 @@ msgstr "<strong>بانتظار الموافقة</strong>"
 #. module: portal_leaves
 #: model:ir.model.fields,field_description:portal_leaves.field_hr_leave__access_warning
 msgid "Access warning"
-msgstr ""
+msgstr "تحذير الوصول"
 
 #. module: portal_leaves
 #. odoo-python
@@ -152,7 +159,7 @@ msgstr "جهة الاتصال"
 #. module: portal_leaves
 #: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
 msgid "Create New Request"
-msgstr "إنشاء طلب جدبد"
+msgstr "إنشاء طلب جديد"
 
 #. module: portal_leaves
 #: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
@@ -177,7 +184,7 @@ msgstr "ساعات مخصصة"
 #. module: portal_leaves
 #: model:ir.model.fields,help:portal_leaves.field_hr_leave__access_url
 msgid "Customer Portal URL"
-msgstr ""
+msgstr "رابط البورتال"
 
 #. module: portal_leaves
 #: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
@@ -234,19 +241,19 @@ msgstr "الساعات"
 #. odoo-python
 #: code:addons/portal_leaves/controllers/portal.py:0
 msgid "Last month"
-msgstr "اخر شهر"
+msgstr "الشهر الماضي"
 
 #. module: portal_leaves
 #. odoo-python
 #: code:addons/portal_leaves/controllers/portal.py:0
 msgid "Last week"
-msgstr "اخر اسبوع"
+msgstr "الأسبوع الماضي"
 
 #. module: portal_leaves
 #. odoo-python
 #: code:addons/portal_leaves/controllers/portal.py:0
 msgid "Last year"
-msgstr "اخر سنة"
+msgstr "السنة الماضية"
 
 #. module: portal_leaves
 #: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_home_menu_leave
@@ -291,7 +298,7 @@ msgstr "لا شيء"
 #. module: portal_leaves
 #: model:ir.model.fields,field_description:portal_leaves.field_hr_leave__access_url
 msgid "Portal Access URL"
-msgstr ""
+msgstr "رابط الوصول للبورتال"
 
 #. module: portal_leaves
 #: model_terms:ir.ui.view,arch_db:portal_leaves.portal_request_page
@@ -308,12 +315,12 @@ msgstr "مرفوضة"
 #. odoo-python
 #: code:addons/portal_leaves/controllers/portal.py:0
 msgid "Search In Description"
-msgstr ""
+msgstr "البحث في الوصف"
 
 #. module: portal_leaves
 #: model:ir.model.fields,field_description:portal_leaves.field_hr_leave__access_token
 msgid "Security Token"
-msgstr ""
+msgstr "رمز الأمان"
 
 #. module: portal_leaves
 #: model:ir.model.fields,help:portal_leaves.field_hr_employee__leave_manager_id
@@ -342,7 +349,7 @@ msgstr "من"
 #. odoo-python
 #: code:addons/portal_leaves/controllers/portal.py:0
 msgid "State"
-msgstr ""
+msgstr "الحالة"
 
 #. module: portal_leaves
 #: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
@@ -365,13 +372,13 @@ msgstr "تم الإرسال"
 #. odoo-python
 #: code:addons/portal_leaves/controllers/portal.py:0
 msgid "The field '%s' does not exist in the targeted model"
-msgstr ""
+msgstr "الحقل '%s' غير موجود في النموذج المستهدف"
 
 #. module: portal_leaves
 #. odoo-python
 #: code:addons/portal_leaves/controllers/portal.py:0
 msgid "The start date must be anterior to the end date"
-msgstr ""
+msgstr "يجب أن يكون تاريخ البدء قبل تاريخ الانتهاء"
 
 #. module: portal_leaves
 #: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
@@ -382,25 +389,25 @@ msgstr "لا يوجد حاليا أي إجازات لحسابك."
 #. module: portal_leaves
 #: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
 msgid "There is no time-off types for portal"
-msgstr ""
+msgstr "لا توجد أنواع إجازة متاحة للبورتال."
 
 #. module: portal_leaves
 #. odoo-python
 #: code:addons/portal_leaves/controllers/portal.py:0
 msgid "This Quarter"
-msgstr ""
+msgstr "هذا الربع"
 
 #. module: portal_leaves
 #. odoo-python
 #: code:addons/portal_leaves/controllers/portal.py:0
 msgid "This month"
-msgstr "هذه الشهر"
+msgstr "هذا الشهر"
 
 #. module: portal_leaves
 #. odoo-python
 #: code:addons/portal_leaves/controllers/portal.py:0
 msgid "This week"
-msgstr "هذه الاسبوع"
+msgstr "هذا الأسبوع"
 
 #. module: portal_leaves
 #. odoo-python
@@ -462,3 +469,46 @@ msgstr "تحقق"
 #: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_home_leave
 msgid "View your time off requests and create new ones"
 msgstr "قم بمراجعة طلبات الإجازة الخاصة بك أو انشاء طلبات جديدة"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Annual Leave"
+msgstr "الإجازة السنوية"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Extra Hours"
+msgstr "ساعات إضافية"
+
+#. module: portal_leaves
+#. odoo-python
+#: code:addons/portal_leaves/controllers/portal.py:0
+msgid "Hrs"
+msgstr "ساعة"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+msgid "Total:"
+msgstr "الإجمالي:"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+msgid "Used:"
+msgstr "المستخدم:"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_my_leaves
+msgid "No allocated balance available yet."
+msgstr "لا يوجد رصيد مخصص بعد."
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "Select start time"
+msgstr "اختر وقت البداية"
+
+#. module: portal_leaves
+#: model_terms:ir.ui.view,arch_db:portal_leaves.portal_timeoff_request_form
+msgid "Select end time"
+msgstr "اختر وقت النهاية"

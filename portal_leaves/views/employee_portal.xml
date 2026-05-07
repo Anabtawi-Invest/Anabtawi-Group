@@ -71,8 +71,8 @@
                                 </small>
                             </div>
                             <div class="o_leave_balance_card__meta">
-                                <span>Total: <t t-esc="balance['total']"/> <t t-esc="balance['unit_label']"/></span>
-                                <span>Used: <t t-esc="balance['used']"/> <t t-esc="balance['unit_label']"/></span>
+                                <span><span>Total:</span> <t t-esc="balance['total']"/> <t t-esc="balance['unit_label']"/></span>
+                                <span><span>Used:</span> <t t-esc="balance['used']"/> <t t-esc="balance['unit_label']"/></span>
                             </div>
                             <div t-if="balance['missing']" class="o_leave_balance_card__hint">
                                 No allocated balance available yet.
