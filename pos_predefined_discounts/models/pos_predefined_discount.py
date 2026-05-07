@@ -182,4 +182,3 @@ class ResConfigSettings(models.TransientModel):
         related="pos_config_id.predefined_discount_ids",
         readonly=False,
     )
-
