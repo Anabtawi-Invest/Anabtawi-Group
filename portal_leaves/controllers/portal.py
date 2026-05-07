@@ -182,6 +182,32 @@ class EmployeePortal(CustomerPortal):
             allowed_company_ids=[employee.company_id.id],
         ).get_allocation_data_request(hidden_allocations=False)
 
+    def _get_portal_selectable_leave_types(self, employee):
+        """Same selection rules as the backend time off form (hr_leave_views holiday_status_id domain)."""
+        if not employee:
+            return request.env['hr.leave.type'].browse()
+        LeaveType = request.env['hr.leave.type'].sudo().with_company(employee.company_id).with_context(
+            employee_id=employee.id,
+            default_employee_id=employee.id,
+            allowed_company_ids=[employee.company_id.id],
+        )
+        domain = [
+            '&',
+            '|',
+            ('company_id', '=', False),
+            ('company_id', '=', employee.company_id.id),
+            '|',
+            ('requires_allocation', '=', False),
+            '&',
+            ('has_valid_allocation', '=', True),
+            '|',
+            ('allows_negative', '=', True),
+            '&',
+            ('virtual_remaining_leaves', '>', 0),
+            ('allows_negative', '=', False),
+        ]
+        return LeaveType.search(domain, order='sequence')
+
     def _prepare_featured_timeoff_balances(self, timeoff_types):
         def _normalize_name(name):
             return (name or '').strip().lower()
@@ -292,8 +318,7 @@ class EmployeePortal(CustomerPortal):
             sorted(post.keys()),
         )
         if employee:
-            timeoff_data = self._get_portal_timeoff_types(employee)
-            timeoffs = request.env['hr.leave.type'].sudo().browse([timeoff[3] for timeoff in timeoff_data])
+            timeoffs = self._get_portal_selectable_leave_types(employee)
             timeoff_types = self.request_name_get(timeoffs)
             day_hours = employee.resource_calendar_id.hours_per_day / 2 if employee.resource_calendar_id else 0
             _logger.info(
@@ -305,7 +330,7 @@ class EmployeePortal(CustomerPortal):
                 employee.resource_calendar_id.id if employee.resource_calendar_id else False,
                 timeoffs.ids,
                 timeoffs.mapped('name'),
-                "hide_on_dashboard=False",
+                "backend_form_domain",
                 day_hours,
             )
             if not timeoff_types:
