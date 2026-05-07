@@ -22,7 +22,7 @@ class PosPredefinedDiscount(models.Model):
     is_employee_discount = fields.Boolean(
         string="Employee Discount",
         default=False,
-        help="If enabled, this discount can be authorized by a selected employee password or the configured manager password.",
+        help="If enabled, this discount can be authorized by a selected employee password or the manager password.",
     )
     pos_config_id = fields.Many2one(
         "pos.config",
@@ -35,8 +35,40 @@ class PosPredefinedDiscount(models.Model):
     def _check_discount_range(self):
         for rec in self:
             if rec.discount < 0.0 or rec.discount > 100.0:
-                # keep it aligned with the POS behavior (0..100)
                 raise ValidationError(_("Discount must be between 0 and 100."))
+
+    @api.model
+    def _pos_discount_employee_password_matches(self, employee, password):
+        """Predefined-discount POS auth: digits only + exact match to employee_password (no date).
+
+        Implemented on this module so it does not depend on which employee_request revision is deployed.
+        """
+        if not employee:
+            return False
+        pwd = str(password or "").strip()
+        if not pwd.isdigit():
+            return False
+        stored = str(employee.sudo().employee_password or "").strip()
+        return bool(stored) and stored == pwd
+
+    @api.model
+    def _pos_discount_employee_password_diag(self, employee, password):
+        if not employee:
+            return {"code": "no_employee"}
+        pwd = str(password or "").strip()
+        if not pwd.isdigit():
+            return {"code": "not_numeric", "employee_id": employee.id}
+        stored = str(employee.sudo().employee_password or "").strip()
+        if not stored:
+            return {"code": "no_stored_password", "employee_id": employee.id}
+        if stored != pwd:
+            return {
+                "code": "mismatch",
+                "employee_id": employee.id,
+                "stored_len": len(stored),
+                "submitted_len": len(pwd),
+            }
+        return {}
 
     @api.model
     def _load_pos_data_domain(self, data, config):
@@ -65,13 +97,10 @@ class PosPredefinedDiscount(models.Model):
             employee_record = hr_employee_model.sudo().browse(int(employee_id)).exists()
 
         manager_valid = bool(
-            manager_employee
-            and hr_employee_model.pos_employee_request_check_password(manager_employee.id, password)
+            manager_employee and self._pos_discount_employee_password_matches(manager_employee, password)
         )
-
         employee_valid = bool(
-            employee_record
-            and hr_employee_model.pos_employee_request_check_password(employee_record.id, password)
+            employee_record and self._pos_discount_employee_password_matches(employee_record, password)
         )
 
         if manager_valid or employee_valid:
@@ -90,14 +119,7 @@ class PosPredefinedDiscount(models.Model):
         def _compact_diag(rec):
             if not rec:
                 return {}
-            diag = getattr(hr_employee_model, "_pos_employee_password_auth_diag", None)
-            if not diag:
-                return {
-                    "code": "employee_request_upgrade_required",
-                    "hint": "Deploy/upgrade employee_request with _pos_employee_password_auth_diag or rely on POS employee password check logs.",
-                }
-            d = diag(rec.id, password) or {}
-            return {k: v for k, v in d.items() if k != "ok"}
+            return self._pos_discount_employee_password_diag(rec, password)
 
         manager_pw_diag = _compact_diag(manager_employee)
         employee_pw_diag = _compact_diag(employee_record)
@@ -154,9 +176,7 @@ class PosPredefinedDiscount(models.Model):
 
         if discount.is_employee_discount:
             raise UserError(
-                _(
-                    "Authorization failed. Enter the selected employee password or the manager password."
-                )
+                _("Authorization failed. Enter the selected employee password or the manager password.")
             )
 
         if not manager_employee:
