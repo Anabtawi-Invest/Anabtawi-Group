@@ -22,9 +22,6 @@
                 <a href="/my/overtime_approvals/new" class="btn btn-primary">New request</a>
                 <a href="/my" class="btn btn-link">My account</a>
             </div>
-            <div class="alert alert-info" role="status">
-                Approved overtime requests unlock one overtime attendance session only.
-            </div>
             <div t-if="success_message" class="alert alert-success" role="status">
                 <span t-out="success_message"/>
             </div>

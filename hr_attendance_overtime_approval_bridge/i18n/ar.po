@@ -22,11 +22,6 @@ msgid "Approval type"
 msgstr "نوع الموافقة"
 
 #. module: hr_attendance_overtime_approval_bridge
-#: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_list
-msgid "Approved overtime requests unlock one overtime attendance session only."
-msgstr "طلبات العمل الإضافي المعتمدة تفتح جلسة حضور إضافية واحدة فقط."
-
-#. module: hr_attendance_overtime_approval_bridge
 #: model_terms:ir.ui.view,arch_db:hr_attendance_overtime_approval_bridge.portal_overtime_no_employee
 msgid "Back to My Account"
 msgstr "العودة إلى حسابي"
