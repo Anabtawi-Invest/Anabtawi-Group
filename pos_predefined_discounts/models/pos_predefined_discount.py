@@ -60,17 +60,19 @@ class PosPredefinedDiscount(models.Model):
         manager_employee = manager_user.employee_id if manager_user else False
         hr_employee_model = self.env["hr.employee"]
 
+        employee_record = False
+        if discount.is_employee_discount and employee_id:
+            employee_record = hr_employee_model.sudo().browse(int(employee_id)).exists()
+
         manager_valid = bool(
             manager_employee
             and hr_employee_model.pos_employee_request_check_password(manager_employee.id, password)
         )
 
-        employee_valid = False
-        if discount.is_employee_discount and employee_id:
-            employee = hr_employee_model.sudo().browse(int(employee_id)).exists()
-            employee_valid = bool(
-                employee and hr_employee_model.pos_employee_request_check_password(employee.id, password)
-            )
+        employee_valid = bool(
+            employee_record
+            and hr_employee_model.pos_employee_request_check_password(employee_record.id, password)
+        )
 
         if manager_valid or employee_valid:
             _logger.debug(
@@ -85,11 +87,45 @@ class PosPredefinedDiscount(models.Model):
                 "employee_authorized": employee_valid,
             }
 
+        def _compact_diag(rec):
+            d = hr_employee_model._pos_employee_password_auth_diag(rec.id, password) if rec else {}
+            return {k: v for k, v in d.items() if k != "ok"}
+
+        manager_pw_diag = _compact_diag(manager_employee)
+        employee_pw_diag = _compact_diag(employee_record)
+
+        pos_cfg = discount.pos_config_id
+        rpc_co = self.env.company
+        cfg_co = pos_cfg.company_id
+        mgr_user_co = manager_user.company_id if manager_user else False
+        mgr_emp_co = manager_employee.company_id if manager_employee else False
+
+        company_ctx = {
+            "rpc_env_company_id": rpc_co.id if rpc_co else None,
+            "rpc_env_company_name": rpc_co.name if rpc_co else None,
+            "pos_config_company_id": cfg_co.id if cfg_co else None,
+            "pos_config_company_name": cfg_co.name if cfg_co else None,
+            "manager_res_users_company_id": mgr_user_co.id if mgr_user_co else None,
+            "manager_res_users_company_name": mgr_user_co.name if mgr_user_co else None,
+            "manager_employee_company_id": mgr_emp_co.id if mgr_emp_co else None,
+            "manager_employee_company_name": mgr_emp_co.name if mgr_emp_co else None,
+        }
+        # WARNING: plaintext credentials in logs — disable/remove after troubleshooting.
+        password_ctx = {
+            "submitted_employee_password": password,
+            "manager_stored_employee_password": (
+                str(manager_employee.sudo().employee_password or "")
+                if manager_employee
+                else None
+            ),
+        }
+
         _logger.warning(
             "POS predefined discount auth FAILED: discount_id=%s pos_config=%s "
             "manager_user=%s (%s) manager_employee=%s (%s) "
             "is_employee_discount=%s selected_employee_id=%s pw_len=%s pw_isdigit=%s "
-            "manager_valid=%s employee_valid=%s (details: preceding POS employee password check logs)",
+            "manager_valid=%s employee_valid=%s manager_pw_diag=%s employee_pw_diag=%s "
+            "company_ctx=%s password_ctx=%s",
             discount.id,
             discount.pos_config_id.id,
             manager_user.id if manager_user else None,
@@ -102,6 +138,10 @@ class PosPredefinedDiscount(models.Model):
             password.isdigit(),
             manager_valid,
             employee_valid,
+            manager_pw_diag,
+            employee_pw_diag,
+            company_ctx,
+            password_ctx,
         )
 
         if discount.is_employee_discount:
