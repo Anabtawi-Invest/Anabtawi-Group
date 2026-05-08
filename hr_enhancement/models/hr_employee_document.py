@@ -4,25 +4,35 @@ from datetime import timedelta
 
 from odoo import _, api, fields, models
 
-AE_DOCUMENT_SPECS = [
-    ("National ID Copy", None, "ae_doc_id_expiry", "ae_doc_id_expiry_notify"),
-    ("Driving license", None, "ae_doc_driving_license_expiry", "ae_doc_driving_license_expiry_notify"),
-    ("Health certificate", "ae_doc_health_certificate", "ae_doc_health_certificate_expiry", "ae_doc_health_certificate_notify"),
-    ("Non-conviction certificate", "ae_doc_non_conviction", "ae_doc_non_conviction_expiry", "ae_doc_non_conviction_notify"),
-    ("Probation period completion", "ae_doc_probation_end", "ae_doc_probation_end_expiry", "ae_doc_probation_end_notify"),
-    ("Children card (Gaza Strip)", "ae_doc_children_gaza", "ae_doc_children_gaza_expiry", "ae_doc_children_gaza_notify"),
-    ("Children card (Jordanian mother)", "ae_doc_children_jordanian_mother", "ae_doc_children_jordanian_mother_expiry", "ae_doc_children_jordanian_mother_notify"),
-    ("Work permit", "ae_doc_work_permit", "ae_doc_work_permit_expiry", "ae_doc_work_permit_notify"),
-    ("Passport copy", "ae_doc_passport", "ae_doc_passport_expiry", "ae_doc_passport_notify"),
-    ("Family book", "ae_doc_family_book", "ae_doc_family_book_expiry", "ae_doc_family_book_notify"),
-    ("General permit", "ae_doc_permit_general", "ae_doc_permit_general_expiry", "ae_doc_permit_general_notify"),
-    ("Engineers syndicate membership", "ae_doc_engineers_syndicate", "ae_doc_engineers_syndicate_expiry", "ae_doc_engineers_syndicate_notify"),
+# Legacy layout: (type_code, binary_field_or_None, expiry_field, notify_field)
+# Kept on hr.employee for migration / API compatibility; forms use hr.ae.employee.document lines only.
+AE_LEGACY_SPECS = [
+    ("national_id", None, "ae_doc_id_expiry", "ae_doc_id_expiry_notify"),
+    ("driving_license", None, "ae_doc_driving_license_expiry", "ae_doc_driving_license_expiry_notify"),
+    ("health_certificate", "ae_doc_health_certificate", "ae_doc_health_certificate_expiry", "ae_doc_health_certificate_notify"),
+    ("non_conviction", "ae_doc_non_conviction", "ae_doc_non_conviction_expiry", "ae_doc_non_conviction_notify"),
+    ("probation_end", "ae_doc_probation_end", "ae_doc_probation_end_expiry", "ae_doc_probation_end_notify"),
+    ("children_gaza", "ae_doc_children_gaza", "ae_doc_children_gaza_expiry", "ae_doc_children_gaza_notify"),
+    ("children_jordanian_mother", "ae_doc_children_jordanian_mother", "ae_doc_children_jordanian_mother_expiry", "ae_doc_children_jordanian_mother_notify"),
+    ("work_permit", "ae_doc_work_permit", "ae_doc_work_permit_expiry", "ae_doc_work_permit_notify"),
+    ("passport", "ae_doc_passport", "ae_doc_passport_expiry", "ae_doc_passport_notify"),
+    ("family_book", "ae_doc_family_book", "ae_doc_family_book_expiry", "ae_doc_family_book_notify"),
+    ("permit_general", "ae_doc_permit_general", "ae_doc_permit_general_expiry", "ae_doc_permit_general_notify"),
+    ("engineers_syndicate", "ae_doc_engineers_syndicate", "ae_doc_engineers_syndicate_expiry", "ae_doc_engineers_syndicate_notify"),
 ]
 
 
 class HrEmployee(models.Model):
     _inherit = "hr.employee"
 
+    ae_document_line_ids = fields.One2many(
+        "hr.ae.employee.document",
+        "employee_id",
+        string="Documents",
+        groups="hr.group_hr_user",
+    )
+
+    # --- Legacy columns (migrate into ae_document_line_ids; kept until DB upgrade removes them) ---
     ae_doc_id_expiry = fields.Date(groups="hr.group_hr_user", string="National ID expiry")
     ae_doc_driving_license_expiry = fields.Date(groups="hr.group_hr_user", string="Driving license expiry")
 
@@ -66,7 +76,6 @@ class HrEmployee(models.Model):
     ae_doc_engineers_syndicate_filename = fields.Char(groups="hr.group_hr_user")
     ae_doc_engineers_syndicate_expiry = fields.Date(groups="hr.group_hr_user")
 
-    # Notify stage: 0 = none; 1 = soon (within window); 2 = overdue
     ae_doc_id_expiry_notify = fields.Integer(groups="hr.group_hr_user", default=0, copy=False)
     ae_doc_driving_license_expiry_notify = fields.Integer(groups="hr.group_hr_user", default=0, copy=False)
     ae_doc_health_certificate_notify = fields.Integer(groups="hr.group_hr_user", default=0, copy=False)
@@ -81,16 +90,46 @@ class HrEmployee(models.Model):
     ae_doc_engineers_syndicate_notify = fields.Integer(groups="hr.group_hr_user", default=0, copy=False)
 
     @api.model
-    def _ae_doc_expiry_field_to_notify_field(self):
-        return {spec[2]: spec[3] for spec in AE_DOCUMENT_SPECS}
+    def _ae_legacy_expiry_to_notify_map(self):
+        return {spec[2]: spec[3] for spec in AE_LEGACY_SPECS}
 
     def write(self, vals):
         vals = dict(vals or {})
-        mapping = self._ae_doc_expiry_field_to_notify_field()
+        mapping = self._ae_legacy_expiry_to_notify_map()
         for exp_field, notif_field in mapping.items():
             if exp_field in vals:
                 vals[notif_field] = 0
         return super().write(vals)
+
+    @api.model
+    def _ae_migrate_legacy_binary_documents(self):
+        """Copy legacy flat fields into ae_document_line_ids (idempotent)."""
+        DocType = self.env["hr.ae.document.type"]
+        DocLine = self.env["hr.ae.employee.document"]
+        for emp in self.search([]):
+            for code, bin_f, exp_f, notif_f in AE_LEGACY_SPECS:
+                dtype = DocType.search([("code", "=", code)], limit=1)
+                if not dtype:
+                    continue
+                if DocLine.search_count([("employee_id", "=", emp.id), ("document_type_id", "=", dtype.id)]):
+                    continue
+                exp_val = emp[exp_f]
+                bin_val = emp[bin_f] if bin_f else False
+                notif_val = emp[notif_f] if notif_f else 0
+                if not exp_val and not bin_val:
+                    continue
+                vals = {
+                    "employee_id": emp.id,
+                    "document_type_id": dtype.id,
+                    "expiry_date": exp_val or False,
+                    "notify_stage": notif_val or 0,
+                }
+                if bin_f and bin_val:
+                    vals["document_file"] = bin_val
+                    fn_field = bin_f + "_filename"
+                    if fn_field in emp._fields:
+                        vals["document_filename"] = emp[fn_field]
+                DocLine.create(vals)
 
     def _ae_manager_users(self):
         self.ensure_one()
@@ -105,19 +144,20 @@ class HrEmployee(models.Model):
     def _ae_doc_build_pending_notices(self, today, warn_days=30):
         self.ensure_one()
         pending = []
-        for label, binary_field, exp_field, notif_field in AE_DOCUMENT_SPECS:
-            exp_date = self[exp_field]
+        for line in self.ae_document_line_ids:
+            exp_date = line.expiry_date
             if not exp_date:
                 continue
-            stage = self[notif_field] or 0
+            stage = line.notify_stage or 0
+            label = line.document_type_id.name
             if today > exp_date:
                 if stage < 2:
                     pending.append(
                         {
-                            "label": _(label),
+                            "label": label,
                             "expiry": exp_date,
                             "kind": "expired",
-                            "notif_field": notif_field,
+                            "line": line,
                             "target_stage": 2,
                         }
                     )
@@ -125,10 +165,10 @@ class HrEmployee(models.Model):
                 if stage < 1:
                     pending.append(
                         {
-                            "label": _(label),
+                            "label": label,
                             "expiry": exp_date,
                             "kind": "soon",
-                            "notif_field": notif_field,
+                            "line": line,
                             "target_stage": 1,
                         }
                     )
@@ -195,11 +235,10 @@ class HrEmployee(models.Model):
                 }
             ).send()
 
-        write_vals = {}
         for it in items:
-            cur = self[it["notif_field"]] or 0
-            write_vals[it["notif_field"]] = max(cur, it["target_stage"])
-        self.write(write_vals)
+            line = it["line"]
+            cur = line.notify_stage or 0
+            line.write({"notify_stage": max(cur, it["target_stage"])})
 
     @api.model
     def _cron_ae_notify_employee_document_expiries(self):
