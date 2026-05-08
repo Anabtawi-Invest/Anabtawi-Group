@@ -24,7 +24,7 @@ class PortalCheckInController(http.Controller):
         if minutes == 60:
             hours += 1
             minutes = 0
-        return "%s hrs %s min" % (hours, minutes)
+        return _("%(hours)s h %(minutes)s min", hours=hours, minutes=minutes)
 
     @staticmethod
     def _format_datetime_to_user_time(dt_value):
@@ -159,7 +159,12 @@ class PortalCheckInController(http.Controller):
             'employee': employee,
             'state': employee.attendance_state if employee else False,
             'device_tracking_enabled': employee.company_id.attendance_device_tracking if employee else False,
-            'hours_today_display': self._format_hours(employee.hours_today) if employee else "0 hrs 0 min",
+            'location_permission_required': _('Location permission required'),
+            'hours_today_display': (
+                self._format_hours(employee.hours_today)
+                if employee
+                else _("%(hours)s h %(minutes)s min", hours=0, minutes=0)
+            ),
             'recent_attendances': recent_attendances,
             'today_check_in': self._format_datetime_to_user_time(today_check_in),
             'today_check_out': self._format_datetime_to_user_time(today_check_out),
@@ -171,6 +176,29 @@ class PortalCheckInController(http.Controller):
             'required_weekly_hours': required_weekly_hours,
             'weekly_gate_reached': weekly_gate_reached,
             'available_overtime_authorization': available_overtime_authorization,
+            # Portal UI labels (Arabic via i18n)
+            'txt_hello': _('Hello'),
+            'txt_overtime_approvals_btn': _('Overtime Approvals'),
+            'txt_attendance_updated': _('Attendance updated successfully.'),
+            'txt_no_employee': _('Your user is not linked to an employee profile.'),
+            'txt_location_default': _('You cannot check in from this location.'),
+            'txt_weekly_threshold': _('You reached the weekly worked hours threshold.'),
+            'txt_checkin_locked_ot': _('Check-in is locked until one overtime request is approved.'),
+            'txt_ot_auth_session': _('An approved overtime authorization is available for one session.'),
+            'txt_max_auth_hours': _('Maximum authorized hours:'),
+            'txt_check_in_btn': _('CHECK IN'),
+            'txt_check_out_btn': _('CHECK OUT'),
+            'txt_stat_check_in': _('Check In'),
+            'txt_stat_check_out': _('Check Out'),
+            'txt_working_hours': _('Working Hours'),
+            'txt_weekly_worked': _('Weekly Worked'),
+            'txt_weekly_limit': _('Weekly Limit'),
+            'txt_ot_approval': _('OT Approval'),
+            'txt_approved': _('Approved'),
+            'txt_none': _('None'),
+            'txt_hist_check_in': _('Check In'),
+            'txt_hist_check_out': _('Check Out'),
+            'txt_hist_hours': _('Hours'),
         }
         return request.render('portal_check_in.portal_my_check_in', values)
 

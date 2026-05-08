@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="emp_profile_pdf">
+        <t t-call="web.basic_layout">
+            <t t-foreach="docs" t-as="o">
+                <div class="page" style="font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; color: #222;">
+                    <style type="text/css">
+                        .aep-header { width: 100%; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 12px; border-collapse: collapse; }
+                        .aep-header td { vertical-align: middle; }
+                        .aep-main-grid { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 10px; }
+                        .aep-main-grid td { padding: 6px 8px !important; font-size: 10pt !important; line-height: 1.35; border: 1px solid #ccc; vertical-align: middle; }
+                        .aep-main-grid td.aep-mlab { font-weight: bold; width: 11%; background: #fafafa; }
+                        .aep-main-grid td.aep-mval { width: 17%; }
+                        .aep-main-grid td.aep-ephoto { width: 90px; text-align: center; vertical-align: middle; border-left: 2px solid #ddd; background: #fafafa; }
+                        .aep-section-title { font-weight: bold; margin: 6px 0 4px; font-size: 11pt; }
+                        .aep-data-table { font-size: 9.5pt !important; }
+                        .aep-data-table th { padding: 7px 6px !important; }
+                        .aep-data-table td { padding: 6px 7px !important; }
+                        .aep-salary-bar td { padding: 12px 10px !important; font-size: 10.5pt !important; }
+                        .aep-footer { font-size: 9pt !important; }
+                    </style>
+                    <table class="aep-header">
+                        <tr>
+                            <td style="text-align: left; width: 58%;">
+                                <div style="font-size: 18pt; font-weight: bold; color: #c0392b; line-height: 1.2;">Employee Profile</div>
+                            </td>
+                            <td style="text-align: right; width: 42%;">
+                                <t t-if="o.company_id.logo">
+                                    <img t-att-src="image_data_uri(o.company_id.logo)" style="max-height: 52px; max-width: 240px;" alt="Logo"/>
+                                </t>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <t t-set="bank" t-value="o.profile_primary_bank_account()"/>
+                    <table class="aep-main-grid">
+                        <tr>
+                            <td class="aep-mlab">Number</td>
+                            <td class="aep-mval" t-out="o.id"/>
+                            <td class="aep-mlab">Gender</td>
+                            <td class="aep-mval" t-out="o.profile_sex_display()"/>
+                            <td class="aep-mlab">Birth Date</td>
+                            <td class="aep-mval"><span t-if="o.birthday" t-field="o.birthday"/></td>
+                            <td class="aep-ephoto" rowspan="10">
+                                <t t-if="o.avatar_1920">
+                                    <img t-att-src="image_data_uri(o.avatar_1920)" style="width: 88px; height: 88px; object-fit: cover; border: 1px solid #bbb;" alt=""/>
+                                </t>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="aep-mlab">Name</td>
+                            <td class="aep-mval" t-out="o.display_name"/>
+                            <td class="aep-mlab">Marital Status</td>
+                            <td class="aep-mval" t-out="o.profile_marital_display()"/>
+                            <td class="aep-mlab">Birth Place</td>
+                            <td class="aep-mval"><span t-out="o.place_of_birth or ''"/></td>
+                        </tr>
+                        <tr>
+                            <td class="aep-mlab">Alternate Name</td>
+                            <td class="aep-mval" dir="rtl" style="text-align:right;"><span t-out="o.name_arabic or ''"/></td>
+                            <td class="aep-mlab">Nationality</td>
+                            <td class="aep-mval"><span t-out="o.country_id.name or ''"/></td>
+                            <td class="aep-mlab">Home Phone</td>
+                            <td class="aep-mval"><span t-out="o.emergency_phone or ''"/></td>
+                        </tr>
+                        <tr>
+                            <td class="aep-mlab">Start Date</td>
+                            <td class="aep-mval"><span t-if="o.contract_date_start" t-field="o.contract_date_start"/></td>
+                            <td class="aep-mlab">National Number</td>
+                            <td class="aep-mval"><span t-out="o.identification_id or ''"/></td>
+                            <td class="aep-mlab">Mobile No.</td>
+                            <td class="aep-mval"><span t-out="o.private_phone or ''"/></td>
+                        </tr>
+                        <tr>
+                            <td class="aep-mlab">دائرة</td>
+                            <td class="aep-mval"><span t-out="o.department_id.name or ''"/></td>
+                            <td class="aep-mlab">SS Number</td>
+                            <td class="aep-mval"><span t-out="o.ssnid or ''"/></td>
+                            <td class="aep-mlab">Status</td>
+                            <td class="aep-mval" t-out="o.profile_status_display()"/>
+                        </tr>
+                        <tr>
+                            <td class="aep-mlab">قسم</td>
+                            <td class="aep-mval"><span t-out="o.job_id.name or ''"/></td>
+                            <td class="aep-mlab">Mother Name</td>
+                            <td class="aep-mval"><span t-out="o.mother_name or ''"/></td>
+                            <td class="aep-mlab">Termination Date</td>
+                            <td class="aep-mval"><span t-if="o.departure_date" t-field="o.departure_date"/></td>
+                        </tr>
+                        <tr>
+                            <td class="aep-mlab">فرع</td>
+                            <td class="aep-mval"><span t-out="o.job_title or ''"/></td>
+                            <td class="aep-mlab">Medical Insurance</td>
+                            <td class="aep-mval"><span t-out="o.profile_health_insurance_header_display()"/></td>
+                            <td class="aep-mlab">City</td>
+                            <td class="aep-mval"><span t-out="o.private_city or ''"/></td>
+                        </tr>
+                        <tr>
+                            <td class="aep-mlab">Occupation</td>
+                            <td class="aep-mval"><span t-out="o.job_title or ''"/></td>
+                            <td class="aep-mlab">Bank</td>
+                            <td class="aep-mval"><span t-out="bank.bank_id.name if bank and bank.bank_id else ''"/></td>
+                            <td class="aep-mlab">Address</td>
+                            <td class="aep-mval"><span t-out="o.private_street or ''"/></td>
+                        </tr>
+                        <tr>
+                            <td class="aep-mlab">Type</td>
+                            <td class="aep-mval"><span t-out="o.structure_type_id.name or ''"/></td>
+                            <td class="aep-mlab">Bank Branch</td>
+                            <td class="aep-mval"><span t-out="bank.salary_bank_branch if bank else ''"/></td>
+                            <td class="aep-mlab">Email</td>
+                            <td class="aep-mval"><span t-out="o.email or o.private_email or ''"/></td>
+                        </tr>
+                        <tr>
+                            <td class="aep-mlab">Religion</td>
+                            <td class="aep-mval"><span t-out="o.religion or ''"/></td>
+                            <td class="aep-mlab">Income Tax Number</td>
+                            <td class="aep-mval"><span t-out="bank.salary_income_tax_number if bank else ''"/></td>
+                            <td class="aep-mlab">Blood Type</td>
+                            <td class="aep-mval" t-out="o.profile_blood_type_display()"/>
+                        </tr>
+                    </table>
+
+                    <table class="aep-salary-bar" style="width: 100%; background: #e8e8e8; border: 1px solid #ccc; margin: 12px 0; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 33%; text-align: center; font-weight: bold;">
+                                Basic Salary<br/>
+                                <span t-if="o.currency_id and o.wage is not None">
+                                    <span t-field="o.wage" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                </span>
+                            </td>
+                            <td style="width: 33%; text-align: center; font-weight: bold; border-left: 1px solid #ccc; border-right: 1px solid #ccc;">
+                                SS Salary<br/><span style="font-weight:normal;">—</span>
+                            </td>
+                            <td style="width: 33%; text-align: center; font-weight: bold;">
+                                Service Charge Points<br/><span style="font-weight:normal;">—</span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 50%; vertical-align: top; padding-right: 8px;">
+                                <div class="aep-section-title">Dependants</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc;">No.</th>
+                                        <th style="border:1px solid #ccc;">Name</th>
+                                        <th style="border:1px solid #ccc;">Birth Date</th>
+                                        <th style="border:1px solid #ccc;">Birth Place</th>
+                                        <th style="border:1px solid #ccc;">Med. Ins.</th>
+                                    </tr>
+                                    <t t-foreach="dep_map.get(o.id, [])" t-as="dep">
+                                        <tr>
+                                            <td style="border:1px solid #ccc; text-align:center;" t-out="dep_index + 1"/>
+                                            <td style="border:1px solid #ccc;" t-out="dep.name or ''"/>
+                                            <td style="border:1px solid #ccc;"><span t-if="dep.birthdate" t-field="dep.birthdate"/></td>
+                                            <td style="border:1px solid #ccc;"><span t-out="dep.notes or ''"/></td>
+                                            <td style="border:1px solid #ccc; text-align:center;">
+                                                <t t-if="dep.grade_id">☑</t>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not len(dep_map.get(o.id, []))">
+                                        <tr><td colspan="5" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+
+                                <div class="aep-section-title">Previous Jobs</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc;">Employer</th>
+                                        <th style="border:1px solid #ccc;">Start</th>
+                                        <th style="border:1px solid #ccc;">End</th>
+                                        <th style="border:1px solid #ccc;">Occupation</th>
+                                        <th style="border:1px solid #ccc;">Termination</th>
+                                    </tr>
+                                    <t t-foreach="o.previous_job_line_ids" t-as="pj">
+                                        <tr>
+                                            <td style="border:1px solid #ccc;" t-out="pj.employer or ''"/>
+                                            <td style="border:1px solid #ccc;"><span t-if="pj.date_start" t-field="pj.date_start"/></td>
+                                            <td style="border:1px solid #ccc;"><span t-if="pj.date_end" t-field="pj.date_end"/></td>
+                                            <td style="border:1px solid #ccc;" t-out="pj.occupation or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="pj.termination_reason or ''"/>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not o.previous_job_line_ids">
+                                        <tr><td colspan="5" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+
+                                <div class="aep-section-title">Official Documents</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc;">Type</th>
+                                        <th style="border:1px solid #ccc;">Number</th>
+                                        <th style="border:1px solid #ccc;">Issue Place</th>
+                                        <th style="border:1px solid #ccc;">Issue Date</th>
+                                        <th style="border:1px solid #ccc;">Expiry</th>
+                                    </tr>
+                                    <t t-foreach="o.official_document_line_ids" t-as="doc">
+                                        <tr>
+                                            <td style="border:1px solid #ccc;" t-out="doc.document_type_id.name or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="doc.number or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="doc.issue_place or ''"/>
+                                            <td style="border:1px solid #ccc;"><span t-if="doc.issue_date" t-field="doc.issue_date"/></td>
+                                            <td style="border:1px solid #ccc;"><span t-if="doc.expiry_date" t-field="doc.expiry_date"/></td>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not o.official_document_line_ids">
+                                        <tr><td colspan="5" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+                            </td>
+                            <td style="width: 50%; vertical-align: top; padding-left: 8px;">
+                                <div class="aep-section-title">Warnings</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc;">Date</th>
+                                        <th style="border:1px solid #ccc;">Warning Type</th>
+                                        <th style="border:1px solid #ccc;">Reason</th>
+                                    </tr>
+                                    <t t-foreach="o.warning_line_ids" t-as="w">
+                                        <tr>
+                                            <td style="border:1px solid #ccc;"><span t-if="w.warning_date" t-field="w.warning_date"/></td>
+                                            <td style="border:1px solid #ccc;" t-out="w.warning_type_id.name or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="w.reason or ''"/>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not o.warning_line_ids">
+                                        <tr><td colspan="3" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+
+                                <div class="aep-section-title">Education</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc;">Year</th>
+                                        <th style="border:1px solid #ccc;">Degree</th>
+                                        <th style="border:1px solid #ccc;">Specialty</th>
+                                        <th style="border:1px solid #ccc;">Institute</th>
+                                    </tr>
+                                    <t t-foreach="o.education_line_ids" t-as="ed">
+                                        <tr>
+                                            <td style="border:1px solid #ccc;" t-out="ed.year or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="ed.degree or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="ed.specialty or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="ed.institute or ''"/>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not o.education_line_ids">
+                                        <tr><td colspan="4" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+
+                                <div class="aep-section-title">Career Movements</div>
+                                <table class="aep-data-table" style="width:100%; border:1px solid #ccc; border-collapse:collapse;">
+                                    <tr style="background:#e8e8e8;">
+                                        <th style="border:1px solid #ccc;">Type</th>
+                                        <th style="border:1px solid #ccc;">Date</th>
+                                        <th style="border:1px solid #ccc;">Old</th>
+                                        <th style="border:1px solid #ccc;">New</th>
+                                    </tr>
+                                    <t t-foreach="o.career_movement_line_ids" t-as="cm">
+                                        <tr>
+                                            <td style="border:1px solid #ccc;" t-out="cm.movement_type_id.name or ''"/>
+                                            <td style="border:1px solid #ccc;"><span t-if="cm.movement_date" t-field="cm.movement_date"/></td>
+                                            <td style="border:1px solid #ccc;" t-out="cm.old_value or ''"/>
+                                            <td style="border:1px solid #ccc;" t-out="cm.new_value or ''"/>
+                                        </tr>
+                                    </t>
+                                    <t t-if="not o.career_movement_line_ids">
+                                        <tr><td colspan="4" style="border:1px solid #ccc; height:22px;">&#160;</td></tr>
+                                    </t>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div class="aep-footer" style="margin-top: 16px; color: #555; display: flex; justify-content: space-between;">
+                        <div>
+                            Printed by <t t-out="print_user.name"/> —
+                            <t t-out="print_time.strftime('%Y-%m-%d %H:%M')"/>
+                        </div>
+                        <div>
+                            Licensed To: <t t-out="o.company_id.name"/>
+                        </div>
+                        <div>Page 1 of 1</div>
+                    </div>
+                </div>
+                <p t-if="not o_last" style="page-break-after: always;"/>
+            </t>
+        </t>
+    </template>
+</odoo>

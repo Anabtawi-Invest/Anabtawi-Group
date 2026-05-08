@@ -1,5 +1,6 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
+import logging
 from datetime import datetime, time
 
 from werkzeug.exceptions import NotFound
@@ -9,6 +10,8 @@ from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 
 from odoo.addons.portal.controllers.portal import CustomerPortal, pager as portal_pager
+
+_logger = logging.getLogger(__name__)
 
 
 class OvertimeApprovalPortal(CustomerPortal):
@@ -31,7 +34,51 @@ class OvertimeApprovalPortal(CustomerPortal):
                 ("company_id", "=", False),
                 ("company_id", "=", company.id),
             ]
-        return Category.search(domain)
+        categories = Category.search(domain)
+        if not categories:
+            self._overtime_portal_log_no_categories(employee, domain, categories)
+        return categories
+
+    def _overtime_portal_log_no_categories(self, employee, domain, categories):
+        """Explain empty category list for portal /my/overtime_approvals/new."""
+        user = request.env.user
+        session_company = request.env.company
+        emp_company = employee.company_id
+        Category = request.env["approval.category"].sudo()
+
+        all_ot = Category.search([("is_overtime_category", "=", True)])
+        lines = [
+            "user_id=%s login=%r",
+            "employee_id=%s name=%r company_id=%s company_name=%r",
+            "request.env.company_id=%s (session/website company)",
+            "search domain=%s → count=%s",
+            "all is_overtime_category (no company filter in this query): count=%s",
+        ]
+        args = [
+            user.id,
+            user.login,
+            employee.id,
+            employee.name,
+            emp_company.id if emp_company else None,
+            emp_company.name if emp_company else None,
+            session_company.id if session_company else None,
+            domain,
+            len(categories),
+            len(all_ot),
+        ]
+        has_company = "company_id" in Category._fields
+        for rec in all_ot:
+            if has_company:
+                cid = rec.company_id.id if rec.company_id else None
+                cname = rec.company_id.name if rec.company_id else None
+            else:
+                cid = cname = None
+            args.extend([rec.id, rec.name, cid, cname])
+            lines.append("  overtime category id=%s name=%r company_id=%s company_name=%r")
+
+        _logger.warning(
+            "Overtime portal: no categories for user; " + "; ".join(lines), *args
+        )
 
     def _overtime_portal_requests_domain(self):
         return [

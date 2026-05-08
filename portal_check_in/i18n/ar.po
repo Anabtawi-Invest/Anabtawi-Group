@@ -1,0 +1,184 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+#	* portal_check_in
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5);\n"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "%(hours)s h %(minutes)s min"
+msgstr "%(hours)s ساعة %(minutes)s دقيقة"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "An approved overtime authorization is available for one session."
+msgstr "توجد موافقة مسبقة على العمل الإضافي لجلسة واحدة."
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Approved"
+msgstr "معتمد"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Attendance updated successfully."
+msgstr "تم تحديث الحضور بنجاح."
+
+#. module: portal_check_in
+#: model_terms:ir.ui.view,arch_db:portal_check_in.portal_breadcrumbs_check_in
+#: model_terms:ir.ui.view,arch_db:portal_check_in.portal_my_home_menu_check_in
+msgid "Attendance"
+msgstr "الحضور والانصراف"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "CHECK IN"
+msgstr "تسجيل دخول"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "CHECK OUT"
+msgstr "تسجيل خروج"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Check In"
+msgstr "وقت الدخول"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Check Out"
+msgstr "وقت الخروج"
+
+#. module: portal_check_in
+#: model_terms:ir.ui.view,arch_db:portal_check_in.portal_my_home_menu_check_in
+msgid "Check in and check out"
+msgstr "سجّل حضورك وانصرافك"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Check-in is locked until one overtime request is approved."
+msgstr "تسجيل الدخول معطّل حتى تُوافق على طلب عمل إضافي واحد على الأقل."
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Hello"
+msgstr "مرحباً"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Hours"
+msgstr "الساعات"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Location permission required"
+msgstr "يلزم السماح بالوصول إلى الموقع الجغرافي"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Maximum authorized hours:"
+msgstr "الحد الأقصى للساعات المعتمدة:"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "None"
+msgstr "بدون"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "OT Approval"
+msgstr "موافقة الإضافي"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+#: model_terms:ir.ui.view,arch_db:portal_check_in.portal_my_home_menu_check_in
+msgid "Overtime Approvals"
+msgstr "موافقات العمل الإضافي"
+
+#. module: portal_check_in
+#: model_terms:ir.ui.view,arch_db:portal_check_in.portal_my_home_menu_check_in
+msgid "Request approval for your overtime hours"
+msgstr "اطلب اعتماد ساعات العمل الإضافي"
+
+#. module: portal_check_in
+#: model_terms:ir.ui.view,arch_db:portal_check_in.portal_my_home_menu_check_in
+msgid "Time Off"
+msgstr "الإجازات"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Unknown"
+msgstr "غير معروف"
+
+#. module: portal_check_in
+#: model_terms:ir.ui.view,arch_db:portal_check_in.portal_my_home_menu_check_in
+msgid "View your time off requests and create new ones"
+msgstr "عرض طلبات الإجازة وإنشاء طلبات جديدة"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Weekly Limit"
+msgstr "الحد الأسبوعي"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Weekly Worked"
+msgstr "الساعات الأسبوعية الفعلية"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Working Hours"
+msgstr "ساعات العمل اليوم"
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "You cannot check in from this location."
+msgstr "لا يمكنك تسجيل الحضور من هذا الموقع."
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "You reached the weekly worked hours threshold."
+msgstr "لقد بلغت الحد الأسبوعي المسموح لساعات العمل."
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "Your user is not linked to an employee profile."
+msgstr "المستخدم غير مرتبط بملف موظف."
+
+#. module: portal_check_in
+#. odoo-python
+#: code:addons/portal_check_in/controllers/portal.py:0
+msgid "لا يمكنك تسجيل الحضور من هذا الموقع."
+msgstr "لا يمكنك تسجيل الحضور من هذا الموقع."
