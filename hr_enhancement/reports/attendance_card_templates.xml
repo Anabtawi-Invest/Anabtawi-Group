@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_attendance_card">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div class="page o_ae_attendance_card"
+                     style="font-family: Helvetica, Arial, sans-serif; position: relative; padding-bottom: 20mm;">
+                    <t t-call="hr_enhancement.ae_pdf_header"/>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;"
+                           cellpadding="4" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th style="border: 1px solid #000;"><t t-out="h_emp_no"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_emp_name"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_week_day"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_date_in"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_time_in"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_date_out"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_time_out"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_vacation"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_leave"/></th>
+                                <th style="border: 1px solid #000;"><t t-out="h_attendance"/></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="report_lines" t-as="row">
+                                <td t-if="row_first" style="vertical-align:middle;text-align:center;border:1px solid #000;"
+                                    t-att-rowspan="rowspan">
+                                    <t t-out="employee.identification_id or employee.barcode or employee.id"/>
+                                </td>
+                                <td t-if="row_first" style="vertical-align:middle;text-align:center;border:1px solid #000;"
+                                    t-att-rowspan="rowspan">
+                                    <t t-out="employee.name"/>
+                                </td>
+                                <td style="vertical-align:middle;text-align:center;border:1px solid #000;">
+                                    <t t-out="row['weekday']"/>
+                                    <t t-if="row['weekday_note']"><br/><t t-out="row['weekday_note']"/></t>
+                                </td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['date_in']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['time_in']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['date_out']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['time_out']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['vacation']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['leave']"/></td>
+                                <td style="text-align:center;border:1px solid #000;"><t t-out="row['attendance']"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <t t-call="hr_enhancement.ae_pdf_footer"/>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

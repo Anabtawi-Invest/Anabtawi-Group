@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_enhancement_attendance_card_wizard" model="ir.ui.view">
+        <field name="name">hr.enhancement.attendance.card.wizard.form</field>
+        <field name="model">hr.enhancement.attendance.card.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Attendance Cards">
+                <group>
+                    <field name="employee_id"/>
+                    <field name="date_from"/>
+                    <field name="date_to"/>
+                </group>
+                <footer>
+                    <button name="action_print_pdf" string="Print PDF" type="object" class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_enhancement_attendance_card_wizard" model="ir.actions.act_window">
+        <field name="name">Attendance Cards</field>
+        <field name="res_model">hr.enhancement.attendance.card.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="view_hr_enhancement_attendance_card_wizard"/>
+    </record>
+
+    <menuitem id="menu_hr_enhancement_attendance_card"
+              name="Attendance Cards PDF"
+              parent="hr_attendance.menu_hr_attendance_root"
+              action="action_hr_enhancement_attendance_card_wizard"
+              groups="hr_attendance.group_hr_attendance_officer"
+              sequence="25"/>
+</odoo>

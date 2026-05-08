@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="paperformat_hr_enhancement_attendance_card" model="report.paperformat">
+        <field name="name">Attendance Card (A4 Landscape)</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="page_height">0</field>
+        <field name="page_width">0</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">8</field>
+        <field name="margin_bottom">18</field>
+        <field name="margin_left">6</field>
+        <field name="margin_right">6</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <record id="action_report_attendance_card" model="ir.actions.report">
+        <field name="name">Attendance Cards</field>
+        <field name="model">hr.enhancement.attendance.card.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_enhancement.report_attendance_card</field>
+        <field name="report_file">hr_enhancement.report_attendance_card</field>
+        <field name="paperformat_id" ref="paperformat_hr_enhancement_attendance_card"/>
+        <field name="print_report_name">'Attendance_Card_%s' % ((object.employee_id.identification_id or object.employee_id.barcode or object.employee_id.id),)</field>
+    </record>
+</odoo>
