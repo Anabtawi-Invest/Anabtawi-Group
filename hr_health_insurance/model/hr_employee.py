@@ -9,6 +9,12 @@ class Employee(models.Model):
     _inherit = "hr.employee"
 
     health_insurance_ids = fields.One2many("health.insurance", "employee_id", string="Health Insurances")
+    health_document_line_ids = fields.One2many(
+        "hr.health.employee.document",
+        "employee_id",
+        string="HR Documents",
+        groups="hr.group_hr_user",
+    )
     health_insurance_eligible = fields.Boolean(
         string="Health Insurance UI Eligible",
         compute="_compute_health_insurance_eligible",
