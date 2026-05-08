@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 {
     "name": "HR Enhancement",
-    "version": "19.0.1.3.0",
+    "version": "19.0.1.4.0",
     "category": "Human Resources",
     "summary": "Time off, attendance card PDF, regulated employee documents",
-    "depends": ["hr", "hr_holidays", "hr_attendance", "mail"],
+    "depends": ["hr", "hr_holidays", "hr_attendance", "mail", "hr_health_insurance"],
     "data": [
         "security/ir.model.access.csv",
-        "data/hr_ae_document_type_data.xml",
-        "views/hr_ae_document_type_views.xml",
+        "data/hr_health_document_type_data.xml",
         "views/hr_employee_personal_views.xml",
-        "views/hr_employee_document_views.xml",
         "data/employee_document_migrate.xml",
         "data/employee_document_cron.xml",
         "reports/attendance_card_report.xml",
