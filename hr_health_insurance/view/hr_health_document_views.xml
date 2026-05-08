@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_health_document_type_view_list" model="ir.ui.view">
+        <field name="name">hr.health.document.type.list</field>
+        <field name="model">hr.health.document.type</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code" optional="show"/>
+                <field name="active" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="hr_health_document_type_view_form" model="ir.ui.view">
+        <field name="name">hr.health.document.type.form</field>
+        <field name="model">hr.health.document.type</field>
+        <field name="arch" type="xml">
+            <form string="Document Type">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="hr_health_document_type_action" model="ir.actions.act_window">
+        <field name="name">Document Types</field>
+        <field name="res_model">hr.health.document.type</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem
+        id="menu_hr_health_document_type"
+        name="Document Types"
+        action="hr_health_document_type_action"
+        parent="menu_hr_health_insurance_master"
+        sequence="5"
+        groups="hr.group_hr_manager"
+    />
+</odoo>

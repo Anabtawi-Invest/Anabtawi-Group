@@ -1,5 +1,8 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_hr_health_age_group,hr.health.age.group,model_hr_health_age_group,,1,1,1,1
+access_hr_health_document_type_officer,hr.health.document.type officer,hr_health_insurance.model_hr_health_document_type,hr.group_hr_user,1,0,0,0
+access_hr_health_document_type_manager,hr.health.document.type manager,hr_health_insurance.model_hr_health_document_type,hr.group_hr_manager,1,1,1,1
+access_hr_health_employee_document_officer,hr.health.employee.document officer,hr_health_insurance.model_hr_health_employee_document,hr.group_hr_user,1,1,1,1
 access_health_insurance_officer,health.insurance.officer,model_health_insurance,hr.group_hr_user,1,1,1,1
 access_health_insurance_employee,health.insurance.employee,model_health_insurance,base.group_user,1,0,0,0
 access.hr.health.grade.officer,access_hr_health_grade_officer,hr_health_insurance.model_hr_health_grade,hr.group_hr_user,1,1,1,1
