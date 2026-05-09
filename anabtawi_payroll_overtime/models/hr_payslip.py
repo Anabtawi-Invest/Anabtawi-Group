@@ -42,11 +42,26 @@ class HrPayslip(models.Model):
         self.ensure_one()
         if not self.employee_id:
             return 0.0
+        # Align with OT wallet when latness_deduction (or similar) is installed.
+        if hasattr(self, "_get_ot_available_for_deduction"):
+            return max(0.0, self._get_ot_available_for_deduction())
 
         if hasattr(self.employee_id, "get_overtime_data_by_employee"):
             overtime_data = self.employee_id.get_overtime_data_by_employee()
             return max(0.0, overtime_data.get(self.employee_id.id, {}).get("unspent_compensable_overtime", 0.0))
         return 0.0
+
+    def _message_overtime_exceeds_balance(self, requested_hours, balance_hours):
+        self.ensure_one()
+        return _(
+            "You cannot pay more extra hours than the available balance. "
+            "Requested: %(requested).2f h, available: %(balance).2f h (employee: %(employee)s).\n"
+            "لا يمكن صرف ساعات إضافية أكبر من الرصيد المتاح. المطلوب: %(requested).2f س، المتاح: %(balance).2f س (الموظف: %(employee)s)."
+        ) % {
+            "requested": requested_hours,
+            "balance": balance_hours,
+            "employee": self.employee_id.name or "",
+        }
 
     def _get_overtime_quantity_to_deduct(self):
         self.ensure_one()
@@ -84,13 +99,8 @@ class HrPayslip(models.Model):
                 _logger.info("Payslip %s skipped overtime deduction: overtime quantity is %s", slip.id, quantity)
                 continue
             current_balance = slip._get_employee_extra_hours_balance()
-            if quantity > current_balance:
-                raise ValidationError(_(
-                    "The overtime quantity (%(quantity).2f) is greater than the employee balance (%(balance).2f) for %(employee)s.",
-                    quantity=quantity,
-                    balance=current_balance,
-                    employee=slip.employee_id.name,
-                ))
+            if quantity > current_balance + 1e-6:
+                raise ValidationError(slip._message_overtime_exceeds_balance(quantity, current_balance))
             _logger.info(
                 "Payslip %s overtime deduction start: employee=%s quantity=%s balance_before=%s",
                 slip.id, slip.employee_id.id, quantity, current_balance,
