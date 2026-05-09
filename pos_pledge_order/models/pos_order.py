@@ -239,7 +239,10 @@ class PosOrder(models.Model):
     @api.model
     def _process_order(self, order, existing_order):
         pledge_meta = self._pledge_strip_ui_order(order)
-        res_id = super()._process_order(order, existing_order)
+        pos_order = self
+        if pledge_meta["total"] > 0:
+            pos_order = self.with_context(pos_pledge_sync=True)
+        res_id = super(PosOrder, pos_order)._process_order(order, existing_order)
         if pledge_meta["total"] > 0:
             po = self.browse(res_id).sudo()
             po.write({
@@ -248,6 +251,12 @@ class PosOrder(models.Model):
                 "pledge_snapshot_product_ids": [(6, 0, pledge_meta["product_ids"])],
             })
         return res_id
+
+    def _process_payment_lines(self, order_data, order, pos_session, draft):
+        """Sync amount_total/amount_paid from DB lines+payments; stub new() can diverge from persisted lines."""
+        if self.env.context.get('pos_pledge_sync'):
+            order._compute_prices()
+        return super()._process_payment_lines(order_data, order, pos_session, draft)
 
     def _prepare_pos_pledge_tracking_vals(self, pledge_total, pledge_product_ids):
         """Prepare payload to create pos.pledge tracking record from a paid POS order."""
