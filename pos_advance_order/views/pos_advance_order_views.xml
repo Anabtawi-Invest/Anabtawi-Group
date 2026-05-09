@@ -35,7 +35,7 @@
                 <field name="user_id"/>
                 <field name="picking_date"/>
                 <field name="pos_config_id"/>
-                <field name="payment_method"/>
+                <field name="pos_payment_method_id"/>
                 <field name="payment_progress"/>
                 <field name="state"/>
                 <field name="amount_total" widget="monetary"/>
@@ -136,7 +136,8 @@
                         <group>
                             <field name="partner_id" required="1" readonly="state != 'draft'"/>
                             <field name="user_id" required="1" readonly="state != 'draft'"/>
-                            <field name="payment_method" required="1" readonly="state != 'draft'"/>
+                            <field name="pos_payment_method_id" required="1" readonly="state != 'draft'"/>
+                            <field name="payment_method" invisible="1"/>
                             <field name="advance_amount" widget="monetary" readonly="state != 'draft'"/>
                             <field name="is_employee_pricelist" readonly="state != 'draft'"/>
                             <field name="employee_pricelist_employee_id" readonly="1" invisible="not employee_pricelist_employee_id"/>

@@ -4,6 +4,31 @@ import { Component, onMounted, useState } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
+import { formatCurrency } from "@web/core/currency";
+
+/** Same filtering idea as PaymentScreen (minimal + pay_later) plus exclusions for advances. */
+export function getAdvanceEligiblePaymentMethods(pos) {
+    if (!pos?.config?.payment_method_ids) {
+        return [];
+    }
+    const cashier = pos.cashier;
+    const role = cashier?._role;
+    const list = [...pos.config.payment_method_ids]
+        .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+        .filter((pm) => {
+            if (role === "minimal" && pm.type === "pay_later") {
+                return false;
+            }
+            if (pm.type === "pay_later") {
+                return false;
+            }
+            if (pm.payment_method_type && pm.payment_method_type !== "none") {
+                return false;
+            }
+            return true;
+        });
+    return list;
+}
 
 export class AdvanceOrderFormPopup extends Component {
     static template = "pos_advance_order.AdvanceOrderFormPopup";
@@ -11,6 +36,7 @@ export class AdvanceOrderFormPopup extends Component {
     static props = {
         close: Function,
         getPayload: Function,
+        pos: Object,
         posConfigId: { type: Number, optional: true },
         companyId: { type: Number, optional: true },
     };
@@ -18,10 +44,13 @@ export class AdvanceOrderFormPopup extends Component {
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
+        const paymentMethods = getAdvanceEligiblePaymentMethods(this.props.pos);
+        const defaultPmId = paymentMethods.length ? paymentMethods[0].id : null;
+
         this.state = useState({
             loading: true,
             advance_amount: 0,
-            payment_method: "cash",
+            selected_payment_method_id: defaultPmId,
             from_pos_config_id: this.props.posConfigId || null,
             picking_pos_config_id: this.props.posConfigId || null,
             pricelist_name: "",
@@ -31,12 +60,47 @@ export class AdvanceOrderFormPopup extends Component {
             employees: [],
             discounts: [],
             pos_configs: [],
+            payment_methods: paymentMethods,
         });
 
         onMounted(async () => {
             await this._loadPopupData();
             this.state.loading = false;
         });
+    }
+
+    paymentMethodIconSrc(pm) {
+        if (!pm) {
+            return "";
+        }
+        if (pm.image) {
+            return `/web/image/pos.payment.method/${pm.id}/image`;
+        }
+        if (pm.type === "cash") {
+            return "/point_of_sale/static/src/img/money.png";
+        }
+        return "/point_of_sale/static/src/img/card-bank.png";
+    }
+
+    advanceAmountFmt() {
+        const currencyId = this.props.pos?.currency?.id;
+        const amount = Number(this.state.advance_amount) || 0;
+        return formatCurrency(amount, currencyId);
+    }
+
+    isPaymentSelected(pm) {
+        return pm.id === this.state.selected_payment_method_id;
+    }
+
+    paymentMethodRowClass(pm) {
+        const selected = this.isPaymentSelected(pm);
+        return (
+            `button paymentmethod btn btn-secondary btn-lg lh-lg d-flex justify-content-between align-items-center flex-fill text-start ${selected ? "border border-3 border-primary" : "opacity-75"}`
+        );
+    }
+
+    selectPaymentMethod(pm) {
+        this.state.selected_payment_method_id = pm.id;
     }
 
     async _loadPopupData() {
@@ -105,14 +169,6 @@ export class AdvanceOrderFormPopup extends Component {
         this.state.advance_amount = Number.isFinite(value) ? value : 0;
     }
 
-    onPaymentMethodChange(ev) {
-        this.state.payment_method = ev.target.value || "cash";
-    }
-
-    onFromPosChange(ev) {
-        this.state.from_pos_config_id = ev.target.value ? parseInt(ev.target.value, 10) : null;
-    }
-
     onPickingPosChange(ev) {
         this.state.picking_pos_config_id = ev.target.value ? parseInt(ev.target.value, 10) : null;
         this._syncPricelistName();
@@ -140,6 +196,12 @@ export class AdvanceOrderFormPopup extends Component {
                 : `${discount.value}`;
     }
 
+    get noEligiblePaymentMethodsText() {
+        return _t(
+            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration."
+        );
+    }
+
     confirm() {
         if (!this.state.advance_amount || this.state.advance_amount <= 0) {
             this.notification.add(_t("Advance amount must be greater than zero."), { type: "warning" });
@@ -154,13 +216,21 @@ export class AdvanceOrderFormPopup extends Component {
             this.notification.add(_t("Please select Picking POS."), { type: "warning" });
             return;
         }
+        if (!this.state.selected_payment_method_id) {
+            this.notification.add(_t("Please select a payment method."), { type: "warning" });
+            return;
+        }
         if (this.state.with_employee && !this.state.employee_id) {
             this.notification.add(_t("Please select an employee."), { type: "warning" });
             return;
         }
+        const selectedPm = this.state.payment_methods.find(
+            (pm) => pm.id === this.state.selected_payment_method_id
+        );
         this.props.getPayload({
             advance_amount: this.state.advance_amount,
-            payment_method: this.state.payment_method,
+            payment_method_id: this.state.selected_payment_method_id,
+            payment_method_name: selectedPm?.name || "",
             from_pos_config_id: currentFromPosId,
             pos_config_id: this.state.picking_pos_config_id,
             employee_id: this.state.with_employee ? this.state.employee_id : false,
@@ -173,4 +243,3 @@ export class AdvanceOrderFormPopup extends Component {
         this.props.close();
     }
 }
-

@@ -27,6 +27,13 @@ class PosConfig(models.Model):
         domain="[('account_type', '=', 'liability_current')]",
         help="Liability account for customer advance payments",
     )
+    pos_advance_receivable_account_id = fields.Many2one(
+        "account.account",
+        string="POS Advance Receivable Account",
+        domain="[('account_type', '=', 'asset_receivable')]",
+        help="Accounts receivable used when posting advance payment clearing and reconciliation. "
+        "If empty, each customer's receivable account is used.",
+    )
 
     pos_cash_journal_id = fields.Many2one(
         "account.journal",

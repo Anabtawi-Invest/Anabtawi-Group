@@ -19,6 +19,9 @@ export class AdvanceOrderReceipt extends Component {
     }
 
     get paymentMethodLabel() {
-        return this.data.paymentMethod === "bank" ? _t("Card/Bank") : _t("Cash");
+        if (this.data.paymentMethod) {
+            return this.data.paymentMethod;
+        }
+        return _t("N/A");
     }
 }
