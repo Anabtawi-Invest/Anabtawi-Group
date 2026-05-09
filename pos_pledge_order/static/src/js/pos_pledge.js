@@ -939,7 +939,9 @@ patch(PaymentScreen.prototype, {
             console.log(`[PLEDGE]   -> Final price for line: ${price}`);
             
             if (product?.has_pledge) {
-                const lineAmount = product.pledge_amount || price;
+                const qty = line.get_quantity ? line.get_quantity() : line.qty || 0;
+                const unitPledge = product.pledge_amount || 0;
+                const lineAmount = unitPledge ? unitPledge * qty : price;
                 pledgeAmount += lineAmount;
                 console.log(`[PLEDGE]   -> Adding ${lineAmount} to pledgeAmount (total: ${pledgeAmount})`);
             } else if (product?.is_employee_service) {

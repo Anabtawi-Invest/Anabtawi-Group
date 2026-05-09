@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import models, api, fields, _
+from odoo.exceptions import UserError, ValidationError
+from odoo.fields import Command
 from odoo.tools import float_compare, float_repr
 import logging
 
@@ -16,10 +18,26 @@ class PosOrder(models.Model):
     )
     pledge_collection_pos_order_id = fields.Many2one(
         'pos.order',
-        string='Pledge Collection POS Order',
+        string='Pledge Collection POS Order (legacy)',
         readonly=True,
         copy=False,
-        help='Technical link to the POS order created automatically to collect pledge amount.',
+        help='Legacy: separate POS order used before pledge was posted as accounting only.',
+    )
+    pledge_deposit_move_id = fields.Many2one(
+        'account.move',
+        string='Pledge Deposit Entry',
+        readonly=True,
+        copy=False,
+        help='Posted like advance deposit: Dr liquidity / Cr POS Advance Account (pledge not in pos.payment).',
+    )
+    pledge_snapshot_product_ids = fields.Many2many(
+        'product.product',
+        'pos_order_pledge_snapshot_product_rel',
+        'pos_order_id',
+        'product_id',
+        string='Pledge Products (removed from order lines)',
+        readonly=True,
+        copy=False,
     )
     is_pledge_generated = fields.Boolean(
         string='Pledge Generated Order',
@@ -74,31 +92,14 @@ class PosOrder(models.Model):
         _logger.info("[PLEDGE] _order_fields: employee_id = %s", employee_id)
         return vals
 
-    @api.depends('lines.product_id.has_pledge')
+    @api.depends('lines.product_id.has_pledge', 'total_pledge_amount')
     def _compute_has_pledge(self):
         for order in self:
-            _logger.info("[PLEDGE] Computing has_pledge for order: %s", order.name)
-            _logger.info("[PLEDGE] Order has %d lines", len(order.lines))
-            
-            pledge_lines = []
-            for line in order.lines:
-                _logger.info("[PLEDGE]   Line: %s (Product ID: %s)", 
-                            line.product_id.name, line.product_id.id)
-                _logger.info("[PLEDGE]     - has_pledge: %s", line.product_id.has_pledge)
-                
-                if line.product_id.has_pledge:
-                    pledge_lines.append(line)
-                    _logger.info("[PLEDGE]     ✓ This is a pledge product!")
-            
-            has_pledge_items = len(pledge_lines) > 0
-            order.has_pledge = has_pledge_items
-            
-            if has_pledge_items:
-                _logger.info("[PLEDGE] ✓ Order %s computed has_pledge=True (%d pledge lines)", 
-                            order.name, len(pledge_lines))
-            else:
-                _logger.info("[PLEDGE] ✗ Order %s computed has_pledge=False (no pledge lines found)", 
-                            order.name)
+            has_line_pledge = any(
+                line.product_id and line.product_id.has_pledge for line in order.lines
+            )
+            has_snapshot = (order.total_pledge_amount or 0.0) > 0
+            order.has_pledge = has_line_pledge or has_snapshot
 
     def _create_pledge_payments(self):
         """
@@ -126,6 +127,94 @@ class PosOrder(models.Model):
             total_pledge_qty += qty
             pledge_product_ids.append(line.product_id.id)
         return total_pledge_amount, list(set(pledge_product_ids)), total_pledge_qty
+
+    def _get_pledge_totals(self):
+        """Pledge from remaining lines, or from snapshot when lines were stripped at sync."""
+        self.ensure_one()
+        amt, pids, qty = self._compute_pledge_from_lines()
+        if amt > 0:
+            return amt, pids, qty
+        snap_amt = self.total_pledge_amount or 0.0
+        if snap_amt <= 0:
+            return 0.0, [], 0.0
+        pids_snap = list(self.pledge_snapshot_product_ids.ids)
+        qty_snap = float(self.pledge_product_qty or 0)
+        return snap_amt, pids_snap, qty_snap
+
+    @api.model
+    def _pledge_strip_ui_order(self, order):
+        """Remove pledge lines from sync payload; reduce first payment by pledge (off-pos-payment pattern)."""
+        Product = self.env["product.product"].sudo()
+        meta = {"total": 0.0, "product_ids": [], "qty": 0.0}
+        is_refund = order.get("is_refund") or (order.get("amount_total") or 0) < 0
+        if is_refund:
+            return meta
+
+        lines = order.get("lines") or []
+        new_lines = []
+        for line in lines:
+            if not isinstance(line, (list, tuple)) or len(line) < 3:
+                new_lines.append(line)
+                continue
+            vals = line[2]
+            if not isinstance(vals, dict):
+                new_lines.append(line)
+                continue
+            pid = vals.get("product_id")
+            if not pid:
+                new_lines.append(line)
+                continue
+            prod = Product.browse(pid)
+            if prod.exists() and prod.has_pledge:
+                qty = float(vals.get("qty") or 0.0)
+                unit = prod.pledge_amount or 0.0
+                line_pledge = qty * unit
+                if line_pledge > 0:
+                    meta["total"] += line_pledge
+                    meta["qty"] += qty
+                    meta["product_ids"].append(pid)
+                continue
+            new_lines.append(line)
+
+        if meta["total"] <= 0:
+            return meta
+
+        order["lines"] = new_lines
+        meta["product_ids"] = list(set(meta["product_ids"]))
+
+        payments = order.get("payment_ids") or []
+        for pay in payments:
+            if not isinstance(pay, (list, tuple)) or len(pay) < 3:
+                continue
+            pvals = pay[2]
+            if not isinstance(pvals, dict):
+                continue
+            p_amt = float(pvals.get("amount") or 0.0)
+            if p_amt <= 0:
+                continue
+            new_amt = p_amt - meta["total"]
+            if new_amt < -0.0001:
+                raise UserError(_("The pledge amount exceeds the payment. Adjust payments or pledge configuration."))
+            pvals["amount"] = new_amt
+            break
+
+        for k in ("amount_total", "amount_tax", "amount_paid", "amount_return", "amount_difference"):
+            order.pop(k, None)
+
+        return meta
+
+    @api.model
+    def _process_order(self, order, existing_order):
+        pledge_meta = self._pledge_strip_ui_order(order)
+        res_id = super()._process_order(order, existing_order)
+        if pledge_meta["total"] > 0:
+            po = self.browse(res_id).sudo()
+            po.write({
+                "total_pledge_amount": pledge_meta["total"],
+                "pledge_product_qty": int(pledge_meta["qty"]),
+                "pledge_snapshot_product_ids": [(6, 0, pledge_meta["product_ids"])],
+            })
+        return res_id
 
     def _prepare_pos_pledge_tracking_vals(self, pledge_total, pledge_product_ids):
         """Prepare payload to create pos.pledge tracking record from a paid POS order."""
@@ -181,92 +270,111 @@ class PosOrder(models.Model):
             "currency_id": self.currency_id.id or self.company_id.currency_id.id,
         }
 
-    def _create_pledge_collection_orders(self):
-        """Create a separate paid POS order for pledge amount (same behavior as advance flow)."""
-        PosOrder = self.env['pos.order'].sudo()
-        PosOrderLine = self.env['pos.order.line'].sudo()
-        PosPayment = self.env['pos.payment'].sudo()
+    def _pledge_get_payment_journal_from_order(self):
+        self.ensure_one()
+        for pay in self.payment_ids:
+            if pay.payment_method_id and pay.payment_method_id.journal_id:
+                return pay.payment_method_id.journal_id
+        pm = self.config_id.payment_method_ids.filtered(lambda m: m.type == "cash" and m.journal_id)[:1]
+        if pm:
+            return pm.journal_id
+        pm = self.config_id.payment_method_ids.filtered(lambda m: m.journal_id)[:1]
+        return pm.journal_id
 
+    def _pledge_get_inbound_payment_method_line(self, journal):
+        line = journal.inbound_payment_method_line_ids.filtered(lambda l: l.payment_account_id)[:1]
+        if not line:
+            line = journal.inbound_payment_method_line_ids[:1]
+        if not line:
+            raise UserError(
+                _("Please define an inbound payment method on journal %s for pledge deposit posting.")
+                % journal.display_name
+            )
+        return line
+
+    def _post_pledge_deposit_move(self):
+        """Dr liquidity (same journal as POS payments) / Cr POS Advance — pledge not in pos.payment totals."""
+        self.ensure_one()
+        if self.pledge_deposit_move_id:
+            return self.pledge_deposit_move_id
+
+        pledge_total, _pids, pledge_qty = self._get_pledge_totals()
+        if pledge_total <= 0 or pledge_qty <= 0:
+            return self.env["account.move"]
+
+        liability_acc = self.config_id.pos_advance_account_id
+        if not liability_acc:
+            raise UserError(_("Please set 'POS Advance Account' on the POS configuration first."))
+        if not self.partner_id:
+            raise UserError(_("A customer is required to post pledge deposit for order %s.") % self.name)
+
+        journal = self._pledge_get_payment_journal_from_order()
+        if not journal:
+            raise UserError(_("Configure payment methods with journals on the POS to post pledge deposits."))
+
+        payment_method_line = self._pledge_get_inbound_payment_method_line(journal)
+        liquidity_account = payment_method_line.payment_account_id
+        if not liquidity_account:
+            raise UserError(
+                _(
+                    "Configure an inbound payment method with a payment account on journal '%s' "
+                    "so pledge deposits can be posted."
+                )
+                % journal.display_name
+            )
+
+        move = self.env["account.move"].sudo().create({
+            "move_type": "entry",
+            "journal_id": journal.id,
+            "date": fields.Date.context_today(self),
+            "ref": _("POS pledge deposit - %s") % self.name,
+            "partner_id": self.partner_id.id,
+            "line_ids": [
+                Command.create({
+                    "name": _("Pledge deposit %s") % self.name,
+                    "account_id": liquidity_account.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": pledge_total,
+                    "credit": 0.0,
+                }),
+                Command.create({
+                    "name": _("Pledge deposit %s") % self.name,
+                    "account_id": liability_acc.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": 0.0,
+                    "credit": pledge_total,
+                }),
+            ],
+        })
+        move.action_post()
+        self.pledge_deposit_move_id = move.id
+        if self.session_id:
+            self.session_id._invalidate_open_sessions_cash_balance()
+        _logger.info(
+            "[PLEDGE] Posted pledge deposit move %s for order %s (amount=%s)",
+            move.id,
+            self.name,
+            pledge_total,
+        )
+        return move
+
+    def _create_pledge_collection_orders(self):
+        """On paid orders with pledge lines: post liability move and tracking record (no extra POS order)."""
         for order in self:
             if order.is_pledge_generated:
                 continue
-            if order.pledge_collection_pos_order_id:
+            pledge_total, pledge_product_ids, pledge_qty = order._get_pledge_totals()
+            if pledge_total <= 0 or pledge_qty <= 0:
                 continue
-
-            has_pledge_field = 'pledge_product_id' in order.config_id._fields
-            pledge_product = order.config_id.pledge_product_id if has_pledge_field else False
-            if not pledge_product:
-                _logger.info(
-                    "[PLEDGE] Skipping pledge collection order for %s (missing config pledge_product_id).",
-                    order.name,
-                )
-                continue
-
-            pledge_total, pledge_product_ids, pledge_qty = order._compute_pledge_from_lines()
-            if pledge_total <= 0:
-                continue
-            if pledge_qty <= 0:
-                continue
-
-            payment_method = order.payment_ids[:1].payment_method_id or order.session_id.payment_method_ids[:1]
-            if not payment_method:
-                _logger.warning("[PLEDGE] No payment method found to create pledge collection order for %s", order.name)
-                continue
-
-            pledge_order = PosOrder.create({
-                'session_id': order.session_id.id,
-                'partner_id': order.partner_id.id if order.partner_id else False,
-                'to_invoice': False,
-                'amount_tax': 0.0,
-                'amount_total': 0.0,
-                'amount_paid': 0.0,
-                'amount_return': 0.0,
-                'amount_difference': 0.0,
-                'is_pledge_generated': True,
-            })
-
-            PosOrderLine.create({
-                'order_id': pledge_order.id,
-                'product_id': pledge_product.id,
-                'name': _("Pledge"),
-                'qty': pledge_qty,
-                'price_unit': pledge_total / pledge_qty,
-                'discount': 0.0,
-                'tax_ids': [(6, 0, [])],
-                'price_subtotal': pledge_total,
-                'price_subtotal_incl': pledge_total,
-                'price_extra': 0.0,
-                'full_product_name': pledge_product.display_name,
-            })
-
-            pledge_order._compute_prices()
-            PosPayment.create({
-                'pos_order_id': pledge_order.id,
-                'payment_method_id': payment_method.id,
-                'amount': pledge_order.amount_total,
-            })
-            pledge_order._compute_prices()
-            pledge_order.action_pos_order_paid()
-            pledge_order._create_order_picking()
-
-            order.pledge_collection_pos_order_id = pledge_order.id
-            _logger.info(
-                "[PLEDGE] Created pledge collection POS order %s for source order %s (amount=%s).",
-                pledge_order.name,
-                order.name,
-                pledge_total,
-            )
 
             if not order.partner_id:
                 _logger.warning(
-                    "[PLEDGE] Cannot create pos.pledge for %s because customer is missing.",
+                    "[PLEDGE] Cannot process pledge for %s because customer is missing.",
                     order.name,
                 )
                 continue
 
-            pledge_record = self.env["pos.pledge"].sudo().search(
-                [("pos_order_id", "=", order.id)], limit=1
-            )
+            pledge_record = self.env["pos.pledge"].sudo().search([("pos_order_id", "=", order.id)], limit=1)
             if not pledge_record:
                 try:
                     vals = order._prepare_pos_pledge_tracking_vals(pledge_total, pledge_product_ids)
@@ -285,7 +393,11 @@ class PosOrder(models.Model):
                     continue
 
             order.pledge_id = pledge_record.id
-    
+
+            move = order._post_pledge_deposit_move()
+            if move and pledge_record:
+                pledge_record.pledge_move_id = move.id
+
     def write(self, vals):
         """Override write to trigger pledge order creation when order state changes."""
         _logger.info("[PLEDGE] write() called on %d orders with vals: %s", len(self), vals)

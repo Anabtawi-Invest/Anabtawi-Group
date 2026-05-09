@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension" owl="1">
+        <xpath expr="//div[@t-if='props.default_cash_details.payment_amount']" position="after">
+            <div
+                t-if="shouldShowPledgeCashLine()"
+                class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                <span t-esc="pledgeCashLineLabel()"/>
+                <span class="align-top" t-esc="env.utils.formatCurrency(Math.abs(props.default_cash_details.pledge_payment_amount))"/>
+            </div>
+        </xpath>
+        <xpath expr="//div[@t-foreach='props.non_cash_payment_methods']//div[contains(@class,'fs-3')]" position="after">
+            <div
+                t-if="shouldShowPledgeBankLine(pm)"
+                class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                <span t-esc="pledgeBankLineLabel(pm)"/>
+                <span class="align-top" t-esc="env.utils.formatCurrency(Math.abs(pm.pledge_payment_amount))"/>
+            </div>
+        </xpath>
+    </t>
+</templates>

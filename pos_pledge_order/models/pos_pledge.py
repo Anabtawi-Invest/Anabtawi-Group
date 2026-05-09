@@ -2,7 +2,7 @@
 import logging
 
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -154,7 +154,32 @@ class PosPledge(models.Model):
         return True
 
     def action_return_pledge(self):
-        self.write({"state": "returned", "return_date": fields.Datetime.now()})
+        """Reverse posted pledge deposit move and mark pledge returned."""
+        for pledge in self:
+            if pledge.state == "returned" and pledge.return_move_id:
+                continue
+            if pledge.state != "active":
+                raise UserError(_("Only active pledges can be returned: %s") % pledge.name)
+            if pledge.return_move_id:
+                continue
+            move = pledge.pledge_move_id
+            if not move or move.state != "posted":
+                raise UserError(
+                    _("No posted pledge journal entry is linked to %s. Cannot reverse.") % pledge.name
+                )
+            reverse_moves = move._reverse_moves(
+                [{
+                    "date": fields.Date.context_today(pledge),
+                    "ref": _("Pledge return - %s") % pledge.name,
+                }],
+                cancel=False,
+            )
+            reverse_moves.action_post()
+            pledge.write({
+                "state": "returned",
+                "return_date": fields.Datetime.now(),
+                "return_move_id": reverse_moves.id,
+            })
         return True
 
     def action_link_payments(self):
