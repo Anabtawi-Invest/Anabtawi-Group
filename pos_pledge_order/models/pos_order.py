@@ -198,10 +198,43 @@ class PosOrder(models.Model):
             pvals["amount"] = new_amt
             break
 
-        for k in ("amount_total", "amount_tax", "amount_paid", "amount_return", "amount_difference"):
-            order.pop(k, None)
-
+        # amount_tax, amount_total, amount_paid, etc. are required on pos.order at create();
+        # stripping lines does not trigger server-side recompute before create().
+        self._pledge_recompute_sync_order_amounts(order)
         return meta
+
+    @api.model
+    def _pledge_recompute_sync_order_amounts(self, order):
+        """Recompute pos.order header amounts from sync payload after pledge lines/payments were adjusted.
+
+        Core _process_order passes the dict straight into create(); required monetary fields must be set.
+        """
+        sid = order.get("session_id")
+        if not sid:
+            return
+        session = self.env["pos.session"].browse(sid)
+        if not session.exists():
+            return
+        config = session.config_id
+        vals_for_new = {
+            "session_id": session.id,
+            "company_id": order.get("company_id") or config.company_id.id,
+            "pricelist_id": order.get("pricelist_id") or config.pricelist_id.id,
+            "fiscal_position_id": order.get("fiscal_position_id")
+            or config.default_fiscal_position_id.id,
+            "lines": order.get("lines") or [],
+            "payment_ids": order.get("payment_ids") or [],
+            "is_refund": order.get("is_refund", False),
+        }
+        if order.get("partner_id"):
+            vals_for_new["partner_id"] = order["partner_id"]
+        stub = self.new(vals_for_new)
+        stub._compute_prices()
+        order["amount_tax"] = stub.amount_tax
+        order["amount_total"] = stub.amount_total
+        order["amount_paid"] = stub.amount_paid
+        order["amount_return"] = stub.amount_return
+        order["amount_difference"] = stub.amount_difference
 
     @api.model
     def _process_order(self, order, existing_order):
