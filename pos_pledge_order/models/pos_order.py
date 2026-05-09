@@ -285,13 +285,17 @@ class PosOrder(models.Model):
         if pledge_meta["total"] > 0:
             pos_order = self.with_context(pos_pledge_sync=True)
         res_id = super(PosOrder, pos_order)._process_order(order, existing_order)
+        po = self.browse(res_id).sudo()
         if pledge_meta["total"] > 0:
-            po = self.browse(res_id).sudo()
             po.write({
                 "total_pledge_amount": pledge_meta["total"],
                 "pledge_product_qty": int(pledge_meta["qty"]),
                 "pledge_snapshot_product_ids": [(6, 0, pledge_meta["product_ids"])],
             })
+            # Journal entry & pos.pledge need snapshot + paid state. Core calls write({'state': paid})
+            # before this snapshot exists, so _get_pledge_totals() was 0 in write() — run again here.
+            if po.state in ("paid", "done"):
+                po._create_pledge_collection_orders()
         return res_id
 
     def _process_payment_lines(self, order_data, order, pos_session, draft):
@@ -488,8 +492,8 @@ class PosOrder(models.Model):
         
         result = super().write(vals)
         
-        # If order is being validated/paid, create pledge collection orders.
-        # This happens after order is synced from POS
+        # Pledge deposit is finalized in _process_order after total_pledge_amount snapshot write.
+        # This hook still runs when state→paid before snapshot (early no-op) or for non-POS writes.
         if vals.get('state') in ('paid', 'done'):
             _logger.info("[PLEDGE] Order state changed to %s, checking for pledge orders", vals.get('state'))
             normal_orders = self.filtered(lambda o: not o.is_pledge_generated)
