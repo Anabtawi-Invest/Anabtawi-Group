@@ -24,7 +24,7 @@ class HrEmployee(models.Model):
     )
 
     @api.model
-    def _generate_employee_password(self, length=12):
+    def _generate_employee_password(self, length=5):
         digits = string.digits
         return "".join(secrets.choice(digits) for _ in range(int(length)))
 
