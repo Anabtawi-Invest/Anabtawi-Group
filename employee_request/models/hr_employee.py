@@ -29,18 +29,28 @@ class HrEmployee(models.Model):
         return "".join(secrets.choice(digits) for _ in range(int(length)))
 
     @api.model
-    def _cron_rotate_employee_password(self):
-        """Rotate employee passwords every 24 hours (or initialize missing ones)."""
-        now = fields.Datetime.now()
-        cutoff = now - relativedelta(hours=24)
+    def _cron_rotate_employee_password(self, force=False):
+        """Rotate employee passwords (scheduled), or initialize missing / stale ones.
 
-        employees = self.sudo().search(
-            [
+        By default, only employees with no timestamp or a password older than 24 hours
+        are updated — so a manual "Run" shortly after the last generation does nothing.
+
+        Pass ``force=True`` (e.g. from the server action "Force rotate employee passwords")
+        to regenerate for all employees.
+        """
+        now = fields.Datetime.now()
+
+        if force:
+            domain = []
+        else:
+            cutoff = now - relativedelta(hours=24)
+            domain = [
                 "|",
                 ("employee_password_generated_at", "=", False),
                 ("employee_password_generated_at", "<", cutoff),
             ]
-        )
+
+        employees = self.sudo().search(domain)
         for employee in employees:
             employee.write(
                 {
