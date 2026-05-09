@@ -28,7 +28,7 @@ class PosOrder(models.Model):
         string='Pledge Deposit Entry',
         readonly=True,
         copy=False,
-        help='Posted like advance deposit: Dr liquidity / Cr POS Advance Account (pledge not in pos.payment).',
+        help='Posted as: Dr liquidity / Cr Pledge Liability Account from POS config (pledge not in pos.payment).',
     )
     pledge_snapshot_product_ids = fields.Many2many(
         'product.product',
@@ -293,7 +293,7 @@ class PosOrder(models.Model):
         return line
 
     def _post_pledge_deposit_move(self):
-        """Dr liquidity (same journal as POS payments) / Cr POS Advance — pledge not in pos.payment totals."""
+        """Dr liquidity (same journal as POS payments) / Cr pledge liability — pledge not in pos.payment totals."""
         self.ensure_one()
         if self.pledge_deposit_move_id:
             return self.pledge_deposit_move_id
@@ -302,9 +302,9 @@ class PosOrder(models.Model):
         if pledge_total <= 0 or pledge_qty <= 0:
             return self.env["account.move"]
 
-        liability_acc = self.config_id.pos_advance_account_id
+        liability_acc = self.config_id.pos_pledge_liability_account_id
         if not liability_acc:
-            raise UserError(_("Please set 'POS Advance Account' on the POS configuration first."))
+            raise UserError(_("Please set 'Pledge Liability Account' on the POS configuration first."))
         if not self.partner_id:
             raise UserError(_("A customer is required to post pledge deposit for order %s.") % self.name)
 

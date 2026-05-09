@@ -19,7 +19,7 @@
         * Three business case scenarios supported
     """,
     'author': 'Your Company',
-    'depends': ['point_of_sale', 'pos_sale', 'account', 'hr', 'pos_advance_order'],
+    'depends': ['point_of_sale', 'pos_sale', 'account', 'hr'],
     'data': [
         'security/ir.model.access.csv',
         'data/sequence.xml',
