@@ -109,6 +109,21 @@ class PosOrder(models.Model):
         _logger.info("[PLEDGE] _create_pledge_payments is disabled.")
         return True
 
+    @staticmethod
+    def _pledge_sync_line_qty(vals):
+        """Quantity on POS sync line command (qty is ORM name; some payloads use quantity)."""
+        if not isinstance(vals, dict):
+            return 0.0
+        raw = vals.get("qty")
+        if raw is None:
+            raw = vals.get("quantity")
+        if raw is None or raw is False:
+            return 0.0
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return 0.0
+
     def _compute_pledge_from_lines(self):
         """Return (total_pledge_amount, pledge_product_ids, total_pledge_qty) from pledged order lines."""
         self.ensure_one()
@@ -129,25 +144,36 @@ class PosOrder(models.Model):
         return total_pledge_amount, list(set(pledge_product_ids)), total_pledge_qty
 
     def _get_pledge_totals(self):
-        """Pledge from remaining lines, or from snapshot when lines were stripped at sync."""
+        """Pledge from remaining lines, or from snapshot when lines were stripped at sync.
+
+        For **one** pledge product on the order, posted accounting uses **pledge_product_qty ×
+        product.pledge_amount** (e.g. 5 × 10 → 50 on the journal entry), not a per-unit-only amount.
+        Multiple pledge SKUs still use **total_pledge_amount** from the POS snapshot (sum of lines).
+        """
         self.ensure_one()
         amt, pids, qty = self._compute_pledge_from_lines()
         if amt > 0:
             return amt, pids, qty
+        pids_snap = list(self.pledge_snapshot_product_ids.ids)
+        qty_snap = float(self.pledge_product_qty or 0)
+        cur = self.currency_id or self.company_id.currency_id
+        if len(pids_snap) == 1 and qty_snap > 0:
+            unit = float(self.env["product.product"].browse(pids_snap[0]).pledge_amount or 0.0)
+            if unit > 0:
+                je_amt = cur.round(qty_snap * unit)
+                if je_amt > 0:
+                    return je_amt, pids_snap, qty_snap
         snap_amt = self.total_pledge_amount or 0.0
         if snap_amt <= 0:
             return 0.0, [], 0.0
-        pids_snap = list(self.pledge_snapshot_product_ids.ids)
-        qty_snap = float(self.pledge_product_qty or 0)
         return snap_amt, pids_snap, qty_snap
 
     @api.model
     def _pledge_strip_ui_order(self, order):
-        """Remove pledge lines from sync; reduce payments by pledge total (spread across all positive lines).
+        """Remove pledge lines from sync; reduce payments by pledge total (spread across all positive rows).
 
-        Pledge amount matches the line totals from the POS payload when present (price_subtotal_incl),
-        so it stays consistent with tax/pricelist. Pledge is subtracted from payments across all
-        positive payment rows, not only the first (split payments / rounding).
+        Prefer **price_subtotal_incl** / **price_subtotal** from the POS payload (line total as computed in POS).
+        If those are missing, fall back to **qty × product.pledge_amount**.
         """
         Product = self.env["product.product"].sudo()
         meta = {"total": 0.0, "product_ids": [], "qty": 0.0}
@@ -174,7 +200,7 @@ class PosOrder(models.Model):
                 continue
             prod = Product.browse(pid)
             if prod.exists() and prod.has_pledge:
-                qty = float(vals.get("qty") or 0.0)
+                qty = self._pledge_sync_line_qty(vals)
                 line_pledge = 0.0
                 for key in ("price_subtotal_incl", "price_subtotal"):
                     raw = vals.get(key)
@@ -187,8 +213,9 @@ class PosOrder(models.Model):
                             line_pledge = cand
                             break
                 if line_pledge <= 0 and qty > 0:
-                    unit = prod.pledge_amount or 0.0
-                    line_pledge = qty * unit
+                    unit_pledge = float(prod.pledge_amount or 0.0)
+                    if unit_pledge > 0:
+                        line_pledge = currency.round(qty * unit_pledge)
                 if line_pledge > 0:
                     meta["total"] += line_pledge
                     meta["qty"] += qty
@@ -389,6 +416,10 @@ class PosOrder(models.Model):
         pledge_total, _pids, pledge_qty = self._get_pledge_totals()
         if pledge_total <= 0 or pledge_qty <= 0:
             return self.env["account.move"]
+
+        prec = self.currency_id.rounding
+        if float_compare(pledge_total, self.total_pledge_amount or 0.0, precision_rounding=prec) != 0:
+            self.sudo().write({"total_pledge_amount": pledge_total})
 
         liability_acc = self.config_id.pos_pledge_liability_account_id
         if not liability_acc:
