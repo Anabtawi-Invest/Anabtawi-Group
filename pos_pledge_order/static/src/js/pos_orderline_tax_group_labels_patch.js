@@ -8,7 +8,8 @@ import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
 /**
  * Core POS assumes `orderLine.order_id` is always set. After sync / related-model
- * updates, some lines can briefly lack `order_id`, breaking receipt rendering.
+ * updates, some lines can briefly lack `order_id`, breaking receipt rendering
+ * (taxGroupLabels, currency, prices, priceIncl, getTotalDiscount).
  *
  * Lazy getters are cached: patch then `clearGettersCache()`.
  */
@@ -18,6 +19,17 @@ function pledgeLogReceiptGuard(source, message, payload) {
         ts: new Date().toISOString(),
     });
 }
+
+/** Minimal `tax_details` shape when order/prices map is missing (avoid NaN in formatters). */
+const PLEDGE_EMPTY_LINE_TAX_DETAILS = Object.freeze({
+    total_included: 0,
+    total_excluded: 0,
+    no_discount_total_included: 0,
+    no_discount_total_excluded: 0,
+    discount_amount: 0,
+    total_excluded_currency: 0,
+    total_included_currency: 0,
+});
 
 patch(PosOrderlineAccounting.prototype, {
     get taxGroupLabels() {
@@ -52,6 +64,51 @@ patch(PosOrderlineAccounting.prototype, {
             });
             return "";
         }
+    },
+
+    get prices() {
+        const order = this.order_id;
+        if (!order?.prices?.baseLineByLineUuids) {
+            if (!order) {
+                pledgeLogReceiptGuard("prices", "order_id missing", { lineUuid: this.uuid });
+            }
+            return PLEDGE_EMPTY_LINE_TAX_DETAILS;
+        }
+        const data = order.prices.baseLineByLineUuids[this.uuid];
+        if (!data?.tax_details) {
+            pledgeLogReceiptGuard("prices", "no tax_details for line uuid", { lineUuid: this.uuid });
+            return PLEDGE_EMPTY_LINE_TAX_DETAILS;
+        }
+        return data.tax_details;
+    },
+
+    get unitPrices() {
+        const order = this.order_id;
+        if (!order?.unitPrices?.baseLineByLineUuids) {
+            return PLEDGE_EMPTY_LINE_TAX_DETAILS;
+        }
+        const data = order.unitPrices.baseLineByLineUuids[this.uuid];
+        return data?.tax_details ?? PLEDGE_EMPTY_LINE_TAX_DETAILS;
+    },
+
+    get priceIncl() {
+        const sign = this.order_id?.orderSign ?? 1;
+        return this.currency.round((this.prices.total_included || 0) * sign);
+    },
+
+    get priceExcl() {
+        const sign = this.order_id?.orderSign ?? 1;
+        return this.currency.round((this.prices.total_excluded || 0) * sign);
+    },
+
+    get priceInclNoDiscount() {
+        const sign = this.order_id?.orderSign ?? 1;
+        return this.currency.round((this.prices.no_discount_total_included || 0) * sign);
+    },
+
+    get priceExclNoDiscount() {
+        const sign = this.order_id?.orderSign ?? 1;
+        return this.currency.round((this.prices.no_discount_total_excluded || 0) * sign);
     },
 });
 
