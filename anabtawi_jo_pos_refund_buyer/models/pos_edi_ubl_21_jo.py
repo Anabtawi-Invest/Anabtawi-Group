@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
-"""JoFotara: POS refund XML must repeat the same buyer block as the original order.
+"""JoFotara Jordan POS XML fixes (Anabtawi Group):
 
-Standard l10n_jo_edi_pos strips several AccountingCustomerParty fields on credit_note
-documents. The portal compares buyer info to the original submission and responds with
-EINV_MESSAGE "Credit invoice buyer info does not match the original invoice".
+1. Refunds: buyer node must mirror the original sale or JoFotara returns
+   "Credit invoice buyer info does not match the original invoice".
+
+2. Line discount amounts: Jordan account EDI uses abs() per line on AllowanceCharge; POS
+   does not. Sub-cent rounding with fractional quantities can make the derived discount
+   negative while Disc.% is zero. JoFotara rejects with generalInvoiceCalculations
+   "discount cannot be negative". We emit abs() on line allowances (matching account Move).
 """
 
 from odoo import models
@@ -54,5 +58,32 @@ class PosEdiXmlUBL21Jo(models.AbstractModel):
             'cbc:CountrySubentityCode': {'_text': state.code if state else ''},
             'cac:Country': {
                 'cbc:IdentificationCode': {'_text': country.code if country else ''},
+            },
+        }
+
+    def _add_pos_order_line_allowance_charge_nodes(self, line_node, vals):
+        """Mirror l10n_jo_edi (account invoices): allowance amount is never negative."""
+        currency_suffix = vals['currency_suffix']
+        amount = abs(vals[f'discount_amount{currency_suffix}'])
+        line_node['cac:Price']['cac:AllowanceCharge'] = {
+            'cbc:ChargeIndicator': {'_text': 'false'},
+            'cbc:AllowanceChargeReason': {'_text': 'DISCOUNT'},
+            'cbc:Amount': {
+                '_text': self.format_float(amount, vals['currency_dp']),
+                'currencyID': vals['currency_name'],
+            },
+        }
+
+    def _add_pos_order_allowance_charge_nodes(self, document_node, vals):
+        """Ensure document-level recap discount is never negative (same edge cases)."""
+        currency_suffix = vals['currency_suffix']
+        raw = vals[f'discount_amount{currency_suffix}']
+        amount = abs(raw)
+        document_node['cac:AllowanceCharge'] = {
+            'cbc:ChargeIndicator': {'_text': 'false'},
+            'cbc:AllowanceChargeReason': {'_text': 'discount'},
+            'cbc:Amount': {
+                '_text': self.format_float(amount, vals['currency_dp']),
+                'currencyID': vals['currency_name'],
             },
         }
