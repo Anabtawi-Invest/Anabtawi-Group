@@ -143,12 +143,20 @@ class PosOrder(models.Model):
 
     @api.model
     def _pledge_strip_ui_order(self, order):
-        """Remove pledge lines from sync payload; reduce first payment by pledge (off-pos-payment pattern)."""
+        """Remove pledge lines from sync; reduce payments by pledge total (spread across all positive lines).
+
+        Pledge amount matches the line totals from the POS payload when present (price_subtotal_incl),
+        so it stays consistent with tax/pricelist. Pledge is subtracted from payments across all
+        positive payment rows, not only the first (split payments / rounding).
+        """
         Product = self.env["product.product"].sudo()
         meta = {"total": 0.0, "product_ids": [], "qty": 0.0}
         is_refund = order.get("is_refund") or (order.get("amount_total") or 0) < 0
         if is_refund:
             return meta
+
+        session = self.env["pos.session"].browse(order.get("session_id"))
+        currency = session.currency_id if session.exists() else self.env.company.currency_id
 
         lines = order.get("lines") or []
         new_lines = []
@@ -167,8 +175,20 @@ class PosOrder(models.Model):
             prod = Product.browse(pid)
             if prod.exists() and prod.has_pledge:
                 qty = float(vals.get("qty") or 0.0)
-                unit = prod.pledge_amount or 0.0
-                line_pledge = qty * unit
+                line_pledge = 0.0
+                for key in ("price_subtotal_incl", "price_subtotal"):
+                    raw = vals.get(key)
+                    if raw is not None:
+                        try:
+                            cand = float(raw)
+                        except (TypeError, ValueError):
+                            cand = 0.0
+                        if cand > 0:
+                            line_pledge = cand
+                            break
+                if line_pledge <= 0 and qty > 0:
+                    unit = prod.pledge_amount or 0.0
+                    line_pledge = qty * unit
                 if line_pledge > 0:
                     meta["total"] += line_pledge
                     meta["qty"] += qty
@@ -181,22 +201,44 @@ class PosOrder(models.Model):
 
         order["lines"] = new_lines
         meta["product_ids"] = list(set(meta["product_ids"]))
+        meta["total"] = currency.round(meta["total"])
 
         payments = order.get("payment_ids") or []
+        pay_rows = []
         for pay in payments:
             if not isinstance(pay, (list, tuple)) or len(pay) < 3:
                 continue
             pvals = pay[2]
             if not isinstance(pvals, dict):
                 continue
-            p_amt = float(pvals.get("amount") or 0.0)
+            try:
+                p_amt = float(pvals.get("amount") or 0.0)
+            except (TypeError, ValueError):
+                p_amt = 0.0
             if p_amt <= 0:
                 continue
-            new_amt = p_amt - meta["total"]
-            if new_amt < -0.0001:
-                raise UserError(_("The pledge amount exceeds the payment. Adjust payments or pledge configuration."))
-            pvals["amount"] = new_amt
-            break
+            pay_rows.append((pvals, p_amt))
+
+        total_pay = currency.round(sum(a for _, a in pay_rows))
+        pledge_left = currency.round(meta["total"])
+        if currency.compare_amounts(total_pay, pledge_left) < 0:
+            raise UserError(
+                _("Total payments (%s) are less than the pledge amount (%s). Adjust payments or pledge configuration.")
+                % (total_pay, pledge_left)
+            )
+
+        for pvals, p_amt in pay_rows:
+            if currency.is_zero(pledge_left) or pledge_left < 0:
+                break
+            take = min(p_amt, pledge_left)
+            pvals["amount"] = currency.round(p_amt - take)
+            pledge_left = currency.round(pledge_left - take)
+
+        if currency.compare_amounts(pledge_left, 0.0) > 0:
+            raise UserError(
+                _("The pledge amount could not be fully deducted from payments (%s remaining). Adjust payments or pledge configuration.")
+                % pledge_left
+            )
 
         # amount_tax, amount_total, amount_paid, etc. are required on pos.order at create();
         # stripping lines does not trigger server-side recompute before create().
