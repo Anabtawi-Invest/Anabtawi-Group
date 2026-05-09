@@ -31,6 +31,7 @@
     ],
     'assets': {
         'point_of_sale._assets_pos': [
+            'pos_pledge_order/static/src/js/pos_orderline_tax_group_labels_patch.js',
             'pos_pledge_order/static/src/js/pledge_closing_popup.js',
             'pos_pledge_order/static/src/xml/pledge_closing_popup.xml',
             'pos_pledge_order/static/src/js/pledge_list_popup.js',
