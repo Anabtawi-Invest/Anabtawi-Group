@@ -139,6 +139,7 @@
                             <field name="pos_payment_method_id" required="1" readonly="state != 'draft'"/>
                             <field name="payment_method" invisible="1"/>
                             <field name="advance_amount" widget="monetary" readonly="state != 'draft'"/>
+                            <field name="amount_tendered" widget="monetary" readonly="state != 'draft'"/>
                             <field name="is_employee_pricelist" readonly="state != 'draft'"/>
                             <field name="employee_pricelist_employee_id" readonly="1" invisible="not employee_pricelist_employee_id"/>
                             <field name="discount_id" readonly="state != 'draft'" />
@@ -202,6 +203,7 @@
                     <group class="oe_subtotal_footer oe_right">
                         <field name="amount_total" widget="monetary" readonly="1"/>
                         <field name="amount_paid" widget="monetary" readonly="1"/>
+                        <field name="change_amount" widget="monetary" readonly="1"/>
                         <field name="pledge_amount" widget="monetary" readonly="1" invisible="pledge_amount == 0"/>
 
                         <field name="discount_amount" widget="monetary" readonly="1"/>

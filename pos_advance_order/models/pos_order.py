@@ -106,6 +106,29 @@ class PosOrder(models.Model):
                         },
                     )
                 )
+            if order.advance_order_id:
+                advance = order.advance_order_id
+                currency = order.currency_id
+                invoice_lines.append(
+                    (
+                        0,
+                        None,
+                        {
+                            "name": _(
+                                "Advance payment details: Tendered %(tendered)s, Change Returned %(change)s",
+                                tendered=float_repr(
+                                    advance.amount_tendered or 0.0,
+                                    currency.decimal_places,
+                                ),
+                                change=float_repr(
+                                    advance.change_amount or 0.0,
+                                    currency.decimal_places,
+                                ),
+                            ),
+                            "display_type": "line_note",
+                        },
+                    )
+                )
         return invoice_lines
 
     def _generate_pos_order_invoice(self):

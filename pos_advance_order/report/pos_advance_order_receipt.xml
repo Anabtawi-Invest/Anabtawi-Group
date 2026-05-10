@@ -59,6 +59,14 @@
                                 <span t-esc="o.currency_id.format(o.amount_paid)"/>
                             </div>
                             <div style="display:flex; justify-content:space-between;">
+                                <span>Amount Tendered</span>
+                                <span t-esc="o.currency_id.format(o.amount_tendered)"/>
+                            </div>
+                            <div style="display:flex; justify-content:space-between;">
+                                <span>Change Returned</span>
+                                <span t-esc="o.currency_id.format(o.change_amount)"/>
+                            </div>
+                            <div style="display:flex; justify-content:space-between;">
                                 <span>Remaining</span>
                                 <span t-esc="o.currency_id.format(o.amount_remaining)"/>
                             </div>

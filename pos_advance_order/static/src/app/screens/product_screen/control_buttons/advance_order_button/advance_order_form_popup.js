@@ -50,6 +50,7 @@ export class AdvanceOrderFormPopup extends Component {
         this.state = useState({
             loading: true,
             advance_amount: 0,
+            amount_tendered: 0,
             selected_payment_method_id: defaultPmId,
             from_pos_config_id: this.props.posConfigId || null,
             picking_pos_config_id: this.props.posConfigId || null,
@@ -84,7 +85,7 @@ export class AdvanceOrderFormPopup extends Component {
 
     advanceAmountFmt() {
         const currencyId = this.props.pos?.currency?.id;
-        const amount = Number(this.state.advance_amount) || 0;
+        const amount = Number(this.state.amount_tendered) || 0;
         return formatCurrency(amount, currencyId);
     }
 
@@ -166,7 +167,16 @@ export class AdvanceOrderFormPopup extends Component {
 
     onAdvanceAmountInput(ev) {
         const value = Number(ev.target.value || 0);
-        this.state.advance_amount = Number.isFinite(value) ? value : 0;
+        const normalized = Number.isFinite(value) ? value : 0;
+        this.state.advance_amount = normalized;
+        if (this.state.amount_tendered < normalized) {
+            this.state.amount_tendered = normalized;
+        }
+    }
+
+    onAmountTenderedInput(ev) {
+        const value = Number(ev.target.value || 0);
+        this.state.amount_tendered = Number.isFinite(value) ? value : 0;
     }
 
     onPickingPosChange(ev) {
@@ -207,6 +217,10 @@ export class AdvanceOrderFormPopup extends Component {
             this.notification.add(_t("Advance amount must be greater than zero."), { type: "warning" });
             return;
         }
+        if (this.state.amount_tendered < this.state.advance_amount) {
+            this.notification.add(_t("Amount tendered cannot be less than advance amount."), { type: "warning" });
+            return;
+        }
         const currentFromPosId = this.props.posConfigId || this.state.from_pos_config_id;
         if (!currentFromPosId) {
             this.notification.add(_t("Please select From POS."), { type: "warning" });
@@ -229,6 +243,7 @@ export class AdvanceOrderFormPopup extends Component {
         );
         this.props.getPayload({
             advance_amount: this.state.advance_amount,
+            amount_tendered: this.state.amount_tendered,
             payment_method_id: this.state.selected_payment_method_id,
             payment_method_name: selectedPm?.name || "",
             from_pos_config_id: currentFromPosId,

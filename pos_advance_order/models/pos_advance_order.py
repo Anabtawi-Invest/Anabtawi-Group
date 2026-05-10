@@ -116,6 +116,19 @@ class PosAdvanceOrder(models.Model):
     amount_total = fields.Monetary(string="Total", currency_field="currency_id", compute="_compute_amounts", store=True)
     amount_grand_total = fields.Monetary(string="Grand Total", currency_field="currency_id", compute="_compute_amounts", store=True)
     advance_amount = fields.Monetary(string="Advance", currency_field="currency_id", default=0.0)
+    amount_tendered = fields.Monetary(
+        string="Amount Tendered",
+        currency_field="currency_id",
+        default=0.0,
+        help="Amount received from customer for the advance payment.",
+    )
+    change_amount = fields.Monetary(
+        string="Change Returned",
+        currency_field="currency_id",
+        compute="_compute_change_amount",
+        store=True,
+        help="Amount returned to the customer (amount_tendered - advance_amount).",
+    )
     amount_paid = fields.Monetary(string="Paid Amount", currency_field="currency_id", compute="_compute_payment_amounts", store=True)
     amount_remaining = fields.Monetary(string="Remaining Amount", currency_field="currency_id", compute="_compute_payment_amounts", store=True)
     from_pos_config_id = fields.Many2one(
@@ -591,6 +604,13 @@ class PosAdvanceOrder(models.Model):
             order.amount_paid = min(paid, total)
             order.amount_remaining = total - order.amount_paid
 
+    @api.depends("amount_tendered", "advance_amount")
+    def _compute_change_amount(self):
+        for order in self:
+            tendered = order.amount_tendered or 0.0
+            advance = order.advance_amount or 0.0
+            order.change_amount = max(tendered - advance, 0.0)
+
     def _get_open_session(self, config):
         session = self.env["pos.session"].sudo().search(
             [("config_id", "=", config.id), ("state", "=", "opened"), ("rescue", "=", False)],
@@ -863,6 +883,16 @@ class PosAdvanceOrder(models.Model):
             if order.advance_amount and order.advance_amount < 0:
                 raise UserError(_("Advance amount cannot be negative."))
 
+    @api.constrains("amount_tendered", "advance_amount")
+    def _check_amount_tendered(self):
+        for order in self:
+            tendered = order.amount_tendered or 0.0
+            advance = order.advance_amount or 0.0
+            if tendered and tendered < 0:
+                raise UserError(_("Amount tendered cannot be negative."))
+            if tendered and tendered < advance:
+                raise UserError(_("Amount tendered cannot be less than advance amount."))
+
     @api.constrains("pos_payment_method_id", "from_pos_config_id", "state")
     def _check_pos_payment_method_config(self):
         for order in self:
@@ -903,6 +933,12 @@ class PosAdvanceOrder(models.Model):
 
             if order.advance_amount > order.amount_grand_total:
                 raise UserError(_("Advance amount cannot be greater than the total."))
+
+            if not order.amount_tendered:
+                order.amount_tendered = order.advance_amount
+
+            if order.amount_tendered < order.advance_amount:
+                raise UserError(_("Amount tendered cannot be less than advance amount."))
 
             order.state = "confirmed"
 
@@ -1020,28 +1056,43 @@ class PosAdvanceOrder(models.Model):
             payment_method_line.id,
         )
 
+        tendered_amount = self.amount_tendered or self.advance_amount
+        move_lines = [
+            Command.create({
+                "name": _("Advance deposit %s") % self.name,
+                "account_id": liquidity_account.id,
+                "partner_id": self.partner_id.id,
+                "debit": tendered_amount,
+                "credit": 0.0,
+            }),
+        ]
+        if self.change_amount and not float_is_zero(self.change_amount, precision_rounding=self.currency_id.rounding):
+            move_lines.append(
+                Command.create({
+                    "name": _("Advance change return %s") % self.name,
+                    "account_id": liquidity_account.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": 0.0,
+                    "credit": self.change_amount,
+                })
+            )
+        move_lines.append(
+            Command.create({
+                "name": _("Advance deposit %s") % self.name,
+                "account_id": liability_account.id,
+                "partner_id": self.partner_id.id,
+                "debit": 0.0,
+                "credit": self.advance_amount,
+            })
+        )
+
         move = self.env["account.move"].sudo().create({
             "move_type": "entry",
             "journal_id": journal.id,
             "date": fields.Date.context_today(self),
             "ref": _("Advance deposit - %s") % self.name,
             "partner_id": self.partner_id.id,
-            "line_ids": [
-                Command.create({
-                    "name": _("Advance deposit %s") % self.name,
-                    "account_id": liquidity_account.id,
-                    "partner_id": self.partner_id.id,
-                    "debit": self.advance_amount,
-                    "credit": 0.0,
-                }),
-                Command.create({
-                    "name": _("Advance deposit %s") % self.name,
-                    "account_id": liability_account.id,
-                    "partner_id": self.partner_id.id,
-                    "debit": 0.0,
-                    "credit": self.advance_amount,
-                }),
-            ],
+            "line_ids": move_lines,
         })
         move.action_post()
         self.advance_deposit_move_id = move.id
@@ -1358,6 +1409,8 @@ class PosAdvanceOrder(models.Model):
         for vals in vals_list:
             if vals.get("name", "New") == "New":
                 vals["name"] = self.env["ir.sequence"].next_by_code("pos.advance.order") or _("New")
+            if vals.get("advance_amount") and not vals.get("amount_tendered"):
+                vals["amount_tendered"] = vals["advance_amount"]
             if vals.get("pos_payment_method_id") and "payment_method" not in vals:
                 pm = PaymentMethod.browse(vals["pos_payment_method_id"])
                 vals["payment_method"] = self._payment_method_selection_from_pos_pm(pm)

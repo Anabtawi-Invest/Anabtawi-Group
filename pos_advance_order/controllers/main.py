@@ -29,6 +29,7 @@ class PosAdvanceOrderController(http.Controller):
         from_pos_config_id = payload.get("from_pos_config_id")
         lines = payload.get("lines") or []
         advance_amount = float(payload.get("advance_amount") or 0.0)
+        amount_tendered = float(payload.get("amount_tendered") or advance_amount or 0.0)
         payment_method_id = payload.get("payment_method_id")
         employee_id = payload.get("employee_id")
         discount_id = payload.get("discount_id")
@@ -41,6 +42,8 @@ class PosAdvanceOrderController(http.Controller):
             raise ValidationError("Order lines are required.")
         if advance_amount <= 0:
             raise ValidationError("Advance amount must be greater than zero.")
+        if amount_tendered < advance_amount:
+            raise ValidationError(_("Amount tendered cannot be less than advance amount."))
 
         pos_config = request.env["pos.config"].sudo().browse(int(pos_config_id)).exists()
         if not pos_config:
@@ -96,6 +99,7 @@ class PosAdvanceOrderController(http.Controller):
             "picking_date": fields.Datetime.now(),
             "pos_payment_method_id": pm.id,
             "advance_amount": advance_amount,
+            "amount_tendered": amount_tendered,
             "line_ids": line_vals,
         }
         if employee_id:
@@ -116,5 +120,7 @@ class PosAdvanceOrderController(http.Controller):
             "state": order.state,
             "amount_total": order.amount_total,
             "advance_amount": order.advance_amount,
+            "amount_tendered": order.amount_tendered,
+            "change_amount": order.change_amount,
             "advance_pos_order_id": order.advance_pos_order_id.id,
         }
