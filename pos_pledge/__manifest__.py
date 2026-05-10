@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': '(do not download)POS Pledge (Rahn) Management-anabtawi',
-    'version': '19.0.1.0.1',
+    'version': '19.0.1.0.2',
     'category': 'Point of Sale',
     'summary': 'Manage pledge (Rahn) scenarios with employees, delivery, and accounting',
     'description': """

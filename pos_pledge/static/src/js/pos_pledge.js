@@ -1,6 +1,7 @@
 /** @odoo-module */
 
-console.log("[PLEDGE] Module loading started...");
+const PLEDGE_BUILD_TAG = "PLEDGE_BUILD_2026_05_10_2149";
+console.log("[PLEDGE] Module loading started...", PLEDGE_BUILD_TAG);
 
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
@@ -1584,4 +1585,4 @@ _buildFullReceiptHtml(receiptData) {
 });
 
 console.log("[PLEDGE] ReceiptScreen patch applied");
-console.log("[PLEDGE] Module loaded successfully!");
+console.log("[PLEDGE] Module loaded successfully!", PLEDGE_BUILD_TAG);
