@@ -8,15 +8,15 @@
                 t-att-class="advanceOrderButtonClass()"
                 t-on-click="onClickAdvanceOrder"
                 type="button">
-                <i class="fa fa-calendar-check-o me-2" role="img" aria-label="Advance Order" title="Advance Order"/>
-                <span>Advance Order</span>
+                <i class="fa fa-calendar-check-o me-2" role="img" t-att-aria-label="advanceOrderButtonLabel" t-att-title="advanceOrderButtonLabel"/>
+                <span t-esc="advanceOrderButtonLabel"/>
             </button>
             <button
                 t-att-class="completeAdvanceOrderButtonClass()"
                 t-on-click="onClickCompleteAdvanceOrder"
                 type="button">
-                <i class="fa fa-check-square-o me-2" role="img" aria-label="Complete Advance Order" title="Complete Advance Order"/>
-                <span>Complete Advance Order</span>
+                <i class="fa fa-check-square-o me-2" role="img" t-att-aria-label="completeAdvanceOrderButtonLabel" t-att-title="completeAdvanceOrderButtonLabel"/>
+                <span t-esc="completeAdvanceOrderButtonLabel"/>
             </button>
         </xpath>
     </t>
