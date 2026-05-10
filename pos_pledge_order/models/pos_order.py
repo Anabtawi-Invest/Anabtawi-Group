@@ -35,7 +35,7 @@ class PosOrder(models.Model):
         'pos_order_pledge_snapshot_product_rel',
         'pos_order_id',
         'product_id',
-        string='Pledge Products (removed from order lines)',
+        string='Pledge Products Snapshot',
         readonly=True,
         copy=False,
     )
@@ -170,10 +170,11 @@ class PosOrder(models.Model):
 
     @api.model
     def _pledge_strip_ui_order(self, order):
-        """Remove pledge lines from sync; reduce payments by pledge total (spread across all positive rows).
+        """Compute pledge snapshot from UI payload without removing order lines.
 
-        Prefer **price_subtotal_incl** / **price_subtotal** from the POS payload (line total as computed in POS).
-        If those are missing, fall back to **qty × product.pledge_amount**.
+        Previous behavior stripped pledged products from ``order['lines']`` and reduced payments.
+        Business now requires pledged products to remain visible in ``pos.order`` lines
+        with their natural sale price.
         """
         Product = self.env["product.product"].sudo()
         meta = {"total": 0.0, "product_ids": [], "qty": 0.0}
@@ -185,91 +186,61 @@ class PosOrder(models.Model):
         currency = session.currency_id if session.exists() else self.env.company.currency_id
 
         lines = order.get("lines") or []
-        new_lines = []
-        for line in lines:
+        for index, line in enumerate(lines, start=1):
             if not isinstance(line, (list, tuple)) or len(line) < 3:
-                new_lines.append(line)
                 continue
             vals = line[2]
             if not isinstance(vals, dict):
-                new_lines.append(line)
                 continue
             pid = vals.get("product_id")
             if not pid:
-                new_lines.append(line)
                 continue
             prod = Product.browse(pid)
             if prod.exists() and prod.has_pledge:
                 qty = self._pledge_sync_line_qty(vals)
                 line_pledge = 0.0
-                for key in ("price_subtotal_incl", "price_subtotal"):
-                    raw = vals.get(key)
-                    if raw is not None:
-                        try:
-                            cand = float(raw)
-                        except (TypeError, ValueError):
-                            cand = 0.0
-                        if cand > 0:
-                            line_pledge = cand
-                            break
-                if line_pledge <= 0 and qty > 0:
+                # Prefer canonical pledge definition first.
+                if qty > 0:
                     unit_pledge = float(prod.pledge_amount or 0.0)
                     if unit_pledge > 0:
                         line_pledge = currency.round(qty * unit_pledge)
+                # Fallback for legacy data where pledge_amount is not configured.
+                if line_pledge <= 0:
+                    for key in ("price_subtotal_incl", "price_subtotal"):
+                        raw = vals.get(key)
+                        if raw is not None:
+                            try:
+                                cand = float(raw)
+                            except (TypeError, ValueError):
+                                cand = 0.0
+                            if cand > 0:
+                                line_pledge = cand
+                                break
                 if line_pledge > 0:
                     meta["total"] += line_pledge
                     meta["qty"] += qty
                     meta["product_ids"].append(pid)
+                    _logger.info(
+                        "[PLEDGE][TRACE] payload line %s keeps pledged product id=%s qty=%s sale_subtotal=%s pledge_snapshot=%s",
+                        index,
+                        pid,
+                        qty,
+                        vals.get("price_subtotal_incl", vals.get("price_subtotal")),
+                        line_pledge,
+                    )
                 continue
-            new_lines.append(line)
 
         if meta["total"] <= 0:
             return meta
 
-        order["lines"] = new_lines
         meta["product_ids"] = list(set(meta["product_ids"]))
         meta["total"] = currency.round(meta["total"])
-
-        payments = order.get("payment_ids") or []
-        pay_rows = []
-        for pay in payments:
-            if not isinstance(pay, (list, tuple)) or len(pay) < 3:
-                continue
-            pvals = pay[2]
-            if not isinstance(pvals, dict):
-                continue
-            try:
-                p_amt = float(pvals.get("amount") or 0.0)
-            except (TypeError, ValueError):
-                p_amt = 0.0
-            if p_amt <= 0:
-                continue
-            pay_rows.append((pvals, p_amt))
-
-        total_pay = currency.round(sum(a for _, a in pay_rows))
-        pledge_left = currency.round(meta["total"])
-        if currency.compare_amounts(total_pay, pledge_left) < 0:
-            raise UserError(
-                _("Total payments (%s) are less than the pledge amount (%s). Adjust payments or pledge configuration.")
-                % (total_pay, pledge_left)
-            )
-
-        for pvals, p_amt in pay_rows:
-            if currency.is_zero(pledge_left) or pledge_left < 0:
-                break
-            take = min(p_amt, pledge_left)
-            pvals["amount"] = currency.round(p_amt - take)
-            pledge_left = currency.round(pledge_left - take)
-
-        if currency.compare_amounts(pledge_left, 0.0) > 0:
-            raise UserError(
-                _("The pledge amount could not be fully deducted from payments (%s remaining). Adjust payments or pledge configuration.")
-                % pledge_left
-            )
-
-        # amount_tax, amount_total, amount_paid, etc. are required on pos.order at create();
-        # stripping lines does not trigger server-side recompute before create().
-        self._pledge_recompute_sync_order_amounts(order)
+        _logger.info(
+            "[PLEDGE][TRACE] pledge snapshot computed without stripping lines: total=%s qty=%s products=%s",
+            meta["total"],
+            meta["qty"],
+            meta["product_ids"],
+        )
         return meta
 
     @api.model
@@ -313,6 +284,13 @@ class PosOrder(models.Model):
             pos_order = self.with_context(pos_pledge_sync=True)
         res_id = super(PosOrder, pos_order)._process_order(order, existing_order)
         po = self.browse(res_id).sudo()
+        _logger.info(
+            "[PLEDGE][TRACE] _process_order done order=%s lines=%s pledge_lines=%s snapshot_total=%s",
+            po.name,
+            len(po.lines),
+            len(po.lines.filtered(lambda l: l.product_id.has_pledge)),
+            pledge_meta["total"],
+        )
         if pledge_meta["total"] > 0:
             po.write({
                 "total_pledge_amount": pledge_meta["total"],
