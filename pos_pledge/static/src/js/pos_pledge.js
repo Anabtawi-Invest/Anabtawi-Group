@@ -405,7 +405,26 @@ patch(PosOrder.prototype, {
         if (this.employee_id) {
             data.employee_id = this.employee_id;
         }
-        console.log("[PLEDGE] Serializing order with employee_id:", this.employee_id);
+        const lines = this.getOrderlines ? this.getOrderlines() : this.lines || [];
+        console.warn(
+            "[PLEDGE][TRACE][FRONT] serializeForORM order=%s employee_id=%s lines=%s payload_lines=%s",
+            this.name || this.uid || "n/a",
+            this.employee_id || "none",
+            lines.length,
+            (data.lines || []).length
+        );
+        lines.forEach((line, idx) => {
+            const product = line.getProduct ? line.getProduct() : (line.product || line.product_id);
+            console.warn(
+                "[PLEDGE][TRACE][FRONT] line#%s product=%s id=%s qty=%s unit=%s has_pledge=%s",
+                idx + 1,
+                product?.display_name || product?.name || "unknown",
+                product?.id || "n/a",
+                line.get_quantity ? line.get_quantity() : (line.qty || 0),
+                line.get_unit_price ? line.get_unit_price() : (line.price_unit || 0),
+                product?.has_pledge === true
+            );
+        });
         return data;
     },
 });

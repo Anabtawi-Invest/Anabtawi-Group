@@ -83,26 +83,81 @@ class PosOrder(models.Model):
         exist on ``pos.order`` with its normal sale price for traceability.
         """
         raw_lines = order.get("lines") or []
+        _logger.warning(
+            "[PLEDGE][TRACE] _process_order start uuid=%s name=%s raw_lines=%s existing_order=%s",
+            order.get("uuid"),
+            order.get("name"),
+            len(raw_lines),
+            bool(existing_order),
+        )
         pos_order = super()._process_order(order, existing_order)
 
         try:
+            _logger.warning(
+                "[PLEDGE][TRACE] pos_order created id=%s name=%s actual_lines=%s",
+                pos_order.id,
+                pos_order.name,
+                len(pos_order.lines),
+            )
+            for line in pos_order.lines:
+                _logger.warning(
+                    "[PLEDGE][TRACE] actual line -> product=%s(id=%s) qty=%s price_unit=%s has_pledge=%s",
+                    line.product_id.display_name,
+                    line.product_id.id,
+                    line.qty,
+                    line.price_unit,
+                    line.product_id.has_pledge,
+                )
+
             existing_product_ids = set(pos_order.lines.mapped("product_id").ids)
             missing_specs = []
 
-            for cmd in raw_lines:
+            for index, cmd in enumerate(raw_lines, start=1):
                 if not isinstance(cmd, (list, tuple)) or len(cmd) < 3:
+                    _logger.warning("[PLEDGE][TRACE] raw line #%s skipped: invalid command format -> %s", index, cmd)
                     continue
                 line_vals = cmd[2] or {}
                 product_id = line_vals.get("product_id")
                 if not product_id:
+                    _logger.warning(
+                        "[PLEDGE][TRACE] raw line #%s skipped: no product_id in payload (%s)",
+                        index,
+                        line_vals,
+                    )
                     continue
                 if isinstance(product_id, (list, tuple)):
                     product_id = product_id[0]
                 product = self.env["product.product"].sudo().browse(int(product_id)).exists()
-                if not product or not product.has_pledge:
+                if not product:
+                    _logger.warning(
+                        "[PLEDGE][TRACE] raw line #%s skipped: product id=%s not found",
+                        index,
+                        product_id,
+                    )
+                    continue
+                _logger.warning(
+                    "[PLEDGE][TRACE] raw line #%s -> product=%s(id=%s) qty=%s price_unit=%s has_pledge=%s",
+                    index,
+                    product.display_name,
+                    product.id,
+                    line_vals.get("qty"),
+                    line_vals.get("price_unit"),
+                    product.has_pledge,
+                )
+                if not product.has_pledge:
                     continue
                 if product.id in existing_product_ids:
+                    _logger.warning(
+                        "[PLEDGE][TRACE] raw line #%s already exists in pos_order lines, no restore needed (product_id=%s)",
+                        index,
+                        product.id,
+                    )
                     continue
+                _logger.warning(
+                    "[PLEDGE][TRACE] raw line #%s marked as missing pledged product (product_id=%s)",
+                    index,
+                    product.id,
+                )
                 missing_specs.append((product, line_vals))
 
             if missing_specs:
@@ -132,10 +187,22 @@ class PosOrder(models.Model):
                         "price_extra": line_vals.get("price_extra", 0.0) or 0.0,
                         "full_product_name": line_vals.get("full_product_name") or product.display_name,
                     })
+                    _logger.warning(
+                        "[PLEDGE][TRACE] restored pledged line -> product=%s(id=%s) qty=%s price_unit=%s",
+                        product.display_name,
+                        product.id,
+                        qty,
+                        price_unit,
+                    )
                 pos_order._compute_prices()
                 _logger.info(
                     "[PLEDGE] Restored %d missing pledged product lines on pos.order %s",
                     len(missing_specs),
+                    pos_order.name,
+                )
+            else:
+                _logger.warning(
+                    "[PLEDGE][TRACE] no missing pledged lines detected from payload for pos_order=%s",
                     pos_order.name,
                 )
         except Exception:
