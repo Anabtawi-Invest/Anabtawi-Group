@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="pos_advance_order.AdvanceOrderFormPopup" owl="1">
-        <Dialog size="'md'" t-att-title="popupTitle">
+        <Dialog size="'md'" title="popupTitle">
             <div class="o_pos_advance_popup" t-on-click.stop="">
                 <div class="rounded-top px-3 py-2 mb-3 bg-primary text-white">
                     <span class="fw-bold" t-esc="popupTitle"/>
