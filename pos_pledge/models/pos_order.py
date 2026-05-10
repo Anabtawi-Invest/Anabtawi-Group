@@ -64,6 +64,86 @@ class PosOrder(models.Model):
     )
 
     @api.model
+    def _normalize_line_tax_ids(self, tax_value):
+        if not tax_value:
+            return []
+        if isinstance(tax_value, list) and tax_value and isinstance(tax_value[0], (tuple, list)):
+            ids = []
+            for cmd in tax_value:
+                if isinstance(cmd, (tuple, list)) and len(cmd) >= 3 and cmd[0] == 6:
+                    ids.extend(cmd[2] or [])
+            return ids
+        return tax_value if isinstance(tax_value, list) else []
+
+    @api.model
+    def _process_order(self, order, existing_order):
+        """Safety net: keep pledged products in main POS order lines if frontend payload has them.
+
+        Some pledge flows create side records/payments, but the source product line must still
+        exist on ``pos.order`` with its normal sale price for traceability.
+        """
+        raw_lines = order.get("lines") or []
+        pos_order = super()._process_order(order, existing_order)
+
+        try:
+            existing_product_ids = set(pos_order.lines.mapped("product_id").ids)
+            missing_specs = []
+
+            for cmd in raw_lines:
+                if not isinstance(cmd, (list, tuple)) or len(cmd) < 3:
+                    continue
+                line_vals = cmd[2] or {}
+                product_id = line_vals.get("product_id")
+                if not product_id:
+                    continue
+                if isinstance(product_id, (list, tuple)):
+                    product_id = product_id[0]
+                product = self.env["product.product"].sudo().browse(int(product_id)).exists()
+                if not product or not product.has_pledge:
+                    continue
+                if product.id in existing_product_ids:
+                    continue
+                missing_specs.append((product, line_vals))
+
+            if missing_specs:
+                PosOrderLine = self.env["pos.order.line"].sudo()
+                for product, line_vals in missing_specs:
+                    qty = line_vals.get("qty", 1.0) or 1.0
+                    price_unit = line_vals.get("price_unit", product.lst_price or 0.0)
+                    discount = line_vals.get("discount", 0.0) or 0.0
+                    subtotal = line_vals.get("price_subtotal")
+                    subtotal_incl = line_vals.get("price_subtotal_incl")
+                    if subtotal is None:
+                        subtotal = price_unit * qty * (1 - discount / 100.0)
+                    if subtotal_incl is None:
+                        subtotal_incl = subtotal
+                    tax_ids = self._normalize_line_tax_ids(line_vals.get("tax_ids"))
+
+                    PosOrderLine.create({
+                        "order_id": pos_order.id,
+                        "product_id": product.id,
+                        "name": line_vals.get("name") or line_vals.get("full_product_name") or product.display_name,
+                        "qty": qty,
+                        "price_unit": price_unit,
+                        "discount": discount,
+                        "tax_ids": [(6, 0, tax_ids)],
+                        "price_subtotal": subtotal,
+                        "price_subtotal_incl": subtotal_incl,
+                        "price_extra": line_vals.get("price_extra", 0.0) or 0.0,
+                        "full_product_name": line_vals.get("full_product_name") or product.display_name,
+                    })
+                pos_order._compute_prices()
+                _logger.info(
+                    "[PLEDGE] Restored %d missing pledged product lines on pos.order %s",
+                    len(missing_specs),
+                    pos_order.name,
+                )
+        except Exception:
+            _logger.exception("[PLEDGE] Failed restoring missing pledged lines for order payload.")
+
+        return pos_order
+
+    @api.model
     def _order_fields(self, ui_order):
         """Read employee_id from UI order"""
         vals = super()._order_fields(ui_order)
