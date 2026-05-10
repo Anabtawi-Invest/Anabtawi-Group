@@ -89,6 +89,74 @@ export class AdvanceOrderFormPopup extends Component {
         return formatCurrency(amount, currencyId);
     }
 
+    get popupTitle() {
+        return _t("Advance Order Details");
+    }
+
+    get popupSubtitle() {
+        return _t("Deposit and picking configuration");
+    }
+
+    get fromPosLabel() {
+        return _t("From POS");
+    }
+
+    get pickingPosLabel() {
+        return _t("Picking POS");
+    }
+
+    get selectPickingPosPlaceholder() {
+        return _t("-- Select Picking POS --");
+    }
+
+    get pricelistLabel() {
+        return _t("Pricelist");
+    }
+
+    get advanceAmountLabel() {
+        return _t("Advance Amount");
+    }
+
+    get amountTenderedLabel() {
+        return _t("Amount Tendered");
+    }
+
+    get amountTenderedHint() {
+        return _t("Customer paid amount (can be greater than advance).");
+    }
+
+    get paymentMethodLabel() {
+        return _t("Payment method");
+    }
+
+    get withEmployeeLabel() {
+        return _t("With Employee");
+    }
+
+    get employeeLabel() {
+        return _t("Employee");
+    }
+
+    get selectEmployeePlaceholder() {
+        return _t("-- Select Employee --");
+    }
+
+    get discountOptionalLabel() {
+        return _t("Discount (Optional)");
+    }
+
+    get noDiscountPlaceholder() {
+        return _t("-- No Discount --");
+    }
+
+    get cancelButtonLabel() {
+        return _t("Cancel");
+    }
+
+    get confirmButtonLabel() {
+        return _t("Confirm");
+    }
+
     isPaymentSelected(pm) {
         return pm.id === this.state.selected_payment_method_id;
     }

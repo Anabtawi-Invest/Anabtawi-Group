@@ -931,3 +931,31 @@ msgstr "فشل إكمال طلب العربون."
 #. module: pos_advance_order
 msgid "Advance payment details: Tendered %(tendered)s, Change Returned %(change)s"
 msgstr "تفاصيل دفعة العربون: المبلغ المستلم %(tendered)s، المبلغ المرجّع %(change)s"
+
+#. module: pos_advance_order
+msgid "-- Select Picking POS --"
+msgstr "-- اختر نقطة استلام --"
+
+#. module: pos_advance_order
+msgid "-- Select Employee --"
+msgstr "-- اختر موظفًا --"
+
+#. module: pos_advance_order
+msgid "-- No Discount --"
+msgstr "-- بدون خصم --"
+
+#. module: pos_advance_order
+msgid "Pick an advance paid order to finish settlement"
+msgstr "اختر طلب عربون مدفوع لإكمال التسوية"
+
+#. module: pos_advance_order
+msgid "Type customer name or phone..."
+msgstr "اكتب اسم العميل أو رقم الهاتف..."
+
+#. module: pos_advance_order
+msgid "Phone"
+msgstr "الهاتف"
+
+#. module: pos_advance_order
+msgid "Complete"
+msgstr "إكمال"

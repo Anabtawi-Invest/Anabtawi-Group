@@ -58,6 +58,62 @@ export class CompleteAdvanceOrderPopup extends Component {
         return formatCurrency(amount, currencyId);
     }
 
+    get popupTitle() {
+        return _t("Complete Advance Order");
+    }
+
+    get popupSubtitle() {
+        return _t("Pick an advance paid order to finish settlement");
+    }
+
+    get searchLabel() {
+        return _t("Search by Customer Name or Phone");
+    }
+
+    get searchPlaceholder() {
+        return _t("Type customer name or phone...");
+    }
+
+    get colAdvanceLabel() {
+        return _t("Advance");
+    }
+
+    get colCustomerLabel() {
+        return _t("Customer");
+    }
+
+    get colPhoneLabel() {
+        return _t("Phone");
+    }
+
+    get colTotalLabel() {
+        return _t("Total");
+    }
+
+    get colAdvancePaidLabel() {
+        return _t("Advance Paid");
+    }
+
+    get colRemainingLabel() {
+        return _t("Remaining");
+    }
+
+    get noOrdersText() {
+        return _t("No advance orders found for this Picking POS.");
+    }
+
+    get paymentMethodLabel() {
+        return _t("Payment method");
+    }
+
+    get cancelButtonLabel() {
+        return _t("Cancel");
+    }
+
+    get completeButtonLabel() {
+        return _t("Complete");
+    }
+
     isPaymentSelected(pm) {
         return pm.id === this.state.selected_payment_method_id;
     }
