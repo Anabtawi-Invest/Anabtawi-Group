@@ -38,6 +38,21 @@ export class CompleteAdvanceOrderPopup extends Component {
         });
     }
 
+    _isArabicContext() {
+        const urlLang = new URLSearchParams(window.location.search).get("lang") || "";
+        const htmlLang = document?.documentElement?.lang || "";
+        const bodyDir = document?.body ? window.getComputedStyle(document.body).direction : "";
+        return urlLang.startsWith("ar") || htmlLang.startsWith("ar") || bodyDir === "rtl";
+    }
+
+    _tr(msgid, fallbackArabic) {
+        const translated = _t(msgid);
+        if (translated === msgid && this._isArabicContext()) {
+            return fallbackArabic;
+        }
+        return translated;
+    }
+
     paymentMethodIconSrc(pm) {
         if (!pm) {
             return "";
@@ -59,59 +74,59 @@ export class CompleteAdvanceOrderPopup extends Component {
     }
 
     get popupTitle() {
-        return _t("Complete Advance Order");
+        return this._tr("Complete Advance Order", "إكمال طلب العربون");
     }
 
     get popupSubtitle() {
-        return _t("Pick an advance paid order to finish settlement");
+        return this._tr("Pick an advance paid order to finish settlement", "اختر طلب عربون مدفوع لإكمال التسوية");
     }
 
     get searchLabel() {
-        return _t("Search by Customer Name or Phone");
+        return this._tr("Search by Customer Name or Phone", "بحث باسم العميل أو رقم الهاتف");
     }
 
     get searchPlaceholder() {
-        return _t("Type customer name or phone...");
+        return this._tr("Type customer name or phone...", "اكتب اسم العميل أو رقم الهاتف...");
     }
 
     get colAdvanceLabel() {
-        return _t("Advance");
+        return this._tr("Advance", "العربون");
     }
 
     get colCustomerLabel() {
-        return _t("Customer");
+        return this._tr("Customer", "العميل");
     }
 
     get colPhoneLabel() {
-        return _t("Phone");
+        return this._tr("Phone", "الهاتف");
     }
 
     get colTotalLabel() {
-        return _t("Total");
+        return this._tr("Total", "الإجمالي");
     }
 
     get colAdvancePaidLabel() {
-        return _t("Advance Paid");
+        return this._tr("Advance Paid", "العربون المدفوع");
     }
 
     get colRemainingLabel() {
-        return _t("Remaining");
+        return this._tr("Remaining", "المتبقي");
     }
 
     get noOrdersText() {
-        return _t("No advance orders found for this Picking POS.");
+        return this._tr("No advance orders found for this Picking POS.", "لا توجد طلبات عربون لنقطة الاستلام هذه.");
     }
 
     get paymentMethodLabel() {
-        return _t("Payment method");
+        return this._tr("Payment method", "طريقة الدفع");
     }
 
     get cancelButtonLabel() {
-        return _t("Cancel");
+        return this._tr("Cancel", "إلغاء");
     }
 
     get completeButtonLabel() {
-        return _t("Complete");
+        return this._tr("Complete", "إكمال");
     }
 
     isPaymentSelected(pm) {
@@ -169,15 +184,16 @@ export class CompleteAdvanceOrderPopup extends Component {
             }));
         } catch (error) {
             this.notification.add(
-                error?.message || _t("Failed to load advance orders."),
+                error?.message || this._tr("Failed to load advance orders.", "فشل تحميل طلبات العربون."),
                 { type: "danger" }
             );
         }
     }
 
     get noEligiblePaymentMethodsText() {
-        return _t(
-            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration."
+        return this._tr(
+            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration.",
+            "لا توجد طرق دفع مناسبة في نقطة البيع هذه. أضف طرق دفع نقدية أو بنكية يدوية بدون تكامل طرفية أو QR في إعدادات نقطة البيع."
         );
     }
 
@@ -203,11 +219,11 @@ export class CompleteAdvanceOrderPopup extends Component {
 
     confirm() {
         if (!this.state.selected_order_id) {
-            this.notification.add(_t("Please select an advance order."), { type: "warning" });
+            this.notification.add(this._tr("Please select an advance order.", "يرجى اختيار طلب عربون."), { type: "warning" });
             return;
         }
         if (!this.state.selected_payment_method_id) {
-            this.notification.add(_t("Please select a payment method."), { type: "warning" });
+            this.notification.add(this._tr("Please select a payment method.", "يرجى اختيار طريقة دفع."), { type: "warning" });
             return;
         }
         const selectedPm = this.state.payment_methods.find(
