@@ -67,6 +67,23 @@ export class AdvanceOrderFormPopup extends Component {
         onMounted(async () => {
             await this._loadPopupData();
             this.state.loading = false;
+            this._debugI18n();
+        });
+    }
+
+    _debugI18n() {
+        // Diagnostic log to verify that the latest assets are loaded and translations are resolved.
+        console.warn("[ADV_I18N_DEBUG_V2] Advance popup translations", {
+            marker: "ADV_I18N_DEBUG_V2_2026_05_10",
+            browserLanguage: navigator.language,
+            htmlLanguage: document?.documentElement?.lang || "",
+            popupTitle: _t("Advance Order Details"),
+            fromPos: _t("From POS"),
+            pickingPos: _t("Picking POS"),
+            advanceAmount: _t("Advance Amount"),
+            amountTendered: _t("Amount Tendered"),
+            paymentMethod: _t("Payment method"),
+            completeAdvanceOrder: _t("Complete Advance Order"),
         });
     }
 

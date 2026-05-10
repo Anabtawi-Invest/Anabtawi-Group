@@ -23,6 +23,14 @@ patch(ControlButtons.prototype, {
         this.pos = usePos();
         this.orm = useService("orm");
         this.printer = useService("printer");
+        // Diagnostic log to ensure this JS bundle revision is active in POS.
+        console.warn("[ADV_I18N_DEBUG_V2] ControlButtons loaded", {
+            marker: "ADV_I18N_DEBUG_V2_2026_05_10",
+            browserLanguage: navigator.language,
+            htmlLanguage: document?.documentElement?.lang || "",
+            advanceOrderButton: _t("Advance Order"),
+            completeAdvanceOrderButton: _t("Complete Advance Order"),
+        });
     },
 
     /** Same breakpoints as POS `buttonClass`, but distinct hue for Advance vs default grey controls. */
