@@ -1327,11 +1327,12 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_amount(self, pos_payment_method_id=None, pos_config_id=None):
+    def action_create_remaining_amount(self, pos_payment_method_id=None, pos_config_id=None, amount_tendered=None):
         """Alias for POS button flow."""
         return self.action_create_remaining_payment(
             pos_payment_method_id=pos_payment_method_id,
             pos_config_id=pos_config_id,
+            amount_tendered=amount_tendered,
         )
 
     def action_refund_advance_payment(self):
