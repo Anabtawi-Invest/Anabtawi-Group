@@ -313,6 +313,26 @@ class PosOrder(models.Model):
                 'full_product_name': pledge_product.display_name,
             })
 
+            # Keep previous accounting behavior (single pledge collection amount),
+            # but also create zero-value reference lines for pledged source products
+            # so they are visible in POS order lines for audit/tracking.
+            pledged_source_lines = order.lines.filtered(lambda l: l.product_id and l.product_id.has_pledge)
+            for src_line in pledged_source_lines:
+                src_product = src_line.product_id
+                PosOrderLine.create({
+                    'order_id': pledge_order.id,
+                    'product_id': src_product.id,
+                    'name': _("[Reference] %(product)s") % {'product': src_product.display_name},
+                    'qty': src_line.qty or 1.0,
+                    'price_unit': 0.0,
+                    'discount': 0.0,
+                    'tax_ids': [(6, 0, [])],
+                    'price_subtotal': 0.0,
+                    'price_subtotal_incl': 0.0,
+                    'price_extra': 0.0,
+                    'full_product_name': src_product.display_name,
+                })
+
             pledge_order._compute_prices()
             PosPayment.create({
                 'pos_order_id': pledge_order.id,
