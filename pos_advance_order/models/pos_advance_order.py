@@ -131,6 +131,18 @@ class PosAdvanceOrder(models.Model):
     )
     amount_paid = fields.Monetary(string="Paid Amount", currency_field="currency_id", compute="_compute_payment_amounts", store=True)
     amount_remaining = fields.Monetary(string="Remaining Amount", currency_field="currency_id", compute="_compute_payment_amounts", store=True)
+    remaining_amount_tendered = fields.Monetary(
+        string="Remaining Amount Tendered",
+        currency_field="currency_id",
+        default=0.0,
+        help="Amount received from customer when completing remaining payment.",
+    )
+    remaining_change_amount = fields.Monetary(
+        string="Remaining Change Returned",
+        currency_field="currency_id",
+        default=0.0,
+        help="Amount returned to the customer when completing remaining payment.",
+    )
     from_pos_config_id = fields.Many2one(
         "pos.config",
         string="From POS",
@@ -828,7 +840,7 @@ class PosAdvanceOrder(models.Model):
         PosPayment = self.env["pos.payment"].sudo()
         rounding = order.currency_id.rounding
         for payment_method, amount in payments:
-            if float_compare(amount, 0.0, precision_rounding=rounding) <= 0:
+            if float_is_zero(amount, precision_rounding=rounding):
                 continue
             _logger.info(
                 "[ADV_POS_DEBUG] Payment line order=%s advance_order=%s method=%s amount=%s",
@@ -1208,7 +1220,7 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_payment(self, pos_payment_method_id=None, pos_config_id=None):
+    def action_create_remaining_payment(self, pos_payment_method_id=None, pos_config_id=None, amount_tendered=None):
         """Create a full POS sale with product lines only; pay cash/bank for remainder and Customer Account for the prepaid amount.
 
         Accounting: apply advance via _post_advance_completion_settlement_move (Dr liability / Cr receivable).
@@ -1249,6 +1261,10 @@ class PosAdvanceOrder(models.Model):
             rounding = order.currency_id.rounding
             remaining = order.amount_remaining or 0.0
             advance_part = order.advance_amount or 0.0
+            remaining_tendered = float(amount_tendered if amount_tendered is not None else remaining)
+            if float_compare(remaining_tendered, remaining, precision_rounding=rounding) < 0:
+                raise UserError(_("Amount tendered cannot be less than remaining amount."))
+            remaining_change = max(remaining_tendered - remaining, 0.0)
 
             pay_later_pm = False
             if not float_is_zero(advance_part, precision_rounding=rounding):
@@ -1274,11 +1290,16 @@ class PosAdvanceOrder(models.Model):
                 raise UserError(
                     _("Order total does not match remaining plus advance. Recalculate the advance order.")
                 )
-            payouts = [(pm, remaining)]
+            payouts = [(pm, remaining_tendered)]
+            if not float_is_zero(remaining_change, precision_rounding=rounding):
+                # Explicit change return line to keep net payment equal to the order total.
+                payouts.append((pm, -remaining_change))
             if pay_later_pm:
                 payouts.append((pay_later_pm, advance_part))
             order._pay_pos_order_multi(pos_order, payouts)
             order.remaining_pos_order_id = pos_order.id
+            order.remaining_amount_tendered = remaining_tendered
+            order.remaining_change_amount = remaining_change
             order._post_advance_completion_settlement_move()
             order.state = "fully_paid"
 

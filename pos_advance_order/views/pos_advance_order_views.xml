@@ -204,6 +204,8 @@
                         <field name="amount_total" widget="monetary" readonly="1"/>
                         <field name="amount_paid" widget="monetary" readonly="1"/>
                         <field name="change_amount" widget="monetary" readonly="1"/>
+                        <field name="remaining_amount_tendered" widget="monetary" readonly="1" invisible="remaining_amount_tendered == 0"/>
+                        <field name="remaining_change_amount" widget="monetary" readonly="1" invisible="remaining_change_amount == 0"/>
                         <field name="pledge_amount" widget="monetary" readonly="1" invisible="pledge_amount == 0"/>
 
                         <field name="discount_amount" widget="monetary" readonly="1"/>

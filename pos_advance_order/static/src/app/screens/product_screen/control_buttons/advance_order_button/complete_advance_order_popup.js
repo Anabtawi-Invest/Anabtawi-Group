@@ -27,6 +27,7 @@ export class CompleteAdvanceOrderPopup extends Component {
             loading: true,
             search: "",
             selected_order_id: null,
+            amount_tendered: 0,
             advance_orders: [],
             payment_methods: paymentMethods,
             selected_payment_method_id: defaultPmId,
@@ -89,6 +90,17 @@ export class CompleteAdvanceOrderPopup extends Component {
         return this._tr("Type customer name or phone...", "اكتب اسم العميل أو رقم الهاتف...");
     }
 
+    get amountTenderedLabel() {
+        return this._tr("Amount Tendered", "المبلغ المستلم");
+    }
+
+    get amountTenderedHint() {
+        return this._tr(
+            "Customer paid amount for remaining settlement.",
+            "المبلغ الذي دفعه العميل عند تسوية المتبقي."
+        );
+    }
+
     get colAdvanceLabel() {
         return this._tr("Advance", "العربون");
     }
@@ -127,6 +139,21 @@ export class CompleteAdvanceOrderPopup extends Component {
 
     get completeButtonLabel() {
         return this._tr("Complete", "إكمال");
+    }
+
+    get changeReturnedLabel() {
+        return this._tr("Change Returned", "المبلغ المرجّع");
+    }
+
+    get selectedRemainingAmount() {
+        const sel = this.state.advance_orders.find((o) => o.id === this.state.selected_order_id);
+        return Number(sel?.amount_remaining ?? 0);
+    }
+
+    get remainingChangeAmount() {
+        const tendered = Number(this.state.amount_tendered || 0);
+        const due = this.selectedRemainingAmount;
+        return Math.max(tendered - due, 0);
     }
 
     isPaymentSelected(pm) {
@@ -201,6 +228,11 @@ export class CompleteAdvanceOrderPopup extends Component {
         this.state.search = (ev.target.value || "").toLowerCase();
     }
 
+    onAmountTenderedInput(ev) {
+        const value = Number(ev.target.value || 0);
+        this.state.amount_tendered = Number.isFinite(value) ? value : 0;
+    }
+
     get filteredOrders() {
         const term = (this.state.search || "").trim();
         if (!term) {
@@ -215,6 +247,8 @@ export class CompleteAdvanceOrderPopup extends Component {
 
     selectOrder(orderId) {
         this.state.selected_order_id = orderId;
+        const selected = this.state.advance_orders.find((o) => o.id === orderId);
+        this.state.amount_tendered = Number(selected?.amount_remaining ?? 0);
     }
 
     confirm() {
@@ -226,6 +260,13 @@ export class CompleteAdvanceOrderPopup extends Component {
             this.notification.add(this._tr("Please select a payment method.", "يرجى اختيار طريقة دفع."), { type: "warning" });
             return;
         }
+        if (this.state.amount_tendered < this.selectedRemainingAmount) {
+            this.notification.add(
+                this._tr("Amount tendered cannot be less than remaining amount.", "لا يمكن أن يكون المبلغ المستلم أقل من المبلغ المتبقي."),
+                { type: "warning" }
+            );
+            return;
+        }
         const selectedPm = this.state.payment_methods.find(
             (pm) => pm.id === this.state.selected_payment_method_id
         );
@@ -233,6 +274,8 @@ export class CompleteAdvanceOrderPopup extends Component {
             advance_order_id: this.state.selected_order_id,
             payment_method_id: this.state.selected_payment_method_id,
             payment_method_name: selectedPm?.name || "",
+            amount_tendered: this.state.amount_tendered,
+            change_amount: this.remainingChangeAmount,
         });
         this.props.close();
     }

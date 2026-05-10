@@ -232,6 +232,7 @@ patch(ControlButtons.prototype, {
                 {
                     pos_payment_method_id: popupPayload.payment_method_id,
                     pos_config_id: this.pos.config.id,
+                    amount_tendered: popupPayload.amount_tendered,
                 }
             );
             this.notification.add(this._tr("Advance order completed successfully.", "تم إكمال طلب العربون بنجاح."), { type: "success" });

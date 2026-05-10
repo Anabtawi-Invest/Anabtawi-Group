@@ -959,3 +959,23 @@ msgstr "الهاتف"
 #. module: pos_advance_order
 msgid "Complete"
 msgstr "إكمال"
+
+#. module: pos_advance_order
+msgid "Customer paid amount for remaining settlement."
+msgstr "المبلغ الذي دفعه العميل عند تسوية المتبقي."
+
+#. module: pos_advance_order
+msgid "Remaining Amount Tendered"
+msgstr "المبلغ المستلم للمتبقي"
+
+#. module: pos_advance_order
+msgid "Remaining Change Returned"
+msgstr "المبلغ المرجّع للمتبقي"
+
+#. module: pos_advance_order
+msgid "Remaining payment details: Tendered %(tendered)s, Change Returned %(change)s"
+msgstr "تفاصيل دفعة المتبقي: المبلغ المستلم %(tendered)s، المبلغ المرجّع %(change)s"
+
+#. module: pos_advance_order
+msgid "Amount tendered cannot be less than remaining amount."
+msgstr "لا يمكن أن يكون المبلغ المستلم أقل من المبلغ المتبقي."
