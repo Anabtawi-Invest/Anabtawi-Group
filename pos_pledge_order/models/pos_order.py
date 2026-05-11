@@ -298,7 +298,7 @@ class PosOrder(models.Model):
             pos_order = self.with_context(pos_pledge_sync=True)
         res_id = super(PosOrder, pos_order)._process_order(order, existing_order)
         po = self.browse(res_id).sudo()
-        _logger.info(
+        _logger.warning(
             "[PLEDGE][TRACE] _process_order done order=%s lines=%s pledge_lines=%s snapshot_total=%s",
             po.name,
             len(po.lines),
@@ -313,8 +313,14 @@ class PosOrder(models.Model):
             })
             # Journal entry & pos.pledge need snapshot + paid state. Core calls write({'state': paid})
             # before this snapshot exists, so _get_pledge_totals() was 0 in write() — run again here.
-            if po.state in ("paid", "done"):
+            if po.state in ("paid", "done", "invoiced"):
                 po._create_pledge_collection_orders()
+            else:
+                _logger.warning(
+                    "[PLEDGE][TRACE] _process_order skip immediate create order=%s state=%s",
+                    po.name,
+                    po.state,
+                )
         return res_id
 
     def _process_payment_lines(self, order_data, order, pos_session, draft):
@@ -562,18 +568,18 @@ class PosOrder(models.Model):
 
     def write(self, vals):
         """Override write to trigger pledge order creation when order state changes."""
-        _logger.info("[PLEDGE] write() called on %d orders with vals: %s", len(self), vals)
+        _logger.warning("[PLEDGE] write() called on %d orders with vals: %s", len(self), vals)
         
         result = super().write(vals)
         
         # Pledge deposit is finalized in _process_order after total_pledge_amount snapshot write.
         # This hook still runs when state→paid before snapshot (early no-op) or for non-POS writes.
-        if vals.get('state') in ('paid', 'done'):
-            _logger.info("[PLEDGE] Order state changed to %s, checking for pledge orders", vals.get('state'))
+        if vals.get('state') in ('paid', 'done', 'invoiced'):
+            _logger.warning("[PLEDGE] Order state changed to %s, checking for pledge orders", vals.get('state'))
             normal_orders = self.filtered(lambda o: not o.is_pledge_generated)
             normal_orders._create_pledge_collection_orders()
         else:
-            _logger.info("[PLEDGE] State not in (paid, done): %s", vals.get('state'))
+            _logger.warning("[PLEDGE][TRACE] write skip: state not in (paid, done, invoiced): %s", vals.get('state'))
         
         return result
 
