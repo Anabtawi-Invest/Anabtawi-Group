@@ -51,12 +51,20 @@ export class PledgeListPopup extends Component {
                 console.log("[PLEDGE] Filtering for customer pledges (without employee_id)");
             }
             
-            this.state.pledges = await this.orm.searchRead(
-                "pos.pledge",
+            const rows = await this.orm.searchRead(
+                "pos.advance.order.pledge",
                 domain,
-                ['id', 'name', 'partner_id', 'pledge_amount', 'employee_amount', 'delivery_amount', 'case_type', 'create_date', 'employee_id', 'state', 'return_date', 'pos_order_id'],
+                ['id', 'order_id', 'pos_order_id', 'partner_id', 'employee_id', 'product_id', 'pledge_qty', 'pledge_amount_unit', 'pledge_subtotal', 'create_date', 'state', 'return_date'],
                 { order: 'create_date desc' }
             );
+            this.state.pledges = rows.map((row) => ({
+                ...row,
+                name: row.order_id?.[1] || row.pos_order_id?.[1] || _t("POS Pledge"),
+                pledge_amount: row.pledge_subtotal || 0,
+                employee_amount: 0,
+                delivery_amount: 0,
+                case_type: "case2",
+            }));
             
             // Load employee names for each pledge
             const employeeIds = this.state.pledges
@@ -198,10 +206,10 @@ export class PledgeListPopup extends Component {
         try {
             // Load full pledge details including products
             const pledgeDetails = await this.orm.searchRead(
-                "pos.pledge",
+                "pos.advance.order.pledge",
                 [['id', '=', pledge.id]],
-                ['id', 'name', 'partner_id', 'employee_id', 'pledge_amount', 'employee_amount', 'delivery_amount', 
-                 'case_type', 'create_date', 'return_date', 'state', 'pledge_products', 'pos_order_id'],
+                ['id', 'order_id', 'pos_order_id', 'partner_id', 'employee_id', 'product_id', 'pledge_qty', 'pledge_amount_unit', 'pledge_subtotal',
+                 'create_date', 'return_date', 'state'],
                 { limit: 1 }
             );
             
@@ -215,53 +223,22 @@ export class PledgeListPopup extends Component {
             
             const fullPledge = pledgeDetails[0];
             
-            // Load pledge products details
-            let products = [];
-            if (fullPledge.pledge_products && fullPledge.pledge_products.length > 0) {
-                const productIds = fullPledge.pledge_products.map(p => p[0]);
-                const productDetails = await this.orm.searchRead(
-                    "product.product",
-                    [['id', 'in', productIds]],
-                    ['id', 'name', 'display_name']
-                );
-                
-                // Get quantities from pos.order lines if available
-                if (fullPledge.pos_order_id && fullPledge.pos_order_id[0]) {
-                    try {
-                        const orderLines = await this.orm.searchRead(
-                            "pos.order.line",
-                            [['order_id', '=', fullPledge.pos_order_id[0]]],
-                            ['product_id', 'qty']
-                        );
-                        
-                        products = productDetails.map(product => {
-                            const line = orderLines.find(l => l.product_id && l.product_id[0] === product.id);
-                            return {
-                                id: product.id,
-                                name: product.display_name || product.name,
-                                qty: line ? line.qty : 1
-                            };
-                        });
-                    } catch (error) {
-                        console.warn("[PLEDGE] Could not load order lines:", error);
-                        products = productDetails.map(product => ({
-                            id: product.id,
-                            name: product.display_name || product.name,
-                            qty: 1
-                        }));
-                    }
-                } else {
-                    products = productDetails.map(product => ({
-                        id: product.id,
-                        name: product.display_name || product.name,
-                        qty: 1
-                    }));
-                }
-            }
+            const products = fullPledge.product_id
+                ? [{
+                    id: fullPledge.product_id[0],
+                    name: fullPledge.product_id[1],
+                    qty: fullPledge.pledge_qty || 1,
+                }]
+                : [];
             
             // Combine all details
             this.state.selectedPledgeDetails = {
                 ...fullPledge,
+                name: fullPledge.order_id?.[1] || fullPledge.pos_order_id?.[1] || _t("POS Pledge"),
+                pledge_amount: fullPledge.pledge_subtotal || 0,
+                employee_amount: 0,
+                delivery_amount: 0,
+                case_type: "case2",
                 employee_name: pledge.employee_name || '',
                 partner_phone: pledge.partner_phone || '',
                 products: products

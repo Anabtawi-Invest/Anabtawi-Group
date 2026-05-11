@@ -313,7 +313,7 @@ patch(ControlButtons.prototype, {
             console.log("[PLEDGE] Calling action_return_pledge for ID:", selectedPledge.id, "Type:", returnType);
             
             await this.env.services.orm.call(
-                "pos.pledge",
+                "pos.advance.order.pledge",
                 "action_return_pledge",
                 [[selectedPledge.id]],
                 { context: { return_type: returnType } }
@@ -1067,11 +1067,11 @@ patch(PaymentScreen.prototype, {
             };
 
             console.log("[PLEDGE] Prepared pledge data for backend:", pledgeData);
-            console.log("[PLEDGE] Calling pos.pledge.create_from_pos...");
+            console.log("[PLEDGE] Calling pos.advance.order.pledge.create_from_pos...");
 
             // Use the orm service from setup
             const pledgeId = await this.orm.call(
-                "pos.pledge",
+                "pos.advance.order.pledge",
                 "create_from_pos",
                 [pledgeData]
             );

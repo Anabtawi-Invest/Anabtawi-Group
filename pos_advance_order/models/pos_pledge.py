@@ -3,7 +3,7 @@
 from collections import defaultdict
 
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 
 
 class PosAdvanceOrderPledge(models.Model):
@@ -53,6 +53,19 @@ class PosAdvanceOrderPledge(models.Model):
         store=True,
         readonly=True,
     )
+    state = fields.Selection(
+        [
+            ("active", "Active"),
+            ("returned", "Returned"),
+            ("cancelled", "Cancelled"),
+        ],
+        string="State",
+        default="active",
+        index=True,
+    )
+    return_date = fields.Datetime(string="Return Date", readonly=True, copy=False)
+    pledge_move_id = fields.Many2one("account.move", string="Pledge Move", readonly=True, copy=False)
+    return_move_id = fields.Many2one("account.move", string="Return Move", readonly=True, copy=False)
 
     @api.depends(
         "order_id.currency_id",
@@ -114,6 +127,23 @@ class PosAdvanceOrderPledge(models.Model):
              WHERE pl.pos_order_id = o.id
                AND pl.partner_id IS NULL
                AND o.partner_id IS NOT NULL
+            """
+        )
+        self.env.cr.execute(
+            """
+            UPDATE pos_advance_order_pledge
+               SET state = 'active'
+             WHERE state IS NULL
+            """
+        )
+        self.env.cr.execute(
+            """
+            UPDATE pos_advance_order_pledge pl
+               SET pledge_move_id = o.pledge_deposit_move_id
+              FROM pos_order o
+             WHERE pl.pos_order_id = o.id
+               AND pl.pledge_move_id IS NULL
+               AND o.pledge_deposit_move_id IS NOT NULL
             """
         )
 
@@ -207,6 +237,9 @@ class PosAdvanceOrderPledge(models.Model):
                         "partner_id": partner_id,
                         "pledge_qty": qty,
                         "pledge_amount_unit": unit_amount,
+                        "state": "active",
+                        "return_date": False,
+                        "return_move_id": False,
                     }
                 )
                 created |= existing
@@ -220,7 +253,59 @@ class PosAdvanceOrderPledge(models.Model):
                     "product_id": product_id,
                     "pledge_qty": qty,
                     "pledge_amount_unit": unit_amount,
+                    "state": "active",
                 }
             )
         return created[:1].id
+
+    def action_return_pledge(self):
+        """Reverse pledge deposit move and mark pledge lines returned."""
+        for pledge in self:
+            if pledge.state == "returned" and pledge.return_move_id:
+                continue
+            if pledge.state != "active":
+                raise UserError(_("Only active pledges can be returned."))
+
+            order = pledge.pos_order_id
+            if not order:
+                raise UserError(_("Pledge line is not linked to a POS order."))
+
+            related_lines = self.search(
+                [("pos_order_id", "=", order.id), ("state", "=", "active")]
+            )
+            if not related_lines:
+                related_lines = pledge
+
+            move = related_lines[:1].pledge_move_id or order.pledge_deposit_move_id
+            if not move or move.state != "posted":
+                raise UserError(_("No posted pledge journal entry is linked to this pledge."))
+
+            existing_return = related_lines.filtered(lambda l: l.return_move_id)[:1]
+            reverse_move = existing_return.return_move_id if existing_return else False
+            if not reverse_move:
+                reverse_moves = move._reverse_moves(
+                    [
+                        {
+                            "date": fields.Date.context_today(pledge),
+                            "ref": _("Pledge return - %s") % (order.name or order.pos_reference or move.ref),
+                        }
+                    ],
+                    cancel=False,
+                )
+                reverse_moves.action_post()
+                reverse_move = reverse_moves
+
+            related_lines.write(
+                {
+                    "state": "returned",
+                    "return_date": fields.Datetime.now(),
+                    "return_move_id": reverse_move.id,
+                    "pledge_move_id": move.id,
+                }
+            )
+        return True
+
+    def action_cancel(self):
+        self.write({"state": "cancelled"})
+        return True
 

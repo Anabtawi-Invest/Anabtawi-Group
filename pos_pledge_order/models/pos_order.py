@@ -550,6 +550,9 @@ class PosOrder(models.Model):
 
             move = order._post_pledge_deposit_move()
             if move:
+                self.env["pos.advance.order.pledge"].sudo().search(
+                    [("pos_order_id", "=", order.id)]
+                ).write({"pledge_move_id": move.id})
                 _logger.info(
                     "[PLEDGE][TRACE] posted move_id=%s for order=%s",
                     move.id,
