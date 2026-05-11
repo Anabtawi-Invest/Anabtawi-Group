@@ -8,9 +8,18 @@ patch(PosOrderAccounting.prototype, {
         const result = super._computeAllPrices(opts);
         const fixedNamesByTaxGroup = {};
 
+        for (const taxGroup of this.models["account.tax.group"].getAll()) {
+            const fixedName = (taxGroup.pos_fixed_group_name || "").trim();
+            if (fixedName) {
+                fixedNamesByTaxGroup[taxGroup.id] = fixedName;
+            }
+        }
+
+        // Backward compatibility: if Tax Group field is empty,
+        // allow using tax-level fixed name.
         for (const tax of this.models["account.tax"].getAll()) {
             const fixedName = (tax.pos_fixed_name || "").trim();
-            if (fixedName && tax.tax_group_id?.id) {
+            if (fixedName && tax.tax_group_id?.id && !fixedNamesByTaxGroup[tax.tax_group_id.id]) {
                 fixedNamesByTaxGroup[tax.tax_group_id.id] = fixedName;
             }
         }
@@ -20,7 +29,6 @@ patch(PosOrderAccounting.prototype, {
                 const fixedName = fixedNamesByTaxGroup[taxGroup.id];
                 if (fixedName) {
                     taxGroup.group_name = fixedName;
-                    taxGroup.group_label = "";
                 }
             }
         }

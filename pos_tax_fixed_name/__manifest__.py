@@ -8,6 +8,7 @@
     "depends": ["point_of_sale", "account"],
     "data": [
         "views/account_tax_views.xml",
+        "views/account_tax_group_views.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [
