@@ -482,7 +482,7 @@ class PosOrder(models.Model):
         return move
 
     def _create_pledge_collection_orders(self):
-        """On paid orders with pledge lines: post liability move and tracking record (no extra POS order)."""
+        """On paid orders with pledge lines: post liability move + create pos.advance.order.pledge lines."""
         for order in self:
             _logger.info(
                 "[PLEDGE][TRACE] _create_pledge_collection_orders order=%s state=%s partner=%s is_pledge_generated=%s",
@@ -523,53 +523,37 @@ class PosOrder(models.Model):
                 )
                 continue
 
-            pledge_record = self.env["pos.pledge"].sudo().search([("pos_order_id", "=", order.id)], limit=1)
-            _logger.info(
-                "[PLEDGE][TRACE] existing pos.pledge lookup order=%s order_id=%s found=%s",
-                order.name,
-                order.id,
-                pledge_record.id if pledge_record else False,
-            )
-            if not pledge_record:
-                try:
-                    vals = order._prepare_pos_pledge_tracking_vals(pledge_total, pledge_product_ids)
-                    _logger.info(
-                        "[PLEDGE][TRACE] creating pos.pledge for order=%s with vals=%s",
-                        order.name,
-                        vals,
-                    )
-                    pledge_record = self.env["pos.pledge"].sudo().create(vals)
-                    _logger.info(
-                        "[PLEDGE] Created pos.pledge %s for order %s",
-                        pledge_record.name,
-                        order.name,
-                    )
-                except Exception as e:
-                    _logger.warning(
-                        "[PLEDGE] Could not create pos.pledge from source order %s: %s",
-                        order.name,
-                        e,
-                    )
-                    _logger.exception(
-                        "[PLEDGE][TRACE] create pos.pledge failed for order=%s",
-                        order.name,
-                    )
-                    continue
-
-            order.pledge_id = pledge_record.id
-            _logger.info(
-                "[PLEDGE][TRACE] linked order=%s to pledge_id=%s",
-                order.name,
-                pledge_record.id,
-            )
+            try:
+                line_id = self.env["pos.advance.order.pledge"].sudo().create_from_pos(
+                    {
+                        "pos_order_id": order.id,
+                        "partner_id": order.partner_id.id,
+                        "pledge_products": pledge_product_ids,
+                    }
+                )
+                _logger.info(
+                    "[PLEDGE] Created/updated pos.advance.order.pledge (id=%s) for order %s",
+                    line_id,
+                    order.name,
+                )
+            except Exception as e:
+                _logger.warning(
+                    "[PLEDGE] Could not create pos.advance.order.pledge from source order %s: %s",
+                    order.name,
+                    e,
+                )
+                _logger.exception(
+                    "[PLEDGE][TRACE] create pos.advance.order.pledge failed for order=%s",
+                    order.name,
+                )
+                continue
 
             move = order._post_pledge_deposit_move()
-            if move and pledge_record:
-                pledge_record.pledge_move_id = move.id
+            if move:
                 _logger.info(
-                    "[PLEDGE][TRACE] linked pledge_id=%s to move_id=%s",
-                    pledge_record.id,
+                    "[PLEDGE][TRACE] posted move_id=%s for order=%s",
                     move.id,
+                    order.name,
                 )
 
     def write(self, vals):

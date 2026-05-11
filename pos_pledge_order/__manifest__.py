@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'POS Pledge (Rahn) Management',
-    'version': '19.0.1.0.11',
+    'version': '19.0.1.0.12',
     'category': 'Point of Sale',
     'summary': 'Manage pledge (Rahn) scenarios with employees, delivery, and accounting',
     'description': """
@@ -19,7 +19,7 @@
         * Three business case scenarios supported
     """,
     'author': 'Your Company',
-    'depends': ['point_of_sale', 'pos_sale', 'account', 'hr'],
+    'depends': ['point_of_sale', 'pos_sale', 'account', 'hr', 'pos_advance_order'],
     'data': [
         'security/ir.model.access.csv',
         'data/sequence.xml',
