@@ -311,9 +311,15 @@ class PosOrder(models.Model):
                 "pledge_product_qty": int(pledge_meta["qty"]),
                 "pledge_snapshot_product_ids": [(6, 0, pledge_meta["product_ids"])],
             })
-            # Journal entry & pos.pledge need snapshot + paid state. Core calls write({'state': paid})
-            # before this snapshot exists, so _get_pledge_totals() was 0 in write() — run again here.
+            # Journal entry & pos.pledge need snapshot + final state.
+            # Execute directly here to avoid missing creation due to hook timing/race.
             if po.state in ("paid", "done", "invoiced"):
+                _logger.warning(
+                    "[PLEDGE][TRACE] _process_order immediate ensure order=%s state=%s snapshot_total=%s",
+                    po.name,
+                    po.state,
+                    pledge_meta["total"],
+                )
                 po._create_pledge_collection_orders()
             else:
                 _logger.warning(
