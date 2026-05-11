@@ -152,11 +152,25 @@ class PosOrder(models.Model):
         """
         self.ensure_one()
         amt, pids, qty = self._compute_pledge_from_lines()
+        _logger.info(
+            "[PLEDGE][TRACE] _get_pledge_totals order=%s from_lines amount=%s qty=%s products=%s",
+            self.name,
+            amt,
+            qty,
+            pids,
+        )
         if amt > 0:
             return amt, pids, qty
         pids_snap = list(self.pledge_snapshot_product_ids.ids)
         qty_snap = float(self.pledge_product_qty or 0)
         cur = self.currency_id or self.company_id.currency_id
+        _logger.info(
+            "[PLEDGE][TRACE] _get_pledge_totals order=%s snapshot amount=%s qty=%s products=%s",
+            self.name,
+            self.total_pledge_amount or 0.0,
+            qty_snap,
+            pids_snap,
+        )
         if len(pids_snap) == 1 and qty_snap > 0:
             unit = float(self.env["product.product"].browse(pids_snap[0]).pledge_amount or 0.0)
             if unit > 0:
@@ -458,10 +472,32 @@ class PosOrder(models.Model):
     def _create_pledge_collection_orders(self):
         """On paid orders with pledge lines: post liability move and tracking record (no extra POS order)."""
         for order in self:
+            _logger.info(
+                "[PLEDGE][TRACE] _create_pledge_collection_orders order=%s state=%s partner=%s is_pledge_generated=%s",
+                order.name,
+                order.state,
+                order.partner_id.id if order.partner_id else False,
+                order.is_pledge_generated,
+            )
             if order.is_pledge_generated:
+                _logger.info(
+                    "[PLEDGE][TRACE] skip order=%s reason=is_pledge_generated",
+                    order.name,
+                )
                 continue
             pledge_total, pledge_product_ids, pledge_qty = order._get_pledge_totals()
+            _logger.info(
+                "[PLEDGE][TRACE] order=%s totals pledge_total=%s pledge_qty=%s pledge_product_ids=%s",
+                order.name,
+                pledge_total,
+                pledge_qty,
+                pledge_product_ids,
+            )
             if pledge_total <= 0 or pledge_qty <= 0:
+                _logger.info(
+                    "[PLEDGE][TRACE] skip order=%s reason=pledge_total_or_qty_non_positive",
+                    order.name,
+                )
                 continue
 
             if not order.partner_id:
@@ -469,12 +505,27 @@ class PosOrder(models.Model):
                     "[PLEDGE] Cannot process pledge for %s because customer is missing.",
                     order.name,
                 )
+                _logger.info(
+                    "[PLEDGE][TRACE] skip order=%s reason=missing_partner",
+                    order.name,
+                )
                 continue
 
             pledge_record = self.env["pos.pledge"].sudo().search([("pos_order_id", "=", order.id)], limit=1)
+            _logger.info(
+                "[PLEDGE][TRACE] existing pos.pledge lookup order=%s order_id=%s found=%s",
+                order.name,
+                order.id,
+                pledge_record.id if pledge_record else False,
+            )
             if not pledge_record:
                 try:
                     vals = order._prepare_pos_pledge_tracking_vals(pledge_total, pledge_product_ids)
+                    _logger.info(
+                        "[PLEDGE][TRACE] creating pos.pledge for order=%s with vals=%s",
+                        order.name,
+                        vals,
+                    )
                     pledge_record = self.env["pos.pledge"].sudo().create(vals)
                     _logger.info(
                         "[PLEDGE] Created pos.pledge %s for order %s",
@@ -487,13 +538,27 @@ class PosOrder(models.Model):
                         order.name,
                         e,
                     )
+                    _logger.exception(
+                        "[PLEDGE][TRACE] create pos.pledge failed for order=%s",
+                        order.name,
+                    )
                     continue
 
             order.pledge_id = pledge_record.id
+            _logger.info(
+                "[PLEDGE][TRACE] linked order=%s to pledge_id=%s",
+                order.name,
+                pledge_record.id,
+            )
 
             move = order._post_pledge_deposit_move()
             if move and pledge_record:
                 pledge_record.pledge_move_id = move.id
+                _logger.info(
+                    "[PLEDGE][TRACE] linked pledge_id=%s to move_id=%s",
+                    pledge_record.id,
+                    move.id,
+                )
 
     def write(self, vals):
         """Override write to trigger pledge order creation when order state changes."""
