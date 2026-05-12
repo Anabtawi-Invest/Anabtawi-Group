@@ -55,9 +55,19 @@
                                 </div>
                             </t>
                             <div style="display:flex; justify-content:space-between;">
-                                <span>Advance Paid</span>
-                                <span t-esc="o.currency_id.format(o.amount_paid)"/>
+                                <span>Advance (deposit)</span>
+                                <span t-esc="o.currency_id.format(o.advance_amount)"/>
                             </div>
+                            <div style="display:flex; justify-content:space-between;">
+                                <span>Amount tendered</span>
+                                <span t-esc="o.currency_id.format(o.amount_tendered or o.advance_amount)"/>
+                            </div>
+                            <t t-if="o.advance_change_amount">
+                                <div style="display:flex; justify-content:space-between; font-weight:bold;">
+                                    <span>Return to customer</span>
+                                    <span t-esc="o.currency_id.format(o.advance_change_amount)"/>
+                                </div>
+                            </t>
                             <div style="display:flex; justify-content:space-between;">
                                 <span>Remaining</span>
                                 <span t-esc="o.currency_id.format(o.amount_remaining)"/>

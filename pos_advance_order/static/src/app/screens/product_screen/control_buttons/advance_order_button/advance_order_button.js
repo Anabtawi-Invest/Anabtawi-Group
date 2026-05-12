@@ -76,6 +76,14 @@ patch(ControlButtons.prototype, {
     _buildAdvanceReceiptData({ result, partner, payload }) {
         const total = toNumber(result?.amount_total, 0);
         const advanceAmount = toNumber(result?.advance_amount, payload.advance_amount || 0);
+        const amountTendered = toNumber(
+            result?.amount_tendered,
+            payload.amount_tendered ?? advanceAmount
+        );
+        const changeDue = toNumber(
+            result?.advance_change_amount,
+            Math.max(amountTendered - advanceAmount, 0)
+        );
         return {
             companyName: this.pos.company?.name || "",
             posName: this.pos.config?.name || "",
@@ -87,6 +95,8 @@ patch(ControlButtons.prototype, {
             currencyId: this.pos.currency?.id,
             total: total,
             advanceAmount: advanceAmount,
+            amountTendered: amountTendered,
+            changeDue: changeDue,
             remainingAmount: Math.max(total - advanceAmount, 0),
             lines: (payload.lines || []).map((line) => ({
                 product_id: line.product_id,
@@ -130,12 +140,15 @@ patch(ControlButtons.prototype, {
             this.notification.add(_t("Advance amount must be greater than zero."), { type: "danger" });
             return;
         }
+        const amountTenderedRaw = toNumber(popupPayload.amount_tendered, advanceAmount);
+        const amountTendered = amountTenderedRaw >= advanceAmount ? amountTenderedRaw : advanceAmount;
 
         const payload = {
             partner_id: partner.id,
             pos_config_id: popupPayload.pos_config_id || this.pos.config.id,
             from_pos_config_id: popupPayload.from_pos_config_id || this.pos.config.id,
             advance_amount: advanceAmount,
+            amount_tendered: amountTendered,
             payment_method_id: popupPayload.payment_method_id,
             payment_method_name: popupPayload.payment_method_name || "",
             employee_id: popupPayload.employee_id || false,

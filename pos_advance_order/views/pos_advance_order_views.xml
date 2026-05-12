@@ -139,6 +139,8 @@
                             <field name="pos_payment_method_id" required="1" readonly="state != 'draft'"/>
                             <field name="payment_method" invisible="1"/>
                             <field name="advance_amount" widget="monetary" readonly="state != 'draft'"/>
+                            <field name="amount_tendered" widget="monetary" readonly="state != 'draft'"/>
+                            <field name="advance_change_amount" widget="monetary" readonly="1"/>
                             <field name="is_employee_pricelist" readonly="state != 'draft'"/>
                             <field name="employee_pricelist_employee_id" readonly="1" invisible="not employee_pricelist_employee_id"/>
                             <field name="discount_id" readonly="state != 'draft'" />

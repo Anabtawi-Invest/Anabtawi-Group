@@ -52,8 +52,16 @@
                     <span class="ms-auto" t-esc="formatCurrency(props.receipt.total)"/>
                 </div>
                 <div class="d-flex">
-                    <span>Advance Paid</span>
+                    <span>Advance Paid (deposit)</span>
                     <span class="ms-auto" t-esc="formatCurrency(props.receipt.advanceAmount)"/>
+                </div>
+                <div class="d-flex">
+                    <span>Amount Tendered</span>
+                    <span class="ms-auto" t-esc="formatCurrency(props.receipt.amountTendered)"/>
+                </div>
+                <div t-if="props.receipt.changeDue > 0" class="d-flex fw-bolder text-success">
+                    <span>Return to customer</span>
+                    <span class="ms-auto" t-esc="formatCurrency(props.receipt.changeDue)"/>
                 </div>
                 <div class="d-flex fw-bolder">
                     <span>Remaining</span>

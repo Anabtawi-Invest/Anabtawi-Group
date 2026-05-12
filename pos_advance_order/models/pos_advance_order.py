@@ -116,6 +116,20 @@ class PosAdvanceOrder(models.Model):
     amount_total = fields.Monetary(string="Total", currency_field="currency_id", compute="_compute_amounts", store=True)
     amount_grand_total = fields.Monetary(string="Grand Total", currency_field="currency_id", compute="_compute_amounts", store=True)
     advance_amount = fields.Monetary(string="Advance", currency_field="currency_id", default=0.0)
+    amount_tendered = fields.Monetary(
+        string="Amount Tendered",
+        currency_field="currency_id",
+        default=0.0,
+        help="Cash or card total handed by the customer at the register. "
+        "Accounting and POS session deposit totals use the Advance amount only; "
+        "the difference is change to return to the customer.",
+    )
+    advance_change_amount = fields.Monetary(
+        string="Change Due",
+        currency_field="currency_id",
+        compute="_compute_advance_change_amount",
+        help="Amount to return to the customer: Amount Tendered minus Advance.",
+    )
     amount_paid = fields.Monetary(string="Paid Amount", currency_field="currency_id", compute="_compute_payment_amounts", store=True)
     amount_remaining = fields.Monetary(string="Remaining Amount", currency_field="currency_id", compute="_compute_payment_amounts", store=True)
     from_pos_config_id = fields.Many2one(
@@ -577,6 +591,19 @@ class PosAdvanceOrder(models.Model):
             if commands:
                 order.write({"pledge_line_ids": commands})
 
+    @api.depends("amount_tendered", "advance_amount")
+    def _compute_advance_change_amount(self):
+        for order in self:
+            rounding = order.currency_id.rounding or 0.01
+            advance = order.advance_amount or 0.0
+            tendered = order.amount_tendered or 0.0
+            if float_is_zero(tendered, precision_rounding=rounding):
+                tendered = advance
+            order.advance_change_amount = max(
+                order.currency_id.round(tendered - advance),
+                0.0,
+            )
+
     @api.depends("amount_grand_total", "advance_amount", "discount_amount", "state")
     def _compute_payment_amounts(self):
         for order in self:
@@ -862,6 +889,15 @@ class PosAdvanceOrder(models.Model):
         for order in self:
             if order.advance_amount and order.advance_amount < 0:
                 raise UserError(_("Advance amount cannot be negative."))
+
+    @api.constrains("advance_amount", "amount_tendered")
+    def _check_amount_tendered_vs_advance(self):
+        for order in self:
+            rnd = order.currency_id.rounding or 0.01
+            if float_is_zero(order.amount_tendered or 0.0, precision_rounding=rnd):
+                continue
+            if float_compare(order.amount_tendered, order.advance_amount or 0.0, precision_rounding=rnd) < 0:
+                raise UserError(_("Amount tendered cannot be less than the advance amount."))
 
     @api.constrains("pos_payment_method_id", "from_pos_config_id", "state")
     def _check_pos_payment_method_config(self):
@@ -1361,6 +1397,14 @@ class PosAdvanceOrder(models.Model):
             if vals.get("pos_payment_method_id") and "payment_method" not in vals:
                 pm = PaymentMethod.browse(vals["pos_payment_method_id"])
                 vals["payment_method"] = self._payment_method_selection_from_pos_pm(pm)
+            advance = float(vals.get("advance_amount") or 0.0)
+            tendered = vals.get("amount_tendered", None)
+            tendered_f = float(tendered) if tendered is not None else 0.0
+            rounding = self.env.company.currency_id.rounding or 0.01
+            if float_is_zero(tendered_f, precision_rounding=rounding):
+                vals["amount_tendered"] = advance
+            elif float_compare(tendered_f, advance, precision_rounding=rounding) < 0:
+                raise UserError(_("Amount tendered cannot be less than the advance amount."))
         return super().create(vals_list)
 
     # -------------------------------------------------------------------------

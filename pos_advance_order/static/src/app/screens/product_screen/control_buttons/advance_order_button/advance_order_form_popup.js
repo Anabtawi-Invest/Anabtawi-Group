@@ -50,6 +50,7 @@ export class AdvanceOrderFormPopup extends Component {
         this.state = useState({
             loading: true,
             advance_amount: 0,
+            amount_tendered: 0,
             selected_payment_method_id: defaultPmId,
             from_pos_config_id: this.props.posConfigId || null,
             picking_pos_config_id: this.props.posConfigId || null,
@@ -86,6 +87,26 @@ export class AdvanceOrderFormPopup extends Component {
         const currencyId = this.props.pos?.currency?.id;
         const amount = Number(this.state.advance_amount) || 0;
         return formatCurrency(amount, currencyId);
+    }
+
+    amountTenderedFmt() {
+        const currencyId = this.props.pos?.currency?.id;
+        const amount = Number(this.state.amount_tendered) || 0;
+        return formatCurrency(amount, currencyId);
+    }
+
+    changeDueFmt() {
+        const currencyId = this.props.pos?.currency?.id;
+        const advance = Number(this.state.advance_amount) || 0;
+        const tendered = Number(this.state.amount_tendered) || 0;
+        const change = Math.max(tendered - advance, 0);
+        return formatCurrency(change, currencyId);
+    }
+
+    changeDueRaw() {
+        const advance = Number(this.state.advance_amount) || 0;
+        const tendered = Number(this.state.amount_tendered) || 0;
+        return Math.max(tendered - advance, 0);
     }
 
     isPaymentSelected(pm) {
@@ -167,6 +188,18 @@ export class AdvanceOrderFormPopup extends Component {
     onAdvanceAmountInput(ev) {
         const value = Number(ev.target.value || 0);
         this.state.advance_amount = Number.isFinite(value) ? value : 0;
+        if (this.state.amount_tendered < this.state.advance_amount) {
+            this.state.amount_tendered = this.state.advance_amount;
+        }
+    }
+
+    onAmountTenderedInput(ev) {
+        const value = Number(ev.target.value || 0);
+        this.state.amount_tendered = Number.isFinite(value) ? value : 0;
+        const advance = Number(this.state.advance_amount) || 0;
+        if (this.state.amount_tendered < advance) {
+            this.state.amount_tendered = advance;
+        }
     }
 
     onPickingPosChange(ev) {
@@ -220,6 +253,15 @@ export class AdvanceOrderFormPopup extends Component {
             this.notification.add(_t("Please select a payment method."), { type: "warning" });
             return;
         }
+        const tendered = Number(this.state.amount_tendered) || 0;
+        const advance = Number(this.state.advance_amount) || 0;
+        if (tendered < advance) {
+            this.notification.add(
+                _t("Amount tendered cannot be less than the advance amount."),
+                { type: "warning" }
+            );
+            return;
+        }
         if (this.state.with_employee && !this.state.employee_id) {
             this.notification.add(_t("Please select an employee."), { type: "warning" });
             return;
@@ -229,6 +271,7 @@ export class AdvanceOrderFormPopup extends Component {
         );
         this.props.getPayload({
             advance_amount: this.state.advance_amount,
+            amount_tendered: tendered,
             payment_method_id: this.state.selected_payment_method_id,
             payment_method_name: selectedPm?.name || "",
             from_pos_config_id: currentFromPosId,

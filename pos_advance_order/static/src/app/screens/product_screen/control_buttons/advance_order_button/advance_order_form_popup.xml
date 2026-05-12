@@ -58,6 +58,29 @@
                 </div>
 
                 <div class="form-group mb-3">
+                    <label>
+                        <strong>Amount Tendered <span class="text-danger">*</span></strong>
+                    </label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        min="0"
+                        step="0.01"
+                        t-att-value="state.amount_tendered"
+                        t-on-input="onAmountTenderedInput"
+                        t-att-disabled="state.loading ? 'disabled' : undefined"
+                    />
+                    <small class="form-text text-muted">
+                        Customer paid at register (can exceed advance). Drawer and accounting record the advance only; give the customer the rest as change.
+                    </small>
+                </div>
+
+                <div t-if="changeDueRaw() > 0" class="alert alert-info py-2 mb-3" role="status">
+                    <strong>Return to customer:</strong>
+                    <span class="ms-1" t-esc="changeDueFmt()"/>
+                </div>
+
+                <div class="form-group mb-3">
                     <label><strong>Payment method</strong></label>
                     <div
                         t-if="!state.payment_methods.length"
@@ -81,7 +104,14 @@
                                         />
                                         <span class="payment-name" t-esc="pm.name"/>
                                     </div>
-                                    <span class="text-muted" t-esc="advanceAmountFmt()"/>
+                                    <div class="text-end">
+                                        <div class="text-muted small" title="Recorded in cash / journal (advance deposit)">
+                                            Deposit: <span t-esc="advanceAmountFmt()"/>
+                                        </div>
+                                        <div t-if="changeDueRaw() > 0" class="text-muted small">
+                                            Tendered: <span t-esc="amountTenderedFmt()"/>
+                                        </div>
+                                    </div>
                                 </div>
                             </t>
                         </div>
