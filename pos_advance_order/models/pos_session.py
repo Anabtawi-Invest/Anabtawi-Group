@@ -5,8 +5,7 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_is_zero
 
-# Synthetic id for Closing Register UI only (not a real pos.payment.method).
-ADVANCE_CLOSING_LINE_PAYMENT_METHOD_ID = -987654320
+# Synthetic ids for Closing Register UI only (not real pos.payment.method).
 ADVANCE_DEPOSIT_CASH_CLOSING_LINE_PAYMENT_METHOD_ID = -987654321
 ADVANCE_DEPOSIT_BANK_CLOSING_LINE_PAYMENT_METHOD_ID = -987654322
 
@@ -150,13 +149,6 @@ class PosSession(models.Model):
                                 row["amount"] = self.currency_id.round(row["amount"] - amt)
                                 row["number"] = max(0, (row.get("number") or 0) - 1)
                                 break
-                non_cash.append({
-                    "name": _("Advance (on completion)"),
-                    "amount": total_adv,
-                    "number": len(advance_payments),
-                    "id": ADVANCE_CLOSING_LINE_PAYMENT_METHOD_ID,
-                    "type": "pay_later",
-                })
 
         if not float_is_zero(deposit_cash, precision_rounding=rounding):
             default_cash["payment_amount"] = self.currency_id.round(
