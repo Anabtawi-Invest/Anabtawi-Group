@@ -2,7 +2,7 @@
 {
     "name": "       POS Advance Order-two cashiers ",
     "author":"Anabtawi",
-    'version': '19.0.2.0.25',
+    'version': '19.0.2.0.26',
     "category": "Point of Sale",
     "summary": "Create and manage advance orders for POS pickup",
     "license": "LGPL-3",

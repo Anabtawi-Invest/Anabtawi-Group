@@ -176,9 +176,6 @@ class PosOrder(models.Model):
                 continue
             receivable_account = advance._get_advance_receivable_account()
 
-            if advance.remaining_settlement_via_pos_line:
-                advance._apply_invoice_residual_after_pos_deposit_line(invoice, order)
-
             settlement_moves = self.env["account.move"]
             if advance.advance_completion_settlement_move_id:
                 settlement_moves |= advance.advance_completion_settlement_move_id

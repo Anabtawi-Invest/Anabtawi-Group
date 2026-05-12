@@ -186,13 +186,6 @@ class PosAdvanceOrder(models.Model):
         copy=False,
         help="Posted entry when the sale completes: debit pledge liability, credit receivable (after pledge is collected on POS).",
     )
-    remaining_settlement_via_pos_line = fields.Boolean(
-        string="Remaining Sale Used Deposit POS Line",
-        readonly=True,
-        copy=False,
-        help="Technical: remaining POS order used a negative deposit product line instead of Customer Account; "
-        "advance is cleared in the session move and cash totals match the amount received only.",
-    )
     # Kept for UI (can be removed later). Now computed from POS orders rather than account.payment.
     payment_progress = fields.Selection(
         [("no_payment", "No Payment"), ("advance_paid", "Advance Paid"), ("fully_paid", "Fully Paid")],
@@ -696,6 +689,15 @@ class PosAdvanceOrder(models.Model):
             )
         return pm
 
+    def _get_advance_application_payment_method(self, session):
+        """Payment method recorded for the prepaid amount on the completion POS order (second payment line)."""
+        self.ensure_one()
+        cfg = self.pos_config_id
+        pm = cfg.pos_advance_application_payment_method_id
+        if pm and pm.id in session.payment_method_ids.ids:
+            return pm
+        return self._get_pay_later_payment_method(session)
+
     def _normalize_tax_ids(self, tax_value):
         """Normalize tax_ids input (either [Command/set], [(6,0,ids)], ids list) -> ids list."""
         if not tax_value:
@@ -1145,8 +1147,6 @@ class PosAdvanceOrder(models.Model):
     def _post_advance_completion_settlement_move(self):
         """After full POS settlement: Dr liability / Cr POS advance receivable for the prepaid amount."""
         self.ensure_one()
-        if self.remaining_settlement_via_pos_line:
-            return False
         if self.advance_completion_settlement_move_id:
             return self.advance_completion_settlement_move_id
         if not self.advance_amount or float_is_zero(self.advance_amount, precision_rounding=self.currency_id.rounding):
@@ -1271,72 +1271,6 @@ class PosAdvanceOrder(models.Model):
         )
         return move
 
-    def _apply_invoice_residual_after_pos_deposit_line(self, invoice, pos_order):
-        """Clear remaining invoice receivable after POS cleared liability via negative deposit line."""
-        self.ensure_one()
-        invoice.ensure_one()
-        pos_order.ensure_one()
-        if not self.remaining_settlement_via_pos_line or not self.advance_amount:
-            return
-        partner_ar = self.partner_id.with_company(self.company_id).property_account_receivable_id
-        if not partner_ar:
-            return
-        inv_lines = invoice.line_ids.filtered(
-            lambda l: l.account_id == partner_ar and not l.reconciled and l.balance > 0
-        )
-        if not inv_lines:
-            return
-        open_bal = sum(inv_lines.mapped("balance"))
-        amt = min(self.advance_amount, open_bal)
-        if float_is_zero(amt, precision_rounding=invoice.currency_id.rounding):
-            return
-        profit = self.pos_config_id.pos_profit_account_id
-        if not profit:
-            raise UserError(
-                _(
-                    "Set 'POS Profit Account' on the POS configuration to post the advance invoice clearing "
-                    "when completing orders without Customer Account payment."
-                )
-            )
-        journal = self.pos_config_id.invoice_journal_id or self.env["account.journal"].sudo().search(
-            [
-                ("company_id", "=", self.company_id.id),
-                ("type", "=", "general"),
-            ],
-            limit=1,
-        )
-        if not journal:
-            raise UserError(_("No journal found for the advance invoice clearing entry."))
-        move = self.env["account.move"].sudo().create({
-            "move_type": "entry",
-            "journal_id": journal.id,
-            "date": fields.Date.context_today(self),
-            "ref": _("Advance applied to invoice (POS) - %s") % self.name,
-            "partner_id": self.partner_id.id,
-            "line_ids": [
-                Command.create({
-                    "name": _("Advance applied %(ref)s") % {"ref": self.name},
-                    "account_id": profit.id,
-                    "partner_id": self.partner_id.id,
-                    "debit": amt,
-                    "credit": 0.0,
-                }),
-                Command.create({
-                    "name": _("Advance applied %(ref)s") % {"ref": self.name},
-                    "account_id": partner_ar.id,
-                    "partner_id": self.partner_id.id,
-                    "debit": 0.0,
-                    "credit": amt,
-                }),
-            ],
-        })
-        move.action_post()
-        rec_lines = move.line_ids.filtered(
-            lambda l: l.account_id == partner_ar and not l.reconciled
-        )
-        if rec_lines and inv_lines:
-            (rec_lines | inv_lines).sudo().reconcile()
-
     def _invalidate_open_sessions_cash_balance(self):
         """Recompute theoretical cash balance when advance JE changes (not wired to POS orders)."""
         for order in self:
@@ -1384,9 +1318,9 @@ class PosAdvanceOrder(models.Model):
         return True
 
     def action_create_remaining_payment(self, pos_payment_method_id=None, pos_config_id=None, amount_tendered=None):
-        """Create a full POS sale with product lines only; pay cash/bank for remainder and Customer Account for the prepaid amount.
+        """Create a full POS sale at the full product total; pay remainder in cash/bank and record the advance as its own payment line.
 
-        Accounting: apply advance via _post_advance_completion_settlement_move; after pledge POS order, apply pledge via _post_pledge_completion_settlement_move (Dr pledge liability / Cr receivable).
+        Accounting: _post_advance_completion_settlement_move (Dr liability / Cr receivable); pledge settlement if any.
         Pass ``pos_config_id`` when calling from POS so completion is enforced on the Picking POS only.
         """
         for order in self:
@@ -1429,15 +1363,7 @@ class PosAdvanceOrder(models.Model):
                 raise UserError(_("Amount tendered cannot be less than remaining amount."))
             remaining_change = max(remaining_tendered - remaining, 0.0)
 
-            use_deposit_pos_line = (
-                not float_is_zero(advance_part, precision_rounding=rounding)
-                and bool(pos_config.advance_deposit_product_id)
-            )
-            pay_later_pm = False
-            if not float_is_zero(advance_part, precision_rounding=rounding) and not use_deposit_pos_line:
-                pay_later_pm = order._get_pay_later_payment_method(session)
-
-            # Build POS order lines (full sale; optional negative deposit line avoids Customer Account)
+            # Full sale total on POS (no negative deposit line); advance appears only as a payment line.
             lines = []
             for l in order.line_ids.filtered(lambda x: not x.display_type and x.product_id):
                 lines.append({
@@ -1449,46 +1375,21 @@ class PosAdvanceOrder(models.Model):
                     "product_uom_id": l.product_uom_id.id,
                     "name": l.product_id.display_name,
                 })
-            if use_deposit_pos_line:
-                dep = pos_config.advance_deposit_product_id
-                lines.append({
-                    "product_id": dep.id,
-                    "qty": 1.0,
-                    "price_unit": -advance_part,
-                    "discount": 0.0,
-                    "tax_ids": [(6, 0, [])],
-                    "product_uom_id": dep.uom_id.id,
-                    "name": _("Advance applied %s") % order.name,
-                })
 
             pos_order = order._create_pos_order(session, lines, mark_advance_generated=False)
             rounding_po = pos_order.currency_id.rounding
-            if use_deposit_pos_line:
-                if not float_is_zero(
-                    pos_order.amount_total - remaining,
-                    precision_rounding=rounding_po,
-                ):
-                    raise UserError(
-                        _(
-                            "POS order total (%(got)s) should equal the remaining amount (%(exp)s). "
-                            "Recalculate taxes or advance lines.",
-                            got=pos_order.amount_total,
-                            exp=remaining,
-                        )
-                    )
-            else:
-                diff_total = remaining + advance_part - pos_order.amount_total
-                if not float_is_zero(diff_total, precision_rounding=rounding_po):
-                    raise UserError(
-                        _("Order total does not match remaining plus advance. Recalculate the advance order.")
-                    )
-            order.write({"remaining_settlement_via_pos_line": use_deposit_pos_line})
+            diff_total = remaining + advance_part - pos_order.amount_total
+            if not float_is_zero(diff_total, precision_rounding=rounding_po):
+                raise UserError(
+                    _("Order total does not match remaining plus advance. Recalculate the advance order.")
+                )
+
             payouts = [(pm, remaining_tendered)]
             if not float_is_zero(remaining_change, precision_rounding=rounding):
-                # Explicit change return line to keep net payment equal to the order total.
                 payouts.append((pm, -remaining_change))
-            if pay_later_pm:
-                payouts.append((pay_later_pm, advance_part))
+            if not float_is_zero(advance_part, precision_rounding=rounding):
+                adv_pm = order._get_advance_application_payment_method(session)
+                payouts.append((adv_pm, advance_part))
             order._pay_pos_order_multi(pos_order, payouts)
             order.remaining_pos_order_id = pos_order.id
             order.remaining_amount_tendered = remaining_tendered
