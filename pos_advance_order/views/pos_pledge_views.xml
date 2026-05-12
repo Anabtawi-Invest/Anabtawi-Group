@@ -79,10 +79,10 @@
                 <filter string="Returned" name="returned_pledges" domain="[('state', '=', 'returned')]"/>
                 <filter string="Cancelled" name="cancelled_pledges" domain="[('state', '=', 'cancelled')]"/>
                 <separator/>
-                <group expand="0" string="Group By">
-                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
-                    <filter string="Customer" name="group_partner" context="{'group_by': 'partner_id'}"/>
-                    <filter string="POS Order" name="group_pos_order" context="{'group_by': 'pos_order_id'}"/>
+                <group>
+                    <filter string="Status" name="group_state" domain="[]" context="{'group_by': 'state'}"/>
+                    <filter string="Customer" name="group_partner" domain="[]" context="{'group_by': 'partner_id'}"/>
+                    <filter string="POS Order" name="group_pos_order" domain="[]" context="{'group_by': 'pos_order_id'}"/>
                 </group>
             </search>
         </field>
