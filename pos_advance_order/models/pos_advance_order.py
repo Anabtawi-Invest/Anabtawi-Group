@@ -1414,6 +1414,21 @@ class PosAdvanceOrder(models.Model):
                     pos_order.lines.filtered(lambda l: l.product_id and l.product_id.has_pledge).mapped("product_id.id"),
                 )
                 if hasattr(pos_order, "_create_pledge_collection_orders"):
+                    pledge_total_snapshot = sum(order.pledge_line_ids.mapped("pledge_subtotal")) or 0.0
+                    pledge_qty_snapshot = sum(order.pledge_line_ids.mapped("pledge_qty")) or 0.0
+                    pledge_product_ids_snapshot = order.pledge_line_ids.mapped("product_id").ids
+                    pos_order.sudo().write({
+                        "total_pledge_amount": pledge_total_snapshot,
+                        "pledge_product_qty": int(pledge_qty_snapshot),
+                        "pledge_snapshot_product_ids": [(6, 0, pledge_product_ids_snapshot)],
+                    })
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] snapshot pushed to completion pos_order=%s total=%s qty=%s products=%s",
+                        pos_order.name,
+                        pledge_total_snapshot,
+                        pledge_qty_snapshot,
+                        pledge_product_ids_snapshot,
+                    )
                     before_count = self.env["pos.advance.order.pledge"].sudo().search_count(
                         [("pos_order_id", "=", pos_order.id)]
                     )
