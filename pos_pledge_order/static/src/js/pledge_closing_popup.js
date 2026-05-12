@@ -6,14 +6,12 @@ import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popu
 
 patch(ClosePosPopup.prototype, {
     pledgeCashLineLabel() {
-        return _t("Pledge (POS Advance Account)");
+        return _t("Pledge deposits");
     },
 
     pledgeBankLineLabel(pm) {
         const name = pm?.name || "";
-        return name
-            ? `${_t("Pledge (POS Advance Account)")}: ${name}`
-            : _t("Pledge (POS Advance Account)");
+        return name ? `${_t("Pledge deposits")}: ${name}` : _t("Pledge deposits");
     },
 
     shouldShowPledgeCashLine() {
