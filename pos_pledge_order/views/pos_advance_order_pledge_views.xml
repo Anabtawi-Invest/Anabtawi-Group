@@ -1,35 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- pos.advance.order.pledge: UI and menu (depends on pos_advance_order base views). -->
+    <!--
+        Primary list/form for pos.advance.order.pledge (no inherit) + explicit view_ids on the
+        action so this UI is always used for the POS «Pledges» menu even if another form exists.
 
-    <record id="view_pos_advance_order_pledge_list_inherit_rahn" model="ir.ui.view">
-        <field name="name">pos.advance.order.pledge.list.inherit.rahn</field>
+        Search view still extends pos_advance_order base to avoid duplicating search logic.
+    -->
+
+    <record id="view_pos_advance_order_pledge_list_rahn_primary" model="ir.ui.view">
+        <field name="name">pos.advance.order.pledge.list.rahn.primary</field>
         <field name="model">pos.advance.order.pledge</field>
-        <field name="inherit_id" ref="pos_advance_order.view_pos_advance_order_pledge_list"/>
+        <field name="priority">1</field>
         <field name="arch" type="xml">
-            <xpath expr="//list" position="attributes">
-                <attribute name="decoration-muted">state == 'returned'</attribute>
-                <attribute name="decoration-danger">state == 'cancelled'</attribute>
-            </xpath>
-            <xpath expr="//field[@name='product_id']" position="after">
+            <list string="Pledges" decoration-muted="state == 'returned'" decoration-danger="state == 'cancelled'">
+                <field name="partner_id"/>
+                <field name="employee_id" optional="hide"/>
+                <field name="pos_order_id"/>
+                <field name="order_id" optional="hide"/>
+                <field name="product_id"/>
                 <field name="state" widget="badge"
                     decoration-success="state == 'active'"
                     decoration-warning="state == 'returned'"
                     decoration-danger="state == 'cancelled'"/>
-            </xpath>
-            <xpath expr="//field[@name='pledge_subtotal']" position="after">
+                <field name="pledge_qty"/>
+                <field name="pledge_amount_unit" widget="monetary"/>
+                <field name="pledge_subtotal" widget="monetary"/>
                 <field name="receive_date" optional="show"/>
                 <field name="return_date" optional="show"/>
-            </xpath>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
         </field>
     </record>
 
-    <record id="view_pos_advance_order_pledge_form_inherit_rahn" model="ir.ui.view">
-        <field name="name">pos.advance.order.pledge.form.inherit.rahn</field>
+    <record id="view_pos_advance_order_pledge_form_rahn_primary" model="ir.ui.view">
+        <field name="name">pos.advance.order.pledge.form.rahn.primary</field>
         <field name="model">pos.advance.order.pledge</field>
-        <field name="inherit_id" ref="pos_advance_order.view_pos_advance_order_pledge_form"/>
+        <field name="priority">1</field>
         <field name="arch" type="xml">
-            <xpath expr="//form/sheet" position="before">
+            <form string="Pledge">
                 <header>
                     <button name="action_return_pledge" type="object" string="Return Pledge" class="btn-primary"
                         invisible="state != 'active'"/>
@@ -38,19 +46,30 @@
                     <field name="state" widget="statusbar"
                         statusbar_visible="active,returned,cancelled"/>
                 </header>
-            </xpath>
-            <xpath expr="//form/sheet/group[1]" position="after">
-                <group string="Schedule">
-                    <field name="receive_date"/>
-                    <field name="return_date"/>
-                </group>
-            </xpath>
-            <xpath expr="//field[@name='pledge_subtotal']/parent::group" position="after">
-                <group string="Accounting" groups="account.group_account_invoice">
-                    <field name="pledge_move_id" readonly="1"/>
-                    <field name="return_move_id" readonly="1"/>
-                </group>
-            </xpath>
+                <sheet>
+                    <group>
+                        <field name="partner_id"/>
+                        <field name="employee_id" readonly="1" invisible="not employee_id"/>
+                        <field name="pos_order_id"/>
+                        <field name="order_id" invisible="not order_id"/>
+                        <field name="product_id" required="1"/>
+                    </group>
+                    <group string="Schedule">
+                        <field name="receive_date"/>
+                        <field name="return_date"/>
+                    </group>
+                    <group>
+                        <field name="pledge_qty"/>
+                        <field name="pledge_amount_unit" widget="monetary"/>
+                        <field name="pledge_subtotal" widget="monetary" readonly="1"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                    <group string="Accounting" groups="account.group_account_invoice">
+                        <field name="pledge_move_id" readonly="1"/>
+                        <field name="return_move_id" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
         </field>
     </record>
 
@@ -100,6 +119,11 @@
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="pos_advance_order.view_pos_advance_order_pledge_search"/>
         <field name="context">{}</field>
+        <field name="view_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('pos_pledge_order.view_pos_advance_order_pledge_list_rahn_primary')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('pos_pledge_order.view_pos_advance_order_pledge_form_rahn_primary')}),
+        ]"/>
     </record>
 
     <menuitem
