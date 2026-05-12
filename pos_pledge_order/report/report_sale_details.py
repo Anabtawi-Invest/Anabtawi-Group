@@ -31,8 +31,12 @@ class ReportPointOfSaleSaleDetails(models.AbstractModel):
             cur = session.currency_id
             cash = summary.get("cash") or 0.0
             if not cur.is_zero(cash):
+                if cash > 0:
+                    pay_name = _("Cash pledge (deposit) %s") % session.name
+                else:
+                    pay_name = _("Cash pledge (return / cash out) %s") % session.name
                 result["payments"].append({
-                    "name": _("Cash pledge %s") % session.name,
+                    "name": pay_name,
                     "session": session.id,
                     "total": cash,
                     "final_count": cash,
@@ -46,8 +50,12 @@ class ReportPointOfSaleSaleDetails(models.AbstractModel):
                     continue
                 pm = self.env["pos.payment.method"].sudo().browse(pm_id)
                 label = pm.exists() and pm.name or _("Payment method")
+                if amt > 0:
+                    pay_name = _("Pledge deposit (%s) — %s") % (label, session.name)
+                else:
+                    pay_name = _("Pledge return / cash out (%s) — %s") % (label, session.name)
                 result["payments"].append({
-                    "name": _("Pledge (%s) — %s") % (label, session.name),
+                    "name": pay_name,
                     "session": session.id,
                     "total": amt,
                     "final_count": amt,

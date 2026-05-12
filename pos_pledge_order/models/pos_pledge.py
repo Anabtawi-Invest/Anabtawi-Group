@@ -167,19 +167,25 @@ class PosPledge(models.Model):
                 raise UserError(
                     _("No posted pledge journal entry is linked to %s. Cannot reverse.") % pledge.name
                 )
-            reverse_moves = move._reverse_moves(
+            move_sudo = move.sudo()
+            reverse_moves = move_sudo._reverse_moves(
                 [{
                     "date": fields.Date.context_today(pledge),
                     "ref": _("Pledge return - %s") % pledge.name,
                 }],
                 cancel=False,
             )
-            reverse_moves.action_post()
+            reverse_moves.sudo().action_post()
             pledge.write({
                 "state": "returned",
                 "return_date": fields.Datetime.now(),
-                "return_move_id": reverse_moves.id,
+                "return_move_id": reverse_moves[:1].id,
             })
+            po = pledge.pos_order_id
+            if po and po.session_id and po.session_id.state in ("opened", "closing_control"):
+                po.session_id.invalidate_recordset(
+                    ["cash_register_balance_end", "cash_register_difference"]
+                )
         return True
 
     def action_link_payments(self):

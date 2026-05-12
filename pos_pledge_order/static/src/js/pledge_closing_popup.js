@@ -6,22 +6,33 @@ import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popu
 
 patch(ClosePosPopup.prototype, {
     pledgeCashLineLabel() {
-        return _t("Pledge deposits");
+        const dc = this.props.default_cash_details || {};
+        const amt = Number(dc.pledge_payment_amount ?? 0);
+        if (amt < 0) {
+            return _t("Pledge returns (cash out)");
+        }
+        return _t("Pledge deposits (cash in)");
     },
 
     pledgeBankLineLabel(pm) {
         const name = pm?.name || "";
-        return name ? `${_t("Pledge deposits")}: ${name}` : _t("Pledge deposits");
+        const amt = Number(pm?.pledge_payment_amount ?? 0);
+        const suffix =
+            amt < 0 ? _t("Pledge returns") : _t("Pledge deposits");
+        if (name) {
+            return `${suffix}: ${name}`;
+        }
+        return suffix;
     },
 
     shouldShowPledgeCashLine() {
         const dc = this.props.default_cash_details || {};
         const amt = dc.pledge_payment_amount ?? 0;
-        return !!(amt && this.pos.currency && !this.pos.currency.isZero(amt));
+        return !!(this.pos.currency && !this.pos.currency.isZero(amt));
     },
 
     shouldShowPledgeBankLine(pm) {
         const amt = pm?.pledge_payment_amount ?? 0;
-        return !!(amt && this.pos.currency && !this.pos.currency.isZero(amt));
+        return !!(this.pos.currency && !this.pos.currency.isZero(amt));
     },
 });

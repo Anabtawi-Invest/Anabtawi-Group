@@ -7,7 +7,7 @@
                 t-if="shouldShowPledgeCashLine()"
                 class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
                 <span t-esc="pledgeCashLineLabel()"/>
-                <span class="align-top" t-esc="env.utils.formatCurrency(Math.abs(props.default_cash_details.pledge_payment_amount))"/>
+                <span class="align-top" t-esc="env.utils.formatCurrency(props.default_cash_details.pledge_payment_amount || 0)"/>
             </div>
         </xpath>
         <xpath expr="//span[@t-esc='pm.name']/parent::div" position="after">
@@ -15,7 +15,7 @@
                 t-if="shouldShowPledgeBankLine(pm)"
                 class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
                 <span t-esc="pledgeBankLineLabel(pm)"/>
-                <span class="align-top" t-esc="env.utils.formatCurrency(Math.abs(pm.pledge_payment_amount))"/>
+                <span class="align-top" t-esc="env.utils.formatCurrency(pm.pledge_payment_amount || 0)"/>
             </div>
         </xpath>
     </t>

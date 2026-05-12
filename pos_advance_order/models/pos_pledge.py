@@ -260,6 +260,7 @@ class PosAdvanceOrderPledge(models.Model):
 
     def action_return_pledge(self):
         """Reverse pledge deposit move and mark pledge lines returned."""
+        PledgeLine = self.env["pos.advance.order.pledge"]
         for pledge in self:
             if pledge.state == "returned" and pledge.return_move_id:
                 continue
@@ -270,7 +271,7 @@ class PosAdvanceOrderPledge(models.Model):
             if not order:
                 raise UserError(_("Pledge line is not linked to a POS order."))
 
-            related_lines = self.search(
+            related_lines = PledgeLine.search(
                 [("pos_order_id", "=", order.id), ("state", "=", "active")]
             )
             if not related_lines:
@@ -281,19 +282,22 @@ class PosAdvanceOrderPledge(models.Model):
                 raise UserError(_("No posted pledge journal entry is linked to this pledge."))
 
             existing_return = related_lines.filtered(lambda l: l.return_move_id)[:1]
-            reverse_move = existing_return.return_move_id if existing_return else False
+            reverse_move = existing_return.return_move_id
             if not reverse_move:
-                reverse_moves = move._reverse_moves(
+                # POS users have read-only access to account.move; reversal must run elevated.
+                move_sudo = move.sudo()
+                reverse_moves = move_sudo._reverse_moves(
                     [
                         {
                             "date": fields.Date.context_today(pledge),
-                            "ref": _("Pledge return - %s") % (order.name or order.pos_reference or move.ref),
+                            "ref": _("Pledge return - %s")
+                            % (order.name or order.pos_reference or move_sudo.ref),
                         }
                     ],
                     cancel=False,
                 )
-                reverse_moves.action_post()
-                reverse_move = reverse_moves
+                reverse_moves.sudo().action_post()
+                reverse_move = reverse_moves[:1]
 
             related_lines.write(
                 {
@@ -303,6 +307,12 @@ class PosAdvanceOrderPledge(models.Model):
                     "pledge_move_id": move.id,
                 }
             )
+
+            sess = order.session_id
+            if sess and sess.state in ("opened", "closing_control"):
+                sess.invalidate_recordset(
+                    ["cash_register_balance_end", "cash_register_difference"]
+                )
         return True
 
     def action_cancel(self):
