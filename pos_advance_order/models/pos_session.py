@@ -1,16 +1,67 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 
-from odoo import _, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_is_zero
 
 # Synthetic id for Closing Register UI only (not a real pos.payment.method).
 ADVANCE_CLOSING_LINE_PAYMENT_METHOD_ID = -987654320
+ADVANCE_DEPOSIT_CASH_CLOSING_LINE_PAYMENT_METHOD_ID = -987654321
+ADVANCE_DEPOSIT_BANK_CLOSING_LINE_PAYMENT_METHOD_ID = -987654322
 
 
 class PosSession(models.Model):
     _inherit = "pos.session"
+
+    def _advance_orders_deposited_in_session(self):
+        """Advance orders whose deposit entry was posted during this session window."""
+        self.ensure_one()
+        advance_orders = self.env["pos.advance.order"].sudo()
+        end = self.stop_at or fields.Datetime.now()
+        deposited = advance_orders.browse()
+        domain = [
+            ("company_id", "=", self.company_id.id),
+            ("state", "not in", ("draft", "cancel")),
+            ("advance_deposit_move_id.state", "=", "posted"),
+        ]
+        for adv_order in advance_orders.search(domain):
+            pay_cfg = adv_order.from_pos_config_id or adv_order.pos_config_id
+            if pay_cfg != self.config_id:
+                continue
+            move = adv_order.advance_deposit_move_id
+            if move and self.start_at <= move.create_date <= end:
+                deposited |= adv_order
+        return deposited
+
+    def _get_deposited_advance_summary(self):
+        """Split deposited advances by liquidity type for closing register display."""
+        self.ensure_one()
+        summary = {"cash": 0.0, "bank": 0.0, "cash_count": 0, "bank_count": 0}
+        if not self.config_id.enable_advance_order:
+            return summary
+        currency = self.currency_id
+        cash_total = 0.0
+        bank_total = 0.0
+        cash_count = 0
+        bank_count = 0
+        for adv_order in self._advance_orders_deposited_in_session():
+            amount = adv_order.advance_amount or 0.0
+            if currency.is_zero(amount):
+                continue
+            pm = adv_order.pos_payment_method_id
+            is_cash = (pm and pm.type == "cash") or (not pm and adv_order.payment_method == "cash")
+            if is_cash:
+                cash_total += amount
+                cash_count += 1
+            else:
+                bank_total += amount
+                bank_count += 1
+        summary["cash"] = currency.round(cash_total)
+        summary["bank"] = currency.round(bank_total)
+        summary["cash_count"] = cash_count
+        summary["bank_count"] = bank_count
+        return summary
 
     def get_closing_control_data(self):
         """Split advance-on-completion amounts into their own Closing Register line.
@@ -25,6 +76,12 @@ class PosSession(models.Model):
         cfg = self.config_id
         if not cfg.enable_advance_order:
             return data
+
+        deposited_summary = self._get_deposited_advance_summary()
+        deposit_cash = deposited_summary["cash"]
+        deposit_bank = deposited_summary["bank"]
+        deposit_cash_count = deposited_summary["cash_count"]
+        deposit_bank_count = deposited_summary["bank_count"]
 
         rounding = self.currency_id.rounding
         orders = self._get_closed_orders()
@@ -47,46 +104,66 @@ class PosSession(models.Model):
                     continue
                 advance_payments |= pay
 
-        if not advance_payments:
-            return data
-
-        total_adv = sum(advance_payments.mapped("amount"))
-        if float_is_zero(total_adv, precision_rounding=rounding):
-            return data
-
         default_cash = data.get("default_cash_details") or {}
         dc_id = default_cash.get("id")
         non_cash = list(data.get("non_cash_payment_methods") or [])
 
-        for pay in advance_payments:
-            amt = pay.amount
-            pm = pay.payment_method_id
-            if dc_id and pm.id == dc_id:
-                default_cash["payment_amount"] = self.currency_id.round(
-                    (default_cash.get("payment_amount") or 0.0) - amt
-                )
-                default_cash["amount"] = self.currency_id.round(
-                    (default_cash.get("amount") or 0.0) - amt
-                )
-            else:
-                for row in non_cash:
-                    if row.get("id") == pm.id:
-                        row["amount"] = self.currency_id.round(row["amount"] - amt)
-                        row["number"] = max(0, (row.get("number") or 0) - 1)
-                        break
+        if advance_payments:
+            total_adv = sum(advance_payments.mapped("amount"))
+            if not float_is_zero(total_adv, precision_rounding=rounding):
+                for pay in advance_payments:
+                    amt = pay.amount
+                    pm = pay.payment_method_id
+                    if dc_id and pm.id == dc_id:
+                        default_cash["payment_amount"] = self.currency_id.round(
+                            (default_cash.get("payment_amount") or 0.0) - amt
+                        )
+                        default_cash["amount"] = self.currency_id.round(
+                            (default_cash.get("amount") or 0.0) - amt
+                        )
+                    else:
+                        for row in non_cash:
+                            if row.get("id") == pm.id:
+                                row["amount"] = self.currency_id.round(row["amount"] - amt)
+                                row["number"] = max(0, (row.get("number") or 0) - 1)
+                                break
+                non_cash.append({
+                    "name": _("Advance (on completion)"),
+                    "amount": total_adv,
+                    "number": len(advance_payments),
+                    "id": ADVANCE_CLOSING_LINE_PAYMENT_METHOD_ID,
+                    "type": "pay_later",
+                })
+
+        if not float_is_zero(deposit_cash, precision_rounding=rounding):
+            default_cash["payment_amount"] = self.currency_id.round(
+                (default_cash.get("payment_amount") or 0.0) + deposit_cash
+            )
+            default_cash["amount"] = self.currency_id.round(
+                (default_cash.get("amount") or 0.0) + deposit_cash
+            )
+            non_cash.append({
+                "name": _("Cash Advance"),
+                "amount": deposit_cash,
+                "number": deposit_cash_count,
+                "id": ADVANCE_DEPOSIT_CASH_CLOSING_LINE_PAYMENT_METHOD_ID,
+                "type": "pay_later",
+            })
+
+        if not float_is_zero(deposit_bank, precision_rounding=rounding):
+            non_cash.append({
+                "name": _("Bank Advance"),
+                "amount": deposit_bank,
+                "number": deposit_bank_count,
+                "id": ADVANCE_DEPOSIT_BANK_CLOSING_LINE_PAYMENT_METHOD_ID,
+                "type": "pay_later",
+            })
 
         non_cash = [
             row
             for row in non_cash
             if not float_is_zero(row.get("amount") or 0.0, precision_rounding=rounding)
         ]
-        non_cash.append({
-            "name": _("Advance (on completion)"),
-            "amount": total_adv,
-            "number": len(advance_payments),
-            "id": ADVANCE_CLOSING_LINE_PAYMENT_METHOD_ID,
-            "type": "pay_later",
-        })
 
         data["default_cash_details"] = default_cash or data.get("default_cash_details")
         data["non_cash_payment_methods"] = non_cash
