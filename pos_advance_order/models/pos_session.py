@@ -107,7 +107,7 @@ class PosSession(models.Model):
 
         rounding = self.currency_id.rounding
         orders = self._get_closed_orders()
-        advance_payments = self.env["pos.payment"]
+        reclassified_advance_by_pm = defaultdict(lambda: {"amount": 0.0, "number": 0})
         for order in orders:
             advance = order.advance_order_id
             if not advance or not advance.pos_config_id:
@@ -119,36 +119,40 @@ class PosSession(models.Model):
                 app_pm = advance._get_advance_application_payment_method(self)
             except UserError:
                 continue
-            for pay in order.payment_ids:
-                if pay.payment_method_id != app_pm:
-                    continue
-                if float_is_zero(pay.amount, precision_rounding=rounding):
-                    continue
-                advance_payments |= pay
+            positive_amount_on_method = sum(
+                pay.amount
+                for pay in order.payment_ids
+                if pay.payment_method_id == app_pm
+                and pay.amount > 0.0
+            )
+            advance_part = min(advance.advance_amount or 0.0, positive_amount_on_method)
+            if float_is_zero(advance_part, precision_rounding=rounding):
+                continue
+            bucket = reclassified_advance_by_pm[app_pm.id]
+            bucket["amount"] += advance_part
+            bucket["number"] += 1
 
         default_cash = data.get("default_cash_details") or {}
         dc_id = default_cash.get("id")
         non_cash = list(data.get("non_cash_payment_methods") or [])
 
-        if advance_payments:
-            total_adv = sum(advance_payments.mapped("amount"))
-            if not float_is_zero(total_adv, precision_rounding=rounding):
-                for pay in advance_payments:
-                    amt = pay.amount
-                    pm = pay.payment_method_id
-                    if dc_id and pm.id == dc_id:
-                        default_cash["payment_amount"] = self.currency_id.round(
-                            (default_cash.get("payment_amount") or 0.0) - amt
-                        )
-                        default_cash["amount"] = self.currency_id.round(
-                            (default_cash.get("amount") or 0.0) - amt
-                        )
-                    else:
-                        for row in non_cash:
-                            if row.get("id") == pm.id:
-                                row["amount"] = self.currency_id.round(row["amount"] - amt)
-                                row["number"] = max(0, (row.get("number") or 0) - 1)
-                                break
+        for pm_id, payload in reclassified_advance_by_pm.items():
+            amt = self.currency_id.round(payload["amount"])
+            if float_is_zero(amt, precision_rounding=rounding):
+                continue
+            if dc_id and pm_id == dc_id:
+                default_cash["payment_amount"] = self.currency_id.round(
+                    (default_cash.get("payment_amount") or 0.0) - amt
+                )
+                default_cash["amount"] = self.currency_id.round(
+                    (default_cash.get("amount") or 0.0) - amt
+                )
+                continue
+            for row in non_cash:
+                if row.get("id") == pm_id:
+                    row["amount"] = self.currency_id.round(row["amount"] - amt)
+                    row["number"] = max(0, (row.get("number") or 0) - payload["number"])
+                    break
 
         if not float_is_zero(deposit_cash, precision_rounding=rounding):
             default_cash["payment_amount"] = self.currency_id.round(
