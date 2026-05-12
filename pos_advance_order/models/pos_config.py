@@ -1,10 +1,22 @@
 # -*- coding: utf-8 -*-
 
-from odoo import fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class PosConfig(models.Model):
     _inherit = "pos.config"
+
+    @api.constrains("enable_advance_order", "pos_advance_receivable_account_id")
+    def _check_advance_receivable_account(self):
+        for cfg in self:
+            if cfg.enable_advance_order and not cfg.pos_advance_receivable_account_id:
+                raise ValidationError(
+                    _(
+                        "When Advance Order is enabled, you must set "
+                        "'POS Advance Receivable Account' on this POS configuration."
+                    )
+                )
 
     enable_advance_order = fields.Boolean(string="Enable Advance Order")
     advance_order_manager_id = fields.Many2one(
@@ -31,8 +43,8 @@ class PosConfig(models.Model):
         "account.account",
         string="POS Advance Receivable Account",
         domain="[('account_type', '=', 'asset_receivable')]",
-        help="Accounts receivable used when posting advance payment clearing and reconciliation. "
-        "If empty, each customer's receivable account is used.",
+        help="Receivable account used for Customer Account (pay later) on advance completion and for settlement entries. "
+        "Required when Advance Order is enabled on this POS.",
     )
 
     pos_cash_journal_id = fields.Many2one(
