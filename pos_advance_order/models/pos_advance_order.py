@@ -179,6 +179,13 @@ class PosAdvanceOrder(models.Model):
         copy=False,
         help="Posted entry when the sale completes: debit liability, credit advance receivable to align with invoicing.",
     )
+    pledge_completion_settlement_move_id = fields.Many2one(
+        "account.move",
+        string="Pledge Completion Settlement",
+        readonly=True,
+        copy=False,
+        help="Posted entry when the sale completes: debit pledge liability, credit receivable (after pledge is collected on POS).",
+    )
     # Kept for UI (can be removed later). Now computed from POS orders rather than account.payment.
     payment_progress = fields.Selection(
         [("no_payment", "No Payment"), ("advance_paid", "Advance Paid"), ("fully_paid", "Fully Paid")],
@@ -995,6 +1002,17 @@ class PosAdvanceOrder(models.Model):
             or self.partner_id.with_company(self.company_id).property_account_receivable_id
         )
 
+    def _get_pledge_liability_account(self):
+        """Liability credited when pledge is sold on POS; debited when pledge is applied at completion."""
+        self.ensure_one()
+        cfg = self.pos_config_id
+        if cfg.pos_pledge_liability_account_id:
+            return cfg.pos_pledge_liability_account_id
+        pledge_product = cfg.pledge_product_id
+        if not pledge_product:
+            return False
+        return pledge_product.property_account_income_id or pledge_product.product_tmpl_id.property_account_income_id
+
     def _get_payment_journal(self):
         """Select journal: POS payment method journal first (same as normal POS payments), then From/Picking POS fallback."""
         self.ensure_one()
@@ -1174,6 +1192,76 @@ class PosAdvanceOrder(models.Model):
         )
         return move
 
+    def _post_pledge_completion_settlement_move(self):
+        """After pledge POS order is paid: Dr pledge liability / Cr receivable for pledge_amount."""
+        self.ensure_one()
+        if self.pledge_completion_settlement_move_id:
+            return self.pledge_completion_settlement_move_id
+        rounding = self.currency_id.rounding
+        if not self.pledge_amount or float_is_zero(self.pledge_amount, precision_rounding=rounding):
+            return False
+        if not self.pledge_pos_order_id:
+            _logger.warning(
+                "[PLEDGE_SETTLEMENT] Skipped: pledge_amount=%s but no pledge POS order (configure pledge product?) advance=%s",
+                self.pledge_amount,
+                self.name,
+            )
+            return False
+        liability = self._get_pledge_liability_account()
+        receivable = self._get_advance_receivable_account()
+        if not liability or not receivable:
+            raise UserError(
+                _(
+                    "Configure pledge liability: set 'Pledge Liability Account' on the POS or ensure the pledge product has an income account, "
+                    "and set POS Advance Receivable (or partner receivable)."
+                )
+            )
+        pos_cfg = self.pos_config_id
+        journal = (
+            pos_cfg.invoice_journal_id
+            or self.env["account.journal"].search(
+                [
+                    ("company_id", "=", self.company_id.id),
+                    ("type", "=", "general"),
+                ],
+                limit=1,
+            )
+        )
+        if not journal:
+            raise UserError(_("No journal found to post the pledge settlement entry."))
+
+        move = self.env["account.move"].sudo().create({
+            "move_type": "entry",
+            "journal_id": journal.id,
+            "date": fields.Date.context_today(self),
+            "ref": _("Pledge completion settlement - %s") % self.name,
+            "line_ids": [
+                Command.create({
+                    "name": _("Apply pledge %(ref)s") % {"ref": self.name},
+                    "account_id": liability.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": self.pledge_amount,
+                    "credit": 0.0,
+                }),
+                Command.create({
+                    "name": _("Apply pledge %(ref)s") % {"ref": self.name},
+                    "account_id": receivable.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": 0.0,
+                    "credit": self.pledge_amount,
+                }),
+            ],
+        })
+        move.action_post()
+        self.pledge_completion_settlement_move_id = move.id
+        _logger.info(
+            "[PLEDGE_SETTLEMENT] advance=%s move_id=%s amount=%s",
+            self.name,
+            move.id,
+            self.pledge_amount,
+        )
+        return move
+
     def _invalidate_open_sessions_cash_balance(self):
         """Recompute theoretical cash balance when advance JE changes (not wired to POS orders)."""
         for order in self:
@@ -1223,7 +1311,7 @@ class PosAdvanceOrder(models.Model):
     def action_create_remaining_payment(self, pos_payment_method_id=None, pos_config_id=None, amount_tendered=None):
         """Create a full POS sale with product lines only; pay cash/bank for remainder and Customer Account for the prepaid amount.
 
-        Accounting: apply advance via _post_advance_completion_settlement_move (Dr liability / Cr receivable).
+        Accounting: apply advance via _post_advance_completion_settlement_move; after pledge POS order, apply pledge via _post_pledge_completion_settlement_move (Dr pledge liability / Cr receivable).
         Pass ``pos_config_id`` when calling from POS so completion is enforced on the Picking POS only.
         """
         for order in self:
@@ -1301,7 +1389,6 @@ class PosAdvanceOrder(models.Model):
             order.remaining_amount_tendered = remaining_tendered
             order.remaining_change_amount = remaining_change
             order._post_advance_completion_settlement_move()
-            order.state = "fully_paid"
 
             # Create a separate POS order for pledge (paid immediately) in the same session
             if order.pledge_amount and order.pledge_amount > 0 and pos_config.pledge_product_id:
@@ -1324,6 +1411,9 @@ class PosAdvanceOrder(models.Model):
                         "pos_order_id": pledge_order.id,
                         "partner_id": order.partner_id.id,
                     })
+                order._post_pledge_completion_settlement_move()
+
+            order.state = "fully_paid"
 
         return True
 

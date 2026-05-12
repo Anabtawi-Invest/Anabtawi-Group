@@ -68,4 +68,11 @@ class PosConfig(models.Model):
         domain=[("sale_ok", "=", True)],
         help="Product used to record pledge amount as a POS sale line. Its income account should be a liability.",
     )
+    pos_pledge_liability_account_id = fields.Many2one(
+        "account.account",
+        string="Pledge Liability Account",
+        domain="[('account_type', '=', 'liability_current')]",
+        help="Account debited when applying pledge to receivable at sale completion. "
+        "If empty, the pledge product income account is used (must match POS pledge postings).",
+    )
 

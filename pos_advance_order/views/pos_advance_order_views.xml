@@ -222,6 +222,9 @@
                         <field name="remaining_pos_order_id" readonly="1" invisible="not remaining_pos_order_id"/>
                         <field name="pledge_pos_order_id" readonly="1" invisible="not pledge_pos_order_id"/>
                         <field name="return_pledge_pos_order_id" readonly="1" invisible="not return_pledge_pos_order_id"/>
+                        <field name="advance_deposit_move_id" readonly="1" groups="account.group_account_invoice" invisible="not advance_deposit_move_id"/>
+                        <field name="advance_completion_settlement_move_id" readonly="1" groups="account.group_account_invoice" invisible="not advance_completion_settlement_move_id"/>
+                        <field name="pledge_completion_settlement_move_id" readonly="1" groups="account.group_account_invoice" invisible="not pledge_completion_settlement_move_id"/>
                     </group>
                 </sheet>
             </form>
