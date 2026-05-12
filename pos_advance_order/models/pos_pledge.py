@@ -59,22 +59,11 @@ class PosAdvanceOrderPledge(models.Model):
             ("returned", "Returned"),
             ("cancelled", "Cancelled"),
         ],
-        string="Status",
+        string="State",
         default="active",
         index=True,
     )
-    receive_date = fields.Datetime(
-        string="Received On",
-        readonly=True,
-        copy=False,
-        help="Date and time when the pledge was collected at POS.",
-    )
-    return_date = fields.Datetime(
-        string="Returned On",
-        readonly=True,
-        copy=False,
-        help="Date and time when the pledge was returned and the deposit was reversed.",
-    )
+    return_date = fields.Datetime(string="Return Date", readonly=True, copy=False)
     pledge_move_id = fields.Many2one("account.move", string="Pledge Move", readonly=True, copy=False)
     return_move_id = fields.Many2one("account.move", string="Return Move", readonly=True, copy=False)
 
@@ -157,13 +146,6 @@ class PosAdvanceOrderPledge(models.Model):
                AND o.pledge_deposit_move_id IS NOT NULL
             """
         )
-        self.env.cr.execute(
-            """
-            UPDATE pos_advance_order_pledge
-               SET receive_date = create_date
-             WHERE receive_date IS NULL
-            """
-        )
 
     @api.constrains("order_id", "pos_order_id")
     def _check_origin(self):
@@ -188,8 +170,6 @@ class PosAdvanceOrderPledge(models.Model):
                 pos_order = self.env["pos.order"].browse(vals["pos_order_id"])
                 if pos_order.exists() and pos_order.partner_id:
                     vals["partner_id"] = pos_order.partner_id.id
-            if "receive_date" not in vals:
-                vals["receive_date"] = fields.Datetime.now()
         return super().create(vals_list)
 
     @api.model
@@ -251,18 +231,17 @@ class PosAdvanceOrderPledge(models.Model):
                 )
 
             if existing:
-                write_vals = {
-                    "pos_order_id": pos_order.id,
-                    "partner_id": partner_id,
-                    "pledge_qty": qty,
-                    "pledge_amount_unit": unit_amount,
-                    "state": "active",
-                    "return_date": False,
-                    "return_move_id": False,
-                }
-                if existing.state == "returned" or not existing.receive_date:
-                    write_vals["receive_date"] = fields.Datetime.now()
-                existing.write(write_vals)
+                existing.write(
+                    {
+                        "pos_order_id": pos_order.id,
+                        "partner_id": partner_id,
+                        "pledge_qty": qty,
+                        "pledge_amount_unit": unit_amount,
+                        "state": "active",
+                        "return_date": False,
+                        "return_move_id": False,
+                    }
+                )
                 created |= existing
                 continue
 

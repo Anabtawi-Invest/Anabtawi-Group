@@ -1,24 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Base list/form/search for pos.advance.order.pledge (extended in pos_pledge_order). -->
     <record id="view_pos_advance_order_pledge_list" model="ir.ui.view">
         <field name="name">pos.advance.order.pledge.list</field>
         <field name="model">pos.advance.order.pledge</field>
         <field name="arch" type="xml">
-            <list string="Pledges" decoration-muted="state == 'returned'" decoration-danger="state == 'cancelled'">
+            <list string="Pledges">
                 <field name="partner_id"/>
                 <field name="employee_id" optional="hide"/>
                 <field name="pos_order_id"/>
                 <field name="order_id" optional="hide"/>
                 <field name="product_id"/>
-                <field name="state" widget="badge"
-                    decoration-success="state == 'active'"
-                    decoration-warning="state == 'returned'"
-                    decoration-danger="state == 'cancelled'"/>
                 <field name="pledge_qty"/>
                 <field name="pledge_amount_unit" widget="monetary"/>
                 <field name="pledge_subtotal" widget="monetary"/>
-                <field name="receive_date" optional="show"/>
-                <field name="return_date" optional="show"/>
                 <field name="currency_id" column_invisible="True"/>
             </list>
         </field>
@@ -29,10 +24,6 @@
         <field name="model">pos.advance.order.pledge</field>
         <field name="arch" type="xml">
             <form string="Pledge">
-                <header>
-                    <field name="state" widget="statusbar"
-                        statusbar_visible="active,returned,cancelled"/>
-                </header>
                 <sheet>
                     <group>
                         <field name="partner_id"/>
@@ -41,19 +32,11 @@
                         <field name="order_id" invisible="not order_id"/>
                         <field name="product_id" required="1"/>
                     </group>
-                    <group string="Schedule">
-                        <field name="receive_date"/>
-                        <field name="return_date"/>
-                    </group>
                     <group>
                         <field name="pledge_qty"/>
                         <field name="pledge_amount_unit" widget="monetary"/>
                         <field name="pledge_subtotal" widget="monetary" readonly="1"/>
                         <field name="currency_id" invisible="1"/>
-                    </group>
-                    <group string="Accounting" groups="account.group_account_invoice">
-                        <field name="pledge_move_id" readonly="1"/>
-                        <field name="return_move_id" readonly="1"/>
                     </group>
                 </sheet>
             </form>
@@ -70,34 +53,7 @@
                 <field name="order_id"/>
                 <field name="pos_order_id"/>
                 <field name="product_id"/>
-                <field name="state"/>
-                <filter string="Active" name="active_pledges" domain="[('state', '=', 'active')]"/>
-                <filter string="Returned" name="returned_pledges" domain="[('state', '=', 'returned')]"/>
-                <filter string="Cancelled" name="cancelled_pledges" domain="[('state', '=', 'cancelled')]"/>
-                <separator/>
-                <group expand="0" string="Group By">
-                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
-                    <filter string="Customer" name="group_partner" context="{'group_by': 'partner_id'}"/>
-                    <filter string="POS Order" name="group_pos_order" context="{'group_by': 'pos_order_id'}"/>
-                </group>
             </search>
         </field>
     </record>
-
-    <record id="action_pos_advance_order_pledge" model="ir.actions.act_window">
-        <field name="name">Pledges</field>
-        <field name="res_model">pos.advance.order.pledge</field>
-        <field name="view_mode">list,form</field>
-        <field name="search_view_id" ref="view_pos_advance_order_pledge_search"/>
-        <field name="context">{}</field>
-    </record>
-
-    <menuitem
-        id="menu_pos_advance_order_pledge"
-        name="Pledges"
-        parent="point_of_sale.menu_point_of_sale"
-        action="action_pos_advance_order_pledge"
-        sequence="20"
-        groups="point_of_sale.group_pos_user,point_of_sale.group_pos_manager"
-    />
 </odoo>

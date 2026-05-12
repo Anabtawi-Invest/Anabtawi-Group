@@ -192,15 +192,9 @@
                                 <list string="Pledges">
                                     <field name="employee_id" optional="hide"/>
                                     <field name="product_id"/>
-                                    <field name="state" widget="badge"
-                                        decoration-success="state == 'active'"
-                                        decoration-warning="state == 'returned'"
-                                        decoration-danger="state == 'cancelled'"/>
                                     <field name="pledge_qty"/>
                                     <field name="pledge_amount_unit" widget="monetary"/>
                                     <field name="pledge_subtotal" widget="monetary"/>
-                                    <field name="receive_date" optional="show"/>
-                                    <field name="return_date" optional="show"/>
                                 </list>
                             </field>
                         </page>
