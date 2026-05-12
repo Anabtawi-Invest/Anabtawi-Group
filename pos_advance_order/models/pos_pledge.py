@@ -267,17 +267,40 @@ class PosAdvanceOrderPledge(models.Model):
             if pledge.state != "active":
                 raise UserError(_("Only active pledges can be returned."))
 
-            order = pledge.pos_order_id
-            if not order:
-                raise UserError(_("Pledge line is not linked to a POS order."))
+            pos_order = pledge.pos_order_id
+            advance = pledge.order_id
+            if pos_order:
+                related_lines = PledgeLine.search(
+                    [("pos_order_id", "=", pos_order.id), ("state", "=", "active")]
+                )
+            elif advance:
+                related_lines = PledgeLine.search(
+                    [("order_id", "=", advance.id), ("state", "=", "active")]
+                )
+                linked_pos = related_lines.filtered("pos_order_id")[:1]
+                pos_order = (
+                    linked_pos.pos_order_id
+                    if linked_pos
+                    else advance.pledge_pos_order_id
+                )
+            else:
+                raise UserError(
+                    _(
+                        "This pledge is not linked to a POS order or an advance order. "
+                        "Open the related advance order and complete the pledge collection on POS, or contact an administrator."
+                    )
+                )
 
-            related_lines = PledgeLine.search(
-                [("pos_order_id", "=", order.id), ("state", "=", "active")]
-            )
             if not related_lines:
                 related_lines = pledge
 
-            move = related_lines[:1].pledge_move_id or order.pledge_deposit_move_id
+            move = False
+            for line in related_lines:
+                if line.pledge_move_id:
+                    move = line.pledge_move_id
+                    break
+            if not move and pos_order:
+                move = pos_order.pledge_deposit_move_id
             if not move or move.state != "posted":
                 raise UserError(_("No posted pledge journal entry is linked to this pledge."))
 
@@ -286,12 +309,17 @@ class PosAdvanceOrderPledge(models.Model):
             if not reverse_move:
                 # POS users have read-only access to account.move; reversal must run elevated.
                 move_sudo = move.sudo()
+                ref_name = (
+                    (pos_order and (pos_order.name or pos_order.pos_reference))
+                    or (advance and advance.name)
+                    or move_sudo.ref
+                    or ""
+                )
                 reverse_moves = move_sudo._reverse_moves(
                     [
                         {
                             "date": fields.Date.context_today(pledge),
-                            "ref": _("Pledge return - %s")
-                            % (order.name or order.pos_reference or move_sudo.ref),
+                            "ref": _("Pledge return - %s") % ref_name,
                         }
                     ],
                     cancel=False,
@@ -308,7 +336,7 @@ class PosAdvanceOrderPledge(models.Model):
                 }
             )
 
-            sess = order.session_id
+            sess = pos_order.session_id if pos_order else False
             if sess and sess.state in ("opened", "closing_control"):
                 sess.invalidate_recordset(
                     ["cash_register_balance_end", "cash_register_difference"]

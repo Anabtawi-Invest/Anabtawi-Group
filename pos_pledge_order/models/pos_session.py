@@ -19,17 +19,70 @@ class PosSession(models.Model):
         orders = super()._get_closed_orders()
         return orders.filtered(lambda o: not o.is_pledge_generated)
 
-    def _pledge_deposit_voided_by_return_this_session(self, order):
-        """True if pledge lines exist, all returned, and reversal move was posted during this session."""
+    def _get_pledge_deposit_closing_summary(self):
+        """Gross pledge cash effect from journal entries (not pos.payment), split in / out.
+
+        - ``cash_in`` / ``by_pm_in``: pledge deposits for orders **in this session** (posted deposit JE).
+        - ``cash_out`` / ``by_pm_out``: pledge **returns** whose reversal move was posted in this
+          session window (cash left the drawer), for any linked POS order.
+        - ``cash`` / ``by_pm``: net (in − out) for adjusting expected payment totals.
+        """
         self.ensure_one()
+        cur = self.currency_id
         end = self.stop_at or fields.Datetime.now()
-        lines = order.sudo().advance_pledge_line_ids
-        if not lines or not all(l.state == "returned" for l in lines):
-            return False
-        ret = lines[:1].return_move_id
-        if not ret or ret.state != "posted":
-            return False
-        return bool(self.start_at <= ret.create_date <= end)
+        cash_in = 0.0
+        cash_out = 0.0
+        by_pm_in = defaultdict(float)
+        by_pm_out = defaultdict(float)
+
+        for order in self._get_closed_orders():
+            move = order.sudo().pledge_deposit_move_id
+            if not move or move.state != "posted":
+                continue
+            amt = order.total_pledge_amount or 0.0
+            for part in self._iter_pledge_journal_payment_split(amt, move):
+                if part[0] == "cash":
+                    cash_in += part[1]
+                else:
+                    by_pm_in[part[2]] += part[1]
+
+        PledgeLine = self.env["pos.advance.order.pledge"].sudo()
+        returned_here = PledgeLine.search([
+            ("state", "=", "returned"),
+            ("return_move_id.state", "=", "posted"),
+            ("return_move_id.create_date", ">=", self.start_at),
+            ("return_move_id.create_date", "<=", end),
+            ("pos_order_id", "!=", False),
+        ])
+        seen_orders = set()
+        for pl in returned_here:
+            order = pl.pos_order_id
+            if not order or order.id in seen_orders:
+                continue
+            seen_orders.add(order.id)
+            move = order.sudo().pledge_deposit_move_id
+            if not move or move.state != "posted":
+                continue
+            amt = order.total_pledge_amount or 0.0
+            for part in self._iter_pledge_journal_payment_split(amt, move):
+                if part[0] == "cash":
+                    cash_out += part[1]
+                else:
+                    by_pm_out[part[2]] += part[1]
+
+        cash_net = cur.round(cash_in - cash_out)
+        by_pm_net = defaultdict(float)
+        for pid in set(by_pm_in) | set(by_pm_out):
+            by_pm_net[pid] = cur.round(by_pm_in[pid] - by_pm_out.get(pid, 0.0))
+
+        return {
+            "cash_in": cur.round(cash_in),
+            "cash_out": cur.round(cash_out),
+            "cash": cash_net,
+            "by_pm_in": {k: cur.round(v) for k, v in by_pm_in.items()},
+            "by_pm_out": {k: cur.round(v) for k, v in by_pm_out.items()},
+            "by_pm": dict(by_pm_net),
+        }
 
     def _iter_pledge_journal_payment_split(self, amount, move):
         """Yield ('cash', amt) or ('pm', pm_id, amt) for a pledge deposit move."""
@@ -53,61 +106,6 @@ class PosSession(models.Model):
             mj.display_name,
             move.display_name,
         )
-
-    def _get_pledge_deposit_closing_summary(self):
-        """Pledge deposits posted as JEs (not in pos.payment): allocate by journal vs POS payment methods.
-
-        - Skips deposits that were fully returned (reversal posted) in the same session (net 0 in drawer).
-        - Subtracts pledge reversals posted this session when the original sale was in a **prior**
-          session (cash left the drawer during this session).
-        """
-        self.ensure_one()
-        outcome = {"cash": 0.0, "by_pm": defaultdict(float)}
-        cur = self.currency_id
-        end = self.stop_at or fields.Datetime.now()
-
-        for order in self._get_closed_orders():
-            move = order.sudo().pledge_deposit_move_id
-            if not move or move.state != "posted":
-                continue
-            if self._pledge_deposit_voided_by_return_this_session(order):
-                continue
-            amt = order.total_pledge_amount or 0.0
-            for part in self._iter_pledge_journal_payment_split(amt, move):
-                if part[0] == "cash":
-                    outcome["cash"] += part[1]
-                else:
-                    outcome["by_pm"][part[2]] += part[1]
-
-        PledgeLine = self.env["pos.advance.order.pledge"].sudo()
-        returned_here = PledgeLine.search([
-            ("state", "=", "returned"),
-            ("return_move_id.state", "=", "posted"),
-            ("return_move_id.create_date", ">=", self.start_at),
-            ("return_move_id.create_date", "<=", end),
-            ("pos_order_id", "!=", False),
-        ])
-        seen_orders = set()
-        for pl in returned_here:
-            order = pl.pos_order_id
-            if not order or order.id in seen_orders:
-                continue
-            if order.session_id.id == self.id:
-                continue
-            seen_orders.add(order.id)
-            move = order.sudo().pledge_deposit_move_id
-            if not move or move.state != "posted":
-                continue
-            amt = order.total_pledge_amount or 0.0
-            for part in self._iter_pledge_journal_payment_split(amt, move):
-                if part[0] == "cash":
-                    outcome["cash"] -= part[1]
-                else:
-                    outcome["by_pm"][part[2]] -= part[1]
-
-        outcome["cash"] = cur.round(outcome["cash"])
-        outcome["by_pm"] = {pid: cur.round(a) for pid, a in outcome["by_pm"].items()}
-        return outcome
 
     @api.depends(
         'payment_method_ids',
@@ -156,6 +154,8 @@ class PosSession(models.Model):
 
         if data.get("default_cash_details"):
             dc = dict(data["default_cash_details"])
+            dc["pledge_cash_in"] = summary["cash_in"]
+            dc["pledge_cash_out"] = summary["cash_out"]
             dc["pledge_payment_amount"] = cash_extra
             if not cur.is_zero(cash_extra):
                 dc["amount"] = cur.round(dc["amount"] + cash_extra)
@@ -164,10 +164,15 @@ class PosSession(models.Model):
         patched = []
         for row in data.get("non_cash_payment_methods") or []:
             r = dict(row)
-            adv = cur.round(by_pm.get(row["id"], 0.0))
-            r["pledge_payment_amount"] = adv
-            if not cur.is_zero(adv):
-                r["amount"] = cur.round(r["amount"] + adv)
+            pid = row["id"]
+            pin = cur.round((summary.get("by_pm_in") or {}).get(pid, 0.0))
+            pout = cur.round((summary.get("by_pm_out") or {}).get(pid, 0.0))
+            r["pledge_pm_in"] = pin
+            r["pledge_pm_out"] = pout
+            net = cur.round((summary.get("by_pm") or {}).get(pid, 0.0))
+            r["pledge_payment_amount"] = net
+            if not cur.is_zero(net):
+                r["amount"] = cur.round(r["amount"] + net)
             patched.append(r)
         data["non_cash_payment_methods"] = patched
         return data

@@ -1,38 +1,52 @@
 /** @odoo-module **/
 
 import { _t } from "@web/core/l10n/translation";
+import { sprintf } from "@web/core/utils/strings";
 import { patch } from "@web/core/utils/patch";
 import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
 
 patch(ClosePosPopup.prototype, {
-    pledgeCashLineLabel() {
-        const dc = this.props.default_cash_details || {};
-        const amt = Number(dc.pledge_payment_amount ?? 0);
-        if (amt < 0) {
-            return _t("Pledge returns (cash out)");
-        }
+    pledgeCashInLabel() {
         return _t("Pledge deposits (cash in)");
     },
 
-    pledgeBankLineLabel(pm) {
+    pledgeCashOutLabel() {
+        return _t("Pledge returns (cash out)");
+    },
+
+    pledgeBankInLabel(pm) {
         const name = pm?.name || "";
-        const amt = Number(pm?.pledge_payment_amount ?? 0);
-        const suffix =
-            amt < 0 ? _t("Pledge returns") : _t("Pledge deposits");
-        if (name) {
-            return `${suffix}: ${name}`;
-        }
-        return suffix;
+        return name
+            ? sprintf(_t("Pledge deposit (%s)"), name)
+            : _t("Pledge deposit");
     },
 
-    shouldShowPledgeCashLine() {
+    pledgeBankOutLabel(pm) {
+        const name = pm?.name || "";
+        return name
+            ? sprintf(_t("Pledge return (%s)"), name)
+            : _t("Pledge return");
+    },
+
+    shouldShowPledgeCashInLine() {
         const dc = this.props.default_cash_details || {};
-        const amt = dc.pledge_payment_amount ?? 0;
-        return !!(this.pos.currency && !this.pos.currency.isZero(amt));
+        const v = dc.pledge_cash_in ?? 0;
+        return !!(this.pos.currency && !this.pos.currency.isZero(v));
     },
 
-    shouldShowPledgeBankLine(pm) {
-        const amt = pm?.pledge_payment_amount ?? 0;
-        return !!(this.pos.currency && !this.pos.currency.isZero(amt));
+    shouldShowPledgeCashOutLine() {
+        const dc = this.props.default_cash_details || {};
+        const v = dc.pledge_cash_out ?? 0;
+        return !!(this.pos.currency && !this.pos.currency.isZero(v));
+    },
+
+    shouldShowPledgeBankInLine(pm) {
+        const v = pm?.pledge_pm_in ?? 0;
+        return !!(this.pos.currency && !this.pos.currency.isZero(v));
+    },
+
+    shouldShowPledgeBankOutLine(pm) {
+        const v = pm?.pledge_pm_out ?? 0;
+        return !!(this.pos.currency && !this.pos.currency.isZero(v));
     },
 });

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'POS Pledge (Rahn) Management',
-    'version': '19.0.1.0.16',
+    'version': '19.0.1.0.17',
     'category': 'Point of Sale',
     'summary': 'Manage pledge (Rahn) scenarios with employees, delivery, and accounting',
     'description': """
