@@ -1399,28 +1399,39 @@ class PosAdvanceOrder(models.Model):
             order.remaining_change_amount = remaining_change
             order._post_advance_completion_settlement_move()
 
-            # Create a separate POS order for pledge (paid immediately) in the same session
-            if order.pledge_amount and order.pledge_amount > 0 and pos_config.pledge_product_id:
-                pledge_product = pos_config.pledge_product_id
-                pledge_lines = [{
-                    "product_id": pledge_product.id,
-                    "qty": 1.0,
-                    "price_unit": order.pledge_amount,
-                    "discount": 0.0,
-                    "tax_ids": [(6, 0, [])],
-                    "product_uom_id": pledge_product.uom_id.id,
-                    "name": _("Pledge"),
-                }]
-                pledge_order = order._create_pos_order(session, pledge_lines)
-                order._pay_pos_order(pledge_order, pm, pledge_order.amount_total)
-                order.pledge_pos_order_id = pledge_order.id
-                # Link pledge lines to the POS order that collected the pledge.
-                if order.pledge_line_ids:
-                    order.pledge_line_ids.sudo().write({
-                        "pos_order_id": pledge_order.id,
-                        "partner_id": order.partner_id.id,
-                    })
-                order._post_pledge_completion_settlement_move()
+            # Pledge handling on completion:
+            # if pos_pledge_order is installed, reuse its native flow to create
+            # pos.advance.order.pledge + deposit payment entry from the same sale order.
+            if order.pledge_amount and order.pledge_amount > 0:
+                if hasattr(pos_order, "_create_pledge_collection_orders"):
+                    pos_order._create_pledge_collection_orders()
+                    order.pledge_pos_order_id = pos_order.id
+                    if order.pledge_line_ids:
+                        order.pledge_line_ids.sudo().write({
+                            "pos_order_id": pos_order.id,
+                            "partner_id": order.partner_id.id,
+                        })
+                elif pos_config.pledge_product_id:
+                    # Legacy fallback when pos_pledge_order flow is unavailable.
+                    pledge_product = pos_config.pledge_product_id
+                    pledge_lines = [{
+                        "product_id": pledge_product.id,
+                        "qty": 1.0,
+                        "price_unit": order.pledge_amount,
+                        "discount": 0.0,
+                        "tax_ids": [(6, 0, [])],
+                        "product_uom_id": pledge_product.uom_id.id,
+                        "name": _("Pledge"),
+                    }]
+                    pledge_order = order._create_pos_order(session, pledge_lines)
+                    order._pay_pos_order(pledge_order, pm, pledge_order.amount_total)
+                    order.pledge_pos_order_id = pledge_order.id
+                    if order.pledge_line_ids:
+                        order.pledge_line_ids.sudo().write({
+                            "pos_order_id": pledge_order.id,
+                            "partner_id": order.partner_id.id,
+                        })
+                    order._post_pledge_completion_settlement_move()
 
             order.state = "fully_paid"
 
