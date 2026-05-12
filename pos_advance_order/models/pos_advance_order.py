@@ -1403,15 +1403,58 @@ class PosAdvanceOrder(models.Model):
             # if pos_pledge_order is installed, reuse its native flow to create
             # pos.advance.order.pledge + deposit payment entry from the same sale order.
             if order.pledge_amount and order.pledge_amount > 0:
+                _logger.warning(
+                    "[ADV_PLEDGE_DEBUG] completion start advance=%s pos_order=%s pledge_amount=%s "
+                    "order_pledge_lines=%s pos_lines=%s pos_pledge_products=%s",
+                    order.name,
+                    pos_order.id,
+                    order.pledge_amount,
+                    order.pledge_line_ids.ids,
+                    pos_order.lines.ids,
+                    pos_order.lines.filtered(lambda l: l.product_id and l.product_id.has_pledge).mapped("product_id.id"),
+                )
                 if hasattr(pos_order, "_create_pledge_collection_orders"):
+                    before_count = self.env["pos.advance.order.pledge"].sudo().search_count(
+                        [("pos_order_id", "=", pos_order.id)]
+                    )
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] calling _create_pledge_collection_orders order=%s "
+                        "before_count=%s state=%s partner=%s",
+                        pos_order.name,
+                        before_count,
+                        pos_order.state,
+                        pos_order.partner_id.id if pos_order.partner_id else False,
+                    )
                     pos_order._create_pledge_collection_orders()
+                    after_lines = self.env["pos.advance.order.pledge"].sudo().search(
+                        [("pos_order_id", "=", pos_order.id)]
+                    )
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] after _create_pledge_collection_orders order=%s "
+                        "after_count=%s created_ids=%s",
+                        pos_order.name,
+                        len(after_lines),
+                        after_lines.ids,
+                    )
                     order.pledge_pos_order_id = pos_order.id
                     if order.pledge_line_ids:
                         order.pledge_line_ids.sudo().write({
                             "pos_order_id": pos_order.id,
                             "partner_id": order.partner_id.id,
                         })
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] linked advance pledge lines advance=%s lines=%s pos_order=%s",
+                        order.name,
+                        order.pledge_line_ids.ids,
+                        pos_order.id,
+                    )
                 elif pos_config.pledge_product_id:
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] fallback legacy pledge order flow advance=%s pos_cfg=%s pledge_product=%s",
+                        order.name,
+                        pos_config.id,
+                        pos_config.pledge_product_id.id if pos_config.pledge_product_id else False,
+                    )
                     # Legacy fallback when pos_pledge_order flow is unavailable.
                     pledge_product = pos_config.pledge_product_id
                     pledge_lines = [{
@@ -1432,6 +1475,11 @@ class PosAdvanceOrder(models.Model):
                             "partner_id": order.partner_id.id,
                         })
                     order._post_pledge_completion_settlement_move()
+                else:
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] skipped pledge processing advance=%s reason=no_pos_pledge_method_and_no_pledge_product",
+                        order.name,
+                    )
 
             order.state = "fully_paid"
 
