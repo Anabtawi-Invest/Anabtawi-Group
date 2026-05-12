@@ -147,16 +147,26 @@ class PosAdvanceOrderPledge(models.Model):
              WHERE state IS NULL
             """
         )
+        # Only when pos.order has pledge_deposit_move_id (e.g. pos_pledge_order); skip otherwise.
         self.env.cr.execute(
             """
-            UPDATE pos_advance_order_pledge pl
-               SET pledge_move_id = o.pledge_deposit_move_id
-              FROM pos_order o
-             WHERE pl.pos_order_id = o.id
-               AND pl.pledge_move_id IS NULL
-               AND o.pledge_deposit_move_id IS NOT NULL
+            SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'pos_order'
+               AND column_name = 'pledge_deposit_move_id'
+             LIMIT 1
             """
         )
+        if self.env.cr.fetchone():
+            self.env.cr.execute(
+                """
+                UPDATE pos_advance_order_pledge pl
+                   SET pledge_move_id = o.pledge_deposit_move_id
+                  FROM pos_order o
+                 WHERE pl.pos_order_id = o.id
+                   AND pl.pledge_move_id IS NULL
+                   AND o.pledge_deposit_move_id IS NOT NULL
+                """
+            )
         self.env.cr.execute(
             """
             UPDATE pos_advance_order_pledge
@@ -320,8 +330,8 @@ class PosAdvanceOrderPledge(models.Model):
                 if line.pledge_move_id:
                     move = line.pledge_move_id
                     break
-            if not move and pos_order:
-                move = pos_order.pledge_deposit_move_id
+            if not move and pos_order and "pledge_deposit_move_id" in self.env["pos.order"]._fields:
+                move = pos_order.sudo().pledge_deposit_move_id
             if not move or move.state != "posted":
                 raise UserError(_("No posted pledge journal entry is linked to this pledge."))
 
