@@ -1,89 +1,12 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 
-from odoo import _, api, fields, models
+from odoo import _, models
 from odoo.exceptions import UserError
 from odoo.tools import float_is_zero
 
-# Synthetic ids for Closing Register UI only (not real pos.payment.method).
-ADVANCE_DEPOSIT_CASH_CLOSING_LINE_PAYMENT_METHOD_ID = -987654321
-ADVANCE_DEPOSIT_BANK_CLOSING_LINE_PAYMENT_METHOD_ID = -987654322
-
-
 class PosSession(models.Model):
     _inherit = "pos.session"
-
-    @api.depends(
-        "payment_method_ids",
-        "order_ids",
-        "cash_register_balance_start",
-        "cash_register_balance_end_real",
-        "statement_line_ids.amount",
-    )
-    def _compute_cash_balance(self):
-        """Include cash advance deposits in theoretical cash balance on closing."""
-        super()._compute_cash_balance()
-        for session in self:
-            if not session.config_id.enable_advance_order:
-                continue
-            cash_advance = session._get_deposited_advance_summary()["cash"]
-            if session.currency_id.is_zero(cash_advance):
-                continue
-            session.cash_register_balance_end = session.currency_id.round(
-                session.cash_register_balance_end + cash_advance
-            )
-            session.cash_register_difference = session.currency_id.round(
-                session.cash_register_balance_end_real - session.cash_register_balance_end
-            )
-
-    def _advance_orders_deposited_in_session(self):
-        """Advance orders whose deposit entry was posted during this session window."""
-        self.ensure_one()
-        advance_orders = self.env["pos.advance.order"].sudo()
-        end = self.stop_at or fields.Datetime.now()
-        deposited = advance_orders.browse()
-        domain = [
-            ("company_id", "=", self.company_id.id),
-            ("state", "not in", ("draft", "cancel")),
-            ("advance_deposit_move_id.state", "=", "posted"),
-        ]
-        for adv_order in advance_orders.search(domain):
-            pay_cfg = adv_order.from_pos_config_id or adv_order.pos_config_id
-            if pay_cfg != self.config_id:
-                continue
-            move = adv_order.advance_deposit_move_id
-            if move and self.start_at <= move.create_date <= end:
-                deposited |= adv_order
-        return deposited
-
-    def _get_deposited_advance_summary(self):
-        """Split deposited advances by liquidity type for closing register display."""
-        self.ensure_one()
-        summary = {"cash": 0.0, "bank": 0.0, "cash_count": 0, "bank_count": 0}
-        if not self.config_id.enable_advance_order:
-            return summary
-        currency = self.currency_id
-        cash_total = 0.0
-        bank_total = 0.0
-        cash_count = 0
-        bank_count = 0
-        for adv_order in self._advance_orders_deposited_in_session():
-            amount = adv_order.advance_amount or 0.0
-            if currency.is_zero(amount):
-                continue
-            pm = adv_order.pos_payment_method_id
-            is_cash = (pm and pm.type == "cash") or (not pm and adv_order.payment_method == "cash")
-            if is_cash:
-                cash_total += amount
-                cash_count += 1
-            else:
-                bank_total += amount
-                bank_count += 1
-        summary["cash"] = currency.round(cash_total)
-        summary["bank"] = currency.round(bank_total)
-        summary["cash_count"] = cash_count
-        summary["bank_count"] = bank_count
-        return summary
 
     def get_closing_control_data(self):
         """Split advance-on-completion amounts into their own Closing Register line.
@@ -98,12 +21,6 @@ class PosSession(models.Model):
         cfg = self.config_id
         if not cfg.enable_advance_order:
             return data
-
-        deposited_summary = self._get_deposited_advance_summary()
-        deposit_cash = deposited_summary["cash"]
-        deposit_bank = deposited_summary["bank"]
-        deposit_cash_count = deposited_summary["cash_count"]
-        deposit_bank_count = deposited_summary["bank_count"]
 
         rounding = self.currency_id.rounding
         orders = self._get_closed_orders()
@@ -153,30 +70,6 @@ class PosSession(models.Model):
                     row["amount"] = self.currency_id.round(row["amount"] - amt)
                     row["number"] = max(0, (row.get("number") or 0) - payload["number"])
                     break
-
-        if not float_is_zero(deposit_cash, precision_rounding=rounding):
-            default_cash["payment_amount"] = self.currency_id.round(
-                (default_cash.get("payment_amount") or 0.0) + deposit_cash
-            )
-            default_cash["amount"] = self.currency_id.round(
-                (default_cash.get("amount") or 0.0) + deposit_cash
-            )
-            non_cash.append({
-                "name": _("Cash Advance"),
-                "amount": deposit_cash,
-                "number": deposit_cash_count,
-                "id": ADVANCE_DEPOSIT_CASH_CLOSING_LINE_PAYMENT_METHOD_ID,
-                "type": "pay_later",
-            })
-
-        if not float_is_zero(deposit_bank, precision_rounding=rounding):
-            non_cash.append({
-                "name": _("Bank Advance"),
-                "amount": deposit_bank,
-                "number": deposit_bank_count,
-                "id": ADVANCE_DEPOSIT_BANK_CLOSING_LINE_PAYMENT_METHOD_ID,
-                "type": "pay_later",
-            })
 
         non_cash = [
             row
