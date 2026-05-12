@@ -119,6 +119,11 @@ msgid "Advance"
 msgstr "عربون"
 
 #. module: pos_advance_order
+#: code:addons/pos_advance_order/models/pos_session.py:0
+msgid "Advance (on completion)"
+msgstr "عربون (تطبيق عند الإكمال)"
+
+#. module: pos_advance_order
 #: model:ir.model.fields,field_description:pos_advance_order.field_pos_order__is_advance_generated
 msgid "Advance Generated"
 msgstr "مولّد من عربون"
