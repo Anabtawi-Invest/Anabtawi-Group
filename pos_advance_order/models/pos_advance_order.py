@@ -1417,6 +1417,42 @@ class PosAdvanceOrder(models.Model):
                     pledge_total_snapshot = sum(order.pledge_line_ids.mapped("pledge_subtotal")) or 0.0
                     pledge_qty_snapshot = sum(order.pledge_line_ids.mapped("pledge_qty")) or 0.0
                     pledge_product_ids_snapshot = order.pledge_line_ids.mapped("product_id").ids
+                    # Fallback: rebuild snapshot from advance order lines when pledge_line_ids
+                    # is empty/outdated on completion.
+                    if float_is_zero(pledge_total_snapshot, precision_rounding=rounding) or not pledge_product_ids_snapshot:
+                        qty_by_product = {}
+                        for adv_line in order.line_ids.filtered(lambda l: not l.display_type and l.product_id and l.product_id.has_pledge):
+                            qty_by_product.setdefault(adv_line.product_id, 0.0)
+                            qty_by_product[adv_line.product_id] += adv_line.product_qty or 0.0
+                        if qty_by_product:
+                            pledge_qty_snapshot = sum(qty_by_product.values())
+                            pledge_product_ids_snapshot = [prod.id for prod in qty_by_product.keys()]
+                            pledge_total_snapshot = sum(
+                                (qty_by_product[prod] or 0.0) * (prod.product_tmpl_id.pledge_amount or 0.0)
+                                for prod in qty_by_product.keys()
+                            )
+                            _logger.warning(
+                                "[ADV_PLEDGE_DEBUG] snapshot fallback from advance lines total=%s qty=%s products=%s",
+                                pledge_total_snapshot,
+                                pledge_qty_snapshot,
+                                pledge_product_ids_snapshot,
+                            )
+                    # Last fallback: use configured pledge product + amount on advance order.
+                    if (
+                        float_is_zero(pledge_total_snapshot, precision_rounding=rounding)
+                        and order.pledge_amount
+                        and order.pledge_amount > 0
+                        and pos_config.pledge_product_id
+                    ):
+                        pledge_total_snapshot = order.pledge_amount
+                        pledge_qty_snapshot = 1.0
+                        pledge_product_ids_snapshot = [pos_config.pledge_product_id.id]
+                        _logger.warning(
+                            "[ADV_PLEDGE_DEBUG] snapshot fallback from order.pledge_amount total=%s qty=%s products=%s",
+                            pledge_total_snapshot,
+                            pledge_qty_snapshot,
+                            pledge_product_ids_snapshot,
+                        )
                     pos_order.sudo().write({
                         "total_pledge_amount": pledge_total_snapshot,
                         "pledge_product_qty": int(pledge_qty_snapshot),
