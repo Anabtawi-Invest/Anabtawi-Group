@@ -1,6 +1,7 @@
 from odoo import _, fields, http
 from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
+from odoo.tools import float_compare, float_is_zero
 
 
 class PosAdvanceOrderController(http.Controller):
@@ -29,7 +30,7 @@ class PosAdvanceOrderController(http.Controller):
         from_pos_config_id = payload.get("from_pos_config_id")
         lines = payload.get("lines") or []
         advance_amount = float(payload.get("advance_amount") or 0.0)
-        amount_tendered = float(payload.get("amount_tendered") or advance_amount or 0.0)
+        amount_tendered = float(payload.get("amount_tendered") or 0.0)
         payment_method_id = payload.get("payment_method_id")
         employee_id = payload.get("employee_id")
         discount_id = payload.get("discount_id")
@@ -42,12 +43,18 @@ class PosAdvanceOrderController(http.Controller):
             raise ValidationError("Order lines are required.")
         if advance_amount <= 0:
             raise ValidationError("Advance amount must be greater than zero.")
-        if amount_tendered < advance_amount:
-            raise ValidationError(_("Amount tendered cannot be less than advance amount."))
 
         pos_config = request.env["pos.config"].sudo().browse(int(pos_config_id)).exists()
         if not pos_config:
             raise ValidationError("Invalid POS configuration.")
+
+        tender_rounding = pos_config.currency_id.rounding or 0.01
+        if float_is_zero(amount_tendered, precision_rounding=tender_rounding):
+            amount_tendered = advance_amount
+        if float_compare(amount_tendered, advance_amount, precision_rounding=tender_rounding) < 0:
+            raise ValidationError(
+                _("Amount tendered cannot be less than the advance amount.")
+            )
 
         partner = request.env["res.partner"].sudo().browse(int(partner_id)).exists()
         if not partner:

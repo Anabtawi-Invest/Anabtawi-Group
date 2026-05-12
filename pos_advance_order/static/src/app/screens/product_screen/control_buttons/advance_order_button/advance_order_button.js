@@ -23,29 +23,6 @@ patch(ControlButtons.prototype, {
         this.pos = usePos();
         this.orm = useService("orm");
         this.printer = useService("printer");
-        // Diagnostic log to ensure this JS bundle revision is active in POS.
-        console.warn("[ADV_I18N_DEBUG_V2] ControlButtons loaded", {
-            marker: "ADV_I18N_DEBUG_V2_2026_05_10",
-            browserLanguage: navigator.language,
-            htmlLanguage: document?.documentElement?.lang || "",
-            advanceOrderButton: _t("Advance Order"),
-            completeAdvanceOrderButton: _t("Complete Advance Order"),
-        });
-    },
-
-    _isArabicContext() {
-        const urlLang = new URLSearchParams(window.location.search).get("lang") || "";
-        const htmlLang = document?.documentElement?.lang || "";
-        const bodyDir = document?.body ? window.getComputedStyle(document.body).direction : "";
-        return urlLang.startsWith("ar") || htmlLang.startsWith("ar") || bodyDir === "rtl";
-    },
-
-    _tr(msgid, fallbackArabic) {
-        const translated = _t(msgid);
-        if (translated === msgid && this._isArabicContext()) {
-            return fallbackArabic;
-        }
-        return translated;
     },
 
     /** Same breakpoints as POS `buttonClass`, but distinct hue for Advance vs default grey controls. */
@@ -65,14 +42,6 @@ patch(ControlButtons.prototype, {
                 : "btn btn-success btn-lg py-5";
         }
         return "btn btn-success btn-lg lh-lg";
-    },
-
-    get advanceOrderButtonLabel() {
-        return this._tr("Advance Order", "طلب عربون");
-    },
-
-    get completeAdvanceOrderButtonLabel() {
-        return this._tr("Complete Advance Order", "إكمال طلب العربون");
     },
 
     _getCurrentOrder() {
@@ -109,9 +78,12 @@ patch(ControlButtons.prototype, {
         const advanceAmount = toNumber(result?.advance_amount, payload.advance_amount || 0);
         const amountTendered = toNumber(
             result?.amount_tendered,
-            payload.amount_tendered ?? payload.advance_amount ?? 0
+            payload.amount_tendered ?? advanceAmount
         );
-        const changeAmount = toNumber(result?.change_amount, Math.max(amountTendered - advanceAmount, 0));
+        const changeDue = toNumber(
+            result?.change_amount,
+            Math.max(amountTendered - advanceAmount, 0)
+        );
         return {
             companyName: this.pos.company?.name || "",
             posName: this.pos.config?.name || "",
@@ -124,7 +96,7 @@ patch(ControlButtons.prototype, {
             total: total,
             advanceAmount: advanceAmount,
             amountTendered: amountTendered,
-            changeAmount: changeAmount,
+            changeDue: changeDue,
             remainingAmount: Math.max(total - advanceAmount, 0),
             lines: (payload.lines || []).map((line) => ({
                 product_id: line.product_id,
@@ -138,19 +110,19 @@ patch(ControlButtons.prototype, {
     async onClickAdvanceOrder() {
         const order = this._getCurrentOrder();
         if (!order) {
-            this.notification.add(this._tr("No active order found.", "لا يوجد طلب نشط."), { type: "warning" });
+            this.notification.add(_t("No active order found."), { type: "warning" });
             return;
         }
 
         const partner = this._getOrderPartner(order);
         if (!partner?.id) {
-            this.notification.add(this._tr("Please select a customer first.", "يرجى اختيار عميل أولًا."), { type: "warning" });
+            this.notification.add(_t("Please select a customer first."), { type: "warning" });
             return;
         }
 
         const lines = this._prepareLines(order);
         if (!lines.length) {
-            this.notification.add(this._tr("Please add at least one product line.", "يرجى إضافة سطر منتج واحد على الأقل."), { type: "warning" });
+            this.notification.add(_t("Please add at least one product line."), { type: "warning" });
             return;
         }
 
@@ -164,15 +136,12 @@ patch(ControlButtons.prototype, {
         }
 
         const advanceAmount = toNumber(popupPayload.advance_amount, 0);
-        const amountTendered = toNumber(popupPayload.amount_tendered, advanceAmount);
         if (advanceAmount <= 0) {
-            this.notification.add(this._tr("Advance amount must be greater than zero.", "يجب أن يكون مبلغ العربون أكبر من صفر."), { type: "danger" });
+            this.notification.add(_t("Advance amount must be greater than zero."), { type: "danger" });
             return;
         }
-        if (amountTendered < advanceAmount) {
-            this.notification.add(this._tr("Amount tendered cannot be less than advance amount.", "لا يمكن أن يكون المبلغ المستلم أقل من مبلغ العربون."), { type: "danger" });
-            return;
-        }
+        const amountTenderedRaw = toNumber(popupPayload.amount_tendered, advanceAmount);
+        const amountTendered = amountTenderedRaw >= advanceAmount ? amountTenderedRaw : advanceAmount;
 
         const payload = {
             partner_id: partner.id,
@@ -189,8 +158,7 @@ patch(ControlButtons.prototype, {
 
         try {
             const result = await rpc("/pos/create_advance_order", payload);
-            const createdMsg = this._tr("Advance order created: %s", "تم إنشاء طلب عربون: %s").replace("%s", result?.name || "");
-            this.notification.add(createdMsg, { type: "success" });
+            this.notification.add(_t("Advance order created: %s", result?.name || ""), { type: "success" });
             try {
                 await this.printer.print(
                     AdvanceOrderReceipt,
@@ -201,7 +169,7 @@ patch(ControlButtons.prototype, {
                 );
             } catch (printError) {
                 const printMessage =
-                    printError?.body || printError?.message || this._tr("Advance order created but receipt printing failed.", "تم إنشاء طلب العربون لكن فشلت طباعة الإيصال.");
+                    printError?.body || printError?.message || _t("Advance order created but receipt printing failed.");
                 this.notification.add(printMessage, { type: "warning" });
             }
             // Reset the POS cart after successful advance creation.
@@ -211,7 +179,7 @@ patch(ControlButtons.prototype, {
             }
             this.pos.addNewOrder();
         } catch (error) {
-            const msg = error?.data?.message || error?.message || this._tr("Failed to create advance order.", "فشل إنشاء طلب العربون.");
+            const msg = error?.data?.message || error?.message || _t("Failed to create advance order.");
             this.notification.add(msg, { type: "danger" });
         }
     },
@@ -232,12 +200,11 @@ patch(ControlButtons.prototype, {
                 {
                     pos_payment_method_id: popupPayload.payment_method_id,
                     pos_config_id: this.pos.config.id,
-                    amount_tendered: popupPayload.amount_tendered,
                 }
             );
-            this.notification.add(this._tr("Advance order completed successfully.", "تم إكمال طلب العربون بنجاح."), { type: "success" });
+            this.notification.add(_t("Advance order completed successfully."), { type: "success" });
         } catch (error) {
-            const msg = error?.data?.message || error?.message || this._tr("Failed to complete advance order.", "فشل إكمال طلب العربون.");
+            const msg = error?.data?.message || error?.message || _t("Failed to complete advance order.");
             this.notification.add(msg, { type: "danger" });
         }
     },
