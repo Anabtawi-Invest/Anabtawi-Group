@@ -67,38 +67,6 @@ export class AdvanceOrderFormPopup extends Component {
         onMounted(async () => {
             await this._loadPopupData();
             this.state.loading = false;
-            this._debugI18n();
-        });
-    }
-
-    _isArabicContext() {
-        const urlLang = new URLSearchParams(window.location.search).get("lang") || "";
-        const htmlLang = document?.documentElement?.lang || "";
-        const bodyDir = document?.body ? window.getComputedStyle(document.body).direction : "";
-        return urlLang.startsWith("ar") || htmlLang.startsWith("ar") || bodyDir === "rtl";
-    }
-
-    _tr(msgid, fallbackArabic) {
-        const translated = _t(msgid);
-        if (translated === msgid && this._isArabicContext()) {
-            return fallbackArabic;
-        }
-        return translated;
-    }
-
-    _debugI18n() {
-        // Diagnostic log to verify that the latest assets are loaded and translations are resolved.
-        console.warn("[ADV_I18N_DEBUG_V2] Advance popup translations", {
-            marker: "ADV_I18N_DEBUG_V2_2026_05_10",
-            browserLanguage: navigator.language,
-            htmlLanguage: document?.documentElement?.lang || "",
-            popupTitle: _t("Advance Order Details"),
-            fromPos: _t("From POS"),
-            pickingPos: _t("Picking POS"),
-            advanceAmount: _t("Advance Amount"),
-            amountTendered: _t("Amount Tendered"),
-            paymentMethod: _t("Payment method"),
-            completeAdvanceOrder: _t("Complete Advance Order"),
         });
     }
 
@@ -117,79 +85,28 @@ export class AdvanceOrderFormPopup extends Component {
 
     advanceAmountFmt() {
         const currencyId = this.props.pos?.currency?.id;
+        const amount = Number(this.state.advance_amount) || 0;
+        return formatCurrency(amount, currencyId);
+    }
+
+    amountTenderedFmt() {
+        const currencyId = this.props.pos?.currency?.id;
         const amount = Number(this.state.amount_tendered) || 0;
         return formatCurrency(amount, currencyId);
     }
 
-    get popupTitle() {
-        return this._tr("Advance Order Details", "تفاصيل طلب العربون");
+    changeDueFmt() {
+        const currencyId = this.props.pos?.currency?.id;
+        const advance = Number(this.state.advance_amount) || 0;
+        const tendered = Number(this.state.amount_tendered) || 0;
+        const change = Math.max(tendered - advance, 0);
+        return formatCurrency(change, currencyId);
     }
 
-    get popupSubtitle() {
-        return this._tr("Deposit and picking configuration", "إعدادات العربون والاستلام");
-    }
-
-    get fromPosLabel() {
-        return this._tr("From POS", "من نقطة البيع");
-    }
-
-    get pickingPosLabel() {
-        return this._tr("Picking POS", "نقطة الاستلام");
-    }
-
-    get selectPickingPosPlaceholder() {
-        return this._tr("-- Select Picking POS --", "-- اختر نقطة استلام --");
-    }
-
-    get pricelistLabel() {
-        return this._tr("Pricelist", "قائمة الأسعار");
-    }
-
-    get advanceAmountLabel() {
-        return this._tr("Advance Amount", "مبلغ العربون");
-    }
-
-    get amountTenderedLabel() {
-        return this._tr("Amount Tendered", "المبلغ المستلم");
-    }
-
-    get amountTenderedHint() {
-        return this._tr(
-            "Customer paid amount (can be greater than advance).",
-            "المبلغ الذي دفعه العميل (يمكن أن يكون أكبر من العربون)."
-        );
-    }
-
-    get paymentMethodLabel() {
-        return this._tr("Payment method", "طريقة الدفع");
-    }
-
-    get withEmployeeLabel() {
-        return this._tr("With Employee", "مع موظف");
-    }
-
-    get employeeLabel() {
-        return this._tr("Employee", "الموظف");
-    }
-
-    get selectEmployeePlaceholder() {
-        return this._tr("-- Select Employee --", "-- اختر موظفًا --");
-    }
-
-    get discountOptionalLabel() {
-        return this._tr("Discount (Optional)", "الخصم (اختياري)");
-    }
-
-    get noDiscountPlaceholder() {
-        return this._tr("-- No Discount --", "-- بدون خصم --");
-    }
-
-    get cancelButtonLabel() {
-        return this._tr("Cancel", "إلغاء");
-    }
-
-    get confirmButtonLabel() {
-        return this._tr("Confirm", "تأكيد");
+    changeDueRaw() {
+        const advance = Number(this.state.advance_amount) || 0;
+        const tendered = Number(this.state.amount_tendered) || 0;
+        return Math.max(tendered - advance, 0);
     }
 
     isPaymentSelected(pm) {
@@ -248,7 +165,7 @@ export class AdvanceOrderFormPopup extends Component {
             this._syncPricelistName();
         } catch (error) {
             this.notification.add(
-                error?.message || this._tr("Failed to load popup data.", "فشل تحميل بيانات النافذة."),
+                error?.message || _t("Failed to load popup data."),
                 { type: "danger" }
             );
         }
@@ -270,16 +187,19 @@ export class AdvanceOrderFormPopup extends Component {
 
     onAdvanceAmountInput(ev) {
         const value = Number(ev.target.value || 0);
-        const normalized = Number.isFinite(value) ? value : 0;
-        this.state.advance_amount = normalized;
-        if (this.state.amount_tendered < normalized) {
-            this.state.amount_tendered = normalized;
+        this.state.advance_amount = Number.isFinite(value) ? value : 0;
+        if (this.state.amount_tendered < this.state.advance_amount) {
+            this.state.amount_tendered = this.state.advance_amount;
         }
     }
 
     onAmountTenderedInput(ev) {
         const value = Number(ev.target.value || 0);
         this.state.amount_tendered = Number.isFinite(value) ? value : 0;
+        const advance = Number(this.state.advance_amount) || 0;
+        if (this.state.amount_tendered < advance) {
+            this.state.amount_tendered = advance;
+        }
     }
 
     onPickingPosChange(ev) {
@@ -310,36 +230,40 @@ export class AdvanceOrderFormPopup extends Component {
     }
 
     get noEligiblePaymentMethodsText() {
-        return this._tr(
-            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration.",
-            "لا توجد طرق دفع مناسبة في نقطة البيع هذه. أضف طرق دفع نقدية أو بنكية يدوية بدون تكامل طرفية أو QR في إعدادات نقطة البيع."
+        return _t(
+            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration."
         );
     }
 
     confirm() {
         if (!this.state.advance_amount || this.state.advance_amount <= 0) {
-            this.notification.add(this._tr("Advance amount must be greater than zero.", "يجب أن يكون مبلغ العربون أكبر من صفر."), { type: "warning" });
-            return;
-        }
-        if (this.state.amount_tendered < this.state.advance_amount) {
-            this.notification.add(this._tr("Amount tendered cannot be less than advance amount.", "لا يمكن أن يكون المبلغ المستلم أقل من مبلغ العربون."), { type: "warning" });
+            this.notification.add(_t("Advance amount must be greater than zero."), { type: "warning" });
             return;
         }
         const currentFromPosId = this.props.posConfigId || this.state.from_pos_config_id;
         if (!currentFromPosId) {
-            this.notification.add(this._tr("Please select From POS.", "يرجى اختيار نقطة البيع المصدر."), { type: "warning" });
+            this.notification.add(_t("Please select From POS."), { type: "warning" });
             return;
         }
         if (!this.state.picking_pos_config_id) {
-            this.notification.add(this._tr("Please select Picking POS.", "يرجى اختيار نقطة الاستلام."), { type: "warning" });
+            this.notification.add(_t("Please select Picking POS."), { type: "warning" });
             return;
         }
         if (!this.state.selected_payment_method_id) {
-            this.notification.add(this._tr("Please select a payment method.", "يرجى اختيار طريقة دفع."), { type: "warning" });
+            this.notification.add(_t("Please select a payment method."), { type: "warning" });
+            return;
+        }
+        const tendered = Number(this.state.amount_tendered) || 0;
+        const advance = Number(this.state.advance_amount) || 0;
+        if (tendered < advance) {
+            this.notification.add(
+                _t("Amount tendered cannot be less than the advance amount."),
+                { type: "warning" }
+            );
             return;
         }
         if (this.state.with_employee && !this.state.employee_id) {
-            this.notification.add(this._tr("Please select an employee.", "يرجى اختيار موظف."), { type: "warning" });
+            this.notification.add(_t("Please select an employee."), { type: "warning" });
             return;
         }
         const selectedPm = this.state.payment_methods.find(
@@ -347,7 +271,7 @@ export class AdvanceOrderFormPopup extends Component {
         );
         this.props.getPayload({
             advance_amount: this.state.advance_amount,
-            amount_tendered: this.state.amount_tendered,
+            amount_tendered: tendered,
             payment_method_id: this.state.selected_payment_method_id,
             payment_method_name: selectedPm?.name || "",
             from_pos_config_id: currentFromPosId,

@@ -44,6 +44,14 @@ patch(ControlButtons.prototype, {
         return "btn btn-success btn-lg lh-lg";
     },
 
+    get advanceOrderButtonLabel() {
+        return _t("Advance Order");
+    },
+
+    get completeAdvanceOrderButtonLabel() {
+        return _t("Complete Advance Order");
+    },
+
     _getCurrentOrder() {
         return this.currentOrder || this.pos.getOrder?.();
     },
