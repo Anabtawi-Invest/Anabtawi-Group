@@ -252,6 +252,22 @@ class PosSession(models.Model):
         order = payment.pos_order_id
         advance = order.advance_order_id
         if advance and advance.pos_config_id.pos_advance_receivable_account_id:
+            # Reroute only the advance-application payment line on completion order.
+            # Keep normal customer cash/bank payments on standard POS receivable flow.
+            if not advance.remaining_pos_order_id or order.id != advance.remaining_pos_order_id.id:
+                return super()._get_split_receivable_vals(
+                    payment, amount, amount_converted
+                )
+            try:
+                advance_application_pm = advance._get_advance_application_payment_method(self)
+            except UserError:
+                return super()._get_split_receivable_vals(
+                    payment, amount, amount_converted
+                )
+            if payment.payment_method_id != advance_application_pm:
+                return super()._get_split_receivable_vals(
+                    payment, amount, amount_converted
+                )
             acc = advance.pos_config_id.pos_advance_receivable_account_id
             accounting_partner = self.env["res.partner"]._find_accounting_partner(
                 payment.partner_id
