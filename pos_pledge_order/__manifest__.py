@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'POS Pledge (Rahn) Management',
-    'version': '19.0.1.0.19',
+    'version': '19.0.1.0.20',
     'category': 'Point of Sale',
     'summary': 'Manage pledge (Rahn) scenarios with employees, delivery, and accounting',
     'description': """
@@ -25,7 +25,6 @@
         'data/sequence.xml',
         'data/product_data.xml',
         'views/product_template_views.xml',
-        'views/pos_advance_order_pledge_views.xml',
         'views/pos_order_views.xml',
         'views/pos_pledge_views.xml',
         'views/pos_config_views.xml',

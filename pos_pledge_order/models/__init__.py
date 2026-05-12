@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from . import pos_advance_order_pledge
 from . import pos_pledge
 from . import pos_config
 from . import pos_order
