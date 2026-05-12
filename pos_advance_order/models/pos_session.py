@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 
-from odoo import _, api, fields, models
+from odoo import _, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_is_zero
 
@@ -12,29 +12,6 @@ ADVANCE_DEPOSIT_BANK_CLOSING_LINE_PAYMENT_METHOD_ID = -987654322
 
 class PosSession(models.Model):
     _inherit = "pos.session"
-
-    @api.depends(
-        "payment_method_ids",
-        "order_ids",
-        "cash_register_balance_start",
-        "cash_register_balance_end_real",
-        "statement_line_ids.amount",
-    )
-    def _compute_cash_balance(self):
-        """Include cash advance deposits in theoretical cash balance on closing."""
-        super()._compute_cash_balance()
-        for session in self:
-            if not session.config_id.enable_advance_order:
-                continue
-            cash_advance = session._get_deposited_advance_summary()["cash"]
-            if session.currency_id.is_zero(cash_advance):
-                continue
-            session.cash_register_balance_end = session.currency_id.round(
-                session.cash_register_balance_end + cash_advance
-            )
-            session.cash_register_difference = session.currency_id.round(
-                session.cash_register_balance_end_real - session.cash_register_balance_end
-            )
 
     def _advance_orders_deposited_in_session(self):
         """Advance orders whose deposit entry was posted during this session window."""
@@ -155,12 +132,6 @@ class PosSession(models.Model):
                     break
 
         if not float_is_zero(deposit_cash, precision_rounding=rounding):
-            default_cash["payment_amount"] = self.currency_id.round(
-                (default_cash.get("payment_amount") or 0.0) + deposit_cash
-            )
-            default_cash["amount"] = self.currency_id.round(
-                (default_cash.get("amount") or 0.0) + deposit_cash
-            )
             non_cash.append({
                 "name": _("Cash Advance"),
                 "amount": deposit_cash,
