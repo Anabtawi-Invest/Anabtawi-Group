@@ -28,7 +28,7 @@
                     <t t-set="icon" t-value="'/portal/static/src/img/portal-connection.svg'"/>
                     <t t-set="title">Attendance</t>
                     <t t-set="text">Check in and check out</t>
-                    <t t-set="url" t-value="'/my/check-in'"/>
+                    <t t-set="url" t-value="'/odoo/check-in' if request.env.user._is_internal() else '/my/check-in'"/>
                     <t t-set="config_card" t-value="True"/>
                 </t>
                 <t t-call="portal.portal_docs_entry">
@@ -141,7 +141,7 @@
                                 </div>
                                 <t t-if="employee">
                                     <div class="pc-check-circle-wrap">
-                                        <form id="checkin_form" action="/my/check-in/toggle" method="post" class="o_portal_check_in_form" t-att-data-device-tracking-enabled="'1' if device_tracking_enabled else '0'">
+                                        <form id="checkin_form" t-att-action="toggle_url" method="post" class="o_portal_check_in_form" t-att-data-device-tracking-enabled="'1' if device_tracking_enabled else '0'">
                                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                             <input type="hidden" name="latitude" id="lat" class="o_portal_check_latitude"/>
                                             <input type="hidden" name="longitude" id="lon" class="o_portal_check_longitude"/>

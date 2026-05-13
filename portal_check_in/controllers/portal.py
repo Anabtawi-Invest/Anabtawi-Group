@@ -111,8 +111,12 @@ class PortalCheckInController(http.Controller):
         )
         return geo_information
 
-    @http.route(['/my/check-in'], type='http', auth='user', website=True)
+    @http.route(['/my/check-in', '/odoo/check-in'], type='http', auth='user', website=True)
     def portal_my_check_in(self, **kwargs):
+        current_path = request.httprequest.path or ''
+        is_backend_path = current_path.startswith('/odoo/check-in')
+        if is_backend_path and not request.env.user._is_internal():
+            return request.redirect('/my/check-in')
         _logger.info(
             "portal_check_in: page opened by user_id=%s with kwargs=%s",
             request.env.user.id,
@@ -199,11 +203,12 @@ class PortalCheckInController(http.Controller):
             'txt_hist_check_in': _('Check In'),
             'txt_hist_check_out': _('Check Out'),
             'txt_hist_hours': _('Hours'),
+            'toggle_url': '/odoo/check-in/toggle' if is_backend_path else '/my/check-in/toggle',
         }
         return request.render('portal_check_in.portal_my_check_in', values)
 
     @http.route(
-        ['/my/check-in/toggle'],
+        ['/my/check-in/toggle', '/odoo/check-in/toggle'],
         type='http',
         auth='user',
         website=True,
@@ -211,6 +216,11 @@ class PortalCheckInController(http.Controller):
         csrf=True,
     )
     def portal_toggle_check_in(self, **kwargs):
+        current_path = request.httprequest.path or ''
+        is_backend_path = current_path.startswith('/odoo/check-in/toggle')
+        check_in_page_url = '/odoo/check-in' if is_backend_path else '/my/check-in'
+        if is_backend_path and not request.env.user._is_internal():
+            return request.redirect('/my/check-in')
         _logger.info(
             "portal_check_in: toggle requested by user_id=%s with raw kwargs keys=%s",
             request.env.user.id,
@@ -222,7 +232,7 @@ class PortalCheckInController(http.Controller):
                 "portal_check_in: no employee linked to user_id=%s",
                 request.env.user.id,
             )
-            return request.redirect('/my/check-in?error=no_employee')
+            return request.redirect('%s?error=no_employee' % check_in_page_url)
 
         try:
             # Attendance is always toggled for the current user's own employee only.
@@ -242,7 +252,7 @@ class PortalCheckInController(http.Controller):
                 attendance.id if attendance else False,
                 employee.attendance_state,
             )
-            return request.redirect('/my/check-in?success=1')
+            return request.redirect('%s?success=1' % check_in_page_url)
         except UserError as error:
             error_message = (error.args and error.args[0]) or _("لا يمكنك تسجيل الحضور من هذا الموقع.")
             _logger.warning(
@@ -252,11 +262,11 @@ class PortalCheckInController(http.Controller):
                 error_message,
             )
             message = quote(error_message)
-            return request.redirect('/my/check-in?error=location_restricted&message=%s' % message)
+            return request.redirect('%s?error=location_restricted&message=%s' % (check_in_page_url, message))
         except Exception:
             _logger.exception(
                 "portal_check_in: toggle failed for user_id=%s employee_id=%s",
                 request.env.user.id,
                 employee.id,
             )
-            return request.redirect('/my/check-in?error=attendance_failed')
+            return request.redirect('%s?error=attendance_failed' % check_in_page_url)
