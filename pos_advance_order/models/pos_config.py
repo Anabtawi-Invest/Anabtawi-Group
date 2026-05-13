@@ -87,7 +87,7 @@ class PosConfig(models.Model):
     pos_advance_application_payment_method_id = fields.Many2one(
         "pos.payment.method",
         string="Advance Application Payment Method",
-        domain="[('id', 'in', payment_method_ids), ('type', '=', 'pay_later')]",
+        domain="[('id', 'in', payment_method_ids), ('journal_id', '=', False)]",
         help="Shown as the second payment line on the completion POS order for the prepaid advance (e.g. 5 when cash is 25). "
         "Create a dedicated method named e.g. 'Advance / عربون' (often type Customer Account / pay later) and add it to this POS. "
         "If empty, the first Customer Account method on the session is used.",
