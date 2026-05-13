@@ -1402,7 +1402,19 @@ class PosAdvanceOrder(models.Model):
             # Pledge handling on completion:
             # if pos_pledge_order is installed, reuse its native flow to create
             # pos.advance.order.pledge + deposit payment entry from the same sale order.
-            if order.pledge_amount and order.pledge_amount > 0:
+            # Do not rely only on order.pledge_amount because it can be zero while
+            # pledge products are present on lines and need snapshot syncing.
+            has_pledge_on_lines = bool(
+                order.line_ids.filtered(
+                    lambda l: not l.display_type and l.product_id and l.product_id.has_pledge
+                )
+            )
+            has_pledge_indicators = bool(
+                (order.pledge_amount and order.pledge_amount > 0)
+                or order.pledge_line_ids
+                or has_pledge_on_lines
+            )
+            if has_pledge_indicators:
                 _logger.warning(
                     "[ADV_PLEDGE_DEBUG] completion start advance=%s pos_order=%s pledge_amount=%s "
                     "order_pledge_lines=%s pos_lines=%s pos_pledge_products=%s",
@@ -1531,6 +1543,15 @@ class PosAdvanceOrder(models.Model):
                         "[ADV_PLEDGE_DEBUG] skipped pledge processing advance=%s reason=no_pos_pledge_method_and_no_pledge_product",
                         order.name,
                     )
+            else:
+                _logger.warning(
+                    "[ADV_PLEDGE_DEBUG] skipped pledge processing advance=%s reason=no_pledge_indicators "
+                    "pledge_amount=%s pledge_lines=%s has_pledge_on_lines=%s",
+                    order.name,
+                    order.pledge_amount,
+                    order.pledge_line_ids.ids,
+                    has_pledge_on_lines,
+                )
 
             order.state = "fully_paid"
 
