@@ -146,8 +146,12 @@ class PosSession(models.Model):
             default_cash
             and not float_is_zero(deposit_cash, precision_rounding=rounding)
         ):
+            # Increase expected drawer cash by deposited advances collected earlier.
             default_cash["advance_payment_amount"] = self.currency_id.round(
                 (default_cash.get("advance_payment_amount") or 0.0) + deposit_cash
+            )
+            default_cash["amount"] = self.currency_id.round(
+                (default_cash.get("amount") or 0.0) + deposit_cash
             )
 
         non_cash_by_id = {row.get("id"): row for row in non_cash}
