@@ -1159,18 +1159,9 @@ class PosAdvanceOrder(models.Model):
         receivable = self._get_advance_receivable_account()
         if not liability or not receivable:
             raise UserError(_("Configure POS Advance Account and Advance Receivable on the POS."))
-        journal = (
-            pos_cfg.invoice_journal_id
-            or self.env["account.journal"].search(
-                [
-                    ("company_id", "=", self.company_id.id),
-                    ("type", "=", "general"),
-                ],
-                limit=1,
-            )
-        )
+        journal = pos_cfg.advance_settlement_journal_id
         if not journal:
-            raise UserError(_("No journal found to post the advance settlement entry."))
+            raise UserError(_("Please configure an Advance Settlement Journal on the POS."))
 
         move = self.env["account.move"].sudo().create({
             "move_type": "entry",
@@ -1229,18 +1220,9 @@ class PosAdvanceOrder(models.Model):
                 )
             )
         pos_cfg = self.pos_config_id
-        journal = (
-            pos_cfg.invoice_journal_id
-            or self.env["account.journal"].search(
-                [
-                    ("company_id", "=", self.company_id.id),
-                    ("type", "=", "general"),
-                ],
-                limit=1,
-            )
-        )
+        journal = pos_cfg.advance_settlement_journal_id
         if not journal:
-            raise UserError(_("No journal found to post the pledge settlement entry."))
+            raise UserError(_("Please configure an Advance Settlement Journal on the POS."))
 
         move = self.env["account.move"].sudo().create({
             "move_type": "entry",

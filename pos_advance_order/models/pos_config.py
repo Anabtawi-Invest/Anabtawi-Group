@@ -71,6 +71,12 @@ class PosConfig(models.Model):
         domain="[('type', 'in', ('cash', 'bank'))]",
         help="Journal for card/bank advance payments",
     )
+    advance_settlement_journal_id = fields.Many2one(
+        "account.journal",
+        string="Advance Settlement Journal",
+        domain="[('company_id', '=', company_id), ('type', '=', 'general')]",
+        help="Journal used for advance completion settlement entries.",
+    )
 
     pos_profit_account_id = fields.Many2one(
         "account.account",

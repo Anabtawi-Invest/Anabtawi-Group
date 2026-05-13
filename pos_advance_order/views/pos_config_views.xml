@@ -16,6 +16,7 @@
                             <field name="pos_advance_receivable_account_id" options="{'no_create': True}"/>
                             <field name="pos_cash_journal_id" options="{'no_create': True}"/>
                             <field name="pos_card_journal_id" options="{'no_create': True}"/>
+                            <field name="advance_settlement_journal_id" options="{'no_create': True}"/>
                             <field name="pos_profit_account_id" options="{'no_create': True}"/>
                             <field name="pos_advance_application_payment_method_id" options="{'no_create': True}"/>
                             <field name="advance_deposit_product_id" options="{'no_create': True}"/>
