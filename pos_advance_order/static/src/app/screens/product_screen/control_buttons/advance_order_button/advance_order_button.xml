@@ -23,21 +23,23 @@
 
     <!-- Closing Register: advance deposit shown inside the same payment row -->
     <t t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension" owl="1">
-        <xpath expr="//PaymentMethodBreakdown[@title.translate='Cash In / Out']" position="before">
-            <div
-                t-if="props.default_cash_details.advance_payment_amount"
-                class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
-                <span>Advance included</span>
-                <span class="align-top" t-esc="env.utils.formatCurrency(props.default_cash_details.advance_payment_amount)"/>
-            </div>
+        <xpath expr="//span[@t-esc='env.utils.formatCurrency(props.default_cash_details.amount)']" position="replace">
+            <span>
+                <t t-esc="env.utils.formatCurrency(props.default_cash_details.amount)"/>
+                <small t-if="props.default_cash_details.advance_payment_amount" class="ms-2 text-muted fs-6">
+                    (Advance included:
+                    <t t-esc="env.utils.formatCurrency(props.default_cash_details.advance_payment_amount)"/>)
+                </small>
+            </span>
         </xpath>
-        <xpath expr="//span[@t-esc='pm.name']/parent::div" position="after">
-            <div
-                t-if="pm.advance_payment_amount"
-                class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
-                <span>Advance included</span>
-                <span class="align-top" t-esc="env.utils.formatCurrency(pm.advance_payment_amount)"/>
-            </div>
+        <xpath expr="//span[@t-esc='env.utils.formatCurrency(pm.amount)']" position="replace">
+            <span>
+                <t t-esc="env.utils.formatCurrency(pm.amount)"/>
+                <small t-if="pm.advance_payment_amount" class="ms-2 text-muted fs-6">
+                    (Advance included:
+                    <t t-esc="env.utils.formatCurrency(pm.advance_payment_amount)"/>)
+                </small>
+            </span>
         </xpath>
     </t>
 </templates>
