@@ -1,14 +1,9 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 
-from odoo import _, fields, models
+from odoo import fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_is_zero
-
-# Synthetic ids for Closing Register UI only (not real pos.payment.method).
-ADVANCE_DEPOSIT_CASH_CLOSING_LINE_PAYMENT_METHOD_ID = -987654321
-ADVANCE_DEPOSIT_BANK_CLOSING_LINE_PAYMENT_METHOD_ID = -987654322
-
 
 class PosSession(models.Model):
     _inherit = "pos.session"
@@ -36,7 +31,13 @@ class PosSession(models.Model):
     def _get_deposited_advance_summary(self):
         """Split deposited advances by liquidity type for closing register display."""
         self.ensure_one()
-        summary = {"cash": 0.0, "bank": 0.0, "cash_count": 0, "bank_count": 0}
+        summary = {
+            "cash": 0.0,
+            "bank": 0.0,
+            "cash_count": 0,
+            "bank_count": 0,
+            "by_payment_method": {},
+        }
         if not self.config_id.enable_advance_order:
             return summary
         currency = self.currency_id
@@ -50,6 +51,17 @@ class PosSession(models.Model):
                 continue
             pm = adv_order.pos_payment_method_id
             is_cash = (pm and pm.type == "cash") or (not pm and adv_order.payment_method == "cash")
+            pm_key = pm.id if pm else False
+            pm_bucket = summary["by_payment_method"].setdefault(
+                pm_key,
+                {
+                    "amount": 0.0,
+                    "count": 0,
+                    "type": pm.type if pm else ("cash" if is_cash else "bank"),
+                },
+            )
+            pm_bucket["amount"] += amount
+            pm_bucket["count"] += 1
             if is_cash:
                 cash_total += amount
                 cash_count += 1
@@ -60,6 +72,8 @@ class PosSession(models.Model):
         summary["bank"] = currency.round(bank_total)
         summary["cash_count"] = cash_count
         summary["bank_count"] = bank_count
+        for bucket in summary["by_payment_method"].values():
+            bucket["amount"] = currency.round(bucket["amount"])
         return summary
 
     def get_closing_control_data(self):
@@ -77,10 +91,7 @@ class PosSession(models.Model):
             return data
 
         deposited_summary = self._get_deposited_advance_summary()
-        deposit_cash = deposited_summary["cash"]
-        deposit_bank = deposited_summary["bank"]
-        deposit_cash_count = deposited_summary["cash_count"]
-        deposit_bank_count = deposited_summary["bank_count"]
+        deposited_by_pm = deposited_summary.get("by_payment_method", {})
 
         rounding = self.currency_id.rounding
         orders = self._get_closed_orders()
@@ -112,6 +123,10 @@ class PosSession(models.Model):
         default_cash = data.get("default_cash_details") or {}
         dc_id = default_cash.get("id")
         non_cash = list(data.get("non_cash_payment_methods") or [])
+        if default_cash:
+            default_cash["advance_payment_amount"] = 0.0
+        for row in non_cash:
+            row["advance_payment_amount"] = 0.0
 
         for pm_id, payload in reclassified_advance_by_pm.items():
             amt = self.currency_id.round(payload["amount"])
@@ -131,23 +146,38 @@ class PosSession(models.Model):
                     row["number"] = max(0, (row.get("number") or 0) - payload["number"])
                     break
 
-        if not float_is_zero(deposit_cash, precision_rounding=rounding):
-            non_cash.append({
-                "name": _("Cash Advance"),
-                "amount": deposit_cash,
-                "number": deposit_cash_count,
-                "id": ADVANCE_DEPOSIT_CASH_CLOSING_LINE_PAYMENT_METHOD_ID,
-                "type": "pay_later",
-            })
+        non_cash_by_id = {row.get("id"): row for row in non_cash}
+        cash_fallback_row = next((row for row in non_cash if row.get("type") == "cash"), None)
+        bank_fallback_row = next((row for row in non_cash if row.get("type") == "bank"), None)
 
-        if not float_is_zero(deposit_bank, precision_rounding=rounding):
-            non_cash.append({
-                "name": _("Bank Advance"),
-                "amount": deposit_bank,
-                "number": deposit_bank_count,
-                "id": ADVANCE_DEPOSIT_BANK_CLOSING_LINE_PAYMENT_METHOD_ID,
-                "type": "pay_later",
-            })
+        for pm_id, bucket in deposited_by_pm.items():
+            deposit_amount = self.currency_id.round(bucket.get("amount") or 0.0)
+            if float_is_zero(deposit_amount, precision_rounding=rounding):
+                continue
+
+            target_row = None
+            if pm_id and dc_id and pm_id == dc_id:
+                target_row = default_cash
+            elif pm_id and pm_id in non_cash_by_id:
+                target_row = non_cash_by_id[pm_id]
+            elif bucket.get("type") == "cash":
+                target_row = default_cash if default_cash else cash_fallback_row
+            else:
+                target_row = bank_fallback_row
+
+            if not target_row:
+                continue
+
+            target_row["amount"] = self.currency_id.round(
+                (target_row.get("amount") or 0.0) + deposit_amount
+            )
+            if "payment_amount" in target_row:
+                target_row["payment_amount"] = self.currency_id.round(
+                    (target_row.get("payment_amount") or 0.0) + deposit_amount
+                )
+            target_row["advance_payment_amount"] = self.currency_id.round(
+                (target_row.get("advance_payment_amount") or 0.0) + deposit_amount
+            )
 
         non_cash = [
             row

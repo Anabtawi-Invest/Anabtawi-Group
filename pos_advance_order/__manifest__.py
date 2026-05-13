@@ -42,6 +42,7 @@
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/complete_advance_order_popup.xml",
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_button.js",
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_button.xml",
+            "pos_advance_order/static/src/overrides/closing_popup/closing_popup.xml",
         ],
     },
     "installable": True,
