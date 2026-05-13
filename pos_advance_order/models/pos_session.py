@@ -128,11 +128,8 @@ class PosSession(models.Model):
             if float_is_zero(amt, precision_rounding=rounding):
                 continue
             if dc_id and pm_id == dc_id:
-                default_cash["payment_amount"] = self.currency_id.round(
-                    (default_cash.get("payment_amount") or 0.0) - amt
-                )
-                default_cash["amount"] = self.currency_id.round(
-                    (default_cash.get("amount") or 0.0) - amt
+                default_cash["advance_payment_amount"] = self.currency_id.round(
+                    (default_cash.get("advance_payment_amount") or 0.0) + amt
                 )
                 continue
             for row in non_cash:
