@@ -77,13 +77,7 @@ class PosSession(models.Model):
         return summary
 
     def get_closing_control_data(self):
-        """Split advance-on-completion amounts into their own Closing Register line.
-
-        When the advance application uses the same method as main cash, Odoo would
-        show the full order total under cash. We subtract those payment lines from
-        their native bucket and add one informational row so cash count matches
-        physical cash (e.g. 25) while advance (e.g. 5) is visible as 'Advance'.
-        """
+        """Keep reclassification logic and only change advance presentation in closing UI."""
         data = super().get_closing_control_data()
         self.ensure_one()
         cfg = self.config_id
@@ -91,6 +85,7 @@ class PosSession(models.Model):
             return data
 
         deposited_summary = self._get_deposited_advance_summary()
+        deposit_cash = deposited_summary["cash"]
         deposited_by_pm = deposited_summary.get("by_payment_method", {})
 
         rounding = self.currency_id.rounding
@@ -146,22 +141,35 @@ class PosSession(models.Model):
                     row["number"] = max(0, (row.get("number") or 0) - payload["number"])
                     break
 
+        # Merge deposited cash advances into default cash line (instead of synthetic row).
+        if (
+            default_cash
+            and not float_is_zero(deposit_cash, precision_rounding=rounding)
+        ):
+            default_cash["amount"] = self.currency_id.round(
+                (default_cash.get("amount") or 0.0) + deposit_cash
+            )
+            default_cash["payment_amount"] = self.currency_id.round(
+                (default_cash.get("payment_amount") or 0.0) + deposit_cash
+            )
+            default_cash["advance_payment_amount"] = self.currency_id.round(
+                (default_cash.get("advance_payment_amount") or 0.0) + deposit_cash
+            )
+
         non_cash_by_id = {row.get("id"): row for row in non_cash}
-        cash_fallback_row = next((row for row in non_cash if row.get("type") == "cash"), None)
         bank_fallback_row = next((row for row in non_cash if row.get("type") == "bank"), None)
 
         for pm_id, bucket in deposited_by_pm.items():
             deposit_amount = self.currency_id.round(bucket.get("amount") or 0.0)
             if float_is_zero(deposit_amount, precision_rounding=rounding):
                 continue
+            if bucket.get("type") == "cash":
+                # Cash deposits were already merged into default cash details.
+                continue
 
             target_row = None
-            if pm_id and dc_id and pm_id == dc_id:
-                target_row = default_cash
-            elif pm_id and pm_id in non_cash_by_id:
+            if pm_id and pm_id in non_cash_by_id:
                 target_row = non_cash_by_id[pm_id]
-            elif bucket.get("type") == "cash":
-                target_row = default_cash if default_cash else cash_fallback_row
             else:
                 target_row = bank_fallback_row
 
