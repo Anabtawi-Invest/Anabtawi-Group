@@ -146,12 +146,6 @@ class PosSession(models.Model):
             default_cash
             and not float_is_zero(deposit_cash, precision_rounding=rounding)
         ):
-            default_cash["amount"] = self.currency_id.round(
-                (default_cash.get("amount") or 0.0) + deposit_cash
-            )
-            default_cash["payment_amount"] = self.currency_id.round(
-                (default_cash.get("payment_amount") or 0.0) + deposit_cash
-            )
             default_cash["advance_payment_amount"] = self.currency_id.round(
                 (default_cash.get("advance_payment_amount") or 0.0) + deposit_cash
             )
@@ -176,13 +170,6 @@ class PosSession(models.Model):
             if not target_row:
                 continue
 
-            target_row["amount"] = self.currency_id.round(
-                (target_row.get("amount") or 0.0) + deposit_amount
-            )
-            if "payment_amount" in target_row:
-                target_row["payment_amount"] = self.currency_id.round(
-                    (target_row.get("payment_amount") or 0.0) + deposit_amount
-                )
             target_row["advance_payment_amount"] = self.currency_id.round(
                 (target_row.get("advance_payment_amount") or 0.0) + deposit_amount
             )
