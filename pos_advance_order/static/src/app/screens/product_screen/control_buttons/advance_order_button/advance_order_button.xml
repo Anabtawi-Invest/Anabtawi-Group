@@ -21,22 +21,22 @@
         </xpath>
     </t>
 
-    <!-- Closing Register: advance deposits as dedicated lines under cash / under each payment method -->
+    <!-- Closing Register: advance deposit shown inside the same payment row -->
     <t t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension" owl="1">
         <xpath expr="//PaymentMethodBreakdown[@title.translate='Cash In / Out']" position="before">
             <div
-                t-if="shouldShowAdvanceCashLine()"
+                t-if="props.default_cash_details.advance_payment_amount"
                 class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
-                <span t-esc="advanceCashLineLabel()"/>
-                <span class="align-top" t-esc="env.utils.formatCurrency(Math.abs(props.default_cash_details.advance_payment_amount))"/>
+                <span>Advance included</span>
+                <span class="align-top" t-esc="env.utils.formatCurrency(props.default_cash_details.advance_payment_amount)"/>
             </div>
         </xpath>
         <xpath expr="//span[@t-esc='pm.name']/parent::div" position="after">
             <div
-                t-if="shouldShowAdvanceBankLine(pm)"
+                t-if="pm.advance_payment_amount"
                 class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
-                <span t-esc="advanceBankLineLabel(pm)"/>
-                <span class="align-top" t-esc="env.utils.formatCurrency(Math.abs(pm.advance_payment_amount))"/>
+                <span>Advance included</span>
+                <span class="align-top" t-esc="env.utils.formatCurrency(pm.advance_payment_amount)"/>
             </div>
         </xpath>
     </t>
