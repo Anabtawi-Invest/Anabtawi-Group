@@ -1499,6 +1499,49 @@ class PosAdvanceOrder(models.Model):
                         len(after_lines),
                         after_lines.ids,
                     )
+                    if not after_lines:
+                        _logger.warning(
+                            "[ADV_PLEDGE_DEBUG] no pledge records created by pos_pledge_order flow; "
+                            "running direct fallback create_from_pos for order=%s",
+                            pos_order.name,
+                        )
+                        fallback_products = pledge_product_ids_snapshot or pos_order.lines.filtered(
+                            lambda l: l.product_id and l.product_id.has_pledge
+                        ).mapped("product_id.id")
+                        try:
+                            line_id = self.env["pos.advance.order.pledge"].sudo().create_from_pos(
+                                {
+                                    "pos_order_id": pos_order.id,
+                                    "partner_id": order.partner_id.id,
+                                    "pledge_products": fallback_products,
+                                }
+                            )
+                            _logger.warning(
+                                "[ADV_PLEDGE_DEBUG] fallback create_from_pos done order=%s line_id=%s products=%s",
+                                pos_order.name,
+                                line_id,
+                                fallback_products,
+                            )
+                            if hasattr(pos_order, "_post_pledge_deposit_move"):
+                                move = pos_order._post_pledge_deposit_move()
+                                if move:
+                                    self.env["pos.advance.order.pledge"].sudo().search(
+                                        [("pos_order_id", "=", pos_order.id)]
+                                    ).write({"pledge_move_id": move.id})
+                                    _logger.warning(
+                                        "[ADV_PLEDGE_DEBUG] fallback _post_pledge_deposit_move done order=%s move_id=%s",
+                                        pos_order.name,
+                                        move.id,
+                                    )
+                            after_lines = self.env["pos.advance.order.pledge"].sudo().search(
+                                [("pos_order_id", "=", pos_order.id)]
+                            )
+                        except Exception:
+                            _logger.exception(
+                                "[ADV_PLEDGE_DEBUG] direct fallback create_from_pos failed order=%s products=%s",
+                                pos_order.name,
+                                fallback_products,
+                            )
                     order.pledge_pos_order_id = pos_order.id
                     if order.pledge_line_ids:
                         order.pledge_line_ids.sudo().write({
