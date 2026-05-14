@@ -1,12 +1,52 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
+import logging
 
-from odoo import fields, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_is_zero
 
+_logger = logging.getLogger(__name__)
+
+
 class PosSession(models.Model):
     _inherit = "pos.session"
+
+    @api.depends(
+        "payment_method_ids",
+        "order_ids",
+        "cash_register_balance_start",
+        "cash_register_balance_end_real",
+        "statement_line_ids.amount",
+    )
+    def _compute_cash_balance(self):
+        """Include deposited cash advances in theoretical drawer cash."""
+        super()._compute_cash_balance()
+        for session in self:
+            if not session.config_id.enable_advance_order:
+                continue
+            deposited_summary = session._get_deposited_advance_summary()
+            extra_cash = deposited_summary.get("cash") or 0.0
+            if session.currency_id.is_zero(extra_cash):
+                continue
+            before_end = session.cash_register_balance_end or 0.0
+            before_diff = session.cash_register_difference or 0.0
+            session.cash_register_balance_end = session.currency_id.round(
+                (session.cash_register_balance_end or 0.0) + extra_cash
+            )
+            session.cash_register_difference = session.currency_id.round(
+                (session.cash_register_balance_end_real or 0.0) - session.cash_register_balance_end
+            )
+            _logger.info(
+                "[ADV_CASH_BALANCE] session=%s(%s) extra_cash=%s before_end=%s after_end=%s before_diff=%s after_diff=%s",
+                session.name,
+                session.id,
+                extra_cash,
+                before_end,
+                session.cash_register_balance_end,
+                before_diff,
+                session.cash_register_difference,
+            )
 
     def _advance_orders_deposited_in_session(self):
         """Advance orders whose deposit entry was posted during this session window."""
@@ -87,6 +127,13 @@ class PosSession(models.Model):
         deposited_summary = self._get_deposited_advance_summary()
         deposit_cash = deposited_summary["cash"]
         deposited_by_pm = deposited_summary.get("by_payment_method", {})
+        _logger.info(
+            "[ADV_CLOSING] session=%s(%s) deposit_cash=%s deposited_by_pm=%s",
+            self.name,
+            self.id,
+            deposit_cash,
+            deposited_by_pm,
+        )
 
         rounding = self.currency_id.rounding
         orders = self._get_closed_orders()
@@ -137,6 +184,12 @@ class PosSession(models.Model):
                     row["amount"] = self.currency_id.round(row["amount"] - amt)
                     row["number"] = max(0, (row.get("number") or 0) - payload["number"])
                     break
+        _logger.info(
+            "[ADV_CLOSING] session=%s(%s) reclassified_by_pm=%s",
+            self.name,
+            self.id,
+            {pm_id: self.currency_id.round(v["amount"]) for pm_id, v in reclassified_advance_by_pm.items()},
+        )
 
         # Merge deposited cash advances into default cash line (instead of synthetic row).
         if (
@@ -144,6 +197,9 @@ class PosSession(models.Model):
             and not float_is_zero(deposit_cash, precision_rounding=rounding)
         ):
             default_cash["advance_payment_amount"] = self.currency_id.round(deposit_cash)
+            default_cash["amount"] = self.currency_id.round(
+                (default_cash.get("amount") or 0.0) + deposit_cash
+            )
 
         non_cash_by_id = {row.get("id"): row for row in non_cash}
         bank_fallback_row = next((row for row in non_cash if row.get("type") == "bank"), None)
@@ -175,6 +231,13 @@ class PosSession(models.Model):
 
         data["default_cash_details"] = default_cash or data.get("default_cash_details")
         data["non_cash_payment_methods"] = non_cash
+        _logger.info(
+            "[ADV_CLOSING] session=%s(%s) default_cash=%s non_cash_rows=%s",
+            self.name,
+            self.id,
+            data.get("default_cash_details"),
+            data.get("non_cash_payment_methods"),
+        )
         return data
 
     def _accumulate_amounts(self, data):
