@@ -12,6 +12,11 @@ class ResConfigSettings(models.TransientModel):
     hi_account_id = fields.Many2one('account.account', 'Health Account',
                                     related='company_id.hi_account_id',
                                     readonly=False)
+    before_the_expiry_date = fields.Integer(
+        string="Before The Expiry Date",
+        related='company_id.before_the_expiry_date',
+        readonly=False,
+    )
 
 
 class Company(models.Model):
@@ -19,3 +24,4 @@ class Company(models.Model):
 
     hi_reference_employee_in_journal_entries = fields.Boolean(string="Health Reference Employee In Journal Entries")
     hi_account_id = fields.Many2one('account.account', 'Health Account')
+    before_the_expiry_date = fields.Integer(string="Before The Expiry Date", default=1)

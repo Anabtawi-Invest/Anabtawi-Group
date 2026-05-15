@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'SW - Health Insurance',
-    'version': '1.3',
+    'name': 'Health Insurance',
+    'version': '1.4',
     'category': 'Human Resources',
     'summary': 'Employee health insurance management.',
     'description': """
@@ -30,6 +30,7 @@
         "view/hr_employee_health_documents_views.xml",
         "view/hr_health_grade_view.xml",
         "view/hr_health_contract_view.xml",
-        "view/res_config.xml"
+        "view/res_config.xml",
+        "view/hr_health_employee_document_cron.xml",
     ],
 }

@@ -17,6 +17,9 @@
                         <setting id="health_reference_employee_setting">
                             <field name="hi_reference_employee_in_journal_entries"/>
                         </setting>
+                        <setting id="health_before_expiry_date_setting">
+                            <field name="before_the_expiry_date"/>
+                        </setting>
                     </block>
                 </xpath>
 
