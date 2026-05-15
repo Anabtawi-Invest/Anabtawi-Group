@@ -8,7 +8,6 @@
                 <field name="sequence" widget="handle"/>
                 <field name="name"/>
                 <field name="code" optional="show"/>
-                <field name="is_probation_document" optional="show"/>
                 <field name="active" optional="hide"/>
             </list>
         </field>
@@ -25,7 +24,6 @@
                         <group>
                             <field name="name"/>
                             <field name="code"/>
-                            <field name="is_probation_document"/>
                             <field name="sequence"/>
                             <field name="active"/>
                         </group>

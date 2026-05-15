@@ -10,6 +10,5 @@ class HrHealthDocumentType(models.Model):
 
     name = fields.Char(string='Name', required=True, translate=True)
     code = fields.Char(string='Code')
-    is_probation_document = fields.Boolean(string='Probation Document')
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
