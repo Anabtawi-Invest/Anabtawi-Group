@@ -31,6 +31,5 @@
         "view/hr_health_grade_view.xml",
         "view/hr_health_contract_view.xml",
         "view/res_config.xml",
-        "view/hr_health_employee_document_cron.xml",
     ],
 }
