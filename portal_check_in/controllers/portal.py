@@ -111,6 +111,12 @@ class PortalCheckInController(http.Controller):
         )
         return geo_information
 
+    @staticmethod
+    def _is_duplicate_open_attendance(latest_attendance, now_dt, duplicate_window_seconds=10):
+        if not latest_attendance or latest_attendance.check_out:
+            return False
+        return (now_dt - latest_attendance.check_in) <= timedelta(seconds=duplicate_window_seconds)
+
     @http.route(['/my/check-in', '/odoo/check-in'], type='http', auth='user', website=True)
     def portal_my_check_in(self, **kwargs):
         current_path = request.httprequest.path or ''
@@ -192,6 +198,7 @@ class PortalCheckInController(http.Controller):
             'txt_max_auth_hours': _('Maximum authorized hours:'),
             'txt_check_in_btn': _('CHECK IN'),
             'txt_check_out_btn': _('CHECK OUT'),
+            'txt_processing': _('Processing...'),
             'txt_stat_check_in': _('Check In'),
             'txt_stat_check_out': _('Check Out'),
             'txt_working_hours': _('Working Hours'),
@@ -245,6 +252,25 @@ class PortalCheckInController(http.Controller):
                 longitude,
             )
             geo_information = self._build_geo_information(employee, latitude=latitude, longitude=longitude)
+            # Serialize attendance toggles per employee to avoid race-condition duplicates.
+            request.env.cr.execute(
+                "SELECT id FROM hr_employee WHERE id = %s FOR UPDATE",
+                [employee.id],
+            )
+            employee = request.env['hr.employee'].sudo().browse(employee.id)
+            latest_attendance = request.env['hr.attendance'].sudo().search(
+                [('employee_id', '=', employee.id)],
+                order='check_in desc',
+                limit=1,
+            )
+            now_dt = fields.Datetime.now()
+            if self._is_duplicate_open_attendance(latest_attendance, now_dt, duplicate_window_seconds=10):
+                _logger.info(
+                    "portal_check_in: duplicate toggle ignored for employee_id=%s attendance_id=%s",
+                    employee.id,
+                    latest_attendance.id,
+                )
+                return request.redirect('%s?success=1' % check_in_page_url)
             attendance = employee._attendance_action_change(geo_information)
             _logger.info(
                 "portal_check_in: attendance toggled successfully for employee_id=%s attendance_id=%s new_state=%s",
