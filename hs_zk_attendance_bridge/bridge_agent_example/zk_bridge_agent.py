@@ -7,9 +7,10 @@ It fetches attendance logs using pyzk and pushes them to Odoo.sh.
 
 from __future__ import annotations
 
- import json
+import json
 import os
 import sys
+import time
 from datetime import timezone
 
 import requests
@@ -23,7 +24,7 @@ def getenv(name: str, default: str | None = None, required: bool = False) -> str
     return value
 
 
-def load_devices() -> list[dict]:
+def load_devices(default_token: str = "") -> list[dict]:
     """Load devices from DEVICES_JSON or fallback to legacy single-device env vars."""
     devices_json = getenv("DEVICES_JSON", "").strip()
     if devices_json:
@@ -40,11 +41,18 @@ def load_devices() -> list[dict]:
             if not device_ip:
                 raise RuntimeError(f"Device #{index} is missing 'ip'")
 
+            device_token = (device.get("token") or default_token).strip()
+            if not device_token:
+                raise RuntimeError(
+                    f"Device #{index} is missing 'token' and BRIDGE_TOKEN is not set"
+                )
+
             devices.append(
                 {
                     "ip": device_ip,
                     "port": int(device.get("port", 4370)),
                     "identifier": (device.get("identifier") or device.get("device_identifier") or device_ip),
+                    "token": device_token,
                     "timezone": device.get("timezone", ""),
                     "password": int(device.get("password", 0)),
                     "timeout": int(device.get("timeout", 30)),
@@ -59,6 +67,7 @@ def load_devices() -> list[dict]:
             "ip": device_ip,
             "port": int(getenv("DEVICE_PORT", "4370")),
             "identifier": getenv("DEVICE_IDENTIFIER", device_ip),
+            "token": getenv("BRIDGE_TOKEN", required=True),
             "timezone": getenv("DEVICE_TIMEZONE", ""),
             "password": int(getenv("DEVICE_PASSWORD", "0")),
             "timeout": int(getenv("DEVICE_TIMEOUT", "30")),
@@ -66,7 +75,7 @@ def load_devices() -> list[dict]:
     ]
 
 
-def sync_device(odoo_url: str, bridge_token: str, device: dict) -> dict:
+def sync_device(odoo_url: str, device: dict) -> dict:
     zk_client = ZK(
         device["ip"],
         port=device["port"],
@@ -101,7 +110,7 @@ def sync_device(odoo_url: str, bridge_token: str, device: dict) -> dict:
                 pass
 
     payload = {
-        "token": bridge_token,
+        "token": device["token"],
         "device_identifier": device["identifier"],
         "source": "zk_bridge_agent",
         "records": records,
@@ -117,14 +126,14 @@ def sync_device(odoo_url: str, bridge_token: str, device: dict) -> dict:
 
 def main() -> int:
     odoo_url = getenv("ODOO_URL", required=True).rstrip("/")
-    bridge_token = getenv("BRIDGE_TOKEN", required=True)
-    devices = load_devices()
+    bridge_token = getenv("BRIDGE_TOKEN", "")
+    devices = load_devices(bridge_token)
 
     results = []
     failures = []
     for device in devices:
         try:
-            result = sync_device(odoo_url, bridge_token, device)
+            result = sync_device(odoo_url, device)
             results.append({"device_identifier": device["identifier"], "response": result})
         except Exception as exc:
             failures.append({"device_identifier": device["identifier"], "error": str(exc)})
@@ -134,8 +143,27 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    run_once = getenv("RUN_ONCE", "0").strip().lower() in {"1", "true", "yes"}
+    sync_interval = int(getenv("SYNC_INTERVAL", "60"))
+
+    if run_once:
+        try:
+            raise SystemExit(main())
+        except Exception as exc:
+            print(f"Bridge sync failed: {exc}", file=sys.stderr)
+            raise SystemExit(1)
+
     try:
-        raise SystemExit(main())
-    except Exception as exc:
-        print(f"Bridge sync failed: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+        while True:
+            try:
+                exit_code = main()
+                if exit_code != 0:
+                    print(f"Sync cycle finished with exit code {exit_code}", file=sys.stderr)
+            except Exception as exc:
+                print(f"Bridge sync failed: {exc}", file=sys.stderr)
+
+            print(f"Waiting {sync_interval} seconds before next sync...")
+            time.sleep(sync_interval)
+    except KeyboardInterrupt:
+        print("Stopped by user")
+        raise SystemExit(0)
