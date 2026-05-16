@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_user_record_activity_wizard_form" model="ir.ui.view">
+        <field name="name">user.record.activity.wizard.form</field>
+        <field name="model">user.record.activity.wizard</field>
+        <field name="arch" type="xml">
+            <form string="User Record Activity Report">
+                <group>
+                    <group>
+                        <field name="date_from" required="1"/>
+                        <field name="date_to" required="1"/>
+                    </group>
+                    <group>
+                        <field name="include_all_models"/>
+                        <field name="model_ids"
+                               widget="many2many_tags"
+                               invisible="include_all_models"
+                               required="not include_all_models"
+                               options="{'no_create': True}"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_export_xlsx"
+                            type="object"
+                            class="btn-primary"
+                            string="Download Excel"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_user_record_activity_wizard" model="ir.actions.act_window">
+        <field name="name">User Record Activity Report</field>
+        <field name="res_model">user.record.activity.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_user_record_activity_report_root"
+              name="User Activity Reports"
+              parent="base.menu_administration"
+              groups="base.group_system"
+              sequence="190"/>
+    <menuitem id="menu_user_record_activity_report"
+              name="Created Records by User"
+              parent="menu_user_record_activity_report_root"
+              action="action_user_record_activity_wizard"
+              groups="base.group_system"
+              sequence="10"/>
+</odoo>
