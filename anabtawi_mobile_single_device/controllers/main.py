@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 
+import logging
+
 from odoo import http, _
 from odoo.exceptions import AccessDenied, UserError
 from odoo.http import request
+
+_logger = logging.getLogger(__name__)
 
 
 def _parse_authorization_bearer(header_value):
@@ -51,13 +55,22 @@ class AnabtawiMobileAuthController(http.Controller):
         password = payload.get('password') or ''
         device_uid = (payload.get('device_uid') or '').strip()
         device_name = (payload.get('device_name') or '').strip()
+        _logger.info(
+            "Mobile login request received: login=%s device_uid=%s device_name=%s has_json=%s",
+            login_name,
+            device_uid,
+            device_name,
+            bool(request.httprequest.is_json),
+        )
 
         if not login_name or not password:
+            _logger.warning("Mobile login rejected: missing login/password login=%s", login_name)
             return request.make_json_response(
                 {'error': 'invalid_request', 'message': _('login and password are required.')},
                 status=400,
             )
         if not device_uid:
+            _logger.warning("Mobile login rejected: missing device_uid login=%s", login_name)
             return request.make_json_response(
                 {'error': 'invalid_request', 'message': _('device_uid is required.')},
                 status=400,
@@ -73,6 +86,7 @@ class AnabtawiMobileAuthController(http.Controller):
         try:
             auth_info = request.env['res.users'].sudo().authenticate(credential, wsgienv)
         except AccessDenied:
+            _logger.warning("Mobile login access denied: login=%s", login_name)
             return request.make_json_response(
                 {'error': 'access_denied', 'message': _('Invalid login or password.')},
                 status=401,
@@ -81,6 +95,7 @@ class AnabtawiMobileAuthController(http.Controller):
         uid = auth_info['uid']
         user = request.env['res.users'].sudo().browse(uid)
         if not self._eligible_mobile_user(user):
+            _logger.warning("Mobile login forbidden by group eligibility: user_id=%s login=%s", user.id, login_name)
             return request.make_json_response(
                 {'error': 'forbidden', 'message': _('This user cannot use the mobile login.')},
                 status=403,
@@ -91,11 +106,19 @@ class AnabtawiMobileAuthController(http.Controller):
                 user, device_uid, device_name
             )
         except UserError as e:
+            _logger.warning(
+                "Mobile login rejected by device policy: user_id=%s login=%s device_uid=%s reason=%s",
+                user.id,
+                login_name,
+                device_uid,
+                e.args[0] if e.args else "unknown",
+            )
             return request.make_json_response(
                 {'error': 'device_mismatch', 'message': e.args[0]},
                 status=403,
             )
 
+        _logger.info("Mobile login success: user_id=%s login=%s device_uid=%s", user.id, login_name, device_uid)
         return request.make_json_response({
             'status': 'ok',
             'uid': user.id,

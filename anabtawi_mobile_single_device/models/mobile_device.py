@@ -3,9 +3,12 @@
 import hashlib
 import hmac
 import secrets
+import logging
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class AnabtawiMobileDevice(models.Model):
@@ -55,6 +58,14 @@ class AnabtawiMobileDevice(models.Model):
         ], limit=1)
         if employee and employee.department_id and employee.department_id.mobile_device_limit:
             limit = employee.department_id.mobile_device_limit
+        _logger.info(
+            "Mobile auth limit resolved: user_id=%s employee_id=%s department_id=%s department_name=%s limit=%s",
+            user.id,
+            employee.id if employee else None,
+            employee.department_id.id if employee and employee.department_id else None,
+            employee.department_id.name if employee and employee.department_id else None,
+            limit,
+        )
         return max(1, int(limit))
 
     def _apply_new_tokens(self, plain_token):
@@ -70,6 +81,7 @@ class AnabtawiMobileDevice(models.Model):
     def register_or_refresh_login(self, user, device_uid_clean, device_name):
         """Password auth already succeeded. Returns a dict with ``access_token`` (plain) or raises UserError."""
         if not device_uid_clean:
+            _logger.warning("Mobile auth rejected: missing device_uid for user_id=%s", user.id)
             raise UserError(_('device_uid is required.'))
 
         self_sudo = self.sudo()
@@ -79,10 +91,23 @@ class AnabtawiMobileDevice(models.Model):
             ('active', '=', True),
         ])
         active_same_device = active_rows.filtered(lambda r: r.device_uid == device_uid_clean)[:1]
+        _logger.info(
+            "Mobile auth register attempt: user_id=%s device_uid=%s active_devices=%s limit=%s",
+            user.id,
+            device_uid_clean,
+            len(active_rows),
+            allowed_limit,
+        )
 
         plain = self_sudo._issue_plain_token()
         if active_same_device:
             row_sudo = active_same_device.sudo()
+            _logger.info(
+                "Mobile auth refreshing existing device: user_id=%s record_id=%s device_uid=%s",
+                user.id,
+                row_sudo.id,
+                device_uid_clean,
+            )
             row_sudo.write({
                 'device_name': device_name if device_name else row_sudo.device_name,
             })
@@ -90,6 +115,13 @@ class AnabtawiMobileDevice(models.Model):
             return {'access_token': plain}
 
         if len(active_rows) >= allowed_limit:
+            _logger.warning(
+                "Mobile auth rejected by device limit: user_id=%s device_uid=%s active_devices=%s limit=%s",
+                user.id,
+                device_uid_clean,
+                len(active_rows),
+                allowed_limit,
+            )
             raise UserError(_(
                 'You reached your department device limit (%s). '
                 'Ask an administrator to reset one of your registered devices.'
@@ -101,6 +133,12 @@ class AnabtawiMobileDevice(models.Model):
         ], limit=1)
         if row:
             row_sudo = row.sudo()
+            _logger.info(
+                "Mobile auth reactivating known device record: user_id=%s record_id=%s device_uid=%s",
+                user.id,
+                row_sudo.id,
+                device_uid_clean,
+            )
             row_sudo.write({
                 'device_name': device_name if device_name else row_sudo.device_name,
             })
@@ -117,6 +155,13 @@ class AnabtawiMobileDevice(models.Model):
             'active': True,
             'last_login': fields.Datetime.now(),
         })
+        _logger.info(
+            "Mobile auth created new device record: user_id=%s device_uid=%s active_devices_before=%s limit=%s",
+            user.id,
+            device_uid_clean,
+            len(active_rows),
+            allowed_limit,
+        )
         return {'access_token': plain}
 
     @api.model
