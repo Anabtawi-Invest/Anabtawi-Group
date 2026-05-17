@@ -23,7 +23,11 @@ class AnabtawiMobileDevice(models.Model):
     last_login = fields.Datetime()
 
     _sql_constraints = [
-        ('user_id_unique', 'unique(user_id)', _('Only one mobile device record is allowed per user.')),
+        (
+            'user_device_uid_unique',
+            'unique(user_id, device_uid)',
+            _('The same device is already registered for this user.'),
+        ),
     ]
 
     @api.model
@@ -41,6 +45,18 @@ class AnabtawiMobileDevice(models.Model):
     def _issue_plain_token(self):
         return secrets.token_urlsafe(32)
 
+    @api.model
+    def _get_allowed_devices_limit(self, user):
+        """Return the max active devices for a user based on employee department."""
+        limit = 1
+        employee = self.env['hr.employee'].sudo().search([
+            ('user_id', '=', user.id),
+            ('active', '=', True),
+        ], limit=1)
+        if employee and employee.department_id and employee.department_id.mobile_device_limit:
+            limit = employee.department_id.mobile_device_limit
+        return max(1, int(limit))
+
     def _apply_new_tokens(self, plain_token):
         digest = self._hash_plain_token(plain_token)
         self.sudo().write({
@@ -57,34 +73,50 @@ class AnabtawiMobileDevice(models.Model):
             raise UserError(_('device_uid is required.'))
 
         self_sudo = self.sudo()
-        row = self_sudo.search([('user_id', '=', user.id)], limit=1)
-
-        if row and row.active and row.token_hash and row.device_uid and row.device_uid != device_uid_clean:
-            raise UserError(_(
-                'This account is registered to another device. Ask an administrator to reset the mobile device.'
-            ))
+        allowed_limit = self_sudo._get_allowed_devices_limit(user)
+        active_rows = self_sudo.search([
+            ('user_id', '=', user.id),
+            ('active', '=', True),
+        ])
+        active_same_device = active_rows.filtered(lambda r: r.device_uid == device_uid_clean)[:1]
 
         plain = self_sudo._issue_plain_token()
-
-        if not row:
-            digest = self_sudo._hash_plain_token(plain)
-            self_sudo.create({
-                'user_id': user.id,
-                'device_uid': device_uid_clean,
-                'device_name': device_name or '',
-                'token_hash': digest,
-                'token_index': digest[:8] if digest else False,
-                'active': True,
-                'last_login': fields.Datetime.now(),
+        if active_same_device:
+            row_sudo = active_same_device.sudo()
+            row_sudo.write({
+                'device_name': device_name if device_name else row_sudo.device_name,
             })
+            row_sudo._apply_new_tokens(plain)
             return {'access_token': plain}
 
-        row_sudo = row.sudo()
-        row_sudo.write({
+        if len(active_rows) >= allowed_limit:
+            raise UserError(_(
+                'You reached your department device limit (%s). '
+                'Ask an administrator to reset one of your registered devices.'
+            ) % allowed_limit)
+
+        row = self_sudo.search([
+            ('user_id', '=', user.id),
+            ('device_uid', '=', device_uid_clean),
+        ], limit=1)
+        if row:
+            row_sudo = row.sudo()
+            row_sudo.write({
+                'device_name': device_name if device_name else row_sudo.device_name,
+            })
+            row_sudo._apply_new_tokens(plain)
+            return {'access_token': plain}
+
+        digest = self_sudo._hash_plain_token(plain)
+        self_sudo.create({
+            'user_id': user.id,
             'device_uid': device_uid_clean,
-            'device_name': device_name if device_name else row_sudo.device_name,
+            'device_name': device_name or '',
+            'token_hash': digest,
+            'token_index': digest[:8] if digest else False,
+            'active': True,
+            'last_login': fields.Datetime.now(),
         })
-        row_sudo._apply_new_tokens(plain)
         return {'access_token': plain}
 
     @api.model
