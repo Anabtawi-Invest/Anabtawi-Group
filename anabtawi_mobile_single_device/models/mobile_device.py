@@ -238,26 +238,29 @@ class ResDeviceLog(models.Model):
 
         allowed_limit = self.env['anabtawi.mobile.device']._get_allowed_devices_limit(user)
         current_session_identifier = request.session.sid[:STORED_SESSION_BYTES]
-        devices = self.env['res.device'].sudo().search([
+        all_devices = self.env['res.device'].sudo().search([
             ('user_id', '=', user.id),
-            ('device_type', '=', 'mobile'),
         ], order='last_activity desc')
+        mobile_devices = all_devices.filtered(lambda d: d.device_type == 'mobile')
+        computer_devices = all_devices.filtered(lambda d: d.device_type == 'computer')
         _logger.info(
-            "Web login device limit check: user_id=%s mobile_devices=%s limit=%s current_session=%s",
+            "Web login device limit check: user_id=%s total_devices=%s mobile_devices=%s computer_devices=%s limit=%s current_session=%s",
             user.id,
-            len(devices),
+            len(all_devices),
+            len(mobile_devices),
+            len(computer_devices),
             allowed_limit,
             current_session_identifier,
         )
 
-        if len(devices) <= allowed_limit:
+        if len(all_devices) <= allowed_limit:
             return
 
-        current_device = devices.filtered(lambda d: d.session_identifier == current_session_identifier)[:1]
+        current_device = all_devices.filtered(lambda d: d.session_identifier == current_session_identifier)[:1]
         _logger.warning(
-            "Web login rejected by department device limit: user_id=%s mobile_devices=%s limit=%s session=%s",
+            "Web login rejected by department device limit: user_id=%s total_devices=%s limit=%s session=%s",
             user.id,
-            len(devices),
+            len(all_devices),
             allowed_limit,
             current_session_identifier,
         )
