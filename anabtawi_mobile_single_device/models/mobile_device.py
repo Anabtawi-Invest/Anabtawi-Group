@@ -222,6 +222,8 @@ class ResDeviceLog(models.Model):
         if not user or not user.active:
             return False
         u = user.with_user(user)
+        if u.has_group('base.group_system'):
+            return False
         if u.has_group('base.group_public') and not u.has_group('base.group_portal') and not u.has_group('base.group_user'):
             return False
         return u.has_group('base.group_portal') or u.has_group('base.group_user')
