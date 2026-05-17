@@ -7,6 +7,7 @@ import logging
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.http import STORED_SESSION_BYTES
 
 _logger = logging.getLogger(__name__)
 
@@ -212,3 +213,55 @@ class HrDepartment(models.Model):
         for rec in self:
             if rec.mobile_device_limit < 1:
                 raise ValidationError(_('Mobile Device Limit must be at least 1.'))
+
+
+class ResDeviceLog(models.Model):
+    _inherit = 'res.device.log'
+
+    def _eligible_mobile_user(self, user):
+        if not user or not user.active:
+            return False
+        u = user.with_user(user)
+        if u.has_group('base.group_public') and not u.has_group('base.group_portal') and not u.has_group('base.group_user'):
+            return False
+        return u.has_group('base.group_portal') or u.has_group('base.group_user')
+
+    @api.model
+    def _update_device(self, request):
+        super()._update_device(request)
+        if not request or not request.session or not request.session.uid:
+            return
+
+        user = self.env['res.users'].sudo().browse(request.session.uid)
+        if not self._eligible_mobile_user(user):
+            return
+
+        allowed_limit = self.env['anabtawi.mobile.device']._get_allowed_devices_limit(user)
+        current_session_identifier = request.session.sid[:STORED_SESSION_BYTES]
+        devices = self.env['res.device'].sudo().search([
+            ('user_id', '=', user.id),
+            ('device_type', '=', 'mobile'),
+        ], order='last_activity desc')
+        _logger.info(
+            "Web login device limit check: user_id=%s mobile_devices=%s limit=%s current_session=%s",
+            user.id,
+            len(devices),
+            allowed_limit,
+            current_session_identifier,
+        )
+
+        if len(devices) <= allowed_limit:
+            return
+
+        current_device = devices.filtered(lambda d: d.session_identifier == current_session_identifier)[:1]
+        _logger.warning(
+            "Web login rejected by department device limit: user_id=%s mobile_devices=%s limit=%s session=%s",
+            user.id,
+            len(devices),
+            allowed_limit,
+            current_session_identifier,
+        )
+        if current_device:
+            current_device._revoke()
+        else:
+            request.session.logout()
