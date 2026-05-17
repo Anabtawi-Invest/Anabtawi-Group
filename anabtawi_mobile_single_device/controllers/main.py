@@ -21,15 +21,24 @@ def _parse_authorization_bearer(header_value):
 
 class AnabtawiMobileAuthController(http.Controller):
 
+    def _safe_has_group(self, user, group_xmlid):
+        """Use stable language and fail open on group check errors."""
+        try:
+            return bool(user.sudo().with_context(lang='en_US').has_group(group_xmlid))
+        except Exception:
+            return False
+
     def _eligible_mobile_user(self, user):
         if not user or not user.active:
             return False
-        u = user.with_user(user)
-        if u.has_group('base.group_system'):
+        if self._safe_has_group(user, 'base.group_system'):
             return False
-        if u.has_group('base.group_public') and not u.has_group('base.group_portal') and not u.has_group('base.group_user'):
+        is_public = self._safe_has_group(user, 'base.group_public')
+        is_portal = self._safe_has_group(user, 'base.group_portal')
+        is_internal = self._safe_has_group(user, 'base.group_user')
+        if is_public and not is_portal and not is_internal:
             return False
-        return u.has_group('base.group_portal') or u.has_group('base.group_user')
+        return is_portal or is_internal
 
     @http.route(
         '/anabtawi/mobile/auth/login',
