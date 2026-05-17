@@ -5,7 +5,7 @@ import hmac
 import secrets
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 
 class AnabtawiMobileDevice(models.Model):
@@ -151,3 +151,19 @@ class AnabtawiMobileDevice(models.Model):
 
     def action_revoke_token(self):
         self.action_reset_device()
+
+
+class HrDepartment(models.Model):
+    _inherit = 'hr.department'
+
+    mobile_device_limit = fields.Integer(
+        string='Mobile Device Limit',
+        default=1,
+        help='Maximum number of active mobile devices allowed for users in this department.',
+    )
+
+    @api.constrains('mobile_device_limit')
+    def _check_mobile_device_limit(self):
+        for rec in self:
+            if rec.mobile_device_limit < 1:
+                raise ValidationError(_('Mobile Device Limit must be at least 1.'))
