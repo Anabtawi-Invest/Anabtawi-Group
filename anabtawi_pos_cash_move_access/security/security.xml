@@ -2,7 +2,8 @@
 <odoo>
     <record id="group_pos_cash_in_out" model="res.groups">
         <field name="name">POS Cash In/Out</field>
-        <field name="category_id" ref="base.module_category_point_of_sale"/>
+        <field name="privilege_id" ref="point_of_sale.res_groups_privilege_point_of_sale"/>
+        <field name="implied_ids" eval="[(4, ref('point_of_sale.group_pos_user'))]"/>
         <field name="comment">Users in this group can use Cash In/Out from POS.</field>
     </record>
 </odoo>
