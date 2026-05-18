@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         Form View
+    ============================================================ -->
+    <record id="view_overtime_request_form" model="ir.ui.view">
+        <field name="name">attendance.overtime.request.form</field>
+        <field name="model">attendance.overtime.request</field>
+        <field name="arch" type="xml">
+            <form string="Overtime Request">
+                <header>
+                    <button name="action_submit"
+                            string="Submit"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_approve"
+                            string="Approve"
+                            type="object"
+                            class="btn-success"
+                            groups="hr_attendance.group_hr_attendance_manager"
+                            invisible="state != 'submitted'"/>
+                    <button name="action_refuse"
+                            string="Refuse"
+                            type="object"
+                            class="btn-danger"
+                            groups="hr_attendance.group_hr_attendance_manager"
+                            invisible="state != 'submitted'"/>
+                    <button name="action_cancel"
+                            string="Cancel"
+                            type="object"
+                            invisible="state not in ['draft', 'submitted']"/>
+                    <button name="action_reset_draft"
+                            string="Reset to Draft"
+                            type="object"
+                            invisible="state not in ['refused', 'cancelled']"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,submitted,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Employee Information">
+                            <field name="employee_id"
+                                   readonly="state not in ['draft']"/>
+                            <field name="department_id"/>
+                        </group>
+                        <group string="Overtime Details">
+                            <field name="date"
+                                   readonly="state not in ['draft']"/>
+                            <field name="overtime_hours"
+                                   readonly="state not in ['draft']"
+                                   widget="float_time"/>
+                            <field name="overtime_end_datetime"
+                                   invisible="state != 'approved'"/>
+                        </group>
+                    </group>
+                    <group string="Reason">
+                        <field name="reason"
+                               nolabel="1"
+                               readonly="state not in ['draft']"
+                               placeholder="Describe why overtime is needed..."/>
+                    </group>
+                    <group invisible="state not in ['approved']" string="Approval Info">
+                        <field name="approved_by"/>
+                        <field name="approval_date"/>
+                    </group>
+                    <group invisible="state != 'refused'" string="Refusal Info">
+                        <field name="refusal_reason"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         List View
+    ============================================================ -->
+    <record id="view_overtime_request_list" model="ir.ui.view">
+        <field name="name">attendance.overtime.request.list</field>
+        <field name="model">attendance.overtime.request</field>
+        <field name="arch" type="xml">
+            <list string="Overtime Requests"
+                  decoration-success="state == 'approved'"
+                  decoration-danger="state == 'refused'"
+                  decoration-muted="state == 'cancelled'"
+                  decoration-info="state == 'submitted'">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="department_id"/>
+                <field name="date"/>
+                <field name="overtime_hours" widget="float_time"/>
+                <field name="state"
+                       widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-danger="state == 'refused'"
+                       decoration-warning="state == 'submitted'"
+                       decoration-secondary="state in ['draft', 'cancelled']"/>
+                <field name="approved_by" optional="show"/>
+                <field name="approval_date" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Search View
+    ============================================================ -->
+    <record id="view_overtime_request_search" model="ir.ui.view">
+        <field name="name">attendance.overtime.request.search</field>
+        <field name="model">attendance.overtime.request</field>
+        <field name="arch" type="xml">
+            <search string="Search Overtime Requests">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="department_id"/>
+                <field name="date"/>
+                <separator/>
+                <filter string="My Requests"
+                        name="my_requests"
+                        domain="[('employee_id.user_id', '=', uid)]"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Submitted" name="submitted" domain="[('state', '=', 'submitted')]"/>
+                <filter string="Approved" name="approved" domain="[('state', '=', 'approved')]"/>
+                <filter string="Refused" name="refused" domain="[('state', '=', 'refused')]"/>
+                <separator/>
+                <filter string="This Month"
+                        name="this_month"
+                        domain="[('date', '&gt;=', (context_today() + relativedelta(day=1)).strftime('%Y-%m-%d')),
+                                  ('date', '&lt;=', (context_today() + relativedelta(months=1, day=1, days=-1)).strftime('%Y-%m-%d'))]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Employee" name="group_employee"
+                            context="{'group_by': 'employee_id'}"/>
+                    <filter string="Department" name="group_department"
+                            context="{'group_by': 'department_id'}"/>
+                    <filter string="Date" name="group_date"
+                            context="{'group_by': 'date'}"/>
+                    <filter string="Status" name="group_state"
+                            context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Actions
+    ============================================================ -->
+    <record id="action_overtime_request_all" model="ir.actions.act_window">
+        <field name="name">Overtime Requests</field>
+        <field name="res_model">attendance.overtime.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_overtime_request_search"/>
+        <field name="context">{'search_default_submitted': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No overtime requests yet.
+            </p>
+            <p>
+                Employees can request overtime here. Once approved, they will be
+                allowed to check in outside their regular shift hours.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_overtime_request_my" model="ir.actions.act_window">
+        <field name="name">My Overtime Requests</field>
+        <field name="res_model">attendance.overtime.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_overtime_request_search"/>
+        <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+        <field name="context">{'search_default_my_requests': 1}</field>
+    </record>
+
+    <!-- ============================================================
+         Refuse Wizard View
+    ============================================================ -->
+    <record id="view_overtime_refuse_wizard_form" model="ir.ui.view">
+        <field name="name">overtime.refuse.wizard.form</field>
+        <field name="model">overtime.refuse.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Refuse Overtime Request">
+                <group>
+                    <field name="overtime_request_id" readonly="1"/>
+                    <field name="refusal_reason"
+                           placeholder="Please provide a reason for refusal..."
+                           required="1"/>
+                </group>
+                <footer>
+                    <button name="action_refuse"
+                            string="Refuse Request"
+                            type="object"
+                            class="btn-danger"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

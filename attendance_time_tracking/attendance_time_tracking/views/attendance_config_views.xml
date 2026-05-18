@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="res_config_settings_view_form_inherit_att_tracking" model="ir.ui.view">
+        <field name="name">res.config.settings.form.inherit.att_tracking</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@id='hr']" position="after">
+                <div id="attendance_time_tracking" data-string="Attendance Time Tracking">
+                    <h2>Attendance Time Tracking</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <field name="enforce_checkin_window"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="enforce_checkin_window"/>
+                                <div class="text-muted">
+                                    Restrict check-in to scheduled working hours only.
+                                </div>
+                                <div class="content-group" invisible="not enforce_checkin_window">
+                                    <div class="row mt16">
+                                        <label for="checkin_tolerance_minutes"
+                                               class="col-lg-4 o_light_label"/>
+                                        <field name="checkin_tolerance_minutes"
+                                               class="col-lg-2"/>
+                                        <span class="col-lg-2">minutes before shift</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <field name="auto_checkout_enabled"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="auto_checkout_enabled"/>
+                                <div class="text-muted">
+                                    Automatically check out employees who forget to check out.
+                                </div>
+                                <div class="content-group" invisible="not auto_checkout_enabled">
+                                    <div class="row mt16">
+                                        <label for="auto_checkout_grace_minutes"
+                                               class="col-lg-4 o_light_label"/>
+                                        <field name="auto_checkout_grace_minutes"
+                                               class="col-lg-2"/>
+                                        <span class="col-lg-2">minutes after shift end</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
