@@ -71,7 +71,7 @@
                         </div>
                     </div>
                 </div>
-                <t t-call="portal.portal_pager"/>
+                <t t-if="pager" t-call="portal.pager"/>
             </div>
         </t>
     </template>
