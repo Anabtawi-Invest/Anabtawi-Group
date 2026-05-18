@@ -6,7 +6,7 @@
     """,
     'category': 'Portal',
     'author': "enbtawi",
-    'version': '1.7',
+    'version': '1.8',
     'depends': [
         'base', 'hr', 'hr_payroll', 'base_portal', 'hr_holidays',
         'resource', 'portal', 'hr_attendance', 'hr_attendance_geofence_config',
