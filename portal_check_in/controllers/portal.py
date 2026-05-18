@@ -234,7 +234,10 @@ class PortalCheckInController(http.Controller):
             )
             return request.redirect('%s?error=no_employee' % check_in_page_url)
 
+        lock_acquired = False
         try:
+            employee._acquire_portal_attendance_action_lock(lock_minutes=10)
+            lock_acquired = True
             # Attendance is always toggled for the current user's own employee only.
             latitude = self._safe_float(kwargs.get('latitude'))
             longitude = self._safe_float(kwargs.get('longitude'))
@@ -254,6 +257,8 @@ class PortalCheckInController(http.Controller):
             )
             return request.redirect('%s?success=1' % check_in_page_url)
         except UserError as error:
+            if lock_acquired:
+                employee._release_portal_attendance_action_lock()
             error_message = (error.args and error.args[0]) or _("لا يمكنك تسجيل الحضور من هذا الموقع.")
             _logger.warning(
                 "portal_check_in: business validation blocked toggle for user_id=%s employee_id=%s reason=%s",
@@ -264,6 +269,8 @@ class PortalCheckInController(http.Controller):
             message = quote(error_message)
             return request.redirect('%s?error=location_restricted&message=%s' % (check_in_page_url, message))
         except Exception:
+            if lock_acquired:
+                employee._release_portal_attendance_action_lock()
             _logger.exception(
                 "portal_check_in: toggle failed for user_id=%s employee_id=%s",
                 request.env.user.id,

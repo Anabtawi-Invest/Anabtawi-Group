@@ -13,11 +13,43 @@ _logger = logging.getLogger(__name__)
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
+    portal_attendance_lock_until = fields.Datetime(
+        string="Portal Attendance Lock Until",
+        copy=False,
+        help="If set, this employee cannot submit another portal attendance action until this time.",
+    )
+
     allow_remote_attendance = fields.Boolean(
         string="Allow Check-in From Any Location",
         help="If enabled, this employee can check in from any location and geofence "
              "restrictions are skipped.",
     )
+
+    def _acquire_portal_attendance_action_lock(self, lock_minutes=10):
+        self.ensure_one()
+        self.env.cr.execute(
+            """
+                SELECT portal_attendance_lock_until
+                FROM hr_employee
+                WHERE id = %s
+                FOR UPDATE
+            """,
+            (self.id,),
+        )
+        row = self.env.cr.fetchone()
+        lock_until = row and row[0]
+        now = fields.Datetime.now()
+        if lock_until and lock_until > now:
+            raise UserError(
+                _(
+                    "Attendance action already submitted. Please wait 10 minutes before trying again."
+                )
+            )
+        self.write({'portal_attendance_lock_until': now + timedelta(minutes=lock_minutes)})
+
+    def _release_portal_attendance_action_lock(self):
+        self.ensure_one()
+        self.write({'portal_attendance_lock_until': False})
 
     @staticmethod
     def _safe_float(value):
