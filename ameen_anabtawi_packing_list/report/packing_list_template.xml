@@ -1,0 +1,5 @@
+<odoo>
+  <template id="packing_list_template">
+    <t t-call="ameen_anabtawi_packing_list.packing_list_body"/>
+  </template>
+</odoo>
