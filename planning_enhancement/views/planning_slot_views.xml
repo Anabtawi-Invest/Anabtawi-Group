@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="planning_slot_form_inherit_extra_hours" model="ir.ui.view">
+        <field name="name">planning.slot.form.inherit.extra.hours</field>
+        <field name="model">planning.slot</field>
+        <field name="inherit_id" ref="planning.planning_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='resource_id']" position="after">
+                <label for="extra_hours_display" invisible="not resource_id"/>
+                <div class="o_row" invisible="not resource_id">
+                    <field name="extra_hours_display" widget="float_time" class="oe_inline" readonly="1"/>
+                </div>
+            </xpath>
+            <xpath expr="//sheet/group" position="after">
+                <group string="Extra Hours Conversion">
+                    <field name="convert_ot_to_leave"/>
+                    <field
+                        name="ot_leave_id" invisible="not convert_ot_to_leave"
+                    />
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
