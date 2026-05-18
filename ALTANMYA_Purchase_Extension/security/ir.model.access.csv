@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+tanmya_purchase_stage_type,tanmya.purchase.stage.type,model_tanmya_purchase_stage_type,base.group_user,1,1,1,1
+tanmya_purchase_stage,tanmya.purchase.stage,model_tanmya_purchase_stage,base.group_user,1,1,1,1
+tanmya_purchase_order_pending,tanmya.purchase.order.pending,model_tanmya_purchase_order_pending,base.group_user,1,1,1,1
+
