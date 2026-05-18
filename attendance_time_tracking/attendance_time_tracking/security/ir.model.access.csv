@@ -1,4 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_overtime_request_employee,attendance.overtime.request (Employee),model_attendance_overtime_request,hr_attendance.group_hr_attendance_user,1,1,1,0
-access_overtime_request_manager,attendance.overtime.request (Manager),model_attendance_overtime_request,hr_attendance.group_hr_attendance_manager,1,1,1,1
-access_overtime_refuse_wizard_user,overtime.refuse.wizard (User),model_overtime_refuse_wizard,hr_attendance.group_hr_attendance_user,1,1,1,1
