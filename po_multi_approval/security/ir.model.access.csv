@@ -1,2 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_po_approval_line,approval.line,po_multi_approval.model_po_approval_line,,1,0,0,0
