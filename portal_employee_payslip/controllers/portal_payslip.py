@@ -116,7 +116,7 @@ class PortalEmployeePayslipController(CustomerPortal):
         pdf_content = request.env["ir.actions.report"].sudo()._render_qweb_pdf(
             report_name, [payslip.id]
         )[0]
-        filename = "%s.pdf" % (payslip.number or payslip.name or _("Payslip"))
+        filename = "%s.pdf" % (payslip.display_name or _("Payslip"))
         return request.make_response(
             pdf_content,
             headers=[

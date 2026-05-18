@@ -30,10 +30,6 @@
                             Your user is not linked to an employee profile.
                         </div>
 
-                        <div t-elif="not download_enabled" class="alert alert-warning" role="alert">
-                            No PDF payslip report is configured for your payroll setup.
-                        </div>
-
                         <div t-elif="not payslips" class="alert alert-info" role="status">
                             No payslips are available yet.
                         </div>
@@ -44,27 +40,30 @@
                                     <tr>
                                         <th>Reference</th>
                                         <th>Period</th>
-                                        <th class="text-end">Net Wage</th>
+                                        <th>Status</th>
                                         <th class="text-end">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr t-foreach="payslips" t-as="slip">
                                         <td>
-                                            <span t-esc="slip.number or slip.name"/>
+                                            <span t-esc="slip.display_name"/>
                                         </td>
                                         <td>
                                             <span t-field="slip.date_from"/>
                                             <span> - </span>
                                             <span t-field="slip.date_to"/>
                                         </td>
-                                        <td class="text-end">
-                                            <span t-field="slip.net_wage" t-options='{"widget": "monetary", "display_currency": slip.currency_id}'/>
+                                        <td>
+                                            <span t-esc="slip.state"/>
                                         </td>
                                         <td class="text-end">
-                                            <a t-attf-href="/my/payslips/#{slip.id}/download" class="btn btn-sm btn-primary">
+                                            <a t-if="download_enabled" t-attf-href="/my/payslips/#{slip.id}/download" class="btn btn-sm btn-primary">
                                                 Download
                                             </a>
+                                            <button t-else="" type="button" class="btn btn-sm btn-secondary" disabled="disabled">
+                                                Report not configured
+                                            </button>
                                         </td>
                                     </tr>
                                 </tbody>
