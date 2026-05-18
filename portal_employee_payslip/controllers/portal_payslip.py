@@ -6,16 +6,15 @@ from odoo.addons.portal.controllers.portal import CustomerPortal, pager as porta
 class PortalEmployeePayslipController(CustomerPortal):
     _items_per_page = 20
 
-    def _get_current_employee(self):
-        return request.env["hr.employee"].sudo().search(
+    def _get_current_employees(self):
+        return request.env["hr.employee"].sudo().with_context(active_test=False).search(
             [("user_id", "=", request.env.user.id)],
-            limit=1,
         )
 
-    def _get_payslip_domain(self, employee):
+    def _get_payslip_domain(self, employees):
         return [
-            ("employee_id", "=", employee.id),
-            ("state", "in", ["done", "paid"]),
+            ("employee_id", "in", employees.ids),
+            ("state", "!=", "cancel"),
         ]
 
     def _prepare_home_portal_values(self, counters):
@@ -23,13 +22,13 @@ class PortalEmployeePayslipController(CustomerPortal):
         if "payslip_count" not in counters:
             return values
 
-        employee = self._get_current_employee()
-        if not employee:
+        employees = self._get_current_employees()
+        if not employees:
             values["payslip_count"] = 0
             return values
 
         payslip_count = request.env["hr.payslip"].sudo().search_count(
-            self._get_payslip_domain(employee)
+            self._get_payslip_domain(employees)
         )
         values["payslip_count"] = payslip_count
         return values
@@ -53,13 +52,14 @@ class PortalEmployeePayslipController(CustomerPortal):
     )
     def portal_my_payslips(self, page=1, **kwargs):
         values = self._prepare_portal_layout_values()
-        employee = self._get_current_employee()
+        employees = self._get_current_employees()
+        employee = employees[:1]
 
         Payslip = request.env["hr.payslip"].sudo()
         payslips = Payslip
         pager = {}
-        if employee:
-            domain = self._get_payslip_domain(employee)
+        if employees:
+            domain = self._get_payslip_domain(employees)
             pager = portal_pager(
                 url="/my/payslips",
                 total=Payslip.search_count(domain),
@@ -94,15 +94,15 @@ class PortalEmployeePayslipController(CustomerPortal):
     )
     def portal_download_payslip(self, payslip_id, **kwargs):
         del kwargs
-        employee = self._get_current_employee()
-        if not employee:
+        employees = self._get_current_employees()
+        if not employees:
             return request.redirect("/my/payslips")
 
         payslip = request.env["hr.payslip"].sudo().search(
             [
                 ("id", "=", payslip_id),
-                ("employee_id", "=", employee.id),
-                ("state", "in", ["done", "paid"]),
+                ("employee_id", "in", employees.ids),
+                ("state", "!=", "cancel"),
             ],
             limit=1,
         )
