@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="ai_assistant.Hub">
+        <div class="o_ai_assistant_hub d-print-none">
+            <t t-if="showPanel">
+                <AiAssistantPanel
+                    isMinimized="state.isMinimized"
+                    onClose.bind="onClose"
+                    onToggleMinimize.bind="onToggleMinimize"/>
+            </t>
+            <t t-if="showBubble">
+                <div class="o-mail-ChatBubble o_ai_assistant_bubble position-relative">
+                    <button
+                        type="button"
+                        class="o-mail-ChatHub-bubbleBtn btn shadow"
+                        title="AI Assistant"
+                        aria-label="Open AI Assistant"
+                        t-on-click="onBubbleClick">
+                        <img
+                            class="o-mail-ChatBubble-avatar bg-view rounded-circle object-fit-cover"
+                            src="/ai_assistant/static/description/icon.png"
+                            alt="AI Assistant"
+                            draggable="false"/>
+                    </button>
+                </div>
+            </t>
+        </div>
+    </t>
+
+</templates>

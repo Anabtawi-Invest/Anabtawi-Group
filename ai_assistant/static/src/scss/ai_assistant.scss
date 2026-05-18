@@ -1,0 +1,66 @@
+// Position the hub to the left of native Odoo chat bubbles (OdooBot / Discuss).
+.o_ai_assistant_hub {
+    position: fixed;
+    z-index: $zindex-sticky;
+    bottom: $o-mail-ChatHub-bubblesMargin;
+    right: $o-mail-ChatHub-bubblesMargin + $o-mail-ChatHub-bubblesWidth + $o-mail-ChatHub-bubblesStart + 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.o_ai_assistant_bubble {
+    width: $o-mail-ChatHub-bubblesWidth;
+}
+
+.o_ai_assistant_panel {
+    width: 360px;
+    height: 600px;
+    max-height: 650px;
+    z-index: $zindex-sticky;
+    margin-bottom: 0;
+    border-radius: $border-radius-lg $border-radius-lg 0 0;
+    transform-origin: bottom right;
+    transition: opacity 0.2s ease, transform 0.2s ease, height 0.2s ease;
+
+    &.o_ai_assistant_panel--open {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    &--minimized {
+        height: auto !important;
+        max-height: none;
+    }
+}
+
+.o_ai_assistant_thread {
+    .o-mail-Message.o-selfAuthored {
+        flex-direction: row-reverse;
+
+        .o-mail-Message-core {
+            flex-direction: row-reverse;
+        }
+    }
+}
+
+.o_ai_assistant_typing {
+    padding-left: $o-mail-Message-sidebarSmallWidth + map-get($spacers, 2);
+}
+
+.o_ai_assistant_empty {
+    margin-top: map-get($spacers, 4);
+}
+
+@media (max-width: 768px) {
+    .o_ai_assistant_hub {
+        right: $o-mail-ChatHub-bubblesMargin;
+        bottom: calc(#{$o-mail-ChatHub-bubblesMargin} + #{$o-mail-ChatHub-bubblesWidth} + 8px);
+    }
+
+    .o_ai_assistant_panel {
+        width: calc(100vw - #{$o-mail-ChatHub-bubblesMargin * 2});
+        max-width: 360px;
+        right: $o-mail-ChatHub-bubblesMargin;
+    }
+}

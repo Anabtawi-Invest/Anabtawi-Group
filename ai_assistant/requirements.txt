@@ -1,0 +1,4 @@
+# Required only when AI Provider = OpenAI in Settings (not needed for Mock mode).
+# Install in the same Python environment as Odoo:
+#   pip install -r addons/ai_assistant/requirements.txt
+openai>=1.40.0

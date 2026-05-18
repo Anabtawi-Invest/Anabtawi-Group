@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="ai_assistant.Panel">
+        <div
+            class="o-mail-ChatWindow o_ai_assistant_panel overflow-hidden d-flex flex-column shadow bg-100 o-rounded-bubble border border-secondary mb-2"
+            t-att-class="{ 'o_ai_assistant_panel--minimized': props.isMinimized, 'o_ai_assistant_panel--open': !props.isMinimized }">
+            <div class="o-mail-ChatWindow-header d-flex align-items-center flex-shrink-0 bg-100 z-1 border-bottom border-secondary">
+                <div class="o-mail-ChatWindow-threadAvatar position-relative bg-inherit my-0 me-1 ms-1 py-1">
+                    <img class="rounded-3 object-fit-cover" t-att-src="avatarUrl" alt="AI Assistant"/>
+                </div>
+                <div class="text-truncate fw-bold border border-transparent o-mx-0_5 my-0 py-1 fs-5" title="AI Assistant">
+                    AI Assistant
+                </div>
+                <div class="ms-1 flex-grow-1"/>
+                <div class="d-flex flex-shrink-0 me-1">
+                    <button
+                        type="button"
+                        class="btn btn-link px-2 py-1 text-muted"
+                        title="Minimize"
+                        aria-label="Minimize"
+                        t-on-click="props.onToggleMinimize">
+                        <i class="fa fa-window-minimize"/>
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-link px-2 py-1 text-muted"
+                        title="Close"
+                        aria-label="Close"
+                        t-on-click="props.onClose">
+                        <i class="fa fa-times"/>
+                    </button>
+                </div>
+            </div>
+
+            <t t-if="!props.isMinimized">
+                <div class="d-flex flex-column h-100 overflow-hidden bg-inherit">
+                    <div
+                        class="o_ai_assistant_thread flex-grow-1 overflow-auto o-scrollbar-thin position-relative bg-inherit px-2 py-2"
+                        t-ref="messagesContainer">
+                        <t t-if="!groupedItems.length and !state.isLoading">
+                            <div class="o_ai_assistant_empty text-muted text-center py-5 px-3">
+                                <i class="fa fa-commenting-o fa-2x mb-2 d-block opacity-50" aria-hidden="true"/>
+                                <p class="mb-0 smaller">Ask me anything to get started.</p>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <t t-foreach="groupedItems" t-as="item" t-key="item.id">
+                                <t t-if="item.type === 'date'">
+                                    <div class="o-mail-DateSection d-flex align-items-center w-100 fw-bold my-2">
+                                        <hr class="o-discuss-separator flex-grow-1"/>
+                                        <span class="px-2 smaller text-muted opacity-50" t-esc="item.label"/>
+                                        <hr class="o-discuss-separator flex-grow-1"/>
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <t t-set="message" t-value="item.message"/>
+                                    <div
+                                        class="o-mail-Message position-relative rounded-0 bg-inherit mb-2"
+                                        t-att-class="{ 'o-selfAuthored': message.role === 'user' }">
+                                        <div class="o-mail-Message-core position-relative d-flex flex-shrink-0 bg-inherit">
+                                            <div
+                                                t-if="message.role === 'assistant'"
+                                                class="o-mail-Message-sidebar d-flex flex-shrink-0 align-items-start flex-column bg-inherit o-inChatWindow">
+                                                <div class="o-mail-Message-avatarContainer position-relative bg-inherit rounded-3 o-inChatWindow">
+                                                    <img class="o-mail-Message-avatar w-100 h-100 rounded-3" t-att-src="avatarUrl" alt="AI Assistant"/>
+                                                </div>
+                                            </div>
+                                            <div class="w-100 o-min-width-0">
+                                                <div class="o-mail-Message-contentContainer position-relative d-flex" t-att-class="{ 'flex-row-reverse': message.role === 'user' }">
+                                                    <div class="o-mail-Message-content o-min-width-0">
+                                                        <div
+                                                            class="o-mail-Message-bubble border o-rounded-bubble px-2 py-1"
+                                                            t-att-class="{
+                                                                'o-blue': message.role === 'user',
+                                                                'o-muted': message.role === 'assistant' and !message.isError,
+                                                                'border-danger text-danger': message.isError,
+                                                            }">
+                                                            <t t-esc="message.content"/>
+                                                        </div>
+                                                        <small class="o-mail-Message-date o-xsmaller d-block mt-1" t-att-class="{ 'text-end': message.role === 'user' }">
+                                                            <t t-esc="formatMessageTime(message.timestamp)"/>
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </t>
+                            </t>
+                            <t t-if="state.isLoading">
+                                <div class="o_ai_assistant_typing d-flex align-items-center px-2 py-1">
+                                    <div class="o-discuss-Typing-icon d-flex align-items-center o-sizeSmall me-2">
+                                        <span class="o-discuss-Typing-dot d-flex flex-shrink-0 rounded-pill o-sizeSmall"/>
+                                        <span class="flex-grow-1 flex-shrink-0"/>
+                                        <span class="o-discuss-Typing-dot o-discuss-Typing-dot2 d-flex flex-shrink-0 rounded-pill o-sizeSmall"/>
+                                        <span class="flex-grow-1 flex-shrink-0"/>
+                                        <span class="o-discuss-Typing-dot o-discuss-Typing-dot3 d-flex flex-shrink-0 rounded-pill o-sizeSmall"/>
+                                    </div>
+                                    <span class="smaller text-muted">AI Assistant is typing...</span>
+                                </div>
+                            </t>
+                        </t>
+                    </div>
+
+                    <div class="o-mail-Composer d-grid flex-shrink-0 pt-0 position-relative o-chatWindow mx-2 my-1 mb-2">
+                        <div class="o-mail-Composer-coreMain d-flex flex-nowrap align-items-end flex-grow-1">
+                            <div class="o-mail-Composer-inputContainer o-mail-Composer-bg d-flex flex-grow-1 border o-rounded-bubble align-items-end w-100">
+                                <button
+                                    type="button"
+                                    class="btn border-0 text-muted flex-shrink-0"
+                                    title="Attach file"
+                                    aria-label="Attach file"
+                                    t-att-disabled="state.isLoading"
+                                    t-on-click="onAttachmentClick">
+                                    <i class="fa fa-paperclip"/>
+                                </button>
+                                <textarea
+                                    t-ref="messageInput"
+                                    class="form-control border-0 shadow-none o-mail-Composer-input flex-grow-1"
+                                    rows="1"
+                                    placeholder="Message AI Assistant..."
+                                    t-model="state.inputValue"
+                                    t-att-disabled="state.isLoading"
+                                    t-on-keydown="onInputKeydown"/>
+                                <button
+                                    type="button"
+                                    class="btn border-0 text-primary flex-shrink-0"
+                                    title="Send"
+                                    aria-label="Send"
+                                    t-att-disabled="!canSend"
+                                    t-on-click="onSendMessage">
+                                    <i class="fa fa-paper-plane"/>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+
+</templates>
