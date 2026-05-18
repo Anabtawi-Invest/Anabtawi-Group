@@ -13,11 +13,73 @@ _logger = logging.getLogger(__name__)
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
+    portal_attendance_lock_until = fields.Datetime(
+        string="Portal Attendance Lock Until",
+        copy=False,
+        help="If set, this employee cannot submit another portal attendance action until this time.",
+    )
+
     allow_remote_attendance = fields.Boolean(
         string="Allow Check-in From Any Location",
         help="If enabled, this employee can check in from any location and geofence "
              "restrictions are skipped.",
     )
+
+    def _acquire_portal_attendance_action_lock(self, lock_minutes=10):
+        self.ensure_one()
+        _logger.info(
+            "portal_check_in lock acquire requested: employee_id=%s lock_minutes=%s",
+            self.id,
+            lock_minutes,
+        )
+        self.env.cr.execute(
+            """
+                SELECT portal_attendance_lock_until
+                FROM hr_employee
+                WHERE id = %s
+                FOR UPDATE
+            """,
+            (self.id,),
+        )
+        row = self.env.cr.fetchone()
+        lock_until = row and row[0]
+        now = fields.Datetime.now()
+        _logger.info(
+            "portal_check_in lock read: employee_id=%s lock_until=%s now=%s is_locked=%s",
+            self.id,
+            lock_until,
+            now,
+            bool(lock_until and lock_until > now),
+        )
+        if lock_until and lock_until > now:
+            _logger.warning(
+                "portal_check_in lock blocked request: employee_id=%s lock_until=%s now=%s",
+                self.id,
+                lock_until,
+                now,
+            )
+            raise UserError(
+                _(
+                    "Attendance action already submitted. Please wait 10 minutes before trying again."
+                )
+            )
+        new_lock_until = now + timedelta(minutes=lock_minutes)
+        self.write({'portal_attendance_lock_until': new_lock_until})
+        _logger.info(
+            "portal_check_in lock set: employee_id=%s new_lock_until=%s",
+            self.id,
+            new_lock_until,
+        )
+
+    def _release_portal_attendance_action_lock(self):
+        self.ensure_one()
+        old_lock_until = self.portal_attendance_lock_until
+        self.write({'portal_attendance_lock_until': False})
+        _logger.info(
+            "portal_check_in lock released: employee_id=%s previous_lock_until=%s",
+            self.id,
+            old_lock_until,
+        )
 
     @staticmethod
     def _safe_float(value):

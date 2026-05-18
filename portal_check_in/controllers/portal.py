@@ -111,12 +111,6 @@ class PortalCheckInController(http.Controller):
         )
         return geo_information
 
-    @staticmethod
-    def _is_duplicate_open_attendance(latest_attendance, now_dt, duplicate_window_seconds=10):
-        if not latest_attendance or latest_attendance.check_out:
-            return False
-        return (now_dt - latest_attendance.check_in) <= timedelta(seconds=duplicate_window_seconds)
-
     @http.route(['/my/check-in', '/odoo/check-in'], type='http', auth='user', website=True)
     def portal_my_check_in(self, **kwargs):
         current_path = request.httprequest.path or ''
@@ -198,7 +192,6 @@ class PortalCheckInController(http.Controller):
             'txt_max_auth_hours': _('Maximum authorized hours:'),
             'txt_check_in_btn': _('CHECK IN'),
             'txt_check_out_btn': _('CHECK OUT'),
-            'txt_processing': _('Processing...'),
             'txt_stat_check_in': _('Check In'),
             'txt_stat_check_out': _('Check Out'),
             'txt_working_hours': _('Working Hours'),
@@ -241,7 +234,23 @@ class PortalCheckInController(http.Controller):
             )
             return request.redirect('%s?error=no_employee' % check_in_page_url)
 
+        lock_acquired = False
         try:
+            employee.invalidate_recordset(['portal_attendance_lock_until'])
+            _logger.info(
+                "portal_check_in: before lock acquire employee_id=%s route=%s current_lock_until=%s",
+                employee.id,
+                current_path,
+                employee.portal_attendance_lock_until,
+            )
+            employee._acquire_portal_attendance_action_lock(lock_minutes=10)
+            lock_acquired = True
+            employee.invalidate_recordset(['portal_attendance_lock_until'])
+            _logger.info(
+                "portal_check_in: lock acquired employee_id=%s lock_until=%s",
+                employee.id,
+                employee.portal_attendance_lock_until,
+            )
             # Attendance is always toggled for the current user's own employee only.
             latitude = self._safe_float(kwargs.get('latitude'))
             longitude = self._safe_float(kwargs.get('longitude'))
@@ -252,25 +261,6 @@ class PortalCheckInController(http.Controller):
                 longitude,
             )
             geo_information = self._build_geo_information(employee, latitude=latitude, longitude=longitude)
-            # Serialize attendance toggles per employee to avoid race-condition duplicates.
-            request.env.cr.execute(
-                "SELECT id FROM hr_employee WHERE id = %s FOR UPDATE",
-                [employee.id],
-            )
-            employee = request.env['hr.employee'].sudo().browse(employee.id)
-            latest_attendance = request.env['hr.attendance'].sudo().search(
-                [('employee_id', '=', employee.id)],
-                order='check_in desc',
-                limit=1,
-            )
-            now_dt = fields.Datetime.now()
-            if self._is_duplicate_open_attendance(latest_attendance, now_dt, duplicate_window_seconds=10):
-                _logger.info(
-                    "portal_check_in: duplicate toggle ignored for employee_id=%s attendance_id=%s",
-                    employee.id,
-                    latest_attendance.id,
-                )
-                return request.redirect('%s?success=1' % check_in_page_url)
             attendance = employee._attendance_action_change(geo_information)
             _logger.info(
                 "portal_check_in: attendance toggled successfully for employee_id=%s attendance_id=%s new_state=%s",
@@ -278,8 +268,20 @@ class PortalCheckInController(http.Controller):
                 attendance.id if attendance else False,
                 employee.attendance_state,
             )
+            _logger.info(
+                "portal_check_in: success finished with lock kept employee_id=%s lock_until=%s",
+                employee.id,
+                employee.portal_attendance_lock_until,
+            )
             return request.redirect('%s?success=1' % check_in_page_url)
         except UserError as error:
+            if lock_acquired:
+                employee._release_portal_attendance_action_lock()
+                _logger.warning(
+                    "portal_check_in: released lock after user error employee_id=%s reason=%s",
+                    employee.id,
+                    (error.args and error.args[0]) or '',
+                )
             error_message = (error.args and error.args[0]) or _("لا يمكنك تسجيل الحضور من هذا الموقع.")
             _logger.warning(
                 "portal_check_in: business validation blocked toggle for user_id=%s employee_id=%s reason=%s",
@@ -290,6 +292,12 @@ class PortalCheckInController(http.Controller):
             message = quote(error_message)
             return request.redirect('%s?error=location_restricted&message=%s' % (check_in_page_url, message))
         except Exception:
+            if lock_acquired:
+                employee._release_portal_attendance_action_lock()
+                _logger.exception(
+                    "portal_check_in: released lock after unexpected error employee_id=%s",
+                    employee.id,
+                )
             _logger.exception(
                 "portal_check_in: toggle failed for user_id=%s employee_id=%s",
                 request.env.user.id,

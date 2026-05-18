@@ -145,7 +145,7 @@
                                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                             <input type="hidden" name="latitude" id="lat" class="o_portal_check_latitude"/>
                                             <input type="hidden" name="longitude" id="lon" class="o_portal_check_longitude"/>
-                                            <button type="button" class="pc-check-circle-btn" onclick="submitCheckIn()" t-att-data-processing-label="txt_processing" t-att-disabled="'disabled' if (weekly_gate_reached and state != 'checked_in' and not available_overtime_authorization) else None">
+                                            <button type="button" class="pc-check-circle-btn" onclick="submitCheckIn()" t-att-disabled="'disabled' if (weekly_gate_reached and state != 'checked_in' and not available_overtime_authorization) else None">
                                                 <i class="fa fa-hand-pointer-o"/>
                                                 <t t-if="state == 'checked_in'"><t t-esc="txt_check_out_btn"/></t>
                                                 <t t-else=""><t t-esc="txt_check_in_btn"/></t>
@@ -226,24 +226,6 @@
                 (function () {
                     var isSubmitting = false;
 
-                    function setButtonProcessing(button, processing) {
-                        if (!button) {
-                            return;
-                        }
-                        if (processing) {
-                            if (!button.dataset.originalHtml) {
-                                button.dataset.originalHtml = button.innerHTML;
-                            }
-                            button.disabled = true;
-                            button.textContent = button.dataset.processingLabel || 'Processing...';
-                            return;
-                        }
-                        if (button.dataset.originalHtml) {
-                            button.innerHTML = button.dataset.originalHtml;
-                        }
-                        button.disabled = false;
-                    }
-
                     function showLocationBlockedAlert() {
                         var locationBlockedAlert = document.querySelector('.o_portal_location_restricted_alert');
                         if (locationBlockedAlert) {
@@ -267,26 +249,12 @@
                         var trackingEnabled = form.dataset.deviceTrackingEnabled === '1';
 
                         function submitForm() {
-                            try {
-                                form.submit();
-                            } catch (error) {
-                                isSubmitting = false;
-                                setButtonProcessing(button, false);
-                                throw error;
-                            }
-                        }
-
-                        function startSubmission() {
                             isSubmitting = true;
-                            setButtonProcessing(button, true);
+                            if (button) {
+                                button.disabled = true;
+                            }
+                            form.submit();
                         }
-
-                        function rollbackSubmission() {
-                            isSubmitting = false;
-                            setButtonProcessing(button, false);
-                        }
-
-                        startSubmission();
 
                         if (!trackingEnabled) {
                             submitForm();
@@ -297,7 +265,6 @@
                         var locationMsg = locationMsgEl &amp;&amp; locationMsgEl.value ? locationMsgEl.value : 'Location permission required';
 
                         if (!navigator.geolocation || !navigator.onLine) {
-                            rollbackSubmission();
                             window.alert(locationMsg);
                             return;
                         }
@@ -309,7 +276,6 @@
                                 submitForm();
                             },
                             function () {
-                                rollbackSubmission();
                                 window.alert(locationMsg);
                             },
                             {
