@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': "check in",
-    'summary': "",
+    'summary': "check in",
     'description': """
     """,
     'category': 'Portal',
