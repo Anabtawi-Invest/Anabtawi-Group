@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<odoo>
-    <record id="group_purchase_confirm_approval_manager" model="res.groups">
-        <field name="name">Purchase Confirm Approval Manager</field>
-        <field name="implied_ids" eval="[(4, ref('purchase.group_purchase_manager'))]"/>
-    </record>
-</odoo>
