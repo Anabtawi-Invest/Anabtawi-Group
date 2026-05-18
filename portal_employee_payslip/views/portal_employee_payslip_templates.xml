@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="portal_my_home_menu_employee_payslip" inherit_id="portal.portal_my_home" priority="120">
+        <xpath expr="//div[@id='portal_common_category']" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="icon" t-value="'/portal/static/src/img/portal-connection.svg'"/>
+                <t t-set="title">Employee Payslip</t>
+                <t t-set="text">View and download your payslips</t>
+                <t t-set="url" t-value="'/my/payslips'"/>
+                <t t-set="placeholder_count" t-value="'payslip_count'"/>
+                <t t-set="config_card" t-value="True"/>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="portal_breadcrumbs_employee_payslip" inherit_id="portal.portal_breadcrumbs" priority="30">
+        <xpath expr="//ol" position="inside">
+            <li t-if="page_name == 'my_payslips'" class="breadcrumb-item active">Employee Payslip</li>
+        </xpath>
+    </template>
+
+    <template id="portal_my_payslips" name="Portal Employee Payslips">
+        <t t-call="portal.portal_layout">
+            <div class="container">
+                <div class="row">
+                    <div class="col-12">
+                        <h3 class="mb-3">My Payslips</h3>
+
+                        <div t-if="not employee" class="alert alert-warning" role="alert">
+                            Your user is not linked to an employee profile.
+                        </div>
+
+                        <div t-elif="not download_enabled" class="alert alert-warning" role="alert">
+                            No PDF payslip report is configured for your payroll setup.
+                        </div>
+
+                        <div t-elif="not payslips" class="alert alert-info" role="status">
+                            No payslips are available yet.
+                        </div>
+
+                        <div t-else="" class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Reference</th>
+                                        <th>Period</th>
+                                        <th class="text-end">Net Wage</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="payslips" t-as="slip">
+                                        <td>
+                                            <span t-esc="slip.number or slip.name"/>
+                                        </td>
+                                        <td>
+                                            <span t-field="slip.date_from"/>
+                                            <span> - </span>
+                                            <span t-field="slip.date_to"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <span t-field="slip.net_wage" t-options='{"widget": "monetary", "display_currency": slip.currency_id}'/>
+                                        </td>
+                                        <td class="text-end">
+                                            <a t-attf-href="/my/payslips/#{slip.id}/download" class="btn btn-sm btn-primary">
+                                                Download
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <t t-call="portal.portal_pager"/>
+            </div>
+        </t>
+    </template>
+</odoo>
