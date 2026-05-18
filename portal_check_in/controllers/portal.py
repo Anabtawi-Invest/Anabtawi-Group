@@ -236,8 +236,21 @@ class PortalCheckInController(http.Controller):
 
         lock_acquired = False
         try:
+            employee.invalidate_recordset(['portal_attendance_lock_until'])
+            _logger.info(
+                "portal_check_in: before lock acquire employee_id=%s route=%s current_lock_until=%s",
+                employee.id,
+                current_path,
+                employee.portal_attendance_lock_until,
+            )
             employee._acquire_portal_attendance_action_lock(lock_minutes=10)
             lock_acquired = True
+            employee.invalidate_recordset(['portal_attendance_lock_until'])
+            _logger.info(
+                "portal_check_in: lock acquired employee_id=%s lock_until=%s",
+                employee.id,
+                employee.portal_attendance_lock_until,
+            )
             # Attendance is always toggled for the current user's own employee only.
             latitude = self._safe_float(kwargs.get('latitude'))
             longitude = self._safe_float(kwargs.get('longitude'))
@@ -255,10 +268,20 @@ class PortalCheckInController(http.Controller):
                 attendance.id if attendance else False,
                 employee.attendance_state,
             )
+            _logger.info(
+                "portal_check_in: success finished with lock kept employee_id=%s lock_until=%s",
+                employee.id,
+                employee.portal_attendance_lock_until,
+            )
             return request.redirect('%s?success=1' % check_in_page_url)
         except UserError as error:
             if lock_acquired:
                 employee._release_portal_attendance_action_lock()
+                _logger.warning(
+                    "portal_check_in: released lock after user error employee_id=%s reason=%s",
+                    employee.id,
+                    (error.args and error.args[0]) or '',
+                )
             error_message = (error.args and error.args[0]) or _("لا يمكنك تسجيل الحضور من هذا الموقع.")
             _logger.warning(
                 "portal_check_in: business validation blocked toggle for user_id=%s employee_id=%s reason=%s",
@@ -271,6 +294,10 @@ class PortalCheckInController(http.Controller):
         except Exception:
             if lock_acquired:
                 employee._release_portal_attendance_action_lock()
+                _logger.exception(
+                    "portal_check_in: released lock after unexpected error employee_id=%s",
+                    employee.id,
+                )
             _logger.exception(
                 "portal_check_in: toggle failed for user_id=%s employee_id=%s",
                 request.env.user.id,
