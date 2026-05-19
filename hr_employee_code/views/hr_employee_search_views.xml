@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Employee model search (used by HR and inherited employee search views) -->
+        <record id="view_employee_filter_inherit_employee_number" model="ir.ui.view">
+            <field name="name">hr.employee.search.employee.number</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search/field[@name='name']" position="after">
+                    <field name="employee_number" string="Employee Number" filter_domain="[('employee_number', 'ilike', self)]"/>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Attendance -->
+        <record id="hr_attendance_view_filter_inherit_employee_number" model="ir.ui.view">
+            <field name="name">hr.attendance.search.employee.number</field>
+            <field name="model">hr.attendance</field>
+            <field name="inherit_id" ref="hr_attendance.hr_attendance_view_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search/field[@name='employee_id']" position="attributes">
+                    <attribute name="filter_domain">['|', ('employee_id.name', 'ilike', self), ('employee_id.employee_number', 'ilike', self)]</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="hr_attendance_management_view_filter_inherit_employee_number" model="ir.ui.view">
+            <field name="name">hr.attendance.management.search.employee.number</field>
+            <field name="model">hr.attendance</field>
+            <field name="inherit_id" ref="hr_attendance.hr_attendance_management_view_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search/field[@name='employee_id']" position="attributes">
+                    <attribute name="filter_domain">['|', ('employee_id.name', 'ilike', self), ('employee_id.employee_number', 'ilike', self)]</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Time Off -->
+        <record id="view_hr_holidays_filter_inherit_employee_number" model="ir.ui.view">
+            <field name="name">hr.leave.search.employee.number</field>
+            <field name="model">hr.leave</field>
+            <field name="inherit_id" ref="hr_holidays.view_hr_holidays_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search/field[@name='employee_id']" position="attributes">
+                    <attribute name="filter_domain">['|', ('employee_id.name', 'ilike', self), ('employee_id.employee_number', 'ilike', self)]</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_hr_leave_allocation_filter_inherit_employee_number" model="ir.ui.view">
+            <field name="name">hr.leave.allocation.search.employee.number</field>
+            <field name="model">hr.leave.allocation</field>
+            <field name="inherit_id" ref="hr_holidays.view_hr_leave_allocation_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search/field[@name='employee_id']" position="attributes">
+                    <attribute name="filter_domain">['|', ('employee_id.name', 'ilike', self), ('employee_id.employee_number', 'ilike', self)]</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Expenses -->
+        <record id="hr_expense_view_search_inherit_employee_number" model="ir.ui.view">
+            <field name="name">hr.expense.search.employee.number</field>
+            <field name="model">hr.expense</field>
+            <field name="inherit_id" ref="hr_expense.hr_expense_view_search"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search/field[@name='employee_id']" position="attributes">
+                    <attribute name="filter_domain">['|', ('employee_id.name', 'ilike', self), ('employee_id.employee_number', 'ilike', self)]</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Recruitment -->
+        <record id="hr_applicant_view_search_bis_inherit_employee_number" model="ir.ui.view">
+            <field name="name">hr.applicant.search.employee.number</field>
+            <field name="model">hr.applicant</field>
+            <field name="inherit_id" ref="hr_recruitment.hr_applicant_view_search_bis"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search/field[@name='partner_name']" position="after">
+                    <field name="employee_id" string="Employee" filter_domain="['|', ('employee_id.name', 'ilike', self), ('employee_id.employee_number', 'ilike', self)]"/>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Skills -->
+        <record id="hr_employee_skill_view_search_inherit_employee_number" model="ir.ui.view">
+            <field name="name">hr.employee.skill.search.employee.number</field>
+            <field name="model">hr.employee.skill</field>
+            <field name="inherit_id" ref="hr_skills.hr_employee_skill_view_search"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search/field[@name='employee_id']" position="attributes">
+                    <attribute name="filter_domain">['|', ('employee_id.name', 'ilike', self), ('employee_id.employee_number', 'ilike', self)]</attribute>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Work Entries -->
+        <record id="hr_work_entry_view_search_inherit_employee_number" model="ir.ui.view">
+            <field name="name">hr.work.entry.search.employee.number</field>
+            <field name="model">hr.work.entry</field>
+            <field name="inherit_id" ref="hr_work_entry.hr_work_entry_view_search"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search/field[@name='employee_id']" position="attributes">
+                    <attribute name="filter_domain">['|', ('employee_id.name', 'ilike', self), ('employee_id.employee_number', 'ilike', self)]</attribute>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>
