@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── List ─────────────────────────────────────────────────────────── -->
+    <record id="view_cake_order_list" model="ir.ui.view">
+        <field name="name">cake.order.list</field>
+        <field name="model">cake.order</field>
+        <field name="arch" type="xml">
+            <list string="Custom Cake Orders"
+                  decoration-info="state == 'new'"
+                  decoration-warning="state == 'in_production'"
+                  decoration-success="state == 'done'"
+                  decoration-danger="state == 'cancelled'">
+                <field name="name"/>
+                <field name="date_order"/>
+                <field name="customer_name"/>
+                <field name="persons" string="Size"/>
+                <field name="sponge_id"/>
+                <field name="filling_id"/>
+                <field name="decoration_id"/>
+                <field name="use_sugar_paste" string="Sugar"/>
+                <field name="selling_price" string="Price"/>
+                <field name="email_sent" optional="show"/>
+                <field name="mrp_order_id" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'new'"
+                       decoration-warning="state in ('confirmed','in_production')"
+                       decoration-success="state == 'done'"
+                       decoration-danger="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Form ─────────────────────────────────────────────────────────── -->
+    <record id="view_cake_order_form" model="ir.ui.view">
+        <field name="name">cake.order.form</field>
+        <field name="model">cake.order</field>
+        <field name="arch" type="xml">
+            <form string="Custom Cake Order | طلب جاتو مخصص">
+                <header>
+                    <button name="action_create_mo"
+                            string="Create MO | إنشاء أمر تصنيع"
+                            type="object" class="btn-primary"
+                            invisible="mrp_order_id != False"/>
+                    <button name="action_send_email"
+                            string="📧 Send to Manufacturing | إرسال للمصنع"
+                            type="object" class="btn-secondary"/>
+                    <button name="action_mark_in_production"
+                            string="▶ In Production"
+                            type="object"
+                            invisible="state not in ('confirmed',)"/>
+                    <button name="action_mark_done"
+                            string="✔ Mark Done"
+                            type="object"
+                            invisible="state != 'in_production'"/>
+                    <button name="action_cancel"
+                            string="✖ Cancel"
+                            type="object"
+                            invisible="state in ('done','cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="new,confirmed,in_production,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <group>
+                        <group string="Cake Specification | مواصفات الجاتو">
+                            <field name="persons"/>
+                            <field name="sponge_id"/>
+                            <field name="cream_id"/>
+                            <field name="filling_id"/>
+                            <field name="decoration_id"/>
+                            <field name="disk_id"/>
+                            <field name="use_sugar_paste"/>
+                            <field name="sugar_paste_id"
+                                   invisible="not use_sugar_paste"
+                                   required="use_sugar_paste"/>
+                        </group>
+                        <group string="Order Info | معلومات الطلب">
+                            <field name="date_order" readonly="1"/>
+                            <field name="customer_name"/>
+                            <field name="pos_order_id" readonly="1"/>
+                            <field name="mrp_order_id" readonly="1"/>
+                            <field name="email_sent" readonly="1"/>
+                            <!-- Cost only visible to system managers -->
+                            <field name="total_cost"    readonly="1" groups="base.group_system"/>
+                            <field name="selling_price" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <group string="Extra Features | الميزات الإضافية"
+                           invisible="not extra_features_json">
+                        <field name="extra_features_display" nolabel="1" readonly="1"/>
+                    </group>
+
+                    <group string="Notes | ملاحظات">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Search ────────────────────────────────────────────────────────── -->
+    <record id="view_cake_order_search" model="ir.ui.view">
+        <field name="name">cake.order.search</field>
+        <field name="model">cake.order</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="customer_name"/>
+                <field name="filling_id"/>
+                <filter name="state_new"          string="New"           domain="[('state','=','new')]"/>
+                <filter name="state_confirmed"     string="Confirmed"     domain="[('state','=','confirmed')]"/>
+                <filter name="state_in_production" string="In Production" domain="[('state','=','in_production')]"/>
+                <filter name="state_done"          string="Done"          domain="[('state','=','done')]"/>
+                <filter name="no_email"            string="Email Not Sent" domain="[('email_sent','=',False),('state','!=','cancelled')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state"   string="Status"      context="{'group_by':'state'}"/>
+                    <filter name="group_persons" string="Cake Size"   context="{'group_by':'persons'}"/>
+                    <filter name="group_date"    string="Order Date"  context="{'group_by':'date_order:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── Action ────────────────────────────────────────────────────────── -->
+    <record id="action_cake_order" model="ir.actions.act_window">
+        <field name="name">Custom Cake Orders | طلبات الجاتو</field>
+        <field name="res_model">cake.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_cake_order_search"/>
+        <field name="context">{'search_default_state_confirmed': 1}</field>
+    </record>
+
+</odoo>

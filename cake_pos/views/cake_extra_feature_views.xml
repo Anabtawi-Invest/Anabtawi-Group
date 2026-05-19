@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_cake_extra_feature_list" model="ir.ui.view">
+        <field name="name">cake.extra.feature.list</field>
+        <field name="model">cake.extra.feature</field>
+        <field name="arch" type="xml">
+            <list string="Extra Features" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="feature_type"/>
+                <field name="extra_cost"/>
+                <field name="is_size_dependent"/>
+                <field name="cost_per_person" optional="show"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cake_extra_feature_form" model="ir.ui.view">
+        <field name="name">cake.extra.feature.form</field>
+        <field name="model">cake.extra.feature</field>
+        <field name="arch" type="xml">
+            <form string="Extra Feature | ميزة إضافية">
+                <sheet>
+                    <group>
+                        <group string="Feature Definition | تعريف الميزة">
+                            <field name="name"/>
+                            <field name="feature_type"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                            <field name="description"/>
+                        </group>
+                        <group string="Pricing | التسعير">
+                            <field name="is_size_dependent"/>
+                            <field name="extra_cost"
+                                   invisible="is_size_dependent"
+                                   string="Fixed Extra Cost"/>
+                            <field name="cost_per_person"
+                                   invisible="not is_size_dependent"
+                                   string="Cost per Person"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Dropdown Options | خيارات القائمة"
+                              invisible="feature_type != 'dropdown'">
+                            <field name="option_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="extra_cost"
+                                           string="Cost Override (0 = use parent cost)"/>
+                                    <field name="active"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cake_extra_feature" model="ir.actions.act_window">
+        <field name="name">Extra Features | الميزات الإضافية</field>
+        <field name="res_model">cake.extra.feature</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

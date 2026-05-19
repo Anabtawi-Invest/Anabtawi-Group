@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_cake_ingredient_list" model="ir.ui.view">
+        <field name="name">cake.ingredient.list</field>
+        <field name="model">cake.ingredient</field>
+        <field name="arch" type="xml">
+            <list string="Cake Ingredients" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="category"/>
+                <field name="name"/>
+                <field name="cost_per_kg" optional="show"/>
+                <field name="flat_cost"   optional="show"/>
+                <field name="internal_ref" optional="hide"/>
+                <field name="cost_10"  optional="show"/>
+                <field name="cost_15"  optional="hide"/>
+                <field name="cost_20"  optional="hide"/>
+                <field name="cost_25"  optional="hide"/>
+                <field name="cost_30"  optional="show"/>
+                <field name="cost_35"  optional="hide"/>
+                <field name="cost_40"  optional="hide"/>
+                <field name="cost_45"  optional="hide"/>
+                <field name="cost_50"  optional="hide"/>
+                <field name="active"   optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_cake_ingredient_form" model="ir.ui.view">
+        <field name="name">cake.ingredient.form</field>
+        <field name="model">cake.ingredient</field>
+        <field name="arch" type="xml">
+            <form string="Cake Ingredient">
+                <sheet>
+                    <group>
+                        <group string="Identity | الهوية">
+                            <field name="name"/>
+                            <field name="category"/>
+                            <field name="sequence"/>
+                            <field name="internal_ref"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Cost Input | إدخال التكلفة">
+                            <field name="cost_per_kg"
+                                   invisible="category == 'disk'"/>
+                            <field name="flat_cost"
+                                   invisible="category != 'disk'"/>
+                        </group>
+                    </group>
+                    <separator string="Auto-calculated Cost by Cake Size (matches Excel columns)"/>
+                    <group col="9">
+                        <field name="cost_10" readonly="1" string="10 أشخاص"/>
+                        <field name="cost_15" readonly="1" string="15"/>
+                        <field name="cost_20" readonly="1" string="20"/>
+                        <field name="cost_25" readonly="1" string="25"/>
+                        <field name="cost_30" readonly="1" string="30"/>
+                        <field name="cost_35" readonly="1" string="35"/>
+                        <field name="cost_40" readonly="1" string="40"/>
+                        <field name="cost_45" readonly="1" string="45"/>
+                        <field name="cost_50" readonly="1" string="50"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cake_ingredient" model="ir.actions.act_window">
+        <field name="name">Ingredients &amp; Costs | المكونات والتكاليف</field>
+        <field name="res_model">cake.ingredient</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>
