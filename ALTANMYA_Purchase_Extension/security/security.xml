@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="module_altanmya_purchase_extension" model="ir.module.category">
+        <field name="name">Altanmya Purchase Extension</field>
+        <field name="description">Helps you manage purchase module extension.</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="res_groups_privilege_altanmya_purchase_extension" model="res.groups.privilege">
+        <field name="name">Altanmya Purchase Extension</field>
+        <field name="category_id" ref="module_altanmya_purchase_extension"/>
+        <field name="sequence">10</field>
+    </record>
+
+    <record model="res.groups" id="altanmya_purchase_stage_type">
+        <field name="name">purchase order change type</field>
+        <field name="privilege_id" ref="res_groups_privilege_altanmya_purchase_extension"/>
+    </record>
+
+</odoo>

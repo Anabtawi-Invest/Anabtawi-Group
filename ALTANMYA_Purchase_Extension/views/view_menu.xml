@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<data>
+
+    <menuitem id="menu_tanmya_purchase_stage_type" name="Purchase types" parent="purchase.menu_purchase_config" sequence="10" action="tanmya_purchase_stage_type_action"/>
+<!--    <menuitem id="menu_tanmya_sale_stage" name="Sales Stages" parent="sale.menu_sale_config" sequence="6" action="tanmya_sale_stage_type_stages_action"/>-->
+</data>
+</odoo>

@@ -1,0 +1,10 @@
+<odoo>
+
+        <record model="tanmya_purchase_stage" id="5">
+            <field name="code">cancel</field>
+            <field name="name">Cancelled</field>
+            <field name="stageorder">1030</field>
+            <field name="issystem">True</field>
+       </record>
+
+</odoo>
