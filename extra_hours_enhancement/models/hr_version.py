@@ -19,9 +19,9 @@ class HrVersion(models.Model):
             for start, end, overtime in intervals:
                 for overtime_line in overtime:
                     singleton_payload_intervals.append((start, end, overtime_line))
-            normalized_intervals[resource_id] = Intervals(
-                singleton_payload_intervals, keep_distinct=True
-            )
+            # Return raw tuples to avoid Intervals normalization merging
+            # same-boundary overtime lines back into multi-record payloads.
+            normalized_intervals[resource_id] = singleton_payload_intervals
         return normalized_intervals
 
     def _get_attendance_intervals(self, start_dt, end_dt):
