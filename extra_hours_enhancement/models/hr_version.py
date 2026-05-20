@@ -121,7 +121,9 @@ class HrVersion(models.Model):
                 )
                 if not approved_overtimes:
                     continue
-                work_entry_overtime_intervals[r].append((start, end, approved_overtimes))
+                # Keep overtime payloads singleton to match enterprise expectations.
+                for approved_overtime in approved_overtimes:
+                    work_entry_overtime_intervals[r].append((start, end, approved_overtime))
 
         return {
             r: (mapped_intervals[r] - overtime_intervals[r])
