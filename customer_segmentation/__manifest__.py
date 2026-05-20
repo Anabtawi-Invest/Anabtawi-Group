@@ -1,5 +1,5 @@
 {
-    'name': 'Customer Segmentation',
+    'name': 'Customer Segmentation updated2',
     'version': '19.0.1.0.0',
     'category': 'Sales/Customer Segmentation',
     'summary': 'Department-based customer segmentation with bulk import functionality',
