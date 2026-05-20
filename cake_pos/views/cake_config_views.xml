@@ -11,10 +11,10 @@
                         <h1><field name="name"/></h1>
                     </div>
                     <group string="Pricing | التسعير">
-                        <field name="markup_pct"
-                               help="Selling price = Total cost × (1 + markup%). Default 642% → ×7.42 matches Excel basic sales/cost ratio."/>
+                        <field name="markup_pct"/>
                         <field name="markup_multiplier" readonly="1"/>
-                        <field name="pos_product_id"/>
+                        <!-- required enforced at view level, not ORM level [P4 fix] -->
+                        <field name="pos_product_id" required="1"/>
                     </group>
                     <group string="Email | البريد الإلكتروني">
                         <field name="manufacturing_email"/>
@@ -35,27 +35,26 @@
         <field name="view_mode">form</field>
     </record>
 
-    <!-- ═══════════════════════════════════════════════════════════
-         TOP-LEVEL MENU
-    ═══════════════════════════════════════════════════════════ -->
+    <!-- ═══ MENUS — all in ONE file, loaded after cake_order_views.xml ═══ -->
     <menuitem id="menu_cake_root"
-              name="🎂 Custom Cake | جاتو مخصص"
-              sequence="85"/>
+              name="Custom Cake | جاتو مخصص"
+              sequence="85"
+              web_icon="cake_pos,static/description/icon.png"/>
 
     <menuitem id="menu_cake_orders"
               name="Orders | الطلبات"
               parent="menu_cake_root"
-              action="cake_order_views.action_cake_order"
+              action="action_cake_order"
               sequence="10"/>
 
     <menuitem id="menu_cake_ingredients"
-              name="Ingredients &amp; Costs | المكونات"
+              name="Ingredients | المكونات"
               parent="menu_cake_root"
               action="action_cake_ingredient"
               sequence="20"/>
 
     <menuitem id="menu_cake_extra_features"
-              name="Extra Features | الميزات الإضافية"
+              name="Extra Features | الإضافات"
               parent="menu_cake_root"
               action="action_cake_extra_feature"
               sequence="30"/>

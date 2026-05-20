@@ -239,3 +239,17 @@
   color: #b00;
   font-size: .9rem;
 }
+
+/* ── POS Control Button ───────────────────────────────────────────── */
+.cake-pos-btn {
+  background: linear-gradient(135deg, #7b3f00, #c67c1a) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  font-size: 0.9rem !important;
+  padding: 8px 14px !important;
+  cursor: pointer !important;
+  transition: opacity .15s !important;
+}
+.cake-pos-btn:hover { opacity: .88 !important; }

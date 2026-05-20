@@ -1,20 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates xml:space="preserve">
-
-  <!--
-    Inject the "Custom Cake" button into the POS ProductScreen control pad.
-    It appears alongside the standard POS action buttons.
-  -->
-  <t t-name="cake_pos.CustomCakeButton"
-     t-inherit="point_of_sale.ProductScreen"
+  <t t-name="cake_pos.ActionpadWidgetPatch"
+     t-inherit="point_of_sale.ActionpadWidget"
      t-inherit-mode="extension">
     <xpath expr="//div[hasclass('control-buttons')]" position="inside">
-      <button class="control-button btn btn-light fw-bold"
-              t-on-click="openCustomCakePopup"
-              style="background:linear-gradient(135deg,#7b3f00,#c67c1a);color:#fff;border:none;border-radius:8px;padding:8px 14px;">
+      <button class="cake-pos-btn control-button"
+              t-on-click="openCustomCakePopup">
         🎂 جاتو مخصص
       </button>
     </xpath>
   </t>
-
 </templates>

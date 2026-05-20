@@ -1,17 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates xml:space="preserve">
 
+<!--
+  cake_pos.CustomCakePopup — Odoo 19 / OWL 2
+  [J8] All event handlers use named methods, no inline lambdas
+  Props: { close: Function }  (dialog pattern for Odoo 17+)
+-->
 <t t-name="cake_pos.CustomCakePopup">
   <div class="cake-overlay">
     <div class="cake-dialog" dir="rtl">
 
-      <!-- ══ HEADER ══════════════════════════════════════════════════ -->
+      <!-- ══ HEADER ════════════════════════════════════════════════ -->
       <div class="cake-header">
         <span class="cake-header-icon">🎂</span>
         <span class="cake-header-title">تخصيص الجاتو | Custom Cake Builder</span>
       </div>
 
-      <!-- ══ LOADING ═════════════════════════════════════════════════ -->
+      <!-- ══ LOADING ══════════════════════════════════════════════ -->
       <t t-if="state.loading">
         <div class="cake-loading">
           <div class="cake-spinner"/>
@@ -19,28 +24,28 @@
         </div>
       </t>
 
-      <!-- ══ ERROR ═══════════════════════════════════════════════════ -->
+      <!-- ══ ERROR ════════════════════════════════════════════════ -->
       <t t-if="state.error and !state.loading">
         <div class="cake-error-banner">⚠️ <t t-esc="state.error"/></div>
       </t>
 
-      <!-- ══ FORM ════════════════════════════════════════════════════ -->
+      <!-- ══ FORM ══════════════════════════════════════════════════ -->
       <t t-if="!state.loading">
         <div class="cake-body">
 
-          <!-- ── Customer name ──────────────────────────────────── -->
+          <!-- Customer name -->
           <div class="cake-field">
             <label class="cake-label">👤 اسم الزبون | Customer Name</label>
             <input type="text" class="cake-input"
                    t-att-value="state.customer_name"
-                   t-on-input="(ev) => this.onChangeText('customer_name', ev)"
+                   t-on-input="onChangeCustomerName"
                    placeholder="اختياري / Optional"/>
           </div>
 
-          <!-- ── Size ───────────────────────────────────────────── -->
+          <!-- Size -->
           <div class="cake-field">
-            <label class="cake-label">👥 حجم القالب | Cake Size (persons)</label>
-            <select class="cake-select" t-on-change="(ev) => this.onChange('persons', ev)">
+            <label class="cake-label">👥 حجم القالب | Cake Size</label>
+            <select class="cake-select" t-on-change="onChangePersons">
               <option value="10"  t-att-selected="state.persons == '10'">10 أشخاص</option>
               <option value="15"  t-att-selected="state.persons == '15'">15 أشخاص</option>
               <option value="20"  t-att-selected="state.persons == '20'">20 أشخاص</option>
@@ -53,10 +58,10 @@
             </select>
           </div>
 
-          <!-- ── Sponge ─────────────────────────────────────────── -->
+          <!-- Sponge -->
           <div class="cake-field">
             <label class="cake-label">🍰 السبونج | Sponge</label>
-            <select class="cake-select" t-on-change="(ev) => this.onChangeInt('sponge_id', ev)">
+            <select class="cake-select" t-on-change="onChangeSponge">
               <t t-foreach="state.options.sponge" t-as="o" t-key="o.id">
                 <option t-att-value="o.id" t-att-selected="state.sponge_id === o.id"
                         t-esc="o.name"/>
@@ -64,10 +69,10 @@
             </select>
           </div>
 
-          <!-- ── Cream ──────────────────────────────────────────── -->
+          <!-- Cream -->
           <div class="cake-field">
             <label class="cake-label">🍦 الكريما | Cream</label>
-            <select class="cake-select" t-on-change="(ev) => this.onChangeInt('cream_id', ev)">
+            <select class="cake-select" t-on-change="onChangeCream">
               <t t-foreach="state.options.cream" t-as="o" t-key="o.id">
                 <option t-att-value="o.id" t-att-selected="state.cream_id === o.id"
                         t-esc="o.name"/>
@@ -75,10 +80,10 @@
             </select>
           </div>
 
-          <!-- ── Filling ────────────────────────────────────────── -->
+          <!-- Filling -->
           <div class="cake-field">
             <label class="cake-label">🍓 الحشوة | Filling</label>
-            <select class="cake-select" t-on-change="(ev) => this.onChangeInt('filling_id', ev)">
+            <select class="cake-select" t-on-change="onChangeFilling">
               <t t-foreach="state.options.filling" t-as="o" t-key="o.id">
                 <option t-att-value="o.id" t-att-selected="state.filling_id === o.id"
                         t-esc="o.name"/>
@@ -86,10 +91,10 @@
             </select>
           </div>
 
-          <!-- ── Decoration ─────────────────────────────────────── -->
+          <!-- Decoration -->
           <div class="cake-field">
             <label class="cake-label">🎨 الزينة | Decoration</label>
-            <select class="cake-select" t-on-change="(ev) => this.onChangeInt('decoration_id', ev)">
+            <select class="cake-select" t-on-change="onChangeDecoration">
               <t t-foreach="state.options.decoration" t-as="o" t-key="o.id">
                 <option t-att-value="o.id" t-att-selected="state.decoration_id === o.id"
                         t-esc="o.name"/>
@@ -97,10 +102,10 @@
             </select>
           </div>
 
-          <!-- ── Disk ───────────────────────────────────────────── -->
+          <!-- Disk -->
           <div class="cake-field">
-            <label class="cake-label">📀 الدسك | Disk / Board</label>
-            <select class="cake-select" t-on-change="(ev) => this.onChangeInt('disk_id', ev)">
+            <label class="cake-label">📀 الدسك | Disk</label>
+            <select class="cake-select" t-on-change="onChangeDisk">
               <t t-foreach="state.options.disk" t-as="o" t-key="o.id">
                 <option t-att-value="o.id" t-att-selected="state.disk_id === o.id"
                         t-esc="o.name"/>
@@ -108,9 +113,9 @@
             </select>
           </div>
 
-          <!-- ── Sugar Paste toggle ─────────────────────────────── -->
+          <!-- Sugar paste toggle -->
           <div class="cake-field cake-toggle-row">
-            <label class="cake-label">🍬 إضافة عجينة السكر؟ | Add Sugar Paste?</label>
+            <label class="cake-label">🍬 إضافة عجينة السكر؟ | Sugar Paste?</label>
             <label class="cake-toggle-switch">
               <input type="checkbox"
                      t-att-checked="state.use_sugar_paste"
@@ -119,11 +124,10 @@
             </label>
           </div>
 
-          <!-- Sugar paste type (conditional) -->
           <t t-if="state.use_sugar_paste and state.options.sugar_paste.length">
             <div class="cake-field cake-indent">
               <label class="cake-label">🍬 نوع عجينة السكر</label>
-              <select class="cake-select" t-on-change="(ev) => this.onChangeInt('sugar_paste_id', ev)">
+              <select class="cake-select" t-on-change="onChangeSugarPaste">
                 <t t-foreach="state.options.sugar_paste" t-as="o" t-key="o.id">
                   <option t-att-value="o.id" t-att-selected="state.sugar_paste_id === o.id"
                           t-esc="o.name"/>
@@ -132,7 +136,7 @@
             </div>
           </t>
 
-          <!-- ══ EXTRA FEATURES SECTION ════════════════════════════ -->
+          <!-- ══ EXTRA FEATURES ═══════════════════════════════════ -->
           <t t-if="state.extraFeatures.length > 0">
             <div class="cake-section-divider">
               <span>⭐ الميزات الإضافية | Extra Features</span>
@@ -140,17 +144,20 @@
 
             <t t-foreach="state.extraFeatures" t-as="feat" t-key="feat.id">
 
-              <!-- Checkbox feature -->
+              <!-- Checkbox feature [J8]: named handlers with feat.id bound via data attr -->
               <t t-if="feat.feature_type === 'checkbox'">
                 <div class="cake-field cake-toggle-row">
                   <label class="cake-label">
                     <t t-esc="feat.name"/>
                     <t t-if="feat.extra_cost > 0">
-                      <span class="cake-extra-cost"> (+<t t-esc="feat.extra_cost.toFixed(3)"/>)</span>
+                      <span class="cake-extra-cost">
+                        (+<t t-esc="feat.extra_cost.toFixed(3)"/>)
+                      </span>
                     </t>
                   </label>
                   <label class="cake-toggle-switch">
                     <input type="checkbox"
+                           t-att-data-feat-id="feat.id"
                            t-att-checked="getExtraSel(feat.id).value"
                            t-on-change="(ev) => this.onToggleExtraCheckbox(feat.id, ev)"/>
                     <span class="cake-toggle-slider"/>
@@ -166,16 +173,12 @@
                     <label class="cake-toggle-switch cake-toggle-small">
                       <input type="checkbox"
                              t-att-checked="getExtraSel(feat.id).value"
-                             t-on-change="(ev) => {
-                               this.state.extraSelections[feat.id] = this.state.extraSelections[feat.id] || {};
-                               this.state.extraSelections[feat.id].value = ev.target.checked;
-                               this._recalcPrice();
-                             }"/>
+                             t-on-change="(ev) => this.onToggleExtraDropdown(feat.id, ev)"/>
                       <span class="cake-toggle-slider"/>
                     </label>
                     <select class="cake-select cake-select-grow"
                             t-att-disabled="!getExtraSel(feat.id).value"
-                            t-on-change="(ev) => this.onChangeExtraDropdown(feat.id, ev)">
+                            t-on-change="(ev) => this.onChangeExtraDropdownOption(feat.id, ev)">
                       <t t-foreach="feat.options" t-as="opt" t-key="opt.id">
                         <option t-att-value="opt.id"
                                 t-att-selected="getExtraSel(feat.id).optionId === opt.id"
@@ -200,18 +203,18 @@
             </t>
           </t>
 
-          <!-- ── Notes ──────────────────────────────────────────── -->
+          <!-- Notes -->
           <div class="cake-field">
-            <label class="cake-label">📝 ملاحظات خاصة | Special Notes</label>
+            <label class="cake-label">📝 ملاحظات | Notes</label>
             <textarea class="cake-textarea" rows="2"
                       t-att-value="state.notes"
-                      t-on-input="(ev) => this.onChangeText('notes', ev)"
+                      t-on-input="onChangeNotes"
                       placeholder="أي طلبات إضافية / Any special requests..."/>
           </div>
 
         </div><!-- /cake-body -->
 
-        <!-- ══ PRICE BAR ══════════════════════════════════════════ -->
+        <!-- ══ PRICE BAR ═════════════════════════════════════════ -->
         <div class="cake-price-bar">
           <span class="cake-price-label">💰 السعر الإجمالي | Total Price</span>
           <span class="cake-price-value">
@@ -224,19 +227,19 @@
           </span>
         </div>
 
-        <!-- ══ FOOTER ══════════════════════════════════════════════ -->
+        <!-- ══ FOOTER ════════════════════════════════════════════ -->
         <div class="cake-footer">
-          <button class="cake-btn cake-btn-cancel" t-on-click="cancel">
+          <button class="cake-btn cake-btn-cancel" t-on-click="onCancel">
             ✕ إلغاء | Cancel
           </button>
           <button class="cake-btn cake-btn-confirm"
                   t-att-disabled="state.selling_price &lt;= 0 or state.priceLoading"
-                  t-on-click="confirm">
+                  t-on-click="onConfirm">
             ✅ إضافة للطلب | Add to Order
           </button>
         </div>
 
-      </t><!-- /!loading -->
+      </t>
     </div>
   </div>
 </t>
