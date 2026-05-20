@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hr_payslip_extra_hours_adjustment_manager,hr.payslip extra hours adjustment manager,model_hr_payslip,payroll_extra_hours_adjustment.group_extra_hours_adjustment_manager,1,1,0,0

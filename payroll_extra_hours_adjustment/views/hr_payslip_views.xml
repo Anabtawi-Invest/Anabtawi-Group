@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_payslip_form_inherit_extra_hours_adjustment" model="ir.ui.view">
+        <field name="name">hr.payslip.form.inherit.extra.hours.adjustment</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='account_info']/group/group[1]/field[@name='employee_extra_hours_balance']" position="after">
+                <field
+                    name="manual_extra_hours_balance"
+                    widget="float_time"
+                    groups="payroll_extra_hours_adjustment.group_extra_hours_adjustment_manager"
+                />
+                <button
+                    name="action_apply_additional_extra_hours"
+                    type="object"
+                    string="Apply Additional Extra Hours"
+                    class="btn-primary"
+                    groups="payroll_extra_hours_adjustment.group_extra_hours_adjustment_manager"
+                />
+            </xpath>
+        </field>
+    </record>
+</odoo>
