@@ -1,6 +1,7 @@
 /** @odoo-module */
 
-console.log("[PLEDGE] Module loading started...");
+const PLEDGE_ORDER_BUILD_TAG = "PLEDGE_ORDER_BUILD_2026_05_10_2155";
+console.log("[PLEDGE] Module loading started...", PLEDGE_ORDER_BUILD_TAG);
 
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
@@ -312,7 +313,7 @@ patch(ControlButtons.prototype, {
             console.log("[PLEDGE] Calling action_return_pledge for ID:", selectedPledge.id, "Type:", returnType);
             
             await this.env.services.orm.call(
-                "pos.pledge",
+                "pos.advance.order.pledge",
                 "action_return_pledge",
                 [[selectedPledge.id]],
                 { context: { return_type: returnType } }
@@ -405,7 +406,27 @@ patch(PosOrder.prototype, {
         if (this.employee_id) {
             data.employee_id = this.employee_id;
         }
-        console.log("[PLEDGE] Serializing order with employee_id:", this.employee_id);
+        const lines = this.getOrderlines ? this.getOrderlines() : this.lines || [];
+        console.warn(
+            "[PLEDGE][TRACE][FRONT] serializeForORM build=%s order=%s employee_id=%s lines=%s payload_lines=%s",
+            PLEDGE_ORDER_BUILD_TAG,
+            this.name || this.uid || "n/a",
+            this.employee_id || "none",
+            lines.length,
+            (data.lines || []).length
+        );
+        lines.forEach((line, idx) => {
+            const product = line.getProduct ? line.getProduct() : (line.product || line.product_id);
+            console.warn(
+                "[PLEDGE][TRACE][FRONT] line#%s product=%s id=%s qty=%s unit=%s has_pledge=%s",
+                idx + 1,
+                product?.display_name || product?.name || "unknown",
+                product?.id || "n/a",
+                line.get_quantity ? line.get_quantity() : (line.qty || 0),
+                line.get_unit_price ? line.get_unit_price() : (line.price_unit || 0),
+                product?.has_pledge === true
+            );
+        });
         return data;
     },
 });
@@ -939,7 +960,9 @@ patch(PaymentScreen.prototype, {
             console.log(`[PLEDGE]   -> Final price for line: ${price}`);
             
             if (product?.has_pledge) {
-                const lineAmount = product.pledge_amount || price;
+                const qty = line.get_quantity ? line.get_quantity() : line.qty || 0;
+                const unitPledge = product.pledge_amount || 0;
+                const lineAmount = unitPledge ? unitPledge * qty : price;
                 pledgeAmount += lineAmount;
                 console.log(`[PLEDGE]   -> Adding ${lineAmount} to pledgeAmount (total: ${pledgeAmount})`);
             } else if (product?.is_employee_service) {
@@ -1044,11 +1067,11 @@ patch(PaymentScreen.prototype, {
             };
 
             console.log("[PLEDGE] Prepared pledge data for backend:", pledgeData);
-            console.log("[PLEDGE] Calling pos.pledge.create_from_pos...");
+            console.log("[PLEDGE] Calling pos.advance.order.pledge.create_from_pos...");
 
             // Use the orm service from setup
             const pledgeId = await this.orm.call(
-                "pos.pledge",
+                "pos.advance.order.pledge",
                 "create_from_pos",
                 [pledgeData]
             );
@@ -1565,4 +1588,4 @@ _buildFullReceiptHtml(receiptData) {
 });
 
 console.log("[PLEDGE] ReceiptScreen patch applied");
-console.log("[PLEDGE] Module loaded successfully!");
+console.log("[PLEDGE] Module loaded successfully!", PLEDGE_ORDER_BUILD_TAG);

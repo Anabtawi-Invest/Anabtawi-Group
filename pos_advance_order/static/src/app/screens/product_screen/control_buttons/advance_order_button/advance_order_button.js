@@ -44,6 +44,14 @@ patch(ControlButtons.prototype, {
         return "btn btn-success btn-lg lh-lg";
     },
 
+    get advanceOrderButtonLabel() {
+        return _t("Advance Order");
+    },
+
+    get completeAdvanceOrderButtonLabel() {
+        return _t("Complete Advance Order");
+    },
+
     _getCurrentOrder() {
         return this.currentOrder || this.pos.getOrder?.();
     },
@@ -81,7 +89,7 @@ patch(ControlButtons.prototype, {
             payload.amount_tendered ?? advanceAmount
         );
         const changeDue = toNumber(
-            result?.advance_change_amount,
+            result?.change_amount,
             Math.max(amountTendered - advanceAmount, 0)
         );
         return {

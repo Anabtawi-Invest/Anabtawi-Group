@@ -120,18 +120,29 @@ class PosAdvanceOrder(models.Model):
         string="Amount Tendered",
         currency_field="currency_id",
         default=0.0,
-        help="Cash or card total handed by the customer at the register. "
-        "Accounting and POS session deposit totals use the Advance amount only; "
-        "the difference is change to return to the customer.",
+        help="Amount received from customer for the advance payment.",
     )
-    advance_change_amount = fields.Monetary(
-        string="Change Due",
+    change_amount = fields.Monetary(
+        string="Change Returned",
         currency_field="currency_id",
-        compute="_compute_advance_change_amount",
-        help="Amount to return to the customer: Amount Tendered minus Advance.",
+        compute="_compute_change_amount",
+        store=True,
+        help="Amount returned to the customer (amount_tendered - advance_amount).",
     )
     amount_paid = fields.Monetary(string="Paid Amount", currency_field="currency_id", compute="_compute_payment_amounts", store=True)
     amount_remaining = fields.Monetary(string="Remaining Amount", currency_field="currency_id", compute="_compute_payment_amounts", store=True)
+    remaining_amount_tendered = fields.Monetary(
+        string="Remaining Amount Tendered",
+        currency_field="currency_id",
+        default=0.0,
+        help="Amount received from customer when completing remaining payment.",
+    )
+    remaining_change_amount = fields.Monetary(
+        string="Remaining Change Returned",
+        currency_field="currency_id",
+        default=0.0,
+        help="Amount returned to the customer when completing remaining payment.",
+    )
     from_pos_config_id = fields.Many2one(
         "pos.config",
         string="From POS",
@@ -167,6 +178,13 @@ class PosAdvanceOrder(models.Model):
         readonly=True,
         copy=False,
         help="Posted entry when the sale completes: debit liability, credit advance receivable to align with invoicing.",
+    )
+    pledge_completion_settlement_move_id = fields.Many2one(
+        "account.move",
+        string="Pledge Completion Settlement",
+        readonly=True,
+        copy=False,
+        help="Posted entry when the sale completes: debit pledge liability, credit receivable (after pledge is collected on POS).",
     )
     # Kept for UI (can be removed later). Now computed from POS orders rather than account.payment.
     payment_progress = fields.Selection(
@@ -591,19 +609,6 @@ class PosAdvanceOrder(models.Model):
             if commands:
                 order.write({"pledge_line_ids": commands})
 
-    @api.depends("amount_tendered", "advance_amount")
-    def _compute_advance_change_amount(self):
-        for order in self:
-            rounding = order.currency_id.rounding or 0.01
-            advance = order.advance_amount or 0.0
-            tendered = order.amount_tendered or 0.0
-            if float_is_zero(tendered, precision_rounding=rounding):
-                tendered = advance
-            order.advance_change_amount = max(
-                order.currency_id.round(tendered - advance),
-                0.0,
-            )
-
     @api.depends("amount_grand_total", "advance_amount", "discount_amount", "state")
     def _compute_payment_amounts(self):
         for order in self:
@@ -617,6 +622,13 @@ class PosAdvanceOrder(models.Model):
 
             order.amount_paid = min(paid, total)
             order.amount_remaining = total - order.amount_paid
+
+    @api.depends("amount_tendered", "advance_amount")
+    def _compute_change_amount(self):
+        for order in self:
+            tendered = order.amount_tendered or 0.0
+            advance = order.advance_amount or 0.0
+            order.change_amount = max(tendered - advance, 0.0)
 
     def _get_open_session(self, config):
         session = self.env["pos.session"].sudo().search(
@@ -676,6 +688,18 @@ class PosAdvanceOrder(models.Model):
                 _("This POS session must include a Customer Account payment method to complete advance orders.")
             )
         return pm
+
+    def _get_advance_application_payment_method(self, session):
+        """Payment method recorded for the prepaid amount on the completion POS order (second payment line)."""
+        self.ensure_one()
+        cfg = self.pos_config_id
+        pm = cfg.pos_advance_application_payment_method_id
+        if pm and pm.id in session.payment_method_ids.ids:
+            # Advance application must go through pay_later so settlement
+            # (Dr liability / Cr advance receivable) is fully consumed.
+            if pm.type == "pay_later":
+                return pm
+        return self._get_pay_later_payment_method(session)
 
     def _normalize_tax_ids(self, tax_value):
         """Normalize tax_ids input (either [Command/set], [(6,0,ids)], ids list) -> ids list."""
@@ -835,7 +859,7 @@ class PosAdvanceOrder(models.Model):
         PosPayment = self.env["pos.payment"].sudo()
         rounding = order.currency_id.rounding
         for payment_method, amount in payments:
-            if float_compare(amount, 0.0, precision_rounding=rounding) <= 0:
+            if float_is_zero(amount, precision_rounding=rounding):
                 continue
             _logger.info(
                 "[ADV_POS_DEBUG] Payment line order=%s advance_order=%s method=%s amount=%s",
@@ -890,14 +914,15 @@ class PosAdvanceOrder(models.Model):
             if order.advance_amount and order.advance_amount < 0:
                 raise UserError(_("Advance amount cannot be negative."))
 
-    @api.constrains("advance_amount", "amount_tendered")
-    def _check_amount_tendered_vs_advance(self):
+    @api.constrains("amount_tendered", "advance_amount")
+    def _check_amount_tendered(self):
         for order in self:
-            rnd = order.currency_id.rounding or 0.01
-            if float_is_zero(order.amount_tendered or 0.0, precision_rounding=rnd):
-                continue
-            if float_compare(order.amount_tendered, order.advance_amount or 0.0, precision_rounding=rnd) < 0:
-                raise UserError(_("Amount tendered cannot be less than the advance amount."))
+            tendered = order.amount_tendered or 0.0
+            advance = order.advance_amount or 0.0
+            if tendered and tendered < 0:
+                raise UserError(_("Amount tendered cannot be negative."))
+            if tendered and tendered < advance:
+                raise UserError(_("Amount tendered cannot be less than advance amount."))
 
     @api.constrains("pos_payment_method_id", "from_pos_config_id", "state")
     def _check_pos_payment_method_config(self):
@@ -939,6 +964,12 @@ class PosAdvanceOrder(models.Model):
 
             if order.advance_amount > order.amount_grand_total:
                 raise UserError(_("Advance amount cannot be greater than the total."))
+
+            if not order.amount_tendered:
+                order.amount_tendered = order.advance_amount
+
+            if order.amount_tendered < order.advance_amount:
+                raise UserError(_("Amount tendered cannot be less than advance amount."))
 
             order.state = "confirmed"
 
@@ -982,6 +1013,17 @@ class PosAdvanceOrder(models.Model):
             pos_cfg.pos_advance_receivable_account_id
             or self.partner_id.with_company(self.company_id).property_account_receivable_id
         )
+
+    def _get_pledge_liability_account(self):
+        """Liability credited when pledge is sold on POS; debited when pledge is applied at completion."""
+        self.ensure_one()
+        cfg = self.pos_config_id
+        if cfg.pos_pledge_liability_account_id:
+            return cfg.pos_pledge_liability_account_id
+        pledge_product = cfg.pledge_product_id
+        if not pledge_product:
+            return False
+        return pledge_product.property_account_income_id or pledge_product.product_tmpl_id.property_account_income_id
 
     def _get_payment_journal(self):
         """Select journal: POS payment method journal first (same as normal POS payments), then From/Picking POS fallback."""
@@ -1056,28 +1098,43 @@ class PosAdvanceOrder(models.Model):
             payment_method_line.id,
         )
 
+        tendered_amount = self.amount_tendered or self.advance_amount
+        move_lines = [
+            Command.create({
+                "name": _("Advance deposit %s") % self.name,
+                "account_id": liquidity_account.id,
+                "partner_id": self.partner_id.id,
+                "debit": tendered_amount,
+                "credit": 0.0,
+            }),
+        ]
+        if self.change_amount and not float_is_zero(self.change_amount, precision_rounding=self.currency_id.rounding):
+            move_lines.append(
+                Command.create({
+                    "name": _("Advance change return %s") % self.name,
+                    "account_id": liquidity_account.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": 0.0,
+                    "credit": self.change_amount,
+                })
+            )
+        move_lines.append(
+            Command.create({
+                "name": _("Advance deposit %s") % self.name,
+                "account_id": liability_account.id,
+                "partner_id": self.partner_id.id,
+                "debit": 0.0,
+                "credit": self.advance_amount,
+            })
+        )
+
         move = self.env["account.move"].sudo().create({
             "move_type": "entry",
             "journal_id": journal.id,
             "date": fields.Date.context_today(self),
             "ref": _("Advance deposit - %s") % self.name,
             "partner_id": self.partner_id.id,
-            "line_ids": [
-                Command.create({
-                    "name": _("Advance deposit %s") % self.name,
-                    "account_id": liquidity_account.id,
-                    "partner_id": self.partner_id.id,
-                    "debit": self.advance_amount,
-                    "credit": 0.0,
-                }),
-                Command.create({
-                    "name": _("Advance deposit %s") % self.name,
-                    "account_id": liability_account.id,
-                    "partner_id": self.partner_id.id,
-                    "debit": 0.0,
-                    "credit": self.advance_amount,
-                }),
-            ],
+            "line_ids": move_lines,
         })
         move.action_post()
         self.advance_deposit_move_id = move.id
@@ -1102,18 +1159,9 @@ class PosAdvanceOrder(models.Model):
         receivable = self._get_advance_receivable_account()
         if not liability or not receivable:
             raise UserError(_("Configure POS Advance Account and Advance Receivable on the POS."))
-        journal = (
-            pos_cfg.invoice_journal_id
-            or self.env["account.journal"].search(
-                [
-                    ("company_id", "=", self.company_id.id),
-                    ("type", "=", "general"),
-                ],
-                limit=1,
-            )
-        )
+        journal = pos_cfg.advance_settlement_journal_id
         if not journal:
-            raise UserError(_("No journal found to post the advance settlement entry."))
+            raise UserError(_("Please configure an Advance Settlement Journal on the POS."))
 
         move = self.env["account.move"].sudo().create({
             "move_type": "entry",
@@ -1144,6 +1192,67 @@ class PosAdvanceOrder(models.Model):
             self.name,
             move.id,
             self.advance_amount,
+        )
+        return move
+
+    def _post_pledge_completion_settlement_move(self):
+        """After pledge POS order is paid: Dr pledge liability / Cr receivable for pledge_amount."""
+        self.ensure_one()
+        if self.pledge_completion_settlement_move_id:
+            return self.pledge_completion_settlement_move_id
+        rounding = self.currency_id.rounding
+        if not self.pledge_amount or float_is_zero(self.pledge_amount, precision_rounding=rounding):
+            return False
+        if not self.pledge_pos_order_id:
+            _logger.warning(
+                "[PLEDGE_SETTLEMENT] Skipped: pledge_amount=%s but no pledge POS order (configure pledge product?) advance=%s",
+                self.pledge_amount,
+                self.name,
+            )
+            return False
+        liability = self._get_pledge_liability_account()
+        receivable = self._get_advance_receivable_account()
+        if not liability or not receivable:
+            raise UserError(
+                _(
+                    "Configure pledge liability: set 'Pledge Liability Account' on the POS or ensure the pledge product has an income account, "
+                    "and set POS Advance Receivable (or partner receivable)."
+                )
+            )
+        pos_cfg = self.pos_config_id
+        journal = pos_cfg.advance_settlement_journal_id
+        if not journal:
+            raise UserError(_("Please configure an Advance Settlement Journal on the POS."))
+
+        move = self.env["account.move"].sudo().create({
+            "move_type": "entry",
+            "journal_id": journal.id,
+            "date": fields.Date.context_today(self),
+            "ref": _("Pledge completion settlement - %s") % self.name,
+            "line_ids": [
+                Command.create({
+                    "name": _("Apply pledge %(ref)s") % {"ref": self.name},
+                    "account_id": liability.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": self.pledge_amount,
+                    "credit": 0.0,
+                }),
+                Command.create({
+                    "name": _("Apply pledge %(ref)s") % {"ref": self.name},
+                    "account_id": receivable.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": 0.0,
+                    "credit": self.pledge_amount,
+                }),
+            ],
+        })
+        move.action_post()
+        self.pledge_completion_settlement_move_id = move.id
+        _logger.info(
+            "[PLEDGE_SETTLEMENT] advance=%s move_id=%s amount=%s",
+            self.name,
+            move.id,
+            self.pledge_amount,
         )
         return move
 
@@ -1193,10 +1302,10 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_payment(self, pos_payment_method_id=None, pos_config_id=None):
-        """Create a full POS sale with product lines only; pay cash/bank for remainder and Customer Account for the prepaid amount.
+    def action_create_remaining_payment(self, pos_payment_method_id=None, pos_config_id=None, amount_tendered=None):
+        """Create a full POS sale at the full product total; pay remainder in cash/bank and record the advance as its own payment line.
 
-        Accounting: apply advance via _post_advance_completion_settlement_move (Dr liability / Cr receivable).
+        Accounting: _post_advance_completion_settlement_move (Dr liability / Cr receivable); pledge settlement if any.
         Pass ``pos_config_id`` when calling from POS so completion is enforced on the Picking POS only.
         """
         for order in self:
@@ -1234,12 +1343,12 @@ class PosAdvanceOrder(models.Model):
             rounding = order.currency_id.rounding
             remaining = order.amount_remaining or 0.0
             advance_part = order.advance_amount or 0.0
+            remaining_tendered = float(amount_tendered if amount_tendered is not None else remaining)
+            if float_compare(remaining_tendered, remaining, precision_rounding=rounding) < 0:
+                raise UserError(_("Amount tendered cannot be less than remaining amount."))
+            remaining_change = max(remaining_tendered - remaining, 0.0)
 
-            pay_later_pm = False
-            if not float_is_zero(advance_part, precision_rounding=rounding):
-                pay_later_pm = order._get_pay_later_payment_method(session)
-
-            # Build POS order lines (full sale; no negative deposit line)
+            # Full sale total on POS (no negative deposit line); advance appears only as a payment line.
             lines = []
             for l in order.line_ids.filtered(lambda x: not x.display_type and x.product_id):
                 lines.append({
@@ -1259,43 +1368,226 @@ class PosAdvanceOrder(models.Model):
                 raise UserError(
                     _("Order total does not match remaining plus advance. Recalculate the advance order.")
                 )
-            payouts = [(pm, remaining)]
-            if pay_later_pm:
-                payouts.append((pay_later_pm, advance_part))
+
+            payouts = [(pm, remaining_tendered)]
+            if not float_is_zero(remaining_change, precision_rounding=rounding):
+                payouts.append((pm, -remaining_change))
+            if not float_is_zero(advance_part, precision_rounding=rounding):
+                adv_pm = order._get_advance_application_payment_method(session)
+                payouts.append((adv_pm, advance_part))
             order._pay_pos_order_multi(pos_order, payouts)
             order.remaining_pos_order_id = pos_order.id
+            order.remaining_amount_tendered = remaining_tendered
+            order.remaining_change_amount = remaining_change
             order._post_advance_completion_settlement_move()
-            order.state = "fully_paid"
 
-            # Create a separate POS order for pledge (paid immediately) in the same session
-            if order.pledge_amount and order.pledge_amount > 0 and pos_config.pledge_product_id:
-                pledge_product = pos_config.pledge_product_id
-                pledge_lines = [{
-                    "product_id": pledge_product.id,
-                    "qty": 1.0,
-                    "price_unit": order.pledge_amount,
-                    "discount": 0.0,
-                    "tax_ids": [(6, 0, [])],
-                    "product_uom_id": pledge_product.uom_id.id,
-                    "name": _("Pledge"),
-                }]
-                pledge_order = order._create_pos_order(session, pledge_lines)
-                order._pay_pos_order(pledge_order, pm, pledge_order.amount_total)
-                order.pledge_pos_order_id = pledge_order.id
-                # Link pledge lines to the POS order that collected the pledge.
-                if order.pledge_line_ids:
-                    order.pledge_line_ids.sudo().write({
-                        "pos_order_id": pledge_order.id,
-                        "partner_id": order.partner_id.id,
+            # Pledge handling on completion:
+            # if pos_pledge_order is installed, reuse its native flow to create
+            # pos.advance.order.pledge + deposit payment entry from the same sale order.
+            # Do not rely only on order.pledge_amount because it can be zero while
+            # pledge products are present on lines and need snapshot syncing.
+            has_pledge_on_lines = bool(
+                order.line_ids.filtered(
+                    lambda l: not l.display_type and l.product_id and l.product_id.has_pledge
+                )
+            )
+            has_pledge_indicators = bool(
+                (order.pledge_amount and order.pledge_amount > 0)
+                or order.pledge_line_ids
+                or has_pledge_on_lines
+            )
+            if has_pledge_indicators:
+                _logger.warning(
+                    "[ADV_PLEDGE_DEBUG] completion start advance=%s pos_order=%s pledge_amount=%s "
+                    "order_pledge_lines=%s pos_lines=%s pos_pledge_products=%s",
+                    order.name,
+                    pos_order.id,
+                    order.pledge_amount,
+                    order.pledge_line_ids.ids,
+                    pos_order.lines.ids,
+                    pos_order.lines.filtered(lambda l: l.product_id and l.product_id.has_pledge).mapped("product_id.id"),
+                )
+                if hasattr(pos_order, "_create_pledge_collection_orders"):
+                    pledge_total_snapshot = sum(order.pledge_line_ids.mapped("pledge_subtotal")) or 0.0
+                    pledge_qty_snapshot = sum(order.pledge_line_ids.mapped("pledge_qty")) or 0.0
+                    pledge_product_ids_snapshot = order.pledge_line_ids.mapped("product_id").ids
+                    # Fallback: rebuild snapshot from advance order lines when pledge_line_ids
+                    # is empty/outdated on completion.
+                    if float_is_zero(pledge_total_snapshot, precision_rounding=rounding) or not pledge_product_ids_snapshot:
+                        qty_by_product = {}
+                        for adv_line in order.line_ids.filtered(lambda l: not l.display_type and l.product_id and l.product_id.has_pledge):
+                            qty_by_product.setdefault(adv_line.product_id, 0.0)
+                            qty_by_product[adv_line.product_id] += adv_line.product_qty or 0.0
+                        if qty_by_product:
+                            pledge_qty_snapshot = sum(qty_by_product.values())
+                            pledge_product_ids_snapshot = [prod.id for prod in qty_by_product.keys()]
+                            pledge_total_snapshot = sum(
+                                (qty_by_product[prod] or 0.0) * (prod.product_tmpl_id.pledge_amount or 0.0)
+                                for prod in qty_by_product.keys()
+                            )
+                            _logger.warning(
+                                "[ADV_PLEDGE_DEBUG] snapshot fallback from advance lines total=%s qty=%s products=%s",
+                                pledge_total_snapshot,
+                                pledge_qty_snapshot,
+                                pledge_product_ids_snapshot,
+                            )
+                    # Last fallback: use configured pledge product + amount on advance order.
+                    if (
+                        float_is_zero(pledge_total_snapshot, precision_rounding=rounding)
+                        and order.pledge_amount
+                        and order.pledge_amount > 0
+                        and pos_config.pledge_product_id
+                    ):
+                        pledge_total_snapshot = order.pledge_amount
+                        pledge_qty_snapshot = 1.0
+                        pledge_product_ids_snapshot = [pos_config.pledge_product_id.id]
+                        _logger.warning(
+                            "[ADV_PLEDGE_DEBUG] snapshot fallback from order.pledge_amount total=%s qty=%s products=%s",
+                            pledge_total_snapshot,
+                            pledge_qty_snapshot,
+                            pledge_product_ids_snapshot,
+                        )
+                    pos_order.sudo().write({
+                        "total_pledge_amount": pledge_total_snapshot,
+                        "pledge_product_qty": int(pledge_qty_snapshot),
+                        "pledge_snapshot_product_ids": [(6, 0, pledge_product_ids_snapshot)],
                     })
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] snapshot pushed to completion pos_order=%s total=%s qty=%s products=%s",
+                        pos_order.name,
+                        pledge_total_snapshot,
+                        pledge_qty_snapshot,
+                        pledge_product_ids_snapshot,
+                    )
+                    before_count = self.env["pos.advance.order.pledge"].sudo().search_count(
+                        [("pos_order_id", "=", pos_order.id)]
+                    )
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] calling _create_pledge_collection_orders order=%s "
+                        "before_count=%s state=%s partner=%s",
+                        pos_order.name,
+                        before_count,
+                        pos_order.state,
+                        pos_order.partner_id.id if pos_order.partner_id else False,
+                    )
+                    pos_order._create_pledge_collection_orders()
+                    after_lines = self.env["pos.advance.order.pledge"].sudo().search(
+                        [("pos_order_id", "=", pos_order.id)]
+                    )
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] after _create_pledge_collection_orders order=%s "
+                        "after_count=%s created_ids=%s",
+                        pos_order.name,
+                        len(after_lines),
+                        after_lines.ids,
+                    )
+                    if not after_lines:
+                        _logger.warning(
+                            "[ADV_PLEDGE_DEBUG] no pledge records created by pos_pledge_order flow; "
+                            "running direct fallback create_from_pos for order=%s",
+                            pos_order.name,
+                        )
+                        fallback_products = pledge_product_ids_snapshot or pos_order.lines.filtered(
+                            lambda l: l.product_id and l.product_id.has_pledge
+                        ).mapped("product_id.id")
+                        try:
+                            line_id = self.env["pos.advance.order.pledge"].sudo().create_from_pos(
+                                {
+                                    "pos_order_id": pos_order.id,
+                                    "partner_id": order.partner_id.id,
+                                    "pledge_products": fallback_products,
+                                }
+                            )
+                            _logger.warning(
+                                "[ADV_PLEDGE_DEBUG] fallback create_from_pos done order=%s line_id=%s products=%s",
+                                pos_order.name,
+                                line_id,
+                                fallback_products,
+                            )
+                            if hasattr(pos_order, "_post_pledge_deposit_move"):
+                                move = pos_order._post_pledge_deposit_move()
+                                if move:
+                                    self.env["pos.advance.order.pledge"].sudo().search(
+                                        [("pos_order_id", "=", pos_order.id)]
+                                    ).write({"pledge_move_id": move.id})
+                                    _logger.warning(
+                                        "[ADV_PLEDGE_DEBUG] fallback _post_pledge_deposit_move done order=%s move_id=%s",
+                                        pos_order.name,
+                                        move.id,
+                                    )
+                            after_lines = self.env["pos.advance.order.pledge"].sudo().search(
+                                [("pos_order_id", "=", pos_order.id)]
+                            )
+                        except Exception:
+                            _logger.exception(
+                                "[ADV_PLEDGE_DEBUG] direct fallback create_from_pos failed order=%s products=%s",
+                                pos_order.name,
+                                fallback_products,
+                            )
+                    order.pledge_pos_order_id = pos_order.id
+                    if order.pledge_line_ids:
+                        order.pledge_line_ids.sudo().write({
+                            "pos_order_id": pos_order.id,
+                            "partner_id": order.partner_id.id,
+                        })
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] linked advance pledge lines advance=%s lines=%s pos_order=%s",
+                        order.name,
+                        order.pledge_line_ids.ids,
+                        pos_order.id,
+                    )
+                elif pos_config.pledge_product_id:
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] fallback legacy pledge order flow advance=%s pos_cfg=%s pledge_product=%s",
+                        order.name,
+                        pos_config.id,
+                        pos_config.pledge_product_id.id if pos_config.pledge_product_id else False,
+                    )
+                    # Legacy fallback when pos_pledge_order flow is unavailable.
+                    pledge_product = pos_config.pledge_product_id
+                    pledge_lines = [{
+                        "product_id": pledge_product.id,
+                        "qty": 1.0,
+                        "price_unit": order.pledge_amount,
+                        "discount": 0.0,
+                        "tax_ids": [(6, 0, [])],
+                        "product_uom_id": pledge_product.uom_id.id,
+                        "name": _("Pledge"),
+                    }]
+                    pledge_order = order._create_pos_order(session, pledge_lines)
+                    order._pay_pos_order(pledge_order, pm, pledge_order.amount_total)
+                    order.pledge_pos_order_id = pledge_order.id
+                    if order.pledge_line_ids:
+                        order.pledge_line_ids.sudo().write({
+                            "pos_order_id": pledge_order.id,
+                            "partner_id": order.partner_id.id,
+                        })
+                    order._post_pledge_completion_settlement_move()
+                else:
+                    _logger.warning(
+                        "[ADV_PLEDGE_DEBUG] skipped pledge processing advance=%s reason=no_pos_pledge_method_and_no_pledge_product",
+                        order.name,
+                    )
+            else:
+                _logger.warning(
+                    "[ADV_PLEDGE_DEBUG] skipped pledge processing advance=%s reason=no_pledge_indicators "
+                    "pledge_amount=%s pledge_lines=%s has_pledge_on_lines=%s",
+                    order.name,
+                    order.pledge_amount,
+                    order.pledge_line_ids.ids,
+                    has_pledge_on_lines,
+                )
+
+            order.state = "fully_paid"
 
         return True
 
-    def action_create_remaining_amount(self, pos_payment_method_id=None, pos_config_id=None):
+    def action_create_remaining_amount(self, pos_payment_method_id=None, pos_config_id=None, amount_tendered=None):
         """Alias for POS button flow."""
         return self.action_create_remaining_payment(
             pos_payment_method_id=pos_payment_method_id,
             pos_config_id=pos_config_id,
+            amount_tendered=amount_tendered,
         )
 
     def action_refund_advance_payment(self):
@@ -1394,17 +1686,11 @@ class PosAdvanceOrder(models.Model):
         for vals in vals_list:
             if vals.get("name", "New") == "New":
                 vals["name"] = self.env["ir.sequence"].next_by_code("pos.advance.order") or _("New")
+            if vals.get("advance_amount") and not vals.get("amount_tendered"):
+                vals["amount_tendered"] = vals["advance_amount"]
             if vals.get("pos_payment_method_id") and "payment_method" not in vals:
                 pm = PaymentMethod.browse(vals["pos_payment_method_id"])
                 vals["payment_method"] = self._payment_method_selection_from_pos_pm(pm)
-            advance = float(vals.get("advance_amount") or 0.0)
-            tendered = vals.get("amount_tendered", None)
-            tendered_f = float(tendered) if tendered is not None else 0.0
-            rounding = self.env.company.currency_id.rounding or 0.01
-            if float_is_zero(tendered_f, precision_rounding=rounding):
-                vals["amount_tendered"] = advance
-            elif float_compare(tendered_f, advance, precision_rounding=rounding) < 0:
-                raise UserError(_("Amount tendered cannot be less than the advance amount."))
         return super().create(vals_list)
 
     # -------------------------------------------------------------------------

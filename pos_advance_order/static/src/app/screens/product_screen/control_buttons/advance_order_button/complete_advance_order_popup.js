@@ -27,6 +27,7 @@ export class CompleteAdvanceOrderPopup extends Component {
             loading: true,
             search: "",
             selected_order_id: null,
+            amount_tendered: 0,
             advance_orders: [],
             payment_methods: paymentMethods,
             selected_payment_method_id: defaultPmId,
@@ -36,6 +37,21 @@ export class CompleteAdvanceOrderPopup extends Component {
             await this._loadAdvanceOrders();
             this.state.loading = false;
         });
+    }
+
+    _isArabicContext() {
+        const urlLang = new URLSearchParams(window.location.search).get("lang") || "";
+        const htmlLang = document?.documentElement?.lang || "";
+        const bodyDir = document?.body ? window.getComputedStyle(document.body).direction : "";
+        return urlLang.startsWith("ar") || htmlLang.startsWith("ar") || bodyDir === "rtl";
+    }
+
+    _tr(msgid, fallbackArabic) {
+        const translated = _t(msgid);
+        if (translated === msgid && this._isArabicContext()) {
+            return fallbackArabic;
+        }
+        return translated;
     }
 
     paymentMethodIconSrc(pm) {
@@ -56,6 +72,88 @@ export class CompleteAdvanceOrderPopup extends Component {
         const sel = this.state.advance_orders.find((o) => o.id === this.state.selected_order_id);
         const amount = sel ? Number(sel.amount_remaining ?? 0) : 0;
         return formatCurrency(amount, currencyId);
+    }
+
+    get popupTitle() {
+        return this._tr("Complete Advance Order", "إكمال طلب العربون");
+    }
+
+    get popupSubtitle() {
+        return this._tr("Pick an advance paid order to finish settlement", "اختر طلب عربون مدفوع لإكمال التسوية");
+    }
+
+    get searchLabel() {
+        return this._tr("Search by Customer Name or Phone", "بحث باسم العميل أو رقم الهاتف");
+    }
+
+    get searchPlaceholder() {
+        return this._tr("Type customer name or phone...", "اكتب اسم العميل أو رقم الهاتف...");
+    }
+
+    get amountTenderedLabel() {
+        return this._tr("Amount Tendered", "المبلغ المستلم");
+    }
+
+    get amountTenderedHint() {
+        return this._tr(
+            "Customer paid amount for remaining settlement.",
+            "المبلغ الذي دفعه العميل عند تسوية المتبقي."
+        );
+    }
+
+    get colAdvanceLabel() {
+        return this._tr("Advance", "العربون");
+    }
+
+    get colCustomerLabel() {
+        return this._tr("Customer", "العميل");
+    }
+
+    get colPhoneLabel() {
+        return this._tr("Phone", "الهاتف");
+    }
+
+    get colTotalLabel() {
+        return this._tr("Total", "الإجمالي");
+    }
+
+    get colAdvancePaidLabel() {
+        return this._tr("Advance Paid", "العربون المدفوع");
+    }
+
+    get colRemainingLabel() {
+        return this._tr("Remaining", "المتبقي");
+    }
+
+    get noOrdersText() {
+        return this._tr("No advance orders found for this Picking POS.", "لا توجد طلبات عربون لنقطة الاستلام هذه.");
+    }
+
+    get paymentMethodLabel() {
+        return this._tr("Payment method", "طريقة الدفع");
+    }
+
+    get cancelButtonLabel() {
+        return this._tr("Cancel", "إلغاء");
+    }
+
+    get completeButtonLabel() {
+        return this._tr("Complete", "إكمال");
+    }
+
+    get changeReturnedLabel() {
+        return this._tr("Change Returned", "المبلغ المرجّع");
+    }
+
+    get selectedRemainingAmount() {
+        const sel = this.state.advance_orders.find((o) => o.id === this.state.selected_order_id);
+        return Number(sel?.amount_remaining ?? 0);
+    }
+
+    get remainingChangeAmount() {
+        const tendered = Number(this.state.amount_tendered || 0);
+        const due = this.selectedRemainingAmount;
+        return Math.max(tendered - due, 0);
     }
 
     isPaymentSelected(pm) {
@@ -113,20 +211,26 @@ export class CompleteAdvanceOrderPopup extends Component {
             }));
         } catch (error) {
             this.notification.add(
-                error?.message || _t("Failed to load advance orders."),
+                error?.message || this._tr("Failed to load advance orders.", "فشل تحميل طلبات العربون."),
                 { type: "danger" }
             );
         }
     }
 
     get noEligiblePaymentMethodsText() {
-        return _t(
-            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration."
+        return this._tr(
+            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration.",
+            "لا توجد طرق دفع مناسبة في نقطة البيع هذه. أضف طرق دفع نقدية أو بنكية يدوية بدون تكامل طرفية أو QR في إعدادات نقطة البيع."
         );
     }
 
     onSearchInput(ev) {
         this.state.search = (ev.target.value || "").toLowerCase();
+    }
+
+    onAmountTenderedInput(ev) {
+        const value = Number(ev.target.value || 0);
+        this.state.amount_tendered = Number.isFinite(value) ? value : 0;
     }
 
     get filteredOrders() {
@@ -143,15 +247,24 @@ export class CompleteAdvanceOrderPopup extends Component {
 
     selectOrder(orderId) {
         this.state.selected_order_id = orderId;
+        const selected = this.state.advance_orders.find((o) => o.id === orderId);
+        this.state.amount_tendered = Number(selected?.amount_remaining ?? 0);
     }
 
     confirm() {
         if (!this.state.selected_order_id) {
-            this.notification.add(_t("Please select an advance order."), { type: "warning" });
+            this.notification.add(this._tr("Please select an advance order.", "يرجى اختيار طلب عربون."), { type: "warning" });
             return;
         }
         if (!this.state.selected_payment_method_id) {
-            this.notification.add(_t("Please select a payment method."), { type: "warning" });
+            this.notification.add(this._tr("Please select a payment method.", "يرجى اختيار طريقة دفع."), { type: "warning" });
+            return;
+        }
+        if (this.state.amount_tendered < this.selectedRemainingAmount) {
+            this.notification.add(
+                this._tr("Amount tendered cannot be less than remaining amount.", "لا يمكن أن يكون المبلغ المستلم أقل من المبلغ المتبقي."),
+                { type: "warning" }
+            );
             return;
         }
         const selectedPm = this.state.payment_methods.find(
@@ -161,6 +274,8 @@ export class CompleteAdvanceOrderPopup extends Component {
             advance_order_id: this.state.selected_order_id,
             payment_method_id: this.state.selected_payment_method_id,
             payment_method_name: selectedPm?.name || "",
+            amount_tendered: this.state.amount_tendered,
+            change_amount: this.remainingChangeAmount,
         });
         this.props.close();
     }

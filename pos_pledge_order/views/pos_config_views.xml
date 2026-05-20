@@ -13,6 +13,7 @@
                 <group string="Pledge (Rahn) Configuration" name="pledge_configuration">
                     <group>
                         <field name="pledge_product_id"/>
+                        <field name="pos_pledge_liability_account_id"/>
                     </group>
                     <group>
                         <div class="alert alert-info" role="status" colspan="2">

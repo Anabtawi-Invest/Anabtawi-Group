@@ -3,7 +3,7 @@
 from collections import defaultdict
 
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 
 
 class PosAdvanceOrderPledge(models.Model):
@@ -53,6 +53,30 @@ class PosAdvanceOrderPledge(models.Model):
         store=True,
         readonly=True,
     )
+    state = fields.Selection(
+        [
+            ("active", "Active"),
+            ("returned", "Returned"),
+            ("cancelled", "Cancelled"),
+        ],
+        string="Status",
+        default="active",
+        index=True,
+    )
+    receive_date = fields.Datetime(
+        string="Received On",
+        readonly=True,
+        copy=False,
+        help="Date and time when the pledge was collected at POS.",
+    )
+    return_date = fields.Datetime(
+        string="Returned On",
+        readonly=True,
+        copy=False,
+        help="Date and time when the pledge was returned and the deposit was reversed.",
+    )
+    pledge_move_id = fields.Many2one("account.move", string="Pledge Move", readonly=True, copy=False)
+    return_move_id = fields.Many2one("account.move", string="Return Move", readonly=True, copy=False)
 
     @api.depends(
         "order_id.currency_id",
@@ -116,6 +140,40 @@ class PosAdvanceOrderPledge(models.Model):
                AND o.partner_id IS NOT NULL
             """
         )
+        self.env.cr.execute(
+            """
+            UPDATE pos_advance_order_pledge
+               SET state = 'active'
+             WHERE state IS NULL
+            """
+        )
+        # Only when pos.order has pledge_deposit_move_id (e.g. pos_pledge_order); skip otherwise.
+        self.env.cr.execute(
+            """
+            SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'pos_order'
+               AND column_name = 'pledge_deposit_move_id'
+             LIMIT 1
+            """
+        )
+        if self.env.cr.fetchone():
+            self.env.cr.execute(
+                """
+                UPDATE pos_advance_order_pledge pl
+                   SET pledge_move_id = o.pledge_deposit_move_id
+                  FROM pos_order o
+                 WHERE pl.pos_order_id = o.id
+                   AND pl.pledge_move_id IS NULL
+                   AND o.pledge_deposit_move_id IS NOT NULL
+                """
+            )
+        self.env.cr.execute(
+            """
+            UPDATE pos_advance_order_pledge
+               SET receive_date = create_date
+             WHERE receive_date IS NULL
+            """
+        )
 
     @api.constrains("order_id", "pos_order_id")
     def _check_origin(self):
@@ -140,6 +198,8 @@ class PosAdvanceOrderPledge(models.Model):
                 pos_order = self.env["pos.order"].browse(vals["pos_order_id"])
                 if pos_order.exists() and pos_order.partner_id:
                     vals["partner_id"] = pos_order.partner_id.id
+            if "receive_date" not in vals:
+                vals["receive_date"] = fields.Datetime.now()
         return super().create(vals_list)
 
     @api.model
@@ -201,14 +261,18 @@ class PosAdvanceOrderPledge(models.Model):
                 )
 
             if existing:
-                existing.write(
-                    {
-                        "pos_order_id": pos_order.id,
-                        "partner_id": partner_id,
-                        "pledge_qty": qty,
-                        "pledge_amount_unit": unit_amount,
-                    }
-                )
+                write_vals = {
+                    "pos_order_id": pos_order.id,
+                    "partner_id": partner_id,
+                    "pledge_qty": qty,
+                    "pledge_amount_unit": unit_amount,
+                    "state": "active",
+                    "return_date": False,
+                    "return_move_id": False,
+                }
+                if existing.state == "returned" or not existing.receive_date:
+                    write_vals["receive_date"] = fields.Datetime.now()
+                existing.write(write_vals)
                 created |= existing
                 continue
 
@@ -220,7 +284,97 @@ class PosAdvanceOrderPledge(models.Model):
                     "product_id": product_id,
                     "pledge_qty": qty,
                     "pledge_amount_unit": unit_amount,
+                    "state": "active",
                 }
             )
         return created[:1].id
+
+    def action_return_pledge(self):
+        """Reverse pledge deposit move and mark pledge lines returned."""
+        PledgeLine = self.env["pos.advance.order.pledge"]
+        for pledge in self:
+            if pledge.state == "returned" and pledge.return_move_id:
+                continue
+            if pledge.state != "active":
+                raise UserError(_("Only active pledges can be returned."))
+
+            pos_order = pledge.pos_order_id
+            advance = pledge.order_id
+            if pos_order:
+                related_lines = PledgeLine.search(
+                    [("pos_order_id", "=", pos_order.id), ("state", "=", "active")]
+                )
+            elif advance:
+                related_lines = PledgeLine.search(
+                    [("order_id", "=", advance.id), ("state", "=", "active")]
+                )
+                linked_pos = related_lines.filtered("pos_order_id")[:1]
+                pos_order = (
+                    linked_pos.pos_order_id
+                    if linked_pos
+                    else advance.pledge_pos_order_id
+                )
+            else:
+                raise UserError(
+                    _(
+                        "This pledge is not linked to a POS order or an advance order. "
+                        "Open the related advance order and complete the pledge collection on POS, or contact an administrator."
+                    )
+                )
+
+            if not related_lines:
+                related_lines = pledge
+
+            move = False
+            for line in related_lines:
+                if line.pledge_move_id:
+                    move = line.pledge_move_id
+                    break
+            if not move and pos_order and "pledge_deposit_move_id" in self.env["pos.order"]._fields:
+                move = pos_order.sudo().pledge_deposit_move_id
+            if not move or move.state != "posted":
+                raise UserError(_("No posted pledge journal entry is linked to this pledge."))
+
+            existing_return = related_lines.filtered(lambda l: l.return_move_id)[:1]
+            reverse_move = existing_return.return_move_id
+            if not reverse_move:
+                # POS users have read-only access to account.move; reversal must run elevated.
+                move_sudo = move.sudo()
+                ref_name = (
+                    (pos_order and (pos_order.name or pos_order.pos_reference))
+                    or (advance and advance.name)
+                    or move_sudo.ref
+                    or ""
+                )
+                reverse_moves = move_sudo._reverse_moves(
+                    [
+                        {
+                            "date": fields.Date.context_today(pledge),
+                            "ref": _("Pledge return - %s") % ref_name,
+                        }
+                    ],
+                    cancel=False,
+                )
+                reverse_moves.sudo().action_post()
+                reverse_move = reverse_moves[:1]
+
+            related_lines.write(
+                {
+                    "state": "returned",
+                    "return_date": fields.Datetime.now(),
+                    "return_move_id": reverse_move.id,
+                    "pledge_move_id": move.id,
+                }
+            )
+
+            sess = pos_order.session_id if pos_order else False
+            if sess and sess.state in ("opened", "closing_control"):
+                sess.invalidate_recordset(
+                    ["cash_register_balance_end", "cash_register_difference"]
+                )
+        return True
+
+    def action_cancel(self):
+        self.write({"state": "cancelled"})
+        return True
 

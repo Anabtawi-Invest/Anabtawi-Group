@@ -4,15 +4,21 @@
         <field name="name">pos.advance.order.pledge.list</field>
         <field name="model">pos.advance.order.pledge</field>
         <field name="arch" type="xml">
-            <list string="Pledges">
+            <list string="Pledges" decoration-muted="state == 'returned'" decoration-danger="state == 'cancelled'">
                 <field name="partner_id"/>
                 <field name="employee_id" optional="hide"/>
                 <field name="pos_order_id"/>
                 <field name="order_id" optional="hide"/>
                 <field name="product_id"/>
+                <field name="state" widget="badge"
+                    decoration-success="state == 'active'"
+                    decoration-warning="state == 'returned'"
+                    decoration-danger="state == 'cancelled'"/>
                 <field name="pledge_qty"/>
                 <field name="pledge_amount_unit" widget="monetary"/>
                 <field name="pledge_subtotal" widget="monetary"/>
+                <field name="receive_date" optional="show"/>
+                <field name="return_date" optional="show"/>
                 <field name="currency_id" column_invisible="True"/>
             </list>
         </field>
@@ -23,6 +29,14 @@
         <field name="model">pos.advance.order.pledge</field>
         <field name="arch" type="xml">
             <form string="Pledge">
+                <header>
+                    <button name="action_return_pledge" type="object" string="Return Pledge" class="btn-primary"
+                        invisible="state != 'active'"/>
+                    <button name="action_cancel" type="object" string="Cancel" class="btn-secondary"
+                        invisible="state != 'active'"/>
+                    <field name="state" widget="statusbar"
+                        statusbar_visible="active,returned,cancelled"/>
+                </header>
                 <sheet>
                     <group>
                         <field name="partner_id"/>
@@ -31,11 +45,19 @@
                         <field name="order_id" invisible="not order_id"/>
                         <field name="product_id" required="1"/>
                     </group>
+                    <group string="Schedule">
+                        <field name="receive_date"/>
+                        <field name="return_date"/>
+                    </group>
                     <group>
                         <field name="pledge_qty"/>
                         <field name="pledge_amount_unit" widget="monetary"/>
                         <field name="pledge_subtotal" widget="monetary" readonly="1"/>
                         <field name="currency_id" invisible="1"/>
+                    </group>
+                    <group string="Accounting" groups="account.group_account_invoice">
+                        <field name="pledge_move_id" readonly="1"/>
+                        <field name="return_move_id" readonly="1"/>
                     </group>
                 </sheet>
             </form>
@@ -52,6 +74,16 @@
                 <field name="order_id"/>
                 <field name="pos_order_id"/>
                 <field name="product_id"/>
+                <field name="state"/>
+                <filter string="Active" name="active_pledges" domain="[('state', '=', 'active')]"/>
+                <filter string="Returned" name="returned_pledges" domain="[('state', '=', 'returned')]"/>
+                <filter string="Cancelled" name="cancelled_pledges" domain="[('state', '=', 'cancelled')]"/>
+                <separator/>
+                <group>
+                    <filter string="Status" name="group_state" domain="[]" context="{'group_by': 'state'}"/>
+                    <filter string="Customer" name="group_partner" domain="[]" context="{'group_by': 'partner_id'}"/>
+                    <filter string="POS Order" name="group_pos_order" domain="[]" context="{'group_by': 'pos_order_id'}"/>
+                </group>
             </search>
         </field>
     </record>
@@ -73,4 +105,3 @@
         groups="point_of_sale.group_pos_user,point_of_sale.group_pos_manager"
     />
 </odoo>
-

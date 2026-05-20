@@ -128,6 +128,6 @@ class PosAdvanceOrderController(http.Controller):
             "amount_total": order.amount_total,
             "advance_amount": order.advance_amount,
             "amount_tendered": order.amount_tendered,
-            "advance_change_amount": order.advance_change_amount,
+            "change_amount": order.change_amount,
             "advance_pos_order_id": order.advance_pos_order_id.id,
         }

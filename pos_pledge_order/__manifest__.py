@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'POS Pledge (Rahn) Management',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.20',
     'category': 'Point of Sale',
-    "author":"Anabtawi",
     'summary': 'Manage pledge (Rahn) scenarios with employees, delivery, and accounting',
     'description': """
         POS Pledge (Rahn) Management
@@ -20,7 +19,7 @@
         * Three business case scenarios supported
     """,
     'author': 'Your Company',
-    'depends': ['point_of_sale', 'pos_sale', 'account', 'hr'],
+    'depends': ['point_of_sale', 'pos_sale', 'account', 'hr', 'pos_advance_order'],
     'data': [
         'security/ir.model.access.csv',
         'data/sequence.xml',
@@ -32,6 +31,9 @@
     ],
     'assets': {
         'point_of_sale._assets_pos': [
+            'pos_pledge_order/static/src/js/pos_orderline_tax_group_labels_patch.js',
+            'pos_pledge_order/static/src/js/pledge_closing_popup.js',
+            'pos_pledge_order/static/src/xml/pledge_closing_popup.xml',
             'pos_pledge_order/static/src/js/pledge_list_popup.js',
             'pos_pledge_order/static/src/js/employee_selection_popup.js',
             'pos_pledge_order/static/src/js/pos_pledge.js',

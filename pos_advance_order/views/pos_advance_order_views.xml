@@ -140,7 +140,6 @@
                             <field name="payment_method" invisible="1"/>
                             <field name="advance_amount" widget="monetary" readonly="state != 'draft'"/>
                             <field name="amount_tendered" widget="monetary" readonly="state != 'draft'"/>
-                            <field name="advance_change_amount" widget="monetary" readonly="1"/>
                             <field name="is_employee_pricelist" readonly="state != 'draft'"/>
                             <field name="employee_pricelist_employee_id" readonly="1" invisible="not employee_pricelist_employee_id"/>
                             <field name="discount_id" readonly="state != 'draft'" />
@@ -193,9 +192,15 @@
                                 <list string="Pledges">
                                     <field name="employee_id" optional="hide"/>
                                     <field name="product_id"/>
+                                    <field name="state" widget="badge"
+                                        decoration-success="state == 'active'"
+                                        decoration-warning="state == 'returned'"
+                                        decoration-danger="state == 'cancelled'"/>
                                     <field name="pledge_qty"/>
                                     <field name="pledge_amount_unit" widget="monetary"/>
                                     <field name="pledge_subtotal" widget="monetary"/>
+                                    <field name="receive_date" optional="show"/>
+                                    <field name="return_date" optional="show"/>
                                 </list>
                             </field>
                         </page>
@@ -204,6 +209,9 @@
                     <group class="oe_subtotal_footer oe_right">
                         <field name="amount_total" widget="monetary" readonly="1"/>
                         <field name="amount_paid" widget="monetary" readonly="1"/>
+                        <field name="change_amount" widget="monetary" readonly="1"/>
+                        <field name="remaining_amount_tendered" widget="monetary" readonly="1" invisible="remaining_amount_tendered == 0"/>
+                        <field name="remaining_change_amount" widget="monetary" readonly="1" invisible="remaining_change_amount == 0"/>
                         <field name="pledge_amount" widget="monetary" readonly="1" invisible="pledge_amount == 0"/>
 
                         <field name="discount_amount" widget="monetary" readonly="1"/>
@@ -214,6 +222,9 @@
                         <field name="remaining_pos_order_id" readonly="1" invisible="not remaining_pos_order_id"/>
                         <field name="pledge_pos_order_id" readonly="1" invisible="not pledge_pos_order_id"/>
                         <field name="return_pledge_pos_order_id" readonly="1" invisible="not return_pledge_pos_order_id"/>
+                        <field name="advance_deposit_move_id" readonly="1" groups="account.group_account_invoice" invisible="not advance_deposit_move_id"/>
+                        <field name="advance_completion_settlement_move_id" readonly="1" groups="account.group_account_invoice" invisible="not advance_completion_settlement_move_id"/>
+                        <field name="pledge_completion_settlement_move_id" readonly="1" groups="account.group_account_invoice" invisible="not pledge_completion_settlement_move_id"/>
                     </group>
                 </sheet>
             </form>

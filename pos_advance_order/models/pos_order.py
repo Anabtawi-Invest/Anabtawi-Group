@@ -106,6 +106,49 @@ class PosOrder(models.Model):
                         },
                     )
                 )
+            if order.advance_order_id:
+                advance = order.advance_order_id
+                currency = order.currency_id
+                invoice_lines.append(
+                    (
+                        0,
+                        None,
+                        {
+                            "name": _(
+                                "Advance payment details: Tendered %(tendered)s, Change Returned %(change)s",
+                                tendered=float_repr(
+                                    advance.amount_tendered or 0.0,
+                                    currency.decimal_places,
+                                ),
+                                change=float_repr(
+                                    advance.change_amount or 0.0,
+                                    currency.decimal_places,
+                                ),
+                            ),
+                            "display_type": "line_note",
+                        },
+                    )
+                )
+                invoice_lines.append(
+                    (
+                        0,
+                        None,
+                        {
+                            "name": _(
+                                "Remaining payment details: Tendered %(tendered)s, Change Returned %(change)s",
+                                tendered=float_repr(
+                                    advance.remaining_amount_tendered or 0.0,
+                                    currency.decimal_places,
+                                ),
+                                change=float_repr(
+                                    advance.remaining_change_amount or 0.0,
+                                    currency.decimal_places,
+                                ),
+                            ),
+                            "display_type": "line_note",
+                        },
+                    )
+                )
         return invoice_lines
 
     def _generate_pos_order_invoice(self):
@@ -133,42 +176,51 @@ class PosOrder(models.Model):
                 continue
             receivable_account = advance._get_advance_receivable_account()
 
+            settlement_moves = self.env["account.move"]
             if advance.advance_completion_settlement_move_id:
-                settle_move = advance.advance_completion_settlement_move_id
-                settlement_lines = settle_move.line_ids.filtered(
-                    lambda l: (
-                        l.account_id == receivable_account
-                        and not l.reconciled
-                        and l.balance < 0
-                    )
-                )
-                inv_ar_lines = invoice.line_ids.filtered(
-                    lambda l: (
-                        l.account_id == receivable_account
-                        and not l.reconciled
-                        and l.balance > 0
-                    )
-                )
-                _logger.info(
-                    "[ADV_RECON] Completion settlement reconcile: order=%s settlement_lines=%s invoice_ar=%s",
-                    order.id,
-                    settlement_lines.ids,
-                    inv_ar_lines.ids,
-                )
-                if settlement_lines and inv_ar_lines:
-                    try:
-                        (settlement_lines | inv_ar_lines).sudo().reconcile()
-                        _logger.info(
-                            "[ADV_RECON] Completion settlement reconcile done: order=%s",
-                            order.id,
+                settlement_moves |= advance.advance_completion_settlement_move_id
+            if advance.pledge_completion_settlement_move_id:
+                settlement_moves |= advance.pledge_completion_settlement_move_id
+
+            if settlement_moves:
+                for settle_move in settlement_moves:
+                    settlement_lines = settle_move.line_ids.filtered(
+                        lambda l: (
+                            l.account_id == receivable_account
+                            and not l.reconciled
+                            and l.balance < 0
                         )
-                    except Exception as e:
-                        _logger.exception(
-                            "[ADV_RECON] Completion settlement reconcile failed: order=%s error=%s",
-                            order.id,
-                            e,
+                    )
+                    inv_ar_lines = invoice.line_ids.filtered(
+                        lambda l: (
+                            l.account_id == receivable_account
+                            and not l.reconciled
+                            and l.balance > 0
                         )
-                        raise
+                    )
+                    _logger.info(
+                        "[ADV_RECON] Completion settlement reconcile: order=%s move=%s settlement_lines=%s invoice_ar=%s",
+                        order.id,
+                        settle_move.id,
+                        settlement_lines.ids,
+                        inv_ar_lines.ids,
+                    )
+                    if settlement_lines and inv_ar_lines:
+                        try:
+                            (settlement_lines | inv_ar_lines).sudo().reconcile()
+                            _logger.info(
+                                "[ADV_RECON] Completion settlement reconcile done: order=%s move=%s",
+                                order.id,
+                                settle_move.id,
+                            )
+                        except Exception as e:
+                            _logger.exception(
+                                "[ADV_RECON] Completion settlement reconcile failed: order=%s move=%s error=%s",
+                                order.id,
+                                settle_move.id,
+                                e,
+                            )
+                            raise
                 continue
 
             if not payment or not payment.move_id or payment.state not in ("in_process", "paid"):
