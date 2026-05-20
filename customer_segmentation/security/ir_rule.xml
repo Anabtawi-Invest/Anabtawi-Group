@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- Create user groups for each department -->
+        <record id="group_export_sales" model="res.groups">
+            <field name="name">Export Sales Team</field>
+            <field name="category_id" ref="base.module_category_sales"/>
+        </record>
+
+        <record id="group_local_sales" model="res.groups">
+            <field name="name">Local Sales Team</field>
+            <field name="category_id" ref="base.module_category_sales"/>
+        </record>
+
+        <record id="group_procurement" model="res.groups">
+            <field name="name">Procurement Department</field>
+            <field name="category_id" ref="base.module_category_purchases"/>
+        </record>
+
+        <record id="group_pos_team" model="res.groups">
+            <field name="name">POS Team</field>
+            <field name="category_id" ref="base.module_category_sales"/>
+        </record>
+
+        <!-- Record Rules: Export Sales Team can only see export customers -->
+        <record id="rule_export_sales_customers" model="ir.rule">
+            <field name="name">Export Sales - See Export Customers Only</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="group_id" ref="group_export_sales"/>
+            <field name="domain_force">[('is_export_customer', '=', True)]</field>
+            <field name="perm_read">1</field>
+            <field name="perm_write">1</field>
+            <field name="perm_create">1</field>
+            <field name="perm_unlink">0</field>
+        </record>
+
+        <!-- Record Rules: Local Sales Team can only see local customers -->
+        <record id="rule_local_sales_customers" model="ir.rule">
+            <field name="name">Local Sales - See Local Customers Only</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="group_id" ref="group_local_sales"/>
+            <field name="domain_force">[('is_local_customer', '=', True)]</field>
+            <field name="perm_read">1</field>
+            <field name="perm_write">1</field>
+            <field name="perm_create">1</field>
+            <field name="perm_unlink">0</field>
+        </record>
+
+        <!-- Record Rules: Procurement Team can only see vendors -->
+        <record id="rule_procurement_vendors" model="ir.rule">
+            <field name="name">Procurement - See Vendors Only</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="group_id" ref="group_procurement"/>
+            <field name="domain_force">[('is_vendor', '=', True)]</field>
+            <field name="perm_read">1</field>
+            <field name="perm_write">1</field>
+            <field name="perm_create">1</field>
+            <field name="perm_unlink">0</field>
+        </record>
+
+        <!-- Record Rules: POS Team can only see POS customers -->
+        <record id="rule_pos_customers" model="ir.rule">
+            <field name="name">POS - See POS Customers Only</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="group_id" ref="group_pos_team"/>
+            <field name="domain_force">[('is_pos_customer', '=', True)]</field>
+            <field name="perm_read">1</field>
+            <field name="perm_write">1</field>
+            <field name="perm_create">1</field>
+            <field name="perm_unlink">0</field>
+        </record>
+
+        <!-- Admin users can see all customers (no restriction) -->
+        <record id="rule_admin_all_customers" model="ir.rule">
+            <field name="name">Admin - See All Customers</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="group_id" ref="base.group_erp_manager"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read">1</field>
+            <field name="perm_write">1</field>
+            <field name="perm_create">1</field>
+            <field name="perm_unlink">1</field>
+        </record>
+
+    </data>
+</odoo>

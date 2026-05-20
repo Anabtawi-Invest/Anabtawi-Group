@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Partner Form View Extension -->
+    <record id="view_res_partner_form_segmentation" model="ir.ui.view">
+        <field name="name">res.partner.form.segmentation</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='internal_notes']" position="before">
+                <page string="Department Segmentation">
+                    <group>
+                        <field name="department_category" readonly="1"/>
+                    </group>
+                    <group string="Department Assignments">
+                        <field name="is_export_customer"/>
+                        <field name="is_local_customer"/>
+                        <field name="is_vendor"/>
+                        <field name="is_pos_customer"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Partner Tree View -->
+    <record id="view_res_partner_tree_segmentation" model="ir.ui.view">
+        <field name="name">res.partner.tree.segmentation</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <field name="display_name" position="after">
+                <field name="department_category"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Partner List/Kanban View with Department Filter -->
+    <record id="view_res_partner_search_segmentation" model="ir.ui.view">
+        <field name="name">res.partner.search.segmentation</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='supplier']" position="after">
+                <separator/>
+                <filter name="export_customers" string="Export Customers" domain="[('is_export_customer', '=', True)]"/>
+                <filter name="local_customers" string="Local Customers" domain="[('is_local_customer', '=', True)]"/>
+                <filter name="vendors" string="Vendors" domain="[('is_vendor', '=', True)]"/>
+                <filter name="pos_customers" string="POS Customers" domain="[('is_pos_customer', '=', True)]"/>
+                <separator/>
+                <group expand="0" string="Group By">
+                    <filter name="group_by_department" string="Department" context="{'group_by': 'department_category'}"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
