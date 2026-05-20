@@ -11,6 +11,29 @@ from odoo.tools.intervals import Intervals
 class HrVersion(models.Model):
     _inherit = "hr.version"
 
+    def _get_overtime_intervals(self, start_dt, end_dt):
+        overtime_intervals = super()._get_overtime_intervals(start_dt, end_dt)
+        normalized_intervals = {}
+        for resource_id, intervals in overtime_intervals.items():
+            singleton_payload_intervals = []
+            for start, end, overtime in intervals:
+                # Enterprise code expects singleton overtime payloads.
+                # If overlaps were merged upstream into a multi-record payload,
+                # keep the most relevant line for work-entry generation.
+                preferred_overtime = (
+                    overtime.filtered(
+                        lambda ot: ot.status == "approved" and ot.rule_ids.mapped("work_entry_type_id")
+                    )[:1]
+                    or overtime.filtered(lambda ot: ot.status == "approved")[:1]
+                    or overtime[:1]
+                )
+                if preferred_overtime:
+                    singleton_payload_intervals.append((start, end, preferred_overtime))
+            normalized_intervals[resource_id] = Intervals(
+                singleton_payload_intervals, keep_distinct=True
+            )
+        return normalized_intervals
+
     def _get_attendance_intervals(self, start_dt, end_dt):
         start_naive = start_dt.replace(tzinfo=None)
         end_naive = end_dt.replace(tzinfo=None)
@@ -121,7 +144,9 @@ class HrVersion(models.Model):
                 )
                 if not approved_overtimes:
                     continue
-                work_entry_overtime_intervals[r].append((start, end, approved_overtimes))
+                # Keep overtime payloads singleton to match enterprise expectations.
+                for approved_overtime in approved_overtimes:
+                    work_entry_overtime_intervals[r].append((start, end, approved_overtime))
 
         return {
             r: (mapped_intervals[r] - overtime_intervals[r])
