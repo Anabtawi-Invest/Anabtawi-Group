@@ -1,13 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates xml:space="preserve">
+
+  <t t-name="cake_pos.CakeButton">
+    <button class="cake-pos-btn control-button"
+            t-on-click="openCakePopup">
+      🎂 جاتو مخصص
+    </button>
+  </t>
+
   <t t-name="cake_pos.ActionpadWidgetPatch"
      t-inherit="point_of_sale.ActionpadWidget"
      t-inherit-mode="extension">
     <xpath expr="//div[hasclass('control-buttons')]" position="inside">
-      <button class="cake-pos-btn control-button"
-              t-on-click="openCustomCakePopup">
-        🎂 جاتو مخصص
-      </button>
+      <CakeButton />
     </xpath>
   </t>
+
 </templates>
