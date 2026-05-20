@@ -1,7 +1,0 @@
-.pos-adv-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;}
-.pos-adv-body{padding:12px;overflow:auto;}
-.pos-adv-grid{display:grid;grid-template-columns:1fr;gap:12px;max-width:780px;}
-.pos-adv-field label{display:block;margin-bottom:4px;font-weight:600;}
-.pos-adv-field input,.pos-adv-field textarea,.pos-adv-field select{width:100%;box-sizing:border-box;padding:8px;border-radius:8px;}
-.pos-adv-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-@media (max-width: 900px){.pos-adv-row{grid-template-columns:1fr;}}
