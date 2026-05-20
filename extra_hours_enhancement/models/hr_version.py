@@ -17,11 +17,21 @@ class HrVersion(models.Model):
         for resource_id, intervals in overtime_intervals.items():
             singleton_payload_intervals = []
             for start, end, overtime in intervals:
-                for overtime_line in overtime:
-                    singleton_payload_intervals.append((start, end, overtime_line))
-            # Return raw tuples to avoid Intervals normalization merging
-            # same-boundary overtime lines back into multi-record payloads.
-            normalized_intervals[resource_id] = singleton_payload_intervals
+                # Enterprise code expects singleton overtime payloads.
+                # If overlaps were merged upstream into a multi-record payload,
+                # keep the most relevant line for work-entry generation.
+                preferred_overtime = (
+                    overtime.filtered(
+                        lambda ot: ot.status == "approved" and ot.rule_ids.mapped("work_entry_type_id")
+                    )[:1]
+                    or overtime.filtered(lambda ot: ot.status == "approved")[:1]
+                    or overtime[:1]
+                )
+                if preferred_overtime:
+                    singleton_payload_intervals.append((start, end, preferred_overtime))
+            normalized_intervals[resource_id] = Intervals(
+                singleton_payload_intervals, keep_distinct=True
+            )
         return normalized_intervals
 
     def _get_attendance_intervals(self, start_dt, end_dt):
