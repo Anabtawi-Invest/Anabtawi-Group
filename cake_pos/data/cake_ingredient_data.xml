@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+
+    <!-- ══════════════════════════════════════════════════════════════
+         SPONGE — sheet "سبونج"
+         Formula: cost = cost_per_kg × 0.49 × (persons/10)
+         cost_per_kg=1.00 → 30p cost = 1.00×0.49×3 = 1.47 ✓
+         cost_per_kg=1.10 → 30p cost = 1.10×0.49×3 = 1.617 ✓
+    ══════════════════════════════════════════════════════════════ -->
+    <record id="sponge_white" model="cake.ingredient">
+        <field name="name">عجين جاتو أبيض | White Sponge</field>
+        <field name="category">sponge</field>
+        <field name="cost_per_kg">1.0</field>
+        <field name="sequence">1</field>
+    </record>
+    <record id="sponge_black" model="cake.ingredient">
+        <field name="name">عجين جاتو أسود | Black Sponge</field>
+        <field name="category">sponge</field>
+        <field name="cost_per_kg">1.1</field>
+        <field name="sequence">2</field>
+    </record>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         CREAM — sheet "كريما نباتي"
+         Formula: cost = 1.70 × 0.198 × (persons/10)
+         30p = 1.70 × 0.198 × 3 = 1.0098 ✓
+    ══════════════════════════════════════════════════════════════ -->
+    <record id="cream_vegetable" model="cake.ingredient">
+        <field name="name">كريما نباتي | Vegetable Cream</field>
+        <field name="category">cream</field>
+        <field name="cost_per_kg">1.70</field>
+        <field name="sequence">1</field>
+    </record>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         FILLINGS — sheet "حشوات"
+         Formula: cost = cost_per_kg × 0.31 × (persons/10)
+         All 16 fillings with exact cost_per_kg from Excel col B
+    ══════════════════════════════════════════════════════════════ -->
+    <record id="filling_pistachio" model="cake.ingredient">
+        <field name="name">حشوة بستاشيو | Pistachio</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">4.83425</field>
+        <field name="sequence">1</field>
+    </record>
+    <record id="filling_oreo" model="cake.ingredient">
+        <field name="name">حشوة أوريو | Oreo</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">1.18036</field>
+        <field name="sequence">2</field>
+    </record>
+    <record id="filling_triple" model="cake.ingredient">
+        <field name="name">حشوة تربل | Triple Chocolate</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">2.33351</field>
+        <field name="sequence">3</field>
+    </record>
+    <record id="filling_snickers" model="cake.ingredient">
+        <field name="name">حشوة سنكرز | Snickers</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">3.53779</field>
+        <field name="sequence">4</field>
+    </record>
+    <record id="filling_strawberry" model="cake.ingredient">
+        <field name="name">حشوة فراولة | Strawberry</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">3.11015</field>
+        <field name="sequence">5</field>
+    </record>
+    <record id="filling_fruits" model="cake.ingredient">
+        <field name="name">حشوة فواكه | Mixed Fruits</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">3.10588</field>
+        <field name="sequence">6</field>
+    </record>
+    <record id="filling_cream_cheese" model="cake.ingredient">
+        <field name="name">حشوة كريم تشيز | Cream Cheese</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">2.8199</field>
+        <field name="sequence">7</field>
+    </record>
+    <record id="filling_lotus" model="cake.ingredient">
+        <field name="name">حشوة لوتس | Lotus Biscoff</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">2.2369</field>
+        <field name="sequence">8</field>
+    </record>
+    <record id="filling_sorbet_strawberry" model="cake.ingredient">
+        <field name="name">حشوة سوربيه فراولة | Strawberry Sorbet</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">3.17564</field>
+        <field name="sequence">9</field>
+    </record>
+    <record id="filling_cinnabon" model="cake.ingredient">
+        <field name="name">حشوة سينابون | Cinnabon</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">3.67542</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="filling_choc_chip" model="cake.ingredient">
+        <field name="name">حشوة شوكلت شيب | Chocolate Chip</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">1.72877</field>
+        <field name="sequence">11</field>
+    </record>
+    <record id="filling_chocoreso" model="cake.ingredient">
+        <field name="name">حشوة شوكوريزو | Chocoreso</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">1.89094</field>
+        <field name="sequence">12</field>
+    </record>
+    <record id="filling_ferrero" model="cake.ingredient">
+        <field name="name">حشوة فريرو | Ferrero Rocher</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">3.53995</field>
+        <field name="sequence">13</field>
+    </record>
+    <record id="filling_kinder" model="cake.ingredient">
+        <field name="name">حشوة كندر | Kinder</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">2.238</field>
+        <field name="sequence">14</field>
+    </record>
+    <record id="filling_cream_cheese_cups" model="cake.ingredient">
+        <field name="name">حشوة كريم تشيز كاسات | Cream Cheese Cups</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">5.22217</field>
+        <field name="sequence">15</field>
+    </record>
+    <record id="filling_nutella" model="cake.ingredient">
+        <field name="name">حشوة نوتيلا | Nutella</field>
+        <field name="category">filling</field>
+        <field name="cost_per_kg">2.57426</field>
+        <field name="sequence">16</field>
+    </record>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         DECORATIONS — sheet "زينة"
+         Formula: cost = cost_per_kg × 0.128 × (persons/10)
+         شوكلاتة 30p = 5.0 × 0.128 × 3 = 1.92 ✓
+    ══════════════════════════════════════════════════════════════ -->
+    <record id="deco_fruits" model="cake.ingredient">
+        <field name="name">فواكه | Fruits</field>
+        <field name="category">decoration</field>
+        <field name="cost_per_kg">2.0</field>
+        <field name="sequence">1</field>
+    </record>
+    <record id="deco_chocolate" model="cake.ingredient">
+        <field name="name">شوكلاتة | Chocolate</field>
+        <field name="category">decoration</field>
+        <field name="cost_per_kg">5.0</field>
+        <field name="sequence">2</field>
+    </record>
+    <record id="deco_cream" model="cake.ingredient">
+        <field name="name">كريما | Cream</field>
+        <field name="category">decoration</field>
+        <field name="cost_per_kg">7.0</field>
+        <field name="sequence">3</field>
+    </record>
+    <record id="deco_nuts" model="cake.ingredient">
+        <field name="name">مكسرات | Nuts</field>
+        <field name="category">decoration</field>
+        <field name="cost_per_kg">12.75</field>
+        <field name="sequence">4</field>
+    </record>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         DISKS — sheet "Disks" — flat cost per unit
+         All 16 disk options with exact costs
+    ══════════════════════════════════════════════════════════════ -->
+    <record id="disk_square_gold_9x5" model="cake.ingredient">
+        <field name="name">دسكات مربعة ذهبي 9×5 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.13</field>
+        <field name="internal_ref">1020058</field>
+        <field name="sequence">1</field>
+    </record>
+    <record id="disk_round_22" model="cake.ingredient">
+        <field name="name">دسك دائري كرتون 22 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.13</field>
+        <field name="internal_ref">1020591</field>
+        <field name="sequence">2</field>
+    </record>
+    <record id="disk_round_26" model="cake.ingredient">
+        <field name="name">دسك دائري كرتون 26 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.13</field>
+        <field name="internal_ref">1020130</field>
+        <field name="sequence">3</field>
+    </record>
+    <record id="disk_round_27" model="cake.ingredient">
+        <field name="name">دسك دائري كرتون 27 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.13</field>
+        <field name="internal_ref">1020595</field>
+        <field name="sequence">4</field>
+    </record>
+    <record id="disk_round_28" model="cake.ingredient">
+        <field name="name">دسك دائري كرتون 28 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.13</field>
+        <field name="internal_ref">1020132</field>
+        <field name="sequence">5</field>
+    </record>
+    <record id="disk_round_32" model="cake.ingredient">
+        <field name="name">دسك دائري كرتون 32 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.13</field>
+        <field name="internal_ref">1020143</field>
+        <field name="sequence">6</field>
+    </record>
+    <record id="disk_round_gold_21" model="cake.ingredient">
+        <field name="name">دسك دائري ذهبي 21 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.13</field>
+        <field name="internal_ref">1020124</field>
+        <field name="sequence">7</field>
+    </record>
+    <record id="disk_round_gold_25" model="cake.ingredient">
+        <field name="name">دسك دائري ذهبي 25 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.13</field>
+        <field name="internal_ref">1020125</field>
+        <field name="sequence">8</field>
+    </record>
+    <record id="disk_round_gold_30" model="cake.ingredient">
+        <field name="name">دسك دائري ذهبي 30 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.2</field>
+        <field name="internal_ref">1020126</field>
+        <field name="sequence">9</field>
+    </record>
+    <record id="disk_rect_25x30" model="cake.ingredient">
+        <field name="name">دسك مستطيل 25×30 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.22917</field>
+        <field name="internal_ref">1020128</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="disk_rect_30x30" model="cake.ingredient">
+        <field name="name">دسك مستطيل 30×30 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.6</field>
+        <field name="internal_ref">1010415</field>
+        <field name="sequence">11</field>
+    </record>
+    <record id="disk_rect_30x40" model="cake.ingredient">
+        <field name="name">دسك مستطيل 30×40 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.4</field>
+        <field name="internal_ref">1020129</field>
+        <field name="sequence">12</field>
+    </record>
+    <record id="disk_rect_35x35" model="cake.ingredient">
+        <field name="name">دسك مستطيل 35×35 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.28</field>
+        <field name="internal_ref">1020306</field>
+        <field name="sequence">13</field>
+    </record>
+    <record id="disk_rect_35x45" model="cake.ingredient">
+        <field name="name">دسك مستطيل 35×45 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.47324</field>
+        <field name="internal_ref">1020302</field>
+        <field name="sequence">14</field>
+    </record>
+    <record id="disk_rect_60x40" model="cake.ingredient">
+        <field name="name">دسك مستطيل 60×40 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.642</field>
+        <field name="internal_ref">1020447</field>
+        <field name="sequence">15</field>
+    </record>
+    <record id="disk_round_gold_35" model="cake.ingredient">
+        <field name="name">دسك دائري ذهبي 35 سم</field>
+        <field name="category">disk</field>
+        <field name="flat_cost">0.23269</field>
+        <field name="internal_ref">1020127</field>
+        <field name="sequence">16</field>
+    </record>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         SUGAR PASTE — sheet "عجينة السكر"
+         Formula: cost = 3.47 × 0.40 × (persons/10)
+         30p = 3.47 × 0.40 × 3 = 4.164 ✓
+    ══════════════════════════════════════════════════════════════ -->
+    <record id="sugar_paste_default" model="cake.ingredient">
+        <field name="name">عجينة السكر | Sugar Paste</field>
+        <field name="category">sugar_paste</field>
+        <field name="cost_per_kg">3.47</field>
+        <field name="sequence">1</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+
+<!--
+  cake_pos.CustomCakePopup — Odoo 19 / OWL 2
+  [J8] All event handlers use named methods, no inline lambdas
+  Props: { close: Function }  (dialog pattern for Odoo 17+)
+-->
+<t t-name="cake_pos.CustomCakePopup">
+  <div class="cake-overlay">
+    <div class="cake-dialog" dir="rtl">
+
+      <!-- ══ HEADER ════════════════════════════════════════════════ -->
+      <div class="cake-header">
+        <span class="cake-header-icon">🎂</span>
+        <span class="cake-header-title">تخصيص الجاتو | Custom Cake Builder</span>
+      </div>
+
+      <!-- ══ LOADING ══════════════════════════════════════════════ -->
+      <t t-if="state.loading">
+        <div class="cake-loading">
+          <div class="cake-spinner"/>
+          <p>جاري تحميل الخيارات...</p>
+        </div>
+      </t>
+
+      <!-- ══ ERROR ════════════════════════════════════════════════ -->
+      <t t-if="state.error and !state.loading">
+        <div class="cake-error-banner">⚠️ <t t-esc="state.error"/></div>
+      </t>
+
+      <!-- ══ FORM ══════════════════════════════════════════════════ -->
+      <t t-if="!state.loading">
+        <div class="cake-body">
+
+          <!-- Customer name -->
+          <div class="cake-field">
+            <label class="cake-label">👤 اسم الزبون | Customer Name</label>
+            <input type="text" class="cake-input"
+                   t-att-value="state.customer_name"
+                   t-on-input="onChangeCustomerName"
+                   placeholder="اختياري / Optional"/>
+          </div>
+
+          <!-- Size -->
+          <div class="cake-field">
+            <label class="cake-label">👥 حجم القالب | Cake Size</label>
+            <select class="cake-select" t-on-change="onChangePersons">
+              <option value="10"  t-att-selected="state.persons == '10'">10 أشخاص</option>
+              <option value="15"  t-att-selected="state.persons == '15'">15 أشخاص</option>
+              <option value="20"  t-att-selected="state.persons == '20'">20 أشخاص</option>
+              <option value="25"  t-att-selected="state.persons == '25'">25 أشخاص</option>
+              <option value="30"  t-att-selected="state.persons == '30'">30 أشخاص</option>
+              <option value="35"  t-att-selected="state.persons == '35'">35 أشخاص</option>
+              <option value="40"  t-att-selected="state.persons == '40'">40 أشخاص</option>
+              <option value="45"  t-att-selected="state.persons == '45'">45 أشخاص</option>
+              <option value="50"  t-att-selected="state.persons == '50'">50 أشخاص</option>
+            </select>
+          </div>
+
+          <!-- Sponge -->
+          <div class="cake-field">
+            <label class="cake-label">🍰 السبونج | Sponge</label>
+            <select class="cake-select" t-on-change="onChangeSponge">
+              <t t-foreach="state.options.sponge" t-as="o" t-key="o.id">
+                <option t-att-value="o.id" t-att-selected="state.sponge_id === o.id"
+                        t-esc="o.name"/>
+              </t>
+            </select>
+          </div>
+
+          <!-- Cream -->
+          <div class="cake-field">
+            <label class="cake-label">🍦 الكريما | Cream</label>
+            <select class="cake-select" t-on-change="onChangeCream">
+              <t t-foreach="state.options.cream" t-as="o" t-key="o.id">
+                <option t-att-value="o.id" t-att-selected="state.cream_id === o.id"
+                        t-esc="o.name"/>
+              </t>
+            </select>
+          </div>
+
+          <!-- Filling -->
+          <div class="cake-field">
+            <label class="cake-label">🍓 الحشوة | Filling</label>
+            <select class="cake-select" t-on-change="onChangeFilling">
+              <t t-foreach="state.options.filling" t-as="o" t-key="o.id">
+                <option t-att-value="o.id" t-att-selected="state.filling_id === o.id"
+                        t-esc="o.name"/>
+              </t>
+            </select>
+          </div>
+
+          <!-- Decoration -->
+          <div class="cake-field">
+            <label class="cake-label">🎨 الزينة | Decoration</label>
+            <select class="cake-select" t-on-change="onChangeDecoration">
+              <t t-foreach="state.options.decoration" t-as="o" t-key="o.id">
+                <option t-att-value="o.id" t-att-selected="state.decoration_id === o.id"
+                        t-esc="o.name"/>
+              </t>
+            </select>
+          </div>
+
+          <!-- Disk -->
+          <div class="cake-field">
+            <label class="cake-label">📀 الدسك | Disk</label>
+            <select class="cake-select" t-on-change="onChangeDisk">
+              <t t-foreach="state.options.disk" t-as="o" t-key="o.id">
+                <option t-att-value="o.id" t-att-selected="state.disk_id === o.id"
+                        t-esc="o.name"/>
+              </t>
+            </select>
+          </div>
+
+          <!-- Sugar paste toggle -->
+          <div class="cake-field cake-toggle-row">
+            <label class="cake-label">🍬 إضافة عجينة السكر؟ | Sugar Paste?</label>
+            <label class="cake-toggle-switch">
+              <input type="checkbox"
+                     t-att-checked="state.use_sugar_paste"
+                     t-on-change="onToggleSugarPaste"/>
+              <span class="cake-toggle-slider"/>
+            </label>
+          </div>
+
+          <t t-if="state.use_sugar_paste and state.options.sugar_paste.length">
+            <div class="cake-field cake-indent">
+              <label class="cake-label">🍬 نوع عجينة السكر</label>
+              <select class="cake-select" t-on-change="onChangeSugarPaste">
+                <t t-foreach="state.options.sugar_paste" t-as="o" t-key="o.id">
+                  <option t-att-value="o.id" t-att-selected="state.sugar_paste_id === o.id"
+                          t-esc="o.name"/>
+                </t>
+              </select>
+            </div>
+          </t>
+
+          <!-- ══ EXTRA FEATURES ═══════════════════════════════════ -->
+          <t t-if="state.extraFeatures.length > 0">
+            <div class="cake-section-divider">
+              <span>⭐ الميزات الإضافية | Extra Features</span>
+            </div>
+
+            <t t-foreach="state.extraFeatures" t-as="feat" t-key="feat.id">
+
+              <!-- Checkbox feature [J8]: named handlers with feat.id bound via data attr -->
+              <t t-if="feat.feature_type === 'checkbox'">
+                <div class="cake-field cake-toggle-row">
+                  <label class="cake-label">
+                    <t t-esc="feat.name"/>
+                    <t t-if="feat.extra_cost > 0">
+                      <span class="cake-extra-cost">
+                        (+<t t-esc="feat.extra_cost.toFixed(3)"/>)
+                      </span>
+                    </t>
+                  </label>
+                  <label class="cake-toggle-switch">
+                    <input type="checkbox"
+                           t-att-data-feat-id="feat.id"
+                           t-att-checked="getExtraSel(feat.id).value"
+                           t-on-change="(ev) => this.onToggleExtraCheckbox(feat.id, ev)"/>
+                    <span class="cake-toggle-slider"/>
+                  </label>
+                </div>
+              </t>
+
+              <!-- Dropdown feature -->
+              <t t-elif="feat.feature_type === 'dropdown' and feat.options.length > 0">
+                <div class="cake-field">
+                  <label class="cake-label"><t t-esc="feat.name"/></label>
+                  <div class="cake-row-inline">
+                    <label class="cake-toggle-switch cake-toggle-small">
+                      <input type="checkbox"
+                             t-att-checked="getExtraSel(feat.id).value"
+                             t-on-change="(ev) => this.onToggleExtraDropdown(feat.id, ev)"/>
+                      <span class="cake-toggle-slider"/>
+                    </label>
+                    <select class="cake-select cake-select-grow"
+                            t-att-disabled="!getExtraSel(feat.id).value"
+                            t-on-change="(ev) => this.onChangeExtraDropdownOption(feat.id, ev)">
+                      <t t-foreach="feat.options" t-as="opt" t-key="opt.id">
+                        <option t-att-value="opt.id"
+                                t-att-selected="getExtraSel(feat.id).optionId === opt.id"
+                                t-esc="opt.name"/>
+                      </t>
+                    </select>
+                  </div>
+                </div>
+              </t>
+
+              <!-- Text feature -->
+              <t t-elif="feat.feature_type === 'text'">
+                <div class="cake-field">
+                  <label class="cake-label"><t t-esc="feat.name"/></label>
+                  <input type="text" class="cake-input"
+                         t-att-value="getExtraSel(feat.id).value"
+                         t-on-input="(ev) => this.onChangeExtraText(feat.id, ev)"
+                         t-att-placeholder="feat.name"/>
+                </div>
+              </t>
+
+            </t>
+          </t>
+
+          <!-- Notes -->
+          <div class="cake-field">
+            <label class="cake-label">📝 ملاحظات | Notes</label>
+            <textarea class="cake-textarea" rows="2"
+                      t-att-value="state.notes"
+                      t-on-input="onChangeNotes"
+                      placeholder="أي طلبات إضافية / Any special requests..."/>
+          </div>
+
+        </div><!-- /cake-body -->
+
+        <!-- ══ PRICE BAR ═════════════════════════════════════════ -->
+        <div class="cake-price-bar">
+          <span class="cake-price-label">💰 السعر الإجمالي | Total Price</span>
+          <span class="cake-price-value">
+            <t t-if="state.priceLoading">
+              <span class="cake-price-loading">...</span>
+            </t>
+            <t t-else="">
+              <t t-esc="formattedPrice"/>
+            </t>
+          </span>
+        </div>
+
+        <!-- ══ FOOTER ════════════════════════════════════════════ -->
+        <div class="cake-footer">
+          <button class="cake-btn cake-btn-cancel" t-on-click="onCancel">
+            ✕ إلغاء | Cancel
+          </button>
+          <button class="cake-btn cake-btn-confirm"
+                  t-att-disabled="state.selling_price &lt;= 0 or state.priceLoading"
+                  t-on-click="onConfirm">
+            ✅ إضافة للطلب | Add to Order
+          </button>
+        </div>
+
+      </t>
+    </div>
+  </div>
+</t>
+
+</templates>

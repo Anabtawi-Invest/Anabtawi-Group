@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_send_cake_email_form" model="ir.ui.view">
+        <field name="name">cake.send.email.wizard.form</field>
+        <field name="model">cake.send.email.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Send to Manufacturing | إرسال للمصنع">
+                <group>
+                    <field name="email_to"  placeholder="production@yourcompany.com"/>
+                    <field name="email_cc"  placeholder="manager@yourcompany.com (optional)"/>
+                    <field name="subject"/>
+                </group>
+                <separator string="Email Body | محتوى البريد"/>
+                <field name="body_html" widget="html" style="min-height:200px;"/>
+                <footer>
+                    <button name="action_send" string="📧 Send | إرسال"
+                            type="object" class="btn-primary"/>
+                    <button string="Cancel | إلغاء" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

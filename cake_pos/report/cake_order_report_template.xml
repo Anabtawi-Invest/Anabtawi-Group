@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<template id="report_cake_order_template">
+<t t-call="web.html_container">
+<t t-foreach="docs" t-as="o">
+<t t-call="web.external_layout">
+<div class="page" style="font-family:Arial,sans-serif;direction:rtl;padding:20px;">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#7b3f00,#c67c1a);color:#fff;padding:20px;border-radius:8px;margin-bottom:20px;text-align:center;">
+        <h1 style="margin:0;font-size:24px;">🎂 طلب جاتو مخصص</h1>
+        <h2 style="margin:4px 0 0;font-size:16px;opacity:.85;">Custom Cake Order — <t t-esc="o.name"/></h2>
+    </div>
+
+    <!-- Spec table -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        <thead>
+            <tr style="background:#f5e6c8;">
+                <th style="padding:10px;border:1px solid #d4a843;text-align:right;width:40%;">المكون | Component</th>
+                <th style="padding:10px;border:1px solid #d4a843;text-align:right;">التفاصيل | Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="padding:9px;border:1px solid #e8d9a0;font-weight:600;">👥 حجم القالب / Cake Size</td>
+                <td style="padding:9px;border:1px solid #e8d9a0;"><t t-esc="o.persons"/> أشخاص</td>
+            </tr>
+            <tr style="background:#fffdf5;">
+                <td style="padding:9px;border:1px solid #e8d9a0;font-weight:600;">🍰 السبونج / Sponge</td>
+                <td style="padding:9px;border:1px solid #e8d9a0;"><t t-esc="o.sponge_id.name or '—'"/></td>
+            </tr>
+            <tr>
+                <td style="padding:9px;border:1px solid #e8d9a0;font-weight:600;">🍦 الكريما / Cream</td>
+                <td style="padding:9px;border:1px solid #e8d9a0;"><t t-esc="o.cream_id.name or '—'"/></td>
+            </tr>
+            <tr style="background:#fffdf5;">
+                <td style="padding:9px;border:1px solid #e8d9a0;font-weight:600;">🍓 الحشوة / Filling</td>
+                <td style="padding:9px;border:1px solid #e8d9a0;"><t t-esc="o.filling_id.name or '—'"/></td>
+            </tr>
+            <tr>
+                <td style="padding:9px;border:1px solid #e8d9a0;font-weight:600;">🎨 الزينة / Decoration</td>
+                <td style="padding:9px;border:1px solid #e8d9a0;"><t t-esc="o.decoration_id.name or '—'"/></td>
+            </tr>
+            <tr style="background:#fffdf5;">
+                <td style="padding:9px;border:1px solid #e8d9a0;font-weight:600;">📀 الدسك / Disk</td>
+                <td style="padding:9px;border:1px solid #e8d9a0;"><t t-esc="o.disk_id.name or '—'"/></td>
+            </tr>
+            <tr>
+                <td style="padding:9px;border:1px solid #e8d9a0;font-weight:600;">🍬 عجينة السكر / Sugar Paste</td>
+                <td style="padding:9px;border:1px solid #e8d9a0;">
+                    <t t-if="o.use_sugar_paste"><t t-esc="o.sugar_paste_id.name or 'نعم / Yes'"/></t>
+                    <t t-else="">لا / No</t>
+                </td>
+            </tr>
+            <t t-if="o.extra_features_json">
+                <tr style="background:#fff8e7;">
+                    <td colspan="2" style="padding:9px;border:1px solid #e8d9a0;font-weight:700;color:#7b3f00;">
+                        ⭐ الميزات الإضافية / Extra Features
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="padding:9px;border:1px solid #e8d9a0;">
+                        <t t-out="o.extra_features_display"/>
+                    </td>
+                </tr>
+            </t>
+            <t t-if="o.notes">
+                <tr style="background:#fffdf5;">
+                    <td style="padding:9px;border:1px solid #e8d9a0;font-weight:600;">📝 ملاحظات / Notes</td>
+                    <td style="padding:9px;border:1px solid #e8d9a0;"><t t-esc="o.notes"/></td>
+                </tr>
+            </t>
+        </tbody>
+    </table>
+
+    <!-- Footer info -->
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:#666;border-top:2px solid #d4a843;padding-top:12px;">
+        <span>📅 <t t-esc="o.date_order"/></span>
+        <span>👤 <t t-esc="o.customer_name or '—'"/></span>
+        <span>🏷️ <t t-esc="o.pos_order_id.name or '—'"/></span>
+        <span t-if="o.mrp_order_id">🔧 MO: <t t-esc="o.mrp_order_id.name"/></span>
+    </div>
+
+</div>
+</t>
+</t>
+</t>
+</template>
+</odoo>
