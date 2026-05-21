@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="groups_privilege_customer_segmentation" model="res.groups.privilege">
+            <field name="name">Customer Segmentation</field>
+            <field name="category_id" ref="base.module_category_sales"/>
+        </record>
+
+        <record id="group_export_sales" model="res.groups">
+            <field name="name">Export Sales Team</field>
+            <field name="privilege_id" ref="groups_privilege_customer_segmentation"/>
+        </record>
+
+        <record id="group_local_sales" model="res.groups">
+            <field name="name">Local Sales Team</field>
+            <field name="privilege_id" ref="groups_privilege_customer_segmentation"/>
+        </record>
+
+        <record id="group_procurement" model="res.groups">
+            <field name="name">Procurement Department</field>
+            <field name="privilege_id" ref="groups_privilege_customer_segmentation"/>
+        </record>
+
+        <record id="group_pos_team" model="res.groups">
+            <field name="name">POS Team</field>
+            <field name="privilege_id" ref="groups_privilege_customer_segmentation"/>
+        </record>
+
+    </data>
+</odoo>
