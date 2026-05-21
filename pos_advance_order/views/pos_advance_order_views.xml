@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_pos_advance_order_employee_pricelist_wizard" model="ir.actions.act_window">
+        <field name="name">Employee Authorization</field>
+        <field name="res_model">pos.advance.order.employee_pricelist.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_advance_order_id': active_id}</field>
+    </record>
+
+    <record id="action_pos_advance_order" model="ir.actions.act_window">
+        <field name="name">Advance Orders</field>
+        <field name="res_model">pos.advance.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+    </record>
+
+    <!-- Menu beside Reporting (sequence between Orders=10 and Reporting=90) -->
+    <menuitem
+        id="menu_pos_advance_order"
+        name="Advance Orders"
+        parent="point_of_sale.menu_point_root"
+        action="action_pos_advance_order"
+        sequence="80"
+        groups="point_of_sale.group_pos_user,point_of_sale.group_pos_manager"
+    />
+
+    <record id="view_pos_advance_order_tree" model="ir.ui.view">
+        <field name="name">pos.advance.order.tree</field>
+        <field name="model">pos.advance.order</field>
+        <field name="arch" type="xml">
+            <list string="Advance Orders" delete="0">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="user_id"/>
+                <field name="picking_date"/>
+                <field name="pos_config_id"/>
+                <field name="pos_payment_method_id"/>
+                <field name="payment_progress"/>
+                <field name="state"/>
+                <field name="amount_total" widget="monetary"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pos_advance_order_form" model="ir.ui.view">
+        <field name="name">pos.advance.order.form</field>
+        <field name="model">pos.advance.order</field>
+        <field name="arch" type="xml">
+            <form string="Advance Order" delete="0">
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,advance_paid,fully_paid,cancel"/>
+                    <button
+                        name="%(action_pos_advance_order_employee_pricelist_wizard)d"
+                        type="action"
+                        string="Apply Employee Pricelist"
+                        class="btn-secondary"
+                        invisible="state != 'draft' or not is_employee_pricelist"
+                    />
+                    <button
+                        name="action_confirm"
+                        type="object"
+                        string="Confirm"
+                        class="btn-primary"
+                        invisible="state in ('cancel','fully_paid') or state != 'draft'"
+                    />
+                    <button
+                        name="action_create_payment"
+                        type="object"
+                        string="Create Payment"
+                        class="btn-primary"
+                        groups="point_of_sale.group_pos_manager"
+                        invisible="state in ('cancel','fully_paid') or state != 'confirmed' or advance_pos_order_id or advance_amount &lt;= 0 or pos_config_enable_advance_order"
+                    />
+                    <button
+                        name="action_print_receipt"
+                        type="object"
+                        string="Print Receipt"
+                        class="btn-secondary"
+                        invisible="state in ('cancel','fully_paid') or not advance_pos_order_id or remaining_pos_order_id"
+                    />
+                    <button
+                        name="action_print_full_receipt"
+                        type="object"
+                        string="Print Full Receipt"
+                        class="btn-secondary"
+                        invisible="state == 'cancel' or not remaining_pos_order_id"
+                    />
+                    <button
+                        name="action_return_pledge"
+                        type="object"
+                        string="Return Pledge"
+                        class="btn-secondary"
+                        groups="point_of_sale.group_pos_manager"
+                        invisible="state == 'cancel' or pledge_amount &lt;= 0 or return_pledge_pos_order_id"
+                    />
+                    <button
+                        name="action_create_remaining_payment"
+                        type="object"
+                        string="Create Remaining Payment"
+                        class="btn-primary"
+                        groups="point_of_sale.group_pos_manager"
+                        invisible="state in ('cancel','fully_paid') or state != 'advance_paid' or not advance_pos_order_id or remaining_pos_order_id"
+                    />
+                    <button
+                        name="action_set_to_draft"
+                        type="object"
+                        string="Set to Draft"
+                        class="btn-secondary"
+                        invisible="state == 'draft' or state in ('cancel','fully_paid')"
+                    />
+                    <button
+                        name="action_cancel"
+                        type="object"
+                        string="Cancel"
+                        class="btn-secondary"
+                        invisible="state in ('cancel','fully_paid')"
+                    />
+                    <button
+                        name="action_add_from_catalog"
+                        type="object"
+                        string="Catalog"
+                        class="btn-secondary"
+                        invisible="state in ('cancel','fully_paid') or state != 'draft'"
+                        context="{'order_id': id, 'child_field': 'line_ids'}"
+                    />
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group>
+                            <field name="partner_id" required="1" readonly="state != 'draft'"/>
+                            <field name="user_id" required="1" readonly="state != 'draft'"/>
+                            <field name="pos_payment_method_id" required="1" readonly="state != 'draft'"/>
+                            <field name="payment_method" invisible="1"/>
+                            <field name="advance_amount" widget="monetary" readonly="state != 'draft'"/>
+                            <field name="amount_tendered" widget="monetary" readonly="state != 'draft'"/>
+                            <field name="is_employee_pricelist" readonly="state != 'draft'"/>
+                            <field name="employee_pricelist_employee_id" readonly="1" invisible="not employee_pricelist_employee_id"/>
+                            <field name="discount_id" readonly="state != 'draft'" />
+
+
+                        </group>
+                        <group>
+                            <field name="picking_date" required="1" readonly="state != 'draft'"/>
+                            <field name="from_pos_config_id" readonly="state != 'draft'"/>
+                            <field name="pos_config_id" required="1" readonly="state != 'draft'"/>
+                            <field name="pricelist_id" readonly="1"/>
+                            <field name="with_employee" readonly="state != 'draft'"/>
+                            <field name="employee_id" invisible="not with_employee" readonly="state != 'draft'"/>
+                            <field name="payment_progress" readonly="1"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Products">
+                            <field name="line_ids" readonly="state != 'draft'">
+                                <list string="Lines" editable="bottom">
+                                    <control>
+                                        <create name="add_product_control" string="Add a product"/>
+                                        <button
+                                            string="Catalog"
+                                            name="action_add_from_catalog"
+                                            type="object"
+                                            class="px-4 btn-link"
+                                            context="{'order_id': parent.id}"
+                                        />
+                                    </control>
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="display_type" column_invisible="True"/>
+                                    <field name="product_id" required="not display_type" invisible="display_type"/>
+                                    <field name="product_qty" invisible="display_type"/>
+                                    <field name="product_uom_id" invisible="display_type"/>
+                                    <field name="price_unit" invisible="display_type"/>
+                                    <field name="tax_ids" widget="many2many_tags" invisible="display_type"/>
+                                    <field name="price_subtotal" invisible="display_type" widget="monetary"/>
+                                    <field name="price_subtotal_incl" invisible="display_type" widget="monetary"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Pledges">
+                            <group>
+                                <field name="pledge_count" readonly="1"/>
+                            </group>
+                            <field name="pledge_line_ids" readonly="1">
+                                <list string="Pledges">
+                                    <field name="employee_id" optional="hide"/>
+                                    <field name="product_id"/>
+                                    <field name="state" widget="badge"
+                                        decoration-success="state == 'active'"
+                                        decoration-warning="state == 'returned'"
+                                        decoration-danger="state == 'cancelled'"/>
+                                    <field name="pledge_qty"/>
+                                    <field name="pledge_amount_unit" widget="monetary"/>
+                                    <field name="pledge_subtotal" widget="monetary"/>
+                                    <field name="receive_date" optional="show"/>
+                                    <field name="return_date" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+
+                    <group class="oe_subtotal_footer oe_right">
+                        <field name="amount_total" widget="monetary" readonly="1"/>
+                        <field name="amount_paid" widget="monetary" readonly="1"/>
+                        <field name="change_amount" widget="monetary" readonly="1"/>
+                        <field name="remaining_amount_tendered" widget="monetary" readonly="1" invisible="remaining_amount_tendered == 0"/>
+                        <field name="remaining_change_amount" widget="monetary" readonly="1" invisible="remaining_change_amount == 0"/>
+                        <field name="pledge_amount" widget="monetary" readonly="1" invisible="pledge_amount == 0"/>
+
+                        <field name="discount_amount" widget="monetary" readonly="1"/>
+
+                        <field name="amount_remaining" widget="monetary" readonly="1"/>
+                        <field name="from_pos_config_id" readonly="state != 'draft'"/>
+                        <field name="advance_pos_order_id" readonly="1" invisible="not advance_pos_order_id"/>
+                        <field name="remaining_pos_order_id" readonly="1" invisible="not remaining_pos_order_id"/>
+                        <field name="pledge_pos_order_id" readonly="1" invisible="not pledge_pos_order_id"/>
+                        <field name="return_pledge_pos_order_id" readonly="1" invisible="not return_pledge_pos_order_id"/>
+                        <field name="advance_deposit_move_id" readonly="1" groups="account.group_account_invoice" invisible="not advance_deposit_move_id"/>
+                        <field name="advance_completion_settlement_move_id" readonly="1" groups="account.group_account_invoice" invisible="not advance_completion_settlement_move_id"/>
+                        <field name="pledge_completion_settlement_move_id" readonly="1" groups="account.group_account_invoice" invisible="not pledge_completion_settlement_move_id"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>
+

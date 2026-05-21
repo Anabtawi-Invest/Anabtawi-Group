@@ -39,7 +39,7 @@
     <!-- Menu -->
     <menuitem id="menu_internal_transfer_report"
               name="Internal Transfer Report"
-              parent="stock.menu_warehouse_report"
+              parent="stock.menu_stock_warehouse_mgmt"
               action="action_internal_transfer_wizard"/>
 
 

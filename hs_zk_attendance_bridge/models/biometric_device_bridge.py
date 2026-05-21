@@ -4,6 +4,7 @@ import hashlib
 import json
 import secrets
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
@@ -25,6 +26,16 @@ class BiometricDeviceBridge(models.Model):
     device_identifier = fields.Char(
         string="Device Identifier",
         help="Optional external identifier sent by the bridge agent.",
+    )
+    device_timezone = fields.Char(
+        string="Device Timezone",
+        default=lambda self: self.env.user.tz or "UTC",
+        help="IANA timezone used by the biometric device or bridge agent, for example Asia/Amman.",
+    )
+    import_from_date = fields.Date(
+        string="Import From Date",
+        default=fields.Date.context_today,
+        help="Ignore punches older than this date in the device local timezone.",
     )
     access_token = fields.Char(
         string="Bridge Token",
@@ -92,7 +103,7 @@ class BiometricDeviceBridge(models.Model):
         return self.search(domain, limit=1)
 
     @api.model
-    def _parse_bridge_datetime(self, value):
+    def _parse_bridge_datetime(self, value, device_timezone=None):
         if isinstance(value, datetime):
             parsed = value
         elif isinstance(value, str):
@@ -103,8 +114,14 @@ class BiometricDeviceBridge(models.Model):
         else:
             raise ValidationError(_("Invalid punch time: %s") % value)
 
-        if parsed.tzinfo:
-            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        if not parsed.tzinfo:
+            timezone_name = device_timezone or self.device_timezone or "UTC"
+            try:
+                parsed = parsed.replace(tzinfo=ZoneInfo(timezone_name))
+            except ZoneInfoNotFoundError as exc:
+                raise ValidationError(_("Unknown device timezone: %s") % timezone_name) from exc
+
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
         return parsed
 
     @api.model
@@ -128,11 +145,21 @@ class BiometricDeviceBridge(models.Model):
             raise ValidationError(_("Each record must include punch_time, timestamp, or punch_at."))
 
         punch_type = item.get("punch_type") or item.get("type") or ""
+        record_timezone = item.get("device_timezone") or item.get("timezone") or self.device_timezone or "UTC"
         return {
             "device_user_id": str(device_user_id),
-            "punch_time": self._parse_bridge_datetime(punch_time),
+            "punch_time": self._parse_bridge_datetime(punch_time, record_timezone),
             "punch_type": str(punch_type or ""),
+            "device_timezone": record_timezone,
         }
+
+    @api.model
+    def _get_local_punch_date(self, punch_time, device_timezone):
+        try:
+            tzinfo = ZoneInfo(device_timezone or self.device_timezone or "UTC")
+        except ZoneInfoNotFoundError as exc:
+            raise ValidationError(_("Unknown device timezone: %s") % (device_timezone or self.device_timezone or "UTC")) from exc
+        return punch_time.replace(tzinfo=timezone.utc).astimezone(tzinfo).date()
 
     @api.model
     def _apply_punch_to_attendance(self, employee, punch_time):
@@ -167,12 +194,19 @@ class BiometricDeviceBridge(models.Model):
             "duplicates": 0,
             "unmatched": 0,
             "errors": 0,
+            "skipped_before_date": 0,
         }
 
         for item in records:
             payload_text = json.dumps(item, ensure_ascii=True, sort_keys=True)
             try:
                 normalized = self._normalize_punch_values(item)
+                local_punch_date = self._get_local_punch_date(
+                    normalized["punch_time"], normalized["device_timezone"]
+                )
+                if self.import_from_date and local_punch_date < self.import_from_date:
+                    results["skipped_before_date"] += 1
+                    continue
                 import_key = self._make_import_key(
                     self,
                     normalized["device_user_id"],
@@ -239,7 +273,7 @@ class BiometricDeviceBridge(models.Model):
                 "last_request_at": fields.Datetime.now(),
                 "last_sync_at": fields.Datetime.now() if results["imported"] else self.last_sync_at,
                 "last_request_summary": _(
-                    "Imported %(imported)s, duplicates %(duplicates)s, unmatched %(unmatched)s, errors %(errors)s"
+                    "Imported %(imported)s, duplicates %(duplicates)s, skipped %(skipped_before_date)s, unmatched %(unmatched)s, errors %(errors)s"
                 )
                 % results,
             }

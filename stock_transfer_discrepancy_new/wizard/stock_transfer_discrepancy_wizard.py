@@ -46,9 +46,8 @@ class StockTransferDiscrepancyWizard(models.TransientModel):
     def action_confirm(self):
         self.ensure_one()
 
-        now = fields.Datetime.now()  # Picking validation time
-        # Grace before cron moves discrepancy to "open" (driver block). 1 minute for staging/QA; use hours=48 in production.
-        deadline = now + relativedelta(minutes=1)
+        now = fields.Datetime.now()  # This is the picking validation time
+        deadline = now + relativedelta(hours=48)
 
         discrepancies = []
         for line in self.line_ids:
@@ -63,7 +62,6 @@ class StockTransferDiscrepancyWizard(models.TransientModel):
                         "reason": self.reason,
                         "stage": line.stage,
                         "truck_location_id": line.truck_location_id.id,
-                        "driver_id": line.driver_id.id if line.driver_id else False,
                         "responsible_user_id": self.env.user.id,
                         "date": now,
                         "validated_at": now,
@@ -96,7 +94,6 @@ class StockTransferDiscrepancyWizardLine(models.TransientModel):
     actual_qty = fields.Float(string="Actual Qty", required=True, digits="Product Unit")
     difference_qty = fields.Float(string="Difference Qty", required=True, digits="Product Unit")
     truck_location_id = fields.Many2one("stock.location", string="Truck Location", required=True)
-    driver_id = fields.Many2one("stock.transfer.driver", string="Driver")
     stage = fields.Selection(
         [
             ("dispatch", "Dispatch"),

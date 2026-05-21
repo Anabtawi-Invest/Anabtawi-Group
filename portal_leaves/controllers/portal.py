@@ -174,17 +174,31 @@ class EmployeePortal(CustomerPortal):
             'holiday_status_id': 'holiday_status_id',
         }
 
+    def _portal_leave_type_matches_backend_record_rule(self, leave_type, employee):
+        """Match hr_holidays ir.rule hr_holidays_status_rule_multi_company (sudo bypasses this in portal)."""
+        if not leave_type or not employee or not employee.company_id:
+            return False
+        if leave_type.company_id:
+            return leave_type.company_id.id == employee.company_id.id
+        allowed_countries = employee.company_id.country_id.ids + [False]
+        return leave_type.country_id.id in allowed_countries
+
     def _get_portal_timeoff_types(self, employee):
-        if not employee:
+        if not employee or not employee.company_id:
             return []
-        return request.env['hr.leave.type'].sudo().with_company(employee.company_id).with_context(
+        LeaveType = request.env['hr.leave.type'].sudo().with_company(employee.company_id).with_context(
             employee_id=employee.id,
             allowed_company_ids=[employee.company_id.id],
-        ).get_allocation_data_request(hidden_allocations=False)
+        )
+        raw = LeaveType.get_allocation_data_request(hidden_allocations=False)
+        return [
+            row for row in raw
+            if self._portal_leave_type_matches_backend_record_rule(LeaveType.browse(row[3]), employee)
+        ]
 
     def _get_portal_selectable_leave_types(self, employee):
         """Same selection rules as the backend time off form (hr_leave_views holiday_status_id domain)."""
-        if not employee:
+        if not employee or not employee.company_id:
             return request.env['hr.leave.type'].browse()
         LeaveType = request.env['hr.leave.type'].sudo().with_company(employee.company_id).with_context(
             employee_id=employee.id,
@@ -194,8 +208,10 @@ class EmployeePortal(CustomerPortal):
         domain = [
             '&',
             '|',
-            ('company_id', '=', False),
             ('company_id', '=', employee.company_id.id),
+            '&',
+            ('company_id', '=', False),
+            ('country_id', 'in', employee.company_id.country_id.ids + [False]),
             '|',
             ('requires_allocation', '=', False),
             '&',
@@ -399,8 +415,20 @@ class EmployeePortal(CustomerPortal):
     def my_timeoff_request_create(self, **post):
         safe_post = {key: val for key, val in post.items() if key != 'document'}
         values = {}
-        values['holiday_status_id'] = int(post['holiday_status_id'])
-        values['employee_id'] = int(post['employee_id'])
+        employee = request.env['hr.employee'].sudo().search([('user_id', '=', request.env.user.id)], limit=1)
+        if not employee:
+            values['error'] = _("No employee is linked to your user account.")
+            return values
+        if int(post['employee_id']) != employee.id:
+            values['error'] = _("You can only create time off for your own employee record.")
+            return values
+        selectable = self._get_portal_selectable_leave_types(employee)
+        holiday_status_id = int(post['holiday_status_id'])
+        if holiday_status_id not in selectable.ids:
+            values['error'] = _("The selected time off type is not available for your account.")
+            return values
+        values['holiday_status_id'] = holiday_status_id
+        values['employee_id'] = employee.id
         values['date_from'] = post['date_from']
         values['date_to'] = post['date_to']
         values['name'] = post['name']

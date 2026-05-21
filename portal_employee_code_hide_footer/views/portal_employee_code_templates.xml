@@ -6,7 +6,8 @@
         priority="100"
     >
         <xpath expr="//t[@t-call='portal.frontend_layout']" position="before">
-            <t t-set="no_footer" t-value="1 if request and request.httprequest.path.startswith('/my/') else 0"/>
+            <t t-set="portal_path" t-value="request.httprequest.path if request else ''"/>
+            <t t-set="no_footer" t-value="1 if portal_path == '/my' or portal_path.startswith('/my/') else 0"/>
         </xpath>
     </template>
 

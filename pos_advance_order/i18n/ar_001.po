@@ -1,0 +1,986 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* pos_advance_order
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0+e\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-02-03 16:36+0000\n"
+"PO-Revision-Date: 2026-02-03 16:36+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: ar_001\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "%s (Advance)"
+msgstr "%s (عربون)"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "%s (Pledge)"
+msgstr "%s (رهن)"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "%s (Refund Advance)"
+msgstr "%s (استرجاع العربون)"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "%s (Return Pledge)"
+msgstr "%s (إرجاع الرهن)"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "%s (Reverse Advance)"
+msgstr "%s (عكس العربون)"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "%s (Total to Profit)"
+msgstr "%s (الإجمالي إلى الربح)"
+
+#. module: pos_advance_order
+#: model:ir.actions.report,print_report_name:pos_advance_order.action_report_pos_advance_order_receipt
+msgid "'AdvanceOrder-%s' % (object.name)"
+msgstr "'طلب-مسبق-%s' % (object.name)"
+
+#. module: pos_advance_order
+#: model:ir.actions.report,print_report_name:pos_advance_order.action_report_pos_advance_order_full_receipt
+msgid "'AdvanceOrderFull-%s' % (object.name)"
+msgstr "'طلب-مسبق-كامل-%s' % (object.name)"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_receipt
+msgid "<span>Advance Paid</span>"
+msgstr "<span>العربون المدفوع</span>"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_full_receipt
+msgid "<span>Paid Amount</span>"
+msgstr "<span>المبلغ المدفوع</span>"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_full_receipt
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_receipt
+msgid "<span>Pledge Amount</span>"
+msgstr "<span>مبلغ الرهن</span>"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_full_receipt
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_receipt
+msgid "<span>Remaining</span>"
+msgstr "<span>المتبقي</span>"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_full_receipt
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_receipt
+msgid "<span>Total</span>"
+msgstr "<span>الإجمالي</span>"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_full_receipt
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_receipt
+msgid "<strong>Customer:</strong>"
+msgstr "<strong>العميل:</strong>"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_full_receipt
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_receipt
+msgid "<strong>Date:</strong>"
+msgstr "<strong>التاريخ:</strong>"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "A payment is already created for this advance order."
+msgstr "تم إنشاء دفعة مسبقًا لهذا الطلب."
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Add a product"
+msgstr "إضافة منتج"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__advance_amount
+msgid "Advance"
+msgstr "عربون"
+
+#. module: pos_advance_order
+#: code:addons/pos_advance_order/models/pos_session.py:0
+msgid "Advance (on completion)"
+msgstr "عربون (تطبيق عند الإكمال)"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_order__is_advance_generated
+msgid "Advance Generated"
+msgstr "مولّد من عربون"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_order__advance_order_id
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Advance Order"
+msgstr "طلب مسبق"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_config_form_pos_advance_order
+msgid "Advance Order Configuration"
+msgstr "إعدادات الطلب المسبق"
+
+#. module: pos_advance_order
+#: model:ir.actions.report,name:pos_advance_order.action_report_pos_advance_order_full_receipt
+msgid "Advance Order Full Receipt"
+msgstr "إيصال الطلب المسبق (كامل)"
+
+#. module: pos_advance_order
+#: model:ir.actions.report,name:pos_advance_order.action_report_pos_advance_order_receipt
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_receipt
+msgid "Advance Order Receipt"
+msgstr "إيصال الطلب المسبق"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_full_receipt
+msgid "Advance Order Receipt (Full Paid)"
+msgstr "إيصال الطلب المسبق (مدفوع بالكامل)"
+
+#. module: pos_advance_order
+#: model:ir.actions.act_window,name:pos_advance_order.action_pos_advance_order
+#: model:ir.ui.menu,name:pos_advance_order.menu_pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_tree
+msgid "Advance Orders"
+msgstr "الطلبات المسبقة"
+
+#. module: pos_advance_order
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order__payment_progress__advance_paid
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order__state__advance_paid
+msgid "Advance Paid"
+msgstr "تم دفع العربون"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__refund_advance_payment_id
+msgid "Advance Refund Payment"
+msgstr "دفعة استرجاع العربون"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Advance amount cannot be greater than the total."
+msgstr "لا يمكن أن يكون مبلغ العربون أكبر من الإجمالي."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Advance amount cannot be negative."
+msgstr "لا يمكن أن يكون مبلغ العربون سالبًا."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Advance amount must be greater than zero to create a payment."
+msgstr "يجب أن يكون مبلغ العربون أكبر من صفر لإنشاء دفعة."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid ""
+"Advance amount must be greater than zero to create the reversal payment."
+msgstr "يجب أن يكون مبلغ العربون أكبر من صفر لإنشاء دفعة عكسية."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Advance refund payment is already created for this order."
+msgstr "تم إنشاء دفعة استرجاع العربون مسبقًا لهذا الطلب."
+
+#. module: pos_advance_order
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order__payment_method__bank
+msgid "Bank"
+msgstr "بنك"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Cancel"
+msgstr "إلغاء"
+
+#. module: pos_advance_order
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order__state__cancel
+msgid "Cancelled"
+msgstr "ملغي"
+
+#. module: pos_advance_order
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order__payment_method__cash
+msgid "Cash"
+msgstr "نقدي"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Catalog"
+msgstr "الكتالوج"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__company_id
+msgid "Company"
+msgstr "الشركة"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Confirm"
+msgstr "تأكيد"
+
+#. module: pos_advance_order
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order__state__confirmed
+msgid "Confirmed"
+msgstr "مؤكد"
+
+#. module: pos_advance_order
+#: model:ir.model,name:pos_advance_order.model_res_partner
+msgid "Contact"
+msgstr "جهة الاتصال"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Create Payment"
+msgstr "إنشاء دفعة"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Create Remaining Payment"
+msgstr "إنشاء دفعة المتبقي"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__create_uid
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__create_uid
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__create_uid
+msgid "Created by"
+msgstr "أُنشئ بواسطة"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__create_date
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__create_date
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__create_date
+msgid "Created on"
+msgstr "تاريخ الإنشاء"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__currency_id
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__currency_id
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__currency_id
+msgid "Currency"
+msgstr "العملة"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__partner_id
+msgid "Customer"
+msgstr "العميل"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,help:pos_advance_order.field_pos_advance_order_line__product_uom_id
+msgid "Default unit of measure used for all stock operations."
+msgstr "وحدة القياس الافتراضية المستخدمة في جميع عمليات المخزون."
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__display_name
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__display_name
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__display_name
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_config__display_name
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_order__display_name
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_session__display_name
+#: model:ir.model.fields,field_description:pos_advance_order.field_product_template__display_name
+#: model:ir.model.fields,field_description:pos_advance_order.field_res_partner__display_name
+msgid "Display Name"
+msgstr "اسم العرض"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__display_type
+msgid "Display Type"
+msgstr "نوع العرض"
+
+#. module: pos_advance_order
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order__state__draft
+msgid "Draft"
+msgstr "مسودة"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__employee_id
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__user_id
+msgid "Employee"
+msgstr "الموظف"
+
+#. module: pos_advance_order
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order__payment_progress__fully_paid
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order__state__fully_paid
+msgid "Fully Paid"
+msgstr "مدفوع بالكامل"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__amount_grand_total
+msgid "Grand Total"
+msgstr "الإجمالي الكلي"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_product_product__has_pledge
+#: model:ir.model.fields,field_description:pos_advance_order.field_product_template__has_pledge
+msgid "Has Pledge"
+msgstr "يحتوي على رهن"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__id
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__id
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__id
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_config__id
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_order__id
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_session__id
+#: model:ir.model.fields,field_description:pos_advance_order.field_product_template__id
+#: model:ir.model.fields,field_description:pos_advance_order.field_res_partner__id
+msgid "ID"
+msgstr "المُعرف"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,help:pos_advance_order.field_res_partner__pos_profit_account_id
+#: model:ir.model.fields,help:pos_advance_order.field_res_users__pos_profit_account_id
+msgid ""
+"Income/Profit account used when posting the remaining payment (full total) "
+"for POS advance orders of this customer."
+msgstr "حساب الدخل/الربح المستخدم عند ترحيل دفعة المبلغ المتبقي (الإجمالي الكامل) لطلبات العربون الخاصة بهذا العميل."
+
+#. module: pos_advance_order
+#: model:ir.model.fields,help:pos_advance_order.field_pos_config__pos_profit_account_id
+msgid ""
+"Income/Profit account used when posting the remaining payment (full total) "
+"for advance orders."
+msgstr "حساب الدخل/الربح المستخدم عند ترحيل دفعة المبلغ المتبقي (الإجمالي الكامل) لطلبات العربون."
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_full_receipt
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_receipt
+msgid "Item"
+msgstr "الصنف"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__payment_move_id
+msgid "Journal Entry"
+msgstr "قيد يومية"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,help:pos_advance_order.field_pos_config__pos_card_journal_id
+msgid "Journal for card/bank advance payments"
+msgstr "دفتر يومية لدفعات العربون عبر البطاقة/البنك"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,help:pos_advance_order.field_pos_config__pos_cash_journal_id
+msgid "Journal for cash advance payments"
+msgstr "دفتر يومية لدفعات العربون النقدية"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__write_uid
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__write_uid
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__write_uid
+msgid "Last Updated by"
+msgstr "آخر تحديث بواسطة"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__write_date
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__write_date
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__write_date
+msgid "Last Updated on"
+msgstr "آخر تحديث في"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,help:pos_advance_order.field_pos_config__pos_advance_account_id
+msgid "Liability account for customer advance payments"
+msgstr "حساب الالتزام لدفعات العربون الخاصة بالعميل"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__line_ids
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Lines"
+msgstr "السطور"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "New"
+msgstr "جديد"
+
+#. module: pos_advance_order
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order__payment_progress__no_payment
+msgid "No Payment"
+msgstr "بدون دفع"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "No pledge payment found to return."
+msgstr "لا توجد دفعة رهن لإرجاعها."
+
+#. module: pos_advance_order
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order_line__display_type__line_note
+msgid "Note"
+msgstr "ملاحظة"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__order_id
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__order_id
+msgid "Order"
+msgstr "الطلب"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_config__pos_advance_account_id
+msgid "POS Advance Account"
+msgstr "حساب عربون نقطة البيع"
+
+#. module: pos_advance_order
+#: model:ir.model,name:pos_advance_order.model_pos_advance_order
+msgid "POS Advance Order"
+msgstr "طلب عربون نقطة البيع"
+
+#. module: pos_advance_order
+#: model:ir.model,name:pos_advance_order.model_pos_advance_order_line
+msgid "POS Advance Order Line"
+msgstr "سطر طلب عربون نقطة البيع"
+
+#. module: pos_advance_order
+#: model:ir.model,name:pos_advance_order.model_pos_advance_order_pledge
+msgid "POS Advance Order Pledge"
+msgstr "رهن طلب عربون نقطة البيع"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_config__pos_card_journal_id
+msgid "POS Card Journal"
+msgstr "دفتر يومية البطاقة لنقطة البيع"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_config__pos_cash_journal_id
+msgid "POS Cash Journal"
+msgstr "دفتر يومية النقد لنقطة البيع"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_config__pos_profit_account_id
+#: model:ir.model.fields,field_description:pos_advance_order.field_res_partner__pos_profit_account_id
+#: model:ir.model.fields,field_description:pos_advance_order.field_res_users__pos_profit_account_id
+msgid "POS Profit Account"
+msgstr "حساب الربح لنقطة البيع"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__amount_paid
+msgid "Paid Amount"
+msgstr "المبلغ المدفوع"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Paid amount must be greater than zero to refund."
+msgstr "يجب أن يكون المبلغ المدفوع أكبر من صفر للاسترجاع."
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__payment_id
+msgid "Payment"
+msgstr "الدفعة"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__payment_method
+msgid "Payment Method"
+msgstr "طريقة الدفع"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__payment_progress
+msgid "Payment Progress"
+msgstr "تقدم الدفع"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__payment_state
+msgid "Payment Status"
+msgstr "حالة الدفع"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid ""
+"Payment journal is missing; please configure the POS Cash/Card journal."
+msgstr "دفتر يومية الدفع غير محدد؛ يرجى إعداد دفتر يومية النقد/البطاقة لنقطة البيع."
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__picking_date
+msgid "Picking Date"
+msgstr "تاريخ الاستلام"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__pos_config_id
+msgid "Picking POS"
+msgstr "نقطة البيع للاستلام"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__from_pos_config_id
+msgid "From POS"
+msgstr "من نقطة البيع"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid ""
+"Please configure a Cash/Bank journal (with a default account) on the POS "
+"configuration first."
+msgstr "يرجى إعداد دفتر يومية نقد/بنك (مع حساب افتراضي) في إعدادات نقطة البيع أولاً."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Please configure the Cash/Card journal on the POS configuration first."
+msgstr "يرجى إعداد دفتر يومية النقد/البطاقة في إعدادات نقطة البيع أولاً."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Please create the advance payment first."
+msgstr "يرجى إنشاء دفعة العربون أولاً."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Please define an inbound payment method on journal %s."
+msgstr "يرجى تحديد طريقة دفع واردة على دفتر اليومية %s."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Please define an outbound payment method on journal %s."
+msgstr "يرجى تحديد طريقة دفع صادرة على دفتر اليومية %s."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Please set 'POS Advance Account' on the POS configuration first."
+msgstr "يرجى تحديد 'حساب عربون نقطة البيع' في إعدادات نقطة البيع أولاً."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid ""
+"Please set 'POS Profit Account' on the customer or on the POS configuration "
+"first."
+msgstr "يرجى تحديد 'حساب الربح لنقطة البيع' على العميل أو في إعدادات نقطة البيع أولاً."
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.product_template_form_view_pos_pledge
+msgid "Pledge"
+msgstr "رهن"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__pledge_amount
+#: model:ir.model.fields,field_description:pos_advance_order.field_product_product__pledge_amount
+#: model:ir.model.fields,field_description:pos_advance_order.field_product_template__pledge_amount
+msgid "Pledge Amount"
+msgstr "مبلغ الرهن"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_product_product__pledge_currency_id
+#: model:ir.model.fields,field_description:pos_advance_order.field_product_template__pledge_currency_id
+msgid "Pledge Currency"
+msgstr "عملة الرهن"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__pledge_payment_id
+msgid "Pledge Payment"
+msgstr "دفعة الرهن"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__pledge_qty
+msgid "Pledge Qty"
+msgstr "كمية الرهن"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__pledge_subtotal
+msgid "Pledge Total"
+msgstr "إجمالي الرهن"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__pledge_amount_unit
+msgid "Pledge Unit Amount"
+msgstr "قيمة وحدة الرهن"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Pledge return payment is already created."
+msgstr "تم إنشاء دفعة إرجاع الرهن مسبقًا."
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__pledge_line_ids
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Pledges"
+msgstr "الرهونات"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__pledge_count
+msgid "Pledges Count"
+msgstr "عدد الرهنيات"
+
+#. module: pos_advance_order
+#: model:ir.model,name:pos_advance_order.model_pos_config
+msgid "Point of Sale Configuration"
+msgstr "تهيئة نقطة البيع"
+
+#. module: pos_advance_order
+#: model:ir.model,name:pos_advance_order.model_pos_order
+msgid "Point of Sale Orders"
+msgstr "طلبات نقطة البيع"
+
+#. module: pos_advance_order
+#: model:ir.model,name:pos_advance_order.model_pos_session
+msgid "Point of Sale Session"
+msgstr "جلسة نقطة البيع"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__pricelist_id
+msgid "Pricelist"
+msgstr "قائمة الأسعار"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Print Full Receipt"
+msgstr "طباعة إيصال كامل"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Print Receipt"
+msgstr "طباعة إيصال"
+
+#. module: pos_advance_order
+#: model:ir.model,name:pos_advance_order.model_product_template
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__product_id
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_pledge__product_id
+msgid "Product"
+msgstr "المنتج"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Products"
+msgstr "المنتجات"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__amount_products
+msgid "Products Total"
+msgstr "إجمالي المنتجات"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_full_receipt
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_receipt
+msgid "Qty"
+msgstr "الكمية"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__product_qty
+msgid "Quantity"
+msgstr "الكمية"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__name
+msgid "Reference"
+msgstr "المرجع"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Refund Advance"
+msgstr "استرجاع العربون"
+
+#. module: pos_advance_order
+#: model:ir.actions.act_window,name:pos_advance_order.action_pos_advance_order_refunded
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order__state__refunded
+#: model:ir.ui.menu,name:pos_advance_order.menu_pos_advance_order_refunded
+msgid "Refunded"
+msgstr "مسترجع"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__amount_remaining
+msgid "Remaining Amount"
+msgstr "المبلغ المتبقي"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__remaining_payment_id
+msgid "Remaining Payment (Products)"
+msgstr "دفعة المتبقي (المنتجات)"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Remaining/reversal payments are already created for this order."
+msgstr "تم إنشاء دفعات المتبقي/العكس مسبقًا لهذا الطلب."
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Return Pledge"
+msgstr "إرجاع الرهن"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__return_pledge_payment_id
+msgid "Return Pledge Payment"
+msgstr "دفعة إرجاع الرهن"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__reversal_payment_id
+msgid "Reversal Payment"
+msgstr "دفعة عكسية"
+
+#. module: pos_advance_order
+#: model:ir.model.fields.selection,name:pos_advance_order.selection__pos_advance_order_line__display_type__line_section
+msgid "Section"
+msgstr "قسم"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__sequence
+msgid "Sequence"
+msgstr "التسلسل"
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.view_pos_advance_order_form
+msgid "Set to Draft"
+msgstr "إرجاع لمسودة"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__state
+msgid "State"
+msgstr "الحالة"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__price_subtotal
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_full_receipt
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_receipt
+msgid "Subtotal"
+msgstr "الإجمالي الفرعي"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,help:pos_advance_order.field_pos_order__is_advance_generated
+msgid ""
+"Technical flag used to exclude this order from POS session closing "
+"accounting (advance module flow)."
+msgstr "علامة تقنية تُستخدم لاستبعاد هذا الطلب من القيود المحاسبية عند إغلاق جلسة نقطة البيع (مسار موديول العربون)."
+
+#. module: pos_advance_order
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_full_receipt
+#: model_terms:ir.ui.view,arch_db:pos_advance_order.report_pos_advance_order_receipt
+msgid "Thank you"
+msgstr "شكرًا لك"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,help:pos_advance_order.field_pos_advance_order__pricelist_id
+msgid ""
+"The pricelist used if no customer is selected or if the customer has no Sale"
+" Pricelist configured if any."
+msgstr "قائمة الأسعار المستخدمة إذا لم يتم اختيار عميل، أو إذا لم يكن لدى العميل قائمة أسعار مبيعات محددة."
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__amount_total
+msgid "Total"
+msgstr "الإجمالي"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "Total amount must be greater than zero."
+msgstr "يجب أن يكون المبلغ الإجمالي أكبر من صفر."
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__price_unit
+msgid "Unit Price"
+msgstr "سعر الوحدة"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order_line__product_uom_id
+msgid "Unit of Measure"
+msgstr "وحدة القياس"
+
+#. module: pos_advance_order
+#: model:ir.model.fields,field_description:pos_advance_order.field_pos_advance_order__with_employee
+msgid "With Employee"
+msgstr "مع موظف"
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "You can only create a payment on a Confirmed advance order."
+msgstr "يمكنك إنشاء دفعة فقط عندما يكون طلب العربون في حالة مؤكد."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "You can only create remaining payment after the advance is paid."
+msgstr "يمكنك إنشاء دفعة المتبقي فقط بعد دفع العربون."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "You can only delete lines on a Draft advance order."
+msgstr "يمكن حذف السطور فقط عندما يكون طلب العربون في حالة مسودة."
+
+#. module: pos_advance_order
+#. odoo-python
+#: code:addons/pos_advance_order/models/pos_advance_order.py:0
+msgid "You cannot modify a cancelled/refunded advance order."
+msgstr "لا يمكنك تعديل طلب عربون مُلغى/مسترجع."
+
+# --------------------
+# POS Popup / JS text
+# --------------------
+#. module: pos_advance_order
+msgid "Advance Order Details"
+msgstr "تفاصيل طلب العربون"
+
+#. module: pos_advance_order
+msgid "Deposit and picking configuration"
+msgstr "إعدادات العربون والاستلام"
+
+#. module: pos_advance_order
+msgid "Advance Amount"
+msgstr "مبلغ العربون"
+
+#. module: pos_advance_order
+msgid "Amount Tendered"
+msgstr "المبلغ المستلم"
+
+#. module: pos_advance_order
+msgid "Customer paid amount (can be greater than advance)."
+msgstr "المبلغ الذي دفعه العميل (يمكن أن يكون أكبر من العربون)."
+
+#. module: pos_advance_order
+msgid "Change Returned"
+msgstr "المبلغ المرجّع"
+
+#. module: pos_advance_order
+msgid "Discount (Optional)"
+msgstr "الخصم (اختياري)"
+
+#. module: pos_advance_order
+msgid "Payment method"
+msgstr "طريقة الدفع"
+
+#. module: pos_advance_order
+msgid "Please select a payment method."
+msgstr "يرجى اختيار طريقة دفع."
+
+#. module: pos_advance_order
+msgid "Please select a customer first."
+msgstr "يرجى اختيار عميل أولًا."
+
+#. module: pos_advance_order
+msgid "Please add at least one product line."
+msgstr "يرجى إضافة سطر منتج واحد على الأقل."
+
+#. module: pos_advance_order
+msgid "No active order found."
+msgstr "لا يوجد طلب نشط."
+
+#. module: pos_advance_order
+msgid "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration."
+msgstr "لا توجد طرق دفع مناسبة في نقطة البيع هذه. أضف طرق دفع نقدية أو بنكية يدوية بدون تكامل طرفية أو QR في إعدادات نقطة البيع."
+
+#. module: pos_advance_order
+msgid "Advance amount must be greater than zero."
+msgstr "يجب أن يكون مبلغ العربون أكبر من صفر."
+
+#. module: pos_advance_order
+msgid "Amount tendered cannot be less than advance amount."
+msgstr "لا يمكن أن يكون المبلغ المستلم أقل من مبلغ العربون."
+
+#. module: pos_advance_order
+msgid "Amount tendered cannot be negative."
+msgstr "لا يمكن أن يكون المبلغ المستلم سالبًا."
+
+#. module: pos_advance_order
+msgid "Advance order created: %s"
+msgstr "تم إنشاء طلب عربون: %s"
+
+#. module: pos_advance_order
+msgid "Advance order created but receipt printing failed."
+msgstr "تم إنشاء طلب العربون لكن فشلت طباعة الإيصال."
+
+#. module: pos_advance_order
+msgid "Failed to create advance order."
+msgstr "فشل إنشاء طلب العربون."
+
+#. module: pos_advance_order
+msgid "Complete Advance Order"
+msgstr "إكمال طلب العربون"
+
+#. module: pos_advance_order
+msgid "Search by Customer Name or Phone"
+msgstr "بحث باسم العميل أو رقم الهاتف"
+
+#. module: pos_advance_order
+msgid "No advance orders found for this Picking POS."
+msgstr "لا توجد طلبات عربون لنقطة الاستلام هذه."
+
+#. module: pos_advance_order
+msgid "Please select an advance order."
+msgstr "يرجى اختيار طلب عربون."
+
+#. module: pos_advance_order
+msgid "Advance order completed successfully."
+msgstr "تم إكمال طلب العربون بنجاح."
+
+#. module: pos_advance_order
+msgid "Failed to complete advance order."
+msgstr "فشل إكمال طلب العربون."
+
+#. module: pos_advance_order
+msgid "Advance payment details: Tendered %(tendered)s, Change Returned %(change)s"
+msgstr "تفاصيل دفعة العربون: المبلغ المستلم %(tendered)s، المبلغ المرجّع %(change)s"
+
+#. module: pos_advance_order
+msgid "-- Select Picking POS --"
+msgstr "-- اختر نقطة استلام --"
+
+#. module: pos_advance_order
+msgid "-- Select Employee --"
+msgstr "-- اختر موظفًا --"
+
+#. module: pos_advance_order
+msgid "-- No Discount --"
+msgstr "-- بدون خصم --"
+
+#. module: pos_advance_order
+msgid "Pick an advance paid order to finish settlement"
+msgstr "اختر طلب عربون مدفوع لإكمال التسوية"
+
+#. module: pos_advance_order
+msgid "Type customer name or phone..."
+msgstr "اكتب اسم العميل أو رقم الهاتف..."
+
+#. module: pos_advance_order
+msgid "Phone"
+msgstr "الهاتف"
+
+#. module: pos_advance_order
+msgid "Complete"
+msgstr "إكمال"
+
+#. module: pos_advance_order
+msgid "Customer paid amount for remaining settlement."
+msgstr "المبلغ الذي دفعه العميل عند تسوية المتبقي."
+
+#. module: pos_advance_order
+msgid "Remaining Amount Tendered"
+msgstr "المبلغ المستلم للمتبقي"
+
+#. module: pos_advance_order
+msgid "Remaining Change Returned"
+msgstr "المبلغ المرجّع للمتبقي"
+
+#. module: pos_advance_order
+msgid "Remaining payment details: Tendered %(tendered)s, Change Returned %(change)s"
+msgstr "تفاصيل دفعة المتبقي: المبلغ المستلم %(tendered)s، المبلغ المرجّع %(change)s"
+
+#. module: pos_advance_order
+msgid "Amount tendered cannot be less than remaining amount."
+msgstr "لا يمكن أن يكون المبلغ المستلم أقل من المبلغ المتبقي."

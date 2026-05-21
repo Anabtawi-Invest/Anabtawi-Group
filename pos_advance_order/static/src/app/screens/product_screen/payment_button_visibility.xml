@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <!--
+      Prevent nested advance/complete dialogs from bubbling clicks to the Actions popup:
+      Standard POS attaches t-on-click="props.close" on ControlButtonsPopup Dialog root.
+      Close Actions via Escape / header ✕ instead of tapping the backdrop.
+    -->
+    <t t-inherit="point_of_sale.ControlButtonsPopup" t-inherit-mode="extension" owl="1">
+        <xpath expr="//t[@t-name='point_of_sale.ControlButtonsPopup']/Dialog" position="replace">
+            <Dialog bodyClass="'d-flex flex-column'" footer="false" title.translate="Actions">
+                <ControlButtons showRemainingButtons="true" close="props.close"/>
+            </Dialog>
+        </xpath>
+    </t>
+    <t t-inherit="point_of_sale.ProductScreen" t-inherit-mode="extension" owl="1">
+        <xpath expr="//ActionpadWidget" position="attributes">
+            <attribute name="showActionButton">currentOrder and !currentOrder.isEmpty()</attribute>
+        </xpath>
+        <xpath expr="//button[hasclass('pay-button')]" position="attributes">
+            <attribute name="t-if">!pos.scanning</attribute>
+        </xpath>
+    </t>
+</templates>

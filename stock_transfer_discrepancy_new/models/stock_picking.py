@@ -1,6 +1,6 @@
 import logging
 
-from odoo import _, api, fields, models
+from odoo import _, api, models
 from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
@@ -8,12 +8,6 @@ _logger = logging.getLogger(__name__)
 
 class StockPicking(models.Model):
     _inherit = "stock.picking"
-
-    driver_id = fields.Many2one(
-        "stock.transfer.driver",
-        string="Driver",
-        check_company=True,
-    )
 
     def _get_transfer_discrepancy_move_vals(self):
         """Return list of dicts for moves where actual < expected.
@@ -92,7 +86,6 @@ class StockPicking(models.Model):
                         "difference_qty": expected - actual,
                         "truck_location_id": truck_location.id,
                         "stage": stage,
-                        "driver_id": self.driver_id.id if self.driver_id else False,
                     }
                 )
             else:
@@ -219,9 +212,9 @@ class StockPicking(models.Model):
 
         return res
 
-    @api.onchange("picking_type_id", "location_id", "location_dest_id", "driver_id")
+    @api.onchange("picking_type_id", "location_id", "location_dest_id")
     def _onchange_picking_type_id_discrepancy_truck_domain(self):
-        """Internal transfers: locations not blocked by discrepancy; drivers exclude blocked."""
+        """Block selecting trucks with open discrepancies on internal transfers."""
         _logger.info(
             "[DISCREPANCY DOMAIN] _onchange called. picking_type_code=%s",
             self.picking_type_code,
@@ -231,60 +224,87 @@ class StockPicking(models.Model):
                 "[DISCREPANCY DOMAIN] Not internal transfer, skipping domain restriction"
             )
             return {}
-        source_domain = [("usage", "=", "internal")]
-        dest_domain = [("usage", "=", "internal")]
-        company_id = self.company_id.id if self.company_id else False
-        driver_domain = [
-            ("is_blocked", "=", False),
+        source_domain = [
+            ("usage", "=", "internal"),
             "|",
-            ("company_id", "=", False),
-            ("company_id", "=", company_id),
+            ("is_truck", "=", False),
+            ("has_open_discrepancy", "=", False),
         ]
+        dest_domain = [("usage", "=", "internal")]
+        _logger.info(
+            "[DISCREPANCY DOMAIN] Applying source domain on location_id only: %s",
+            source_domain,
+        )
+        
         warning_msg = None
-        if self.driver_id and self.driver_id.is_blocked:
-            drv_name = (
-                self.driver_id.employee_id.name
-                if self.driver_id.employee_id
-                else self.driver_id.display_name
+        if self.location_id:
+            _logger.info(
+                "[DISCREPANCY DOMAIN] Current location_id: %s (ID: %s, is_truck: %s, has_open_discrepancy: %s)",
+                self.location_id.name,
+                self.location_id.id,
+                self.location_id.is_truck,
+                self.location_id.has_open_discrepancy,
             )
-            warning_msg = _(
-                "Driver '%s' is blocked due to open transfer discrepancies. Choose another driver or settle first.",
-                drv_name,
-            )
-            self.driver_id = False
-        if self.location_id and not self.location_id.is_truck:
-            self.driver_id = False
-        result = {
-            "domain": {
-                "location_id": source_domain,
-                "location_dest_id": dest_domain,
-                "driver_id": driver_domain,
-            }
-        }
+            if self.location_id.is_truck and self.location_id.has_open_discrepancy:
+                warning_msg = _(
+                    "Cannot use truck location '%s' as source location: it has open discrepancies. "
+                    "Please settle the discrepancies first or choose another location.",
+                    self.location_id.name,
+                )
+                _logger.warning(
+                    "[DISCREPANCY DOMAIN] Warning: Source location %s has open discrepancy",
+                    self.location_id.name,
+                )
+                # Clear the location to force user to choose another one
+                self.location_id = False
+        
+        result = {"domain": {"location_id": source_domain, "location_dest_id": dest_domain}}
         if warning_msg:
             result["warning"] = {
-                "title": _("Blocked driver"),
+                "title": _("Truck Location with Open Discrepancy"),
                 "message": warning_msg,
             }
         return result
 
-    @api.constrains("location_id", "driver_id", "picking_type_code")
-    def _check_truck_driver_required_and_not_blocked(self):
+    @api.constrains("location_id", "location_dest_id", "picking_type_code")
+    def _check_truck_open_discrepancy(self):
+        """Prevent using trucks with open discrepancies in internal transfers."""
         for picking in self:
             if picking.picking_type_code != "internal":
                 continue
-            if picking.location_id.is_truck:
-                if not picking.driver_id:
-                    raise ValidationError(_("A driver is required when the source location is a truck."))
-                if picking.driver_id.is_blocked:
-                    drv_name = (
-                        picking.driver_id.employee_id.name
-                        if picking.driver_id.employee_id
-                        else picking.driver_id.display_name
+
+            if picking.location_id.is_truck and picking.location_id.has_open_discrepancy:
+                _logger.warning(
+                    "[DISCREPANCY DOMAIN] Constraint violation: Source location %s (ID: %s) is truck with open discrepancy",
+                    picking.location_id.name,
+                    picking.location_id.id,
+                )
+                raise ValidationError(
+                    _(
+                        "Cannot use truck location '%s' as source location: it has open discrepancies. "
+                        "Please settle the discrepancies first or choose another location.",
+                        picking.location_id.name,
                     )
-                    raise ValidationError(
-                        _(
-                            "Driver '%s' cannot be assigned until open transfer discrepancies are settled.",
-                            drv_name,
-                        )
+                )
+
+    @api.constrains("location_id", "location_dest_id", "picking_type_code")
+    def _check_truck_open_discrepancy(self):
+        """Prevent using trucks with open discrepancies in internal transfers."""
+        for picking in self:
+            if picking.picking_type_code != "internal":
+                continue
+
+            if picking.location_id.is_truck and picking.location_id.has_open_discrepancy:
+                _logger.warning(
+                    "[DISCREPANCY DOMAIN] Constraint violation: Source location %s (ID: %s) is truck with open discrepancy",
+                    picking.location_id.name,
+                    picking.location_id.id,
+                )
+                raise ValidationError(
+                    _(
+                        "Cannot use truck location '%s' as source location: it has open discrepancies. "
+                        "Please settle the discrepancies first or choose another location.",
+                        picking.location_id.name,
                     )
+                )
+

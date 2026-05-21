@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "POS Scrap-anabtawi",
+    "name": "POS Scrap",
     "version": "19.0.1.0.0",
     "category": "Point of Sale",
     "summary": "Create stock scrap directly from POS",
-    "author": "enbtawi",
+    "author":"Anabtawi",
     "license": "LGPL-3",
     "depends": ["point_of_sale", "stock"],
     "data": [],

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension" owl="1">
+        <!-- Advance / Complete live only inside Actions popup (ellipsis), not on main control bar -->
+        <xpath expr="//t[@t-if='props.showRemainingButtons']/div/NoteButton" position="after">
+            <button
+                t-if="pos.config.enable_advance_order"
+                t-att-class="advanceOrderButtonClass()"
+                t-on-click="onClickAdvanceOrder"
+                type="button">
+                <i class="fa fa-calendar-check-o me-2" role="img" t-att-aria-label="advanceOrderButtonLabel" t-att-title="advanceOrderButtonLabel"/>
+                <span t-esc="advanceOrderButtonLabel"/>
+            </button>
+            <button
+                t-att-class="completeAdvanceOrderButtonClass()"
+                t-on-click="onClickCompleteAdvanceOrder"
+                type="button">
+                <i class="fa fa-check-square-o me-2" role="img" t-att-aria-label="completeAdvanceOrderButtonLabel" t-att-title="completeAdvanceOrderButtonLabel"/>
+                <span t-esc="completeAdvanceOrderButtonLabel"/>
+            </button>
+        </xpath>
+    </t>
+
+    <!-- Closing Register: advance deposit shown inside the same payment row -->
+    <t t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension" owl="1">
+        <xpath expr="//span[@t-esc='env.utils.formatCurrency(props.default_cash_details.amount)']" position="replace">
+            <span>
+                <t t-esc="env.utils.formatCurrency(props.default_cash_details.amount)"/>
+                <small t-if="props.default_cash_details.advance_payment_amount" class="ms-2 text-muted fs-6">
+                    (Advance included:
+                    <t t-esc="env.utils.formatCurrency(props.default_cash_details.advance_payment_amount)"/>)
+                </small>
+            </span>
+        </xpath>
+        <xpath expr="//span[@t-esc='env.utils.formatCurrency(pm.amount)']" position="replace">
+            <span>
+                <t t-esc="env.utils.formatCurrency(pm.amount)"/>
+                <small t-if="pm.advance_payment_amount" class="ms-2 text-muted fs-6">
+                    (Advance included:
+                    <t t-esc="env.utils.formatCurrency(pm.advance_payment_amount)"/>)
+                </small>
+            </span>
+        </xpath>
+    </t>
+</templates>

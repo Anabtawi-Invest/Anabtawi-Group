@@ -15,8 +15,8 @@ class InternalTransferReportWizard(models.TransientModel):
         ('today','Today'),
     ], default='week', required=True)
 
-    date_from = fields.Date()
-    date_to = fields.Date()
+    date_from = fields.Datetime()
+    date_to = fields.Datetime()
 
     category_id = fields.Many2one(
         'product.category',
@@ -24,32 +24,35 @@ class InternalTransferReportWizard(models.TransientModel):
     )
 
     def _compute_dates(self):
+        self.ensure_one()
         today = fields.Date.today()
 
         if self.filter_type == 'week':
-            start = today - timedelta(days=today.weekday())
-            end = start + timedelta(days=6)
+            start_d = today - timedelta(days=today.weekday())
+            end_d = start_d + timedelta(days=6)
+            start = datetime.combine(start_d, time.min)
+            end = datetime.combine(end_d, time.max)
 
         elif self.filter_type == 'last_month':
             first_day = today.replace(day=1)
             last_month_end = first_day - timedelta(days=1)
-            start = last_month_end.replace(day=1)
-            end = last_month_end
+            start_d = last_month_end.replace(day=1)
+            end_d = last_month_end
+            start = datetime.combine(start_d, time.min)
+            end = datetime.combine(end_d, time.max)
 
         else:
             if not self.date_from or not self.date_to:
-                raise UserError(_("Please set both start and end dates for custom filter."))
-            start = self.date_from
-            end = self.date_to
+                raise UserError(_("Please set both start and end date/time for custom filter."))
+            start = fields.Datetime.to_datetime(self.date_from)
+            end = fields.Datetime.to_datetime(self.date_to)
 
-        return start, end
+        return fields.Datetime.to_string(start), fields.Datetime.to_string(end)
 
     def _get_report_groups(self):
         self.ensure_one()
 
-        date_from, date_to = self._compute_dates()
-        date_from_dt = fields.Datetime.to_string(datetime.combine(date_from, time.min))
-        date_to_dt = fields.Datetime.to_string(datetime.combine(date_to, time.max))
+        date_from_dt, date_to_dt = self._compute_dates()
         picking_domain = [
             ('picking_type_code', '=', 'internal'),
             ('scheduled_date', '>=', date_from_dt),

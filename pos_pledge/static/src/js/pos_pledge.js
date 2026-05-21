@@ -1,7 +1,6 @@
 /** @odoo-module */
 
-const PLEDGE_BUILD_TAG = "PLEDGE_BUILD_2026_05_10_2149";
-console.log("[PLEDGE] Module loading started...", PLEDGE_BUILD_TAG);
+console.log("[PLEDGE] Module loading started...");
 
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
@@ -406,26 +405,7 @@ patch(PosOrder.prototype, {
         if (this.employee_id) {
             data.employee_id = this.employee_id;
         }
-        const lines = this.getOrderlines ? this.getOrderlines() : this.lines || [];
-        console.warn(
-            "[PLEDGE][TRACE][FRONT] serializeForORM order=%s employee_id=%s lines=%s payload_lines=%s",
-            this.name || this.uid || "n/a",
-            this.employee_id || "none",
-            lines.length,
-            (data.lines || []).length
-        );
-        lines.forEach((line, idx) => {
-            const product = line.getProduct ? line.getProduct() : (line.product || line.product_id);
-            console.warn(
-                "[PLEDGE][TRACE][FRONT] line#%s product=%s id=%s qty=%s unit=%s has_pledge=%s",
-                idx + 1,
-                product?.display_name || product?.name || "unknown",
-                product?.id || "n/a",
-                line.get_quantity ? line.get_quantity() : (line.qty || 0),
-                line.get_unit_price ? line.get_unit_price() : (line.price_unit || 0),
-                product?.has_pledge === true
-            );
-        });
+        console.log("[PLEDGE] Serializing order with employee_id:", this.employee_id);
         return data;
     },
 });
@@ -1585,4 +1565,4 @@ _buildFullReceiptHtml(receiptData) {
 });
 
 console.log("[PLEDGE] ReceiptScreen patch applied");
-console.log("[PLEDGE] Module loaded successfully!", PLEDGE_BUILD_TAG);
+console.log("[PLEDGE] Module loaded successfully!");

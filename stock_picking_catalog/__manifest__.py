@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "Stock Picking Product Catalog-anabtawi",
+    "name": "Stock Picking Product Catalog",
     "version": "19.0.1.0.0",
     "category": "Inventory",
     "summary": "Add Catalog button to stock pickings Operations (like Sales)",
-    "author": "enbtawi",
+    "author":"Anabtawi",
     "license": "LGPL-3",
     "depends": ["stock", "product"],
     "data": [

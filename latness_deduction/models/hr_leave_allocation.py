@@ -1,5 +1,11 @@
+import logging
+import traceback
+
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+from odoo.addons.hr_holidays_attendance.models.hr_leave_allocation import HrLeaveAllocation as HrHolidaysAttendanceLeaveAllocation
+
+_logger = logging.getLogger(__name__)
 
 
 class HrLeaveAllocation(models.Model):
@@ -55,9 +61,108 @@ class HrLeaveAllocation(models.Model):
                     payslip.ot_wallet_carry_out_equiv or 0.0
             )
 
+    def _log_ot_diagnostics(self, employees, vals_list=None, phase='unknown', error_message=None):
+        employees = employees.sudo().exists()
+        if not employees:
+            _logger.warning("[OT DEBUG] phase=%s no_employees error=%s", phase, error_message)
+            return
+
+        deductible_by_employee = self.env['hr.leave']._get_deductible_employee_overtime(employees)
+
+        attendance_sums = {}
+        for employee, is_compensable, amount in self.env['hr.attendance.overtime.line'].sudo()._read_group(
+            domain=[
+                ('employee_id', 'in', employees.ids),
+                ('status', '=', 'approved'),
+            ],
+            groupby=['employee_id', 'compensable_as_leave'],
+            aggregates=['manual_duration:sum'],
+        ):
+            attendance_sums.setdefault(employee.id, {'compensable': 0.0, 'non_compensable': 0.0})
+            key = 'compensable' if is_compensable else 'non_compensable'
+            attendance_sums[employee.id][key] += amount or 0.0
+
+        requested_by_employee = {}
+        for vals in vals_list or []:
+            employee_id = vals.get('employee_id')
+            if not employee_id:
+                continue
+            requested_by_employee.setdefault(employee_id, 0.0)
+            requested_by_employee[employee_id] += (
+                vals.get('number_of_hours_display')
+                or vals.get('number_of_hours')
+                or 0.0
+            )
+
+        for employee in employees:
+            sums = attendance_sums.get(employee.id, {})
+            _logger.warning(
+                "[OT DEBUG] phase=%s error=%s employee_id=%s employee=%s widget_total_overtime=%s "
+                "deductible=%s approved_compensable=%s approved_non_compensable=%s requested_hours=%s",
+                phase,
+                error_message,
+                employee.id,
+                employee.display_name,
+                employee.total_overtime,
+                deductible_by_employee[employee],
+                sums.get('compensable', 0.0),
+                sums.get('non_compensable', 0.0),
+                requested_by_employee.get(employee.id, 0.0),
+            )
+
     @api.model_create_multi
     def create(self, vals_list):
-        allocations = super().create(vals_list)
+        def _requested_hours_by_employee(values_list):
+            requested = {}
+            for values in values_list:
+                employee_id = values.get('employee_id')
+                if not employee_id:
+                    continue
+                requested.setdefault(employee_id, 0.0)
+                requested[employee_id] += (
+                    values.get('number_of_hours_display')
+                    or values.get('number_of_hours')
+                    or 0.0
+                )
+            return requested
+
+        try:
+            allocations = super().create(vals_list)
+        except ValidationError as err:
+            employee_ids = [vals.get('employee_id') for vals in vals_list if vals.get('employee_id')]
+            employees = self.env['hr.employee'].browse(employee_ids)
+            self._log_ot_diagnostics(
+                employees=employees,
+                vals_list=vals_list,
+                phase='allocation_create',
+                error_message=str(err),
+            )
+            _logger.warning(
+                "[OT DEBUG TRACE] phase=allocation_create error=%s vals_list=%s\n%s",
+                str(err),
+                vals_list,
+                traceback.format_exc(),
+            )
+            message = (str(err) or '').lower()
+            if 'enough overtime hours' in message:
+                requested_by_employee = _requested_hours_by_employee(vals_list)
+                deductible_by_employee = self.env['hr.leave']._get_deductible_employee_overtime(employees)
+                can_bypass = all(
+                    deductible_by_employee[employee] + 1e-6 >= requested_by_employee.get(employee.id, 0.0)
+                    for employee in employees
+                )
+                if can_bypass:
+                    _logger.warning(
+                        "[OT BYPASS] allocation_create bypassing hr_holidays_attendance check "
+                        "because deductible covers request. employees=%s requested=%s",
+                        employees.ids,
+                        requested_by_employee,
+                    )
+                    allocations = super(HrHolidaysAttendanceLeaveAllocation, self).create(vals_list)
+                else:
+                    raise
+            else:
+                raise
         is_deduct_extra_hours_flow = bool(self.env.context.get('deduct_extra_hours'))
         for alloc, vals in zip(allocations, vals_list):
             # Skip records already linked by custom OT conversion wizard.
@@ -104,6 +209,25 @@ class HrLeaveAllocation(models.Model):
             })
             payslip.with_context(skip_reconciled=True).action_reconcile_lateness_no_ot_bank()
         return allocations
+
+    def write(self, vals):
+        try:
+            return super().write(vals)
+        except ValidationError as err:
+            self._log_ot_diagnostics(
+                employees=self.employee_id,
+                vals_list=[vals],
+                phase='allocation_write',
+                error_message=str(err),
+            )
+            _logger.warning(
+                "[OT DEBUG TRACE] phase=allocation_write error=%s vals=%s ids=%s\n%s",
+                str(err),
+                vals,
+                self.ids,
+                traceback.format_exc(),
+            )
+            raise
 
     def unlink(self):
         for alloc in self:

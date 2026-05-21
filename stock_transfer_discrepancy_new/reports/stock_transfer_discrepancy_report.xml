@@ -46,10 +46,6 @@
                                                         <td><span t-esc="doc.truck_location_id.name or ''"/></td>
                                                     </tr>
                                                     <tr>
-                                                        <td class="font-weight-bold">Driver:</td>
-                                                        <td><span t-esc="doc.driver_id.employee_id.name if doc.driver_id and doc.driver_id.employee_id else ''"/></td>
-                                                    </tr>
-                                                    <tr>
                                                         <td class="font-weight-bold">Stage:</td>
                                                         <td>
                                                             <span t-if="doc.stage == 'dispatch'" class="badge badge-warning">Dispatch</span>

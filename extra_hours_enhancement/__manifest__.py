@@ -2,7 +2,7 @@
     "name": "Extra Hours Enhancement",
     "version": "19.0.1.0.0",
     "summary": "Calculate extra hours balance using work entry rates",
-    "author": "Custom",
+    "author":"Anabtawi",
     "license": "LGPL-3",
     "depends": [
         "hr_attendance",

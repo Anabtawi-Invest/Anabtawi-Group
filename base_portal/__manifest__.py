@@ -4,7 +4,7 @@
     'summary': "Portal users can access their profiles",
     'description': "Ability to link portal users with the designated employee profile on the “HR Settings” tab.",
     'category': 'Portal',
-    'author': "enbtawi",
+    'author':'Anabtawi',
     'version': '1.0',
     'depends': ['base', 'hr', 'portal', 'hr_payroll', 'hr_holidays'],
     'data': [

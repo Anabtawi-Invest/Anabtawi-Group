@@ -31,7 +31,7 @@
                             class="employee-item p-3 mb-2 border rounded cursor-pointer"
                             t-on-click="() => this.selectEmployee(employee)"
                             style="transition: background-color 0.2s;"
-                            t-attf-class="employee-item p-3 mb-2 border rounded cursor-pointer #{state.selectedEmployee and state.selectedEmployee.id === employee.id ? 'bg-primary text-white' : 'bg-white'}"
+                            t-attf-class="employee-item p-3 mb-2 border rounded cursor-pointer #{state.selectedEmployee?.id === employee.id ? 'bg-primary text-white' : 'bg-white'}"
                         >
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>

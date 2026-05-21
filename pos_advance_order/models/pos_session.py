@@ -1,0 +1,367 @@
+# -*- coding: utf-8 -*-
+from collections import defaultdict
+import logging
+
+from odoo import api, fields, models
+from odoo.exceptions import UserError
+from odoo.tools import float_is_zero
+
+_logger = logging.getLogger(__name__)
+
+
+class PosSession(models.Model):
+    _inherit = "pos.session"
+
+    @api.depends(
+        "payment_method_ids",
+        "order_ids",
+        "cash_register_balance_start",
+        "cash_register_balance_end_real",
+        "statement_line_ids.amount",
+    )
+    def _compute_cash_balance(self):
+        """Include deposited cash advances in theoretical drawer cash."""
+        super()._compute_cash_balance()
+        for session in self:
+            if not session.config_id.enable_advance_order:
+                continue
+            deposited_summary = session._get_deposited_advance_summary()
+            extra_cash = deposited_summary.get("cash") or 0.0
+            if session.currency_id.is_zero(extra_cash):
+                continue
+            before_end = session.cash_register_balance_end or 0.0
+            before_diff = session.cash_register_difference or 0.0
+            session.cash_register_balance_end = session.currency_id.round(
+                (session.cash_register_balance_end or 0.0) + extra_cash
+            )
+            session.cash_register_difference = session.currency_id.round(
+                (session.cash_register_balance_end_real or 0.0) - session.cash_register_balance_end
+            )
+            _logger.info(
+                "[ADV_CASH_BALANCE] session=%s(%s) extra_cash=%s before_end=%s after_end=%s before_diff=%s after_diff=%s",
+                session.name,
+                session.id,
+                extra_cash,
+                before_end,
+                session.cash_register_balance_end,
+                before_diff,
+                session.cash_register_difference,
+            )
+
+    def _advance_orders_deposited_in_session(self):
+        """Advance orders whose deposit entry was posted during this session window."""
+        self.ensure_one()
+        advance_orders = self.env["pos.advance.order"].sudo()
+        end = self.stop_at or fields.Datetime.now()
+        deposited = advance_orders.browse()
+        domain = [
+            ("company_id", "=", self.company_id.id),
+            ("state", "not in", ("draft", "cancel")),
+            ("advance_deposit_move_id.state", "=", "posted"),
+        ]
+        for adv_order in advance_orders.search(domain):
+            pay_cfg = adv_order.from_pos_config_id or adv_order.pos_config_id
+            if pay_cfg != self.config_id:
+                continue
+            move = adv_order.advance_deposit_move_id
+            if move and self.start_at <= move.create_date <= end:
+                deposited |= adv_order
+        return deposited
+
+    def _get_deposited_advance_summary(self):
+        """Split deposited advances by liquidity type for closing register display."""
+        self.ensure_one()
+        summary = {
+            "cash": 0.0,
+            "bank": 0.0,
+            "cash_count": 0,
+            "bank_count": 0,
+            "by_payment_method": {},
+        }
+        if not self.config_id.enable_advance_order:
+            return summary
+        currency = self.currency_id
+        cash_total = 0.0
+        bank_total = 0.0
+        cash_count = 0
+        bank_count = 0
+        for adv_order in self._advance_orders_deposited_in_session():
+            amount = adv_order.advance_amount or 0.0
+            if currency.is_zero(amount):
+                continue
+            pm = adv_order.pos_payment_method_id
+            is_cash = (pm and pm.type == "cash") or (not pm and adv_order.payment_method == "cash")
+            pm_key = pm.id if pm else False
+            pm_bucket = summary["by_payment_method"].setdefault(
+                pm_key,
+                {
+                    "amount": 0.0,
+                    "count": 0,
+                    "type": pm.type if pm else ("cash" if is_cash else "bank"),
+                },
+            )
+            pm_bucket["amount"] += amount
+            pm_bucket["count"] += 1
+            if is_cash:
+                cash_total += amount
+                cash_count += 1
+            else:
+                bank_total += amount
+                bank_count += 1
+        summary["cash"] = currency.round(cash_total)
+        summary["bank"] = currency.round(bank_total)
+        summary["cash_count"] = cash_count
+        summary["bank_count"] = bank_count
+        for bucket in summary["by_payment_method"].values():
+            bucket["amount"] = currency.round(bucket["amount"])
+        return summary
+
+    def get_closing_control_data(self):
+        """Keep reclassification logic and only change advance presentation in closing UI."""
+        data = super().get_closing_control_data()
+        self.ensure_one()
+        cfg = self.config_id
+        if not cfg.enable_advance_order:
+            return data
+
+        deposited_summary = self._get_deposited_advance_summary()
+        deposit_cash = deposited_summary["cash"]
+        deposited_by_pm = deposited_summary.get("by_payment_method", {})
+        _logger.info(
+            "[ADV_CLOSING] session=%s(%s) deposit_cash=%s deposited_by_pm=%s",
+            self.name,
+            self.id,
+            deposit_cash,
+            deposited_by_pm,
+        )
+
+        rounding = self.currency_id.rounding
+        orders = self._get_closed_orders()
+        reclassified_advance_by_pm = defaultdict(lambda: {"amount": 0.0, "number": 0})
+        for order in orders:
+            advance = order.advance_order_id
+            if not advance or not advance.pos_config_id:
+                continue
+            remaining = advance.remaining_pos_order_id
+            if not remaining or order.id != remaining.id:
+                continue
+            try:
+                app_pm = advance._get_advance_application_payment_method(self)
+            except UserError:
+                continue
+            positive_amount_on_method = sum(
+                pay.amount
+                for pay in order.payment_ids
+                if pay.payment_method_id == app_pm
+                and pay.amount > 0.0
+            )
+            advance_part = min(advance.advance_amount or 0.0, positive_amount_on_method)
+            if float_is_zero(advance_part, precision_rounding=rounding):
+                continue
+            bucket = reclassified_advance_by_pm[app_pm.id]
+            bucket["amount"] += advance_part
+            bucket["number"] += 1
+
+        default_cash = data.get("default_cash_details") or {}
+        dc_id = default_cash.get("id")
+        non_cash = list(data.get("non_cash_payment_methods") or [])
+        if default_cash:
+            default_cash["advance_payment_amount"] = 0.0
+        for row in non_cash:
+            row["advance_payment_amount"] = 0.0
+
+        for pm_id, payload in reclassified_advance_by_pm.items():
+            amt = self.currency_id.round(payload["amount"])
+            if float_is_zero(amt, precision_rounding=rounding):
+                continue
+            if dc_id and pm_id == dc_id:
+                default_cash["advance_payment_amount"] = self.currency_id.round(
+                    (default_cash.get("advance_payment_amount") or 0.0) + amt
+                )
+                continue
+            for row in non_cash:
+                if row.get("id") == pm_id:
+                    row["amount"] = self.currency_id.round(row["amount"] - amt)
+                    row["number"] = max(0, (row.get("number") or 0) - payload["number"])
+                    break
+        _logger.info(
+            "[ADV_CLOSING] session=%s(%s) reclassified_by_pm=%s",
+            self.name,
+            self.id,
+            {pm_id: self.currency_id.round(v["amount"]) for pm_id, v in reclassified_advance_by_pm.items()},
+        )
+
+        # Merge deposited cash advances into default cash line (instead of synthetic row).
+        if (
+            default_cash
+            and not float_is_zero(deposit_cash, precision_rounding=rounding)
+        ):
+            default_cash["advance_payment_amount"] = self.currency_id.round(deposit_cash)
+            default_cash["amount"] = self.currency_id.round(
+                (default_cash.get("amount") or 0.0) + deposit_cash
+            )
+
+        non_cash_by_id = {row.get("id"): row for row in non_cash}
+        bank_fallback_row = next((row for row in non_cash if row.get("type") == "bank"), None)
+
+        for pm_id, bucket in deposited_by_pm.items():
+            deposit_amount = self.currency_id.round(bucket.get("amount") or 0.0)
+            if float_is_zero(deposit_amount, precision_rounding=rounding):
+                continue
+            if bucket.get("type") == "cash":
+                # Cash deposits were already merged into default cash details.
+                continue
+
+            target_row = None
+            if pm_id and pm_id in non_cash_by_id:
+                target_row = non_cash_by_id[pm_id]
+            else:
+                target_row = bank_fallback_row
+
+            if not target_row:
+                continue
+
+            target_row["advance_payment_amount"] = self.currency_id.round(deposit_amount)
+
+        non_cash = [
+            row
+            for row in non_cash
+            if not float_is_zero(row.get("amount") or 0.0, precision_rounding=rounding)
+        ]
+
+        data["default_cash_details"] = default_cash or data.get("default_cash_details")
+        data["non_cash_payment_methods"] = non_cash
+        _logger.info(
+            "[ADV_CLOSING] session=%s(%s) default_cash=%s non_cash_rows=%s",
+            self.name,
+            self.id,
+            data.get("default_cash_details"),
+            data.get("non_cash_payment_methods"),
+        )
+        return data
+
+    def _accumulate_amounts(self, data):
+        data = super()._accumulate_amounts(data)
+        combine = data.get("combine_receivables_pay_later")
+        if not combine:
+            data["combine_receivables_pay_later_advance"] = {}
+            return data
+
+        amounts_fn = lambda: {"amount": 0.0, "amount_converted": 0.0}
+        combine_advance = defaultdict(amounts_fn)
+        rounding = self.currency_id.rounding
+
+        for order in self._get_closed_orders():
+            if order.is_invoiced:
+                continue
+            advance = order.advance_order_id
+            if not advance or not advance.pos_config_id.pos_advance_receivable_account_id:
+                continue
+            for payment in order.payment_ids:
+                pm = payment.payment_method_id
+                if pm.type != "pay_later" or pm.split_transactions:
+                    continue
+                amount = payment.amount
+                if float_is_zero(amount, precision_rounding=rounding):
+                    continue
+                date = payment.payment_date
+                combine_advance[pm] = self._update_amounts(
+                    combine_advance[pm], {"amount": amount}, date
+                )
+                combine[pm] = self._update_amounts(
+                    combine[pm], {"amount": -amount}, date
+                )
+
+        for pm in list(combine.keys()):
+            if float_is_zero(combine[pm]["amount"], precision_rounding=rounding):
+                del combine[pm]
+        for pm in list(combine_advance.keys()):
+            if float_is_zero(combine_advance[pm]["amount"], precision_rounding=rounding):
+                del combine_advance[pm]
+
+        data["combine_receivables_pay_later_advance"] = dict(combine_advance)
+        return data
+
+    def _get_combine_advance_pay_later_receivable_vals(
+        self, payment_method, amount, amount_converted
+    ):
+        acc = self.config_id.pos_advance_receivable_account_id
+        partial_vals = {
+            "account_id": acc.id,
+            "move_id": self.move_id.id,
+            "name": "%s - %s (Advance)" % (self.name, payment_method.name),
+            "display_type": "payment_term",
+        }
+        return self._debit_amounts(partial_vals, amount, amount_converted)
+
+    def _create_pay_later_receivable_lines(self, data):
+        MoveLine = data.get("MoveLine")
+        combine_receivables_pay_later = data.get("combine_receivables_pay_later") or {}
+        combine_advance = data.get("combine_receivables_pay_later_advance") or {}
+        split_receivables_pay_later = data.get("split_receivables_pay_later")
+        vals = []
+
+        rounding = self.currency_id.rounding
+        for payment_method, amounts in combine_receivables_pay_later.items():
+            if float_is_zero(amounts["amount"], precision_rounding=rounding):
+                continue
+            vals.append(
+                self._get_combine_receivable_vals(
+                    payment_method, amounts["amount"], amounts["amount_converted"]
+                )
+            )
+        for payment_method, amounts in combine_advance.items():
+            if float_is_zero(amounts["amount"], precision_rounding=rounding):
+                continue
+            vals.append(
+                self._get_combine_advance_pay_later_receivable_vals(
+                    payment_method, amounts["amount"], amounts["amount_converted"]
+                )
+            )
+        for payment, amounts in split_receivables_pay_later.items():
+            vals.append(
+                self._get_split_receivable_vals(
+                    payment, amounts["amount"], amounts["amount_converted"]
+                )
+            )
+        for val in vals:
+            val["no_followup"] = False
+        data["pay_later_move_lines"] = MoveLine.create(vals)
+        return data
+
+    def _get_split_receivable_vals(self, payment, amount, amount_converted):
+        order = payment.pos_order_id
+        advance = order.advance_order_id
+        if advance and advance.pos_config_id.pos_advance_receivable_account_id:
+            # Reroute only the advance-application payment line on completion order.
+            # Keep normal customer cash/bank payments on standard POS receivable flow.
+            if not advance.remaining_pos_order_id or order.id != advance.remaining_pos_order_id.id:
+                return super()._get_split_receivable_vals(
+                    payment, amount, amount_converted
+                )
+            try:
+                advance_application_pm = advance._get_advance_application_payment_method(self)
+            except UserError:
+                return super()._get_split_receivable_vals(
+                    payment, amount, amount_converted
+                )
+            if payment.payment_method_id != advance_application_pm:
+                return super()._get_split_receivable_vals(
+                    payment, amount, amount_converted
+                )
+            acc = advance.pos_config_id.pos_advance_receivable_account_id
+            accounting_partner = self.env["res.partner"]._find_accounting_partner(
+                payment.partner_id
+            )
+            if not accounting_partner:
+                return super()._get_split_receivable_vals(
+                    payment, amount, amount_converted
+                )
+            partial_vals = {
+                "account_id": acc.id,
+                "move_id": self.move_id.id,
+                "partner_id": accounting_partner.id,
+                "name": "%s - %s" % (self.name, payment.payment_method_id.name),
+            }
+            return self._debit_amounts(partial_vals, amount, amount_converted)
+        return super()._get_split_receivable_vals(payment, amount, amount_converted)

@@ -5,7 +5,7 @@ from datetime import timedelta
 from odoo import _, api, fields, models
 
 # Legacy layout: (type_code, binary_field_or_None, expiry_field, notify_field)
-# Kept on hr.employee for migration / API compatibility; forms use hr.ae.employee.document lines only.
+# Kept on hr.employee for migration / API compatibility; lines use hr.health.employee.document.
 AE_LEGACY_SPECS = [
     ("national_id", None, "ae_doc_id_expiry", "ae_doc_id_expiry_notify"),
     ("driving_license", None, "ae_doc_driving_license_expiry", "ae_doc_driving_license_expiry_notify"),
@@ -25,14 +25,7 @@ AE_LEGACY_SPECS = [
 class HrEmployee(models.Model):
     _inherit = "hr.employee"
 
-    ae_document_line_ids = fields.One2many(
-        "hr.ae.employee.document",
-        "employee_id",
-        string="Documents",
-        groups="hr.group_hr_user",
-    )
-
-    # --- Legacy columns (migrate into ae_document_line_ids; kept until DB upgrade removes them) ---
+    # --- Legacy columns (migrate into health_document_line_ids; kept until DB upgrade removes them) ---
     ae_doc_id_expiry = fields.Date(groups="hr.group_hr_user", string="National ID expiry")
     ae_doc_driving_license_expiry = fields.Date(groups="hr.group_hr_user", string="Driving license expiry")
 
@@ -102,10 +95,10 @@ class HrEmployee(models.Model):
         return super().write(vals)
 
     @api.model
-    def _ae_migrate_legacy_binary_documents(self):
-        """Copy legacy flat fields into ae_document_line_ids (idempotent)."""
-        DocType = self.env["hr.ae.document.type"]
-        DocLine = self.env["hr.ae.employee.document"]
+    def _migrate_legacy_binary_documents(self):
+        """Copy legacy flat fields into health_document_line_ids (idempotent)."""
+        DocType = self.env["hr.health.document.type"]
+        DocLine = self.env["hr.health.employee.document"]
         for emp in self.search([]):
             for code, bin_f, exp_f, notif_f in AE_LEGACY_SPECS:
                 dtype = DocType.search([("code", "=", code)], limit=1)
@@ -141,10 +134,10 @@ class HrEmployee(models.Model):
             users |= dm.user_id
         return users
 
-    def _ae_doc_build_pending_notices(self, today, warn_days=30):
+    def _hr_doc_build_pending_notices(self, today, warn_days=30):
         self.ensure_one()
         pending = []
-        for line in self.ae_document_line_ids:
+        for line in self.health_document_line_ids:
             exp_date = line.expiry_date
             if not exp_date:
                 continue
@@ -174,7 +167,7 @@ class HrEmployee(models.Model):
                     )
         return pending
 
-    def _ae_send_manager_document_notices(self, items):
+    def _hr_send_manager_document_notices(self, items):
         self.ensure_one()
         if not items:
             return
@@ -241,9 +234,9 @@ class HrEmployee(models.Model):
             line.write({"notify_stage": max(cur, it["target_stage"])})
 
     @api.model
-    def _cron_ae_notify_employee_document_expiries(self):
+    def _cron_notify_employee_document_expiries(self):
         today = fields.Date.context_today(self)
         for emp in self.sudo().search([("active", "=", True)]):
-            pending = emp._ae_doc_build_pending_notices(today)
+            pending = emp._hr_doc_build_pending_notices(today)
             if pending:
-                emp._ae_send_manager_document_notices(pending)
+                emp._hr_send_manager_document_notices(pending)

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_pos_order" model="ir.ui.view">
+            <field name="name">pos.order</field>
+            <field name="model">pos.order</field>
+            <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='partner_id']" position="after">
+                        <field name="is_advance_generated"/>
+
+                </xpath>
+                <xpath expr="//notebook/page[@name='payments']" position="after">
+                    <page string="Pledges" name="advance_pledges">
+                        <field name="advance_pledge_line_ids" nolabel="1">
+                            <list string="Pledges" create="0" delete="0">
+                                <field name="partner_id"/>
+                                <field name="employee_id" optional="hide"/>
+                                <field name="order_id" optional="hide"/>
+                                <field name="product_id"/>
+                                <field name="pledge_qty"/>
+                                <field name="pledge_amount_unit" widget="monetary"/>
+                                <field name="pledge_subtotal" widget="monetary"/>
+                                <field name="currency_id" column_invisible="True"/>
+                            </list>
+                        </field>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_pos_order_filter_customer_number" model="ir.ui.view">
+            <field name="name">pos.order.filter.customer.number</field>
+            <field name="model">pos.order</field>
+            <field name="inherit_id" ref="point_of_sale.view_pos_order_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search/field[@name='partner_id']" position="after">
+                    <field name="pos_reference"
+                           string="Customer Number"
+                           filter_domain="['|','|','|',('partner_id.phone','ilike',self),('partner_id.ref','ilike',self),('partner_id.barcode','ilike',self),('partner_id.vat','ilike',self)]"/>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="action_pos_orders_advance_generated" model="ir.actions.act_window">
+            <field name="name">Advance Generated Orders</field>
+            <field name="res_model">pos.order</field>
+            <field name="path">pos-orders-advance-generated</field>
+            <field name="view_mode">list,form,kanban,pivot</field>
+            <field name="view_id" eval="False"/>
+            <field name="domain">[('is_advance_generated', '=', True)]</field>
+            <field name="context">{}</field>
+        </record>
+
+        <menuitem
+            id="menu_pos_orders_advance_generated"
+            name="Advance Generated Orders"
+            parent="point_of_sale.menu_point_of_sale"
+            action="action_pos_orders_advance_generated"
+            sequence="25"
+            groups="point_of_sale.group_pos_manager,point_of_sale.group_pos_user"/>
+    </data>
+</odoo>
+

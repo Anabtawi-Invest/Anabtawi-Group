@@ -1,5 +1,2 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_hr_ae_document_type_officer,hr.ae.document.type officer,hr_enhancement.model_hr_ae_document_type,hr.group_hr_user,1,0,0,0
-access_hr_ae_document_type_manager,hr.ae.document.type manager,hr_enhancement.model_hr_ae_document_type,hr.group_hr_manager,1,1,1,1
-access_hr_ae_employee_document_officer,hr.ae.employee.document officer,hr_enhancement.model_hr_ae_employee_document,hr.group_hr_user,1,1,1,1
 access_hr_enhancement_attendance_card_wizard_officer,hr_enhancement.attendance_card.wizard officer,model_hr_enhancement_attendance_card_wizard,hr_attendance.group_hr_attendance_officer,1,1,1,1

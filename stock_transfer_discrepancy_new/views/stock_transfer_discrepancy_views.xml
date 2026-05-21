@@ -26,7 +26,6 @@
                 <field name="investigation_deadline"/>
                 <field name="picking_id"/>
                 <field name="truck_location_id"/>
-                <field name="driver_id"/>
                 <field name="product_id"/>
                 <field name="expected_qty"/>
                 <field name="actual_qty"/>
@@ -55,7 +54,6 @@
                             <field name="investigation_deadline"/>
                             <field name="picking_id"/>
                             <field name="truck_location_id"/>
-                            <field name="driver_id"/>
                             <field name="product_id"/>
                             <field name="stage"/>
                             <field name="state"/>

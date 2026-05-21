@@ -3,7 +3,7 @@
     "version": "19.0.1.0.1",
     "summary": "Add a checkbox to employee form for spouse employment status",
     "category": "Human Resources",
-    "author": "Your Company",
+    "author":"Anabtawi",
     "license": "LGPL-3",
     "depends": ["hr"],
     "data": [

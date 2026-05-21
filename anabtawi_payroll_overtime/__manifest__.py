@@ -3,7 +3,7 @@
     "summary": "Pay overtime from payslip inputs and deduct extra hour balance",
     "version": "19.0.1.0.0",
     "category": "Human Resources/Payroll",
-    "author": "Anabtawi Group",
+    "author":"Anabtawi",
     "license": "LGPL-3",
     "depends": [
         "hr_payroll",

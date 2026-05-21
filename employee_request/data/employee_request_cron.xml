@@ -10,5 +10,13 @@
         <field name="interval_type">hours</field>
         <field name="active">True</field>
     </record>
+
+    <!-- Run from Settings → Technical → Server Actions → Run (regenerates everyone). -->
+    <record id="action_server_force_rotate_employee_password" model="ir.actions.server">
+        <field name="name">Force rotate employee passwords</field>
+        <field name="model_id" ref="hr.model_hr_employee"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_rotate_employee_password(force=True)</field>
+    </record>
 </odoo>
 

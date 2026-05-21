@@ -5,7 +5,14 @@
     'category': 'Human Resources/Payroll',
     'author': 'Rana Faris',
     'license': 'LGPL-3',
-    'depends': ['lateness_company_settings1', 'hr_payroll', 'hr_holidays', 'planning'],
+    'depends': [
+        'lateness_company_settings1',
+        'hr_payroll',
+        'hr_holidays',
+        'hr_attendance',
+        'hr_holidays_attendance',
+        'planning',
+    ],
     'data': [
         'security/ir.model.access.csv',
         'data/server_actions.xml',
@@ -16,6 +23,7 @@
         # Company lateness view last so res.company fields are registered first
         'views/res_config_settings_views.xml',
         'views/hr_employee.xml',
+        'views/hr_employee_views.xml',
 
     ],
     'installable': True,

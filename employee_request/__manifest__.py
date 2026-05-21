@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "Employee Request-anabtawi",
+    "name": "Employee Request",
     "version": "19.0.1.0.0",
     "category": "Human Resources",
     "summary": "Base module for employee requests (skeleton).",
-    "author": "",
+    "author":"Anabtawi",
     "license": "LGPL-3",
     "depends": ["base", "hr", "point_of_sale"],
     "data": [
