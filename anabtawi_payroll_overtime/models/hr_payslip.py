@@ -121,13 +121,7 @@ class HrPayslip(models.Model):
         if not employee:
             return 0.0
 
-        if "annual_leave_balance" in employee._fields:
-            return employee.annual_leave_balance or 0.0
-        if "annual_leave_balance_hours" in employee._fields:
-            return employee.annual_leave_balance_hours or 0.0
-        if "remaining_annual_leave_balance_hours" in employee._fields:
-            return employee.remaining_annual_leave_balance_hours or 0.0
-
+        # Prefer the real Time Off balance first (same source as Annual Leave dashboard).
         leave_type = self._get_termination_annual_leave_type()
         if leave_type and hasattr(employee, "_get_consumed_leaves"):
             consumed_data, _to_recheck = employee._get_consumed_leaves(
@@ -142,6 +136,14 @@ class HrPayslip(models.Model):
             if leave_type.request_unit in ("day", "half_day"):
                 leave_value *= employee.resource_calendar_id.hours_per_day or 0.0
             return leave_value
+
+        # Fallback to custom employee fields if no leave type/source is configured.
+        if "annual_leave_balance" in employee._fields:
+            return employee.annual_leave_balance or 0.0
+        if "annual_leave_balance_hours" in employee._fields:
+            return employee.annual_leave_balance_hours or 0.0
+        if "remaining_annual_leave_balance_hours" in employee._fields:
+            return employee.remaining_annual_leave_balance_hours or 0.0
 
         raise ValidationError(
             _(
@@ -166,14 +168,10 @@ class HrPayslip(models.Model):
 
     def _get_termination_extra_hours_value(self):
         self.ensure_one()
-        employee = self.employee_id
-        if not employee:
+        if not self.employee_id:
             return 0.0
-        if "extra_hours_balance" in employee._fields:
-            return employee.extra_hours_balance or 0.0
-        if hasattr(employee, "get_overtime_data_by_employee"):
-            return employee.get_overtime_data_by_employee().get(employee.id, {}).get("unspent_compensable_overtime", 0.0)
-        return 0.0
+        # Must match the same value shown on payslip Other Info tab.
+        return self._get_employee_extra_hours_balance()
 
     def _apply_termination_clearance_inputs(self):
         input_model = self.env["hr.payslip.input"]
