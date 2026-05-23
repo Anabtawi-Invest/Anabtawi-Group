@@ -9,7 +9,6 @@ _logger = logging.getLogger(__name__)
 
 class HrPayslip(models.Model):
     _inherit = "hr.payslip"
-    _OVERTIME_BALANCE_INPUT_CODES = {"ETH_PAY_EOC"}
 
     termination_clearance = fields.Boolean(
         string="Termination Clearance / مخالصة تيرمنيشن",
@@ -167,10 +166,14 @@ class HrPayslip(models.Model):
 
     def _get_termination_extra_hours_value(self):
         self.ensure_one()
-        if not self.employee_id:
+        employee = self.employee_id
+        if not employee:
             return 0.0
-        # Keep termination input in sync with the same balance shown on payslip.
-        return self._get_employee_extra_hours_balance()
+        if "extra_hours_balance" in employee._fields:
+            return employee.extra_hours_balance or 0.0
+        if hasattr(employee, "get_overtime_data_by_employee"):
+            return employee.get_overtime_data_by_employee().get(employee.id, {}).get("unspent_compensable_overtime", 0.0)
+        return 0.0
 
     def _apply_termination_clearance_inputs(self):
         input_model = self.env["hr.payslip.input"]
@@ -238,10 +241,7 @@ class HrPayslip(models.Model):
     def _get_overtime_quantity_to_deduct(self):
         self.ensure_one()
         return sum(
-            self.input_line_ids.filtered(
-                lambda line: line.overtime_quantity_type
-                and (line.input_type_id.code in self._OVERTIME_BALANCE_INPUT_CODES)
-            ).mapped("quantity")
+            self.input_line_ids.filtered("overtime_quantity_type").mapped("quantity")
         )
 
     def _prepare_overtime_balance_line_vals(self, quantity_signed):
