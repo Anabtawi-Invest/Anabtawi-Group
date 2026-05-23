@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_payment_method_form_exclusive_payment_method" model="ir.ui.view">
+        <field name="name">pos.payment.method.form.exclusive.payment.method</field>
+        <field name="model">pos.payment.method</field>
+        <field name="inherit_id" ref="point_of_sale.pos_payment_method_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='split_transactions']" position="after">
+                <field name="exclusive_payment_method"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

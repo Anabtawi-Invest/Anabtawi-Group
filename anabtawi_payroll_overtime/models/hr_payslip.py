@@ -42,14 +42,53 @@ class HrPayslip(models.Model):
         self.ensure_one()
         if not self.employee_id:
             return 0.0
-        # Align with OT wallet when latness_deduction (or similar) is installed.
-        if hasattr(self, "_get_ot_available_for_deduction"):
-            return max(0.0, self._get_ot_available_for_deduction())
+        return max(0.0, self._get_remaining_extra_hours_from_attendance())
 
-        if hasattr(self.employee_id, "get_overtime_data_by_employee"):
-            overtime_data = self.employee_id.get_overtime_data_by_employee()
-            return max(0.0, overtime_data.get(self.employee_id.id, {}).get("unspent_compensable_overtime", 0.0))
-        return 0.0
+    def _get_remaining_extra_hours_from_attendance(self):
+        """Match the 'Remaining Extra Hours' figure from attendance data directly."""
+        self.ensure_one()
+        overtime_line_model = self.env["hr.attendance.overtime.line"].sudo()
+        overtime_metric = (
+            "credited_duration"
+            if "credited_duration" in overtime_line_model._fields
+            else "manual_duration"
+        )
+
+        overtime_data = overtime_line_model.read_group(
+            domain=[
+                ("employee_id", "=", self.employee_id.id),
+                ("compensable_as_leave", "=", True),
+                ("status", "=", "approved"),
+            ],
+            fields=[f"{overtime_metric}:sum"],
+            groupby=[],
+        )
+        approved_overtime = overtime_data[0].get(f"{overtime_metric}_sum", 0.0) if overtime_data else 0.0
+
+        leaves_data = self.env["hr.leave"].sudo().read_group(
+            domain=[
+                ("holiday_status_id.overtime_deductible", "=", True),
+                ("holiday_status_id.requires_allocation", "=", False),
+                ("employee_id", "=", self.employee_id.id),
+                ("state", "not in", ["refuse", "cancel"]),
+            ],
+            fields=["number_of_hours:sum"],
+            groupby=[],
+        )
+        consumed_in_leaves = leaves_data[0].get("number_of_hours_sum", 0.0) if leaves_data else 0.0
+
+        allocations_data = self.env["hr.leave.allocation"].sudo().read_group(
+            domain=[
+                ("holiday_status_id.overtime_deductible", "=", True),
+                ("employee_id", "=", self.employee_id.id),
+                ("state", "in", ["confirm", "validate", "validate1"]),
+            ],
+            fields=["number_of_hours_display:sum"],
+            groupby=[],
+        )
+        consumed_in_allocations = allocations_data[0].get("number_of_hours_display_sum", 0.0) if allocations_data else 0.0
+
+        return approved_overtime - consumed_in_leaves - consumed_in_allocations
 
     def _message_overtime_exceeds_balance(self, requested_hours, balance_hours):
         self.ensure_one()
