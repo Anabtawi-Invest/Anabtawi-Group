@@ -3,7 +3,7 @@ from odoo import api, models, _
 from odoo.exceptions import ValidationError
 from odoo.tools.float_utils import float_compare
 
-_ALLOWED_CODES = {"incoming", "outgoing", "internal"}
+_ALLOWED_CODES = {"outgoing", "internal"}
 
 
 class StockMove(models.Model):
