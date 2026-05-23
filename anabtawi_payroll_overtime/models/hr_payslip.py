@@ -166,14 +166,10 @@ class HrPayslip(models.Model):
 
     def _get_termination_extra_hours_value(self):
         self.ensure_one()
-        employee = self.employee_id
-        if not employee:
+        if not self.employee_id:
             return 0.0
-        if "extra_hours_balance" in employee._fields:
-            return employee.extra_hours_balance or 0.0
-        if hasattr(employee, "get_overtime_data_by_employee"):
-            return employee.get_overtime_data_by_employee().get(employee.id, {}).get("unspent_compensable_overtime", 0.0)
-        return 0.0
+        # Keep termination input in sync with the same balance shown on payslip.
+        return self._get_employee_extra_hours_balance()
 
     def _apply_termination_clearance_inputs(self):
         input_model = self.env["hr.payslip.input"]
