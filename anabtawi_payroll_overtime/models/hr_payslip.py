@@ -9,6 +9,7 @@ _logger = logging.getLogger(__name__)
 
 class HrPayslip(models.Model):
     _inherit = "hr.payslip"
+    _OVERTIME_BALANCE_INPUT_CODES = {"ETH_PAY_EOC"}
 
     termination_clearance = fields.Boolean(
         string="Termination Clearance / مخالصة تيرمنيشن",
@@ -237,7 +238,10 @@ class HrPayslip(models.Model):
     def _get_overtime_quantity_to_deduct(self):
         self.ensure_one()
         return sum(
-            self.input_line_ids.filtered("overtime_quantity_type").mapped("quantity")
+            self.input_line_ids.filtered(
+                lambda line: line.overtime_quantity_type
+                and (line.input_type_id.code in self._OVERTIME_BALANCE_INPUT_CODES)
+            ).mapped("quantity")
         )
 
     def _prepare_overtime_balance_line_vals(self, quantity_signed):
