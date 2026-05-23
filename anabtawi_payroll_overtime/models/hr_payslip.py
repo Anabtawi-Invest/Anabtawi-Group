@@ -128,25 +128,41 @@ class HrPayslip(models.Model):
         if "remaining_annual_leave_balance_hours" in employee._fields:
             return employee.remaining_annual_leave_balance_hours or 0.0
 
-        if hasattr(self, "_get_configured_annual_leave_type"):
-            leave_type = self._get_configured_annual_leave_type()
-            if leave_type:
-                alloc_data = employee._get_consumed_leaves(leave_type, target_date=self.date_to or fields.Date.today())
-                leave_value = sum(
-                    data.get("virtual_remaining_leaves", 0.0)
-                    for data in alloc_data.values()
-                )
-                if leave_type.request_unit in ("day", "half_day"):
-                    leave_value *= employee.resource_calendar_id.hours_per_day or 0.0
-                return leave_value
+        leave_type = self._get_termination_annual_leave_type()
+        if leave_type and hasattr(employee, "_get_consumed_leaves"):
+            consumed_data, _to_recheck = employee._get_consumed_leaves(
+                leave_type,
+                target_date=self.date_to or fields.Date.today(),
+            )
+            leave_content = consumed_data.get(employee, {}).get(leave_type, {})
+            leave_value = sum(
+                values.get("virtual_remaining_leaves", 0.0)
+                for values in leave_content.values()
+            )
+            if leave_type.request_unit in ("day", "half_day"):
+                leave_value *= employee.resource_calendar_id.hours_per_day or 0.0
+            return leave_value
 
         raise ValidationError(
             _(
                 "Unable to determine annual leave balance from employee profile. "
-                "Please add one of these fields on employee: annual_leave_balance, "
-                "annual_leave_balance_hours, or remaining_annual_leave_balance_hours."
+                "Please configure an Annual Leave type (or set one of these employee fields: "
+                "annual_leave_balance, annual_leave_balance_hours, remaining_annual_leave_balance_hours)."
             )
         )
+
+    def _get_termination_annual_leave_type(self):
+        self.ensure_one()
+        company = self.company_id or self.env.company
+        if "lateness_annual_leave_type_id" in company._fields and company.lateness_annual_leave_type_id:
+            return company.lateness_annual_leave_type_id
+        return self.env["hr.leave.type"].search([
+            ("name", "ilike", "annual"),
+        ], limit=1) or self.env["hr.leave.type"].search([
+            ("name", "ilike", "vacation"),
+        ], limit=1) or self.env["hr.leave.type"].search([
+            ("name", "ilike", "سنوي"),
+        ], limit=1)
 
     def _get_termination_extra_hours_value(self):
         self.ensure_one()
