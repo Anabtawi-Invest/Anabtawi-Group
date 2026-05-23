@@ -1,11 +1,12 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import logging
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from odoo import Command, _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools.float_utils import float_compare
+from pytz import UTC, UnknownTimeZoneError, timezone
 
 _logger = logging.getLogger(__name__)
 
@@ -81,6 +82,37 @@ class ApprovalRequest(models.Model):
         ],
         string="Authorization Status",
         compute="_compute_overtime_authorization_state",
+    )
+    overtime_disable_auto_checkout = fields.Boolean(
+        string="Disable Auto Check-Out",
+        copy=False,
+        readonly=True,
+        help="If enabled, the authorized attendance session is never auto checked out.",
+    )
+    overtime_pending_hours = fields.Float(
+        string="Pending Overtime Hours",
+        copy=False,
+        readonly=True,
+    )
+    overtime_pending_week_start = fields.Date(
+        string="Pending Week Start",
+        copy=False,
+        readonly=True,
+    )
+    overtime_pending_week_end = fields.Date(
+        string="Pending Week End",
+        copy=False,
+        readonly=True,
+    )
+    overtime_converted_hours = fields.Float(
+        string="Converted Overtime Hours",
+        copy=False,
+        readonly=True,
+    )
+    overtime_expired_hours = fields.Float(
+        string="Expired Overtime Hours",
+        copy=False,
+        readonly=True,
     )
 
     @api.onchange("request_owner_id", "category_id")
@@ -228,6 +260,45 @@ class ApprovalRequest(models.Model):
         )
         return float(value or 0.0)
 
+    @api.model
+    def _get_week_date_bounds(self, target_date):
+        days_since_week_start = (target_date.weekday() - 5) % 7
+        week_start = target_date - timedelta(days=days_since_week_start)
+        week_end = week_start + timedelta(days=6)
+        return week_start, week_end
+
+    @api.model
+    def _get_week_utc_bounds(self, tz_name, week_start_date):
+        next_week_start_date = week_start_date + timedelta(days=7)
+        try:
+            tz = timezone(tz_name or "UTC")
+        except UnknownTimeZoneError:
+            tz = UTC
+        week_start_utc = tz.localize(
+            datetime.combine(week_start_date, time.min)
+        ).astimezone(UTC)
+        next_week_start_utc = tz.localize(
+            datetime.combine(next_week_start_date, time.min)
+        ).astimezone(UTC)
+        return week_start_utc.replace(tzinfo=None), next_week_start_utc.replace(tzinfo=None)
+
+    @api.model
+    def _compute_weekly_worked_hours_for_period(self, employee, week_start_date):
+        tz_name = employee._get_attendance_timezone() if hasattr(type(employee), "_get_attendance_timezone") else "UTC"
+        week_start_utc, next_week_start_utc = self._get_week_utc_bounds(
+            tz_name, week_start_date
+        )
+        grouped_data = self.env["hr.attendance"].sudo()._read_group(
+            [
+                ("employee_id", "=", employee.id),
+                ("check_in", ">=", week_start_utc),
+                ("check_in", "<", next_week_start_utc),
+            ],
+            [],
+            ["worked_hours:sum"],
+        )
+        return grouped_data[0][0] if grouped_data else 0.0
+
     def _check_requested_overtime_hours_limit(self):
         for request in self.filtered("is_overtime_category"):
             if request.quantity <= 0:
@@ -307,6 +378,7 @@ class ApprovalRequest(models.Model):
             "duration": approved_hours,
             "manual_duration": approved_hours,
             "compensable_as_leave": True,
+            "status": "to_approve",
             "approval_request_ids": [Command.link(self.id)],
         }
 
@@ -340,6 +412,8 @@ class ApprovalRequest(models.Model):
                 continue
 
             approved_hours = min(attendance.worked_hours or 0.0, request.quantity or 0.0)
+            attendance_date = fields.Datetime.to_date(attendance.check_in) or fields.Date.context_today(request)
+            pending_week_start, pending_week_end = request._get_week_date_bounds(attendance_date)
             overtime_lines = attendance.linked_overtime_ids.sorted(
                 lambda line: (line.time_start or attendance.check_in, line.id)
             )
@@ -393,14 +467,12 @@ class ApprovalRequest(models.Model):
                         {
                             "duration": approved_chunk,
                             "manual_duration": approved_chunk,
+                            "status": "to_approve",
                         }
                     )
-                    overtime_line.with_context(
-                        skip_overtime_approval_gate=True
-                    ).action_approve()
                     remaining -= approved_chunk
                     _logger.warning(
-                        "Authorized overtime sync approved line: request_id=%s line_id=%s remaining_after=%s",
+                        "Authorized overtime sync prepared pending line: request_id=%s line_id=%s remaining_after=%s",
                         request.id,
                         overtime_line.id,
                         remaining,
@@ -419,11 +491,8 @@ class ApprovalRequest(models.Model):
                         attendance, remaining
                     )
                 )
-                created_line.with_context(
-                    skip_overtime_approval_gate=True
-                ).action_approve()
                 _logger.warning(
-                    "Authorized overtime sync created line: request_id=%s attendance_id=%s line_id=%s "
+                    "Authorized overtime sync created pending line: request_id=%s attendance_id=%s line_id=%s "
                     "created_hours=%s time_start=%s time_stop=%s",
                     request.id,
                     attendance.id,
@@ -438,7 +507,14 @@ class ApprovalRequest(models.Model):
                     request.id,
                     attendance.id,
                 )
-            request.write({"overtime_authorization_consumed": True})
+            request.write(
+                {
+                    "overtime_authorization_consumed": True,
+                    "overtime_pending_hours": approved_hours,
+                    "overtime_pending_week_start": pending_week_start,
+                    "overtime_pending_week_end": pending_week_end,
+                }
+            )
             attendance.invalidate_recordset(
                 ["linked_overtime_ids", "overtime_status", "overtime_hours", "validated_overtime_hours"]
             )
@@ -508,7 +584,6 @@ class ApprovalRequest(models.Model):
     def action_confirm(self):
         overtime_requests = self.filtered("is_overtime_category")
         overtime_requests.write({"overtime_preauthorization": True})
-        overtime_requests._check_weekly_worked_hours_eligibility()
         self._ensure_overtime_manager_approver()
         return super().action_confirm()
 
@@ -543,8 +618,34 @@ class ApprovalRequest(models.Model):
             elif request.request_status == "refused":
                 request.overtime_line_ids.action_refuse()
 
+    def _mark_auto_checkout_policy_on_approval(self):
+        overtime_requests = self.filtered(
+            lambda req: (
+                req.is_overtime_category
+                and req.overtime_preauthorization
+                and req.request_status == "approved"
+                and not req.overtime_authorization_consumed
+                and not req.overtime_authorized_attendance_id
+                and req.overtime_employee_id
+            )
+        )
+        if not overtime_requests:
+            return
+        attendance_model = self.env["hr.attendance"]
+        for request in overtime_requests:
+            open_attendance = attendance_model.search(
+                [
+                    ("employee_id", "=", request.overtime_employee_id.id),
+                    ("check_out", "=", False),
+                ],
+                limit=1,
+            )
+            if open_attendance:
+                request.write({"overtime_disable_auto_checkout": True})
+
     def action_approve(self, approver=None):
         result = super().action_approve(approver=approver)
+        self._mark_auto_checkout_policy_on_approval()
         self._sync_overtime_lines_with_status()
         return result
 
@@ -555,6 +656,90 @@ class ApprovalRequest(models.Model):
 
     def _action_force_approval(self):
         result = super()._action_force_approval()
+        self._mark_auto_checkout_policy_on_approval()
         self._sync_overtime_lines_with_status()
         return result
+
+    def _cron_convert_pending_weekly_overtime(self):
+        required_weekly_hours = self._get_required_weekly_hours()
+        today = fields.Date.context_today(self)
+        pending_requests = self.search(
+            [
+                ("is_overtime_category", "=", True),
+                ("overtime_preauthorization", "=", True),
+                ("request_status", "=", "approved"),
+                ("overtime_authorization_consumed", "=", True),
+                ("overtime_pending_hours", ">", 0),
+                ("overtime_pending_week_end", "<", today),
+            ]
+        )
+        for request in pending_requests:
+            week_start = request.overtime_pending_week_start
+            if not week_start or not request.overtime_employee_id:
+                pending_hours_before = request.overtime_pending_hours
+                request.write(
+                    {
+                        "overtime_pending_hours": 0.0,
+                        "overtime_pending_week_start": False,
+                        "overtime_pending_week_end": False,
+                        "overtime_expired_hours": request.overtime_expired_hours + pending_hours_before,
+                    }
+                )
+                continue
+
+            weekly_worked_hours = request._compute_weekly_worked_hours_for_period(
+                request.overtime_employee_id, week_start
+            )
+            excess_hours = max(0.0, weekly_worked_hours - required_weekly_hours)
+            pending_lines = request.overtime_line_ids.filtered(
+                lambda line: line.status == "to_approve"
+            ).sorted(lambda line: (line.date, line.time_start or fields.Datetime.now(), line.id))
+            pending_line_hours = sum(pending_lines.mapped("manual_duration"))
+            pending_hours_before = min(request.overtime_pending_hours, pending_line_hours)
+            convertible_hours = min(excess_hours, pending_hours_before)
+            remaining = convertible_hours
+
+            for overtime_line in pending_lines:
+                if remaining <= 0:
+                    break
+                original_duration = overtime_line.manual_duration
+                approved_chunk = min(original_duration, remaining)
+                if approved_chunk <= 0:
+                    continue
+                if approved_chunk < original_duration:
+                    overtime_line.copy(
+                        {
+                            "duration": original_duration - approved_chunk,
+                            "manual_duration": original_duration - approved_chunk,
+                            "status": "refused",
+                        }
+                    )
+                overtime_line.write(
+                    {
+                        "duration": approved_chunk,
+                        "manual_duration": approved_chunk,
+                    }
+                )
+                overtime_line.with_context(
+                    skip_all_overtime_approval_checks=True
+                ).action_approve()
+                remaining -= approved_chunk
+
+            remaining_pending_lines = request.overtime_line_ids.filtered(
+                lambda line: line.status == "to_approve"
+            )
+            if remaining_pending_lines:
+                remaining_pending_lines.action_refuse()
+
+            converted_hours = convertible_hours - remaining
+            expired_hours = max(pending_hours_before - converted_hours, 0.0)
+            request.write(
+                {
+                    "overtime_pending_hours": 0.0,
+                    "overtime_pending_week_start": False,
+                    "overtime_pending_week_end": False,
+                    "overtime_converted_hours": request.overtime_converted_hours + converted_hours,
+                    "overtime_expired_hours": request.overtime_expired_hours + expired_hours,
+                }
+            )
 
