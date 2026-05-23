@@ -98,10 +98,16 @@ class TanmyaPurchaseExt(models.Model):
 
 
     def get_stages(self):
-        lst=[]
-        recset=self.env['tanmya.purchase.stage'].search([],order = 'stageorder')
+        lst = []
+        seen_codes = set()
+        recset = self.env['tanmya.purchase.stage'].search([], order='stageorder,id')
         for stg in recset:
-            lst.append((stg.code,stg.name))
+            # Deduplicate stage keys to avoid Owl statusbar crash on duplicate t-key.
+            code = (stg.code or '').strip()
+            if not code or code in seen_codes:
+                continue
+            seen_codes.add(code)
+            lst.append((code, stg.name))
         return lst
 
 
