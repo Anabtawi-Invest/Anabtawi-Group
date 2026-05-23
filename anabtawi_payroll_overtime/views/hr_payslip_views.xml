@@ -6,7 +6,8 @@
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
         <field name="arch" type="xml">
             <xpath expr="//sheet//group[.//field[@name='date_from'] and .//field[@name='date_to']]" position="inside">
-                <field name="termination_clearance"/>
+                <label for="termination_clearance" string="Termination Clearance / مخالصة تيرمنيشن"/>
+                <field name="termination_clearance" nolabel="1"/>
             </xpath>
 
             <xpath expr="//page[@name='account_info']/group/group[1]" position="inside">
