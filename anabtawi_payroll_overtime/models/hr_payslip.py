@@ -200,8 +200,8 @@ class HrPayslip(models.Model):
             rem_leave_vals = {
                 "payslip_id": slip.id,
                 "input_type_id": rem_leave_type.id,
-                "amount": rem_leave_value,
-                "quantity": 0.0,
+                "amount": 0.0,
+                "quantity": rem_leave_value,
             }
             eoc_vals = {
                 "payslip_id": slip.id,
@@ -217,8 +217,8 @@ class HrPayslip(models.Model):
                 else:
                     slip.input_line_ids += input_model.new({
                         "input_type_id": rem_leave_type.id,
-                        "amount": rem_leave_value,
-                        "quantity": 0.0,
+                        "amount": 0.0,
+                        "quantity": rem_leave_value,
                     })
 
             if eoc_line:
