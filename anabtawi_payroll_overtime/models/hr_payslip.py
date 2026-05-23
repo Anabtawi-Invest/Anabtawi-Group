@@ -10,6 +10,10 @@ _logger = logging.getLogger(__name__)
 class HrPayslip(models.Model):
     _inherit = "hr.payslip"
 
+    termination_clearance = fields.Boolean(
+        string="Termination Clearance / مخالصة تيرمنيشن",
+        help="Automatically fills termination-related salary inputs.",
+    )
     employee_extra_hours_balance = fields.Float(
         string="Extra Hours Balance",
         compute="_compute_employee_extra_hours_balance",
@@ -42,14 +46,53 @@ class HrPayslip(models.Model):
         self.ensure_one()
         if not self.employee_id:
             return 0.0
-        # Align with OT wallet when latness_deduction (or similar) is installed.
-        if hasattr(self, "_get_ot_available_for_deduction"):
-            return max(0.0, self._get_ot_available_for_deduction())
+        return max(0.0, self._get_remaining_extra_hours_from_attendance())
 
-        if hasattr(self.employee_id, "get_overtime_data_by_employee"):
-            overtime_data = self.employee_id.get_overtime_data_by_employee()
-            return max(0.0, overtime_data.get(self.employee_id.id, {}).get("unspent_compensable_overtime", 0.0))
-        return 0.0
+    def _get_remaining_extra_hours_from_attendance(self):
+        """Match the 'Remaining Extra Hours' figure from attendance data directly."""
+        self.ensure_one()
+        overtime_line_model = self.env["hr.attendance.overtime.line"].sudo()
+        overtime_metric = (
+            "credited_duration"
+            if "credited_duration" in overtime_line_model._fields
+            else "manual_duration"
+        )
+
+        overtime_data = overtime_line_model.read_group(
+            domain=[
+                ("employee_id", "=", self.employee_id.id),
+                ("compensable_as_leave", "=", True),
+                ("status", "=", "approved"),
+            ],
+            fields=[f"{overtime_metric}:sum"],
+            groupby=[],
+        )
+        approved_overtime = overtime_data[0].get(f"{overtime_metric}_sum", 0.0) if overtime_data else 0.0
+
+        leaves_data = self.env["hr.leave"].sudo().read_group(
+            domain=[
+                ("holiday_status_id.overtime_deductible", "=", True),
+                ("holiday_status_id.requires_allocation", "=", False),
+                ("employee_id", "=", self.employee_id.id),
+                ("state", "not in", ["refuse", "cancel"]),
+            ],
+            fields=["number_of_hours:sum"],
+            groupby=[],
+        )
+        consumed_in_leaves = leaves_data[0].get("number_of_hours_sum", 0.0) if leaves_data else 0.0
+
+        allocations_data = self.env["hr.leave.allocation"].sudo().read_group(
+            domain=[
+                ("holiday_status_id.overtime_deductible", "=", True),
+                ("employee_id", "=", self.employee_id.id),
+                ("state", "in", ["confirm", "validate", "validate1"]),
+            ],
+            fields=["number_of_hours_display:sum"],
+            groupby=[],
+        )
+        consumed_in_allocations = allocations_data[0].get("number_of_hours_display_sum", 0.0) if allocations_data else 0.0
+
+        return approved_overtime - consumed_in_leaves - consumed_in_allocations
 
     def _message_overtime_exceeds_balance(self, requested_hours, balance_hours):
         self.ensure_one()
@@ -62,6 +105,122 @@ class HrPayslip(models.Model):
             "balance": balance_hours,
             "employee": self.employee_id.name or "",
         }
+
+    def _get_input_type_by_code(self, code):
+        self.ensure_one()
+        input_type = self.env["hr.payslip.input.type"].search([("code", "=", code)], limit=1)
+        if not input_type:
+            raise ValidationError(
+                _("Salary Input Type with code '%s' was not found. Please create/configure it first.") % code
+            )
+        return input_type
+
+    def _get_termination_leave_amount(self):
+        self.ensure_one()
+        employee = self.employee_id
+        if not employee:
+            return 0.0
+
+        if "annual_leave_balance" in employee._fields:
+            return employee.annual_leave_balance or 0.0
+        if "annual_leave_balance_hours" in employee._fields:
+            return employee.annual_leave_balance_hours or 0.0
+        if "remaining_annual_leave_balance_hours" in employee._fields:
+            return employee.remaining_annual_leave_balance_hours or 0.0
+
+        if hasattr(self, "_get_configured_annual_leave_type"):
+            leave_type = self._get_configured_annual_leave_type()
+            if leave_type:
+                alloc_data = employee._get_consumed_leaves(leave_type, target_date=self.date_to or fields.Date.today())
+                leave_value = sum(
+                    data.get("virtual_remaining_leaves", 0.0)
+                    for data in alloc_data.values()
+                )
+                if leave_type.request_unit in ("day", "half_day"):
+                    leave_value *= employee.resource_calendar_id.hours_per_day or 0.0
+                return leave_value
+
+        raise ValidationError(
+            _(
+                "Unable to determine annual leave balance from employee profile. "
+                "Please add one of these fields on employee: annual_leave_balance, "
+                "annual_leave_balance_hours, or remaining_annual_leave_balance_hours."
+            )
+        )
+
+    def _get_termination_extra_hours_value(self):
+        self.ensure_one()
+        employee = self.employee_id
+        if not employee:
+            return 0.0
+        if "extra_hours_balance" in employee._fields:
+            return employee.extra_hours_balance or 0.0
+        if hasattr(employee, "get_overtime_data_by_employee"):
+            return employee.get_overtime_data_by_employee().get(employee.id, {}).get("unspent_compensable_overtime", 0.0)
+        return 0.0
+
+    def _apply_termination_clearance_inputs(self):
+        input_model = self.env["hr.payslip.input"]
+        for slip in self:
+            if not slip.termination_clearance or not slip.employee_id:
+                continue
+
+            rem_leave_type = slip._get_input_type_by_code("REM_LEAVE")
+            eoc_type = slip._get_input_type_by_code("ETH_PAY_EOC")
+
+            if not eoc_type.overtime_quantity_type:
+                raise ValidationError(
+                    _(
+                        "Input Type 'ETH_PAY_EOC' must have 'Use Quantity for Overtime' enabled."
+                    )
+                )
+
+            rem_leave_value = slip._get_termination_leave_amount()
+            eoc_value = slip._get_termination_extra_hours_value()
+
+            rem_leave_line = slip.input_line_ids.filtered(lambda l: l.input_type_id == rem_leave_type)[:1]
+            eoc_line = slip.input_line_ids.filtered(lambda l: l.input_type_id == eoc_type)[:1]
+
+            rem_leave_vals = {
+                "payslip_id": slip.id,
+                "input_type_id": rem_leave_type.id,
+                "amount": rem_leave_value,
+                "quantity": 0.0,
+            }
+            eoc_vals = {
+                "payslip_id": slip.id,
+                "input_type_id": eoc_type.id,
+                "quantity": eoc_value,
+            }
+
+            if rem_leave_line:
+                rem_leave_line.write(rem_leave_vals)
+            else:
+                if slip.id:
+                    input_model.create(rem_leave_vals)
+                else:
+                    slip.input_line_ids += input_model.new({
+                        "input_type_id": rem_leave_type.id,
+                        "amount": rem_leave_value,
+                        "quantity": 0.0,
+                    })
+
+            if eoc_line:
+                eoc_line.write(eoc_vals)
+            else:
+                if slip.id:
+                    input_model.create(eoc_vals)
+                else:
+                    slip.input_line_ids += input_model.new({
+                        "input_type_id": eoc_type.id,
+                        "quantity": eoc_value,
+                    })
+
+    @api.onchange("termination_clearance", "employee_id", "date_to")
+    def _onchange_termination_clearance(self):
+        for slip in self:
+            if slip.termination_clearance and slip.employee_id:
+                slip._apply_termination_clearance_inputs()
 
     def _get_overtime_quantity_to_deduct(self):
         self.ensure_one()
@@ -155,6 +314,7 @@ class HrPayslip(models.Model):
             )
 
     def action_payslip_done(self):
+        self._apply_termination_clearance_inputs()
         self._deduct_extra_hours_balance()
         return super().action_payslip_done()
 
