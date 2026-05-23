@@ -14,3 +14,7 @@ class PosPaymentMethod(models.Model):
         if "exclusive_payment_method" not in fields_list:
             fields_list.append("exclusive_payment_method")
         return fields_list
+
+    def _is_write_forbidden(self, fields):
+        whitelisted_fields = {"sequence", "exclusive_payment_method"}
+        return bool(fields - whitelisted_fields and self.open_session_ids)
