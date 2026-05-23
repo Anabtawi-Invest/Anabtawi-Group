@@ -11,6 +11,7 @@ class HrPayslipInput(models.Model):
     quantity = fields.Float(
         string="Quantity",
         digits=(16, 2),
+        readonly=False,
         help="Overtime hours to convert to amount.",
     )
     overtime_quantity_type = fields.Boolean(

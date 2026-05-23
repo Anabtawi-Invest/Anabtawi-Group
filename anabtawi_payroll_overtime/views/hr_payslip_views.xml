@@ -13,7 +13,7 @@
 
             <xpath expr="//field[@name='input_line_ids']/list/field[@name='amount']" position="before">
                 <field name="overtime_quantity_type" column_invisible="True"/>
-                <field name="quantity" widget="float_without_trailing_zeros"/>
+                <field name="quantity" widget="float_without_trailing_zeros" readonly="0"/>
             </xpath>
             <xpath expr="//field[@name='input_line_ids']/list/field[@name='amount']" position="attributes">
                 <attribute name="readonly">overtime_quantity_type</attribute>
@@ -21,7 +21,7 @@
 
             <xpath expr="//field[@name='input_line_ids']/form/group/field[@name='amount']" position="before">
                 <field name="overtime_quantity_type" invisible="1"/>
-                <field name="quantity"/>
+                <field name="quantity" readonly="0"/>
             </xpath>
             <xpath expr="//field[@name='input_line_ids']/form/group/field[@name='amount']" position="attributes">
                 <attribute name="readonly">overtime_quantity_type</attribute>
