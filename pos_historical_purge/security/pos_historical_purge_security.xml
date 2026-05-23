@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_pos_historical_purge" model="res.groups">
+        <field name="name">Historical Purge</field>
+        <field name="sequence">40</field>
+        <field name="privilege_id" ref="point_of_sale.res_groups_privilege_point_of_sale"/>
+        <field name="implied_ids" eval="[
+            (4, ref('point_of_sale.group_pos_manager')),
+            (4, ref('account.group_account_manager')),
+        ]"/>
+        <field name="comment">May run dry-run and execute POS historical purge wizards.</field>
+    </record>
+</odoo>
