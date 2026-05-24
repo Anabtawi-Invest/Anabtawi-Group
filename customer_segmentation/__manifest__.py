@@ -21,6 +21,7 @@
     'assets': {
         'point_of_sale._assets_pos': [
             'customer_segmentation/static/src/pos/partner_list_filter.js',
+            'customer_segmentation/static/src/pos/partner_default_pos_customer.js',
         ],
     },
     'external_dependencies': {
