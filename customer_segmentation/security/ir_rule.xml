@@ -40,7 +40,7 @@
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="groups" eval="[(4, ref('group_pos_team'))]"/>
             <field name="domain_force">['|', '|', '|', ('is_pos_customer', '=', True), ('id', '=', user.partner_id.id), ('id', '=', user.company_id.partner_id.id), ('user_ids', '!=', False)]</field>
-            <field name="perm_read" eval="True"/>
+            <field name="perm_read" eval="False"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="True"/>
             <field name="perm_unlink" eval="False"/>

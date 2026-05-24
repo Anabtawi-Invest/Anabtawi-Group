@@ -53,3 +53,14 @@ class ResPartner(models.Model):
                 partner.department_category = 'pos'
             else:
                 partner.department_category = False
+
+    @api.model
+    def _load_pos_data_fields(self, config):
+        """
+        Ensure POS receives is_pos_customer so frontend filtering
+        can hide non-POS customers without access-rule side effects.
+        """
+        fields_list = super()._load_pos_data_fields(config)
+        if 'is_pos_customer' not in fields_list:
+            fields_list.append('is_pos_customer')
+        return fields_list
