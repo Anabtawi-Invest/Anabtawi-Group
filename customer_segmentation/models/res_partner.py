@@ -21,6 +21,22 @@ class ResPartner(models.Model):
             _logger.info(
                 "[customer_segmentation] Disabled legacy rule: customer_segmentation.rule_admin_all_customers"
             )
+
+        # Also disable any manually created global "allow all contacts" rules
+        # that bypass segmentation (no group + domain [(1, '=', 1)]).
+        global_open_rules = self.env['ir.rule'].sudo().search([
+            ('model_id', '=', self.env['ir.model']._get_id('res.partner')),
+            ('active', '=', True),
+            ('domain_force', 'in', ['[(1, '=', 1)]', '[(1,"=",1)]']),
+            ('groups', '=', False),
+        ])
+        if global_open_rules:
+            global_open_rules.write({'active': False})
+            _logger.info(
+                "[customer_segmentation] Disabled %s global open res.partner rule(s): %s",
+                len(global_open_rules),
+                global_open_rules.mapped('name'),
+            )
         return result
 
     # Department categories
