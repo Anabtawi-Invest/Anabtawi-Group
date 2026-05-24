@@ -9,6 +9,20 @@ _logger = logging.getLogger(__name__)
 class ResPartner(models.Model):
     _inherit = 'res.partner'
 
+    def _register_hook(self):
+        """
+        Safety net for databases that still contain the legacy
+        'Admin - See All Customers' rule created in old versions.
+        """
+        result = super()._register_hook()
+        rule = self.env.ref('customer_segmentation.rule_admin_all_customers', raise_if_not_found=False)
+        if rule and rule.active:
+            rule.sudo().write({'active': False})
+            _logger.info(
+                "[customer_segmentation] Disabled legacy rule: customer_segmentation.rule_admin_all_customers"
+            )
+        return result
+
     # Department categories
     is_export_customer = fields.Boolean(
         string='Export Sales Customer',
@@ -81,7 +95,7 @@ class ResPartner(models.Model):
         result_ids = [res_id for res_id, _label in result]
 
         _logger.info(
-            "[customer_segmentation] name_search user=%s(id=%s) name=%s operator=%s limit=%s args=%s result_count=%s sample_ids=%s "
+            "[customer_segmentation] name_search user=%s(id=%s) name=%s operator=%s limit=%s domain=%s result_count=%s sample_ids=%s "
             "groups={export:%s, local:%s, procurement:%s, pos:%s, admin:%s}",
             user.login,
             user.id,
