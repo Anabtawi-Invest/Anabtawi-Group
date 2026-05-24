@@ -18,6 +18,14 @@
                     class="btn-primary"
                     groups="payroll_extra_hours_adjustment.group_extra_hours_adjustment_manager"
                 />
+                <button
+                    name="action_reset_additional_extra_hours"
+                    type="object"
+                    string="Cancel / Reset Additional Extra Hours"
+                    class="btn-secondary"
+                    groups="payroll_extra_hours_adjustment.group_extra_hours_adjustment_manager"
+                    invisible="not additional_extra_hours_line_id or additional_extra_hours_reversal_line_id"
+                />
             </xpath>
         </field>
     </record>
