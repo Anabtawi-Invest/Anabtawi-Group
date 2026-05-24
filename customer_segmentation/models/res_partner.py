@@ -27,7 +27,7 @@ class ResPartner(models.Model):
         global_open_rules = self.env['ir.rule'].sudo().search([
             ('model_id', '=', self.env['ir.model']._get_id('res.partner')),
             ('active', '=', True),
-            ('domain_force', 'in', ['[(1, '=', 1)]', '[(1,"=",1)]']),
+            ('domain_force', 'in', ["[(1, '=', 1)]", '[(1,"=",1)]']),
             ('groups', '=', False),
         ])
         if global_open_rules:
