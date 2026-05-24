@@ -6,7 +6,7 @@
             <field name="name">Export Sales - See Export Customers Only</field>
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="groups" eval="[(4, ref('group_export_sales'))]"/>
-            <field name="domain_force">['|', '|', '|', ('is_export_customer', '=', True), ('id', '=', user.partner_id.id), ('id', '=', user.company_id.partner_id.id), ('user_ids', '!=', False)]</field>
+            <field name="domain_force">[('is_export_customer', '=', True)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="True"/>
@@ -17,7 +17,7 @@
             <field name="name">Local Sales - See Local Customers Only</field>
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="groups" eval="[(4, ref('group_local_sales'))]"/>
-            <field name="domain_force">['|', '|', '|', ('is_local_customer', '=', True), ('id', '=', user.partner_id.id), ('id', '=', user.company_id.partner_id.id), ('user_ids', '!=', False)]</field>
+            <field name="domain_force">[('is_local_customer', '=', True)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="True"/>
@@ -28,7 +28,7 @@
             <field name="name">Procurement - See Vendors Only</field>
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="groups" eval="[(4, ref('group_procurement'))]"/>
-            <field name="domain_force">['|', '|', '|', ('is_vendor', '=', True), ('id', '=', user.partner_id.id), ('id', '=', user.company_id.partner_id.id), ('user_ids', '!=', False)]</field>
+            <field name="domain_force">[('is_vendor', '=', True)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="True"/>

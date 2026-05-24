@@ -64,3 +64,51 @@ class ResPartner(models.Model):
         if 'is_pos_customer' not in fields_list:
             fields_list.append('is_pos_customer')
         return fields_list
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """
+        Auto-tag partners by creation channel:
+        - POS creation -> is_pos_customer
+        - Vendors menu / supplier context -> is_vendor
+        - Customer creation -> export/local/pos based on user group
+        Explicit values in vals still take priority.
+        """
+        user = self.env.user
+        ctx = self.env.context
+        department_flags = (
+            'is_export_customer',
+            'is_local_customer',
+            'is_vendor',
+            'is_pos_customer',
+        )
+
+        for vals in vals_list:
+            has_explicit_department = any(flag in vals for flag in department_flags)
+
+            if not has_explicit_department and ctx.get('default_is_pos_customer'):
+                vals['is_pos_customer'] = True
+                has_explicit_department = True
+
+            supplier_rank = vals.get('supplier_rank', 0) or 0
+            if not has_explicit_department and (ctx.get('default_supplier_rank') or supplier_rank > 0):
+                vals['is_vendor'] = True
+                has_explicit_department = True
+
+            customer_rank = vals.get('customer_rank', 0) or 0
+            is_customer_context = bool(ctx.get('default_customer_rank') or customer_rank > 0)
+            if not has_explicit_department and is_customer_context:
+                if user.has_group('customer_segmentation.group_export_sales'):
+                    vals['is_export_customer'] = True
+                    has_explicit_department = True
+                elif user.has_group('customer_segmentation.group_local_sales'):
+                    vals['is_local_customer'] = True
+                    has_explicit_department = True
+                elif user.has_group('customer_segmentation.group_pos_team'):
+                    vals['is_pos_customer'] = True
+                    has_explicit_department = True
+
+            if not has_explicit_department and user.has_group('customer_segmentation.group_procurement'):
+                vals['is_vendor'] = True
+
+        return super().create(vals_list)
