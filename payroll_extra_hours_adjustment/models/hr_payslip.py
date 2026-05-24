@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta
+import logging
 
 from odoo import _, fields, models
 from odoo.exceptions import ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class HrPayslip(models.Model):
@@ -37,11 +40,28 @@ class HrPayslip(models.Model):
 
         adjustment_hours = self.manual_extra_hours_balance
         overtime_line = self.env["hr.attendance.overtime.line"].sudo()
-        overtime_line.create(self._prepare_manual_extra_hours_line_vals(adjustment_hours))
+        balance_before = self.employee_extra_hours_balance if "employee_extra_hours_balance" in self._fields else None
+        _logger.info(
+            "Apply additional extra hours started: payslip=%s employee=%s added_hours=%s balance_before=%s",
+            self.id, self.employee_id.id, adjustment_hours, balance_before,
+        )
+        created_line = overtime_line.create(self._prepare_manual_extra_hours_line_vals(adjustment_hours))
+        _logger.info(
+            "Manual overtime line created from payslip: payslip=%s line_id=%s manual_duration=%s status=%s compensable=%s",
+            self.id,
+            created_line.id,
+            created_line.manual_duration,
+            created_line.status,
+            created_line.compensable_as_leave,
+        )
 
         self.manual_extra_hours_balance = 0.0
         if "employee_extra_hours_balance" in self._fields and hasattr(self, "_compute_employee_extra_hours_balance"):
             self._compute_employee_extra_hours_balance()
+            _logger.info(
+                "Apply additional extra hours finished: payslip=%s employee=%s balance_after=%s",
+                self.id, self.employee_id.id, self.employee_extra_hours_balance,
+            )
 
         return {
             "type": "ir.actions.client",

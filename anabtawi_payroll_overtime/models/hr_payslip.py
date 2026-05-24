@@ -40,13 +40,25 @@ class HrPayslip(models.Model):
     @api.depends("employee_id")
     def _compute_employee_extra_hours_balance(self):
         for slip in self:
-            slip.employee_extra_hours_balance = slip._get_employee_extra_hours_balance()
+            computed_balance = slip._get_employee_extra_hours_balance()
+            _logger.info(
+                "Compute extra hours balance: payslip=%s employee=%s computed_balance=%s",
+                slip.id, slip.employee_id.id if slip.employee_id else None, computed_balance,
+            )
+            slip.employee_extra_hours_balance = computed_balance
 
     def _get_employee_extra_hours_balance(self):
         self.ensure_one()
         if not self.employee_id:
+            _logger.info("Get extra hours balance: payslip=%s has no employee, return 0.0", self.id)
             return 0.0
-        return max(0.0, self._get_remaining_extra_hours_from_attendance())
+        remaining = self._get_remaining_extra_hours_from_attendance()
+        final_balance = max(0.0, remaining)
+        _logger.info(
+            "Get extra hours balance: payslip=%s employee=%s remaining_raw=%s final_balance=%s",
+            self.id, self.employee_id.id, remaining, final_balance,
+        )
+        return final_balance
 
     def _get_remaining_extra_hours_from_attendance(self):
         """Match the 'Remaining Extra Hours' figure from attendance data directly."""
@@ -92,7 +104,18 @@ class HrPayslip(models.Model):
         )
         consumed_in_allocations = allocations_data[0].get("number_of_hours_display_sum", 0.0) if allocations_data else 0.0
 
-        return approved_overtime - consumed_in_leaves - consumed_in_allocations
+        remaining = approved_overtime - consumed_in_leaves - consumed_in_allocations
+        _logger.info(
+            "Remaining extra hours from attendance: payslip=%s employee=%s metric=%s approved_overtime=%s consumed_leaves=%s consumed_allocations=%s remaining=%s",
+            self.id,
+            self.employee_id.id,
+            overtime_metric,
+            approved_overtime,
+            consumed_in_leaves,
+            consumed_in_allocations,
+            remaining,
+        )
+        return remaining
 
     def _message_overtime_exceeds_balance(self, requested_hours, balance_hours):
         self.ensure_one()
