@@ -50,5 +50,6 @@ class HrPayslip(models.Model):
                 "type": "success",
                 "message": _("Additional extra hours have been applied successfully."),
                 "sticky": False,
+                "next": {"type": "ir.actions.client", "tag": "reload"},
             },
         }
