@@ -1,4 +1,9 @@
+import logging
+
 from odoo import api, fields, models
+
+
+_logger = logging.getLogger(__name__)
 
 
 class ResPartner(models.Model):
@@ -64,6 +69,35 @@ class ResPartner(models.Model):
         if 'is_pos_customer' not in fields_list:
             fields_list.append('is_pos_customer')
         return fields_list
+
+    def name_search(self, name='', args=None, operator='ilike', limit=100):
+        """
+        Temporary diagnostic logs to understand why partner filtering
+        is not applied during partner lookup (e.g. in sale order).
+        """
+        args = args or []
+        user = self.env.user
+        result = super().name_search(name=name, args=args, operator=operator, limit=limit)
+        result_ids = [res_id for res_id, _label in result]
+
+        _logger.info(
+            "[customer_segmentation] name_search user=%s(id=%s) name=%s operator=%s limit=%s args=%s result_count=%s sample_ids=%s "
+            "groups={export:%s, local:%s, procurement:%s, pos:%s, admin:%s}",
+            user.login,
+            user.id,
+            name,
+            operator,
+            limit,
+            args,
+            len(result_ids),
+            result_ids[:20],
+            user.has_group('customer_segmentation.group_export_sales'),
+            user.has_group('customer_segmentation.group_local_sales'),
+            user.has_group('customer_segmentation.group_procurement'),
+            user.has_group('customer_segmentation.group_pos_team'),
+            user.has_group('base.group_system'),
+        )
+        return result
 
     @api.model_create_multi
     def create(self, vals_list):
