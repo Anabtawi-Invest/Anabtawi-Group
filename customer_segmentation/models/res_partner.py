@@ -70,14 +70,14 @@ class ResPartner(models.Model):
             fields_list.append('is_pos_customer')
         return fields_list
 
-    def name_search(self, name='', args=None, operator='ilike', limit=100):
+    def name_search(self, name='', domain=None, operator='ilike', limit=100):
         """
         Temporary diagnostic logs to understand why partner filtering
         is not applied during partner lookup (e.g. in sale order).
         """
-        args = args or []
+        domain = domain or []
         user = self.env.user
-        result = super().name_search(name=name, args=args, operator=operator, limit=limit)
+        result = super().name_search(name, domain, operator, limit)
         result_ids = [res_id for res_id, _label in result]
 
         _logger.info(
@@ -88,7 +88,7 @@ class ResPartner(models.Model):
             name,
             operator,
             limit,
-            args,
+            domain,
             len(result_ids),
             result_ids[:20],
             user.has_group('customer_segmentation.group_export_sales'),
