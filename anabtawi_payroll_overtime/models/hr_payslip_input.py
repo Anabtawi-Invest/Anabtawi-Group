@@ -81,5 +81,13 @@ class HrPayslipInput(models.Model):
         payslip = self.payslip_id
         if not payslip:
             return 0.0
-        wage = payslip.wage or payslip.contract_id.wage or payslip.version_id.contract_wage
+        wage = 0.0
+        if "wage" in payslip._fields:
+            wage = payslip.wage or 0.0
+        if not wage and payslip.employee_id and "wage" in payslip.employee_id._fields:
+            wage = payslip.employee_id.wage or 0.0
+        if not wage and payslip.contract_id:
+            wage = payslip.contract_id.wage or 0.0
+        if not wage and "version_id" in payslip._fields and payslip.version_id:
+            wage = payslip.version_id.contract_wage or 0.0
         return wage / (8.0 * 30.0)
