@@ -1,3 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_pos_payment_method_apex,pos.payment.method apex,point_of_sale.model_pos_payment_method,point_of_sale.group_pos_manager,1,1,1,0
-access_pos_payment_apex,pos.payment apex,point_of_sale.model_pos_payment,point_of_sale.group_pos_user,1,1,0,0
