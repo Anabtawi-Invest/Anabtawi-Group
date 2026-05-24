@@ -1,6 +1,7 @@
 import logging
 
 from odoo import api, fields, models
+from odoo.osv import expression
 
 
 _logger = logging.getLogger(__name__)
@@ -8,6 +9,23 @@ _logger = logging.getLogger(__name__)
 
 class ResPartner(models.Model):
     _inherit = 'res.partner'
+
+    def _get_group_segmentation_domain(self, user):
+        """Build partner filter domain based on customer segmentation groups."""
+        group_domains = []
+        if user.has_group('customer_segmentation.group_export_sales'):
+            group_domains.append([('is_export_customer', '=', True)])
+        if user.has_group('customer_segmentation.group_local_sales'):
+            group_domains.append([('is_local_customer', '=', True)])
+        if user.has_group('customer_segmentation.group_procurement'):
+            group_domains.append([('is_vendor', '=', True)])
+        if user.has_group('customer_segmentation.group_pos_team'):
+            group_domains.append([('is_pos_customer', '=', True)])
+        if not group_domains:
+            return []
+        if len(group_domains) == 1:
+            return group_domains[0]
+        return expression.OR(group_domains)
 
     def _register_hook(self):
         """
@@ -105,20 +123,24 @@ class ResPartner(models.Model):
         Temporary diagnostic logs to understand why partner filtering
         is not applied during partner lookup (e.g. in sale order).
         """
-        domain = domain or []
+        base_domain = domain or []
         user = self.env.user
-        result = super().name_search(name, domain, operator, limit)
+        segmentation_domain = self._get_group_segmentation_domain(user)
+        search_domain = expression.AND([base_domain, segmentation_domain]) if segmentation_domain else base_domain
+        result = super().name_search(name, search_domain, operator, limit)
         result_ids = [res_id for res_id, _label in result]
 
         _logger.info(
-            "[customer_segmentation] name_search user=%s(id=%s) name=%s operator=%s limit=%s domain=%s result_count=%s sample_ids=%s "
+            "[customer_segmentation] name_search user=%s(id=%s) name=%s operator=%s limit=%s domain=%s seg_domain=%s final_domain=%s result_count=%s sample_ids=%s "
             "groups={export:%s, local:%s, procurement:%s, pos:%s, admin:%s}",
             user.login,
             user.id,
             name,
             operator,
             limit,
-            domain,
+            base_domain,
+            segmentation_domain,
+            search_domain,
             len(result_ids),
             result_ids[:20],
             user.has_group('customer_segmentation.group_export_sales'),
