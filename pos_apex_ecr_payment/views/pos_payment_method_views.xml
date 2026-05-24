@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_payment_method_form_apex" model="ir.ui.view">
+        <field name="name">pos.payment.method.form.apex</field>
+        <field name="model">pos.payment.method</field>
+        <field name="inherit_id" ref="point_of_sale.pos_payment_method_view_form"/>
+        <field name="arch" type="xml">
+            <!--
+                In Odoo 19 the payment method form has a <sheet> with a <group>.
+                We append our Apex group after the last existing group inside sheet.
+            -->
+            <xpath expr="//sheet" position="inside">
+                <group string="Apex ECR Terminal" attrs="{}">
+                    <group>
+                        <field name="apex_enabled" widget="boolean_toggle"/>
+                    </group>
+                    <group attrs="{'invisible': [('apex_enabled', '=', False)]}">
+                        <field name="apex_service_url" placeholder="http://localhost:9999/ApexECR/Service.asmx"/>
+                        <field name="apex_mid" placeholder="15-digit Merchant ID"/>
+                        <field name="apex_tid" placeholder="8-digit Terminal ID"/>
+                        <field name="apex_secure_key" password="True" placeholder="32-char Merchant Secure Key"/>
+                        <field name="apex_currency_code" placeholder="400"/>
+                    </group>
+                    <group string="Receipt / Printer" attrs="{'invisible': [('apex_enabled', '=', False)]}">
+                        <field name="apex_printer_width"/>
+                        <field name="apex_enable_print_pos_receipt"/>
+                        <field name="apex_timeout"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
