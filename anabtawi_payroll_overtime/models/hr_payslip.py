@@ -69,40 +69,42 @@ class HrPayslip(models.Model):
             if "credited_duration" in overtime_line_model._fields
             else "manual_duration"
         )
+        if overtime_metric == "credited_duration" and not overtime_line_model._fields["credited_duration"].store:
+            overtime_metric = "manual_duration"
 
-        overtime_data = overtime_line_model.read_group(
+        overtime_data = overtime_line_model._read_group(
             domain=[
                 ("employee_id", "=", self.employee_id.id),
                 ("compensable_as_leave", "=", True),
                 ("status", "=", "approved"),
             ],
-            fields=[f"{overtime_metric}:sum"],
             groupby=[],
+            aggregates=[f"{overtime_metric}:sum"],
         )
-        approved_overtime = overtime_data[0].get(f"{overtime_metric}_sum", 0.0) if overtime_data else 0.0
+        approved_overtime = (overtime_data[0][0] or 0.0) if overtime_data else 0.0
 
-        leaves_data = self.env["hr.leave"].sudo().read_group(
+        leaves_data = self.env["hr.leave"].sudo()._read_group(
             domain=[
                 ("holiday_status_id.overtime_deductible", "=", True),
                 ("holiday_status_id.requires_allocation", "=", False),
                 ("employee_id", "=", self.employee_id.id),
                 ("state", "not in", ["refuse", "cancel"]),
             ],
-            fields=["number_of_hours:sum"],
             groupby=[],
+            aggregates=["number_of_hours:sum"],
         )
-        consumed_in_leaves = leaves_data[0].get("number_of_hours_sum", 0.0) if leaves_data else 0.0
+        consumed_in_leaves = (leaves_data[0][0] or 0.0) if leaves_data else 0.0
 
-        allocations_data = self.env["hr.leave.allocation"].sudo().read_group(
+        allocations_data = self.env["hr.leave.allocation"].sudo()._read_group(
             domain=[
                 ("holiday_status_id.overtime_deductible", "=", True),
                 ("employee_id", "=", self.employee_id.id),
                 ("state", "in", ["confirm", "validate", "validate1"]),
             ],
-            fields=["number_of_hours_display:sum"],
             groupby=[],
+            aggregates=["number_of_hours_display:sum"],
         )
-        consumed_in_allocations = allocations_data[0].get("number_of_hours_display_sum", 0.0) if allocations_data else 0.0
+        consumed_in_allocations = (allocations_data[0][0] or 0.0) if allocations_data else 0.0
 
         remaining = approved_overtime - consumed_in_leaves - consumed_in_allocations
         _logger.info(
