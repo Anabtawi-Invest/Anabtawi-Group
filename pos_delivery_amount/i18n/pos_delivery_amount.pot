@@ -1,0 +1,51 @@
+# pos_delivery_amount/i18n/pos_delivery_amount.pot
+# Translation Template for pos_delivery_amount
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo pos_delivery_amount 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-01 00:00+0000\n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Intermediate Account"
+msgstr ""
+
+msgid "Delivery Journal"
+msgstr ""
+
+msgid "Delivery Amount"
+msgstr ""
+
+msgid "Delivery Journal Entry"
+msgstr ""
+
+msgid "Confirm"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Confirm Zero Amount"
+msgstr ""
+
+msgid "Are you sure the Delivery Amount is zero?"
+msgstr ""
+
+msgid "Yes"
+msgstr ""
+
+msgid "No"
+msgstr ""
+
+msgid "Delivery Amount cannot exceed counted cash balance."
+msgstr ""
+
+msgid "Delivery Amount cannot be negative."
+msgstr ""
+
+msgid "Delivery Amount processed successfully."
+msgstr ""
