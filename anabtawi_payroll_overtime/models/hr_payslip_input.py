@@ -60,9 +60,11 @@ class HrPayslipInput(models.Model):
 
     def _apply_overtime_quantity_amount(self):
         for line in self:
-            if not line.overtime_quantity_type:
+            if line.input_type_id.code == "REM_LEAVE":
+                line.amount = line.quantity * line._get_rem_leave_hourly_rate()
                 continue
-            line.amount = line.quantity * line._get_employee_hourly_rate()
+            if line.overtime_quantity_type:
+                line.amount = line.quantity * line._get_employee_hourly_rate()
 
     def _get_employee_hourly_rate(self):
         self.ensure_one()
@@ -73,3 +75,11 @@ class HrPayslipInput(models.Model):
         if payslip.wage_type == "hourly":
             return version.hourly_wage
         return version.contract_wage / self._OVERTIME_FIXED_HOURS
+
+    def _get_rem_leave_hourly_rate(self):
+        self.ensure_one()
+        payslip = self.payslip_id
+        if not payslip:
+            return 0.0
+        wage = payslip.wage or payslip.contract_id.wage or payslip.version_id.contract_wage
+        return wage / (8.0 * 30.0)
