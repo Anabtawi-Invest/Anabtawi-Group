@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_session_form_inherit_delivery_amount" model="ir.ui.view">
+        <field name="name">pos.session.form.inherit.delivery.amount</field>
+        <field name="model">pos.session</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_session_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='cash_register_balance_end_real']" position="after">
+                <field name="delivery_amount"/>
+                <field name="delivery_move_id" groups="account.group_account_readonly"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_pos_session_tree_inherit_delivery_amount" model="ir.ui.view">
+        <field name="name">pos.session.list.inherit.delivery.amount</field>
+        <field name="model">pos.session</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_session_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='cash_register_balance_end_real']" position="after">
+                <field name="delivery_amount"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

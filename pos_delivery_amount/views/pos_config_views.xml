@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pos_config_view_form_inherit_delivery_amount" model="ir.ui.view">
+        <field name="name">pos.config.form.inherit.delivery.amount</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='configuration']/div[@class='row mt16 o_settings_container']" position="inside">
+                <setting string="Delivery Accounting" help="Define accounts used when posting delivery amount at session closing.">
+                    <div class="content-group mt16">
+                        <div class="row mb-2">
+                            <div class="col-lg-4 o_light_label">
+                                <label for="delivery_intermediate_account_id"/>
+                            </div>
+                            <div class="col-lg-8">
+                                <field name="delivery_intermediate_account_id"/>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-lg-4 o_light_label">
+                                <label for="delivery_journal_id"/>
+                            </div>
+                            <div class="col-lg-8">
+                                <field name="delivery_journal_id"/>
+                            </div>
+                        </div>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>
