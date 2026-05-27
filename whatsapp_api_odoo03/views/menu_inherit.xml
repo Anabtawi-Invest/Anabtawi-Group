@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <menuitem id="menu_mrp_bom_form_action"
+                  name="Combo Product's"
+                  action="mrp.mrp_bom_form_action"
+                  parent="stock.menu_stock_inventory_control"
+                  sequence="13"/>
+    </data>
+</odoo>

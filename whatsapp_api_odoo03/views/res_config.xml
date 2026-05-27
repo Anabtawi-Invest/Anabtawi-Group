@@ -1,0 +1,140 @@
+<odoo>
+  <data>
+    <record id="setting_inherit_form_view" model="ir.ui.view">
+      <field name="name">res.config.settings.inherit.go4whatsapp</field>
+      <field name="model">res.config.settings</field>
+      <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+      <field name="arch" type="xml">
+        <xpath expr="//form" position="inside">
+
+          <app name="whatsapp_api_odoo03" string="Go4Whatsapp Connector">
+            <block title="Go4Whatsapp Settings">
+
+              <block title="WhatsApp API Status">
+                <setting string="Embedded Sign Up"
+                        help="Complete Meta embedded signup to activate WhatsApp API">
+
+                  <field name="is_api_active" invisible="1"/>
+
+                  <!-- Pending -->
+                  <div invisible="is_api_active">
+                    <div class="alert alert-warning mb-3">
+                      <strong>Status:</strong> Pending
+                      <p class="mb-0">
+                        Complete embedded signup to activate your WhatsApp API.
+                      </p>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                      <button name="enbeded_signup"
+                              type="object"
+                              string="Start Embedded Sign Up"
+                              class="btn btn-primary"/>
+                      <button name="action_refresh_api_status"
+                              type="object"
+                              string="Refresh Status"
+                              class="btn btn-secondary"/>
+                    </div>
+                  </div>
+
+                  <!-- Active -->
+                  <div invisible="not is_api_active">
+                    <div class="alert alert-success mb-3">
+                      <strong>Status:</strong> Active
+                      <p class="mb-0">
+                        Your WhatsApp API is active and ready to use.
+                      </p>
+                    </div>
+
+                    <button name="action_refresh_api_status"
+                            type="object"
+                            string="Refresh Status"
+                            class="btn btn-secondary"/>
+                  </div>
+
+                </setting>
+              </block>
+
+              <block title="Account Information">
+                <setting string="Connected Account">
+                  <div class="row g-3">
+                    <div class="col-12 col-lg-4">
+                      <label for="user_name"/> <br/>
+                      <field name="user_name" readonly="1"/>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                      <label for="user_email"/><br/>
+                      <field name="user_email" readonly="1"/>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                      <label for="user_mobile_no"/><br/>
+                      <field name="user_mobile_no" readonly="1"/>
+                    </div>
+                  </div>
+                </setting>
+              </block>
+
+              <block title="API Configuration">
+                <setting string="Credentials"
+                        help="Credentials provided by Go4WhatsApp">
+
+                  <div class="row g-3">
+                    <div class="col-12 col-lg-6">
+                      <label for="go4whatsapp_url"/>
+                      <field name="go4whatsapp_url"
+                            placeholder="https://api.go4whatsapp.com"/>
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                      <label for="org_id"/>
+                      <field name="org_id"/>
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                      <label for="apikey"/>
+                      <field name="apikey" password="True"/>
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                      <label for="secureKey"/>
+                      <field name="secureKey" password="True"/>
+                    </div>
+                  </div>
+
+                </setting>
+              </block>
+
+              <block title="Subscription">
+                <setting string="Manage Subscription">
+                  <div class="d-flex gap-3 flex-wrap">
+                    <button name="action_open_payment_renew"
+                            type="object"
+                            string="Renew Subscription"
+                            class="btn btn-primary"/>
+                    <button name="action_open_payment_cancel_subscription"
+                            type="object"
+                            string="Cancel Subscription"
+                            class="btn btn-outline-danger"/>
+                  </div>
+                </setting>
+              </block>
+
+              <block title="Support">
+                <setting string="Contact Information">
+                  <div class="alert alert-info mb-0">
+                    <ul class="mb-0">
+                      <li><strong>WhatsApp:</strong> +91 7587532578</li>
+                      <li><strong>Phone:</strong> +91 9667584436</li>
+                      <li><strong>UAE:</strong> +971 54 508 5552</li>
+                    </ul>
+                  </div>
+                </setting>
+              </block>
+              
+            </block>
+          </app>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>

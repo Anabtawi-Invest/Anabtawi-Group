@@ -1,0 +1,29 @@
+<odoo>
+    <!-- QWEB TEMPLATE -->
+    <template id="go4w_help_page" name="Go4WhatsUp Help Page">
+        <div class="oe_structure">
+            <h2>Need Help With Setup?</h2>
+
+            <p>If you prefer not to handle API configuration, simply click <b>Contact Us</b> and our team will help you out.</p>
+
+            <p><b>Phone Number:</b></p>
+            <ul>
+                <li>-</li>
+                <li>WhatsApp: +91 7587532578</li>
+                <li>+91-9667584436</li>
+                <li>+971 54 508 5552</li>
+            </ul>
+
+            <p><b>Email:</b> connect@go4whatsup.com<br/>
+            Add Subject Line – "Odoo Setup Help"</p>
+
+            <p><b>Visit:</b> https://www.go4whatsup.com/contact-us/</p>
+        </div>
+    </template>
+
+    <!-- CLIENT ACTION -->
+    <record id="action_go4w_help_page" model="ir.actions.client">
+        <field name="name">Go4WhatsUp Help</field>
+        <field name="tag">go4whatsapp_help_action</field>
+    </record>
+</odoo>

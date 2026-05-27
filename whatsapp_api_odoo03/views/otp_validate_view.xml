@@ -1,0 +1,41 @@
+<odoo>
+
+    <!-- OTP FORM VIEW -->
+    <record id="otp_validate_form_view" model="ir.ui.view">
+        <field name="name">otp.validate.form</field>
+        <field name="model">otp.validate</field>
+        <field name="arch" type="xml">
+
+            <form string="Verify OTP">
+                <div class="o_form_label mb-2">
+                  OTP has been sent to your registered email   <b> <field name="email" readonly="1"/>  </b>
+                </div>
+                <group>
+                    <field name="mobile_number"/>
+                    <field name="entered_otp"/>
+                </group>
+
+                <footer>
+                    <button string="Verify OTP"
+                    type="object"
+                    name="action_verify_otp"
+                    class="btn-primary"/>
+
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- OTP ACTION -->
+    <record id="otp_validate_action" model="ir.actions.act_window">
+        <field name="name">OTP Verification</field>
+        <field name="res_model">otp.validate</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="otp_validate_form_view"/>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

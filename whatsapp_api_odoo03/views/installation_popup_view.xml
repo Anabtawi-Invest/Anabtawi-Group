@@ -1,0 +1,53 @@
+<odoo>
+    <record id="installation_popup_form" model="ir.ui.view">
+        <field name="name">installation.popup.form</field>
+        <field name="model">installation.popup</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp API Setup" class="oe_form_custom"
+                  style="max-width:720px; margin:auto; font-family:'Inter', sans-serif; overflow:visible;"
+                  buttons="false">
+
+                <div style="display:flex; flex-direction:column; gap:18px; margin-bottom:25px;">
+                    
+                    <div style="display:flex; gap:12px;">
+                        <field name="country_id"  placeholder="Select Country" class="o_input o_required" style="flex:1; padding:10px; border-radius:6px; border:1px solid #ccc;"/>
+                        <field name="country_code" readonly="1" placeholder="+XX" class="o_input" style="width:80px; padding:10px; border-radius:6px; border:1px solid #ccc; background:#f2f2f2;"/>
+                        <field name="user_mobile_no" placeholder="Enter your Business Number" class="o_input o_required" style="flex:2; padding:10px; border-radius:6px; border:1px solid #ccc;"/>
+                    </div>
+                </div>
+
+                
+                <div style="background:#f4e6f2; padding:18px; border-radius:10px; border:1px solid #82306c; margin-bottom:25px; box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+                    <h4 style="margin-bottom:10px; color:#82306c; font-weight:600; font-size:16px;">Need Help with Setup? 📞</h4>
+                    <ul style="margin:0; padding-left:20px; line-height:1.8; color:#333;">
+                        <li><b>WhatsApp:</b> +91 7587532578</li>
+                        <li><b>Phone:</b> +91 9667584436</li>
+                        <li><b>UAE:</b> +971 54 508 5552</li>
+                    </ul>
+                </div>
+
+            <footer>
+                <div style="text-align:center;">
+                    <button name="action_check_mobileisvalid"
+                            type="object"
+                            class="btn btn-primary"
+                            style="width:420px; height:45px; font-size:15px; background:#82306c; color:#fff; border:none; border-radius:8px;">
+                        Next
+                    </button>
+                </div>
+
+            </footer>
+
+
+            </form>
+        </field>
+    </record>
+
+    <record id="installation_popup_action" model="ir.actions.act_window">
+        <field name="name">Odoo Whatsapp Connector</field>
+        <field name="res_model">installation.popup</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="installation_popup_form"/>
+        <field name="target">new</field>
+    </record>
+</odoo>

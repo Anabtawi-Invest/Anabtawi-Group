@@ -1,0 +1,12 @@
+<odoo>
+    <record id="view_order_tree_inherit_custom" model="ir.ui.view">
+        <field name="name">sale.order.list.custom</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_quotation_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <field name="custom_check_field"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

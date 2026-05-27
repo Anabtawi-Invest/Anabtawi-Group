@@ -1,0 +1,98 @@
+<odoo>
+    <record id="view_help_wizard_form" model="ir.ui.view">
+        <field name="name">help.wizard.form</field>
+        <field name="model">help.wizard</field>
+        <field name="arch" type="xml">
+
+            <form string="Support and Assistance">
+                <sheet class="oe_form_sheet" style="max-width:720px; margin:auto;">
+
+                    <!-- HEADER -->
+                    <div class="text-center mb32">
+                        <h2 class="mb8">
+                            Need Help with Odoo Setup?
+                        </h2>
+                        <p class="text-muted">
+                            Assistance for WhatsApp API, Odoo integration, and account configuration.
+                        </p>
+                    </div>
+
+                    <div class="text-center mb16">
+                        <p class="text-muted" style="max-width:520px; margin:auto;">
+                            Please click on the <b>Embedded Sign Up</b> button below to continue with
+                            the Meta (Facebook) API application and complete the WhatsApp Business setup process.
+                        </p>
+                    </div>
+
+                    <!-- EMBEDDED SIGNUP BUTTON -->
+                    <div class="text-center mb32">
+                        <button name="enbeded_signup"
+                                type="object"
+                                string="Start Embedded Sign Up"
+                                class="btn btn-primary btn-lg"/>
+                    </div>
+
+
+                    <!-- SUPPORT CARD -->
+                    <div class="o_setting_box"
+                         style="border:1px solid #e5e7eb; border-radius:14px; padding:24px;">
+
+                        <!-- PHONE -->
+                        <div class="mb24">
+                            <h4 class="mb8">📞 Phone and WhatsApp Support</h4>
+                            <ul class="mb0">
+                                <li><b>WhatsApp:</b> +91 7587532578</li>
+                                <li><b>Phone:</b> +91 9667584436</li>
+                                <li><b>UAE:</b> +971 54 508 5552</li>
+                            </ul>
+                        </div>
+
+                        <!-- EMAIL -->
+                        <div class="mb24">
+                            <h4 class="mb8">✉️ Email Support</h4>
+                            <p class="mb4">
+                                Email us at:
+                                <a href="mailto:connect@go4whatsup.com" class="fw-bold">
+                                    connect@go4whatsup.com
+                                </a>
+                            </p>
+                            <span class="text-muted">
+                                Subject: <b>Odoo Setup Help</b>
+                            </span>
+                        </div>
+
+                        <!-- WEBSITE -->
+                        <div>
+                            <h4 class="mb12">🌐 Support Portal</h4>
+                            <a href="https://www.go4whatsup.com/contact-us/"
+                               target="_blank"
+                               class="btn btn-outline-primary">
+                                Visit Contact Page
+                            </a>
+                        </div>
+
+                    </div>
+
+                </sheet>
+
+                <!-- FOOTER -->
+                <footer class="text-center mt24">
+                    <button name="action_close_refresh"
+                            string="Close"
+                            type="object"
+                            class="btn btn-secondary"/>
+                </footer>
+
+            </form>
+
+        </field>
+    </record>
+
+    <record id="action_help_wizard" model="ir.actions.act_window">
+        <field name="name">Help Information</field>
+        <field name="res_model">help.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_help_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+</odoo>

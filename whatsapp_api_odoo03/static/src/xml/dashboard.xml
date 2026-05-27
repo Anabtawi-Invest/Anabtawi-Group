@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="whatsapp_api_odoo03.Welcome">
+        <div class="o_form_view o_form_nosheet p-4">
+          <div class="go4-page-body">
+            <br/>
+                        <!-- ================= USER DETAILS ================= -->
+            <div class="go4-center-wrapper go4-welcome-bar">
+
+                <!-- LEFT BRAND -->
+                <div class="go4-brand-left">
+                    <img src="/whatsapp_api_odoo03/static/description/logo.png"
+                        class="go4-header-logo"/>
+                </div>
+
+                <!-- CENTER WELCOME -->
+                <h3 class="go4-welcome-title">
+                    Welcome
+                    <span class="go4-user-name">
+                        <t t-esc="state.user_name"/>
+                    </span>
+                </h3>
+
+            </div>
+
+            <!-- ================= STEPPER ================= -->
+            <div class="go4-stepper mb-5">
+
+                <t t-set="steps" t-value="state.steps"/>
+
+                <div class="step" t-att-class="steps.step1 ? 'completed' : 'pending'">
+                    <div class="circle">1</div>
+                    <div class="label">
+                        <t t-if="steps.step1">Step Completed</t>
+                        <t t-else="">Step Pending</t>
+                    </div>
+                    <div class="title">Registered With Go4WhatsApp</div>
+                </div>
+
+                <div class="line" t-att-class="steps.step1 ? 'completed' : 'pending'"/>
+
+                <div class="step" t-att-class="steps.step2 ? 'completed' : 'pending'">
+                    <div class="circle">2</div>
+                    <div class="label">
+                        <t t-if="steps.step2">Step Completed</t>
+                        <t t-else="">Step Pending</t>
+                    </div>
+                    <div class="title">Verify Meta Business Account</div>
+                </div>
+
+                <div class="line" t-att-class="steps.step2 ? 'completed' : 'pending'"/>
+
+                <div class="step" t-att-class="steps.step3 ? 'completed' : 'pending'">
+                    <div class="circle">3</div>
+                    <div class="label">
+                        <t t-if="steps.step3">Step Completed</t>
+                        <t t-else="">Step Pending</t>
+                    </div>
+                    <div class="title">Get WhatsApp Business API</div>
+                </div>
+
+                <div class="line" t-att-class="steps.step3 ? 'completed' : 'pending'"/>
+
+                <div class="step" t-att-class="steps.step4 ? 'completed' : 'pending'">
+                    <div class="circle">4</div>
+                    <div class="label">
+                        <t t-if="steps.step4">Step Completed</t>
+                        <t t-else="">Step Pending</t>
+                    </div>
+                    <div class="title">Start Sending Messages</div>
+                </div>
+
+                <div class="line" t-att-class="steps.step4 ? 'completed' : 'pending'"/>
+
+                <div class="step"
+                    t-att-class="steps.step5 === 'done' ? 'completed' : 'pending'">
+
+                    <div class="circle">5</div>
+
+                    <div class="label">
+                        <t t-if="steps.step5 === 'done'">
+                            Step Completed
+                        </t>
+                        <t t-else="">
+                            Step Pending
+                        </t>
+                    </div>
+
+                    <div class="title"
+                        t-on-click="applyforgreentick"
+                        t-att-class="steps.step5 === 'pending' ? 'clickable' : 'clickable'">
+
+                        <t t-if="steps.step5 === 'pending'">
+                            Applied for Verified Green Tick
+                        </t>
+                        
+                        <t t-else="">
+                            Apply for Verified Green Tick
+                        </t>
+
+                    </div>
+
+
+
+                </div>
+            </div>
+
+            <div class="go4-info-card">
+
+                <!-- Email -->
+                <div class="go4-info-item">
+                    <div class="icon email">
+                        <i class="fa fa-envelope"/>
+                    </div>
+                    <div class="text">
+                        <span class="label">Email Address</span>
+                        <span class="value">
+                            <t t-esc="state.user_email"/>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <div class="divider"/>
+
+                <!-- Mobile -->
+                <div class="go4-info-item">
+                    <div class="icon phone">
+                        <i class="fa fa-phone"/>
+                    </div>
+                    <div class="text">
+                        <span class="label">Business Mobile</span>
+                        <span class="value">
+                            <t t-esc="state.user_mobile_no"/>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <div class="divider"/>
+
+                <!-- Status -->
+                <div class="go4-info-item">
+                    <div class="icon plug">
+                        <i class="fa fa-plug"/>
+                    </div>
+                    <div class="text">
+                        <span class="label">WhatsApp API Status</span>
+
+                        <t t-if="state.is_api_active">
+                            <span class="value status active">● Active</span>
+                        </t>
+                        <t t-else="">
+                            <span class="value status inactive">● Inactive</span>
+                        </t>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="go4-feature-grid">
+
+                <!-- Template Management -->
+                <div class="go4-feature-card" t-on-click="openTemplatesWizrds">
+                    <div class="go4-icon">
+                        <i class="fa fa-file-text-o"/>
+                    </div>
+                    <h4>Template Management</h4>
+                    <p>
+                        Create, sync, and preview WhatsApp message
+                        templates with Meta-approved template support
+                    </p>
+
+                </div>
+
+                <!-- Trigger Based Automation -->
+                <div class="go4-feature-card" t-on-click="openTriggerPointWizrds">
+                    <div class="go4-icon">
+                        <i class="fa fa-bolt"/>
+                    </div>
+                    <h4>Trigger-Based Automation</h4>
+                    <p>
+                        Send WhatsApp messages automatically based on
+                        events like Order, Invoice, Delivery, CRM triggers
+                    </p>
+                </div>
+
+                <!-- Module Wise Control -->
+                <div class="go4-feature-card" t-on-click="openTriggerPointformWizrds">
+                    <div class="go4-icon">
+                        <i class="fa fa-cog"/>
+                    </div>
+                    <h4>Module-Wise Control</h4>
+                    <p>
+                        Enable or disable WhatsApp features per Odoo
+                        module with role-based visibility
+                    </p>
+                </div>
+
+                <!-- Payment -->
+                <div class="go4-feature-card" t-on-click="openPaymentWizrds">
+                    <div class="go4-icon">
+                        <i class="fa fa-credit-card"/>
+                    </div>
+                    <h4>Payment Management</h4>
+                    <p>
+                        Manage and track payments for WhatsApp services
+                        with detailed transaction history
+                    </p>
+                </div>
+
+                <!-- Settings -->
+                <div class="go4-feature-card" t-on-click="opensettingpage">
+                    <div class="go4-icon">
+                        <i class="fa fa-sliders"/>
+                    </div>
+                    <h4>Settings &amp; Configuration</h4>
+                    <p>
+                        Adjust settings and configure WhatsApp features
+                        to suit your business needs
+                    </p>
+                </div>
+
+            </div>
+
+          </div>  
+        </div>
+    </t>
+
+</templates>

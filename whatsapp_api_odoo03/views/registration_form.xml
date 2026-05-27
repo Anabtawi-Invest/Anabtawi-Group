@@ -1,0 +1,85 @@
+<odoo>
+    <record id="registration_popup_form" model="ir.ui.view">
+        <field name="name">installation.popup.form</field>
+        <field name="model">installation.popup</field>
+        <field name="arch" type="xml">
+            <form string="WhatsApp API Setup" class="oe_form_custom"
+                  style="max-width:720px; margin:auto; font-family:'Inter', sans-serif; overflow:visible;"
+                  buttons="false">
+
+                <!-- Header Box -->
+                <div style="background:#F0F4F8; padding:20px; border-left:5px solid #82306c; margin-bottom:25px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                    <h3 style="margin:0; color:#333; font-weight:700; font-size:18px;">
+                        Odoo WhatsApp API Integration Includes:
+                    </h3>
+                    <ul style="margin-top:12px; line-height:1.8; color:#555; padding-left:18px;">
+                        <li>Template Syncing</li>
+                        <li>Automated Trigger Points (Sales / Account / Invoice etc.)</li>
+                        <li>WhatsApp Communication directly from Odoo</li>
+                        <li>Send WhatsApp Templates to Customers</li>
+                        <li>Lead and Order Syncing</li>
+                        <li>Activity Log for WhatsApp Messages</li>
+                        <li>Real-Time Chat Interface</li>
+                        <li>Professional PDF Generation</li>    
+                    </ul>
+                </div>
+
+                <!-- Pricing Box -->
+                <div style="padding:18px; background:#FFF7E6; border-left:5px solid #A64CA6; margin-bottom:25px; border-radius:10px; color:#333; line-height:1.6; box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+                    <strong style="font-size:16px;">Activate this feature for <span style="color:#82306c;">$29.99/month</span></strong><br/>
+                    Full access for <strong>1 month</strong>. Subscription auto-renews. Cancel anytime.
+                </div>
+
+                <!-- Form Fields -->
+                <div style="display:flex; flex-direction:column; gap:18px; margin-bottom:25px;">
+                    <field name="user_name" placeholder="Enter Your Full Name" class="o_input o_required" style="padding:10px; border-radius:6px; border:1px solid #ccc;"/>
+                    <field name="user_email" placeholder="Enter Valid Email Address" class="o_input o_required" style="padding:10px; border-radius:6px; border:1px solid #ccc;"/>
+
+                    <!-- Country + Code + Mobile -->
+                    <div style="display:flex; gap:12px;">
+                        <field name="country_id"  placeholder="Select Country" class="o_input o_required" style="flex:1; padding:10px; border-radius:6px; border:1px solid #ccc;"/>
+                        <field name="country_code" readonly="1" placeholder="+XX" class="o_input" style="width:80px; padding:10px; border-radius:6px; border:1px solid #ccc; background:#f2f2f2;"/>
+                        <field name="user_mobile_no" placeholder="Enter your Business Number" class="o_input o_required" style="flex:2; padding:10px; border-radius:6px; border:1px solid #ccc;"/>
+                    </div>
+                </div>
+
+                <!-- Support Info -->
+                <div style="background:#f4e6f2; padding:18px; border-radius:10px; border:1px solid #82306c; margin-bottom:25px; box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+                    <h4 style="margin-bottom:10px; color:#82306c; font-weight:600; font-size:16px;">Need Help with Setup? 📞</h4>
+                    <ul style="margin:0; padding-left:20px; line-height:1.8; color:#333;">
+                        <li><b>WhatsApp:</b> +91 7587532578</li>
+                        <li><b>Phone:</b> +91 9667584436</li>
+                        <li><b>UAE:</b> +971 54 508 5552</li>
+                    </ul>
+                </div>
+
+                <!-- Note -->
+                <div style="background:#FFF4F4; padding:15px 18px; border-left:5px solid #D9534F; border-radius:8px; margin-bottom:25px; font-size:14px; color:#B42E2B; box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+                    <strong>NOTE:</strong> During payment, include your country code (Example India: +91XXXXXXXXXX)
+                </div> 
+
+                 <p style="font-size:14px; color:#555; margin-bottom:25px;">* After payment, return to this page to complete setup.</p>
+
+                <footer>
+                    <div style="text-align:center;">
+                        <button name="action_submit_popup" type="object"
+                                class="btn btn-primary"
+                                style="width:420px; height:45px; font-size:15px; background:#82306c; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600;"
+                                onmouseover="this.style.background='#A64CA6';" 
+                                onmouseout="this.style.background='#82306c';">
+                            Continue Process
+                        </button>
+                    </div>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="registration_popup_action" model="ir.actions.act_window">
+        <field name="name">Odoo Whatsapp Connector</field>
+        <field name="res_model">installation.popup</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="registration_popup_form"/>
+        <field name="target">new</field>
+    </record>
+</odoo>

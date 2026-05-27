@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+  <t t-name="whatsapp_api_odoo03.WhatsAppButton">
+    <div>
+      <!-- Floating WhatsApp Button -->
+      <div class="floating-whatsapp-btn" t-on-click="openPopup">
+        <i class="fa fa-whatsapp"></i>
+        <t t-if="state.totalUnreadCount > 0">
+          <span class="unread-badge" t-esc="state.totalUnreadCount"/>
+        </t>
+      </div>
+
+      <!-- Popup Chat -->
+      <t t-if="state.showPopup">
+        <div class="whatsapp-popup">
+
+          <!-- Header -->
+          <div class="chat-header">
+
+            <t t-if="!state.selectedCustomer">
+               <!-- Search Box -->
+                
+              <h3 class="chat-board-heading">Go4Whatsup Chat List</h3>
+              <div class="search-box">
+                <input
+                  type="text"
+                  placeholder="Search by name or phone..."
+                  t-model="state.searchQuery"
+                  class="search-input"
+                />
+                <i class="fa fa-search search-icon"></i>
+              </div>
+
+              <span class="close-btn" t-on-click="openPopup">×</span>
+            </t>
+            <t t-if="state.selectedCustomer">
+              <div class="go-back" t-on-click="goBack">
+                <i class="fa fa-arrow-left"></i>
+              </div>
+              <div class="chat-header-info">
+                <div class="customer-name" t-esc="state.selectedCustomer.name"/>
+                <div class="customer-phone" t-esc="state.selectedCustomer.mobile"/>
+                <!-- Show time left in header -->
+                <t t-if="state.selectedCustomer.chat_active_timer">
+                  <div class="chat-timer-header" t-esc="state.selectedCustomer.chat_active_timer"/>
+                </t>
+              </div>
+              <span class="close-btn" t-on-click="openPopup">×</span>
+            </t>
+            
+          </div>
+
+          <!-- Customer List -->
+          <t t-if="!state.selectedCustomer">
+            <div class="popup-body">
+              <t t-if="state.customers.length === 0">
+                <p>Loading customers...</p>
+              </t>
+
+              <t t-foreach="filteredCustomers" t-as="customer" t-key="customer.id">
+                <div 
+                  class="customer-item"
+                  t-att-class="'customer-item ' + (customer.chatactive ? 'active' : 'inactive')"
+                  t-on-click="() => openChat(customer)"
+                >
+                  <div class="customer-avatar">
+                    <t t-if="customer.image_128">
+                      <img t-att-src="'data:image/png;base64,' + customer.image_128" alt="Avatar"/>
+                    </t>
+                    <t t-else="">
+                      <div class="default-avatar"><i class="fa fa-user"></i></div>
+                    </t>
+                  </div>
+
+                  <div class="customer-details">
+                    <div class="customer-name" t-esc="customer.name"/>
+                    <div class="customer-phone" t-esc="customer.mobile"/>
+                    <t t-if="customer.chat_active_timer">
+                      <div class="chat-timer" t-esc="customer.chat_active_timer"/>
+                    </t>
+                  </div>
+
+                  <!--  Unread Message Badge -->
+                  <t t-if="customer.unread_count > 0">
+                    <div class="unread-count-badge">
+                      <t t-esc="customer.unread_count"/>
+                    </div>
+                  </t>
+                </div>
+              </t>
+            </div>
+          </t>
+
+          <!-- Chat Window -->
+          <t t-if="state.selectedCustomer">
+              <div  id="chatbody" class="chat-body">
+                <t t-if="state.messages.length === 0">
+                  <p style="text-align:center;color:#888;">No messages yet...</p>
+                </t>
+
+                <t t-foreach="state.messages" t-as="msg" t-key="msg.id || msg.message">
+                  <div t-att-class="'chat-message ' + (msg.is_from_user ? 'from-me' : 'from-them')">
+
+                    <!-- Attachments -->
+                    <t t-if="msg.attachment_type == 'image'">
+                      <img t-att-src="msg.attachment_url" class="chat-image"/>
+                    </t>
+                    <t t-if="msg.attachment_type == 'video'">
+                      <video controls="controls" class="chat-video">
+                        <source t-att-src="msg.attachment_url" type="video/mp4"/>
+                      </video>
+                    </t>
+                    <t t-if="msg.attachment_type == 'doc'">
+                      <a t-att-href="msg.attachment_url" target="_blank">
+                        📄 <t t-esc="msg.attachment_name"/>
+                      </a>
+                    </t>
+                    <!-- Text Message -->
+                    <t t-if="msg.message">
+                      <div class="msg-text">
+                        <span t-esc="msg.message"/>
+                          <t t-if="msg.is_from_user">
+                            <span class="ticks">
+                                <!-- Single tick always shows -->
+                                <i
+                                  t-if="msg.single_tick || msg.double_tick"
+                                  t-att-class="'fa fa-check first-icon ' + (msg.read_cust_message ? 'text-success' : 'text-muted')"
+                                ></i>
+                                
+
+                                <!-- Second tick shows only when double_tick is True -->
+                                <i
+                                  t-if="msg.double_tick"
+                                  t-att-class="'fa fa-check secound-icon ' + (msg.read_cust_message ? 'text-success' : 'text-muted')"
+                                ></i>
+                            </span>
+                          </t>
+                      </div>
+                    </t>
+
+
+                  </div>
+                </t>
+              </div>
+              <!-- Input Section -->
+            
+              <t t-if="state.selectedCustomer.chatactive">
+                <div class="chat-input">
+                    <input 
+                      type="text" 
+                      placeholder="Type a message..." 
+                      t-model="state.newMessage"
+                      t-on-keydown="onKeydown"
+                    />
+
+                    <!-- File Upload -->
+                    <label class="file-upload">
+                      <i class="fa fa-paperclip"></i>
+                      <input 
+                        type="file" 
+                        t-on-change="handleFileChange" 
+                        style="display:none;"
+                      />
+                    </label>
+
+                    <!-- Template Send Button -->
+                    <button 
+                      class="template-btn" 
+                      t-on-click="openTemplateList"
+                    >
+                      <i class="fa fa-list"></i>
+                    </button>
+
+                    <!-- Send Button -->
+                    <button class="last_btn"
+                      t-on-click="sendMessage"
+                    >
+                      <i class="fa fa-paper-plane"></i>
+                    </button>
+                </div>
+              </t>
+
+              <!-- Show only Template Button when chat inactive -->
+              <t t-else="">
+                <div class="chat-input inactive-template">
+                  <button 
+                    class="template-btn-full"
+                    t-on-click="openTemplateList"
+                  >
+                    <i class="fa fa-list"></i> Send Template
+                  </button>
+                </div>
+              </t>
+
+              <!-- Template List Popup -->
+              <t t-if="state.showTemplatePopup">
+                <div class="template-popup">
+
+
+                  <t t-if="state.isLoading">
+                    <div class="loader-overlay">
+                      <div class="spinner"></div>
+                      <span>Sending template...</span>
+                    </div>
+                  </t>
+
+
+                  <div class="template-header">
+                    <h4>Select a Template</h4> 
+                    <span class="close-template" t-on-click="closeTemplateList">×</span>
+                  </div>
+                  <div class="template-list">
+                    <t t-if="state.templates and state.templates.length > 0">
+                      <t t-foreach="state.templates" t-as="tpl" t-key="tpl.id">
+                        <div class="template-item" t-on-click="() => sendTemplate(tpl.template_id)">
+                          <div class="template-name" t-esc="tpl.template_name"/>
+                          <!-- <div class="template-lang" t-esc="tpl.language"/> -->
+                        </div>
+                      </t>
+                    </t>
+                    <t t-else="">
+                      <p style="text-align:center;">No templates found.</p>
+                    </t>
+                  </div>
+                </div>
+              </t>
+
+              <!-- Preview Section -->
+              <t t-if="state.previewFile">
+                <div class="file-preview">
+                  <t t-if="state.previewFile.type.startsWith('image/')">
+                    <img t-att-src="state.previewFile.url" class="preview-image" style="max-width:200px; max-height:200px; border-radius:8px;"/>
+                  </t>
+                  <t t-elif="state.previewFile.type.startsWith('video/')">
+                    <video t-att-src="state.previewFile.url" controls="controls" class="preview-video" style="max-width:200px; max-height:200px; border-radius:8px;"></video>
+                  </t>
+                  <t t-else="">
+                    <div class="preview-doc" style="font-size:14px;">
+                      📎 <t t-esc="state.previewFile.name"/>
+                    </div>
+                  </t>
+                  <button class="remove-file-btn" t-on-click="removePreview" style="margin-left:8px;">❌</button>
+                </div>
+              </t>
+          </t>
+        </div>
+      </t>
+    </div>
+  </t>
+</templates>

@@ -1,0 +1,21 @@
+<odoo>
+    <record id="Go4whatsapp_module_list" model="ir.ui.view">
+        <field name="name">module.name</field>
+        <field name="model">module.name</field>
+        <field name="arch" type="xml"> 
+            <list>
+                <field name="name" />
+                <field name="model_db_name" />
+                <field name="trigger_point_ids" />
+            </list>
+        </field>
+    </record>
+
+    <record id="whatsapp_module_list" model="ir.actions.act_window">
+        <field name="name">module</field>
+        <field name="res_model">module.name</field>
+        <field name="view_mode">list,form</field>
+        <field name="target">inline</field>
+    </record>
+
+  </odoo>

@@ -1,0 +1,136 @@
+<odoo>
+    <!-- list View -->
+         <record id="view_whatsapp_template_form" model="ir.ui.view">
+        <field name="name">whatsapp.template.form</field>
+        <field name="model">whatsapp.template</field>
+        <field name="arch" type="xml">
+            
+            <form string="WhatsApp Templates">
+
+            <header>
+                <button name="action_create_template_on_meta" 
+                        string="Create Template on Meta" 
+                        type="object" 
+                        class="btn-primary"/>
+            </header>
+
+            <sheet>
+                <div style="display: flex; flex-wrap: wrap;">
+                <div style="width:70%;">   
+                    <sheet>
+                        <group>
+                            <field name="template_name"/>
+                            <field name="language"/>
+                        </group>
+                        <group>
+                            <field name="category01" string="Template Category"/>
+                            <field name="template_type"/>  
+                            <field name="header_type" invisible="category01 == 'authentication'"/> 
+                            <field name="header_media_file"
+                                filename="header_filename"
+                                widget="binary"
+                                invisible="not header_type or header_type == 'text'"/>
+
+                        </group>
+
+                            <group string="Message Body">
+                                <field name="body_text"
+                                    placeholder="Hello {{1}} your order {{2}} is confirmed"
+                                    readonly="category01 == 'authentication'"/>
+
+                            </group>
+
+                            <button name="action_add_variable"
+                                    type="object"
+                                    string="Add Variable"
+                                    class="btn-primary"
+                                    icon="fa-plus"
+                                    invisible="category01 == 'authentication'" />
+
+                            <separator string="Variables"/>
+
+                            <field name="variable_ids">
+                                <list editable="bottom" create="false">
+                                    <field name="key" readonly="1"/>
+                                    <field name="variable_type"/>
+                                    <field name="custom_value"
+                                        attrs="{'invisible': [('variable_type','!=','custom')]}"/>
+                                </list>
+                            </field>
+
+                        <group>
+                           
+                            <field name="send_footer" invisible="category01 != 'authentication'"/>
+                            <field name="otp_expiry" string="Add Expiry Time" invisible="category01 != 'authentication'"/>
+                            <field name="footer_text" string="Footer Text" readonly="category01 == 'authentication'"/>
+                            
+                        </group>
+                         
+                        <group>
+                        <field name="button_type" />
+                        </group>
+
+                        <group string="Call To Action"
+                            invisible="button_type != 'cta'">
+
+                            <!-- CALL BUTTON -->
+                            <group string="Contact Button">
+                                <field name="cta_call_text"/>
+                                <field name="country_id" />
+                                <field name="country_code" readonly="1" placeholder="+XX" />
+                                <field name="cta_call_number"/>
+                                <field name="cta_call_enabled"/>
+                            </group>
+
+                            <!-- WEBSITE BUTTON -->
+                            <group string="Website Button">
+                                <field name="cta_url_text"/>
+                                <field name="cta_url"/>
+                                <field name="cta_url_enabled"/>
+                            </group>
+
+                        </group>
+
+                    </sheet>
+                </div>    
+
+                <div style="width:30%;"> 
+                <field name="message_preview" string="Message Preview"/>    
+                </div>
+                </div>
+
+            </sheet>
+            </form>
+            
+        </field>
+    </record>
+
+    <record id="view_whatsapp_template_list" model="ir.ui.view">
+        <field name="name">whatsapp.template.list</field>
+        <field name="model">whatsapp.template</field>
+        <field name="arch" type="xml">
+            <list>
+                
+                <field name="template_name"/> 
+                <field name="language"/>  
+                <field name="status"/>
+                <field name="category01"/> 
+                <field name="template_type"/> 
+                <button name="Check_template_status"
+                    type="object"
+                    string="check status"
+                    class="btn-primary"
+                    icon="fa-check"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Menu & Action -->
+    <record id="action_whatsapp_template" model="ir.actions.act_window">
+        <field name="name">Create Whatsapp Template </field>
+        <field name="res_model">whatsapp.template</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_whatsapp_tempalte" name="Whatsapp Templates" parent="go4whatsapp_linker_root" action="action_whatsapp_template"/>
+</odoo>

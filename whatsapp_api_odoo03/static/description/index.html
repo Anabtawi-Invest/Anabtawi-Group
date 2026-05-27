@@ -1,0 +1,2153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>WhatsApp Business API Odoo – Official WhatsApp API Integration</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+          rel="stylesheet"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap"
+          rel="stylesheet">
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"/>
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/assets/owl.carousel.min.css"/>
+    <style>
+        :root {
+          --primary-color: #7f54b3;
+          --bg-white: #fff;
+          --text-color: #121212;
+          --text-color-light: #64728f;
+        }
+        body{
+          font-family: "Montserrat", sans-serif;
+        }
+        .nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-link.active {
+            color: var(--text-color);
+            font-family: Montserrat;
+            font-size: 16px !important;
+            font-weight: 500 !important;
+            border-radius: 30px;
+            line-height: normal;
+            text-transform: capitalize;
+            background-color: #F5F5F5;
+            border: none;
+            margin-bottom: 0;
+            padding: 12px 24px;
+      }
+      .nav-tabs .nav-link:focus, .nav-tabs .nav-link:hover {
+      border-color: transparent;
+      isolation: isolate;
+      }
+      .nav-tabs .nav-link:focus-visible {
+      border-color: transparent;
+      box-shadow: none;
+      }
+      /* owl-carosel */
+    .owl-carousel .owl-nav {
+      position: absolute;
+      top: 42%;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      transform: translateY(-42%);
+    }
+
+    .owl-carousel .owl-nav button.owl-prev {
+      position: absolute;
+      right: -36px;
+      font-size: 28px;
+      background-color: #e4e4e4;
+      border-radius: 20px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .owl-carousel .owl-nav button.owl-next {
+      position: absolute;
+      left: -36px;
+      font-size: 28px;
+      background-color: #e4e4e4;
+      border-radius: 20px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+    }
+
+    </style>
+</head>
+<body>
+<!-- overview -->
+    <div class="container">
+        <div class="my-5">
+            <div class="mb-4 bg-white"
+                    style=" border: 1px solid #EBEEF2; border-radius: 6px; box-shadow: 0px 8px 20px -4px rgba(0, 0, 0, 0.10); border: 1px solid #EBEEF2;">
+                <div>
+                    <ul class="nav nav-tabs justify-content-center bg-white py-2"
+                        id="myTab" role="tablist"
+                        style="border-radius: 6px 6px 0 0;">
+                        <li class="nav-item">
+                            <a aria-controls="overview"
+                                aria-bs-selected="true"
+                                class="nav-link active" data-bs-toggle="tab"
+                                href="#OverviewTab" id="overview-tab" role="tab"
+                                style="color:#1f6fe5; font-weight:500; font-size:16px">
+                                Overview</a>
+                        </li>
+                        <li class="nav-item">
+                            <a aria-controls="feature"
+                                aria-bs-selected="false"
+                                class="nav-link py-2" data-bs-toggle="tab"
+                                href="#feature" id="feature-tab" role="tab"
+                                style="color:#1f6fe5; font-weight:500; font-size:16px">Features</a>
+                        </li> 
+
+                         <li class="nav-item">
+                            <a aria-controls="faq" aria-bs-selected="false"
+                                class="nav-link" data-bs-toggle="tab"
+                                href="#ModuleSetup" id="mob-setup" role="tab"
+                                style="color:#1f6fe5; font-weight:500; font-size:16px">
+                                Module Setup</a>
+                        </li>  
+
+                        <li class="nav-item">
+                            <a aria-controls="faq" aria-bs-selected="false"
+                                class="nav-link" data-bs-toggle="tab"
+                                href="#whyInwizards" id="why-inwi" role="tab"
+                                style="color:#1f6fe5; font-weight:500; font-size:16px">
+                                Why Inwizards</a>
+                        </li>  
+
+                        <li class="nav-item">
+                            <a aria-controls="faq" aria-bs-selected="false"
+                                class="nav-link" data-bs-toggle="tab"
+                                href="#faq" id="faq-tab" role="tab"
+                                style="color:#1f6fe5; font-weight:500; font-size:16px">
+                                FAQs</a>
+                        </li>
+                        <li class="nav-item">
+                            <a aria-controls="releases"
+                                aria-bs-selected="false" class="nav-link"
+                                data-bs-toggle="tab" href="#releases"
+                                id="releases-tab" role="tab"
+                                style="color:#1f6fe5; font-weight:500; font-size:16px">Releases</a>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="tab-content p-md-5 p-2 py-3"  id="myTabContent"  >
+
+                    <!-- overview content -->
+                    <div aria-labelledby="overview-tab"
+                            class="tab-pane fade show active" id="OverviewTab"
+                            role="tabpanel"  >
+
+                        <h2 style="
+                            text-align:center;
+                            font-weight:700;
+                            margin-bottom:20px;
+                            font-size:26px;
+                        ">
+                            Book Your <span style="color:#ff8a1f;">Personalised Demo</span> Right Away
+                        </h2>
+                        <!-- Banner -->
+                        <div style="
+                            max-width:900px;
+                            margin:0 auto 30px;
+                            background-color: #1f6fe5;
+                            color:#fff;
+                            padding:14px 18px;
+                            border-radius:8px;
+                            text-align:center;
+                            font-weight:600;
+                            font-size:14px;
+                        ">
+                        Best WhatsApp Business Connector Implementation Partner (Odoo) – 2025 🏆
+                        </div> 
+                        <!-- Cards Container -->
+                        <div style="
+                            display:flex;
+                            margin-left: 15%;
+                            justify-content:center;
+                            align-items:flex-start;
+                            gap:40px;
+                            flex-wrap:wrap;
+                        ">
+
+                            <div style="
+                                background:#fff;
+                                border-radius:14px;
+                                padding:16px;
+                            ">
+                                <img src="Email.png"
+                                    style="width:100%; max-width:230px;"
+                                    alt="Email QR">
+                            </div>
+                            <div style="
+                                background:#fff;
+                                border-radius:14px;
+                                padding:16px;
+                            ">
+                                <img src="Whatsapp.png"
+                                    style="width:100%; max-width:230px;"
+                                    alt="WhatsApp QR">
+                            </div>
+
+                            <div style="
+                                background:#fff;
+                                border-radius:14px;
+                                padding:16px;
+                            ">
+                                <img src="Meeting-Booking.png"
+                                    style="width:100%; max-width:230px;"
+                                    alt="Meeting QR">
+                            </div>
+
+
+                        </div> 
+                            <!-- Bottom Section -->
+                        <div style="
+                            text-align:center;
+                            max-width:820px;
+                            margin:0 auto;
+                            background:#ffffff;
+                            padding:26px;
+                            border-radius:16px;
+                            box-shadow:0 8px 22px rgba(0,0,0,0.08);
+                        ">
+
+                            <h2 style="
+                                color:#1f6fe5;
+                                font-weight:800;
+                                font-size:24px;
+                                margin-bottom:10px;
+                            ">  
+                                WhatsApp Business API Integration for <span style="color:#ff8a1f;">Odoo ERP</span>
+                            </h2>
+
+                            <p style="
+                                font-size:14px;
+                                color:#444;
+                                line-height:1.7;
+                                margin:14px 0;
+                            ">
+                                WhatsApp Business API Odoo enables businesses to seamlessly connect their official WhatsApp Business API with Odoo ERP. This app is designed for companies that require secure, scalable, and automated WhatsApp communication directly from Odoo.
+                                With WhatsApp API integration, businesses can send automated messages, manage customer conversations, and streamline communication across sales, support, and operations—all from a single Odoo dashboard.
+                            </p>
+
+                            <a href="https://www.youtube.com/watch?v=xtjS8e7OPOE&t=10s"
+                            style="
+                                display:inline-block;
+                                margin-top:16px;
+                                padding:12px 28px;
+                                color:white;
+                                border-radius:8px;
+                                text-decoration:none;
+                                font-weight:700;
+                                background-color: blue;
+                                box-shadow:0 6px 16px rgba(255,138,31,0.35);
+                            ">
+                                ▶ Watch A Demo
+                            </a>
+
+                        </div> 
+                        <!-- Help / Demo Section -->
+
+                       <div>
+                            <div class="row m-0">
+                                <div class="col-10 p-0 position-relative overflow-hidden"
+                                    style="border-radius:22px; max-width:1200px; margin:0 auto; height:400px;">
+
+                                    <!-- Background Image -->
+                                    <img
+                                        src="Personalized-Demo_1.png"
+                                        alt="Need Help Banner"
+                                        loading="lazy"
+                                        class="h-100 w-100 position-absolute img-fluid"
+                                        style="top:0; left:0;"
+                                    >
+
+                                    <!-- Content Overlay -->
+                                    <div class="row position-relative m-0 d-flex align-items-center h-100">
+                                        <div class="col-8 text-center" >
+
+                                            <h2 style="
+                                                font-size:26px;
+                                                font-weight:800;
+                                                margin-bottom:12px;
+                                                color:#1f2937;
+                                            ">
+                                                🤝 Need Help or a
+                                                <span style="color:#ff8a1f;">Personalized Demo?</span>
+                                            </h2>
+
+                                            <p style="
+                                                font-size:15px;
+                                                
+                                                line-height:1.7;
+                                                margin-bottom:24px;
+                                                background: rgba(255,255,255,0.85);
+                                                display: inline-block;
+                                                padding: 12px 16px;
+                                                border-radius:12px;
+                                                color: black;
+                                            ">
+                                                Our team is available to help you with setup, customization,<br>
+                                                and automation workflows to ensure smooth implementation.
+                                            </p>
+
+                                            <!-- Contact Buttons -->
+                                            <div class="d-flex flex-wrap justify-content-center" style="gap:12px; margin-top:12px;">
+                                                <div style="
+                                                    background:rgba(255,255,255,0.85);
+                                                    padding:14px 20px;
+                                                    border-radius:12px;
+                                                    font-size:14px;
+                                                    font-weight:600;
+                                                    color: black;
+                                                ">
+                                                    📧 Email:
+                                                    <a href="mailto:info@inwizards.com" style=" text-decoration:none;color: blue; ">
+                                                        info@inwizards.com
+                                                    </a>
+                                                </div>
+
+                                                <div style="
+                                                    background:rgba(255,255,255,0.85);
+                                                    padding:14px 20px;
+                                                    border-radius:12px;
+                                                    font-size:14px;
+                                                    font-weight:600;
+                                                    color: black;
+                                                ">
+                                                    📞 Call:
+                                                    <span style="color:blue; ">+91-9667584436</span>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Live Preview -->
+                        
+
+                        <!-- Pricing / Highlights -->
+                        <div>
+
+                            <div class="row m-0">
+                                <div class="col-12 p-0 position-relative overflow-hidden"
+                                    style="border-radius:22px; height:450px;">
+
+                                    <!-- Background Image -->
+                                    <img
+                                        src="Odoowhatsapp-connector.png"
+                                        alt="Go4whatsup Banner"
+                                        loading="lazy"
+                                        class="h-100 w-100 position-absolute img-fluid"
+                                        style="top:0; left:0;"
+                                    >
+
+                                    <!-- Content (SAME AS WORKING STRUCTURE) -->
+                                    <div class="row h-100 position-relative m-0 d-flex align-items-center">
+
+                                        <div class="col-12 text-center">
+
+                                            <h2 style="
+                                                font-size:30px;
+                                                font-weight:800;
+                                                margin-bottom:14px;
+                                                color:#1f2937;
+                                            ">
+                                                Go4whatsup – Simple & Powerful Odoo WhatsApp Connector
+                                            </h2><br>
+
+                                            <p style="
+                                                font-size:20px;
+                                                font-weight:700;
+                                                margin-bottom:30px;
+                                                color: black;
+                                            ">
+                                                Try <span style="color:#ff8a1f;">7-Day Free Trial</span><br>
+                                                Then only <span style="color:#ff8a1f;">$29.99 / month</span>
+                                            </p>
+
+                                            <div style="
+                                                max-width:720px;
+                                                margin:0 auto;
+                                                font-size:17px;
+                                                line-height:1.9;
+                                                text-align:left;
+                                                padding:24px 26px;
+                                                border-radius:16px;
+                                                color: black;
+                                            ">
+                                                <div>✔ Official WhatsApp Business API</div>
+                                                <div>✔ Recurring subscription</div>
+                                                <div>✔ Done-for-you onboarding</div>
+                                                <div>✔ Template approval assistance</div>
+                                                <div>✔ Dedicated Go4whatsup support</div>
+                                                <div>✔ Fast setup & expert guidance</div>
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div>
+                            <div class="p-0" style="border-radius:20px; padding-top:41px; padding-bottom:41px;">
+                                <div class="row d-flex align-items-center justify-content-center m-0">
+                                    <div class="col-12 p-0 position-relative overflow-hidden" style="border-radius:20px;">
+
+                                        <!-- Background Image -->
+                                        <!-- <img
+                                            alt="bg-img"
+                                            class="h-100 w-100 position-absolute img-fluid"
+                                            loading="lazy"
+                                            src="How_it_Work_-_background.png"
+                                            style="width:100%; height:100%; object-fit:cover;"
+                                        > -->
+
+                                        <!-- CONTENT OVER IMAGE -->
+                                        <div class="row h-100 position-relative pt-lg-3 px-lg-5 pb-lg-3 p-md-4 p-3 mx-auto d-flex align-items-center">
+                                            <div class="col text-center mt-5">
+
+                                                <!-- CONTENT BOX -->
+                                                <div style="
+                                                    max-width:820px;
+                                                    margin:0 auto;
+                                                    border-radius:18px;
+                                                "> 
+
+                                                    <h2 style="font-size:26px; font-weight:800; margin-bottom:16px; color:#1f6fe5;">
+                                                        🚀 Why Choose
+                                                        <span style="color:#ff8a1f;">WhatsApp Business API </span>
+                                                       for Odoo?
+                                                    </h2>
+
+                                                    <p style="font-size:15px; color:#444; line-height:1.8; margin-bottom:24px;">
+                                                        This app is ideal for medium to large businesses that want to use WhatsApp as an official communication channel without risking number bans or message delivery issues.
+                                                    </p>
+
+                                                    <!-- POINTS -->
+                                                    <div style="font-size:15px; max-width:560px; margin:0 auto 26px; text-align:left;color: black;">
+                                                        <div>✔ Official WhatsApp Business API (No risk of blocking)</div>
+                                                        <div>✔ Centralized chat management inside Odoo</div>
+                                                        <div>✔ Automated notifications and workflows</div>
+                                                        <div>✔ Scalable messaging for high-volume use</div>
+                                                        <div>✔ Secure and compliant communication</div>
+                                                    </div>
+
+                                                    <!-- CTA -->
+                                                    <div style="
+                                                        background:#f3f7fd;
+                                                        padding:14px 18px;
+                                                        border-radius:12px;
+                                                        font-size:15px;
+                                                        font-weight:700;
+                                                        color:#1f6fe5;
+                                                    ">
+                                                        🚀 You’re just
+                                                        <span style="color:#ff8a1f;">one confirmation away</span>
+                                                        from instant customer communication.
+                                                    </div>
+
+                                                </div>
+                                                <!-- END CONTENT BOX -->
+
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- HOW IT WORKS SECTION -->
+                        <div style="
+                            width:100%;
+                            padding:60px 20px;
+                            
+                            text-align:center;
+                        ">
+
+                            <!-- Heading -->
+                            <h2 style="
+                                font-size:28px;
+                                font-weight:800;
+                                color:#1f2937;
+                                margin-bottom:8px;
+                            ">
+                                How It Works — <span style="color:#ff8a1f;">Simple & Automated</span>
+                            </h2>
+
+                            <p style="
+                                font-size:15px;
+                                color:#555;
+                                max-width:720px;
+                                margin:0 auto 40px;
+                                line-height:1.7;
+                            ">
+                                Four simple steps to transform your customer communication using WhatsApp & Odoo
+                            </p>
+
+                            <!-- Cards Wrapper -->
+                            <div style="
+                                display:flex;
+                                align-items:center;
+                                max-width:1200px;
+                                margin:0 auto;
+                                flex-wrap:wrap;
+                            ">
+
+                                <!-- STEP 1 -->
+                                <div style="width:260px;">
+                                    <div style="
+                                        background:#ffffff;
+                                        padding:26px 22px;
+                                        border-radius:20px;
+                                        box-shadow:0 12px 30px rgba(0,0,0,0.08);
+                                        text-align:center;
+                                    ">
+                                        <img src="Create_Document_in_Odoo.png" style="width:50px; margin-bottom:14px;">
+                                        <h3 style="font-size:16px;font-weight:700;color:#1D4ED8;margin-bottom:8px;">
+                                            Create Document in Odoo
+                                        </h3>
+                                        <p style="font-size:13px;color:#555;line-height:1.6;">
+                                            Generate a quotation or invoice using Odoo Sales or Invoicing.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- ARROW -->
+                                <div style="
+                                    font-size:28px;
+                                    color:#F97316;
+                                    font-weight:700;
+                                    margin-top: 80px;
+                                ">➜</div>
+
+                                <!-- STEP 2 -->
+                                <div style="width:260px;">
+                                    <div style="
+                                        background:#ffffff;
+                                        padding:26px 22px;
+                                        border-radius:20px;
+                                        box-shadow:0 12px 30px rgba(0,0,0,0.08);
+                                        text-align:center;
+                                    ">
+                                        <img src="Confirm-the-Document.png" style="width:50px; margin-bottom:14px;">
+                                        <h3 style="font-size:16px;font-weight:700;color:#1D4ED8;margin-bottom:8px;">
+                                            Confirm the Document
+                                        </h3>
+                                        <p style="font-size:13px;color:#555;line-height:1.6;">
+                                            Confirmation triggers WhatsApp automation.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- ARROW -->
+                                <div style="
+                                    font-size:28px;
+                                    color:#F97316;
+                                    font-weight:700;
+                                    margin-top: 80px;
+                                ">➜</div>
+
+                                <!-- STEP 3 -->
+                                <div style="width:260px;">
+                                    <div style="
+                                        background:#ffffff;
+                                        padding:26px 22px;
+                                        border-radius:20px;
+                                        box-shadow:0 12px 30px rgba(0,0,0,0.08);
+                                        text-align:center;
+                                    ">
+                                        <img src="PDF-Generation.png" style="width:50px; margin-bottom:14px;">
+                                        <h3 style="font-size:16px;font-weight:700;color:#1D4ED8;margin-bottom:8px;">
+                                            PDF Generation
+                                        </h3>
+                                        <p style="font-size:13px;color:#555;line-height:1.6;">
+                                            A professional PDF is generated instantly from Odoo.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- ARROW -->
+                                <div style="
+                                    font-size:28px;
+                                    color:#F97316;
+                                    font-weight:700;
+                                    margin-top: 80px;
+                                ">➜</div>
+
+                                <!-- STEP 4 -->
+                                <div style="width:260px;">
+                                    <div style="
+                                        background:#ffffff;
+                                        padding:26px 22px;
+                                        border-radius:20px;
+                                        box-shadow:0 12px 30px rgba(0,0,0,0.08);
+                                        text-align:center;
+                                    ">
+                                        <img src="WhatsApp-Delivery.png" style="width:50px; margin-bottom:14px;">
+                                        <h3 style="font-size:16px;font-weight:700;color:#1D4ED8;margin-bottom:8px;">
+                                            WhatsApp Delivery
+                                        </h3>
+                                        <p style="font-size:13px;color:#555;line-height:1.6;">
+                                            The customer receives the document directly on WhatsApp.
+                                        </p>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <section style="
+                            background:#f8fafc;
+                        ">
+                            <div class="container">
+
+                                <!-- Heading -->
+                                <h2 class="text-center" style="
+                                    font-size:34px;
+                                    margin-bottom:14px;
+                                    font-weight:800;
+                                    color:#1f2937;
+                                ">
+                                    🎥 Watch <span style="color:#ff8a1f;">WhatsApp Odoo Connector</span> in Action
+                                </h2>
+
+                                <!-- Sub text -->
+                                <p class="text-center" style="
+                                    max-width:720px;
+                                    margin:0 auto 36px;
+                                    font-size:15px;
+                                    color:#555;
+                                    line-height:1.7;
+                                ">
+                                    See how whatsapp odoo connector automates quotations, invoices, and customer
+                                    communication directly from Odoo using WhatsApp Business API.
+                                </p>
+
+                                <div class="row align-items-center">
+
+                                    <!-- LEFT : VIDEO -->
+                                    <div class="col-md-6 text-center mb-4">
+                                        <a href="https://www.youtube.com/watch?v=xtjS8e7OPOE"
+                                        target="_blank"
+                                        style="
+                                                display:inline-block;
+                                                border-radius:16px;
+                                                overflow:hidden;
+                                                box-shadow:0 10px 26px rgba(0,0,0,0.08);
+                                                text-decoration:none;
+                                                background:#ffffff;
+                                        ">
+                                            <img src="video-image.png"
+                                                alt="WhatsApp Odoo Connector Demo"
+                                                style="width:100%; max-width:480px; display:block;">
+                                        </a>
+                                    </div>
+
+                                    <!-- RIGHT : WHAT VIDEO COVERS -->
+                                    <div class="col-md-6 mb-4">
+
+                                        <div style="
+                                            background:#ffffff;
+                                            border-radius:20px;
+                                            box-shadow:0 12px 28px rgba(31,111,229,0.12);
+                                            padding:28px 22px;
+                                        ">
+
+                                            <h3 style="
+                                                font-size:24px;
+                                                font-weight:800;
+                                                margin-bottom:22px;
+                                                color:#1f2937;
+                                            ">
+                                                🔍 What this <span style="color:#ff8a1f;">Video Covers</span>
+                                            </h3>
+
+                                            <div style="
+                                                font-size:15px;
+                                                line-height:1.7;
+                                                max-width:520px;
+                                                margin:0 auto;
+                                            ">
+
+                                                <div style="
+                                                    background:#f3f7fd;
+                                                    padding:12px 18px;
+                                                    border-radius:12px;
+                                                    font-weight:600;
+                                                    color:#1f6fe5;
+                                                    box-shadow:0 4px 12px rgba(31,111,229,0.12);
+                                                    margin-bottom:14px;
+                                                ">
+                                                    ✅ Real-time WhatsApp automation from Odoo
+                                                </div>
+
+                                                <div style="
+                                                    background:#fef6ee;
+                                                    padding:12px 18px;
+                                                    border-radius:12px;
+                                                    font-weight:600;
+                                                    color:#ff8a1f;
+                                                    box-shadow:0 4px 12px rgba(255,138,31,0.12);
+                                                    margin-bottom:14px;
+                                                ">
+                                                    ✅ Quotation & invoice PDF delivery
+                                                </div>
+
+                                                <div style="
+                                                    background:#f3f7fd;
+                                                    padding:12px 18px;
+                                                    border-radius:12px;
+                                                    font-weight:600;
+                                                    color:#1f6fe5;
+                                                    box-shadow:0 4px 12px rgba(31,111,229,0.12);
+                                                    margin-bottom:14px;
+                                                ">
+                                                    ✅ Customer reply handling inside Odoo
+                                                </div>
+
+                                                <div style="
+                                                    background:#fef6ee;
+                                                    padding:12px 18px;
+                                                    border-radius:12px;
+                                                    font-weight:600;
+                                                    color:#ff8a1f;
+                                                    box-shadow:0 4px 12px rgba(255,138,31,0.12);
+                                                ">
+                                                    ✅ End-to-end workflow demonstration
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        </section>
+
+                        <div style="max-width:1200px; margin:0 auto; padding:40px 20px; text-align:center;">
+
+                            <!-- Heading -->
+                            <h2 style="font-size:28px; font-weight:700; margin-bottom:40px; color:#1d4ed8;">
+                                Advanced WhatsApp Automation Inside Odoo
+                            </h2>
+
+                            <!-- Table Grid -->
+                            <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+                                <tr>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:20px; border-left:5px solid #f97316; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="Unified-Dashboard.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#1d4ed8;">Unified Dashboard</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Manage WhatsApp API, templates, chats & automation from screen.</p>
+                                        </div>
+                                    </td>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff;border:1px solid #e5e7eb; border-radius:12px; padding:20px; border-left:5px solid #1d4ed8; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="Template-Creation.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#f97316;">Template Creation</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Create text, media, and interactive templates inside Odoo.</p>
+                                        </div>
+                                    </td>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:20px; border-left:5px solid #f97316; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="Live-Preview.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#1d4ed8;">Live Preview</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Preview templates exactly as customers will see them.</p>
+                                        </div>
+                                    </td>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:20px; border-left:5px solid #f97316; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="Meta-Signup.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#f97316;">Meta Signup</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Apply for WhatsApp Business API directly from Odoo.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- Row 2 -->
+                                <tr>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff;  border:1px solid #e5e7eb; border-radius:12px; padding:20px; border-left:5px solid #1d4ed8; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="Green-Tick.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#1d4ed8;">Green Tick</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Track verified green tick application status inside Odoo.</p>
+                                        </div>
+                                    </td>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff; border:1px solid #e5e7eb;  border-radius:12px; padding:20px; border-left:5px solid #f97316; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="Template-Sync.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#f97316;">Template Sync</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Sync approved templates from WhatsApp to Odoo automatically.</p>
+                                        </div>
+                                    </td>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff;border:1px solid #e5e7eb;  border-radius:12px; padding:20px; border-left:5px solid #1d4ed8; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="Trigger-Automation.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#1d4ed8;">Trigger Automation</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Send messages automatically based on Odoo triggers.</p>
+                                        </div>
+                                    </td>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff;border:1px solid #e5e7eb;  border-radius:12px; padding:20px; border-left:5px solid #f97316; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="Module-Control.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#f97316;">Module Control</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Enable or disable WhatsApp automation per Odoo module.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- Row 3 -->
+                                <tr>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff;border:1px solid #e5e7eb;  border-radius:12px; padding:20px; border-left:5px solid #1d4ed8; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="WhatsApp-Chat.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#1d4ed8;">WhatsApp Chat</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Reply to customers in a chat view inside Odoo.</p>
+                                        </div>
+                                    </td>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff;border:1px solid #e5e7eb;  border-radius:12px; padding:20px; border-left:5px solid #f97316; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="Send-Media.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#f97316;">Send Media</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Share files, images, PDFs directly via WhatsApp in Odoo.</p>
+                                        </div>
+                                    </td>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff;border:1px solid #e5e7eb;  border-radius:12px; padding:20px; border-left:5px solid #1d4ed8; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="Activity-Log.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#1d4ed8;">Activity Log</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Track every WhatsApp interaction inside Odoo.</p>
+                                        </div>
+                                    </td>
+                                    <td style="padding:10px;">
+                                        <div style="background:#fff;border:1px solid #e5e7eb;  border-radius:12px; padding:20px; border-left:5px solid #f97316; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                                            <img src="Order-Sync.png" alt="Retail" style="width:40px; height:40px;">
+                                            <h3 style="font-size:16px; font-weight:600; color:#f97316;">Order Sync</h3>
+                                            <p style="font-size:14px; color:#374151; margin-top:8px;">Keep orders, invoices, deliveries synced with WhatsApp actions.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                            </table>
+                        </div>
+
+                        <div class="container" style="max-width:1200px; margin:0 auto; padding:40px 20px;">
+
+                            <!-- Heading -->
+                            <h2 style="text-align:center; font-size:28px; font-weight:700; margin-bottom:10px; color:#1d4ed8;">
+                                Tailored WhatsApp Automation for Every Industry
+                            </h2>
+                            <p style="text-align:center; color:#6b7280; max-width:800px; margin:0 auto 40px; line-height:1.6;">
+                                This Odoo WhatsApp Connector adapts seamlessly across industries, enabling faster communication and better customer engagement.
+                            </p>
+
+                            <div style="max-width:1200px; margin:0 auto; padding:40px 20px; text-align:center;">
+                                <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+                                    <tr>
+                                        <!-- Box 1: Retail & E-Commerce -->
+                                        <td style="padding:10px;">
+                                            <div style="background:#fff;border:1px solid #e5e7eb;  border-radius:12px; padding:20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); text-align:left;">
+                                                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                                                    <img src="Retail--E-Commerce.png" alt="Retail" style="width:40px; height:40px;">
+                                                    <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Retail & E-Commerce</h3>
+                                                </div>
+                                                <ul style="font-size:14px; color:#374151; margin:0; padding-left:18px; line-height:1.5;">
+                                                    <li>Order confirmations</li>
+                                                    <li>Invoice & receipt sharing</li>
+                                                    <li>Payment reminders</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+
+                                        <!-- Box 2: Wholesale & Distribution -->
+                                        <td style="padding:10px;">
+                                            <div style="background:#fff;border:1px solid #e5e7eb;  border-radius:12px; padding:20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); text-align:left;">
+                                                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                                                    <img src="Wholesale--Distribution.png" alt="Wholesale" style="width:40px; height:40px;">
+                                                    <h3 style="font-size:16px; font-weight:600; color:#1d4ed8; margin:6px;">Wholesale & Distribution</h3>
+                                                </div>
+                                                <ul style="font-size:14px; color:#374151; margin:0; padding-left:18px; line-height:1.5;">
+                                                    <li>Bulk order updates</li>
+                                                    <li>Invoice & credit reminders</li>
+                                                    <li>Faster dealer communication</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+
+                                        <!-- Box 3: Food & Hospitality -->
+                                        <td style="padding:10px;">
+                                            <div style="background:#fff;border:1px solid #e5e7eb; border-radius:12px; padding:20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); text-align:left;">
+                                                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                                                    <img src="Food--Hospitality.png" alt="Food" style="width:40px; height:40px;">
+                                                    <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Food & Hospitality</h3>
+                                                </div>
+                                                <ul style="font-size:14px; color:#374151; margin:0; padding-left:18px; line-height:1.5;">
+                                                    <li>Billing & receipt sharing</li>
+                                                    <li>Order confirmation alerts</li>
+                                                    <li>Customer engagement automation</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+
+                                        <!-- Box 4: Healthcare -->
+                                        <td style="padding:10px;">
+                                            <div style="background:#fff;border:1px solid #e5e7eb; border-radius:12px; padding:20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); text-align:left;">
+                                                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                                                    <img src="Healthcare.png" alt="Healthcare" style="width:40px; height:40px;">
+                                                    <h3 style="font-size:16px; font-weight:600; color:#1d4ed8; margin:6px;">Healthcare</h3>
+                                                </div>
+                                                <ul style="font-size:14px; color:#374151; margin:0; padding-left:18px; line-height:1.5;">
+                                                    <li>Appointment reminders</li>
+                                                    <li>Billing notifications</li>
+                                                    <li>Patient communication</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- Row 2 -->
+                                    <tr>
+                                        <!-- Box 5: Real Estate -->
+                                        <td style="padding:10px;">
+                                            <div style="background:#fff;border:1px solid #e5e7eb; border-radius:12px; padding:20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); text-align:left;">
+                                                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                                                    <img src="Real-Estate.png" alt="Real Estate" style="width:40px; height:40px;">
+                                                    <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Real Estate</h3>
+                                                </div>
+                                                <ul style="font-size:14px; color:#374151; margin:0; padding-left:18px; line-height:1.5;">
+                                                    <li>Lead follow-ups</li>
+                                                    <li>Site visit reminders</li>
+                                                    <li>Quotation & invoice sharing</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+
+                                        <!-- Box 6: Logistics & Transportation -->
+                                        <td style="padding:10px;">
+                                            <div style="background:#fff;border:1px solid #e5e7eb; border-radius:12px; padding:20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); text-align:left;">
+                                                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                                                    <img src="Logistics--Transportation.png" alt="Logistics" style="width:40px; height:40px;">
+                                                    <h3 style="font-size:16px; font-weight:600; color:#1d4ed8; margin:6px;">Logistics & Transportation</h3>
+                                                </div>
+                                                <ul style="font-size:14px; color:#374151; margin:0; padding-left:18px; line-height:1.5;">
+                                                    <li>Dispatch updates</li>
+                                                    <li>Delivery alerts</li>
+                                                    <li>Invoice sharing</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+
+                                        <!-- Box 7: Professional Services -->
+                                        <td style="padding:10px;">
+                                            <div style="background:#fff;border:1px solid #e5e7eb; border-radius:12px; padding:20px; box-shadow:0 4px 6px rgba(0,0,0,0.05); text-align:left;">
+                                                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                                                    <img src="Professional-Services.png" alt="Services" style="width:40px; height:40px;">
+                                                    <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Professional Services</h3>
+                                                </div>
+                                                <ul style="font-size:14px; color:#374151; margin:0; padding-left:18px; line-height:1.5;">
+                                                    <li>CRM follow-ups</li>
+                                                    <li>Proposal sharing</li>
+                                                    <li>Payment reminders</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+
+                                        <!-- Box 8: Empty for alignment -->
+                                        <td style="padding:10px;"></td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                        </div>
+
+                        <div class="container-fluid" style="background:#f8fafc;">
+                            <div class="bgm1">
+
+                                <!-- Heading -->
+                                <h2 class="text-center" style="
+                                    font-size:38px;
+                                    margin-bottom:15px;
+                                    margin-top:10px;
+                                    font-weight:600;
+                                    color:#1d4ed8;
+                                ">
+                                    Our Products
+                                </h2>
+
+                                <p class="text-center" style="font-size:17px; margin-bottom:40px; color:#475569;">
+                                    Explore our other extensions and e-commerce connectors to supercharge your Odoo workflows.
+                                </p>
+
+                                <div class="row">
+
+                                    <!-- Product 1 -->
+                                    <div class="col-md-3 mb-4">
+                                        <div class="box_2 p-3" style="
+                                            border-radius:12px;
+                                            border:1px solid #f97316;
+                                            min-height:445px;
+                                            background:#ffffff;
+                                            box-shadow:0 6px 14px rgba(0,0,0,0.06);
+                                        ">
+                                            <a href="https://apps.odoo.com/apps/modules/17.0/quick_print" target="_blank" style="text-decoration:none;">
+                                                <img src="banner.gif" class="img-fluid"
+                                                    style="height:290px; object-fit:contain; margin-bottom:15px;" alt="">
+                                                <h4 class="text-center" style="
+                                                    font-size:18px;
+                                                    color:#1d4ed8;
+                                                    margin:0;
+                                                    padding:10px 5px;
+                                                    font-weight:600;
+                                                ">
+                                                    Odoo Quick Print: Direct Print | Single Click Print
+                                                </h4>
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    <!-- Product 2 -->
+                                    <div class="col-md-3 mb-4">
+                                        <div class="box_2 p-3" style="
+                                            border-radius:12px;
+                                            border:1px solid #1d4ed8;
+                                            min-height:445px;
+                                            background:#ffffff;
+                                            box-shadow:0 6px 14px rgba(0,0,0,0.06);
+                                        ">
+                                            <a href="https://apps.odoo.com/apps/modules/18.0/porter_linker" target="_blank" style="text-decoration:none;">
+                                                <img src="banner2.png" class="img-fluid"
+                                                    style="height:290px; object-fit:contain; margin-bottom:15px;" alt="">
+                                                <h4 class="text-center" style="
+                                                    font-size:18px;
+                                                    color:#f97316;
+                                                    margin:0;
+                                                    padding:10px 5px;
+                                                    font-weight:600;
+                                                ">
+                                                    Porter Connector | Odoo Porter Connector | POS Porter Connector
+                                                </h4>
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    <!-- Product 3 -->
+                                    <div class="col-md-3 mb-4">
+                                        <div class="box_2 p-3" style="
+                                            border-radius:12px;
+                                            border:1px solid #f97316;
+                                            min-height:445px;
+                                            background:#ffffff;
+                                            box-shadow:0 6px 14px rgba(0,0,0,0.06);
+                                        ">
+                                            <a href="https://apps.odoo.com/apps/modules/18.0/pos_emenu" target="_blank" style="text-decoration:none;">
+                                                <img src="banner3.gif" class="img-fluid"
+                                                    style="height:290px; object-fit:contain; margin-bottom:15px;" alt="">
+                                                <h4 class="text-center" style="
+                                                    font-size:18px;
+                                                    color:#1d4ed8;
+                                                    margin:0;
+                                                    padding:10px 5px;
+                                                    font-weight:600;
+                                                ">
+                                                    POS eMenu | Restaurant POS | All In One POS
+                                                </h4>
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    <!-- Product 4 -->
+                                    <div class="col-md-3 mb-4">
+                                        <div class="box_2 p-3" style="
+                                            border-radius:12px;
+                                            border:1px solid #1d4ed8;
+                                            min-height:445px;
+                                            background:#ffffff;
+                                            box-shadow:0 6px 14px rgba(0,0,0,0.06);
+                                        ">
+                                            <a href="https://apps.odoo.com/apps/modules/18.0/shopify_connector_inwi" target="_blank" style="text-decoration:none;">
+                                                <img src="banner4.gif" class="img-fluid"
+                                                    style="height:290px; object-fit:contain; margin-bottom:15px;" alt="">
+                                                <h4 class="text-center" style="
+                                                    font-size:18px;
+                                                    color:#f97316;
+                                                    margin:0;
+                                                    padding:10px 5px;
+                                                    font-weight:600;
+                                                ">
+                                                    Odoo Shopify Connector | Shopify Odoo Connector
+                                                </h4>
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                    </div> 
+
+                    <!-- feature content -->
+                    <div aria-labelledby="feature-tab"
+                            class="tab-pane fade show py-1" id="feature"
+                            role="tabpanel">
+
+                        <div style="max-width:1200px;font-family:Arial,Helvetica,sans-serif;">
+
+                            <h2 style="text-align:center;font-size:32px;font-weight:700;color:#1f2937;margin-bottom:10px;">
+                                Key Features
+                            </h2>
+                            <p style="text-align:center;font-size:16px;color:#6b7280;margin-bottom:50px;">
+                                Powerful WhatsApp automation built seamlessly inside Odoo.
+                            </p>
+
+                            <table width="100%" cellpadding="0" cellspacing="0"
+                                style="border-collapse:separate;border-spacing:20px;">
+
+                                <!-- ROW 1 -->
+                                <tr>
+                                    <td width="33%">
+                                        <div style="border:1px solid #e5e7eb;border-radius:14px;padding:24px;background:#fff;">
+                                            <img src="Unified-Dashboard.png" alt="Retail" style="width:40px; height:40px;">
+                                            <div style="font-size:20px;font-weight:600;color:#e46a0a;margin-bottom:10px;">
+                                                Unified WhatsApp Dashboard
+                                            </div>
+                                            <div style="font-size:15px;color:#6b7280;line-height:1.6;">
+                                                Manage WhatsApp onboarding, templates, automation status, chats, and activity logs from one centralized dashboard inside Odoo.
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td width="33%">
+                                        <div style="border:1px solid #e5e7eb;border-radius:14px;padding:24px;background:#fff;">
+                                            <img src="Meta-Signup.png" alt="Retail" style="width:40px; height:40px;">
+                                            <div style="font-size:20px;font-weight:600;color:#1f4fd8;margin-bottom:10px;">
+                                                Meta Embedded Signup
+                                            </div>
+                                            <div style="font-size:15px;color:#6b7280;line-height:1.6;">
+                                                Complete the official WhatsApp Business API onboarding using Meta’s Embedded signup flow directly from within Odoo.
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td width="33%">
+                                        <div style="border:1px solid #e5e7eb;border-radius:14px;padding:24px;background:#fff;">
+                                            <img src="Template-Creation.png" alt="Retail" style="width:40px; height:40px;">
+                                            <div style="font-size:20px;font-weight:600;color:#e46a0a;margin-bottom:10px;">
+                                                Create WhatsApp Templates
+                                            </div>
+                                            <div style="font-size:15px;color:#6b7280;line-height:1.6;">
+                                                Create and manage WhatsApp templates directly inside Odoo without accessing Meta Business Manager.
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- ROW 2 -->
+                                <tr>
+                                    <td>
+                                        <div style="border:1px solid #e5e7eb;border-radius:14px;padding:24px;background:#fff;">
+                                            <img src="Confirm-the-Document.png" alt="Retail" style="width:40px; height:40px;">
+                                            <div style="font-size:20px;font-weight:600;color:#1f4fd8;margin-bottom:10px;">
+                                                Live Template Preview
+                                            </div>
+                                            <div style="font-size:15px;color:#6b7280;line-height:1.6;">
+                                                Preview WhatsApp templates exactly as customers will receive them, including formatting, variables, buttons, and media.
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div style="border:1px solid #e5e7eb;border-radius:14px;padding:24px;background:#fff;">
+                                            <img src="Send-Media.png" alt="Retail" style="width:40px; height:40px;">
+                                            <div style="font-size:20px;font-weight:600;color:#e46a0a;margin-bottom:10px;">
+                                                Media, Variables & Buttons
+                                            </div>
+                                            <div style="font-size:15px;color:#6b7280;line-height:1.6;">
+                                                Enhance templates with media headers, dynamic variables, call-to-action buttons, and quick replies.
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div style="border:1px solid #e5e7eb;border-radius:14px;padding:24px;background:#fff;">
+                                            <img src="PDF-Generation.png" alt="Retail" style="width:40px; height:40px;">
+                                            <div style="font-size:20px;font-weight:600;color:#1f4fd8;margin-bottom:10px;">
+                                                Auto-Send Quotations & Invoices
+                                            </div>
+                                            <div style="font-size:15px;color:#6b7280;line-height:1.6;">
+                                                Automatically send quotations, invoices, and other PDFs via WhatsApp based on Odoo workflow actions.
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- ROW 3 (2 FEATURES) -->
+                                <tr>
+                                    <td width="33%">
+                                        <div style="border:1px solid #e5e7eb;border-radius:14px;padding:24px;background:#fff;">
+                                            <img src="Template-Sync.png" alt="Retail" style="width:40px; height:40px;">
+                                            <div style="font-size:20px;font-weight:600;color:#e46a0a;margin-bottom:10px;">
+                                                Template Sync & Trigger Automation
+                                            </div>
+                                            <div style="font-size:15px;color:#6b7280;line-height:1.6;">
+                                                Sync approved templates and define trigger points for Sales Orders, Invoices, Deliveries, RFQs, and POS Bills.
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td width="33%">
+                                        <div style="border:1px solid #e5e7eb;border-radius:14px;padding:24px;background:#fff;">
+                                            <img src="WhatsApp-Chat.png" alt="Retail" style="width:40px; height:40px;">
+                                            <div style="font-size:20px;font-weight:600;color:#1f4fd8;margin-bottom:10px;">
+                                                Two-Way WhatsApp Communication
+                                            </div>
+                                            <div style="font-size:15px;color:#6b7280;line-height:1.6;">
+                                                Send and receive WhatsApp messages in real time, including media files and template-based replies.
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                            </table>
+                        </div>
+
+                        <!-- Live Preview -->
+
+                    </div>  
+
+                    <!-- module  setup content --> 
+                    <div aria-labelledby="mob-setup"
+                            class="tab-pane fade show py-1" id="ModuleSetup"
+                            role="tabpanel">
+                            <div class="container">
+                            <!-- Heading -->
+                            <div style="text-align:center; margin-bottom:50px;">
+                                <h2 style="font-size:34px; font-weight:700; color:#111827; margin-bottom:12px;">
+                                    Module – Setup & Features
+                                </h2>
+                                <p style="font-size:16px; color:#6b7280; max-width:700px; margin:auto;">
+                                    Step-by-step guide to configure billing, templates, triggers and WhatsApp messaging in Odoo.
+                                </p>
+                            </div>
+
+                            <div class="row" style="row-gap:24px;">
+
+                                <!-- CARD 1 - Orange -->
+                                <div class="col-md-6">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); 
+                                                border-top:5px solid #F97316; height:100%;">
+                                        <p style="font-size:18px; color:#374151; text-align:center; margin-bottom:18px; font-weight:700;">
+                                            Manage onboarding, API status, templates, automation triggers, chats, and activity logs from one centralized dashboard inside Odoo.
+                                        </p>
+                                        <img src="sn001.png" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                                <!-- CARD 2 - Blue -->
+                                <div class="col-md-6">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); 
+                                                border-top:5px solid #1d4ed8; height:100%;">
+                                        <p style="font-size:18px; color:#374151; text-align:center; margin-bottom:18px; font-weight:700;">
+                                            Check whether your number is registered with us or not.
+                                        </p>
+                                        <img src="sn0033.png" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                                <!-- CARD 3 - Orange -->
+                                <div class="col-md-6">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); 
+                                                border-top:5px solid #F97316; height:100%;">
+                                        <p style="font-size:18px; color:#374151; text-align:center; margin-bottom:18px; font-weight:700;">
+                                            Fill basic details and complete payment. Click <b>Setup Account</b> to login.
+                                        </p>
+                                        <img src="login.png" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                                <!-- CARD 4 - Blue -->
+                                <div class="col-md-6">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); 
+                                                border-top:5px solid #1d4ed8; height:100%; text-align:center;">
+                                        <p style="font-size:18px; color:#374151; margin-bottom:16px; font-weight:700; line-height:1.7;">
+                                            Apply for the official WhatsApp Business API directly from Odoo using Meta’s embedded signup flow. No need to access Meta Business Manager or configure APIs manually.
+                                        </p>
+                                        <ul style="list-style:none; padding:0; margin:0 0 20px 0; text-align:center; color:#374151; font-size:16px; line-height:1.9; font-weight:500;">
+                                            <li>✔ Business verification</li>
+                                            <li>✔ Phone number registration</li>
+                                            <li>✔ API activation</li>
+                                            <li>✔ Green Tick eligibility</li>
+                                        </ul>
+                                        <img src="sn0034.png" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                                <!-- CARD 5 - Orange -->
+                                <div class="col-md-6">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); 
+                                                border-top:5px solid #F97316; height:100%;">
+                                        <p style="font-size:18px; color:#374151; text-align:center; margin-bottom:18px; font-weight:700;">
+                                            Connect your Facebook account and register your account. If you face any problems, please contact us and our team will set up your account.
+                                        </p>
+                                        <img src="fcb.png" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                                <!-- CARD 6 - Blue -->
+                                <div class="col-md-6">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); 
+                                                border-top:5px solid #1d4ed8; height:100%;">
+                                        <p style="font-size:18px; color:#374151; text-align:center; margin-bottom:18px; font-weight:700;">
+                                            View your billing cycle and complete payment history.
+                                        </p>
+                                        <img src="payment_history.png" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                                <!-- CARD 7 - Orange -->
+                                <div class="col-md-12">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); border-top:5px solid #F97316; text-align:center;">
+                                        <p style="font-size:18px; color:#374151; margin-bottom:16px; font-weight:700; line-height:1.7;">
+                                            Create, submit, sync, and manage WhatsApp message templates directly inside Odoo.
+                                        </p>
+                                        <ul style="list-style:none; padding:0; margin:0 0 20px 0; color:#374151; font-size:16px; line-height:1.9; font-weight:500;">
+                                            <li>✔ Text, media & interactive templates</li>
+                                            <li>✔ Dynamic variables</li>
+                                            <li>✔ Call-to-action buttons</li>
+                                            <li>✔ Quick replies</li>
+                                            <li>✔ Live template preview</li>
+                                        </ul>
+                                        <img src="sn0022.jpg" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                                <!-- CARD 8 - Blue -->
+                                <div class="col-md-12">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); border-top:5px solid #1d4ed8; text-align:center;">
+                                        <p style="font-size:18px; color:#374151; margin-bottom:18px; font-weight:700;">
+                                            Preview WhatsApp templates exactly as customers will receive them, ensuring formatting accuracy and faster template approvals.
+                                        </p>
+                                        <img src="tempprew.png" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                                <!-- CARD 9 - Orange -->
+                                <div class="col-md-12">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); border-top:5px solid #F97316; text-align:center;">
+                                        <p style="font-size:18px; color:#374151; margin-bottom:18px; font-weight:700;">
+                                            Automatically send WhatsApp messages based on Odoo workflow actions:
+                                            Quotation sent or approved
+                                            Sales order confirmation
+                                            Invoice creation & payment status
+                                            Delivery order confirmation
+                                            RFQ & Purchase order updates
+                                            POS bill generation
+                                        </p>
+                                        <img src="trigpoint.png" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                                <!-- CARD 10 - Blue -->
+                                <div class="col-md-12">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); border-top:5px solid #1d4ed8; text-align:center;">
+                                        <p style="font-size:18px; color:#374151; margin-bottom:18px; font-weight:700;">
+                                            Access WhatsApp chat toggle button from anywhere in Odoo.
+                                        </p>
+                                        <img src="chatscreen1.png" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                                <!-- CARD 11 - Orange -->
+                                <div class="col-md-12">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); border-top:5px solid #F97316; text-align:center;">
+                                        <p style="font-size:18px; color:#374151; margin-bottom:18px; font-weight:700;">
+                                            Monitor complete WhatsApp activity logs.
+                                        </p>
+                                        <img src="maintainlog.png" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                                <!-- CARD 12 - Blue (PDF) -->
+                                <div class="col-md-12">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); border-top:5px solid #1d4ed8; text-align:center;">
+                                        <p style="font-size:18px; color:#374151; margin-bottom:18px; font-weight:700;">
+                                            Send professionally generated quotations, invoices, delivery slips, and documents as PDFs directly via WhatsApp.
+                                        </p>
+                                        <div class="row" style="row-gap:16px;">
+                                            <div class="col-md-6">
+                                                <img src="sooo12.png" style="width:100%; border-radius:12px;">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <img src="sooo123.png" style="width:100%; border-radius:12px;">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- CARD 13 - Orange (Live Chat) -->
+                                <div class="col-md-12">
+                                    <div style="background:#fff; border-radius:18px; padding:24px; 
+                                                box-shadow:0 6px 18px rgba(0,0,0,0.05); border-top:5px solid #F97316; text-align:center;">
+                                        <p style="font-size:18px; color:#374151; margin-bottom:18px; font-weight:700;">
+                                            Live chat feature that allows you to send and receive messages from customers, including templates, media files, and regular text messages.
+                                        </p>
+                                        <img src="chatshowhis1.png" style="width:100%; border-radius:12px;">
+                                    </div>
+                                </div>
+
+                            </div>
+                            </div>
+
+                    </div>  
+
+                    <!-- why inwizards  setup content --> 
+                    <div aria-labelledby="why-inwi"
+                            class="tab-pane fade show py-1" id="whyInwizards"
+                            role="tabpanel">
+                        <div style="border-radius:20px;">
+                            <!-- Image -->
+                            <img
+                                src="Number-One-Background.png"
+                                alt="Banner"
+                                style="max-width: 100%;max-height: 400px;margin-left: 120px;margin-top: -55px; height: 400px;"
+                            >
+                        </div>
+
+                        <div style="max-width:1200px; margin:40px auto;">
+
+                            <!-- Heading -->
+                            <div class="text-center mb-4">
+                                <h2 style="font-size:26px; font-weight:800; color:#e84a5f;">
+                                    Client Success
+                                </h2>
+                                <p style="font-size:14px; color:#6b7280;">
+                                    Invest your trust like our elite clientele did!
+                                </p>
+                            </div>
+
+                            <!-- Logos -->
+                            <div class="row px-0 py-3">
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="1.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="2.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="3.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="4.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="5.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="6.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="7.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="8.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="9.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="10.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="11.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="12.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="13.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="14.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="15.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-3 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="16.png" class="img-fluid" style="max-height:70px;" alt="">
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="row m-0">
+                                <div class="col-10 p-0 position-relative overflow-hidden"
+                                    style="border-radius:22px; max-width:1200px; margin:0 auto; height:400px;">
+
+                                    <!-- Background Image -->
+                                    <img
+                                        src="Personalized-Demo_1.png"
+                                        alt="Need Help Banner"
+                                        loading="lazy"
+                                        class="h-100 w-100 position-absolute img-fluid"
+                                        style="top:0; left:0;"
+                                    >
+
+                                    <!-- Content Overlay -->
+                                    <div class="row position-relative m-0 d-flex align-items-center h-100">
+                                        <div class="col-8 text-center" >
+
+                                            <h2 style="
+                                                font-size:26px;
+                                                font-weight:800;
+                                                margin-bottom:12px;
+                                                color:#1f2937;
+                                            ">
+                                                🤝 Go Beyond Ordinary with 
+                                                <span style="color:#ff8a1f;">Inwizards Odoo Solutions</span>
+                                            </h2>
+
+                                            <p style="
+                                                font-size:15px;
+                                                color:#555;
+                                                line-height:1.7;
+                                                margin-bottom:24px;
+                                                background: rgba(255,255,255,0.85);
+                                                display: inline-block;
+                                                padding: 12px 16px;
+                                                border-radius:12px;
+                                            ">
+                                                Peerless, powerful, and personalized apps to streamline every workflow.
+                                            </p>
+
+                                            <!-- Contact Buttons -->
+                                            <div class="d-flex flex-wrap justify-content-center" style="gap:12px; margin-top:12px;">
+                                                <div style="
+                                                    background:rgba(255,255,255,0.85);
+                                                    padding:14px 20px;
+                                                    border-radius:12px;
+                                                    font-size:14px;
+                                                    font-weight:600;
+                                                ">
+                                                    📧 Email:
+                                                    <a href="mailto:info@inwizards.com" style="color:#1f6fe5; text-decoration:none;">
+                                                        info@inwizards.com
+                                                    </a>
+                                                </div>
+
+                                                <div style="
+                                                    background:rgba(255,255,255,0.85);
+                                                    padding:14px 20px;
+                                                    border-radius:12px;
+                                                    font-size:14px;
+                                                    font-weight:600;
+                                                ">
+                                                    📞 Call:
+                                                    <span style="color:#1f6fe5;">+91-9667584436</span>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="max-width:1200px; margin:40px auto;">
+
+                            <!-- Heading -->
+                            <div class="text-center mb-4">
+                                <h2 style="font-size:26px; font-weight:800; color:#e84a5f;">
+                                    Inwizards Odoo Services
+                                </h2>
+                                <p style="font-size:14px; color:#6b7280;">
+                                   Upscale your business with expert services from an Odoo Gold Partner.
+                                </p>
+                            </div>
+
+                            <!-- Logos -->
+                            <div class="row px-0 py-3">
+
+                                <div class="col-lg-4 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="Website-Application-Development.png" class="img-fluid" style="max-height:70px;" alt="">
+                                        <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Website Application Development</h3>
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-4 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="Module-Control.png" class="img-fluid" style="max-height:70px;" alt="">
+                                        <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Module Development</h3>
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-4 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="Theme-Development.png" class="img-fluid" style="max-height:70px;" alt="">
+                                        <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Theme Development</h3>
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-4 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="Implimention.png" class="img-fluid" style="max-height:70px;" alt="">
+                                        <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Implementation</h3>
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-4 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="Customization.png" class="img-fluid" style="max-height:70px;" alt="">
+                                        <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Customization</h3>
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-4 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="Intigration.png" class="img-fluid" style="max-height:70px;" alt="">
+                                        <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Integration</h3>
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-4 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="Migration.png" class="img-fluid" style="max-height:70px;" alt="">
+                                        <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Migration</h3>
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-4 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="Support.png" class="img-fluid" style="max-height:70px;" alt="">
+                                        <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Support & Maintenance</h3>
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-4 col-sm-6 mb-4">
+                                    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:26px; text-align:center;">
+                                        <img src="Consulting.png" class="img-fluid" style="max-height:70px;" alt="">
+                                        <h3 style="font-size:16px; font-weight:600; color:#f97316; margin:6px;">Consulting</h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="max-width:1200px; margin:60px auto;">
+
+                            <!-- Heading -->
+                            <div class="text-center mb-5">
+                                <h2 style="font-size:26px; font-weight:800;">
+                                    What our <span style="color:#ff4d4f;">Clients</span> say
+                                </h2>
+                                <p style="font-size:14px; color:#6b7280; max-width:600px; margin:10px auto 0;">
+                                    Our clients love us! Hear from those who have made data-driven decisions with whatsapp odoo connector.
+                                </p>
+                            </div>
+
+                            <!-- Testimonials -->
+                            <div class="row px-0">
+
+                                <!-- Card 1 -->
+                                <div class="col-lg-6 col-md-6 mb-4">
+                                    <div style="
+                                        border:1px solid #eee;
+                                        border-radius:16px;
+                                        padding:26px;
+                                        height:100%;
+                                    ">
+                                        <h4 style="font-size:16px; font-weight:700; margin-bottom:10px;">
+                                            Satisfy with support
+                                        </h4>
+
+                                        <p style="font-size:14px; color:#4b5563; line-height:1.7;">
+                                            Exceptional application and outstanding customer care indeed.
+                                            My experience with them was truly remarkable, and I highly recommend
+                                            their services to anyone looking for top-tier solutions.
+                                        </p>
+
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+                                            <span style="font-size:14px; font-weight:600;">kashif aziz</span>
+                                            <span style="color:#ff4d4f;">★★★★★</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Card 2 -->
+                                <div class="col-lg-6 col-md-6 mb-4">
+                                    <div style="
+                                        border:1px solid #eee;
+                                        border-radius:16px;
+                                        padding:26px;
+                                        height:100%;
+                                    ">
+                                        <h4 style="font-size:16px; font-weight:700; margin-bottom:10px;">
+                                            Very helpful and patient
+                                        </h4>
+
+                                        <p style="font-size:14px; color:#4b5563; line-height:1.7;">
+                                            They were very easy to schedule time with and when I got on the call,
+                                            they answered all my questions. They also understood beyond my
+                                            questions and showed me some features that would help me.
+                                        </p>
+
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+                                            <span style="font-size:14px; font-weight:600;">Ryan Felps</span>
+                                            <span style="color:#ff4d4f;">★★★★★</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>  
+
+                    <!-- Faq content -->
+                    <div aria-labelledby="faq-tab"
+                            class="tab-pane fade show" id="faq"
+                            role="tabpanel">
+                            <!-- FAQ Container -->
+                            <div style="max-width:900px; margin:auto;">
+                            <h2 style="text-align:center; font-weight:700; font-size:28px; color:#111827; margin-bottom:40px;">
+                                Frequently Asked Questions (FAQs)
+                            </h2>
+
+                            <!-- FAQ 1 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">1. What is Odoo + WhatsApp API integration?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                This integration connects your Odoo ERP with WhatsApp Business API via Go4Whatsup. It allows automated communication such as sending quotations, invoices, delivery updates, payment reminders, and notifications directly from Odoo to your customers.
+                                </p>
+                            </details>
+
+                            <!-- FAQ 2 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">2. How does this integration help my business?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                It automates repetitive messaging tasks, improves response times, reduces manual effort, and centralizes customer communication. Your team can track all messages, approvals, and document status directly in Odoo, boosting efficiency and customer satisfaction.
+                                </p>
+                            </details>
+
+                            <!-- FAQ 3 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">3. Do I need technical knowledge to set this up?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                No technical expertise is needed. Our team handles the entire setup, including WhatsApp API activation, template configuration, trigger setup, and testing within Odoo.
+                                </p>
+                            </details>
+
+                            <!-- FAQ 4 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">4. Can I send bulk messages?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                Yes. Approved WhatsApp templates can be used for bulk messages like promotions, notifications, or updates. You can also filter recipients by customer, vendor, or sales order criteria.
+                                </p>
+                            </details>
+
+                            <!-- FAQ 5 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">5. Can I preview WhatsApp messages before sending?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                Yes. go4whatsup provides a live preview of each template, including text, images, and document attachments. You can edit or approve templates before they are sent automatically.
+                                </p>
+                            </details>
+
+                            <!-- FAQ 6 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">6. Can I receive customer replies in Odoo?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                Absolutely. Incoming messages from customers are synced to Odoo’s activity log, enabling your team to respond, track conversations, and link replies to the corresponding order, invoice, or delivery.
+                                </p>
+                            </details>
+
+                            <!-- FAQ 7 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">7. How do trigger points work?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                Trigger points allow you to set rules for sending messages automatically based on specific events such as Sales Order confirmation, Invoice validation, Payment receipt, Delivery status updates, POS bills, and RFQs. Each trigger can have a different template and media attached.
+                                </p>
+                            </details>
+
+                            <!-- FAQ 8 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">8. Does it work with older Odoo versions?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                Yes. The module is compatible with Odoo versions 15, 16, 17, 18, and 19.
+                                </p>
+                            </details>
+
+                            <!-- FAQ 9 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">9. How much does it cost?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                The subscription is $29.99/month, including full setup, WhatsApp API configuration, template setup, and ongoing support.
+                                </p>
+                            </details>
+
+                            <!-- FAQ 10 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">10. Is this integration secure?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                Yes. The integration uses the official WhatsApp Business API via Go4Whatsup. All messages and customer data are encrypted, fully compliant with WhatsApp policies, and tracked within Odoo.
+                                </p>
+                            </details>
+
+                            <!-- FAQ 11 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">11. Can I send media files along with messages?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                Yes. You can attach PDFs, images, or documents to messages. Each media file can be linked to a specific template or trigger point.
+                                </p>
+                            </details>
+
+                            <!-- FAQ 12 -->
+                            <details style="background:#fff; margin-top:15px; padding:18px 22px; border-radius:10px; border:1px solid #F97316;">
+                                <summary style="font-weight:600; color:#3B82F6; cursor:pointer;">12. What happens if a message fails to send?</summary>
+                                <p style="margin-top:10px; color:#374151; line-height:1.6;">
+                                Failed messages are logged in the activity log with details, allowing your team to resend or troubleshoot the issue directly from Odoo.
+                                </p>
+                            </details>
+
+                            </div>
+                    </div>  
+                    <!-- releases content -->
+                    <div aria-labelledby="releases-tab"
+                            class="tab-pane fade show" id="releases"
+                            role="tabpanel">
+                            <!-- HERO -->
+                            <div class="d-flex flex-column justify-content-center align-items-center mb-4"
+                                style="
+                                    position:relative;
+                                    border-radius:30px;
+                                    overflow:hidden;
+                                ">
+                                
+                                <!-- CONTENT -->
+                                <h5 class="position-relative"
+                                    style="
+                                        font-family:Inter, sans-serif;
+                                        font-weight:600;
+                                        font-size:26px;
+                                        line-height:1.4;
+                                        margin-bottom:14px;
+                                        color:#1D4ED8;
+                                        text-align:center;
+                                    ">
+                                    🌟 <span style="color:#F97316;">WhatsApp Odoo Connector</span> Releases
+                                </h5>
+
+                                <p class="position-relative"
+                                    style="
+                                    font-family:Poppins, sans-serif;
+                                    font-weight:500;
+                                    font-size:15px;
+                                    line-height:1.7;
+                                    text-align:center;
+                                    color:#1D4ED8;
+                                    max-width:720px;
+                                    margin:0;
+                                    ">
+                                    Every update brings new capabilities.  
+                                    Keep track of the latest features and enhancements
+                                    designed to visualize and analyze your data like a pro.
+                                </p>
+
+                            </div>
+                            <!-- RELEASE CARD -->
+                            <div style="
+                                background-color:#fafafa;
+                                border:2px solid #e5e7eb;
+                                padding:20px 31px;
+                                border-radius:22px;
+                                margin-bottom:37px;
+                            ">
+                                <!-- BADGE ROW -->
+                                <div class="row">
+                                    <div class="col-1"></div>
+                                    <div class="col-11">
+                                        <div style="margin-top:-35px; margin-right:60px;">
+                                            <div style="
+                                                background-color:#1D4ED8;
+                                                font-size:18px;
+                                                font-weight:500;
+                                                line-height:27px;
+                                                letter-spacing:-0.05em;
+                                                text-align:left;
+                                                color:#ffffff;
+                                                display:inline-block;
+                                                padding:5px 15px;
+                                                border-radius:30px;
+                                            ">
+                                                New Version
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- CONTENT ROW -->
+                                <div class="row align-items-start mt-2">
+
+                                    <!-- IMAGE COLUMN -->
+                                    <div class="col-lg-1">
+                                        <div class="w-100">
+                                            <img
+                                                src="PDF-Generation.png"
+                                                alt="Release Icon"
+                                                width="100"
+                                                height="100"
+                                                class="img-fluid"
+                                                loading="lazy"
+                                            >
+                                        </div>
+                                    </div> <br>
+
+                                    <!-- TEXT COLUMN -->
+                                    <div class="col-lg-11">
+
+                                        <h5 class="mt-2"
+                                            style="
+                                                font-size:22px;
+                                                font-weight:500;
+                                                line-height:33px;
+                                                letter-spacing:-0.05em;
+                                                text-align:left;
+                                                color:#1D4ED8;
+                                            ">
+                                            Release 1.0.0
+                                            <span style="
+                                                color:#F97316;
+                                                font-size:16px;
+                                                font-weight:500;
+                                                line-height:24px;
+                                                letter-spacing:-0.05em;
+                                            ">
+                                                (13th Jan, 2026)
+                                            </span>
+                                        </h5>
+
+                                        <ul style="
+                                            color:#1D4ED8;
+                                            font-size:14.7px;
+                                            font-weight:400;
+                                            line-height:22px;
+                                            letter-spacing:-0.02em;
+                                            text-align:left;
+                                            padding-left:18px;
+                                            margin-bottom:0;
+                                        ">
+                                            <li>
+                                                Latest Version 19 Release of Whatsapp Odoo Connector.
+                                            </li>
+                                        </ul>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                    </div>  
+
+                    <!-- section tab -->
+                    <br>
+                    <div>
+                        <div class="p-0" id="free_support" style="border-radius:20px; padding-top:41px; padding-bottom:41px">
+                            <div class="row d-flex align-items-center justify-content-center m-0">
+                            <div class="col-12 p-0 position-relative overflow-hidden"
+                                style="border-radius:20px;  height:450px;">
+
+                                <img
+                                alt="bg-img"
+                                class="h-100 w-100 position-absolute fix-bottom img-fluid"
+                                loading="lazy"
+                                src="Get-A-Demo.png"
+                                style="width:100%;"
+                                >
+
+                                <div class="row h-100 position-relative pt-lg-3 px-lg-5 pb-lg-3 p-md-4 p-3 mx-auto d-flex"
+                                    style="color:#333333; font-weight:500; font-size:16px; width:100%">
+
+                                <div>
+                                    <h4 style="color:#fff; font-weight:700; font-size:45px; line-height:67px; text-align: center; margin: 40px 0px 0px -30px;">
+                                    Try whatsapp odoo connector
+                                    <br class="d-xl-block d-none">
+                                    with real time chat today
+                                    </h4>
+
+                                    <div class="d-flex align-items-center justify-content-center mt-5">
+                                    <a
+                                        class="d-flex align-items-center me-3 justify-content-center px-4 py-3 text-center"
+                                        href="https://www.youtube.com/watch?v=xtjS8e7OPOE"
+                                        target="_blank"
+                                        style="
+                                        padding:15px !important;
+                                        width:fit-content;
+                                        font-family:Inter;
+                                        text-decoration:none;
+                                        background-color:#ffffff;
+                                        border-radius:8px;
+                                        font-style:normal;
+                                        font-weight:600;
+                                        font-size:16px;
+                                        line-height:18.6px;
+                                        text-transform:capitalize;
+                                        color:#e84a5f;
+                                        "
+                                    >
+                                        Get a demo
+                                    </a>
+
+                                    <span
+                                        class="d-flex align-items-center justify-content-center px-4 py-3 text-center"
+                                        target="_blank"
+                                        href="tel:+91-9667584436"
+                                        style="
+                                        padding:15px !important;
+                                        font-family:Inter;
+                                        text-decoration:none;
+                                        background-color:transparent;
+                                        border-radius:8px;
+                                        font-style:normal;
+                                        font-weight:600;
+                                        font-size:14px;
+                                        width:fit-content;
+                                        line-height:18.6px;
+                                        text-transform:capitalize;
+                                        color:#ffffff;
+                                        border:2px solid #ffffff;
+                                        "
+                                    >
+                                        +91-9667584436
+                                    </span>
+                                    </div>
+
+                                </div>
+                                </div>
+
+                            </div>
+                            </div>
+
+                            
+                        </div>
+                    </div>
+                    
+                </div>
+
+                </div>
+        </div>
+    </div>
+</body>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
+        integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/owl.carousel.min.js"></script>
+<script>
+    $('.owl-carousel').owlCarousel({
+     rtl:true,
+     loop:true,
+     margin:10,
+     nav:true,
+     responsive:{
+         0:{
+             items:1
+         },
+         600:{
+             items:3
+         },
+         1000:{
+             items:3
+         }
+     }
+ })
+</script>
+</html>

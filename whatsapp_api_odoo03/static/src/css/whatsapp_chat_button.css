@@ -1,0 +1,1157 @@
+/* Floating Button */
+.floating-whatsapp-btn {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    width: 60px;
+    height: 60px;
+    background-color: #25D366;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #000;
+    font-size: 28px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+}
+
+.unread-badge {
+  position: absolute;
+    top: -3px;
+    right: 0px;
+    background: red;
+    color: white;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: bold;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+}
+
+/* Main Popup */
+.whatsapp-popup {
+    position: fixed;
+    bottom: 90px;
+    right: 25px;
+    width: 420px;
+    height: 540px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: fadeIn 0.25s ease-in-out;
+    font-family: 'Arial', sans-serif;
+    z-index: 9;
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Header */
+.chat-header {
+    background: #008169;
+    color: white;
+    padding: 10px;
+    /* display: flex; */
+    align-items: center;
+    justify-content: space-between;
+    font-weight: bold;
+}
+.chat-header .go-back {
+    cursor: pointer;
+    margin-right: 10px;
+}
+.go-back {
+    position: relative;
+    z-index: 9;
+    display: inline-block;
+}
+
+.chat-header .chat-header-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    font-weight: normal;
+}
+
+.chat-header-info{
+  display: inline-block;
+  text-align: center;
+  margin-top: -24px;
+}
+
+.chat-header .close-btn {
+    cursor: pointer;
+}
+
+/* Customer List */
+.popup-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+.customer-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.customer-item:hover {
+    background: #f1f1f1;
+}
+.customer-avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.customer-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+.default-avatar {
+    width: 45px;
+    height: 45px;
+    background: #4e4b4b;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+}
+.customer-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+
+
+/* Chat Section */
+.chat-body {
+    flex: 1;
+    overflow-y: auto;
+    background: #f5f5f5;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+
+/* Chat Messages */
+.chat-message {
+    padding: 4px 15px;
+    border-radius: 10px;
+    max-width: 80%;
+    word-wrap: break-word;
+    position: relative;
+}
+
+.from-me {
+    align-self: flex-end;
+    background: #e4ffc9;
+}
+
+.from-them {
+    align-self: flex-start;
+    background: #fff;
+    border: 1px solid #d9d9d98a;
+}
+
+/* Media inside chat messages */
+.chat-image, .chat-video {
+    margin-top: 5px;
+    max-width: 220px;
+    max-height: 180px;
+    border-radius: 8px;
+    display: block;
+    object-fit: cover;
+}
+.chat-video {
+    background: #000;
+}
+
+/* Chat Input (fixed bottom) */
+.chat-input {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    border-top: 1px solid #eee;
+    background: #fff;
+    position: sticky;
+    bottom: 0;
+}
+.chat-input input {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 20px;
+    border: 1px solid #ddd;
+    outline: none;
+}
+
+.chat-input button {
+    background: #008169;
+    border: none;
+    color: white;
+    padding: 8px 14px;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+}
+
+.last_btn{
+    background: #008169;
+    border: none;
+    color: white;
+    padding: 8px 10px;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+}
+
+/* File Preview (before sending) */
+.file-preview {
+  margin: 8px 10px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fafafa;
+}
+
+.preview-image, .preview-video {
+  max-width: 150px;
+  max-height: 120px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.preview-video {
+  background: #000;
+}
+
+.preview-doc {
+  font-size: 14px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.remove-file-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  color: #e74c3c;
+  transition: color 0.2s;
+}
+.remove-file-btn:hover {
+  color: #c0392b;
+}
+
+/* ✅ Unread badge styling */
+.unread-count-badge {
+  background-color: #25D366; /* WhatsApp green */
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: bold;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  box-shadow: 0 0 4px rgba(0,0,0,0.2);
+}
+
+.file-upload {
+  width: 40px;
+  height: 40px;
+  background: #f1f1f1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.file-upload i {
+  font-size: 20px;
+  color: #555;
+}
+
+.file-upload:hover {
+    background: #008169;
+}
+
+.file-upload:hover i {
+  color: white;
+}
+
+
+.search-box {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f7f7f7;
+  border-radius: 10px;
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 5px 10px;
+  font-size: 14px;
+  border-radius: 6px;
+  background-color: white;
+}
+
+.search-icon {
+  margin-left: 8px;
+  color: #888;
+  font-size: 16px;
+}
+
+
+
+.customer-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background 0.2s, border-left 0.2s;
+}
+
+/* Hover Effect */
+.customer-item:hover {
+    background: #f9f9f9;
+}
+
+/* ✅ Active Chat */
+.customer-item.active {
+    background: #80808026;
+    border-bottom: 1px solid #25d36670;
+}
+
+/* ❌ Inactive Chat */
+.customer-item.inactive {
+    background: #f5f5f5;          /* light gray background */
+    opacity: 0.7;
+}
+
+.customer-details .customer-name {
+    font-weight: 600;
+    color: #000;
+    font-size: 16px;
+}
+.customer-details .customer-phone {
+    font-size: 15px;
+    color: #6e6060;
+}
+
+/* Timer text */
+.customer-details .chat-timer {
+    font-size: 12px;
+    color: #6e6060;
+}
+
+.chat-header-info .customer-name {
+    font-weight: 600;
+    color: #fff;
+    font-size: 16px;
+}
+
+.chat-header-info .customer-phone {
+    font-size: 15px;
+    color: #fff;
+}
+
+.chat-header-info .chat-timer-header {
+    font-size: 14px;
+    color: #fff;
+    margin-top: 2px;
+}
+
+.chat-timer-header {
+  font-size: 14px;
+  color: #6e6060;
+  margin-top: 2px;
+}
+.chat-input input[disabled],
+.chat-input button[disabled],
+.chat-input label[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.template-btn {
+  background: #25d366;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  margin-right: 0px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+
+}
+
+.template-btn:hover {
+  background: #f1f1f1;
+  color: #008169;
+}
+
+
+.template-popup {
+  position: absolute;
+  bottom: 60px;
+  right: 10px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  width: 280px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 9999;
+}
+
+.template-header {
+    background: #008169;
+  color: white;
+  padding: 10px;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.template-header h4{
+  color: #fff;
+}
+
+.template-item {
+  padding: 10px;
+  border-bottom: 1px solid #25d36670;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.template-item:hover {
+  background: #f1f1f1;
+}
+.msg-text {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+}
+.ticks {
+  display: flex;
+  flex-direction: column;
+  margin-left: 4px;
+  font-size: 13px;
+}
+
+.first-icon{
+    padding: 0px;
+    font-size: 12px;
+    margin-left: 0px;
+    margin-bottom: -6px;
+}
+
+.secound-icon{
+    padding: 0px;
+    font-size: 13px;
+    margin-left: -1px;
+    margin-bottom: -2px;
+}
+
+/* .ticks i {
+  margin-left: -3px;
+} */
+.text-success {
+  color: #25D366 !important; /* WhatsApp green */
+}
+
+
+span.close-btn {
+    border: 1px solid #ffffff;
+    padding: 11px;
+    border-radius: 15px;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 20px;
+    position: absolute;
+    top: 5px;
+    right: 5px;
+}
+
+.chat-board-heading {
+    /* padding: 12px 0px; */
+    text-align: center;
+    color: #fff;
+}
+
+.msg-text span {
+    color: #000;
+    font-size: 16px;
+}
+
+.chat-input.inactive-template {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #fff;
+  padding: 10px;
+}
+
+.chat-input.inactive-template.chat-input button{
+  width: 100%;
+  border-radius: 0px;
+}
+
+.template-btn-full {
+  width: 90%;
+  background-color: #25d366;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 0;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.template-btn-full:hover {
+  background-color: #1ebd5a;
+}
+
+
+.loader-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.spinner {
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #25D366;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+
+
+/* Actual scroll area */
+.go4-page-body {
+    height: 100%;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+/* Optional – clean scrollbar */
+.go4-page-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.go4-page-body::-webkit-scrollbar-thumb {
+    background: #bdbdbd;
+    border-radius: 4px;
+}
+
+
+/* ITEM */
+.go4-info-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+/* ICON */
+.go4-info-item .icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.icon.email {
+    background: #e8f0ff;
+    color: #2563eb;
+}
+.icon.phone {
+    background: #e9f9ef;
+    color: #16a34a;
+}
+.icon.plug {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+/* TEXT */
+.go4-info-item .text {
+    display: flex;
+    flex-direction: column;
+}
+
+.go4-info-item .label {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.go4-info-item .value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* STATUS */
+.status.active {
+    color: #16a34a;
+}
+.status.inactive {
+    color: #dc2626;
+}
+
+
+.go4-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+    max-width: 1200px;
+    margin: 40px auto;
+}
+
+/* Card */
+.go4-feature-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+    transition: all 0.25s ease;
+    cursor: pointer;
+}
+
+.go4-feature-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.12);
+}
+
+/* Icon box */
+.go4-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: #3ca8c9ea;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 18px;
+}
+
+/* Title */
+.go4-feature-card h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #111827;
+}
+
+/* Description */
+.go4-feature-card p {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #6b7280;
+    margin-bottom: 14px;
+}
+
+/* Actions (Sync / Preview) */
+.go4-card-actions {
+    display: flex;
+    gap: 14px;
+}
+
+.go4-link {
+    font-size: 13px;
+    font-weight: 500;
+    color: #6f63f6;
+    cursor: pointer;
+}
+
+.go4-link:hover {
+    text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .go4-feature-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 576px) {
+    .go4-feature-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+.o_form_view.o_form_nosheet {
+    height: calc(100vh - 48px); /* Odoo top bar height */
+    overflow: hidden;
+}
+
+
+.go4-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px; /* Increased gap to avoid overlap */
+    margin-top: 40px;
+}
+
+.go4-feature-card {
+    background: linear-gradient(
+        135deg,
+        #ffffff 0%,
+        #f9fafb 65%,
+        rgba(124, 123, 173, 0.12) 100%
+    );
+    border-radius: 18px;
+    padding: 28px;
+    cursor: pointer;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.08);
+    transition: all 0.35s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.go4-feature-card:hover {
+    transform: translateY(-8px) scale(1.03);
+    box-shadow: 0 25px 50px rgba(0,0,0,0.12);
+}
+
+.go4-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #eef2ff;
+    color: #6f6bb8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 16px;
+    transition: all 0.3s ease;
+}
+
+.go4-feature-card:hover .go4-icon {
+    background: #6f6bb8;
+    color: #ffffff;
+}
+
+
+
+.go4-info-item {
+    flex: 1 1 220px;
+}
+
+.go4-subtitle {
+    line-height: 1.6;
+    color: #4c4c4c;
+}
+
+
+.clickable {
+    cursor: pointer;
+    color: #875A7B;
+}
+
+.not-clickable {
+    cursor: default;
+    opacity: 0.6;
+}
+
+/* ================= PAGE BACKGROUND ================= */
+.go4-page-body {
+    background: linear-gradient(180deg, #f8f9fd 0%, #ffffff 65%);
+    min-height: 100%;
+}
+
+
+.go4-subtitle {
+    color: #4b5563;
+    max-width: 820px;
+}
+
+
+/* ================= FEATURE CARDS ================= */
+.go4-feature-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        120deg,
+        transparent 70%,
+        rgba(124, 123, 173, 0.08)
+    );
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+.go4-feature-card:hover::after {
+    opacity: 1;
+}
+
+/* ================= ICON STYLE ================= */
+.go4-icon {
+    background: linear-gradient(135deg, #7c7bad, #6f6bb8);
+    color: #ffffff;
+}
+
+
+
+.go4-subtitle {
+    color: #374151;
+}
+
+
+.go4-info-item .label {
+    color: #6b7280;
+}
+
+.go4-info-item .value {
+    color: #111827;
+}
+.go4-feature-card {
+    background: linear-gradient(
+        180deg,
+        #ffffff 0%,
+        #f6f7ff 100%
+    );
+    border: 1px solid rgba(124,123,173,0.12);
+}
+
+.go4-feature-card:hover {
+    border-color: rgba(124,123,173,0.35);
+}
+.go4-feature-card:nth-child(1) .go4-icon {
+    background: linear-gradient(135deg, #6366f1, #818cf8);
+}
+.go4-feature-card:nth-child(2) .go4-icon {
+    background: linear-gradient(135deg, #06b6d4, #22d3ee);
+}
+.go4-feature-card:nth-child(3) .go4-icon {
+    background: linear-gradient(135deg, #10b981, #34d399);
+}
+.go4-feature-card:nth-child(4) .go4-icon {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+}
+.go4-feature-card:nth-child(5) .go4-icon {
+    background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+}
+.go4-feature-card {
+    transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.go4-feature-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 30px 70px rgba(124,123,173,0.25);
+}
+
+.go4-subtitle {
+    font-size: 14.5px;
+    color: #374151;
+}
+
+/* ================= INFO CARD ================= */
+.go4-info-card {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 22px 26px;
+    margin: 30px 80px;
+    background: linear-gradient(
+        135deg,
+        #ffffff,
+        #f6f7ff
+    );
+    border-radius: 26px;
+    box-shadow:
+        0 25px 60px rgba(99,102,241,0.18),
+        inset 0 1px 0 rgba(255,255,255,0.9);
+    position: relative;
+    overflow: hidden;
+}
+
+/* soft gradient stripe */
+.go4-info-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 6px;
+    background: #71639e;
+  
+}
+
+/* ================= ITEM ================= */
+.go4-info-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex: 1;
+    position: relative;
+}
+
+/* ================= ICON ================= */
+.go4-info-item .icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    color: #ffffff;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.15);
+}
+
+/* Icon gradients */
+.icon.email {
+    background: linear-gradient(135deg, #6366f1, #818cf8);
+}
+.icon.phone {
+    background: linear-gradient(135deg, #10b981, #34d399);
+}
+.icon.plug {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+}
+
+/* ================= TEXT ================= */
+.go4-info-item .text {
+    display: flex;
+    flex-direction: column;
+}
+
+.go4-info-item .label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    letter-spacing: 0.3px;
+}
+
+.go4-info-item .value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* ================= STATUS ================= */
+.status.active {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+.status.inactive {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+/* ================= DIVIDER ================= */
+.divider {
+    width: 1px;
+    height: 46px;
+    background: linear-gradient(
+        180deg,
+        transparent,
+        #d1d5db,
+        transparent
+    );
+}
+
+
+.go4-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(180deg, #f5f7ff, #ffffff);
+    padding: 32px 28px;
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(108,99,255,0.15);
+}
+
+.go4-stepper .step {
+    text-align: center;
+    flex: 1;
+    position: relative;
+}
+
+/* CIRCLE */
+.go4-stepper .circle {
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+    border-radius: 50%;
+    background: #71639e;
+    color: #ffffff;
+    font-weight: 700;
+    margin: 0 auto 10px;
+    
+}
+
+/* COMPLETED */
+.go4-stepper .step.completed .circle {
+    background: #71639e;
+}
+
+/* PENDING */
+.go4-stepper .step.pending .circle {
+    background: #ffffff;
+    color: #6b7280;
+    border: 2px dashed #c7c9ff;
+    box-shadow: none;
+}
+
+/* LABEL */
+.go4-stepper .label {
+    font-size: 11px;
+    letter-spacing: 0.6px;
+    font-weight: 700;
+    color: #71639e;
+    margin-bottom: 4px;
+}
+
+/* TITLE */
+.go4-stepper .title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+}
+
+/* LINE */
+.go4-stepper .line {
+    height: 4px;
+    border-radius: 10px;
+    background: #e5e7eb;
+    flex: 1;
+    margin: 0 14px;
+}
+
+/* LINE COMPLETED */
+.go4-stepper .line.completed {
+    background: #71639e;
+}
+
+
+.go4-center-wrapper {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.go4-welcome-title {
+    font-size: 22px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.go4-user-name {
+    position: relative;
+    font-weight: 800;
+    padding: 4px 12px;
+    margin-left: 6px;
+    color: #ffffff;
+    background: #71639e;
+    border-radius: 10px;
+}
+
+/* Upgrade wrapper to flex WITHOUT breaking center */
+.go4-welcome-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+/* Left brand fixed position */
+.go4-brand-left {
+    position: absolute;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: -25px;
+   
+}
+
+/* Logo size */
+.go4-header-logo {
+    height: 55px;
+}
+
+/* Brand text */
+.go4-brand-text {
+    font-weight: 600;
+    color: #875A7B;
+    font-size: 14px;
+}

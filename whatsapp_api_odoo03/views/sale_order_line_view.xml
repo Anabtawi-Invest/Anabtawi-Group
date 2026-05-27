@@ -1,0 +1,13 @@
+
+<odoo>
+    <record id="view_order_form_inherit_custom_column" model="ir.ui.view">
+      <field name="name">sale.order.form.inherit.custom.column</field>
+      <field name="model">sale.order</field>
+      <field name="inherit_id" ref="sale.view_order_form" />
+      <field name="arch" type="xml">
+        <xpath expr="//field[@name='order_line']/list/field[@name='product_id']" position="before">
+          <field name="combo_product_name" readonly="1"/>
+        </xpath>
+      </field>
+    </record>
+  </odoo>
