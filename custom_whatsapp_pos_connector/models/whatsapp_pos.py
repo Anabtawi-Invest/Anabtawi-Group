@@ -153,9 +153,13 @@ class WhatsappPosOrder(models.Model):
     @api.model
     def fetch_pending_for_pos(self, pos_config_id=False, limit=10):
         domain = [("state", "=", "ready_for_pos"), ("company_id", "=", self.env.company.id)]
+        base_domain = list(domain)
         if pos_config_id:
             domain += [("pos_config_id", "in", [False, int(pos_config_id)])]
         orders = self.search(domain, order="id asc", limit=limit)
+        # Fallback: if strict config filter yields nothing, return company pending orders.
+        if not orders and pos_config_id:
+            orders = self.search(base_domain, order="id asc", limit=limit)
         return [order._serialize_for_pos() for order in orders]
 
     def _serialize_for_pos(self):
@@ -499,13 +503,13 @@ class WhatsappPosOrder(models.Model):
         try:
             products = self.env["product.product"].search(
                 [("available_in_pos", "=", True), ("sale_ok", "=", True), ("active", "=", True)],
-                limit=3,
+                limit=10,
             )
         except Exception:
             # Fallback for databases where POS availability lives only on templates/custom schema.
             templates = self.env["product.template"].search(
                 [("available_in_pos", "=", True), ("sale_ok", "=", True), ("active", "=", True)],
-                limit=3,
+                limit=10,
             )
             products = templates.mapped("product_variant_id")
         if not products:

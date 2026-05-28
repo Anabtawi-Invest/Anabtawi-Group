@@ -63,7 +63,14 @@ patch(PosStore.prototype, {
                 this._showWhatsappOrderPopup(order);
             }
         } catch (error) {
-            // Keep silent on background polling errors to avoid cashier spam.
+            // Show one lightweight warning to help diagnose POS-side sync issues.
+            if (!this._waPollWarned) {
+                this._waPollWarned = true;
+                this.env.services.notification.add(
+                    _t("WhatsApp POS polling failed. Please refresh POS."),
+                    { type: "warning" }
+                );
+            }
         }
     },
 
