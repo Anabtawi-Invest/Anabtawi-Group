@@ -43,9 +43,15 @@ class WhatsAppWebhookController(http.Controller):
             icp = request.env["ir.config_parameter"].sudo()
             provider = icp.get_param("custom_whatsapp_pos_connector.provider", "meta")
             whatsapp_model = request.env["whatsapp.pos.order"].sudo()
+            form_payload = dict(request.params or {})
 
-            if provider == "twilio":
-                form_payload = dict(request.params or {})
+            # Auto-detect Twilio payload to avoid relying only on settings value.
+            is_twilio_payload = bool(
+                (form_payload.get("MessageSid") or form_payload.get("SmsSid"))
+                and form_payload.get("From")
+            )
+
+            if provider == "twilio" or is_twilio_payload:
                 _logger.info(
                     "Twilio webhook received: keys=%s from=%s sid=%s",
                     list(form_payload.keys()),
@@ -53,7 +59,11 @@ class WhatsAppWebhookController(http.Controller):
                     form_payload.get("MessageSid") or form_payload.get("SmsSid"),
                 )
                 whatsapp_model.receive_twilio_webhook_payload(form_payload)
-                return request.make_response("", status=200)
+                return request.make_response(
+                    "<?xml version='1.0' encoding='UTF-8'?><Response></Response>",
+                    headers=[("Content-Type", "text/xml; charset=utf-8")],
+                    status=200,
+                )
 
             raw_data = request.httprequest.data.decode("utf-8") if request.httprequest.data else "{}"
             try:
@@ -65,4 +75,8 @@ class WhatsAppWebhookController(http.Controller):
         except Exception as error:
             _logger.exception("Webhook processing failed: %s", error)
             # Keep Twilio delivery stable while logging real error server-side.
-            return request.make_response("", status=200)
+            return request.make_response(
+                "<?xml version='1.0' encoding='UTF-8'?><Response></Response>",
+                headers=[("Content-Type", "text/xml; charset=utf-8")],
+                status=200,
+            )
