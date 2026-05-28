@@ -1,7 +1,10 @@
 import json
+import logging
 
 from odoo import http
 from odoo.http import request
+
+_logger = logging.getLogger(__name__)
 
 
 class WhatsAppWebhookController(http.Controller):
@@ -42,6 +45,12 @@ class WhatsAppWebhookController(http.Controller):
 
         if provider == "twilio":
             form_payload = dict(request.params or {})
+            _logger.info(
+                "Twilio webhook received: keys=%s from=%s sid=%s",
+                list(form_payload.keys()),
+                form_payload.get("From"),
+                form_payload.get("MessageSid") or form_payload.get("SmsSid"),
+            )
             whatsapp_model.receive_twilio_webhook_payload(form_payload)
             # Twilio accepts plain XML/empty 200. Empty response is enough.
             return request.make_response("", status=200)

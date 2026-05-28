@@ -169,7 +169,7 @@ class WhatsappPosOrder(models.Model):
     def receive_twilio_webhook_payload(self, payload):
         if not self._is_webhook_enabled():
             return {"status": "disabled"}
-        message_sid = payload.get("MessageSid")
+        message_sid = payload.get("MessageSid") or payload.get("SmsSid")
         incoming_phone = payload.get("From")
         body = payload.get("Body", "")
         if not message_sid or not incoming_phone:
@@ -517,6 +517,8 @@ class WhatsappPosOrder(models.Model):
         if not account_sid or not auth_token or not sender:
             _logger.warning("Twilio settings are incomplete, outgoing message skipped.")
             return False
+        if not str(sender).strip().startswith("whatsapp:"):
+            sender = f"whatsapp:{str(sender).strip()}"
 
         to_phone = self._ensure_twilio_whatsapp_to(phone_number)
         if not to_phone:
