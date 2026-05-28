@@ -162,10 +162,13 @@ class WhatsappPosOrder(models.Model):
 
     @api.model
     def fetch_pending_for_pos(self, pos_config_id=False, limit=10):
-        domain = [("state", "=", "ready_for_pos"), ("company_id", "=", self.env.company.id)]
+        domain = [("state", "=", "ready_for_pos")]
         base_domain = list(domain)
         if pos_config_id:
+            pos_config = self.env["pos.config"].sudo().browse(int(pos_config_id)).exists()
             domain += [("pos_config_id", "in", [False, int(pos_config_id)])]
+            if pos_config and pos_config.company_id:
+                domain += [("company_id", "=", pos_config.company_id.id)]
         orders = self.search(domain, order="id asc", limit=limit)
         # Fallback: if strict config filter yields nothing, return company pending orders.
         if not orders and pos_config_id:
@@ -419,11 +422,15 @@ class WhatsappPosOrder(models.Model):
 
         partner = conversation.partner_id or self._get_or_create_partner(conversation.phone_number)
         pos_config = self._find_target_pos_config()
+        target_company_id = (
+            pos_config.company_id.id if pos_config and pos_config.company_id else self.env.company.id
+        )
         order_vals = {
             "partner_id": partner.id,
             "phone_number": conversation.phone_number,
             "state": "ready_for_pos",
             "pos_config_id": pos_config.id if pos_config else False,
+            "company_id": target_company_id,
             "line_ids": [
                 (
                     0,
