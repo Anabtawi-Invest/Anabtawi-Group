@@ -111,7 +111,7 @@ patch(PosStore.prototype, {
     },
 
     async _loadWhatsappOrderToCart(orderPayload) {
-        const order = this.addNewOrder();
+        const order = this._getTargetOrderForWhatsapp();
         const partnerModel = this.models?.["res.partner"];
         const productModel = this.models?.["product.product"];
 
@@ -137,11 +137,12 @@ patch(PosStore.prototype, {
                 missedProducts.push(line.product_name);
                 continue;
             }
-            await this.addLineToCurrentOrder(
+            await this.addLineToOrder(
                 {
                     product_tmpl_id: productTemplateId,
                     qty: Number(line.qty || 1),
                     price_unit: Number(line.price_unit || 0),
+                    order_id: order,
                 },
                 { merge: false },
                 false
@@ -161,6 +162,7 @@ patch(PosStore.prototype, {
             session_id: sessionId || false,
             missed_products: missedProducts,
             added_lines_count: addedLinesCount,
+            target_pos_order: order?.name || "",
         });
 
         if (!addedLinesCount) {
@@ -178,6 +180,25 @@ patch(PosStore.prototype, {
                 type: "success",
             });
         }
+    },
+
+    _getTargetOrderForWhatsapp() {
+        const currentOrder = this.getOrder?.() || null;
+        const currentLines = currentOrder?.getOrderlines?.() || [];
+        const isCurrentEmpty = currentOrder && currentLines.length === 0;
+
+        if (isCurrentEmpty) {
+            if (this.setOrder) {
+                this.setOrder(currentOrder);
+            }
+            return currentOrder;
+        }
+
+        const newOrder = this.addNewOrder();
+        if (this.setOrder) {
+            this.setOrder(newOrder);
+        }
+        return newOrder;
     },
 
     async _logWhatsAppClientEvent(eventName, payload = {}, level = "info") {
