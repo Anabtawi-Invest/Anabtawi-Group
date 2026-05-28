@@ -115,41 +115,60 @@ patch(PosStore.prototype, {
         const partnerModel = this.models?.["res.partner"];
         const productModel = this.models?.["product.product"];
 
-        if (orderPayload.partner_id && partnerModel && order?.set_partner) {
+        if (orderPayload.partner_id && partnerModel) {
             const partner = partnerModel.get(orderPayload.partner_id);
-            if (partner) {
+            if (partner && order?.set_partner) {
                 order.set_partner(partner);
+            } else if (partner && order?.setPartner) {
+                order.setPartner(partner);
             }
         }
 
         const missedProducts = [];
+        let addedLinesCount = 0;
         for (const line of orderPayload.line_ids || []) {
             const product = productModel ? productModel.get(line.product_id) : null;
             if (!product) {
                 missedProducts.push(line.product_name);
                 continue;
             }
-            if (order?.add_product) {
-                order.add_product(product, {
-                    quantity: Number(line.qty || 1),
-                    price: Number(line.price_unit || 0),
-                    merge: false,
-                });
+            const productTemplateId = product.product_tmpl_id?.id || product.product_tmpl_id;
+            if (!productTemplateId) {
+                missedProducts.push(line.product_name);
+                continue;
             }
+            await this.addLineToCurrentOrder(
+                {
+                    product_tmpl_id: productTemplateId,
+                    qty: Number(line.qty || 1),
+                    price_unit: Number(line.price_unit || 0),
+                },
+                { merge: false },
+                false
+            );
+            addedLinesCount += 1;
         }
 
         const sessionId = this.pos_session?.id || false;
-        await this.env.services.orm.call("whatsapp.pos.order", "mark_order_loaded", [
-            orderPayload.id,
-            sessionId,
-        ]);
+        if (addedLinesCount > 0) {
+            await this.env.services.orm.call("whatsapp.pos.order", "mark_order_loaded", [
+                orderPayload.id,
+                sessionId,
+            ]);
+        }
         this._logWhatsAppClientEvent("order_loaded_to_cart", {
             order_id: orderPayload.id,
             session_id: sessionId || false,
             missed_products: missedProducts,
+            added_lines_count: addedLinesCount,
         });
 
-        if (missedProducts.length) {
+        if (!addedLinesCount) {
+            this.env.services.notification.add(
+                _t("No products could be loaded. Order remains pending."),
+                { type: "danger" }
+            );
+        } else if (missedProducts.length) {
             this.env.services.notification.add(
                 _t("Loaded with missing products: %s", missedProducts.join(", ")),
                 { type: "warning" }
