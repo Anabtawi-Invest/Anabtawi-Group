@@ -146,8 +146,18 @@ class WhatsappPosOrder(models.Model):
     def mark_order_loaded(self, order_id, pos_session_id=False):
         order = self.browse(int(order_id))
         if not order.exists():
+            self._log_debug(
+                "pos.server",
+                "warning",
+                f"mark_order_loaded called with missing order_id={order_id}",
+            )
             return False
         order.action_mark_loaded(pos_session_id=pos_session_id or False)
+        self._log_debug(
+            "pos.server",
+            "info",
+            f"Order marked loaded id={order.id} session={pos_session_id or ''}",
+        )
         return True
 
     @api.model
@@ -160,6 +170,13 @@ class WhatsappPosOrder(models.Model):
         # Fallback: if strict config filter yields nothing, return company pending orders.
         if not orders and pos_config_id:
             orders = self.search(base_domain, order="id asc", limit=limit)
+        if orders:
+            self._log_debug(
+                "pos.server",
+                "info",
+                f"fetch_pending_for_pos cfg={pos_config_id} returned={len(orders)}",
+                [o.id for o in orders],
+            )
         return [order._serialize_for_pos() for order in orders]
 
     def _serialize_for_pos(self):
@@ -496,6 +513,22 @@ class WhatsappPosOrder(models.Model):
             "custom_whatsapp_pos_new_order",
             payload,
         )
+        self._log_debug(
+            "pos.server",
+            "info",
+            f"bus notification sent for order={order.id}",
+            payload,
+        )
+
+    @api.model
+    def log_pos_client_event(self, event_name, payload=None, level="info"):
+        self._log_debug(
+            "pos.client",
+            level if level in {"info", "warning", "error"} else "info",
+            str(event_name or "event"),
+            payload,
+        )
+        return True
 
     @api.model
     def _send_product_menu(self, conversation):

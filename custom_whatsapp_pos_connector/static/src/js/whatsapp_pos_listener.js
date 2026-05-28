@@ -11,7 +11,11 @@ patch(PosStore.prototype, {
         this._waShownOrderIds = new Set();
         this._waPollingInterval = null;
         this._waBusBound = false;
+        this._waPollWarned = false;
         this._initWhatsappPosRealtime();
+        this._logWhatsAppClientEvent("setup_initialized", {
+            pos_config_id: this.config?.id || false,
+        });
     },
 
     _initWhatsappPosRealtime() {
@@ -30,6 +34,9 @@ patch(PosStore.prototype, {
         busService.addChannel("custom_whatsapp_pos_orders");
         busService.addEventListener("notification", ({ detail }) => {
             const notifications = detail || [];
+            this._logWhatsAppClientEvent("bus_notification_received", {
+                count: notifications.length || 0,
+            });
             for (const item of notifications) {
                 const type = item.type || item[1];
                 const payload = item.payload || item[2];
@@ -59,6 +66,13 @@ patch(PosStore.prototype, {
                 "fetch_pending_for_pos",
                 [configId, 5]
             );
+            if ((orders || []).length) {
+                this._logWhatsAppClientEvent("poll_orders_received", {
+                    config_id: configId,
+                    count: orders.length,
+                    order_ids: orders.map((o) => o.id),
+                });
+            }
             for (const order of orders || []) {
                 this._showWhatsappOrderPopup(order);
             }
@@ -71,14 +85,25 @@ patch(PosStore.prototype, {
                     { type: "warning" }
                 );
             }
+            this._logWhatsAppClientEvent(
+                "poll_failed",
+                { message: error?.message || "unknown polling error" },
+                "error"
+            );
         }
     },
 
     _showWhatsappOrderPopup(order) {
-        if (!order?.id || this._waShownOrderIds.has(order.id)) {
+        if (!order?.id) {
+            this._logWhatsAppClientEvent("popup_skipped_invalid_order", order || {});
+            return;
+        }
+        if (this._waShownOrderIds.has(order.id)) {
+            this._logWhatsAppClientEvent("popup_skipped_duplicate", { order_id: order.id });
             return;
         }
         this._waShownOrderIds.add(order.id);
+        this._logWhatsAppClientEvent("popup_opened", { order_id: order.id, name: order.name });
         this.env.services.dialog.add(WhatsAppPosOrderPopup, {
             order,
             onLoad: async (orderPayload) => this._loadWhatsappOrderToCart(orderPayload),
@@ -118,6 +143,11 @@ patch(PosStore.prototype, {
             orderPayload.id,
             sessionId,
         ]);
+        this._logWhatsAppClientEvent("order_loaded_to_cart", {
+            order_id: orderPayload.id,
+            session_id: sessionId || false,
+            missed_products: missedProducts,
+        });
 
         if (missedProducts.length) {
             this.env.services.notification.add(
@@ -128,6 +158,18 @@ patch(PosStore.prototype, {
             this.env.services.notification.add(_t("WhatsApp order loaded to POS cart."), {
                 type: "success",
             });
+        }
+    },
+
+    async _logWhatsAppClientEvent(eventName, payload = {}, level = "info") {
+        try {
+            await this.env.services.orm.call("whatsapp.pos.order", "log_pos_client_event", [
+                eventName,
+                payload,
+                level,
+            ]);
+        } catch (_error) {
+            // Do not interrupt POS flow due to debug logging failures.
         }
     },
 });
