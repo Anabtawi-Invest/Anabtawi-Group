@@ -19,6 +19,7 @@ class WhatsappPosConversation(models.Model):
     state = fields.Selection(
         [
             ("idle", "Idle"),
+            ("awaiting_category", "Awaiting Category"),
             ("awaiting_product", "Awaiting Product"),
             ("awaiting_quantity", "Awaiting Quantity"),
             ("awaiting_next_action", "Awaiting Next Action"),
@@ -26,6 +27,7 @@ class WhatsappPosConversation(models.Model):
         default="idle",
         required=True,
     )
+    selected_category_id = fields.Many2one("pos.category", ondelete="set null")
     selected_product_id = fields.Many2one("product.product", ondelete="set null")
     cart_json = fields.Text(default="[]")
     menu_map_json = fields.Text(default="{}")
@@ -53,11 +55,18 @@ class WhatsappPosConversation(models.Model):
             data = json.loads(self.menu_map_json or "{}")
         except Exception:
             data = {}
-        return data if isinstance(data, dict) else {}
+        if isinstance(data, dict) and "items" in data:
+            kind = data.get("kind") or ""
+            items = data.get("items") if isinstance(data.get("items"), dict) else {}
+            return {"kind": kind, "items": items}
+        if isinstance(data, dict):
+            # Backward compatibility with old plain map format.
+            return {"kind": "product", "items": data}
+        return {"kind": "", "items": {}}
 
-    def set_menu_map(self, mapping):
+    def set_menu_map(self, mapping, kind="product"):
         self.ensure_one()
-        self.menu_map_json = json.dumps(mapping or {})
+        self.menu_map_json = json.dumps({"kind": kind, "items": mapping or {}})
 
 
 class WhatsappPosMessageLog(models.Model):
@@ -298,11 +307,19 @@ class WhatsappPosOrder(models.Model):
         lowered = (text_value or "").strip().lower()
         normalized_no_space = lowered.replace(" ", "")
 
-        if conversation.state == "awaiting_product" and lowered.isdigit():
+        if lowered in {"menu", "start", "hi", "hello", "منيو", "ابدأ"}:
+            self._send_category_menu(conversation)
+            return
+
+        if lowered.isdigit():
             menu_map = conversation.get_menu_map()
-            mapped_product_id = menu_map.get(lowered)
-            if mapped_product_id:
-                action_id = f"prod_{mapped_product_id}"
+            items = menu_map.get("items", {})
+            kind = menu_map.get("kind")
+            mapped_value = items.get(lowered)
+            if mapped_value and conversation.state == "awaiting_category" and kind == "category":
+                action_id = f"cat_{mapped_value}"
+            elif mapped_value and conversation.state == "awaiting_product" and kind == "product":
+                action_id = f"prod_{mapped_value}"
 
         if conversation.state == "awaiting_next_action" and lowered in {"1", "2", "3"}:
             action_id = {"1": "add_more", "2": "submit_order", "3": "cancel_order"}[lowered]
@@ -316,8 +333,21 @@ class WhatsappPosOrder(models.Model):
             elif lowered in {"add_more", "submit_order", "cancel_order"}:
                 action_id = lowered
 
-        if lowered in {"menu", "start", "hi", "hello", "منيو", "ابدأ"}:
-            self._send_product_menu(conversation)
+        if action_id and action_id.startswith("cat_"):
+            try:
+                match = re.search(r"cat_(\d+)", action_id)
+                if not match:
+                    raise ValueError("No category id in action")
+                category_id = int(match.group(1))
+            except Exception:
+                self._send_text(conversation.phone_number, _("Invalid category selection."))
+                return
+            category = self.env["pos.category"].browse(category_id)
+            if not category.exists():
+                self._send_text(conversation.phone_number, _("Selected category not found."))
+                return
+            conversation.selected_category_id = category.id
+            self._send_products_for_category(conversation, category)
             return
 
         if action_id and action_id.startswith("prod_"):
@@ -352,7 +382,7 @@ class WhatsappPosOrder(models.Model):
             return
 
         if action_id == "add_more":
-            self._send_product_menu(conversation)
+            self._send_category_menu(conversation)
             return
 
         if action_id == "submit_order":
@@ -363,6 +393,7 @@ class WhatsappPosOrder(models.Model):
             conversation.write(
                 {
                     "state": "idle",
+                    "selected_category_id": False,
                     "selected_product_id": False,
                     "cart_json": "[]",
                     "menu_map_json": "{}",
@@ -547,26 +578,64 @@ class WhatsappPosOrder(models.Model):
         return True
 
     @api.model
-    def _send_product_menu(self, conversation):
-        products = self.env["product.product"]
-        try:
-            products = self.env["product.product"].search(
-                [("available_in_pos", "=", True), ("sale_ok", "=", True), ("active", "=", True)],
-                limit=10,
+    def _send_category_menu(self, conversation):
+        templates = self.env["product.template"].search(
+            [("available_in_pos", "=", True), ("sale_ok", "=", True), ("active", "=", True)],
+            limit=200,
+        )
+        categories = templates.mapped("pos_categ_ids")
+        if not categories:
+            categories = self.env["pos.category"].search([], limit=10)
+        categories = categories[:10]
+        if not categories:
+            self._send_text(
+                conversation.phone_number,
+                _("No POS categories available now. Please try later."),
             )
-        except Exception:
-            # Fallback for databases where POS availability lives only on templates/custom schema.
-            templates = self.env["product.template"].search(
-                [("available_in_pos", "=", True), ("sale_ok", "=", True), ("active", "=", True)],
-                limit=10,
+            return
+
+        provider = self._get_provider()
+        menu_map = {}
+        buttons = []
+        for index, category in enumerate(categories, start=1):
+            menu_map[str(index)] = category.id
+            buttons.append({"id": f"cat_{category.id}", "title": (category.display_name or category.name)[:20]})
+        conversation.write({"state": "awaiting_category", "selected_category_id": False, "selected_product_id": False})
+        conversation.set_menu_map(menu_map, kind="category")
+
+        if provider == "twilio":
+            lines = []
+            for index, category in enumerate(categories, start=1):
+                lines.append(f"{index}) {category.display_name or category.name}")
+            text_menu = _("Please choose a category by number:\n%s") % "\n".join(lines)
+            self._send_text(conversation.phone_number, text_menu)
+        else:
+            self._send_buttons(
+                conversation.phone_number,
+                _("Please choose a category:"),
+                buttons,
             )
-            products = templates.mapped("product_variant_id")
+
+    @api.model
+    def _send_products_for_category(self, conversation, category):
+        templates = self.env["product.template"].search(
+            [
+                ("available_in_pos", "=", True),
+                ("sale_ok", "=", True),
+                ("active", "=", True),
+                ("pos_categ_ids", "in", [category.id]),
+            ],
+            limit=10,
+        )
+        products = templates.mapped("product_variant_id")
         if not products:
             self._send_text(
                 conversation.phone_number,
-                _("No POS products available now. Please try later."),
+                _("No products found in this category. Please choose another category."),
             )
+            self._send_category_menu(conversation)
             return
+
         provider = self._get_provider()
         menu_map = {}
         buttons = []
@@ -574,17 +643,21 @@ class WhatsappPosOrder(models.Model):
             menu_map[str(index)] = product.id
             buttons.append({"id": f"prod_{product.id}", "title": product.display_name[:20]})
         conversation.state = "awaiting_product"
-        conversation.set_menu_map(menu_map)
+        conversation.set_menu_map(menu_map, kind="product")
+
         if provider == "twilio":
             lines = []
             for index, product in enumerate(products, start=1):
                 lines.append(f"{index}) {product.display_name}")
-            text_menu = _("Please choose a product by number:\n%s") % "\n".join(lines)
-            self._send_text(conversation.phone_number, text_menu)
+            text_menu = _("Category: %s\nChoose a product by number:\n%s") % (
+                category.display_name or category.name,
+                "\n".join(lines),
+            )
+            self._send_text(conversation.phone_number, text_menu[:1500])
         else:
             self._send_buttons(
                 conversation.phone_number,
-                _("Please choose a product from the menu:"),
+                _("Please choose a product:"),
                 buttons,
             )
 
@@ -813,7 +886,7 @@ class WhatsappPosOrder(models.Model):
         if not phone_number:
             raise UserError(_("Phone number is required."))
         conv = self._get_or_create_conversation(phone_number)
-        self._send_product_menu(conv)
+        self._send_category_menu(conv)
         return True
 
 
