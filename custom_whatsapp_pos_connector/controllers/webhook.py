@@ -39,26 +39,30 @@ class WhatsAppWebhookController(http.Controller):
         csrf=False,
     )
     def receive_webhook(self, **kwargs):
-        icp = request.env["ir.config_parameter"].sudo()
-        provider = icp.get_param("custom_whatsapp_pos_connector.provider", "meta")
-        whatsapp_model = request.env["whatsapp.pos.order"].sudo()
-
-        if provider == "twilio":
-            form_payload = dict(request.params or {})
-            _logger.info(
-                "Twilio webhook received: keys=%s from=%s sid=%s",
-                list(form_payload.keys()),
-                form_payload.get("From"),
-                form_payload.get("MessageSid") or form_payload.get("SmsSid"),
-            )
-            whatsapp_model.receive_twilio_webhook_payload(form_payload)
-            # Twilio accepts plain XML/empty 200. Empty response is enough.
-            return request.make_response("", status=200)
-
-        raw_data = request.httprequest.data.decode("utf-8") if request.httprequest.data else "{}"
         try:
-            payload = json.loads(raw_data or "{}")
-        except Exception:
-            payload = {}
-        whatsapp_model.receive_meta_webhook_payload(payload)
-        return request.make_response("EVENT_RECEIVED", status=200)
+            icp = request.env["ir.config_parameter"].sudo()
+            provider = icp.get_param("custom_whatsapp_pos_connector.provider", "meta")
+            whatsapp_model = request.env["whatsapp.pos.order"].sudo()
+
+            if provider == "twilio":
+                form_payload = dict(request.params or {})
+                _logger.info(
+                    "Twilio webhook received: keys=%s from=%s sid=%s",
+                    list(form_payload.keys()),
+                    form_payload.get("From"),
+                    form_payload.get("MessageSid") or form_payload.get("SmsSid"),
+                )
+                whatsapp_model.receive_twilio_webhook_payload(form_payload)
+                return request.make_response("", status=200)
+
+            raw_data = request.httprequest.data.decode("utf-8") if request.httprequest.data else "{}"
+            try:
+                payload = json.loads(raw_data or "{}")
+            except Exception:
+                payload = {}
+            whatsapp_model.receive_meta_webhook_payload(payload)
+            return request.make_response("EVENT_RECEIVED", status=200)
+        except Exception as error:
+            _logger.exception("Webhook processing failed: %s", error)
+            # Keep Twilio delivery stable while logging real error server-side.
+            return request.make_response("", status=200)

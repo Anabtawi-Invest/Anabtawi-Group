@@ -209,7 +209,14 @@ class WhatsappPosOrder(models.Model):
 
         text_value = self._extract_text_message(message)
         action_id = self._extract_action_id(message)
-        self._route_conversation_input(conversation, text_value, action_id)
+        try:
+            self._route_conversation_input(conversation, text_value, action_id)
+        except Exception as error:
+            _logger.exception("Failed to route incoming WhatsApp message: %s", error)
+            self._send_text(
+                conversation.phone_number,
+                _("Sorry, we could not process your request now. Please send 'menu' again."),
+            )
 
     @api.model
     def _route_conversation_input(self, conversation, text_value, action_id):
@@ -402,10 +409,19 @@ class WhatsappPosOrder(models.Model):
 
     @api.model
     def _send_product_menu(self, conversation):
-        products = self.env["product.product"].search(
-            [("available_in_pos", "=", True), ("sale_ok", "=", True), ("active", "=", True)],
-            limit=3,
-        )
+        products = self.env["product.product"]
+        try:
+            products = self.env["product.product"].search(
+                [("available_in_pos", "=", True), ("sale_ok", "=", True), ("active", "=", True)],
+                limit=3,
+            )
+        except Exception:
+            # Fallback for databases where POS availability lives only on templates/custom schema.
+            templates = self.env["product.template"].search(
+                [("available_in_pos", "=", True), ("sale_ok", "=", True), ("active", "=", True)],
+                limit=3,
+            )
+            products = templates.mapped("product_variant_id")
         if not products:
             self._send_text(
                 conversation.phone_number,
