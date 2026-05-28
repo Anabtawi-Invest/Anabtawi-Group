@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="custom_whatsapp_pos_connector.WhatsAppPosOrderPopup" owl="1">
+        <Dialog size="'md'" t-att-title="title">
+            <div t-on-click.stop="">
+                <div class="mb-2">
+                    <strong><t t-esc="props.order.name"/></strong>
+                </div>
+                <div class="mb-2">
+                    <span><strong>Customer:</strong> <t t-esc="props.order.partner_name"/></span><br/>
+                    <span><strong>Phone:</strong> <t t-esc="props.order.phone_number"/></span>
+                </div>
+                <div class="mb-3">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-end">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="lines" t-as="line" t-key="line.id">
+                                <tr>
+                                    <td><t t-esc="line.product_name"/></td>
+                                    <td class="text-center"><t t-esc="line.qty"/></td>
+                                    <td class="text-end"><t t-esc="line.price_unit"/></td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary" t-on-click.stop="closePopup">Ignore</button>
+                <button class="btn btn-primary" t-on-click.stop="loadOrder">Load in POS</button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_whatsapp_pos" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.whatsapp.pos</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app name="custom_whatsapp_pos_connector" string="WhatsApp POS Connector">
+                    <block title="Provider">
+                        <setting string="WhatsApp Provider">
+                            <field name="whatsapp_provider"/>
+                        </setting>
+                    </block>
+                    <block title="Meta WhatsApp Cloud API">
+                        <setting string="Webhook Enabled">
+                            <field name="whatsapp_webhook_enabled"/>
+                        </setting>
+                        <setting string="Meta Phone Number ID" invisible="whatsapp_provider != 'meta'">
+                            <field name="whatsapp_meta_phone_number_id" placeholder="e.g. 123456789012345"/>
+                        </setting>
+                        <setting string="Meta Access Token" invisible="whatsapp_provider != 'meta'">
+                            <field name="whatsapp_meta_access_token" password="True"/>
+                        </setting>
+                        <setting string="Webhook Verify Token" invisible="whatsapp_provider != 'meta'">
+                            <field name="whatsapp_meta_verify_token"/>
+                        </setting>
+                        <setting string="Meta Business Account ID" invisible="whatsapp_provider != 'meta'">
+                            <field name="whatsapp_meta_business_account_id"/>
+                        </setting>
+                    </block>
+                    <block title="Twilio WhatsApp">
+                        <setting string="Twilio Account SID" invisible="whatsapp_provider != 'twilio'">
+                            <field name="whatsapp_twilio_account_sid"/>
+                        </setting>
+                        <setting string="Twilio Auth Token" invisible="whatsapp_provider != 'twilio'">
+                            <field name="whatsapp_twilio_auth_token" password="True"/>
+                        </setting>
+                        <setting string="Twilio WhatsApp From" invisible="whatsapp_provider != 'twilio'">
+                            <field name="whatsapp_twilio_whatsapp_from" placeholder="whatsapp:+14155238886"/>
+                        </setting>
+                    </block>
+                    <block title="POS Routing">
+                        <setting string="Default POS Config">
+                            <field name="whatsapp_default_pos_config_id"/>
+                        </setting>
+                    </block>
+                    <block title="Webhook URL">
+                        <setting string="Callback">
+                            <div class="text-muted">
+                                <span>/custom_whatsapp_pos/webhook</span>
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

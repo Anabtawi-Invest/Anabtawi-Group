@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_whatsapp_pos_order_user,whatsapp.pos.order user,model_whatsapp_pos_order,base.group_user,1,1,1,1
+access_whatsapp_pos_order_line_user,whatsapp.pos.order.line user,model_whatsapp_pos_order_line,base.group_user,1,1,1,1
+access_whatsapp_pos_conversation_user,whatsapp.pos.conversation user,model_whatsapp_pos_conversation,base.group_user,1,1,1,1
+access_whatsapp_pos_message_log_user,whatsapp.pos.message.log user,model_whatsapp_pos_message_log,base.group_user,1,0,0,0
