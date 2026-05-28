@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 import requests
 
@@ -27,6 +28,7 @@ class WhatsappPosConversation(models.Model):
     )
     selected_product_id = fields.Many2one("product.product", ondelete="set null")
     cart_json = fields.Text(default="[]")
+    menu_map_json = fields.Text(default="{}")
     last_message_at = fields.Datetime()
 
     _sql_constraints = [
@@ -44,6 +46,18 @@ class WhatsappPosConversation(models.Model):
     def set_cart_lines(self, lines):
         self.ensure_one()
         self.cart_json = json.dumps(lines or [])
+
+    def get_menu_map(self):
+        self.ensure_one()
+        try:
+            data = json.loads(self.menu_map_json or "{}")
+        except Exception:
+            data = {}
+        return data if isinstance(data, dict) else {}
+
+    def set_menu_map(self, mapping):
+        self.ensure_one()
+        self.menu_map_json = json.dumps(mapping or {})
 
 
 class WhatsappPosMessageLog(models.Model):
@@ -259,10 +273,21 @@ class WhatsappPosOrder(models.Model):
     @api.model
     def _route_conversation_input(self, conversation, text_value, action_id):
         lowered = (text_value or "").strip().lower()
+        normalized_no_space = lowered.replace(" ", "")
+
+        if conversation.state == "awaiting_product" and lowered.isdigit():
+            menu_map = conversation.get_menu_map()
+            mapped_product_id = menu_map.get(lowered)
+            if mapped_product_id:
+                action_id = f"prod_{mapped_product_id}"
+
+        if conversation.state == "awaiting_next_action" and lowered in {"1", "2", "3"}:
+            action_id = {"1": "add_more", "2": "submit_order", "3": "cancel_order"}[lowered]
+
         if not action_id and lowered:
             # Twilio usually delivers only plain text replies.
-            if lowered.startswith("prod_"):
-                action_id = lowered
+            if normalized_no_space.startswith("prod_"):
+                action_id = normalized_no_space
             elif lowered.startswith("qty_"):
                 action_id = lowered
             elif lowered in {"add_more", "submit_order", "cancel_order"}:
@@ -274,7 +299,10 @@ class WhatsappPosOrder(models.Model):
 
         if action_id and action_id.startswith("prod_"):
             try:
-                product_id = int(action_id.split("_")[1])
+                match = re.search(r"prod_(\d+)", action_id)
+                if not match:
+                    raise ValueError("No product id in action")
+                product_id = int(match.group(1))
             except Exception:
                 self._send_text(conversation.phone_number, _("Invalid product selection."))
                 return
@@ -309,7 +337,14 @@ class WhatsappPosOrder(models.Model):
             return
 
         if action_id == "cancel_order":
-            conversation.write({"state": "idle", "selected_product_id": False, "cart_json": "[]"})
+            conversation.write(
+                {
+                    "state": "idle",
+                    "selected_product_id": False,
+                    "cart_json": "[]",
+                    "menu_map_json": "{}",
+                }
+            )
             self._send_text(conversation.phone_number, _("Order cancelled. Send 'menu' to start again."))
             return
 
@@ -479,15 +514,26 @@ class WhatsappPosOrder(models.Model):
                 _("No POS products available now. Please try later."),
             )
             return
+        provider = self._get_provider()
+        menu_map = {}
         buttons = []
-        for product in products:
+        for index, product in enumerate(products, start=1):
+            menu_map[str(index)] = product.id
             buttons.append({"id": f"prod_{product.id}", "title": product.display_name[:20]})
         conversation.state = "awaiting_product"
-        self._send_buttons(
-            conversation.phone_number,
-            _("Please choose a product from the menu:"),
-            buttons,
-        )
+        conversation.set_menu_map(menu_map)
+        if provider == "twilio":
+            lines = []
+            for index, product in enumerate(products, start=1):
+                lines.append(f"{index}) {product.display_name}")
+            text_menu = _("Please choose a product by number:\n%s") % "\n".join(lines)
+            self._send_text(conversation.phone_number, text_menu)
+        else:
+            self._send_buttons(
+                conversation.phone_number,
+                _("Please choose a product from the menu:"),
+                buttons,
+            )
 
     @api.model
     def _send_quantity_prompt(self, conversation, product):
@@ -506,6 +552,15 @@ class WhatsappPosOrder(models.Model):
         cart = conversation.get_cart_lines()
         lines_text = "\n".join([f"- {line['name']} x {line['qty']}" for line in cart])
         message = _("Cart updated:\n%s\n\nChoose next action:") % lines_text
+        if self._get_provider() == "twilio":
+            twilio_message = (
+                f"{message}\n"
+                f"1) {_('Add More')}\n"
+                f"2) {_('Submit')}\n"
+                f"3) {_('Cancel')}"
+            )
+            self._send_text(conversation.phone_number, twilio_message[:1500])
+            return
         self._send_buttons(
             conversation.phone_number,
             message[:1024],
