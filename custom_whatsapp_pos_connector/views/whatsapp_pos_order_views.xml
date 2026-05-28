@@ -82,4 +82,47 @@
         <field name="res_model">whatsapp.pos.conversation</field>
         <field name="view_mode">list</field>
     </record>
+
+    <record id="view_whatsapp_pos_debug_log_list" model="ir.ui.view">
+        <field name="name">whatsapp.pos.debug.log.list</field>
+        <field name="model">whatsapp.pos.debug.log</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="create_date"/>
+                <field name="source"/>
+                <field name="level"/>
+                <field name="message"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_whatsapp_pos_debug_log_form" model="ir.ui.view">
+        <field name="name">whatsapp.pos.debug.log.form</field>
+        <field name="model">whatsapp.pos.debug.log</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="create_date" readonly="1"/>
+                            <field name="source" readonly="1"/>
+                            <field name="level" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="message" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="payload" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_whatsapp_pos_debug_logs" model="ir.actions.act_window">
+        <field name="name">Debug Logs</field>
+        <field name="res_model">whatsapp.pos.debug.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
 </odoo>

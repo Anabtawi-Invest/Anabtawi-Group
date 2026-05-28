@@ -52,6 +52,18 @@ class WhatsAppWebhookController(http.Controller):
             )
 
             if provider == "twilio" or is_twilio_payload:
+                whatsapp_model._log_debug(
+                    "twilio.webhook.controller",
+                    "info",
+                    "Webhook request received",
+                    {
+                        "provider_setting": provider,
+                        "is_twilio_payload": is_twilio_payload,
+                        "from": form_payload.get("From"),
+                        "sid": form_payload.get("MessageSid") or form_payload.get("SmsSid"),
+                        "body": form_payload.get("Body"),
+                    },
+                )
                 _logger.info(
                     "Twilio webhook received: keys=%s from=%s sid=%s",
                     list(form_payload.keys()),
@@ -70,10 +82,22 @@ class WhatsAppWebhookController(http.Controller):
                 payload = json.loads(raw_data or "{}")
             except Exception:
                 payload = {}
+            whatsapp_model._log_debug(
+                "meta.webhook.controller",
+                "info",
+                "Webhook request received",
+                payload,
+            )
             whatsapp_model.receive_meta_webhook_payload(payload)
             return request.make_response("EVENT_RECEIVED", status=200)
         except Exception as error:
             _logger.exception("Webhook processing failed: %s", error)
+            request.env["whatsapp.pos.order"].sudo()._log_debug(
+                "webhook.controller",
+                "error",
+                f"Webhook processing failed: {error}",
+                {"params": dict(request.params or {})},
+            )
             # Keep Twilio delivery stable while logging real error server-side.
             return request.make_response(
                 "<?xml version='1.0' encoding='UTF-8'?><Response></Response>",

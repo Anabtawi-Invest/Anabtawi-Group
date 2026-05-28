@@ -60,6 +60,21 @@ class WhatsappPosMessageLog(models.Model):
     ]
 
 
+class WhatsappPosDebugLog(models.Model):
+    _name = "whatsapp.pos.debug.log"
+    _description = "WhatsApp POS Debug Log"
+    _order = "id desc"
+
+    source = fields.Char(required=True)
+    level = fields.Selection(
+        [("info", "Info"), ("warning", "Warning"), ("error", "Error")],
+        default="info",
+        required=True,
+    )
+    message = fields.Char(required=True)
+    payload = fields.Text()
+
+
 class WhatsappPosOrder(models.Model):
     _name = "whatsapp.pos.order"
     _description = "WhatsApp POS Order"
@@ -154,8 +169,10 @@ class WhatsappPosOrder(models.Model):
     @api.model
     def receive_meta_webhook_payload(self, payload):
         if not self._is_webhook_enabled():
+            self._log_debug("meta.webhook", "warning", "Webhook disabled", payload)
             return {"status": "disabled"}
 
+        self._log_debug("meta.webhook", "info", "Meta webhook payload received", payload)
         entries = payload.get("entry", []) if isinstance(payload, dict) else []
         for entry in entries:
             for change in entry.get("changes", []):
@@ -168,11 +185,19 @@ class WhatsappPosOrder(models.Model):
     @api.model
     def receive_twilio_webhook_payload(self, payload):
         if not self._is_webhook_enabled():
+            self._log_debug("twilio.webhook", "warning", "Webhook disabled", payload)
             return {"status": "disabled"}
+        self._log_debug("twilio.webhook", "info", "Twilio webhook payload received", payload)
         message_sid = payload.get("MessageSid") or payload.get("SmsSid")
         incoming_phone = payload.get("From")
         body = payload.get("Body", "")
         if not message_sid or not incoming_phone:
+            self._log_debug(
+                "twilio.webhook",
+                "warning",
+                "Ignoring payload without MessageSid/SmsSid or From",
+                payload,
+            )
             return {"status": "ignored"}
         phone = self._normalize_twilio_phone(incoming_phone)
         pseudo_message = {
@@ -189,11 +214,18 @@ class WhatsappPosOrder(models.Model):
         phone = message.get("from")
         msg_id = message.get("id")
         if not phone or not msg_id:
+            self._log_debug(
+                "message.process",
+                "warning",
+                "Incoming message missing phone or id",
+                message,
+            )
             return
 
         if self.env["whatsapp.pos.message.log"].sudo().search_count(
             [("meta_message_id", "=", msg_id)]
         ):
+            self._log_debug("message.process", "info", f"Duplicate message skipped: {msg_id}", message)
             return
 
         self.env["whatsapp.pos.message.log"].sudo().create(
@@ -213,6 +245,12 @@ class WhatsappPosOrder(models.Model):
             self._route_conversation_input(conversation, text_value, action_id)
         except Exception as error:
             _logger.exception("Failed to route incoming WhatsApp message: %s", error)
+            self._log_debug(
+                "message.route",
+                "error",
+                f"Route failed: {error}",
+                {"message": message, "text": text_value, "action_id": action_id},
+            )
             self._send_text(
                 conversation.phone_number,
                 _("Sorry, we could not process your request now. Please send 'menu' again."),
@@ -512,6 +550,7 @@ class WhatsappPosOrder(models.Model):
         access_token = self._get_param("custom_whatsapp_pos_connector.meta_access_token")
         if not phone_number_id or not access_token:
             _logger.warning("WhatsApp Meta settings are incomplete, outgoing message skipped.")
+            self._log_debug("meta.send", "warning", "Meta settings incomplete", payload)
             return False
         url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
         headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
@@ -519,10 +558,18 @@ class WhatsappPosOrder(models.Model):
             response = requests.post(url, headers=headers, json=payload, timeout=20)
             if response.status_code >= 400:
                 _logger.warning("Meta message send failed: %s", response.text)
+                self._log_debug(
+                    "meta.send",
+                    "error",
+                    f"Meta send failed ({response.status_code})",
+                    {"payload": payload, "response": response.text},
+                )
                 return False
+            self._log_debug("meta.send", "info", "Meta send success", payload)
             return True
         except Exception as error:
             _logger.exception("Meta message send exception: %s", error)
+            self._log_debug("meta.send", "error", f"Meta send exception: {error}", payload)
             return False
 
     @api.model
@@ -532,12 +579,23 @@ class WhatsappPosOrder(models.Model):
         sender = self._get_param("custom_whatsapp_pos_connector.twilio_whatsapp_from")
         if not account_sid or not auth_token or not sender:
             _logger.warning("Twilio settings are incomplete, outgoing message skipped.")
+            self._log_debug(
+                "twilio.send",
+                "warning",
+                "Twilio settings incomplete",
+                {
+                    "has_account_sid": bool(account_sid),
+                    "has_auth_token": bool(auth_token),
+                    "sender": sender,
+                },
+            )
             return False
         if not str(sender).strip().startswith("whatsapp:"):
             sender = f"whatsapp:{str(sender).strip()}"
 
         to_phone = self._ensure_twilio_whatsapp_to(phone_number)
         if not to_phone:
+            self._log_debug("twilio.send", "warning", "Twilio To phone invalid", phone_number)
             return False
 
         url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
@@ -546,10 +604,18 @@ class WhatsappPosOrder(models.Model):
             response = requests.post(url, data=data, auth=(account_sid, auth_token), timeout=20)
             if response.status_code >= 400:
                 _logger.warning("Twilio message send failed: %s", response.text)
+                self._log_debug(
+                    "twilio.send",
+                    "error",
+                    f"Twilio send failed ({response.status_code})",
+                    {"payload": data, "response": response.text},
+                )
                 return False
+            self._log_debug("twilio.send", "info", "Twilio send success", data)
             return True
         except Exception as error:
             _logger.exception("Twilio message send exception: %s", error)
+            self._log_debug("twilio.send", "error", f"Twilio send exception: {error}", data)
             return False
 
     @api.model
@@ -599,6 +665,27 @@ class WhatsappPosOrder(models.Model):
         if normalized.startswith("whatsapp:"):
             return normalized
         return f"whatsapp:{normalized}"
+
+    @api.model
+    def _log_debug(self, source, level, message, payload=None):
+        try:
+            if isinstance(payload, (dict, list)):
+                payload_text = json.dumps(payload, ensure_ascii=False)
+            elif payload is None:
+                payload_text = False
+            else:
+                payload_text = str(payload)
+            self.env["whatsapp.pos.debug.log"].sudo().create(
+                {
+                    "source": source,
+                    "level": level,
+                    "message": message[:255],
+                    "payload": payload_text,
+                }
+            )
+        except Exception:
+            # Never break business flow because of debug logger.
+            pass
 
     @api.model
     def action_send_test_menu(self, phone_number):
