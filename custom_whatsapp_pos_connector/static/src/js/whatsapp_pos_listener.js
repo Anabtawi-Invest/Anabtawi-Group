@@ -142,8 +142,8 @@ patch(PosStore.prototype, {
                     product_tmpl_id: productTemplateId,
                     qty: Number(line.qty || 1),
                     price_unit: Number(line.price_unit || 0),
-                    order_id: order,
                 },
+                order,
                 { merge: false },
                 false
             );
