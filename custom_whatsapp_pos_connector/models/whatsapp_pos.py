@@ -410,6 +410,13 @@ class WhatsappPosOrder(models.Model):
             self._add_current_selection_to_cart(conversation, qty_value)
             return
 
+        if conversation.state == "idle":
+            self._send_text(
+                conversation.phone_number,
+                "حلويات العنبتاوي ترحب بكم\nاكتب menu لتصلك قائمة الأصناف",
+            )
+            return
+
         self._send_text(
             conversation.phone_number,
             _("Send 'menu' to browse products and place your order."),
