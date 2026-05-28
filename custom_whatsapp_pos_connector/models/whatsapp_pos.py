@@ -410,15 +410,28 @@ class WhatsappPosOrder(models.Model):
 
     @api.model
     def _get_or_create_partner(self, phone):
-        partner = self.env["res.partner"].sudo().search(
-            ["|", ("mobile", "=", phone), ("phone", "=", phone)],
-            limit=1,
-        )
+        partner_model = self.env["res.partner"].sudo()
+        partner_fields = partner_model._fields
+
+        search_domain = []
+        if "mobile" in partner_fields and "phone" in partner_fields:
+            search_domain = ["|", ("mobile", "=", phone), ("phone", "=", phone)]
+        elif "mobile" in partner_fields:
+            search_domain = [("mobile", "=", phone)]
+        elif "phone" in partner_fields:
+            search_domain = [("phone", "=", phone)]
+
+        partner = partner_model.search(search_domain, limit=1) if search_domain else partner_model.browse()
         if partner:
             return partner
-        return self.env["res.partner"].sudo().create(
-            {"name": f"WhatsApp {phone}", "mobile": phone}
-        )
+
+        create_vals = {"name": f"WhatsApp {phone}"}
+        if "mobile" in partner_fields:
+            create_vals["mobile"] = phone
+        elif "phone" in partner_fields:
+            create_vals["phone"] = phone
+
+        return partner_model.create(create_vals)
 
     @api.model
     def _find_target_pos_config(self):
