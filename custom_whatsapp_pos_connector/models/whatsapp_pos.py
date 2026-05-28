@@ -170,13 +170,12 @@ class WhatsappPosOrder(models.Model):
         # Fallback: if strict config filter yields nothing, return company pending orders.
         if not orders and pos_config_id:
             orders = self.search(base_domain, order="id asc", limit=limit)
-        if orders:
-            self._log_debug(
-                "pos.server",
-                "info",
-                f"fetch_pending_for_pos cfg={pos_config_id} returned={len(orders)}",
-                [o.id for o in orders],
-            )
+        self._log_debug(
+            "pos.server",
+            "info",
+            f"fetch_pending_for_pos cfg={pos_config_id} returned={len(orders)}",
+            [o.id for o in orders],
+        )
         return [order._serialize_for_pos() for order in orders]
 
     def _serialize_for_pos(self):
@@ -439,6 +438,16 @@ class WhatsappPosOrder(models.Model):
             ],
         }
         order = self.create(order_vals)
+        self._log_debug(
+            "order.create",
+            "info",
+            f"WhatsApp order created id={order.id} state={order.state}",
+            {
+                "conversation_phone": conversation.phone_number,
+                "line_count": len(cart),
+                "pos_config_id": order.pos_config_id.id if order.pos_config_id else False,
+            },
+        )
         self._notify_pos_new_order(order)
 
         conversation.write({"state": "idle", "selected_product_id": False, "cart_json": "[]"})
