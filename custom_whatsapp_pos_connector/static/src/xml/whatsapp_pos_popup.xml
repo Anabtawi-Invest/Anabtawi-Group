@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="custom_whatsapp_pos_connector.WhatsAppPosOrderPopup" owl="1">
-        <Dialog size="'md'" t-att-title="title">
+        <Dialog size="'md'" title="title">
             <div t-on-click.stop="">
                 <div class="mb-2">
                     <strong><t t-esc="props.order.name"/></strong>
