@@ -18,22 +18,22 @@ class PortalCheckInController(http.Controller):
     _PORTAL_DASHBOARD_SECTIONS = {
         'time_off': {
             'label': 'Time Off',
-            'url': '/my/leaves',
+            'url': '/my/leaves?from_dashboard=1',
             'icon': 'fa-calendar',
         },
         'overtime_approvals': {
             'label': 'Overtime Approvals',
-            'url': '/my/overtime_approvals',
+            'url': '/my/overtime_approvals?from_dashboard=1',
             'icon': 'fa-clock-o',
         },
         'employee_code': {
             'label': 'Employee Code',
-            'url': '/my/employee-code',
+            'url': '/my/employee-code?from_dashboard=1',
             'icon': 'fa-id-card-o',
         },
         'employee_payslip': {
             'label': 'Employee Payslip',
-            'url': '/my/payslips',
+            'url': '/my/payslips?from_dashboard=1',
             'icon': 'fa-file-text-o',
         },
     }

@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <template id="portal_layout_dashboard_embed_no_header" inherit_id="portal.portal_layout" priority="120">
+        <xpath expr="//t[@t-call='portal.frontend_layout']" position="before">
+            <t t-set="is_dashboard_embed"
+               t-value="request and request.httprequest and request.httprequest.path.startswith('/my/') and ((request.params.get('from_dashboard') in ('1', 'true', 'True')) or request.httprequest.headers.get('Sec-Fetch-Dest') == 'iframe')"/>
+            <!-- Hide website header/offcanvas only for portal pages rendered inside dashboard iframe. -->
+            <t t-if="is_dashboard_embed">
+                <t t-set="no_header" t-value="True"/>
+                <t t-set="no_footer" t-value="True"/>
+            </t>
+        </xpath>
+    </template>
+
     <template id="portal_my_home_menu_check_in" inherit_id="portal.portal_my_home" priority="999">
         <xpath expr="//div[@id='portal_alert_category']" position="attributes">
             <attribute name="t-if">False</attribute>
