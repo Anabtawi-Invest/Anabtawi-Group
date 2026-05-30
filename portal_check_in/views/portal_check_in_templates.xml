@@ -47,17 +47,22 @@
                     margin-top: 1.5rem;
                     margin-bottom: 1.5rem;
                 }
-                .o_portal_dashboard_layout {
-                    display: flex;
-                    gap: 1rem;
-                    align-items: stretch;
+                .o_portal_dashboard_title {
+                    background: #fff;
+                    border-radius: 16px;
+                    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+                    padding: 1rem 1.25rem;
+                    margin-bottom: 1rem;
                 }
-                .o_portal_dashboard_sidebar_offcanvas {
-                    flex: 0 0 280px;
+                .o_portal_dashboard_layout {
+                    display: grid;
+                    grid-template-columns: 24% 76%;
+                    gap: 1rem;
+                    align-items: start;
                 }
                 .o_portal_dashboard_sidebar {
-                    width: 280px;
-                    min-height: 100%;
+                    width: 100%;
+                    min-height: 70vh;
                     background: #fff;
                     border-radius: 16px;
                     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
@@ -122,26 +127,13 @@
                     border-radius: 12px;
                     background: #fff;
                 }
-                .o_portal_dashboard_toggle {
-                    display: none;
-                }
                 @media (max-width: 991.98px) {
                     .o_portal_dashboard_layout {
                         display: block;
                     }
-                    .o_portal_dashboard_toggle {
-                        display: inline-flex;
-                        align-items: center;
-                        margin-bottom: 0.75rem;
-                    }
-                    .o_portal_dashboard_sidebar_offcanvas {
-                        width: 280px;
-                    }
                     .o_portal_dashboard_sidebar {
-                        border-radius: 0;
-                        box-shadow: none;
-                        width: 100%;
-                        height: 100%;
+                        min-height: auto;
+                        margin-bottom: 0.75rem;
                     }
                     .o_portal_dashboard_content {
                         padding: 0.85rem;
@@ -153,39 +145,25 @@
                 }
             </style>
             <div class="container o_portal_dashboard_wrapper">
+                <div class="o_portal_dashboard_title">
+                    <h4 class="mb-0">Employee Portal</h4>
+                </div>
                 <div class="o_portal_dashboard_layout">
-                    <button
-                        type="button"
-                        class="btn btn-outline-secondary o_portal_dashboard_toggle d-lg-none"
-                        data-bs-toggle="offcanvas"
-                        data-bs-target="#o_portal_dashboard_sidebar"
-                        aria-controls="o_portal_dashboard_sidebar"
-                    >
-                        <i class="fa fa-bars me-2"/>Menu
-                    </button>
-                    <div class="o_portal_dashboard_sidebar_offcanvas offcanvas-lg offcanvas-start" tabindex="-1" id="o_portal_dashboard_sidebar">
-                        <div class="offcanvas-header d-lg-none">
-                            <h5 class="offcanvas-title">Employee Portal</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"/>
-                        </div>
-                        <div class="offcanvas-body p-0">
-                            <nav class="o_portal_dashboard_sidebar">
-                                <div class="o_portal_dashboard_sidebar_title">Employee Portal</div>
-                                <a
-                                    t-foreach="portal_dashboard_sections"
-                                    t-as="item"
-                                    t-key="item['key']"
-                                    t-attf-class="o_portal_dashboard_nav_item #{'is-active' if item['active'] else ''}"
-                                    t-att-href="'/my/portal-dashboard?section=%s' % item['key']"
-                                    t-att-data-section-key="item['key']"
-                                    t-att-data-content-url="item['url']"
-                                >
-                                    <i t-attf-class="fa #{item['icon']}"/>
-                                    <span t-esc="item['label']"/>
-                                </a>
-                            </nav>
-                        </div>
-                    </div>
+                    <aside class="o_portal_dashboard_sidebar">
+                        <div class="o_portal_dashboard_sidebar_title">Menu</div>
+                        <a
+                            t-foreach="portal_dashboard_sections"
+                            t-as="item"
+                            t-key="item['key']"
+                            t-attf-class="o_portal_dashboard_nav_item #{'is-active' if item['active'] else ''}"
+                            t-att-href="'/my/portal-dashboard?section=%s' % item['key']"
+                            t-att-data-section-key="item['key']"
+                            t-att-data-content-url="item['url']"
+                        >
+                            <i t-attf-class="fa #{item['icon']}"/>
+                            <span t-esc="item['label']"/>
+                        </a>
+                    </aside>
                     <section class="o_portal_dashboard_content">
                         <div class="o_portal_dashboard_content_header">
                             <h4 class="mb-0" id="o_portal_dashboard_title" t-esc="portal_dashboard_selected_label"/>
@@ -234,14 +212,6 @@
                                 setActive(item);
                                 if (window.history &amp;&amp; window.history.replaceState) {
                                     window.history.replaceState({}, '', item.getAttribute('href'));
-                                }
-
-                                var offcanvas = wrapper.querySelector('#o_portal_dashboard_sidebar');
-                                if (offcanvas &amp;&amp; offcanvas.classList.contains('show')) {
-                                    var closeBtn = offcanvas.querySelector('.btn-close');
-                                    if (closeBtn) {
-                                        closeBtn.click();
-                                    }
                                 }
                             });
                         });
