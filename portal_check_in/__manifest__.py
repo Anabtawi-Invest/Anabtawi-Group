@@ -19,6 +19,12 @@
         'views/portal_check_in_templates.xml',
         'views/hr_work_location_geofence_views.xml'
     ],
+    'assets': {
+        'web.assets_frontend': [
+            'portal_check_in/static/src/scss/portal_dashboard.scss',
+            'portal_check_in/static/src/js/portal_dashboard.js',
+        ],
+    },
 
 
     'license': "Other proprietary",

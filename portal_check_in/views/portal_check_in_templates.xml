@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="portal_my_home_menu_check_in" inherit_id="portal.portal_my_home" priority="90">
+    <template id="portal_my_home_menu_check_in" inherit_id="portal.portal_my_home" priority="999">
         <xpath expr="//div[@id='portal_alert_category']" position="attributes">
             <attribute name="t-if">False</attribute>
         </xpath>
@@ -10,17 +10,8 @@
         <xpath expr="//div[@id='portal_vendor_category']" position="attributes">
             <attribute name="t-if">False</attribute>
         </xpath>
-        <xpath expr="//div[@id='portal_client_category']" position="replace">
-            <div class="o_portal_category row g-2 mt-3" id="portal_client_category">
-                <t t-call="portal.portal_docs_entry">
-                    <t t-set="icon" t-value="'/portal_leaves/static/src/img/leaves.svg'"/>
-                    <t t-set="title">Time Off</t>
-                    <t t-set="url" t-value="'/my/leaves'"/>
-                    <t t-set="text">View your time off requests and create new ones</t>
-                    <t t-set="placeholder_count" t-value="'leave_count'"/>
-                    <t t-set="config_card" t-value="True"/>
-                </t>
-            </div>
+        <xpath expr="//div[@id='portal_client_category']" position="attributes">
+            <attribute name="t-if">False</attribute>
         </xpath>
         <xpath expr="//div[@id='portal_common_category']" position="replace">
             <div class="o_portal_category row g-2 mt-3" id="portal_common_category">
@@ -33,9 +24,9 @@
                 </t>
                 <t t-call="portal.portal_docs_entry">
                     <t t-set="icon" t-value="'/portal/static/src/img/portal-connection.svg'"/>
-                    <t t-set="title">Overtime Approvals</t>
-                    <t t-set="text">Request approval for your overtime hours</t>
-                    <t t-set="url" t-value="'/my/overtime_approvals'"/>
+                    <t t-set="title">Portal</t>
+                    <t t-set="text">Open your employee services dashboard</t>
+                    <t t-set="url" t-value="'/my/portal-dashboard'"/>
                     <t t-set="config_card" t-value="True"/>
                 </t>
             </div>
@@ -45,7 +36,63 @@
     <template id="portal_breadcrumbs_check_in" inherit_id="portal.portal_breadcrumbs">
         <xpath expr="//ol" position="inside">
             <li t-if="page_name == 'my_check_in'" class="breadcrumb-item">Attendance</li>
+            <li t-if="page_name == 'portal_dashboard'" class="breadcrumb-item">Portal Dashboard</li>
         </xpath>
+    </template>
+
+    <template id="portal_dashboard" name="Portal Employee Dashboard">
+        <t t-call="portal.portal_layout">
+            <div class="container o_portal_dashboard_wrapper">
+                <div class="o_portal_dashboard_layout">
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary o_portal_dashboard_toggle d-lg-none"
+                        data-bs-toggle="offcanvas"
+                        data-bs-target="#o_portal_dashboard_sidebar"
+                        aria-controls="o_portal_dashboard_sidebar"
+                    >
+                        <i class="fa fa-bars me-2"/>Menu
+                    </button>
+                    <div class="o_portal_dashboard_sidebar_offcanvas offcanvas-lg offcanvas-start" tabindex="-1" id="o_portal_dashboard_sidebar">
+                        <div class="offcanvas-header d-lg-none">
+                            <h5 class="offcanvas-title">Employee Portal</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"/>
+                        </div>
+                        <div class="offcanvas-body p-0">
+                            <nav class="o_portal_dashboard_sidebar">
+                                <div class="o_portal_dashboard_sidebar_title">Employee Portal</div>
+                                <a
+                                    t-foreach="portal_dashboard_sections"
+                                    t-as="item"
+                                    t-key="item['key']"
+                                    t-attf-class="o_portal_dashboard_nav_item #{'is-active' if item['active'] else ''}"
+                                    t-att-href="'/my/portal-dashboard?section=%s' % item['key']"
+                                    t-att-data-section-key="item['key']"
+                                    t-att-data-content-url="item['url']"
+                                >
+                                    <i t-attf-class="fa #{item['icon']}"/>
+                                    <span t-esc="item['label']"/>
+                                </a>
+                            </nav>
+                        </div>
+                    </div>
+                    <section class="o_portal_dashboard_content">
+                        <div class="o_portal_dashboard_content_header">
+                            <h4 class="mb-0" id="o_portal_dashboard_title" t-esc="portal_dashboard_selected_label"/>
+                        </div>
+                        <div class="o_portal_dashboard_iframe_wrap">
+                            <!-- Keep all existing business logic untouched by reusing existing routes in an iframe shell. -->
+                            <iframe
+                                id="o_portal_dashboard_iframe"
+                                class="o_portal_dashboard_iframe"
+                                t-att-src="portal_dashboard_selected_url"
+                                t-att-title="portal_dashboard_selected_label"
+                            />
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </t>
     </template>
 
     <template id="portal_my_check_in" name="Portal Attendance Check In">
