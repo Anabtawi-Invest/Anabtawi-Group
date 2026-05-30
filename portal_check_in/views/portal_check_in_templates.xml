@@ -63,6 +63,8 @@
                 .o_portal_dashboard_sidebar {
                     width: 100%;
                     min-height: 70vh;
+                    max-height: 78vh;
+                    overflow-y: auto;
                     background: #fff;
                     border-radius: 16px;
                     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
@@ -118,11 +120,12 @@
                 .o_portal_dashboard_iframe_wrap {
                     flex: 1 1 auto;
                     min-height: 70vh;
+                    overflow: hidden;
                 }
                 .o_portal_dashboard_iframe {
                     width: 100%;
-                    height: 100%;
                     min-height: 70vh;
+                    height: 70vh;
                     border: 0;
                     border-radius: 12px;
                     background: #fff;
@@ -175,6 +178,7 @@
                                 class="o_portal_dashboard_iframe"
                                 t-att-src="portal_dashboard_selected_url"
                                 t-att-title="portal_dashboard_selected_label"
+                                scrolling="no"
                             />
                         </div>
                     </section>
@@ -194,11 +198,32 @@
                             return;
                         }
 
+                        function resizeIframe() {
+                            try {
+                                var doc = iframe.contentDocument || (iframe.contentWindow &amp;&amp; iframe.contentWindow.document);
+                                if (!doc) {
+                                    return;
+                                }
+                                var bodyHeight = doc.body ? doc.body.scrollHeight : 0;
+                                var htmlHeight = doc.documentElement ? doc.documentElement.scrollHeight : 0;
+                                var finalHeight = Math.max(bodyHeight, htmlHeight, 720);
+                                iframe.style.height = String(finalHeight) + 'px';
+                            } catch (error) {
+                                // Cross-frame guards: keep default height if document is not accessible.
+                            }
+                        }
+
                         function setActive(clickedItem) {
                             navItems.forEach(function (item) {
                                 item.classList.toggle('is-active', item === clickedItem);
                             });
                         }
+
+                        iframe.addEventListener('load', function () {
+                            resizeIframe();
+                            setTimeout(resizeIframe, 250);
+                            setTimeout(resizeIframe, 900);
+                        });
 
                         navItems.forEach(function (item) {
                             item.addEventListener('click', function (event) {
@@ -215,6 +240,8 @@
                                 }
                             });
                         });
+
+                        resizeIframe();
                     }
 
                     if (document.readyState === 'loading') {
