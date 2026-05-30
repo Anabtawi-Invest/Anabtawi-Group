@@ -63,6 +63,9 @@ class HrAttendanceOvertimeLine(models.Model):
         return records
 
     def action_approve(self):
+        if self.env.context.get("skip_all_overtime_approval_checks"):
+            self.write({"status": "approved"})
+            return True
         if not self.env.context.get("skip_overtime_approval_gate"):
             self._check_overtime_approval_gate()
         return super().action_approve()

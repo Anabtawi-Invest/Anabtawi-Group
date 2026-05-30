@@ -59,6 +59,7 @@ class HrAttendance(models.Model):
         attendances = self.search(
             [
                 ("overtime_authorization_request_id", "!=", False),
+                ("overtime_authorization_request_id.overtime_disable_auto_checkout", "=", False),
                 ("overtime_authorization_deadline", "!=", False),
                 ("check_out", "=", False),
                 ("overtime_authorization_deadline", "<=", deadline_now),

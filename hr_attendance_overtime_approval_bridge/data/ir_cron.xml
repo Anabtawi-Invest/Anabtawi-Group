@@ -9,4 +9,14 @@
         <field name="interval_type">minutes</field>
         <field name="active">True</field>
     </record>
+
+    <record id="ir_cron_convert_pending_weekly_overtime" model="ir.cron">
+        <field name="name">Convert Pending Weekly Overtime</field>
+        <field name="model_id" ref="approvals.model_approval_request"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_convert_pending_weekly_overtime()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active">True</field>
+    </record>
 </odoo>

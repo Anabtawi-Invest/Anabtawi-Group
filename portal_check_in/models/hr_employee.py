@@ -155,11 +155,14 @@ class HrEmployee(models.Model):
 
     def _create_authorized_attendance(self, action_date, geo_information, approval_request):
         self.ensure_one()
+        deadline = False
+        if not approval_request.overtime_disable_auto_checkout:
+            deadline = action_date + timedelta(hours=approval_request.quantity)
         vals = {
             "employee_id": self.id,
             "check_in": action_date,
             "overtime_authorization_request_id": approval_request.id,
-            "overtime_authorization_deadline": action_date + timedelta(hours=approval_request.quantity),
+            "overtime_authorization_deadline": deadline,
         }
         if geo_information:
             vals.update(
@@ -201,7 +204,10 @@ class HrEmployee(models.Model):
     def _apply_authorized_check_out(self, attendance, action_date, geo_information):
         self.ensure_one()
         check_out_date = action_date
-        if attendance.overtime_authorization_deadline:
+        if (
+            attendance.overtime_authorization_deadline
+            and not attendance.overtime_authorization_request_id.overtime_disable_auto_checkout
+        ):
             check_out_date = min(action_date, attendance.overtime_authorization_deadline)
         _logger.warning(
             "portal_check_in authorized check-out start: employee_id=%s attendance_id=%s request_id=%s "
