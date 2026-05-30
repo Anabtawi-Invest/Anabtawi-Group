@@ -19,7 +19,5 @@
         'views/portal_check_in_templates.xml',
         'views/hr_work_location_geofence_views.xml'
     ],
-
-
     'license': "Other proprietary",
 }

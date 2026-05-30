@@ -15,6 +15,28 @@ _logger = logging.getLogger(__name__)
 
 
 class PortalCheckInController(http.Controller):
+    _PORTAL_DASHBOARD_SECTIONS = {
+        'time_off': {
+            'label': 'Time Off',
+            'url': '/my/leaves?from_dashboard=1',
+            'icon': 'fa-calendar',
+        },
+        'overtime_approvals': {
+            'label': 'Overtime Approvals',
+            'url': '/my/overtime_approvals?from_dashboard=1',
+            'icon': 'fa-clock-o',
+        },
+        'employee_code': {
+            'label': 'Employee Code',
+            'url': '/my/employee-code?from_dashboard=1',
+            'icon': 'fa-id-card-o',
+        },
+        'employee_payslip': {
+            'label': 'Employee Payslip',
+            'url': '/my/payslips?from_dashboard=1',
+            'icon': 'fa-file-text-o',
+        },
+    }
 
     @staticmethod
     def _format_hours(hours_value):
@@ -110,6 +132,36 @@ class PortalCheckInController(http.Controller):
             location,
         )
         return geo_information
+
+    def _get_portal_dashboard_values(self, section):
+        sections = self._PORTAL_DASHBOARD_SECTIONS
+        selected_section = section if section in sections else 'time_off'
+        section_items = []
+        for key, meta in sections.items():
+            section_items.append(
+                {
+                    'key': key,
+                    'label': _(meta['label']),
+                    'url': meta['url'],
+                    'icon': meta['icon'],
+                    'active': key == selected_section,
+                }
+            )
+        selected_meta = sections[selected_section]
+        return {
+            'page_name': 'portal_dashboard',
+            # This dashboard only changes navigation/UI and reuses the existing routes unchanged.
+            'portal_dashboard_sections': section_items,
+            'portal_dashboard_selected_section': selected_section,
+            'portal_dashboard_selected_url': selected_meta['url'],
+            'portal_dashboard_selected_label': _(selected_meta['label']),
+        }
+
+    @http.route(['/my/portal-dashboard'], type='http', auth='user', website=True)
+    def portal_dashboard(self, section='time_off', **kwargs):
+        del kwargs
+        values = self._get_portal_dashboard_values(section=section)
+        return request.render('portal_check_in.portal_dashboard', values)
 
     @http.route(['/my/check-in', '/odoo/check-in'], type='http', auth='user', website=True)
     def portal_my_check_in(self, **kwargs):

@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="portal_my_home_menu_check_in" inherit_id="portal.portal_my_home" priority="90">
+    <template id="portal_layout_dashboard_embed_no_header" inherit_id="portal.portal_layout" priority="120">
+        <xpath expr="//t[@t-call='portal.frontend_layout']" position="before">
+            <t t-set="is_dashboard_embed"
+               t-value="request and request.httprequest and request.httprequest.path.startswith('/my/') and ((request.params.get('from_dashboard') in ('1', 'true', 'True')) or request.httprequest.headers.get('Sec-Fetch-Dest') == 'iframe')"/>
+            <!-- Hide website header/offcanvas only for portal pages rendered inside dashboard iframe. -->
+            <t t-if="is_dashboard_embed">
+                <t t-set="no_header" t-value="True"/>
+                <t t-set="no_footer" t-value="True"/>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="portal_my_home_menu_check_in" inherit_id="portal.portal_my_home" priority="999">
         <xpath expr="//div[@id='portal_alert_category']" position="attributes">
             <attribute name="t-if">False</attribute>
         </xpath>
@@ -10,17 +22,8 @@
         <xpath expr="//div[@id='portal_vendor_category']" position="attributes">
             <attribute name="t-if">False</attribute>
         </xpath>
-        <xpath expr="//div[@id='portal_client_category']" position="replace">
-            <div class="o_portal_category row g-2 mt-3" id="portal_client_category">
-                <t t-call="portal.portal_docs_entry">
-                    <t t-set="icon" t-value="'/portal_leaves/static/src/img/leaves.svg'"/>
-                    <t t-set="title">Time Off</t>
-                    <t t-set="url" t-value="'/my/leaves'"/>
-                    <t t-set="text">View your time off requests and create new ones</t>
-                    <t t-set="placeholder_count" t-value="'leave_count'"/>
-                    <t t-set="config_card" t-value="True"/>
-                </t>
-            </div>
+        <xpath expr="//div[@id='portal_client_category']" position="attributes">
+            <attribute name="t-if">False</attribute>
         </xpath>
         <xpath expr="//div[@id='portal_common_category']" position="replace">
             <div class="o_portal_category row g-2 mt-3" id="portal_common_category">
@@ -33,9 +36,9 @@
                 </t>
                 <t t-call="portal.portal_docs_entry">
                     <t t-set="icon" t-value="'/portal/static/src/img/portal-connection.svg'"/>
-                    <t t-set="title">Overtime Approvals</t>
-                    <t t-set="text">Request approval for your overtime hours</t>
-                    <t t-set="url" t-value="'/my/overtime_approvals'"/>
+                    <t t-set="title">Portal</t>
+                    <t t-set="text">Open your employee services dashboard</t>
+                    <t t-set="url" t-value="'/my/portal-dashboard'"/>
                     <t t-set="config_card" t-value="True"/>
                 </t>
             </div>
@@ -45,7 +48,222 @@
     <template id="portal_breadcrumbs_check_in" inherit_id="portal.portal_breadcrumbs">
         <xpath expr="//ol" position="inside">
             <li t-if="page_name == 'my_check_in'" class="breadcrumb-item">Attendance</li>
+            <li t-if="page_name == 'portal_dashboard'" class="breadcrumb-item">Portal Dashboard</li>
         </xpath>
+    </template>
+
+    <template id="portal_dashboard" name="Portal Employee Dashboard">
+        <t t-call="portal.portal_layout">
+            <style>
+                .o_portal_dashboard_wrapper {
+                    margin-top: 1.5rem;
+                    margin-bottom: 1.5rem;
+                }
+                .o_portal_dashboard_title {
+                    background: #fff;
+                    border-radius: 16px;
+                    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+                    padding: 1rem 1.25rem;
+                    margin-bottom: 1rem;
+                }
+                .o_portal_dashboard_layout {
+                    display: grid;
+                    grid-template-columns: 24% 76%;
+                    gap: 1rem;
+                    align-items: start;
+                }
+                .o_portal_dashboard_sidebar {
+                    width: 100%;
+                    min-height: 70vh;
+                    max-height: 78vh;
+                    overflow-y: auto;
+                    background: #fff;
+                    border-radius: 16px;
+                    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+                    padding: 1rem 0.75rem;
+                }
+                .o_portal_dashboard_sidebar_title {
+                    font-size: 1rem;
+                    font-weight: 700;
+                    color: #0f172a;
+                    padding: 0 0.75rem 0.75rem;
+                    margin-bottom: 0.25rem;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+                .o_portal_dashboard_nav_item {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    border-radius: 10px;
+                    padding: 0.7rem 0.75rem;
+                    color: #334155;
+                    text-decoration: none;
+                    font-weight: 500;
+                    transition: all 0.2s ease;
+                }
+                .o_portal_dashboard_nav_item i {
+                    width: 1rem;
+                    text-align: center;
+                }
+                .o_portal_dashboard_nav_item:hover {
+                    background: #f8fafc;
+                    color: #0f172a;
+                }
+                .o_portal_dashboard_nav_item.is-active {
+                    background: #eff6ff;
+                    color: #1d4ed8;
+                    box-shadow: inset 0 0 0 1px #bfdbfe;
+                }
+                .o_portal_dashboard_content {
+                    min-width: 0;
+                    flex: 1 1 auto;
+                    background: #fff;
+                    border-radius: 16px;
+                    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+                    padding: 1rem;
+                    display: flex;
+                    flex-direction: column;
+                }
+                .o_portal_dashboard_content_header {
+                    border-bottom: 1px solid #e2e8f0;
+                    padding-bottom: 0.8rem;
+                    margin-bottom: 0.9rem;
+                }
+                .o_portal_dashboard_iframe_wrap {
+                    flex: 1 1 auto;
+                    min-height: 70vh;
+                    overflow: hidden;
+                }
+                .o_portal_dashboard_iframe {
+                    width: 100%;
+                    min-height: 70vh;
+                    height: 70vh;
+                    border: 0;
+                    border-radius: 12px;
+                    background: #fff;
+                }
+                @media (max-width: 991.98px) {
+                    .o_portal_dashboard_layout {
+                        display: block;
+                    }
+                    .o_portal_dashboard_sidebar {
+                        min-height: auto;
+                        margin-bottom: 0.75rem;
+                    }
+                    .o_portal_dashboard_content {
+                        padding: 0.85rem;
+                    }
+                    .o_portal_dashboard_iframe_wrap,
+                    .o_portal_dashboard_iframe {
+                        min-height: 62vh;
+                    }
+                }
+            </style>
+            <div class="container o_portal_dashboard_wrapper">
+                <div class="o_portal_dashboard_title">
+                    <h4 class="mb-0">Employee Portal</h4>
+                </div>
+                <div class="o_portal_dashboard_layout">
+                    <aside class="o_portal_dashboard_sidebar">
+                        <div class="o_portal_dashboard_sidebar_title">Menu</div>
+                        <a
+                            t-foreach="portal_dashboard_sections"
+                            t-as="item"
+                            t-key="item['key']"
+                            t-attf-class="o_portal_dashboard_nav_item #{'is-active' if item['active'] else ''}"
+                            t-att-href="'/my/portal-dashboard?section=%s' % item['key']"
+                            t-att-data-section-key="item['key']"
+                            t-att-data-content-url="item['url']"
+                        >
+                            <i t-attf-class="fa #{item['icon']}"/>
+                            <span t-esc="item['label']"/>
+                        </a>
+                    </aside>
+                    <section class="o_portal_dashboard_content">
+                        <div class="o_portal_dashboard_content_header">
+                            <h4 class="mb-0" id="o_portal_dashboard_title" t-esc="portal_dashboard_selected_label"/>
+                        </div>
+                        <div class="o_portal_dashboard_iframe_wrap">
+                            <!-- Keep all existing business logic untouched by reusing existing routes in an iframe shell. -->
+                            <iframe
+                                id="o_portal_dashboard_iframe"
+                                class="o_portal_dashboard_iframe"
+                                t-att-src="portal_dashboard_selected_url"
+                                t-att-title="portal_dashboard_selected_label"
+                                scrolling="no"
+                            />
+                        </div>
+                    </section>
+                </div>
+            </div>
+            <script type="text/javascript">
+                (function () {
+                    function setupPortalDashboardNavigation() {
+                        var wrapper = document.querySelector('.o_portal_dashboard_wrapper');
+                        if (!wrapper) {
+                            return;
+                        }
+                        var iframe = wrapper.querySelector('#o_portal_dashboard_iframe');
+                        var title = wrapper.querySelector('#o_portal_dashboard_title');
+                        var navItems = wrapper.querySelectorAll('.o_portal_dashboard_nav_item');
+                        if (!iframe || !title || !navItems.length) {
+                            return;
+                        }
+
+                        function resizeIframe() {
+                            try {
+                                var doc = iframe.contentDocument || (iframe.contentWindow &amp;&amp; iframe.contentWindow.document);
+                                if (!doc) {
+                                    return;
+                                }
+                                var bodyHeight = doc.body ? doc.body.scrollHeight : 0;
+                                var htmlHeight = doc.documentElement ? doc.documentElement.scrollHeight : 0;
+                                var finalHeight = Math.max(bodyHeight, htmlHeight, 720);
+                                iframe.style.height = String(finalHeight) + 'px';
+                            } catch (error) {
+                                // Cross-frame guards: keep default height if document is not accessible.
+                            }
+                        }
+
+                        function setActive(clickedItem) {
+                            navItems.forEach(function (item) {
+                                item.classList.toggle('is-active', item === clickedItem);
+                            });
+                        }
+
+                        iframe.addEventListener('load', function () {
+                            resizeIframe();
+                            setTimeout(resizeIframe, 250);
+                            setTimeout(resizeIframe, 900);
+                        });
+
+                        navItems.forEach(function (item) {
+                            item.addEventListener('click', function (event) {
+                                var url = item.getAttribute('data-content-url');
+                                if (!url) {
+                                    return;
+                                }
+                                event.preventDefault();
+                                iframe.setAttribute('src', url);
+                                title.textContent = item.textContent.trim();
+                                setActive(item);
+                                if (window.history &amp;&amp; window.history.replaceState) {
+                                    window.history.replaceState({}, '', item.getAttribute('href'));
+                                }
+                            });
+                        });
+
+                        resizeIframe();
+                    }
+
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', setupPortalDashboardNavigation);
+                    } else {
+                        setupPortalDashboardNavigation();
+                    }
+                })();
+            </script>
+        </t>
     </template>
 
     <template id="portal_my_check_in" name="Portal Attendance Check In">
