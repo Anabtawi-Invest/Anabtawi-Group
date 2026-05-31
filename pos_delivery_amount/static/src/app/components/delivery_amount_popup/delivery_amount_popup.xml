@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_delivery_amount.DeliveryAmountPopup">
+        <Dialog title="props.title" size="'md'">
+            <div class="d-flex flex-column gap-2">
+                <label class="form-label" t-esc="props.fieldLabel"/>
+                <Input
+                    tModel="[state, 'deliveryAmount']"
+                    isValid.bind="env.utils.isValidFloat"
+                    class="'w-100'"
+                />
+                <div class="text-muted">
+                    <t t-esc="props.maxLabel"/>:
+                    <span t-esc="env.utils.formatCurrency(props.maxAmount)"/>
+                </div>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary" t-on-click="cancel" t-esc="props.cancelLabel"/>
+                <button class="btn btn-primary" t-att-disabled="!canConfirm()" t-on-click="confirm" t-esc="props.confirmLabel"/>
+            </t>
+        </Dialog>
+    </t>
+</templates>
