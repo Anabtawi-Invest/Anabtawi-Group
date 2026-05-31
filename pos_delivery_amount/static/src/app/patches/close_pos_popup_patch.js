@@ -48,7 +48,7 @@ patch(ClosePosPopup.prototype, {
 
             if (result < 0) {
                 console.warn("[pos_delivery_amount] Invalid negative delivery amount.", { result });
-                this.dialog.add(AlertDialog, {
+                await makeAwaitable(this.dialog, AlertDialog, {
                     title: _t("Delivery Amount"),
                     body: _t("Delivery Amount must be positive or zero."),
                 });
@@ -60,7 +60,7 @@ patch(ClosePosPopup.prototype, {
                     result,
                     countedCashBalance,
                 });
-                this.dialog.add(AlertDialog, {
+                await makeAwaitable(this.dialog, AlertDialog, {
                     title: _t("Delivery Amount"),
                     body: _t("Delivery Amount cannot exceed counted cash balance."),
                 });
