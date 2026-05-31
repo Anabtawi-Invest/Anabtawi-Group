@@ -28,6 +28,10 @@ patch(ClosePosPopup.prototype, {
         return error?.message || _t("An error occurred while processing Delivery Amount.");
     },
 
+    async _waitForDialogRenderCycle() {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+    },
+
     async _askDeliveryAmount(countedCashBalance) {
         while (true) {
             const result = await makeAwaitable(this.dialog, DeliveryAmountPopup, {
@@ -38,10 +42,12 @@ patch(ClosePosPopup.prototype, {
             });
 
             if (result === undefined) {
+                console.info("[pos_delivery_amount] Delivery amount entry canceled by user.");
                 return undefined;
             }
 
             if (result < 0) {
+                console.warn("[pos_delivery_amount] Invalid negative delivery amount.", { result });
                 this.dialog.add(AlertDialog, {
                     title: _t("Delivery Amount"),
                     body: _t("Delivery Amount must be positive or zero."),
@@ -50,6 +56,10 @@ patch(ClosePosPopup.prototype, {
             }
 
             if (result > countedCashBalance) {
+                console.warn("[pos_delivery_amount] Delivery amount exceeds counted cash in popup validation.", {
+                    result,
+                    countedCashBalance,
+                });
                 this.dialog.add(AlertDialog, {
                     title: _t("Delivery Amount"),
                     body: _t("Delivery Amount cannot exceed counted cash balance."),
@@ -109,6 +119,12 @@ patch(ClosePosPopup.prototype, {
         if (deliveryAmount === undefined) {
             return;
         }
+        console.info("[pos_delivery_amount] Delivery amount confirmed from popup.", {
+            deliveryAmount,
+            countedCashBalance,
+            sessionId: this.pos.session.id,
+        });
+        await this._waitForDialogRenderCycle();
 
         try {
             await this.pos.data.call("pos.session", "update_closing_control_state_session", [
@@ -124,6 +140,10 @@ patch(ClosePosPopup.prototype, {
 
         let deliveryResponse;
         try {
+            console.info("[pos_delivery_amount] Calling backend action_process_delivery_amount.", {
+                sessionId: this.pos.session.id,
+                deliveryAmount,
+            });
             deliveryResponse = await this.pos.data.call(
                 "pos.session",
                 "action_process_delivery_amount",
@@ -131,8 +151,10 @@ patch(ClosePosPopup.prototype, {
             );
         } catch (error) {
             if (error instanceof ConnectionLostError) {
+                console.error("[pos_delivery_amount] Connection lost while processing delivery amount.", error);
                 throw error;
             }
+            console.error("[pos_delivery_amount] Backend validation/error in action_process_delivery_amount.", error);
             this._showDeliveryAmountError(this._extractDeliveryAmountErrorMessage(error));
             return;
         }

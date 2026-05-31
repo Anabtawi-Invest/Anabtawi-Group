@@ -39,8 +39,8 @@ export class DeliveryAmountPopup extends Component {
     }
 
     confirm() {
-        this.props.close();
         this.props.getPayload(this.env.utils.parseValidFloat(this.state.deliveryAmount));
+        this.props.close();
     }
 
     cancel() {

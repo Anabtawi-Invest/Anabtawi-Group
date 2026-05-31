@@ -1,5 +1,9 @@
+import logging
+
 from odoo import _, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class PosSession(models.Model):
@@ -37,6 +41,13 @@ class PosSession(models.Model):
 
         counted_cash = self.cash_register_balance_end_real or 0.0
         if self.currency_id.compare_amounts(amount, counted_cash) > 0:
+            _logger.warning(
+                "POS delivery amount validation failed on session %s: amount=%s counted_cash=%s user=%s",
+                self.id,
+                amount,
+                counted_cash,
+                self.env.user.id,
+            )
             raise ValidationError(_("Delivery Amount cannot exceed counted cash balance."))
 
         return counted_cash
