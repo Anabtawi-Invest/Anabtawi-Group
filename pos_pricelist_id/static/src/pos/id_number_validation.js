@@ -188,6 +188,12 @@ patch(PosOrder.prototype, {
         console.log("[POS_PRICELIST_ID] PosOrder.setup customer_id_number", this.customer_id_number);
     },
 
+    serializeForORM(opts = {}) {
+        const data = super.serializeForORM(opts);
+        data.customer_id_number = this.customer_id_number || false;
+        return data;
+    },
+
     updatePricelistAndFiscalPosition(newPartner) {
         const lockedPricelist = this.pricelist_id || this.config?.pricelist_id || false;
         super.updatePricelistAndFiscalPosition(newPartner);
