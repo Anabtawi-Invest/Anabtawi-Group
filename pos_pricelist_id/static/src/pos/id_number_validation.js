@@ -6,6 +6,7 @@ import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { TextInputPopup } from "@point_of_sale/app/components/popups/text_input_popup/text_input_popup";
 import OrderPaymentValidation from "@point_of_sale/app/utils/order_payment_validation";
+import { PosOrderAccounting } from "@point_of_sale/app/models/accounting/pos_order_accounting";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
 console.log("[POS_PRICELIST_ID] id_number_validation.js loaded");
@@ -178,6 +179,25 @@ patch(OrderPaymentValidation.prototype, {
         this.order._markDirty?.();
         console.log("[POS_PRICELIST_ID] ID number entered, allowing validation");
         return true;
+    },
+});
+
+patch(PosOrderAccounting.prototype, {
+    _computeAllPrices(opts = {}) {
+        const safeOpts = { ...opts };
+        const sourceLines = safeOpts.lines ?? this.lines;
+
+        if (!Array.isArray(sourceLines)) {
+            console.warn("[POS_PRICELIST_ID] Missing order lines while computing prices, using empty list", {
+                orderUuid: this.uuid,
+                receivedLinesType: typeof sourceLines,
+            });
+            safeOpts.lines = [];
+        } else {
+            safeOpts.lines = sourceLines;
+        }
+
+        return super._computeAllPrices(safeOpts);
     },
 });
 
