@@ -9,5 +9,5 @@ class ResConfigSettings(models.TransientModel):
         "pos.payment.method",
         related="pos_config_id.mep_payment_method_ids",
         readonly=False,
-        string="MEP Payment Methods",
+        string="MEPs Payment Methods",
     )

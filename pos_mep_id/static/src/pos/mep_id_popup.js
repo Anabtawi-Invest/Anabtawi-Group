@@ -16,7 +16,7 @@ export class MepIdPopup extends Component {
         close: Function,
     };
     static defaultProps = {
-        title: _t("Enter MEP ID"),
+        title: _t("Enter MEPs ID"),
         placeholder: _t("MEP ID"),
         confirmLabel: _t("Confirm"),
         cancelLabel: _t("Cancel"),

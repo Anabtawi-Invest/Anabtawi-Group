@@ -5,7 +5,7 @@ from odoo import api, fields, models
 class PosOrder(models.Model):
     _inherit = "pos.order"
 
-    mep_id = fields.Char(string="MEP ID")
+    mep_id = fields.Char(string="MEPs ID")
 
     @api.model
     def _load_pos_data_fields(self, config):

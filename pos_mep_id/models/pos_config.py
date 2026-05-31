@@ -10,7 +10,7 @@ class PosConfig(models.Model):
         "pos_config_mep_payment_method_rel",
         "config_id",
         "payment_method_id",
-        string="MEP Payment Methods",
+        string="MEPs Payment Methods",
         help="When one of these payment methods is selected in POS, cashier must enter a MEP ID.",
     )
 
