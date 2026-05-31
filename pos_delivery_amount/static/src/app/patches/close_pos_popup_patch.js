@@ -3,7 +3,7 @@
 import { _t } from "@web/core/l10n/translation";
 import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { patch } from "@web/core/utils/patch";
-import { ConnectionLostError } from "@web/core/network/rpc";
+import { ConnectionLostError, RPCError } from "@web/core/network/rpc";
 import { ask, makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
 import { DeliveryAmountPopup } from "@pos_delivery_amount/app/components/delivery_amount_popup/delivery_amount_popup";
@@ -14,6 +14,18 @@ patch(ClosePosPopup.prototype, {
             title: _t("Delivery Amount"),
             body: message || _t("An error occurred while processing Delivery Amount."),
         });
+    },
+
+    _extractDeliveryAmountErrorMessage(error) {
+        if (error instanceof RPCError) {
+            return (
+                error?.data?.arguments?.[0] ||
+                error?.data?.message ||
+                error?.message ||
+                _t("An error occurred while processing Delivery Amount.")
+            );
+        }
+        return error?.message || _t("An error occurred while processing Delivery Amount.");
     },
 
     async _askDeliveryAmount(countedCashBalance) {
@@ -118,12 +130,10 @@ patch(ClosePosPopup.prototype, {
                 [this.pos.session.id, deliveryAmount]
             );
         } catch (error) {
-            const errorMessage =
-                error?.data?.arguments?.[0] ||
-                error?.data?.message ||
-                error?.message ||
-                _t("An error occurred while processing Delivery Amount.");
-            this._showDeliveryAmountError(errorMessage);
+            if (error instanceof ConnectionLostError) {
+                throw error;
+            }
+            this._showDeliveryAmountError(this._extractDeliveryAmountErrorMessage(error));
             return;
         }
         if (!deliveryResponse?.successful) {
