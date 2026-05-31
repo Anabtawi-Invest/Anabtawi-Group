@@ -124,7 +124,7 @@ patch(PaymentScreen.prototype, {
             methodId: paymentLine?.payment_method_id?.id,
         });
         const mepId = await makeAwaitable(this.dialog, MepIdPopup, {
-            title: _t("Enter MEP ID"),
+            title: _t("Enter MEPs ID"),
             placeholder: _t("Type MEP ID"),
         });
         const normalizedMepId = (mepId || "").trim();
@@ -182,7 +182,7 @@ patch(OrderPaymentValidation.prototype, {
             if (!lineMepId) {
                 this.pos.dialog.add(AlertDialog, {
                     title: _t("Missing MEP ID"),
-                    body: _t("Please enter a MEP ID for all selected MEP payment methods."),
+                    body: _t("Please enter a MEPs ID for all selected MEP payment methods."),
                 });
                 console.warn("[POS_MEP_ID] Missing MEP ID on required payment line");
                 return false;
