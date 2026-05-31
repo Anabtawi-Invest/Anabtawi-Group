@@ -188,6 +188,12 @@ patch(PosOrder.prototype, {
             hasLinesAtSetup: Boolean(this.lines),
             linesType: typeof this.lines,
         });
+        if (!this.lines || typeof this.lines.map !== "function") {
+            // Defensive guard: some third-party patches trigger price recompute during setup
+            // before lines is initialized, which crashes in _computeAllPrices (lines.map).
+            console.warn("[POS_PRICELIST_ID] Pre-initializing order lines to avoid early map crash");
+            this.lines = [];
+        }
         super.setup(vals);
         // Preserve the value entered in POS even if the order is updated from backend data.
         this.customer_id_number = vals?.customer_id_number || this.customer_id_number || "";
