@@ -188,12 +188,6 @@ patch(PosOrder.prototype, {
             hasLinesAtSetup: Boolean(this.lines),
             linesType: typeof this.lines,
         });
-        if (!this.lines || typeof this.lines.map !== "function") {
-            // Defensive guard: some third-party patches trigger price recompute during setup
-            // before lines is initialized, which crashes in _computeAllPrices (lines.map).
-            console.warn("[POS_PRICELIST_ID] Pre-initializing order lines to avoid early map crash");
-            this.lines = [];
-        }
         super.setup(vals);
         // Preserve the value entered in POS even if the order is updated from backend data.
         this.customer_id_number = vals?.customer_id_number || this.customer_id_number || "";
@@ -204,6 +198,16 @@ patch(PosOrder.prototype, {
         const data = super.serializeForORM(opts);
         data.customer_id_number = this.customer_id_number || false;
         return data;
+    },
+
+    _computeAllPrices(opts = {}) {
+        if (!opts.lines && (!this.lines || typeof this.lines.map !== "function")) {
+            console.warn(
+                "[POS_PRICELIST_ID] _computeAllPrices fallback: lines not ready, using empty list for this call"
+            );
+            return super._computeAllPrices({ ...opts, lines: [] });
+        }
+        return super._computeAllPrices(opts);
     },
 
     updatePricelistAndFiscalPosition(newPartner) {
