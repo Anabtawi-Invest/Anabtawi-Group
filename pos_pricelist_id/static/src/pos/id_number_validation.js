@@ -195,16 +195,20 @@ patch(PosOrder.prototype, {
     },
 
     updatePricelistAndFiscalPosition(newPartner) {
+        // Some POS custom modules may call this during record setup, before lines are initialized.
+        // In that phase, super.updatePricelistAndFiscalPosition() triggers setPricelist(), which
+        // recomputes prices and expects this.lines.map(...) to exist.
+        if (!this.lines || typeof this.lines.map !== "function") {
+            console.log(
+                "[POS_PRICELIST_ID] Skipping updatePricelistAndFiscalPosition during setup; lines not ready"
+            );
+            return;
+        }
+
         const lockedPricelist = this.pricelist_id || this.config?.pricelist_id || false;
         super.updatePricelistAndFiscalPosition(newPartner);
 
         if (!lockedPricelist) {
-            return;
-        }
-
-        // During order setup, lines can still be undefined; avoid forcing a recompute too early.
-        if (!Array.isArray(this.lines)) {
-            console.log("[POS_PRICELIST_ID] Skipping pricelist restore during setup; lines not initialized");
             return;
         }
 
