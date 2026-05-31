@@ -9,7 +9,7 @@ import OrderPaymentValidation from "@point_of_sale/app/utils/order_payment_valid
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
 console.log("[POS_PRICELIST_ID] id_number_validation.js loaded");
-console.log("[POS_PRICELIST_ID] Registering patches: OrderPaymentValidation + PosOrder");
+console.log("[POS_PRICELIST_ID] Registering patches: OrderPaymentValidation + PosOrder.serializeForORM");
 
 function extractPricelistId(value) {
     if (!value) {
@@ -182,64 +182,9 @@ patch(OrderPaymentValidation.prototype, {
 });
 
 patch(PosOrder.prototype, {
-    setup(vals) {
-        console.log("[POS_PRICELIST_ID] PosOrder.setup patch reached", {
-            hasVals: Boolean(vals),
-            hasLinesAtSetup: Boolean(this.lines),
-            linesType: typeof this.lines,
-        });
-        super.setup(vals);
-        // Preserve the value entered in POS even if the order is updated from backend data.
-        this.customer_id_number = vals?.customer_id_number || this.customer_id_number || "";
-        console.log("[POS_PRICELIST_ID] PosOrder.setup customer_id_number", this.customer_id_number);
-    },
-
     serializeForORM(opts = {}) {
         const data = super.serializeForORM(opts);
         data.customer_id_number = this.customer_id_number || false;
         return data;
-    },
-
-    _computeAllPrices(opts = {}) {
-        if (!opts.lines && (!this.lines || typeof this.lines.map !== "function")) {
-            console.warn(
-                "[POS_PRICELIST_ID] _computeAllPrices fallback: lines not ready, using empty list for this call"
-            );
-            return super._computeAllPrices({ ...opts, lines: [] });
-        }
-        return super._computeAllPrices(opts);
-    },
-
-    updatePricelistAndFiscalPosition(newPartner) {
-        console.log("[POS_PRICELIST_ID] updatePricelistAndFiscalPosition patch called", {
-            hasLines: Boolean(this.lines),
-            linesHasMap: Boolean(this.lines && typeof this.lines.map === "function"),
-            partnerId: newPartner?.id || null,
-        });
-        // Some POS custom modules may call this during record setup, before lines are initialized.
-        // In that phase, super.updatePricelistAndFiscalPosition() triggers setPricelist(), which
-        // recomputes prices and expects this.lines.map(...) to exist.
-        if (!this.lines || typeof this.lines.map !== "function") {
-            console.log(
-                "[POS_PRICELIST_ID] Skipping updatePricelistAndFiscalPosition during setup; lines not ready"
-            );
-            return;
-        }
-
-        const lockedPricelist = this.pricelist_id || this.config?.pricelist_id || false;
-        super.updatePricelistAndFiscalPosition(newPartner);
-
-        if (!lockedPricelist) {
-            return;
-        }
-
-        if (extractPricelistId(this.pricelist_id) !== extractPricelistId(lockedPricelist)) {
-            this.setPricelist(lockedPricelist);
-            logJson("[POS_PRICELIST_ID] Restored session/order pricelist after partner change", {
-                partnerId: newPartner?.id || null,
-                lockedPricelist: describePricelistValue(lockedPricelist),
-                currentPricelist: describePricelistValue(this.pricelist_id),
-            });
-        }
     },
 });
