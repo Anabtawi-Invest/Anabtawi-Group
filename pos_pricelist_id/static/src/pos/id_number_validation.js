@@ -202,6 +202,12 @@ patch(PosOrder.prototype, {
             return;
         }
 
+        // During order setup, lines can still be undefined; avoid forcing a recompute too early.
+        if (!Array.isArray(this.lines)) {
+            console.log("[POS_PRICELIST_ID] Skipping pricelist restore during setup; lines not initialized");
+            return;
+        }
+
         if (extractPricelistId(this.pricelist_id) !== extractPricelistId(lockedPricelist)) {
             this.setPricelist(lockedPricelist);
             logJson("[POS_PRICELIST_ID] Restored session/order pricelist after partner change", {
