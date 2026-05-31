@@ -7,16 +7,12 @@ class PosSession(models.Model):
     _inherit = "pos.session"
 
     def action_pos_session_open(self):
-        """Set opening cash to 0 instead of carrying over the previous closing balance."""
-        for session in self.filtered(lambda s: s.state == "opening_control"):
-            if session.config_id.cash_control and not session.rescue:
-                session.cash_register_balance_start = 0
-            session.write({})
-        return True
+        """Open session using the opening amount already set on the session."""
+        return super().action_pos_session_open()
 
     def set_opening_control(self, cashbox_value, notes):
-        """Always register zero as opening cash, regardless of UI input."""
-        return super().set_opening_control(0, notes)
+        """Persist the value entered by the user in Opening Control."""
+        return super().set_opening_control(cashbox_value, notes)
 
     def pos_opening_cash_zero_reset(self):
         """Called from POS UI before showing the opening control popup."""
