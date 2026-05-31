@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pos_config_view_form_inherit_pos_mep_id" model="ir.ui.view">
+        <field name="name">pos.config.form.inherit.pos.mep.id</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//setting[field[@name='module_pos_hr']]" position="after">
+                <setting
+                    id="mep_payment_methods"
+                    string="MEP Payment Methods"
+                    help="Payment methods that require entering a MEP ID in POS."
+                >
+                    <field
+                        name="mep_payment_method_ids"
+                        widget="many2many_tags"
+                        options="{'no_create': True}"
+                        domain="[('id', 'in', payment_method_ids)]"
+                    />
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>
