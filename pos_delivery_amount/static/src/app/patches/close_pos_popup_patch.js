@@ -9,6 +9,13 @@ import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popu
 import { DeliveryAmountPopup } from "@pos_delivery_amount/app/components/delivery_amount_popup/delivery_amount_popup";
 
 patch(ClosePosPopup.prototype, {
+    _showDeliveryAmountError(message) {
+        this.dialog.add(AlertDialog, {
+            title: _t("Delivery Amount"),
+            body: message || _t("An error occurred while processing Delivery Amount."),
+        });
+    },
+
     async _askDeliveryAmount(countedCashBalance) {
         while (true) {
             const result = await makeAwaitable(this.dialog, DeliveryAmountPopup, {
@@ -103,11 +110,22 @@ patch(ClosePosPopup.prototype, {
             }
         }
 
-        const deliveryResponse = await this.pos.data.call(
-            "pos.session",
-            "action_process_delivery_amount",
-            [this.pos.session.id, deliveryAmount]
-        );
+        let deliveryResponse;
+        try {
+            deliveryResponse = await this.pos.data.call(
+                "pos.session",
+                "action_process_delivery_amount",
+                [this.pos.session.id, deliveryAmount]
+            );
+        } catch (error) {
+            const errorMessage =
+                error?.data?.arguments?.[0] ||
+                error?.data?.message ||
+                error?.message ||
+                _t("An error occurred while processing Delivery Amount.");
+            this._showDeliveryAmountError(errorMessage);
+            return;
+        }
         if (!deliveryResponse?.successful) {
             return this.handleClosingError(deliveryResponse);
         }
