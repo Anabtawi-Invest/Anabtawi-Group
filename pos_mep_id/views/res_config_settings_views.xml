@@ -8,8 +8,8 @@
             <xpath expr="//field[@name='pos_payment_method_ids']/ancestor::setting[1]" position="after">
                 <setting
                     id="pos_mep_payment_methods_setting"
-                    string="MEP Payment Methods"
-                    help="Payment methods that require entering a MEP ID in POS."
+                    string="Visa Payment Methods"
+                    help="Payment methods that require entering a Visa ID in POS."
                 >
                     <field
                         name="pos_mep_payment_method_ids"

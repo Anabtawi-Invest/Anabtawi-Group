@@ -8,8 +8,8 @@
             <xpath expr="//setting[field[@name='module_pos_hr']]" position="after">
                 <setting
                     id="mep_payment_methods"
-                    string="MEP Payment Methods"
-                    help="Payment methods that require entering a MEP ID in POS."
+                    string="Visa Payment Methods"
+                    help="Payment methods that require entering a Visa ID in POS."
                 >
                     <field
                         name="mep_payment_method_ids"
