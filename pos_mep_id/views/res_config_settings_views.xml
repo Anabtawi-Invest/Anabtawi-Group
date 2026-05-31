@@ -16,7 +16,6 @@
                         widget="many2many_tags"
                         options="{'no_create': True}"
                         domain="[('id', 'in', pos_payment_method_ids)]"
-                        readonly="pos_has_active_session"
                     />
                 </setting>
             </xpath>
