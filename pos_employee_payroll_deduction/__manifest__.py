@@ -14,7 +14,6 @@
         "data/hr_payslip_input_type_data.xml",
         "views/hr_employee_views.xml",
         "views/pos_payment_method_views.xml",
-        "views/hr_payslip_views.xml",
     ],
     "installable": True,
     "application": False,
