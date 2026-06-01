@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="input_type_pos_debt" model="hr.payslip.input.type">
+        <field name="name">POS Debt Deduction</field>
+        <field name="code">POS_DEBT</field>
+    </record>
+</odoo>
