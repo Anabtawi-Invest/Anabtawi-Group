@@ -5,6 +5,10 @@ from odoo.tools import float_is_zero
 class HrPayslip(models.Model):
     _inherit = "hr.payslip"
 
+    termination_clearance = fields.Boolean(
+        string="Termination Clearance",
+        help="Technical compatibility field used by custom payslip views.",
+    )
     pos_debt_total_open = fields.Monetary(
         string="Open POS Debt",
         compute="_compute_pos_debt_totals",
