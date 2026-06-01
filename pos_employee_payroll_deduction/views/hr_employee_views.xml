@@ -5,7 +5,7 @@
         <field name="model">hr.employee</field>
         <field name="inherit_id" ref="hr.view_employee_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//field[@name='work_contact_id']" position="after">
+            <xpath expr="//page[@name='work_information']//field[@name='department_id']" position="after">
                 <field name="pos_debt_partner_id"/>
                 <field name="pos_debt_monthly_limit"/>
             </xpath>
