@@ -4,19 +4,13 @@ from odoo.exceptions import ValidationError
 
 GROUP_PRICE_OVERRIDE_XMLID = "anabtawi_sale_pricing_control.group_sales_price_override"
 GROUP_PRICE_OVERRIDE_NAME = "Sales Price Override"
-GROUP_NO_PRICELIST_XMLID = "anabtawi_sale_pricing_control.group_sales_order_without_pricelist"
-GROUP_NO_PRICELIST_NAME = "Sales Order Without Pricelist"
 
 
 class SaleOrderLine(models.Model):
     _inherit = "sale.order.line"
 
     def _user_can_override_unit_price(self):
-        user = self.env.user
-        return (
-            user.has_group(GROUP_PRICE_OVERRIDE_XMLID)
-            or user.has_group(GROUP_NO_PRICELIST_XMLID)
-        )
+        return self.env.user.has_group(GROUP_PRICE_OVERRIDE_XMLID)
 
     def _skip_price_override_validation(self):
         context = self.env.context
@@ -50,11 +44,9 @@ class SaleOrderLine(models.Model):
             if currency.compare_amounts(line.price_unit, expected_price):
                 raise ValidationError(_(
                     "You are not allowed to manually modify Unit Price.\n"
-                    "To perform this action, your user must belong to '%(group1)s' "
-                    "or '%(group2)s'."
+                    "To perform this action, your user must belong to '%(group)s'."
                 ) % {
-                    "group1": GROUP_PRICE_OVERRIDE_NAME,
-                    "group2": GROUP_NO_PRICELIST_NAME,
+                    "group": GROUP_PRICE_OVERRIDE_NAME,
                 })
 
     @api.model_create_multi
