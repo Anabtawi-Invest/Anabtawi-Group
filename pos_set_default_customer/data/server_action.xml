@@ -18,7 +18,48 @@
             <field name="state">code</field>
             <field name="code">
 if records:
-    action = records.button_l10n_jo_edi_pos()
+    success_count = 0
+    failed_orders = []
+    for order in records:
+        try:
+            result = order.button_l10n_jo_edi_pos()
+            # button_l10n_jo_edi_pos may return a danger notification instead of raising.
+            if (
+                isinstance(result, dict)
+                and result.get("type") == "ir.actions.client"
+                and result.get("tag") == "display_notification"
+                and result.get("params", {}).get("type") in ("danger", "warning")
+            ):
+                failed_orders.append("%s: %s" % (
+                    order.display_name,
+                    result.get("params", {}).get("message") or env._("Unknown error"),
+                ))
+                continue
+            success_count += 1
+        except Exception as error:
+            failed_orders.append("%s: %s" % (order.display_name, str(error)))
+
+    failed_count = len(failed_orders)
+    details = "\n".join(failed_orders[:10])
+    if failed_count > 10:
+        details += "\n..."
+    message = env._("Processed: %s | Success: %s | Failed: %s") % (
+        len(records),
+        success_count,
+        failed_count,
+    )
+    if details:
+        message += "\n\n" + env._("Failed Orders:") + "\n" + details
+    action = {
+        "type": "ir.actions.client",
+        "tag": "display_notification",
+        "params": {
+            "title": env._("JoFotara Submission Result"),
+            "message": message,
+            "type": "warning" if failed_count else "success",
+            "sticky": bool(failed_count),
+        },
+    }
 else:
     action = {
         "type": "ir.actions.client",
