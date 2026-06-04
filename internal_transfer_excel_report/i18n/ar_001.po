@@ -1,0 +1,145 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* internal_transfer_excel_report
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0+e\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-04 08:45+0000\n"
+"PO-Revision-Date: 2026-06-04 08:45+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+"Language: ar_001\n"
+
+#. module: internal_transfer_excel_report
+#: model:ir.actions.act_window,name:internal_transfer_excel_report.action_internal_transfer_wizard
+#: model:ir.ui.menu,name:internal_transfer_excel_report.menu_internal_transfer_report
+#: model_terms:ir.ui.view,arch_db:internal_transfer_excel_report.view_internal_transfer_wizard
+msgid "Internal Transfer Report"
+msgstr "تقرير النقل الداخلي"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__filter_type
+msgid "Filter Type"
+msgstr "نوع الفلترة"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model.fields.selection,name:internal_transfer_excel_report.selection__internal_transfer_report_wizard__filter_type__week
+msgid "This Week"
+msgstr "هذا الأسبوع"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model.fields.selection,name:internal_transfer_excel_report.selection__internal_transfer_report_wizard__filter_type__last_month
+msgid "Last Month"
+msgstr "الشهر الماضي"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model.fields.selection,name:internal_transfer_excel_report.selection__internal_transfer_report_wizard__filter_type__custom
+msgid "Custom"
+msgstr "مخصص"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model.fields.selection,name:internal_transfer_excel_report.selection__internal_transfer_report_wizard__filter_type__today
+msgid "Today"
+msgstr "اليوم"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__date_from
+msgid "Date From"
+msgstr "من تاريخ"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__date_to
+msgid "Date To"
+msgstr "إلى تاريخ"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__category_id
+msgid "Product Category"
+msgstr "فئة المنتج"
+
+#. module: internal_transfer_excel_report
+#: model_terms:ir.ui.view,arch_db:internal_transfer_excel_report.view_internal_transfer_wizard
+msgid "Print Excel"
+msgstr "طباعة إكسل"
+
+#. module: internal_transfer_excel_report
+#: model_terms:ir.ui.view,arch_db:internal_transfer_excel_report.view_internal_transfer_wizard
+msgid "Cancel"
+msgstr "إلغاء"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model,name:internal_transfer_excel_report.model_internal_transfer_report_wizard
+msgid "Internal Transfer Report Wizard"
+msgstr "معالج تقرير النقل الداخلي"
+
+#. module: internal_transfer_excel_report
+#. odoo-python
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Please set both start and end date/time for custom filter."
+msgstr "يرجى تحديد تاريخ/وقت البداية والنهاية لفلتر التخصيص."
+
+#. module: internal_transfer_excel_report
+#. odoo-python
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Undefined"
+msgstr "غير محدد"
+
+#. module: internal_transfer_excel_report
+#. odoo-python
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Requested by"
+msgstr "طُلب بواسطة"
+
+#. module: internal_transfer_excel_report
+#. odoo-python
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Products"
+msgstr "المنتجات"
+
+#. module: internal_transfer_excel_report
+#. odoo-python
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Quantity"
+msgstr "الكمية"
+
+#. module: internal_transfer_excel_report
+#. odoo-python
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Actual Quantity"
+msgstr "الكمية الفعلية"
+
+#. module: internal_transfer_excel_report
+#. odoo-python
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Delivered Quantity"
+msgstr "الكمية المسلمة"
+
+#. module: internal_transfer_excel_report
+#. odoo-python
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Unit of Measure"
+msgstr "وحدة القياس"
+
+#. module: internal_transfer_excel_report
+#. odoo-python
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "No data for selected filters."
+msgstr "لا توجد بيانات للفلاتر المحددة."
+
+#. module: internal_transfer_excel_report
+#. odoo-python
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Total"
+msgstr "الإجمالي"
+
+#. module: internal_transfer_excel_report
+#. odoo-python
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Internal Transfers"
+msgstr "التحويلات الداخلية"
