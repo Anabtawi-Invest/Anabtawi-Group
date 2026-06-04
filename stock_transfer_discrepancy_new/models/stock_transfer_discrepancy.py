@@ -189,3 +189,30 @@ class StockTransferDiscrepancy(models.Model):
         self.sudo().write(vals)
         if not skip_recompute and self.truck_location_id:
             self.truck_location_id._compute_has_open_discrepancy()
+
+    def action_create_scrap(self):
+        """Open a new scrap form prefilled from the discrepancy."""
+        self.ensure_one()
+        rounding = self.product_id.uom_id.rounding
+        remaining_qty = max((self.difference_qty or 0.0) - (self.resolved_qty or 0.0), 0.0)
+        if float_compare(remaining_qty, 0.0, precision_rounding=rounding) <= 0:
+            remaining_qty = 0.0
+
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Scrap Order",
+            "res_model": "stock.scrap",
+            "view_mode": "form",
+            "target": "current",
+            "context": {
+                "default_product_id": self.product_id.id,
+                "default_product_uom_id": self.product_id.uom_id.id,
+                "default_scrap_qty": remaining_qty,
+                "default_location_id": self.truck_location_id.id,
+                "default_company_id": self.company_id.id,
+                "default_picking_id": self.picking_id.id,
+                "default_origin": self.picking_id.name
+                or self.picking_id.origin
+                or self.display_name,
+            },
+        }
