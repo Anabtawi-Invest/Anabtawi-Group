@@ -9,5 +9,28 @@
             <field name="state">code</field>
             <field name="code">action = model.action_open_default_customer_confirmation(partner_id=7252)</field>
         </record>
+
+        <record id="action_server_submit_selected_orders_to_jofotara" model="ir.actions.server">
+            <field name="name">Submit Selected Orders to JoFotara</field>
+            <field name="model_id" ref="point_of_sale.model_pos_order"/>
+            <field name="binding_model_id" ref="point_of_sale.model_pos_order"/>
+            <field name="binding_type">action</field>
+            <field name="state">code</field>
+            <field name="code">
+if records:
+    action = records.button_l10n_jo_edi_pos()
+else:
+    action = {
+        "type": "ir.actions.client",
+        "tag": "display_notification",
+        "params": {
+            "title": env._("No records selected"),
+            "message": env._("Please select one or more POS orders."),
+            "type": "warning",
+            "sticky": False,
+        },
+    }
+            </field>
+        </record>
     </data>
 </odoo>
