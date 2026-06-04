@@ -78,7 +78,16 @@
         <field name="name">Generate Delivery Amount Reports</field>
         <field name="model_id" ref="model_pos_delivery_amount_report"/>
         <field name="state">code</field>
-        <field name="code">model.action_generate_reports()</field>
+        <field name="code">
+model.action_generate_reports()
+action = {
+    "type": "ir.actions.act_window",
+    "name": "Delivery Amount Report",
+    "res_model": "pos.delivery.amount.report",
+    "view_mode": "list,form",
+    "target": "current",
+}
+        </field>
     </record>
 
     <menuitem id="menu_pos_delivery_amount_report"
@@ -90,8 +99,8 @@
 
     <menuitem id="menu_pos_delivery_amount_report_generate"
               name="Generate Reports"
-              parent="menu_pos_delivery_amount_report"
+              parent="account.menu_finance_entries"
               action="action_pos_delivery_amount_report_generate"
               groups="account.group_account_readonly,account.group_account_invoice,account.group_account_manager"
-              sequence="1"/>
+              sequence="91"/>
 </odoo>
