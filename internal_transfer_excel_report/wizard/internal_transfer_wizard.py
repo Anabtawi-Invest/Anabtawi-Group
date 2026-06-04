@@ -116,9 +116,12 @@ class InternalTransferReportWizard(models.TransientModel):
         self.ensure_one()
         import xlsxwriter  # pylint: disable=import-outside-toplevel
 
+        lang = self.env.context.get('lang') or self.env.user.lang
+        translate = self.with_context(lang=lang).env._
+
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-        sheet = workbook.add_worksheet('Internal Transfers')
+        sheet = workbook.add_worksheet(translate('Internal Transfers'))
         sheet.right_to_left()
         sheet.freeze_panes(1, 0)
 
@@ -139,12 +142,12 @@ class InternalTransferReportWizard(models.TransientModel):
         })
 
         headers = [
-            _('Requested by'),
-            _('Products'),
-            _('Quantity'),
-            _('Actual Quantity'),
-            _('Delivered Quantity'),
-            _('Unit of Measure'),
+            translate('Requested by'),
+            translate('Products'),
+            translate('Quantity'),
+            translate('Actual Quantity'),
+            translate('Delivered Quantity'),
+            translate('Unit of Measure'),
         ]
         for col, header in enumerate(headers):
             sheet.write(0, col, header, header_style)
@@ -157,10 +160,10 @@ class InternalTransferReportWizard(models.TransientModel):
         row = 1
         groups = self._get_report_groups()
         if not groups:
-            sheet.write(row, 0, _('No data for selected filters.'), text_style)
+            sheet.write(row, 0, translate('No data for selected filters.'), text_style)
         else:
             for group in groups:
-                sheet.write(row, 0, _('Total'), group_text_style)
+                sheet.write(row, 0, translate('Total'), group_text_style)
                 sheet.write(row, 1, group['product_name'], group_text_style)
                 sheet.write_number(row, 2, group['total_qty'], group_number_style)
                 sheet.write_number(row, 3, group['total_actual_qty'], group_number_style)
