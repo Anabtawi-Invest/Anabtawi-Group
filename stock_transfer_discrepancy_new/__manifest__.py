@@ -1,6 +1,6 @@
 {
     "name": "Stock Transfer Discrepancy for truck Approved",
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "category": "Inventory/Inventory",
     "author":"Anabtawi",
     "summary": "download this one Require reason when validated quantities are lower than expected",
