@@ -13,6 +13,7 @@
         "security/ir.model.access.csv",
         "views/pos_config_views.xml",
         "views/pos_session_views.xml",
+        "views/pos_delivery_report_views.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [
