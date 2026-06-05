@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension" owl="1">
+        <xpath expr="//InternalNoteButton" position="after">
+            <button t-if="!props.showRemainingButtons"
+                t-att-class="buttonClass"
+                class="btn btn-secondary btn-lg flex-shrink-0"
+                t-on-click="() => this.clickUrlOrdersButton()">
+                <i class="fa fa-map-marker me-1" role="img" aria-label="URL Orders" title="URL Orders"/>
+                <span>URL Orders</span>
+            </button>
+        </xpath>
+    </t>
+</templates>

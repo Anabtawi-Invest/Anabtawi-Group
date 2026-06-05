@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="pos_self_order.CartPage" t-inherit-mode="extension" owl="1">
+        <xpath expr="//div[hasclass('cart_container')]//h1" position="after">
+            <div t-if="requiresCustomerLocation" class="ms-3 ms-sm-0 mb-3">
+                <div class="alert alert-light border d-flex flex-column flex-md-row align-items-md-center gap-3 mb-0">
+                    <div class="flex-grow-1">
+                        <strong>Delivery location required</strong>
+                        <div class="text-muted">Share your location before confirming the order.</div>
+                        <div t-if="locationState.error" class="text-danger mt-1" t-esc="locationState.error"/>
+                        <div t-if="hasCustomerLocation" class="text-success mt-1">
+                            Location captured
+                            (<t t-esc="selfOrder.currentOrder.customer_latitude.toFixed(5)"/>,
+                            <t t-esc="selfOrder.currentOrder.customer_longitude.toFixed(5)"/>)
+                        </div>
+                    </div>
+                    <button type="button"
+                        class="btn btn-secondary btn-lg text-nowrap"
+                        t-att-disabled="locationState.loading or hasCustomerLocation"
+                        t-on-click="() => this.captureCustomerLocation()">
+                        <i t-if="hasCustomerLocation" class="fa fa-check me-2"/>
+                        <i t-else="" class="fa fa-map-marker me-2"/>
+                        <t t-esc="locationButtonLabel"/>
+                    </button>
+                </div>
+            </div>
+        </xpath>
+    </t>
+</templates>
