@@ -94,11 +94,13 @@ action = {
               name="Delivery Amount Report"
               parent="account.menu_finance_entries"
               action="action_pos_delivery_amount_report"
+              groups="account.group_account_readonly,account.group_account_invoice,account.group_account_manager"
               sequence="90"/>
 
     <menuitem id="menu_pos_delivery_amount_report_generate"
               name="Generate Reports"
               parent="account.menu_finance_entries"
               action="action_pos_delivery_amount_report_generate"
+              groups="account.group_account_readonly,account.group_account_invoice,account.group_account_manager"
               sequence="91"/>
 </odoo>
