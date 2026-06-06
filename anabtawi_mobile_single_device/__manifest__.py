@@ -4,11 +4,12 @@
     'version': '19.0.1.0.0',
     'category': 'Tools',
     'summary': 'Bind one mobile app device per user (portal or internal) with Bearer tokens',
-    'depends': ['base', 'hr'],
+    'depends': ['base', 'hr', 'web'],
     'data': [
         'security/ir.model.access.csv',
         'views/mobile_device_views.xml',
         'views/hr_department_views.xml',
+        'views/web_login_notice.xml',
     ],
     'post_init_hook': 'post_init_hook',
     'license': 'LGPL-3',
