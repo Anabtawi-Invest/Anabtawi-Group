@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_account_position_form_inherit_keep_pricelist_price" model="ir.ui.view">
+        <field name="name">account.fiscal.position.form.keep.pricelist.price</field>
+        <field name="model">account.fiscal.position</field>
+        <field name="inherit_id" ref="account.view_account_position_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group/group[field[@name='auto_apply']]" position="inside">
+                <field name="keep_pricelist_price_after_tax_mapping"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
