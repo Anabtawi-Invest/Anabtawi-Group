@@ -21,7 +21,7 @@
     ],
     'assets': {
         'point_of_sale._assets_pos': [
-            'pos_analytical/static/src/overrides/models.js'
+            'sh_pos_analytic_tags/static/src/overrides/models.js'
         ]
     },
     "images": ["static/description/background.png", ],

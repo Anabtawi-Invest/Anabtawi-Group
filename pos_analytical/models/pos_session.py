@@ -1,11 +1,7 @@
 # Copyright (C) Softhealer Technologies.
 # Part of Softhealer Technologies.
 
-import logging
-
 from odoo import models, fields, api
-
-_logger = logging.getLogger(__name__)
 
 
 class PosSessionInherit(models.Model):
@@ -25,31 +21,13 @@ class PosSessionInherit(models.Model):
         Extends the base method to set the analytic account on the resulting
         account move lines for income and expense accounts.
         """
-        res = super(PosSessionInherit, self)._create_account_move(
-            balancing_account,
-            amount_to_balance,
-            bank_payment_method_diffs,
-        )
-        # set analytic account detail in move order line
-        if not self.sh_analytic_account:
-            _logger.info(
-                "[POS_ANALYTICAL] Skip analytic distribution for session %s: no analytic account configured.",
-                self.id,
-            )
-            return res
-
-        analytic_distribution = {str(self.sh_analytic_account.id): 100}
+        res = super(PosSessionInherit, self)._create_account_move(balancing_account, amount_to_balance, bank_payment_method_diffs)
+         # set analytic account detail in move order line
         all_related_moves = self._get_related_account_moves()
         if all_related_moves:
             for each_move in all_related_moves:
                 if each_move.line_ids:
                     for line in each_move.line_ids:
                         if line.account_id.account_type == 'expense_direct_cost' or line.account_id.account_type == "income":
-                            line.write({'analytic_distribution': analytic_distribution})
-                            _logger.debug(
-                                "[POS_ANALYTICAL] Applied analytic distribution on line %s move %s: %s",
-                                line.id,
-                                each_move.id,
-                                analytic_distribution,
-                            )
+                            line.write({'analytic_distribution': {self.sh_analytic_account.id: 100}})
         return res
