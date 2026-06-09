@@ -3,4 +3,6 @@ access_stock_transfer_discrepancy_user,stock.transfer.discrepancy user,model_sto
 access_stock_transfer_discrepancy_manager,stock.transfer.discrepancy manager,model_stock_transfer_discrepancy,stock.group_stock_manager,1,1,1,1
 access_stock_transfer_discrepancy_wizard_user,stock.transfer.discrepancy.wizard user,model_stock_transfer_discrepancy_wizard,stock.group_stock_user,1,1,1,1
 access_stock_transfer_discrepancy_wizard_line_user,stock.transfer.discrepancy.wizard.line user,model_stock_transfer_discrepancy_wizard_line,stock.group_stock_user,1,1,1,1
+access_stock_transfer_driver_user,stock.transfer.driver user,model_stock_transfer_driver,stock.group_stock_user,1,0,0,0
+access_stock_transfer_driver_manager,stock.transfer.driver manager,model_stock_transfer_driver,stock.group_stock_manager,1,1,1,1
 

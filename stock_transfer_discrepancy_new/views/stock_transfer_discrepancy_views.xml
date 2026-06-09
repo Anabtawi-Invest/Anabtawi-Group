@@ -25,8 +25,8 @@
                 <field name="validated_at"/>
                 <field name="investigation_deadline"/>
                 <field name="picking_id"/>
-                <field name="destination_location_id"/>
                 <field name="truck_location_id"/>
+                <field name="driver_id"/>
                 <field name="product_id"/>
                 <field name="expected_qty"/>
                 <field name="actual_qty"/>
@@ -46,7 +46,6 @@
             <form string="Transfer Discrepancy">
                 <header>
                     <button name="%(stock_transfer_discrepancy_new.action_report_stock_transfer_discrepancy)d" type="action" string="Print Report" class="oe_highlight" icon="fa-print"/>
-                    <button name="action_create_scrap" type="object" string="Create Scrap Order" invisible="state == 'settled'"/>
                 </header>
                 <sheet>
                     <group>
@@ -55,8 +54,8 @@
                             <field name="validated_at"/>
                             <field name="investigation_deadline"/>
                             <field name="picking_id"/>
-                            <field name="destination_location_id"/>
                             <field name="truck_location_id"/>
+                            <field name="driver_id"/>
                             <field name="product_id"/>
                             <field name="stage"/>
                             <field name="state"/>
