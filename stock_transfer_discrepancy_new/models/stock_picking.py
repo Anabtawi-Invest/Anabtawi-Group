@@ -226,6 +226,23 @@ class StockPicking(models.Model):
             "[DISCREPANCY DOMAIN] _onchange called. picking_type_code=%s",
             self.picking_type_code,
         )
+        _logger.info(
+            "[DISCREPANCY DOMAIN] picking=%s id=%s company_id=%s source=%s(%s,is_truck=%s) "
+            "dest=%s(%s,is_truck=%s) driver=%s(%s,blocked=%s,company=%s)",
+            self.name,
+            self.id,
+            self.company_id.id if self.company_id else None,
+            self.location_id.display_name if self.location_id else None,
+            self.location_id.id if self.location_id else None,
+            self.location_id.is_truck if self.location_id else None,
+            self.location_dest_id.display_name if self.location_dest_id else None,
+            self.location_dest_id.id if self.location_dest_id else None,
+            self.location_dest_id.is_truck if self.location_dest_id else None,
+            self.driver_id.display_name if self.driver_id else None,
+            self.driver_id.id if self.driver_id else None,
+            self.driver_id.is_blocked if self.driver_id else None,
+            self.driver_id.company_id.id if self.driver_id and self.driver_id.company_id else None,
+        )
         if self.picking_type_code != "internal":
             _logger.info(
                 "[DISCREPANCY DOMAIN] Not internal transfer, skipping domain restriction"
@@ -247,13 +264,47 @@ class StockPicking(models.Model):
                 if self.driver_id.employee_id
                 else self.driver_id.display_name
             )
+            _logger.warning(
+                "[DISCREPANCY DOMAIN] Clearing driver_id=%s (%s): driver is blocked by open discrepancies",
+                self.driver_id.id,
+                drv_name,
+            )
             warning_msg = _(
                 "Driver '%s' is blocked due to open transfer discrepancies. Choose another driver or settle first.",
                 drv_name,
             )
             self.driver_id = False
+        if (
+            self.driver_id
+            and self.driver_id.company_id
+            and self.company_id
+            and self.driver_id.company_id != self.company_id
+        ):
+            _logger.warning(
+                "[DISCREPANCY DOMAIN] Selected driver_id=%s company=%s does not match picking company=%s. "
+                "UI domain may reject this value.",
+                self.driver_id.id,
+                self.driver_id.company_id.id,
+                self.company_id.id,
+            )
         if self.location_id and not self.location_id.is_truck:
+            _logger.warning(
+                "[DISCREPANCY DOMAIN] Clearing driver_id because source location is not truck. "
+                "source_location_id=%s is_truck=%s",
+                self.location_id.id,
+                self.location_id.is_truck,
+            )
             self.driver_id = False
+        _logger.info(
+            "[DISCREPANCY DOMAIN] Computed domains: location_id=%s location_dest_id=%s driver_id=%s",
+            source_domain,
+            dest_domain,
+            driver_domain,
+        )
+        _logger.info(
+            "[DISCREPANCY DOMAIN] Resulting driver after onchange: driver_id=%s",
+            self.driver_id.id if self.driver_id else None,
+        )
         result = {
             "domain": {
                 "location_id": source_domain,
@@ -275,12 +326,24 @@ class StockPicking(models.Model):
                 continue
             if picking.location_id.is_truck:
                 if not picking.driver_id:
+                    _logger.warning(
+                        "[DISCREPANCY CONSTRAINT] Rejecting picking_id=%s (%s): source is truck but driver is missing.",
+                        picking.id,
+                        picking.name,
+                    )
                     raise ValidationError(_("A driver is required when the source location is a truck."))
                 if picking.driver_id.is_blocked:
                     drv_name = (
                         picking.driver_id.employee_id.name
                         if picking.driver_id.employee_id
                         else picking.driver_id.display_name
+                    )
+                    _logger.warning(
+                        "[DISCREPANCY CONSTRAINT] Rejecting picking_id=%s (%s): driver_id=%s (%s) is blocked.",
+                        picking.id,
+                        picking.name,
+                        picking.driver_id.id,
+                        drv_name,
                     )
                     raise ValidationError(
                         _(
