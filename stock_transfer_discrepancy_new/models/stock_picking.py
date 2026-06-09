@@ -14,6 +14,11 @@ class StockPicking(models.Model):
         string="Driver",
         check_company=True,
     )
+    source_is_truck = fields.Boolean(
+        string="Source Is Truck",
+        related="location_id.is_truck",
+        readonly=True,
+    )
 
     def _get_transfer_discrepancy_move_vals(self):
         """Return list of dicts for moves where actual < expected.

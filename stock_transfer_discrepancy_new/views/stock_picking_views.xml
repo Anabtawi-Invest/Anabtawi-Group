@@ -29,9 +29,11 @@
                 <attribute name="domain">[('usage', '=', 'internal')]</attribute>
             </xpath>
             <xpath expr="//field[@name='backorder_id']" position="after">
+                <field name="source_is_truck" invisible="1"/>
                 <field
                     name="driver_id"
                     invisible="picking_type_code != 'internal'"
+                    required="picking_type_code == 'internal' and source_is_truck"
                     readonly="state == 'done'"
                 />
             </xpath>
