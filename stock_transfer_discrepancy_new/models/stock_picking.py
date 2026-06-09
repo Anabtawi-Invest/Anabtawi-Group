@@ -20,6 +20,30 @@ class StockPicking(models.Model):
         readonly=True,
     )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Ensure backorders inherit driver before constraints run.
+
+        During partial validation, Odoo may create backorders. If source is truck,
+        we want driver_id copied from the parent backorder record so the
+        truck/driver constraint doesn't fail unexpectedly.
+        """
+        for vals in vals_list:
+            if vals.get("driver_id"):
+                continue
+            backorder_id = vals.get("backorder_id")
+            if not backorder_id:
+                continue
+            parent = self.browse(backorder_id)
+            if parent and parent.driver_id:
+                vals["driver_id"] = parent.driver_id.id
+                _logger.info(
+                    "[DISCREPANCY CREATE] Auto-filled driver_id=%s from backorder parent picking_id=%s",
+                    parent.driver_id.id,
+                    parent.id,
+                )
+        return super().create(vals_list)
+
     def _get_transfer_discrepancy_move_vals(self):
         """Return list of dicts for moves where actual < expected.
 
