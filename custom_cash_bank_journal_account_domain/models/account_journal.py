@@ -14,7 +14,12 @@ class AccountJournal(models.Model):
                 'asset_current',
                 'asset_non_current',
                 'asset_prepayments',
-                'asset_fixed'
+                'asset_fixed',
+                'expense',
+                'liability_payable',
+                'liability_credit_card',
+                'liability_current',
+                'liability_non_current'
             ))]
         """
     )
@@ -25,7 +30,13 @@ class AccountJournal(models.Model):
                 'liability_payable',
                 'liability_credit_card',
                 'liability_current',
-                'liability_non_current'
+                'liability_non_current',
+                'asset_cash',
+                'asset_current',
+                'asset_non_current',
+                'asset_prepayments',
+                'asset_fixed',
+                
             ))]
         """
     )
