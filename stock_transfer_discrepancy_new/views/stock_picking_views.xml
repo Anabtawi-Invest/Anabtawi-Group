@@ -31,7 +31,7 @@
             <xpath expr="//field[@name='backorder_id']" position="after">
                 <field
                     name="driver_id"
-                    invisible="picking_type_code != 'internal' or not location_id.is_truck"
+                    invisible="picking_type_code != 'internal'"
                     required="picking_type_code == 'internal' and location_id.is_truck"
                     readonly="state == 'done'"
                 />

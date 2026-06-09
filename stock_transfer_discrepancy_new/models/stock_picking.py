@@ -288,13 +288,11 @@ class StockPicking(models.Model):
                 self.company_id.id,
             )
         if self.location_id and not self.location_id.is_truck:
-            _logger.warning(
-                "[DISCREPANCY DOMAIN] Clearing driver_id because source location is not truck. "
-                "source_location_id=%s is_truck=%s",
+            _logger.info(
+                "[DISCREPANCY DOMAIN] Source location is not truck (source_location_id=%s). "
+                "Driver remains optional and will not be auto-cleared.",
                 self.location_id.id,
-                self.location_id.is_truck,
             )
-            self.driver_id = False
         _logger.info(
             "[DISCREPANCY DOMAIN] Computed domains: location_id=%s location_dest_id=%s driver_id=%s",
             source_domain,
