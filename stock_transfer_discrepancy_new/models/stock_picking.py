@@ -353,6 +353,18 @@ class StockPicking(models.Model):
                 continue
             if picking.location_id.is_truck:
                 if not picking.driver_id:
+                    # Backorder flows may create/update internal truck pickings without
+                    # explicitly passing driver_id. Recover it from parent when possible.
+                    if picking.backorder_id and picking.backorder_id.driver_id:
+                        picking.driver_id = picking.backorder_id.driver_id.id
+                        _logger.info(
+                            "[DISCREPANCY CONSTRAINT] Auto-filled missing driver_id=%s from backorder parent "
+                            "for picking_id=%s (%s).",
+                            picking.driver_id.id,
+                            picking.id,
+                            picking.name,
+                        )
+                        continue
                     _logger.warning(
                         "[DISCREPANCY CONSTRAINT] Rejecting picking_id=%s (%s): source is truck but driver is missing.",
                         picking.id,
