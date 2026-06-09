@@ -84,6 +84,13 @@ class StockTransferDiscrepancy(models.Model):
     )
 
     company_id = fields.Many2one(related="picking_id.company_id", store=True, readonly=True)
+    destination_location_id = fields.Many2one(
+        "stock.location",
+        string="Destination Location",
+        related="picking_id.location_dest_id",
+        store=True,
+        readonly=True,
+    )
 
     @api.depends("expected_qty", "actual_qty")
     def _compute_difference_qty(self):
