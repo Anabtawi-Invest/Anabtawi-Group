@@ -44,6 +44,35 @@ class StockPicking(models.Model):
                 )
         return super().create(vals_list)
 
+    def _infer_driver_from_related_pickings(self):
+        """Best-effort driver inference for system-generated internal pickings."""
+        self.ensure_one()
+
+        # 1) Direct backorder parent.
+        if self.backorder_id and self.backorder_id.driver_id:
+            return self.backorder_id.driver_id
+
+        # 2) Origin reference (can contain one or more comma-separated names).
+        if self.origin:
+            origin_names = [name.strip() for name in self.origin.split(",") if name.strip()]
+            if origin_names:
+                origin_pick = self.search(
+                    [("name", "in", origin_names), ("driver_id", "!=", False)],
+                    limit=1,
+                    order="id desc",
+                )
+                if origin_pick:
+                    return origin_pick.driver_id
+
+        # 3) Upstream pickings linked via move chain.
+        upstream_pickings = (
+            self.move_ids.move_orig_ids.picking_id | self.move_ids_without_package.move_orig_ids.picking_id
+        ).filtered(lambda p: p.driver_id)
+        if upstream_pickings:
+            return upstream_pickings[0].driver_id
+
+        return False
+
     def _get_transfer_discrepancy_move_vals(self):
         """Return list of dicts for moves where actual < expected.
 
@@ -355,20 +384,24 @@ class StockPicking(models.Model):
                 if not picking.driver_id:
                     # Backorder flows may create/update internal truck pickings without
                     # explicitly passing driver_id. Recover it from parent when possible.
-                    if picking.backorder_id and picking.backorder_id.driver_id:
-                        picking.driver_id = picking.backorder_id.driver_id.id
+                    inferred_driver = picking._infer_driver_from_related_pickings()
+                    if inferred_driver:
+                        picking.driver_id = inferred_driver.id
                         _logger.info(
-                            "[DISCREPANCY CONSTRAINT] Auto-filled missing driver_id=%s from backorder parent "
-                            "for picking_id=%s (%s).",
+                            "[DISCREPANCY CONSTRAINT] Auto-filled missing driver_id=%s for picking_id=%s (%s) "
+                            "using related picking fallback (backorder/origin/move chain).",
                             picking.driver_id.id,
                             picking.id,
                             picking.name,
                         )
                         continue
                     _logger.warning(
-                        "[DISCREPANCY CONSTRAINT] Rejecting picking_id=%s (%s): source is truck but driver is missing.",
+                        "[DISCREPANCY CONSTRAINT] Rejecting picking_id=%s (%s): source is truck but driver is "
+                        "missing. backorder_id=%s origin=%s",
                         picking.id,
                         picking.name,
+                        picking.backorder_id.id if picking.backorder_id else None,
+                        picking.origin,
                     )
                     raise ValidationError(_("A driver is required when the source location is a truck."))
                 if picking.driver_id.is_blocked:
