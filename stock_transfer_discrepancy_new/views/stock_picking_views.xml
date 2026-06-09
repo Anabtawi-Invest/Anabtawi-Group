@@ -32,7 +32,6 @@
                 <field
                     name="driver_id"
                     invisible="picking_type_code != 'internal'"
-                    required="picking_type_code == 'internal' and location_id.is_truck"
                     readonly="state == 'done'"
                 />
             </xpath>
