@@ -137,14 +137,19 @@ class PosDeliveryAmountReportLine(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
+        reports = self.env["pos.delivery.amount.report"]
         for rec in records:
             rec.session_id.delivery_report_line_id = rec.id
+            reports |= rec.report_id
+        reports._compute_state()
         return records
 
     def unlink(self):
+        reports = self.report_id
         sessions = self.session_id
         res = super().unlink()
         sessions.write({"delivery_report_line_id": False})
+        reports._compute_state()
         return res
 
     @api.constrains("real_arrived_amount")

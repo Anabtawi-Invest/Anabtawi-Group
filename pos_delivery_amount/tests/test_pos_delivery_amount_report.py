@@ -77,3 +77,27 @@ class TestPosDeliveryAmountReport(TestPoSCommon):
             lambda l: l.account_id == self.difference_account and l.debit == 30.0
         )
         self.assertTrue(diff_move_line)
+
+    def test_new_draft_line_reopens_report_and_is_editable(self):
+        report_model = self.env["pos.delivery.amount.report"]
+
+        first_session = self._prepare_closed_session(80.0)
+        report_model.action_generate_reports()
+        first_line = self.env["pos.delivery.amount.report.line"].search(
+            [("session_id", "=", first_session.id)], limit=1
+        )
+        first_line.action_transfer()
+        self.assertEqual(first_line.report_id.state, "transferred")
+
+        second_session = self._prepare_closed_session(60.0)
+        report_model.action_generate_reports()
+        second_line = self.env["pos.delivery.amount.report.line"].search(
+            [("session_id", "=", second_session.id)], limit=1
+        )
+
+        self.assertEqual(second_line.state, "draft")
+        self.assertEqual(second_line.report_id, first_line.report_id)
+        self.assertEqual(second_line.report_id.state, "draft")
+
+        second_line.real_arrived_amount = 55.0
+        self.assertEqual(second_line.real_arrived_amount, 55.0)

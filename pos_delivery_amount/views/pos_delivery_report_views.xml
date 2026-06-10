@@ -36,12 +36,12 @@
                         <field name="total_real_arrived_amount" widget="monetary" readonly="1"/>
                         <field name="total_difference" widget="monetary" readonly="1"/>
                     </group>
-                    <field name="line_ids" nolabel="1" readonly="state == 'transferred'">
+                    <field name="line_ids" nolabel="1">
                         <list editable="bottom" create="0" delete="0">
                             <field name="session_id" string="Session Number" readonly="1"/>
                             <field name="pos_config_id" string="Point of Sale Name" readonly="1"/>
                             <field name="delivery_amount" widget="monetary" readonly="1"/>
-                            <field name="real_arrived_amount"/>
+                            <field name="real_arrived_amount" readonly="state == 'transferred'"/>
                             <field name="difference" widget="monetary" readonly="1"/>
                             <field name="settlement_move_id" readonly="1"/>
                             <field name="state" widget="badge"/>
