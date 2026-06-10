@@ -14,9 +14,9 @@ class StockPicking(models.Model):
         string="Driver",
         check_company=True,
     )
-    source_is_truck = fields.Boolean(
-        string="Source Is Truck",
-        related="location_id.is_truck",
+    destination_is_truck = fields.Boolean(
+        string="Destination Is Truck",
+        related="location_dest_id.is_truck",
         readonly=True,
     )
 
@@ -24,7 +24,7 @@ class StockPicking(models.Model):
     def create(self, vals_list):
         """Ensure backorders inherit driver before constraints run.
 
-        During partial validation, Odoo may create backorders. If source is truck,
+        During partial validation, Odoo may create backorders. If destination is truck,
         we want driver_id copied from the parent backorder record so the
         truck/driver constraint doesn't fail unexpectedly.
         """
@@ -345,11 +345,11 @@ class StockPicking(models.Model):
                 self.driver_id.company_id.id,
                 self.company_id.id,
             )
-        if self.location_id and not self.location_id.is_truck:
+        if self.location_dest_id and not self.location_dest_id.is_truck:
             _logger.info(
-                "[DISCREPANCY DOMAIN] Source location is not truck (source_location_id=%s). "
+                "[DISCREPANCY DOMAIN] Destination location is not truck (destination_location_id=%s). "
                 "Driver remains optional and will not be auto-cleared.",
-                self.location_id.id,
+                self.location_dest_id.id,
             )
         _logger.info(
             "[DISCREPANCY DOMAIN] Computed domains: location_id=%s location_dest_id=%s driver_id=%s",
@@ -375,12 +375,12 @@ class StockPicking(models.Model):
             }
         return result
 
-    @api.constrains("location_id", "driver_id", "picking_type_code")
+    @api.constrains("location_dest_id", "driver_id", "picking_type_code")
     def _check_truck_driver_required_and_not_blocked(self):
         for picking in self:
             if picking.picking_type_code != "internal":
                 continue
-            if picking.location_id.is_truck:
+            if picking.location_dest_id.is_truck:
                 if not picking.driver_id:
                     # Backorder flows may create/update internal truck pickings without
                     # explicitly passing driver_id. Recover it from parent when possible.
@@ -396,14 +396,14 @@ class StockPicking(models.Model):
                         )
                         continue
                     _logger.warning(
-                        "[DISCREPANCY CONSTRAINT] Rejecting picking_id=%s (%s): source is truck but driver is "
+                        "[DISCREPANCY CONSTRAINT] Rejecting picking_id=%s (%s): destination is truck but driver is "
                         "missing. backorder_id=%s origin=%s",
                         picking.id,
                         picking.name,
                         picking.backorder_id.id if picking.backorder_id else None,
                         picking.origin,
                     )
-                    raise ValidationError(_("A driver is required when the source location is a truck."))
+                    raise ValidationError(_("A driver is required when the destination location is a truck."))
                 if picking.driver_id.is_blocked:
                     drv_name = (
                         picking.driver_id.employee_id.name
