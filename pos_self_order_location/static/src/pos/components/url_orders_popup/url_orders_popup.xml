@@ -19,9 +19,13 @@
                                     <t t-if="request.tracking_number" t-esc="request.tracking_number"/>
                                     <t t-if="request.pos_reference"> · <t t-esc="request.pos_reference"/></t>
                                 </div>
-                                <div class="mt-2">
+                                <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
                                     <span class="badge text-bg-secondary" t-esc="formatState(request.state)"/>
-                                    <span class="ms-2 fw-bold" t-esc="formatAmount(request)"/>
+                                    <span t-if="request.payment_preference"
+                                        class="badge"
+                                        t-att-class="formatPaymentBadgeClass(request)"
+                                        t-esc="formatPaymentBadge(request)"/>
+                                    <span class="fw-bold" t-esc="formatAmount(request)"/>
                                 </div>
                             </div>
                             <div class="d-flex flex-wrap gap-2 justify-content-end">

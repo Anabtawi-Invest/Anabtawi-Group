@@ -10,6 +10,8 @@
                 <field name="config_id"/>
                 <field name="partner_id"/>
                 <field name="amount_total"/>
+                <field name="payment_preference" optional="show"/>
+                <field name="payment_preference_label" string="Payment" optional="show"/>
                 <field name="customer_latitude"/>
                 <field name="customer_longitude"/>
                 <field name="pos_order_state"/>
@@ -50,6 +52,8 @@
                             <field name="source" readonly="1"/>
                             <field name="pos_order_id" readonly="1"/>
                             <field name="pos_order_state" readonly="1"/>
+                            <field name="payment_preference" readonly="1"/>
+                            <field name="payment_preference_label" readonly="1"/>
                         </group>
                         <group>
                             <field name="amount_total" readonly="1"/>
@@ -76,6 +80,9 @@
                 <field name="config_id"/>
                 <field name="partner_id"/>
                 <field name="pos_order_id"/>
+                <field name="payment_preference"/>
+                <filter string="Cash on delivery" name="filter_cod" domain="[('payment_preference', '=', 'cash_on_delivery')]"/>
+                <filter string="Pay by card" name="filter_card" domain="[('payment_preference', '=', 'online_card')]"/>
                 <filter string="New" name="filter_new" domain="[('state', '=', 'new')]"/>
                 <filter string="Accepted" name="filter_accepted" domain="[('state', '=', 'accepted')]"/>
                 <filter string="Done" name="filter_done" domain="[('state', '=', 'done')]"/>

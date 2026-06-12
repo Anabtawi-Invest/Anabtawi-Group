@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_pos_self_order_request_user,pos.self.order.request user,model_pos_self_order_request,point_of_sale.group_pos_user,1,1,1,0
 access_pos_self_order_request_manager,pos.self.order.request manager,model_pos_self_order_request,point_of_sale.group_pos_manager,1,1,1,1
+access_pos_self_order_customer_session_manager,pos.self.order.customer.session manager,model_pos_self_order_customer_session,point_of_sale.group_pos_manager,1,1,1,1
+access_pos_self_order_phone_otp_manager,pos.self.order.phone.otp manager,model_pos_self_order_phone_otp,point_of_sale.group_pos_manager,1,1,1,1

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="pos_self_order.ConfirmationPage" t-inherit-mode="extension" owl="1">
+        <xpath expr="//h1[hasclass('mb-0')]" position="replace">
+            <h1 class="mb-0" t-esc="confirmationTitle"/>
+            <p t-if="tracksRequestStatus and confirmationSubtitle"
+                class="mt-3 mb-0 text-muted fs-5 px-3"
+                t-esc="confirmationSubtitle"/>
+            <div t-if="tracksRequestStatus and confirmationSubtitle"
+                class="alert mt-4 mb-0 mx-3 px-4 py-3 fw-semibold"
+                t-att-class="confirmationStatusAlertClass"
+                role="status">
+                <i t-if="showConfirmedMessage" class="fa fa-check-circle me-2"/>
+                <i t-elif="showCancelledMessage" class="fa fa-exclamation-triangle me-2"/>
+                <i t-else="" class="fa fa-clock-o me-2"/>
+                <t t-esc="confirmationSubtitle"/>
+            </div>
+        </xpath>
+    </t>
+</templates>

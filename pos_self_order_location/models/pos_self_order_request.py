@@ -25,6 +25,15 @@ class PosSelfOrderRequest(models.Model):
     amount_total = fields.Monetary(string='Total', related='pos_order_id.amount_total')
     currency_id = fields.Many2one('res.currency', related='pos_order_id.currency_id')
     pos_order_state = fields.Selection(related='pos_order_id.state', string='POS Order State')
+    payment_preference = fields.Selection(
+        related='pos_order_id.customer_payment_preference',
+        store=True,
+        readonly=True,
+    )
+    payment_preference_label = fields.Char(
+        string='Payment Label',
+        compute='_compute_payment_preference_label',
+    )
     state = fields.Selection(
         selection=[
             ('new', 'New'),
@@ -37,6 +46,25 @@ class PosSelfOrderRequest(models.Model):
         required=True,
         index=True,
     )
+
+    @api.depends('payment_preference', 'pos_order_state')
+    def _compute_payment_preference_label(self):
+        preference_labels = dict(
+            self.env['pos.order']._fields['customer_payment_preference'].selection
+        )
+        for record in self:
+            if not record.payment_preference:
+                record.payment_preference_label = False
+                continue
+            label = preference_labels.get(record.payment_preference, record.payment_preference)
+            if record.payment_preference == 'online_card':
+                if record.pos_order_state == 'paid':
+                    label = _('Card (Paid)')
+                else:
+                    label = _('Card (Unpaid)')
+            elif record.payment_preference == 'cash_on_delivery':
+                label = _('Cash on delivery')
+            record.payment_preference_label = label
 
     @api.depends('customer_latitude', 'customer_longitude')
     def _compute_location_url(self):
@@ -105,6 +133,12 @@ class PosSelfOrderRequest(models.Model):
             ('config_id', '=', config_id),
             ('state', 'in', ['new', 'accepted']),
         ])
+        requests = requests.sorted(
+            key=lambda request: (
+                0 if request.payment_preference == 'cash_on_delivery' else 1,
+                -(request.create_date.timestamp() if request.create_date else 0),
+            ),
+        )
         return [{
             'id': request.id,
             'name': request.name,
@@ -118,17 +152,36 @@ class PosSelfOrderRequest(models.Model):
             'pos_order_id': request.pos_order_id.id,
             'pos_reference': request.pos_order_id.pos_reference,
             'tracking_number': request.pos_order_id.tracking_number,
+            'payment_preference': request.payment_preference,
+            'payment_preference_label': request.payment_preference_label,
+            'pos_order_state': request.pos_order_state,
             'create_date': fields.Datetime.to_string(request.create_date),
         } for request in requests]
 
+    def _notify_customer_state(self):
+        for request in self:
+            order = request.pos_order_id
+            if not order.access_token:
+                continue
+            request.config_id._notify('SELF_ORDER_REQUEST_UPDATED', {
+                'order_access_token': order.access_token,
+                'state': request.state,
+                'name': request.name,
+            })
+
     def action_mark_accepted(self):
-        self.filtered(lambda r: r.state == 'new').write({'state': 'accepted'})
+        requests = self.filtered(lambda r: r.state == 'new')
+        requests.write({'state': 'accepted'})
+        requests._notify_customer_state()
 
     def action_mark_done(self):
-        self.filtered(lambda r: r.state in ('new', 'accepted')).write({'state': 'done'})
+        requests = self.filtered(lambda r: r.state in ('new', 'accepted'))
+        requests.write({'state': 'done'})
+        requests._notify_customer_state()
 
     def action_mark_cancelled(self):
         self.write({'state': 'cancelled'})
+        self._notify_customer_state()
 
     def action_open_map(self):
         self.ensure_one()

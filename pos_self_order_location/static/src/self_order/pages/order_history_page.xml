@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="pos_self_order.OrdersHistoryPage" t-inherit-mode="extension" owl="1">
+        <xpath expr="//h1[hasclass('mb-3')]" position="replace">
+            <h1 t-if="orders.length > 0 or activeCartOrder" class="mb-3">My Orders</h1>
+        </xpath>
+
+        <xpath expr="//h1[hasclass('mb-3')]" position="after">
+            <div t-if="historyState.loading" class="d-flex justify-content-center py-4">
+                <div class="spinner-border text-primary" role="status"/>
+            </div>
+            <div t-if="needsPhoneVerification" class="alert alert-warning">
+                <strong>Phone verification required</strong>
+                <div class="mt-2">Verify your phone number on the cart page to see your order history on this device.</div>
+                <button type="button" class="btn btn-primary mt-3" t-on-click="goToCartForPhoneVerification">
+                    Verify phone
+                </button>
+            </div>
+            <div t-if="activeCartOrder" class="alert alert-primary d-flex flex-column flex-md-row align-items-md-center gap-3 mb-3">
+                <div class="flex-grow-1">
+                    <strong>Current cart</strong>
+                    <div class="text-muted">You have an order in progress.</div>
+                </div>
+                <button type="button" class="btn btn-primary text-nowrap" t-on-click="openActiveCart">
+                    Continue order
+                </button>
+            </div>
+        </xpath>
+
+        <xpath expr="//span[hasclass('badge')]" position="replace">
+            <span class="badge py-2 rounded-pill text-capitalize"
+                t-att-class="getOrderStateBadgeClass(order)"
+                t-esc="getOrderState(order.state, order)"/>
+        </xpath>
+
+        <xpath expr="//span[@class='text-muted'][contains(., '#')]" position="after">
+            <span t-if="getPaymentPreferenceLabel(order)" class="badge text-bg-light mt-1">
+                <t t-esc="getPaymentPreferenceLabel(order)"/>
+            </span>
+            <div t-if="getOrderStatusMessage(order)" class="text-muted small mt-1" t-esc="getOrderStatusMessage(order)"/>
+        </xpath>
+    </t>
+</templates>

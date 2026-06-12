@@ -55,6 +55,29 @@ export class UrlOrdersPopup extends Component {
         return labels[state] || state;
     }
 
+    formatPaymentBadge(request) {
+        if (request.payment_preference_label) {
+            return request.payment_preference_label;
+        }
+        if (request.payment_preference === "cash_on_delivery") {
+            return _t("Cash on delivery");
+        }
+        if (request.payment_preference === "online_card") {
+            return request.pos_order_state === "paid" ? _t("Card (Paid)") : _t("Card (Unpaid)");
+        }
+        return "";
+    }
+
+    formatPaymentBadgeClass(request) {
+        if (request.payment_preference === "cash_on_delivery") {
+            return "text-bg-warning";
+        }
+        if (request.payment_preference === "online_card") {
+            return request.pos_order_state === "paid" ? "text-bg-success" : "text-bg-info";
+        }
+        return "text-bg-light";
+    }
+
     openMap(request) {
         if (request.location_url) {
             window.open(request.location_url, "_blank");

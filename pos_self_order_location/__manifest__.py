@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'POS Self Order Location',
-    'version': '1.0.2',
+    'version': '1.2.3',
     'category': 'Point of Sale',
-    'summary': 'Require customer location on mobile self-orders and track them in a dedicated model',
-    'depends': ['pos_self_order', 'point_of_sale'],
+    'summary': 'Mobile self-order delivery location, payment choice, and URL order tracking',
+    'depends': [
+        'pos_self_order',
+        'point_of_sale',
+        'pos_online_payment_self_order',
+    ],
     'data': [
         'security/ir.model.access.csv',
         'data/sequence.xml',
