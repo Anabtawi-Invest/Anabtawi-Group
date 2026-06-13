@@ -5,6 +5,7 @@ from dateutil.relativedelta import relativedelta
 from pytz import timezone, utc
 
 from odoo import models
+from odoo.addons.hr_work_entry_attendance.models.hr_version import HrVersion as HrVersionAttendance
 from odoo.tools.intervals import Intervals
 
 
@@ -61,7 +62,11 @@ class HrVersion(models.Model):
                 )
 
         mapped_intervals = {r: Intervals(intervals[r], keep_distinct=True) for r in resource_ids}
-        mapped_intervals.update(super()._get_attendance_intervals(start_dt, end_dt))
+        # Skip hr_work_entry_attendance implementation: it assumes overtime intervals are singleton.
+        # When two overtime lines share the same boundaries, it can crash with "Expected singleton".
+        mapped_intervals.update(
+            super(HrVersionAttendance, self)._get_attendance_intervals(start_dt, end_dt)
+        )
 
         working_schedule_versions = self.filtered(lambda v: v.work_entry_source == "calendar")
         if working_schedule_versions:
