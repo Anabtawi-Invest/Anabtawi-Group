@@ -27,6 +27,20 @@ class ResPartner(models.Model):
             return group_domains[0]
         return expression.OR(group_domains)
 
+    def _apply_segmentation_domain(self, domain):
+        """
+        Merge caller domain with department segmentation domain when needed.
+        This ensures all search paths (name_search + Search More popup) behave
+        consistently for segmented users.
+        """
+        base_domain = domain or []
+        if self.env.context.get('skip_customer_segmentation_domain'):
+            return base_domain
+        segmentation_domain = self._get_group_segmentation_domain(self.env.user)
+        if not segmentation_domain:
+            return base_domain
+        return expression.AND([base_domain, segmentation_domain])
+
     def _register_hook(self):
         """
         Safety net for databases that still contain the legacy
@@ -126,7 +140,7 @@ class ResPartner(models.Model):
         base_domain = domain or []
         user = self.env.user
         segmentation_domain = self._get_group_segmentation_domain(user)
-        search_domain = expression.AND([base_domain, segmentation_domain]) if segmentation_domain else base_domain
+        search_domain = self._apply_segmentation_domain(base_domain)
         result = super().name_search(name, search_domain, operator, limit)
         result_ids = [res_id for res_id, _label in result]
 
@@ -150,6 +164,21 @@ class ResPartner(models.Model):
             user.has_group('base.group_system'),
         )
         return result
+
+    @api.model
+    def _search(self, domain, offset=0, limit=None, order=None, access_rights_uid=None):
+        """
+        Apply department segmentation to generic searches as well.
+        Search More in many2one fields uses _search instead of name_search.
+        """
+        final_domain = self._apply_segmentation_domain(domain)
+        return super()._search(
+            final_domain,
+            offset=offset,
+            limit=limit,
+            order=order,
+            access_rights_uid=access_rights_uid,
+        )
 
     @api.model_create_multi
     def create(self, vals_list):
