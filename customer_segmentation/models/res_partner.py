@@ -166,7 +166,16 @@ class ResPartner(models.Model):
         return result
 
     @api.model
-    def _search(self, domain, offset=0, limit=None, order=None, access_rights_uid=None):
+    def _search(
+        self,
+        domain,
+        offset=0,
+        limit=None,
+        order=None,
+        *,
+        active_test=True,
+        bypass_access=False,
+    ):
         """
         Apply department segmentation to generic searches as well.
         Search More in many2one fields uses _search instead of name_search.
@@ -177,7 +186,8 @@ class ResPartner(models.Model):
             offset=offset,
             limit=limit,
             order=order,
-            access_rights_uid=access_rights_uid,
+            active_test=active_test,
+            bypass_access=bypass_access,
         )
 
     @api.model_create_multi
