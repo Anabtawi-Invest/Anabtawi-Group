@@ -2,6 +2,7 @@
     "name": "POS Historical Purge",
     "version": "19.0.1.0.0",
     "category": "Point of Sale",
+    "author":"Eng.Rana Faris",
     "summary": "Dependency-aware purge of POS data before a cutoff date",
     "depends": [
         "point_of_sale",
