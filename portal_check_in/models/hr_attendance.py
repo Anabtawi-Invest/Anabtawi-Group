@@ -52,6 +52,20 @@ class HrAttendance(models.Model):
                 continue
             if auto_check_out_at <= attendance.check_in:
                 continue
+            # hr.work.entry enforces a max 24h duration; clamp to avoid cron failures
+            # for stale/open attendances or unexpected shift intervals.
+            max_allowed_check_out = attendance.check_in + timedelta(hours=23, minutes=59, seconds=59)
+            if auto_check_out_at > max_allowed_check_out:
+                _logger.warning(
+                    "portal_check_in auto checkout clamped to 24h window: attendance_id=%s employee_id=%s "
+                    "check_in=%s planned_check_out=%s clamped_check_out=%s",
+                    attendance.id,
+                    attendance.employee_id.id,
+                    attendance.check_in,
+                    auto_check_out_at,
+                    max_allowed_check_out,
+                )
+                auto_check_out_at = max_allowed_check_out
             if now_utc < auto_check_out_at:
                 continue
 
