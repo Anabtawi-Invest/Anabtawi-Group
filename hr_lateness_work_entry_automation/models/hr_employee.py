@@ -19,12 +19,15 @@ class HrEmployee(models.Model):
 
     def _lat_get_work_entry_type(self):
         self.ensure_one()
-        work_entry_type = self.env.ref(
-            "hr_lateness_work_entry_automation.work_entry_type_lateness",
-            raise_if_not_found=False,
-        )
+        work_entry_type = self.env["hr.work.entry.type"].sudo().search([("code", "=", "LAT")], limit=1)
         if not work_entry_type:
-            work_entry_type = self.env["hr.work.entry.type"].search([("code", "=", "LAT")], limit=1)
+            work_entry_type = self.env["hr.work.entry.type"].sudo().create({
+                "name": "Lateness",
+                "display_code": "LAT",
+                "code": "LAT",
+                "color": 2,
+                "is_leave": False,
+            })
         return work_entry_type
 
     def _lat_get_timezone(self):

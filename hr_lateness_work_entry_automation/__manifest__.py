@@ -10,9 +10,7 @@
         "hr_work_entry",
         "planning",
     ],
-    "data": [
-        "data/work_entry_type_data.xml",
-    ],
+    "data": [],
     "installable": True,
     "application": False,
 }
