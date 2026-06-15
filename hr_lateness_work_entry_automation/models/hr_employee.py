@@ -64,6 +64,36 @@ class HrEmployee(models.Model):
             next_day_local.astimezone(pytz.utc).replace(tzinfo=None),
         )
 
+    def _lat_get_calendar_planned_hours_on_day(self, target_date, day_start, day_end):
+        self.ensure_one()
+        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
+        calendar = (
+            version.resource_calendar_id
+            or self.resource_calendar_id
+            or self.company_id.resource_calendar_id
+        )
+        if not calendar:
+            return 0.0
+
+        start_aware = pytz.utc.localize(day_start)
+        end_aware = pytz.utc.localize(day_end)
+        resource = self.resource_id
+        intervals_by_resource = calendar._attendance_intervals_batch(
+            start_aware,
+            end_aware,
+            resources=resource,
+            tz=self._lat_get_timezone(),
+        )
+        intervals = intervals_by_resource.get(resource.id if resource else False)
+        if not intervals:
+            return 0.0
+
+        total_hours = 0.0
+        for interval_start, interval_end, _attendance in intervals._items:
+            if interval_end > interval_start:
+                total_hours += (interval_end - interval_start).total_seconds() / 3600.0
+        return total_hours
+
     def _lat_iter_days_from_interval(self, dt_start, dt_end):
         self.ensure_one()
         if not dt_start or not dt_end or dt_end <= dt_start:
@@ -179,11 +209,20 @@ class HrEmployee(models.Model):
         for day in target_days:
             day_start, day_end = day_bounds[day]
             planned_hours = 0.0
+            planned_source = "planning"
             for slot in slots:
                 overlap_start = max(slot.start_datetime, day_start)
                 overlap_end = min(slot.end_datetime, day_end)
                 if overlap_end > overlap_start:
                     planned_hours += (overlap_end - overlap_start).total_seconds() / 3600.0
+
+            if self._lat_float_is_zero(planned_hours):
+                calendar_planned = self._lat_get_calendar_planned_hours_on_day(day, day_start, day_end)
+                if calendar_planned > 0.0:
+                    planned_hours = calendar_planned
+                    planned_source = "calendar_fallback"
+                else:
+                    planned_source = "none"
 
             attended_hours = 0.0
             for attendance in attendances:
@@ -212,6 +251,13 @@ class HrEmployee(models.Model):
                 grace_hours,
                 should_have_lat,
                 entries_by_day.get(day, self.env["hr.work.entry"]).ids,
+            )
+            _logger.info(
+                "[LAT] day_plan_source employee_id=%s employee=%s date=%s source=%s",
+                self.id,
+                self.display_name,
+                day,
+                planned_source,
             )
             self._lat_sync_work_entry_for_day(
                 target_date=day,
