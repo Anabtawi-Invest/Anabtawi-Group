@@ -97,19 +97,19 @@ class StockPicking(models.Model):
             self.location_dest_id.is_truck,
         )
 
-        # Only apply discrepancy flow when truck is the SOURCE location.
-        if not self.location_id.is_truck:
+        # Only apply discrepancy flow when truck is the DESTINATION location.
+        if not self.location_dest_id.is_truck:
             _logger.warning(
-                "[DISCREPANCY] Skipping: source is not truck. Source is_truck=%s, Dest is_truck=%s",
+                "[DISCREPANCY] Skipping: destination is not truck. Source is_truck=%s, Dest is_truck=%s",
                 self.location_id.is_truck,
                 self.location_dest_id.is_truck,
             )
             return []
 
-        truck_location = self.location_id
-        stage = "receipt"
+        truck_location = self.location_dest_id
+        stage = "dispatch"
         _logger.info(
-            "[DISCREPANCY] Truck found at SOURCE: %s (stage: receipt)",
+            "[DISCREPANCY] Truck found at DESTINATION: %s (stage: dispatch)",
             truck_location.name,
         )
 
@@ -250,8 +250,9 @@ class StockPicking(models.Model):
 
     def _action_done(self):
         res = super()._action_done()
-        # Settlement via internal transfers when truck is SOURCE only.
-        # Moving OUT OF a truck resolves RECEIPT discrepancies.
+        # Settlement via internal transfers:
+        # - Moving OUT OF a truck resolves RECEIPT discrepancies.
+        # - Moving INTO a truck resolves DISPATCH discrepancies.
         Discrepancy = self.env["stock.transfer.discrepancy"]
         truck_locations_to_recompute = set()
         for picking in self.filtered(lambda p: p.picking_type_code == "internal"):
@@ -267,6 +268,23 @@ class StockPicking(models.Model):
                     )
                     Discrepancy.apply_resolution(
                         truck, move.product_id, qty_prod_uom, stage="receipt", exclude_picking_ids=[picking.id]
+                    )
+                    truck_locations_to_recompute.add(truck)
+            if (
+                picking.location_dest_id.is_truck
+                and picking.location_dest_id != picking.location_id
+            ):
+                truck = picking.location_dest_id
+                for move in done_moves:
+                    qty_prod_uom = move.product_uom._compute_quantity(
+                        move.quantity, move.product_id.uom_id, round=False
+                    )
+                    Discrepancy.apply_resolution(
+                        truck,
+                        move.product_id,
+                        qty_prod_uom,
+                        stage="dispatch",
+                        exclude_picking_ids=[picking.id],
                     )
                     truck_locations_to_recompute.add(truck)
 
@@ -375,8 +393,7 @@ class StockPicking(models.Model):
             }
         return result
 
-    @api.constrains("location_dest_id", "driver_id", "picking_type_code")
-    def _check_truck_driver_required_and_not_blocked(self):
+    def button_validate(self):
         for picking in self:
             if picking.picking_type_code != "internal":
                 continue
@@ -396,7 +413,7 @@ class StockPicking(models.Model):
                         )
                         continue
                     _logger.warning(
-                        "[DISCREPANCY CONSTRAINT] Rejecting picking_id=%s (%s): destination is truck but driver is "
+                        "[DISCREPANCY VALIDATE] Rejecting picking_id=%s (%s): destination is truck but driver is "
                         "missing. backorder_id=%s origin=%s",
                         picking.id,
                         picking.name,
@@ -411,7 +428,7 @@ class StockPicking(models.Model):
                         else picking.driver_id.display_name
                     )
                     _logger.warning(
-                        "[DISCREPANCY CONSTRAINT] Rejecting picking_id=%s (%s): driver_id=%s (%s) is blocked.",
+                        "[DISCREPANCY VALIDATE] Rejecting picking_id=%s (%s): driver_id=%s (%s) is blocked.",
                         picking.id,
                         picking.name,
                         picking.driver_id.id,
@@ -423,3 +440,4 @@ class StockPicking(models.Model):
                             drv_name,
                         )
                     )
+        return super().button_validate()
