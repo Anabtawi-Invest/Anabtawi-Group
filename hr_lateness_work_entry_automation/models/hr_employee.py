@@ -1,9 +1,12 @@
 from collections import defaultdict
 from datetime import datetime, time, timedelta
+import logging
 
 import pytz
 
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class HrEmployee(models.Model):
@@ -21,6 +24,11 @@ class HrEmployee(models.Model):
         self.ensure_one()
         work_entry_type = self.env["hr.work.entry.type"].sudo().search([("code", "=", "LAT")], limit=1)
         if not work_entry_type:
+            _logger.info(
+                "[LAT] creating_work_entry_type code=LAT employee_id=%s employee=%s",
+                self.id,
+                self.display_name,
+            )
             work_entry_type = self.env["hr.work.entry.type"].sudo().create({
                 "name": "Lateness",
                 "display_code": "LAT",
@@ -28,6 +36,15 @@ class HrEmployee(models.Model):
                 "color": 2,
                 "is_leave": False,
             })
+        else:
+            _logger.info(
+                "[LAT] using_work_entry_type id=%s code=%s name=%s employee_id=%s employee=%s",
+                work_entry_type.id,
+                work_entry_type.code,
+                work_entry_type.display_name,
+                self.id,
+                self.display_name,
+            )
         return work_entry_type
 
     def _lat_get_timezone(self):
@@ -71,23 +88,55 @@ class HrEmployee(models.Model):
             return
         if not dt_start or not dt_end:
             return
-        recompute_map[employee.id].update(employee._lat_iter_days_from_interval(dt_start, dt_end))
+        days = employee._lat_iter_days_from_interval(dt_start, dt_end)
+        recompute_map[employee.id].update(days)
+        _logger.info(
+            "[LAT] collect_recompute employee_id=%s employee=%s dt_start=%s dt_end=%s days=%s",
+            employee.id,
+            employee.display_name,
+            dt_start,
+            dt_end,
+            sorted(days),
+        )
 
     @api.model
     def _lat_recompute_from_map(self, recompute_map):
         if not recompute_map:
+            _logger.info("[LAT] recompute_skipped reason=empty_map")
             return
         employees = self.browse(list(recompute_map.keys())).exists()
+        _logger.info(
+            "[LAT] recompute_start employee_ids=%s day_map=%s",
+            employees.ids,
+            {employee_id: sorted(days) for employee_id, days in recompute_map.items()},
+        )
         for employee in employees:
             employee._lat_recompute_days(recompute_map.get(employee.id, set()))
+        _logger.info("[LAT] recompute_done employee_ids=%s", employees.ids)
 
     def _lat_recompute_days(self, target_days):
         self.ensure_one()
         target_days = sorted(fields.Date.to_date(day) for day in target_days if day)
         if not target_days:
+            _logger.info(
+                "[LAT] employee_recompute_skipped employee_id=%s employee=%s reason=no_target_days",
+                self.id,
+                self.display_name,
+            )
             return
+        _logger.info(
+            "[LAT] employee_recompute_start employee_id=%s employee=%s target_days=%s",
+            self.id,
+            self.display_name,
+            target_days,
+        )
         lat_type = self._lat_get_work_entry_type()
         if not lat_type:
+            _logger.warning(
+                "[LAT] employee_recompute_skipped employee_id=%s employee=%s reason=no_lat_type",
+                self.id,
+                self.display_name,
+            )
             return
 
         day_bounds = {day: self._lat_get_day_utc_bounds(day) for day in target_days}
@@ -96,7 +145,7 @@ class HrEmployee(models.Model):
 
         slots = self.env["planning.slot"].sudo().search([
             ("resource_id", "=", self.resource_id.id),
-            ("state", "=", "published"),
+            ("state", "in", ["draft", "published"]),
             ("start_datetime", "<", utc_end),
             ("end_datetime", ">", utc_start),
         ]) if self.resource_id else self.env["planning.slot"]
@@ -114,6 +163,14 @@ class HrEmployee(models.Model):
             ("work_entry_type_id", "=", lat_type.id),
             ("state", "!=", "cancelled"),
         ])
+        _logger.info(
+            "[LAT] employee_sources employee_id=%s employee=%s slots=%s attendances=%s existing_lat_entries=%s",
+            self.id,
+            self.display_name,
+            len(slots),
+            len(attendances),
+            existing_lat_entries.ids,
+        )
         entries_by_day = defaultdict(lambda: self.env["hr.work.entry"])
         for entry in existing_lat_entries:
             entries_by_day[entry.date] |= entry
@@ -144,6 +201,18 @@ class HrEmployee(models.Model):
                 not self._lat_float_is_zero(planned_hours)
                 and lateness_hours > grace_hours
             )
+            _logger.info(
+                "[LAT] day_eval employee_id=%s employee=%s date=%s planned=%.4f attended=%.4f lateness=%.4f grace=%.4f should_have_lat=%s existing_entries=%s",
+                self.id,
+                self.display_name,
+                day,
+                planned_hours,
+                attended_hours,
+                lateness_hours,
+                grace_hours,
+                should_have_lat,
+                entries_by_day.get(day, self.env["hr.work.entry"]).ids,
+            )
             self._lat_sync_work_entry_for_day(
                 target_date=day,
                 late_hours=lateness_hours,
@@ -151,16 +220,35 @@ class HrEmployee(models.Model):
                 lat_type=lat_type,
                 existing_entries=entries_by_day.get(day, self.env["hr.work.entry"]),
             )
+        _logger.info(
+            "[LAT] employee_recompute_done employee_id=%s employee=%s",
+            self.id,
+            self.display_name,
+        )
 
     def _lat_sync_work_entry_for_day(self, target_date, late_hours, should_have_lat, lat_type, existing_entries):
         self.ensure_one()
         existing_entries = existing_entries.sorted("id")
         if not should_have_lat:
+            _logger.info(
+                "[LAT] sync_action employee_id=%s employee=%s date=%s action=remove reason=no_lateness_above_grace existing_entries=%s",
+                self.id,
+                self.display_name,
+                target_date,
+                existing_entries.ids,
+            )
             self._lat_remove_entries(existing_entries)
             return
 
         duration = min(round(late_hours, 4), 24.0)
         if duration <= 0.0:
+            _logger.info(
+                "[LAT] sync_action employee_id=%s employee=%s date=%s action=remove reason=non_positive_duration existing_entries=%s",
+                self.id,
+                self.display_name,
+                target_date,
+                existing_entries.ids,
+            )
             self._lat_remove_entries(existing_entries)
             return
 
@@ -169,16 +257,39 @@ class HrEmployee(models.Model):
             keeper = editable_entries[0]
             keeper.sudo().write({"duration": duration})
             self._lat_remove_entries(existing_entries - keeper)
+            _logger.info(
+                "[LAT] sync_action employee_id=%s employee=%s date=%s action=update duration=%.4f keeper=%s removed_duplicates=%s",
+                self.id,
+                self.display_name,
+                target_date,
+                duration,
+                keeper.id,
+                (existing_entries - keeper).ids,
+            )
             return
 
         if existing_entries:
+            _logger.info(
+                "[LAT] sync_action employee_id=%s employee=%s date=%s action=cleanup_validated_before_create existing_entries=%s",
+                self.id,
+                self.display_name,
+                target_date,
+                existing_entries.ids,
+            )
             self._lat_remove_entries(existing_entries)
 
         version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
         if not version:
+            _logger.warning(
+                "[LAT] sync_skipped employee_id=%s employee=%s date=%s reason=no_contract_version duration=%.4f",
+                self.id,
+                self.display_name,
+                target_date,
+                duration,
+            )
             return
 
-        self.env["hr.work.entry"].sudo().create({
+        work_entry = self.env["hr.work.entry"].sudo().create({
             "employee_id": self.id,
             "version_id": version.id,
             "date": target_date,
@@ -186,10 +297,32 @@ class HrEmployee(models.Model):
             "work_entry_type_id": lat_type.id,
             "company_id": self.company_id.id,
         })
+        _logger.info(
+            "[LAT] sync_action employee_id=%s employee=%s date=%s action=create duration=%.4f work_entry_id=%s version_id=%s",
+            self.id,
+            self.display_name,
+            target_date,
+            duration,
+            work_entry.id,
+            version.id,
+        )
 
     def _lat_remove_entries(self, entries):
         for entry in entries:
             if entry.state == "validated":
+                _logger.info(
+                    "[LAT] remove_entry entry_id=%s date=%s employee_id=%s action=cancel reason=validated",
+                    entry.id,
+                    entry.date,
+                    entry.employee_id.id,
+                )
                 entry.sudo().write({"state": "cancelled"})
             else:
+                _logger.info(
+                    "[LAT] remove_entry entry_id=%s date=%s employee_id=%s action=unlink state=%s",
+                    entry.id,
+                    entry.date,
+                    entry.employee_id.id,
+                    entry.state,
+                )
                 entry.sudo().unlink()

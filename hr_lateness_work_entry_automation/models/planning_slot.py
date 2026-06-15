@@ -1,4 +1,8 @@
+import logging
+
 from odoo import api, models
+
+_logger = logging.getLogger(__name__)
 
 
 class PlanningSlot(models.Model):
@@ -26,6 +30,11 @@ class PlanningSlot(models.Model):
         recompute_map = self.env["hr.employee"]._lat_prepare_recompute_map()
         for slot in records:
             slot._lat_collect_recompute_map_for_slot(recompute_map)
+        _logger.info(
+            "[LAT] planning_create trigger slot_ids=%s recompute_map=%s",
+            records.ids,
+            {employee_id: sorted(days) for employee_id, days in recompute_map.items()},
+        )
         self.env["hr.employee"]._lat_recompute_from_map(recompute_map)
         return records
 
@@ -33,11 +42,22 @@ class PlanningSlot(models.Model):
         recompute_map = self.env["hr.employee"]._lat_prepare_recompute_map()
         for slot in self:
             slot._lat_collect_recompute_map_for_slot(recompute_map)
+        _logger.info(
+            "[LAT] planning_write_before trigger slot_ids=%s vals_keys=%s recompute_map=%s",
+            self.ids,
+            sorted(vals.keys()),
+            {employee_id: sorted(days) for employee_id, days in recompute_map.items()},
+        )
 
         result = super().write(vals)
 
         for slot in self:
             slot._lat_collect_recompute_map_for_slot(recompute_map)
+        _logger.info(
+            "[LAT] planning_write_after trigger slot_ids=%s recompute_map=%s",
+            self.ids,
+            {employee_id: sorted(days) for employee_id, days in recompute_map.items()},
+        )
 
         self.env["hr.employee"]._lat_recompute_from_map(recompute_map)
         return result
@@ -46,6 +66,11 @@ class PlanningSlot(models.Model):
         recompute_map = self.env["hr.employee"]._lat_prepare_recompute_map()
         for slot in self:
             slot._lat_collect_recompute_map_for_slot(recompute_map)
+        _logger.info(
+            "[LAT] planning_unlink trigger slot_ids=%s recompute_map=%s",
+            self.ids,
+            {employee_id: sorted(days) for employee_id, days in recompute_map.items()},
+        )
 
         result = super().unlink()
         self.env["hr.employee"]._lat_recompute_from_map(recompute_map)

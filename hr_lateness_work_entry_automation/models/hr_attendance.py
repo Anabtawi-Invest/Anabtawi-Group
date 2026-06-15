@@ -1,4 +1,8 @@
+import logging
+
 from odoo import api, models
+
+_logger = logging.getLogger(__name__)
 
 
 class HrAttendance(models.Model):
@@ -15,6 +19,11 @@ class HrAttendance(models.Model):
                 attendance.check_in,
                 attendance.check_out or attendance.check_in,
             )
+        _logger.info(
+            "[LAT] attendance_create trigger attendance_ids=%s recompute_map=%s",
+            records.ids,
+            {employee_id: sorted(days) for employee_id, days in recompute_map.items()},
+        )
         self.env["hr.employee"]._lat_recompute_from_map(recompute_map)
         return records
 
@@ -27,6 +36,12 @@ class HrAttendance(models.Model):
                 attendance.check_in,
                 attendance.check_out or attendance.check_in,
             )
+        _logger.info(
+            "[LAT] attendance_write_before trigger attendance_ids=%s vals_keys=%s recompute_map=%s",
+            self.ids,
+            sorted(vals.keys()),
+            {employee_id: sorted(days) for employee_id, days in recompute_map.items()},
+        )
 
         result = super().write(vals)
 
@@ -37,6 +52,11 @@ class HrAttendance(models.Model):
                 attendance.check_in,
                 attendance.check_out or attendance.check_in,
             )
+        _logger.info(
+            "[LAT] attendance_write_after trigger attendance_ids=%s recompute_map=%s",
+            self.ids,
+            {employee_id: sorted(days) for employee_id, days in recompute_map.items()},
+        )
 
         self.env["hr.employee"]._lat_recompute_from_map(recompute_map)
         return result
@@ -50,6 +70,11 @@ class HrAttendance(models.Model):
                 attendance.check_in,
                 attendance.check_out or attendance.check_in,
             )
+        _logger.info(
+            "[LAT] attendance_unlink trigger attendance_ids=%s recompute_map=%s",
+            self.ids,
+            {employee_id: sorted(days) for employee_id, days in recompute_map.items()},
+        )
         result = super().unlink()
         self.env["hr.employee"]._lat_recompute_from_map(recompute_map)
         return result
