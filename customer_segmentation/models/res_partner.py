@@ -191,10 +191,24 @@ class ResPartner(models.Model):
         search_domain = self._apply_segmentation_domain(base_domain)
         result = super().name_search(name, search_domain, operator, limit)
         result_ids = [res_id for res_id, _label in result]
+        sample_rows = []
+        if result_ids:
+            sample_partners = self.browse(result_ids[:20]).sudo()
+            sample_rows = [
+                {
+                    'id': partner.id,
+                    'local': bool(partner.is_local_customer),
+                    'export': bool(partner.is_export_customer),
+                    'vendor': bool(partner.is_vendor),
+                    'pos': bool(partner.is_pos_customer),
+                    'has_users': bool(partner.user_ids),
+                }
+                for partner in sample_partners
+            ]
 
         _logger.info(
             "[customer_segmentation] name_search user=%s(id=%s) name=%s operator=%s limit=%s domain=%s seg_domain=%s final_domain=%s result_count=%s sample_ids=%s "
-            "groups={export:%s, local:%s, procurement:%s, pos:%s, admin:%s}",
+            "groups={export:%s, local:%s, procurement:%s, pos:%s, admin:%s} sample_rows=%s",
             user.login,
             user.id,
             name,
@@ -210,6 +224,7 @@ class ResPartner(models.Model):
             user.has_group('customer_segmentation.group_procurement'),
             user.has_group('customer_segmentation.group_pos_team'),
             user.has_group('base.group_system'),
+            sample_rows,
         )
         return result
 
