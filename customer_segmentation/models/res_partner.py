@@ -59,6 +59,14 @@ class ResPartner(models.Model):
         consistently for segmented users.
         """
         base_domain = domain or []
+        if self.env.su:
+            _logger.warning(
+                "[customer_segmentation][diag] skip domain because env.su=True user=%s(id=%s) base_domain=%s",
+                self.env.user.login,
+                self.env.user.id,
+                base_domain,
+            )
+            return base_domain
         if self.env.context.get('skip_customer_segmentation_domain'):
             _logger.warning(
                 "[customer_segmentation][diag] skip context detected user=%s(id=%s) base_domain=%s",
@@ -242,6 +250,21 @@ class ResPartner(models.Model):
         Apply department segmentation to generic searches as well.
         Search More in many2one fields uses _search instead of name_search.
         """
+        if bypass_access:
+            _logger.warning(
+                "[customer_segmentation][diag] _search bypass_access=True, skip segmentation user=%s(id=%s) domain=%s",
+                self.env.user.login,
+                self.env.user.id,
+                domain,
+            )
+            return super()._search(
+                domain,
+                offset=offset,
+                limit=limit,
+                order=order,
+                active_test=active_test,
+                bypass_access=bypass_access,
+            )
         final_domain = self._apply_segmentation_domain(domain)
         _logger.warning(
             "[customer_segmentation][diag] _search user=%s(id=%s) domain=%s final=%s offset=%s limit=%s order=%s active_test=%s bypass_access=%s su=%s",
