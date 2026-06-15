@@ -348,7 +348,15 @@ class ResPartner(models.Model):
         )
 
         for vals in vals_list:
-            has_explicit_department = any(flag in vals for flag in department_flags)
+            explicit_department_values = {
+                flag: vals.get(flag)
+                for flag in department_flags
+                if flag in vals
+            }
+            # UI forms often send all segmentation booleans as False by default.
+            # Treat that case as "no explicit department selected" so auto-tagging
+            # can still apply from context/group (e.g. Purchase -> vendor).
+            has_explicit_department = any(bool(value) for value in explicit_department_values.values())
 
             if not has_explicit_department and ctx.get('default_is_pos_customer'):
                 vals['is_pos_customer'] = True
