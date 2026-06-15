@@ -6,6 +6,7 @@ from datetime import timedelta
 import pytz
 
 from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -69,10 +70,21 @@ class HrAttendance(models.Model):
             if now_utc < auto_check_out_at:
                 continue
 
-            attendance.write({
-                "check_out": auto_check_out_at,
-                "out_mode": "auto_check_out",
-            })
+            try:
+                attendance.write({
+                    "check_out": auto_check_out_at,
+                    "out_mode": "auto_check_out",
+                })
+            except ValidationError:
+                _logger.exception(
+                    "portal_check_in auto checkout failed validation: attendance_id=%s employee_id=%s "
+                    "check_in=%s attempted_check_out=%s",
+                    attendance.id,
+                    attendance.employee_id.id,
+                    attendance.check_in,
+                    auto_check_out_at,
+                )
+                continue
             _logger.info(
                 "portal_check_in auto checkout applied: attendance_id=%s employee_id=%s check_in=%s check_out=%s",
                 attendance.id,
