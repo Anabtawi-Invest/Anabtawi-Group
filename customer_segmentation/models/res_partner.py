@@ -13,14 +13,26 @@ class ResPartner(models.Model):
     def _get_group_segmentation_domain(self, user):
         """Build partner filter domain based on customer segmentation groups."""
         group_domains = []
+
+        def _domain_with_safe_partners(flag_field):
+            # Keep technical/core partner reads working (user partner, company partner,
+            # and partners linked to internal users), while still enforcing segmentation.
+            return [
+                '|', '|', '|',
+                (flag_field, '=', True),
+                ('id', '=', user.partner_id.id),
+                ('id', '=', user.company_id.partner_id.id),
+                ('user_ids', '!=', False),
+            ]
+
         if user.has_group('customer_segmentation.group_export_sales'):
-            group_domains.append([('is_export_customer', '=', True)])
+            group_domains.append(_domain_with_safe_partners('is_export_customer'))
         if user.has_group('customer_segmentation.group_local_sales'):
-            group_domains.append([('is_local_customer', '=', True)])
+            group_domains.append(_domain_with_safe_partners('is_local_customer'))
         if user.has_group('customer_segmentation.group_procurement'):
-            group_domains.append([('is_vendor', '=', True)])
+            group_domains.append(_domain_with_safe_partners('is_vendor'))
         if user.has_group('customer_segmentation.group_pos_team'):
-            group_domains.append([('is_pos_customer', '=', True)])
+            group_domains.append(_domain_with_safe_partners('is_pos_customer'))
         if not group_domains:
             return []
         if len(group_domains) == 1:
