@@ -20,13 +20,12 @@ class ResPartner(models.Model):
 
         def _domain_with_safe_partners(flag_field):
             # Keep technical/core partner reads working (user partner, company partner,
-            # and partners linked to internal users), while still enforcing segmentation.
+            # while still enforcing segmentation.
             return [
-                '|', '|', '|',
+                '|', '|',
                 (flag_field, '=', True),
                 ('id', '=', user.partner_id.id),
                 ('id', '=', user.company_id.partner_id.id),
-                ('user_ids', '!=', False),
             ]
 
         if has_export:
