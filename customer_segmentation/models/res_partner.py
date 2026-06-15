@@ -1,6 +1,7 @@
 import logging
 
 from odoo import api, fields, models
+from odoo.exceptions import AccessError
 from odoo.osv import expression
 
 
@@ -9,6 +10,40 @@ _logger = logging.getLogger(__name__)
 
 class ResPartner(models.Model):
     _inherit = 'res.partner'
+
+    def _log_partner_create_acl_diagnostics(self, vals_list):
+        """Log ACL-related context when partner create is denied."""
+        user = self.env.user
+        group_info = [(group.id, group.xml_id, group.display_name) for group in user.groups_id]
+        partner_model_id = self.env['ir.model']._get_id('res.partner')
+        acl_records = self.env['ir.model.access'].sudo().search([
+            ('model_id', '=', partner_model_id),
+        ])
+        acl_info = []
+        user_group_ids = set(user.groups_id.ids)
+        for acl in acl_records:
+            group_id = acl.group_id.id if acl.group_id else False
+            applies = (not group_id) or (group_id in user_group_ids)
+            acl_info.append({
+                'id': acl.id,
+                'name': acl.name,
+                'group': acl.group_id.xml_id or acl.group_id.display_name or False,
+                'perm_create': bool(acl.perm_create),
+                'perm_read': bool(acl.perm_read),
+                'perm_write': bool(acl.perm_write),
+                'perm_unlink': bool(acl.perm_unlink),
+                'applies_to_user': applies,
+            })
+        _logger.error(
+            "[customer_segmentation][acl_diag] res.partner create denied user=%s(id=%s) groups=%s vals_list=%s "
+            "context_keys=%s matched_acl=%s",
+            user.login,
+            user.id,
+            group_info,
+            vals_list,
+            sorted(self.env.context.keys()),
+            [row for row in acl_info if row['applies_to_user']],
+        )
 
     def _get_group_segmentation_domain(self, user):
         """Build partner filter domain based on customer segmentation groups."""
@@ -334,4 +369,8 @@ class ResPartner(models.Model):
             if not has_explicit_department and user.has_group('customer_segmentation.group_procurement'):
                 vals['is_vendor'] = True
 
-        return super().create(vals_list)
+        try:
+            return super().create(vals_list)
+        except AccessError:
+            self._log_partner_create_acl_diagnostics(vals_list)
+            raise
