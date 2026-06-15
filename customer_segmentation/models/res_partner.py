@@ -13,6 +13,10 @@ class ResPartner(models.Model):
     def _get_group_segmentation_domain(self, user):
         """Build partner filter domain based on customer segmentation groups."""
         group_domains = []
+        has_export = user.has_group('customer_segmentation.group_export_sales')
+        has_local = user.has_group('customer_segmentation.group_local_sales')
+        has_procurement = user.has_group('customer_segmentation.group_procurement')
+        has_pos = user.has_group('customer_segmentation.group_pos_team')
 
         def _domain_with_safe_partners(flag_field):
             # Keep technical/core partner reads working (user partner, company partner,
@@ -25,14 +29,24 @@ class ResPartner(models.Model):
                 ('user_ids', '!=', False),
             ]
 
-        if user.has_group('customer_segmentation.group_export_sales'):
+        if has_export:
             group_domains.append(_domain_with_safe_partners('is_export_customer'))
-        if user.has_group('customer_segmentation.group_local_sales'):
+        if has_local:
             group_domains.append(_domain_with_safe_partners('is_local_customer'))
-        if user.has_group('customer_segmentation.group_procurement'):
+        if has_procurement:
             group_domains.append(_domain_with_safe_partners('is_vendor'))
-        if user.has_group('customer_segmentation.group_pos_team'):
+        if has_pos:
             group_domains.append(_domain_with_safe_partners('is_pos_customer'))
+        _logger.warning(
+            "[customer_segmentation][diag] group-domain user=%s(id=%s) groups={export:%s, local:%s, procurement:%s, pos:%s} domain=%s",
+            user.login,
+            user.id,
+            has_export,
+            has_local,
+            has_procurement,
+            has_pos,
+            group_domains,
+        )
         if not group_domains:
             return []
         if len(group_domains) == 1:
@@ -47,11 +61,33 @@ class ResPartner(models.Model):
         """
         base_domain = domain or []
         if self.env.context.get('skip_customer_segmentation_domain'):
+            _logger.warning(
+                "[customer_segmentation][diag] skip context detected user=%s(id=%s) base_domain=%s",
+                self.env.user.login,
+                self.env.user.id,
+                base_domain,
+            )
             return base_domain
         segmentation_domain = self._get_group_segmentation_domain(self.env.user)
         if not segmentation_domain:
+            _logger.warning(
+                "[customer_segmentation][diag] no segmentation domain user=%s(id=%s) base_domain=%s",
+                self.env.user.login,
+                self.env.user.id,
+                base_domain,
+            )
             return base_domain
-        return expression.AND([base_domain, segmentation_domain])
+        final_domain = expression.AND([base_domain, segmentation_domain])
+        _logger.warning(
+            "[customer_segmentation][diag] apply domain user=%s(id=%s) base=%s seg=%s final=%s context_keys=%s",
+            self.env.user.login,
+            self.env.user.id,
+            base_domain,
+            segmentation_domain,
+            final_domain,
+            sorted(list(self.env.context.keys()))[:20],
+        )
+        return final_domain
 
     def _register_hook(self):
         """
@@ -193,6 +229,19 @@ class ResPartner(models.Model):
         Search More in many2one fields uses _search instead of name_search.
         """
         final_domain = self._apply_segmentation_domain(domain)
+        _logger.warning(
+            "[customer_segmentation][diag] _search user=%s(id=%s) domain=%s final=%s offset=%s limit=%s order=%s active_test=%s bypass_access=%s su=%s",
+            self.env.user.login,
+            self.env.user.id,
+            domain,
+            final_domain,
+            offset,
+            limit,
+            order,
+            active_test,
+            bypass_access,
+            self.env.su,
+        )
         return super()._search(
             final_domain,
             offset=offset,
