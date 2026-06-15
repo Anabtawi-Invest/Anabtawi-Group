@@ -65,9 +65,12 @@ class StockPicking(models.Model):
                     return origin_pick.driver_id
 
         # 3) Upstream pickings linked via move chain.
-        upstream_pickings = (
-            self.move_ids.move_orig_ids.picking_id | self.move_ids_without_package.move_orig_ids.picking_id
-        ).filtered(lambda p: p.driver_id)
+        upstream_pickings = self.move_ids.move_orig_ids.picking_id
+        # Compatibility: some Odoo versions don't have move_ids_without_package on stock.picking.
+        extra_moves = getattr(self, "move_ids_without_package", self.env["stock.move"])
+        if extra_moves:
+            upstream_pickings |= extra_moves.move_orig_ids.picking_id
+        upstream_pickings = upstream_pickings.filtered(lambda p: p.driver_id)
         if upstream_pickings:
             return upstream_pickings[0].driver_id
 
