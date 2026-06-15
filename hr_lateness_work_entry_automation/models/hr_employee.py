@@ -64,7 +64,7 @@ class HrEmployee(models.Model):
             next_day_local.astimezone(pytz.utc).replace(tzinfo=None),
         )
 
-    def _lat_get_calendar_planned_hours_on_day(self, target_date, day_start, day_end):
+    def _lat_get_calendar_intervals_on_day(self, target_date, day_start, day_end):
         self.ensure_one()
         version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
         calendar = (
@@ -86,13 +86,16 @@ class HrEmployee(models.Model):
         )
         intervals = intervals_by_resource.get(resource.id if resource else False)
         if not intervals:
-            return 0.0
+            return []
 
-        total_hours = 0.0
+        normalized_intervals = []
         for interval_start, interval_end, _attendance in intervals._items:
             if interval_end > interval_start:
-                total_hours += (interval_end - interval_start).total_seconds() / 3600.0
-        return total_hours
+                normalized_intervals.append((
+                    interval_start.astimezone(pytz.utc).replace(tzinfo=None),
+                    interval_end.astimezone(pytz.utc).replace(tzinfo=None),
+                ))
+        return normalized_intervals
 
     def _lat_iter_days_from_interval(self, dt_start, dt_end):
         self.ensure_one()
@@ -208,23 +211,30 @@ class HrEmployee(models.Model):
         grace_hours = self._lat_grace_hours()
         for day in target_days:
             day_start, day_end = day_bounds[day]
-            planned_hours = 0.0
+            planning_intervals = []
             planned_source = "planning"
             for slot in slots:
                 overlap_start = max(slot.start_datetime, day_start)
                 overlap_end = min(slot.end_datetime, day_end)
                 if overlap_end > overlap_start:
-                    planned_hours += (overlap_end - overlap_start).total_seconds() / 3600.0
+                    planning_intervals.append((overlap_start, overlap_end))
 
-            if self._lat_float_is_zero(planned_hours):
-                calendar_planned = self._lat_get_calendar_planned_hours_on_day(day, day_start, day_end)
-                if calendar_planned > 0.0:
-                    planned_hours = calendar_planned
+            if not planning_intervals:
+                calendar_intervals = self._lat_get_calendar_intervals_on_day(day, day_start, day_end)
+                if calendar_intervals:
+                    planning_intervals = calendar_intervals
                     planned_source = "calendar_fallback"
                 else:
                     planned_source = "none"
 
-            attended_hours = 0.0
+            planned_hours = 0.0
+            planned_start = False
+            for interval_start, interval_end in planning_intervals:
+                planned_hours += (interval_end - interval_start).total_seconds() / 3600.0
+                if not planned_start or interval_start < planned_start:
+                    planned_start = interval_start
+
+            attendance_start = False
             for attendance in attendances:
                 if not attendance.check_in or not attendance.check_out:
                     continue
@@ -233,20 +243,25 @@ class HrEmployee(models.Model):
                 overlap_start = max(attendance.check_in, day_start)
                 overlap_end = min(attendance.check_out, day_end)
                 if overlap_end > overlap_start:
-                    attended_hours += (overlap_end - overlap_start).total_seconds() / 3600.0
+                    current_start = overlap_start
+                    if not attendance_start or current_start < attendance_start:
+                        attendance_start = current_start
 
-            lateness_hours = max(planned_hours - attended_hours, 0.0)
+            lateness_hours = 0.0
+            if planned_start and attendance_start and attendance_start > planned_start:
+                lateness_hours = (attendance_start - planned_start).total_seconds() / 3600.0
             should_have_lat = (
-                not self._lat_float_is_zero(planned_hours)
+                bool(planned_start and attendance_start)
                 and lateness_hours > grace_hours
             )
             _logger.info(
-                "[LAT] day_eval employee_id=%s employee=%s date=%s planned=%.4f attended=%.4f lateness=%.4f grace=%.4f should_have_lat=%s existing_entries=%s",
+                "[LAT] day_eval employee_id=%s employee=%s date=%s planned_start=%s attendance_start=%s planned_hours=%.4f lateness=%.4f grace=%.4f should_have_lat=%s existing_entries=%s",
                 self.id,
                 self.display_name,
                 day,
+                planned_start,
+                attendance_start,
                 planned_hours,
-                attended_hours,
                 lateness_hours,
                 grace_hours,
                 should_have_lat,
