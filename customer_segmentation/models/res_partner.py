@@ -14,20 +14,26 @@ class ResPartner(models.Model):
     def _log_partner_create_acl_diagnostics(self, vals_list):
         """Log ACL-related context when partner create is denied."""
         user = self.env.user
-        group_info = [(group.id, group.xml_id, group.display_name) for group in user.groups_id]
+        groups = user.group_ids
+        group_xml_map = groups.get_external_id()
+        group_info = [
+            (group.id, group_xml_map.get(group.id), group.display_name)
+            for group in groups
+        ]
         partner_model_id = self.env['ir.model']._get_id('res.partner')
         acl_records = self.env['ir.model.access'].sudo().search([
             ('model_id', '=', partner_model_id),
         ])
         acl_info = []
-        user_group_ids = set(user.groups_id.ids)
+        user_group_ids = set(groups.ids)
         for acl in acl_records:
             group_id = acl.group_id.id if acl.group_id else False
             applies = (not group_id) or (group_id in user_group_ids)
+            acl_group_xml = acl.group_id.get_external_id().get(acl.group_id.id) if acl.group_id else False
             acl_info.append({
                 'id': acl.id,
                 'name': acl.name,
-                'group': acl.group_id.xml_id or acl.group_id.display_name or False,
+                'group': acl_group_xml or (acl.group_id.display_name if acl.group_id else False),
                 'perm_create': bool(acl.perm_create),
                 'perm_read': bool(acl.perm_read),
                 'perm_write': bool(acl.perm_write),
