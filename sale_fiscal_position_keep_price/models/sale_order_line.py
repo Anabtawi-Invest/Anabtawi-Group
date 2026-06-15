@@ -77,7 +77,15 @@ class PosOrder(models.Model):
             if not order.partner_id or not order.fiscal_position_id:
                 continue
             if order.fiscal_position_id.keep_pricelist_price_after_tax_mapping:
+                _logger.info(
+                    "[KEEP PRICE TRACE][POS] updating customer fiscal position from paid order %s: partner=%s(%s) from property_account_position_id=%s to=%s",
+                    order.name or order.id,
+                    order.partner_id.display_name,
+                    order.partner_id.id,
+                    order.partner_id.property_account_position_id.id,
+                    order.fiscal_position_id.id,
+                )
                 order.partner_id.sudo().write({
-                    "fiscal_position_id": order.fiscal_position_id.id,
+                    "property_account_position_id": order.fiscal_position_id.id,
                 })
         return result
