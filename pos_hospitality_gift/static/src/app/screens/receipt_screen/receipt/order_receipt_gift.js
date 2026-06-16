@@ -16,6 +16,9 @@ function toId(value) {
     if (typeof value === "object") {
         return value.id || null;
     }
+    if (typeof value === "string" && !Number.isNaN(Number(value))) {
+        return Number(value);
+    }
     return null;
 }
 
@@ -29,20 +32,48 @@ patch(OrderReceipt.prototype, {
     },
 
     get hospitalityPaymentMethodId() {
-        return toId(this.order.config.hospitality_payment_method_id);
+        const rawHospitality = this.order.config.hospitality_payment_method_id;
+        const hospitalityId = toId(rawHospitality);
+        console.warn("[POS_HOSPITALITY_GIFT][RECEIPT] Hospitality method resolve", {
+            rawHospitality,
+            hospitalityId,
+            configId: this.order.config?.id,
+            orderName: this.order?.name,
+        });
+        return hospitalityId;
     },
 
     get customerPaidAmount() {
         const hospitalityPaymentMethodId = this.hospitalityPaymentMethodId;
+        const paymentDebug = (this.paymentLines || []).map((line) => ({
+            lineId: line.id,
+            amount: line.getAmount?.() ?? line.amount,
+            rawPaymentMethod: line.payment_method_id,
+            paymentMethodId: toId(line.payment_method_id),
+            paymentMethodName: line.payment_method_id?.name,
+        }));
+        console.warn("[POS_HOSPITALITY_GIFT][RECEIPT] Payment lines debug", {
+            hospitalityPaymentMethodId,
+            paymentDebug,
+            orderAmountTotal: this.order.amount_total,
+        });
         if (!hospitalityPaymentMethodId) {
-            return this.paymentLines.reduce((sum, line) => sum + line.getAmount(), 0);
+            const fallbackAmount = this.paymentLines.reduce((sum, line) => sum + line.getAmount(), 0);
+            console.warn("[POS_HOSPITALITY_GIFT][RECEIPT] Hospitality ID missing, using fallback", {
+                fallbackAmount,
+            });
+            return fallbackAmount;
         }
-        return this.paymentLines.reduce((sum, line) => {
+        const computed = this.paymentLines.reduce((sum, line) => {
             if (toId(line.payment_method_id) === hospitalityPaymentMethodId) {
                 return sum;
             }
             return sum + line.getAmount();
         }, 0);
+        console.warn("[POS_HOSPITALITY_GIFT][RECEIPT] Computed customerPaidAmount", {
+            computed,
+        });
+        return computed;
     },
 
     get companySponsoredAmount() {
