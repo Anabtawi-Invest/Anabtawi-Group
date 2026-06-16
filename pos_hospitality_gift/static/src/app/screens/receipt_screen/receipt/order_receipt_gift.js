@@ -32,48 +32,37 @@ patch(OrderReceipt.prototype, {
     },
 
     get hospitalityPaymentMethodId() {
-        const rawHospitality = this.order.config.hospitality_payment_method_id;
-        const hospitalityId = toId(rawHospitality);
-        console.warn("[POS_HOSPITALITY_GIFT][RECEIPT] Hospitality method resolve", {
-            rawHospitality,
-            hospitalityId,
-            configId: this.order.config?.id,
-            orderName: this.order?.name,
-        });
-        return hospitalityId;
+        const rawConfigHospitality = this.order.config.hospitality_payment_method_id;
+        const rawCompanyHospitality = this.order.company?.hospitality_payment_method_id;
+        return toId(rawConfigHospitality) || toId(rawCompanyHospitality);
+    },
+
+    isHospitalityPaymentLine(line) {
+        const paymentMethod = line?.payment_method_id || {};
+        const paymentMethodId = toId(paymentMethod);
+        const hospitalityPaymentMethodId = this.hospitalityPaymentMethodId;
+        if (hospitalityPaymentMethodId && paymentMethodId === hospitalityPaymentMethodId) {
+            return true;
+        }
+
+        if (
+            paymentMethod.is_gift_payment_method === true ||
+            paymentMethod.is_hospitality_payment_method === true
+        ) {
+            return true;
+        }
+
+        const paymentMethodName = (paymentMethod.name || "").trim().toLowerCase();
+        return paymentMethodName === "hospitality" || paymentMethodName.includes("hospitality");
     },
 
     get customerPaidAmount() {
-        const hospitalityPaymentMethodId = this.hospitalityPaymentMethodId;
-        const paymentDebug = (this.paymentLines || []).map((line) => ({
-            lineId: line.id,
-            amount: line.getAmount?.() ?? line.amount,
-            rawPaymentMethod: line.payment_method_id,
-            paymentMethodId: toId(line.payment_method_id),
-            paymentMethodName: line.payment_method_id?.name,
-        }));
-        console.warn("[POS_HOSPITALITY_GIFT][RECEIPT] Payment lines debug", {
-            hospitalityPaymentMethodId,
-            paymentDebug,
-            orderAmountTotal: this.order.amount_total,
-        });
-        if (!hospitalityPaymentMethodId) {
-            const fallbackAmount = this.paymentLines.reduce((sum, line) => sum + line.getAmount(), 0);
-            console.warn("[POS_HOSPITALITY_GIFT][RECEIPT] Hospitality ID missing, using fallback", {
-                fallbackAmount,
-            });
-            return fallbackAmount;
-        }
-        const computed = this.paymentLines.reduce((sum, line) => {
-            if (toId(line.payment_method_id) === hospitalityPaymentMethodId) {
+        return this.paymentLines.reduce((sum, line) => {
+            if (this.isHospitalityPaymentLine(line)) {
                 return sum;
             }
             return sum + line.getAmount();
         }, 0);
-        console.warn("[POS_HOSPITALITY_GIFT][RECEIPT] Computed customerPaidAmount", {
-            computed,
-        });
-        return computed;
     },
 
     get companySponsoredAmount() {
