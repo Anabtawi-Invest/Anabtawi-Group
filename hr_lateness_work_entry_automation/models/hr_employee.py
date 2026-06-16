@@ -13,6 +13,38 @@ class HrEmployee(models.Model):
     _inherit = "hr.employee"
 
     @api.model
+    def _lat_days_in_range(self, date_start, date_stop):
+        start = fields.Date.to_date(date_start)
+        stop = fields.Date.to_date(date_stop)
+        if not start or not stop or stop < start:
+            return []
+        days = []
+        current = start
+        while current <= stop:
+            days.append(current)
+            current += timedelta(days=1)
+        return days
+
+    def generate_work_entries(self, date_start, date_stop, force=False):
+        result = super().generate_work_entries(date_start, date_stop, force=force)
+        days = self._lat_days_in_range(date_start, date_stop)
+        if not days:
+            return result
+        recompute_map = self._lat_prepare_recompute_map()
+        for employee in self.filtered("id"):
+            recompute_map[employee.id].update(days)
+        _logger.warning(
+            "[LAT TRACE2] generate_work_entries_hook employee_ids=%s date_start=%s date_stop=%s force=%s days=%s",
+            self.ids,
+            date_start,
+            date_stop,
+            force,
+            days,
+        )
+        self._lat_recompute_from_map(recompute_map)
+        return result
+
+    @api.model
     def _lat_grace_hours(self):
         return 15.0 / 60.0
 
