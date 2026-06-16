@@ -12,11 +12,9 @@ _logger = logging.getLogger(__name__)
 
 class HrEmployee(models.Model):
     _inherit = "hr.employee"
-
     @api.model
     def _get_lateness_grace_hours(self):
         return 15.0 / 60.0
-
     @api.model
     def _get_work_entry_type_by_code(self, code, fallback_name):
         work_entry_type = self.env["hr.work.entry.type"].search([("code", "=", code)], limit=1)
@@ -28,7 +26,6 @@ class HrEmployee(models.Model):
             "code": code,
             "is_leave": False,
         })
-
     def _get_daily_work_entries(self, target_date, work_entry_type):
         self.ensure_one()
         return self.env["hr.work.entry"].sudo().search([
