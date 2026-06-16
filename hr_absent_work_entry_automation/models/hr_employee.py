@@ -133,6 +133,10 @@ class HrEmployee(models.Model):
     @api.model
     def _create_absent_work_entries_for_day(self, target_date):
         target_date = fields.Date.to_date(target_date)
+        _logger.warning(
+            "[LAT TRACE2] cron_start date=%s",
+            target_date,
+        )
         _logger.info(
             "Absent automation: start processing date=%s",
             target_date,
@@ -158,11 +162,24 @@ class HrEmployee(models.Model):
             target_date,
         )
         for employee in employees:
+            _logger.warning(
+                "[LAT TRACE2] employee_start employee=%s(%s) date=%s",
+                employee.name,
+                employee.id,
+                target_date,
+            )
             employee._apply_absence_for_day(target_date, absent_type, lateness_type)
 
     def _apply_absence_for_day(self, target_date, absent_type, lateness_type):
         self.ensure_one()
         expected_hours = self._get_expected_hours_on_day(target_date)
+        _logger.warning(
+            "[LAT TRACE2] expected employee=%s(%s) date=%s expected_hours=%.2f",
+            self.name,
+            self.id,
+            target_date,
+            expected_hours,
+        )
         if expected_hours <= 0:
             _logger.info(
                 "Absent automation: skip employee=%s(%s) date=%s reason=no expected work hours",
@@ -174,13 +191,41 @@ class HrEmployee(models.Model):
             self._remove_daily_work_entries(target_date, lateness_type)
             return
         has_checkin = self._has_checkin_on_day(target_date)
+        _logger.warning(
+            "[LAT TRACE2] checkin employee=%s(%s) date=%s has_checkin=%s",
+            self.name,
+            self.id,
+            target_date,
+            has_checkin,
+        )
         if has_checkin:
             self._remove_daily_work_entries(target_date, absent_type)
             late_data = self._compute_lateness_hours_on_day(target_date)
             lateness_hours = late_data["lateness_hours"]
             grace = self._get_lateness_grace_hours()
+            _logger.warning(
+                "[LAT TRACE2] lateness_eval employee=%s(%s) date=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s late_in=%.2f early_out=%.2f total=%.2f grace=%.2f",
+                self.name,
+                self.id,
+                target_date,
+                late_data["planned_start"],
+                late_data["planned_end"],
+                late_data["attendance_start"],
+                late_data["attendance_end"],
+                late_data["late_check_in_hours"],
+                late_data["early_check_out_hours"],
+                lateness_hours,
+                grace,
+            )
             if lateness_hours > grace:
                 self._upsert_daily_work_entry(target_date, lateness_type, lateness_hours)
+                _logger.warning(
+                    "[LAT TRACE2] lateness_action employee=%s(%s) date=%s action=upsert_lat duration=%.2f",
+                    self.name,
+                    self.id,
+                    target_date,
+                    lateness_hours,
+                )
                 _logger.info(
                     "Lateness automation: upserted LAT employee=%s(%s) date=%s expected=%.2f attended=%.2f "
                     "planned_source=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s "
@@ -202,6 +247,13 @@ class HrEmployee(models.Model):
                 )
             else:
                 self._remove_daily_work_entries(target_date, lateness_type)
+                _logger.warning(
+                    "[LAT TRACE2] lateness_action employee=%s(%s) date=%s action=remove_lat duration=%.2f",
+                    self.name,
+                    self.id,
+                    target_date,
+                    lateness_hours,
+                )
                 _logger.info(
                     "Lateness automation: no LAT employee=%s(%s) date=%s expected=%.2f attended=%.2f "
                     "planned_source=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s "
@@ -241,6 +293,13 @@ class HrEmployee(models.Model):
 
         self._remove_daily_work_entries(target_date, lateness_type)
         self._upsert_daily_work_entry(target_date, absent_type, expected_hours)
+        _logger.warning(
+            "[LAT TRACE2] absent_action employee=%s(%s) date=%s action=upsert_absent duration=%.2f",
+            self.name,
+            self.id,
+            target_date,
+            expected_hours,
+        )
         _logger.info(
             "Absent automation: created ABSENT work entry for employee=%s(%s) date=%s duration=%s",
             self.name,
