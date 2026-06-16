@@ -38,121 +38,27 @@
       <xpath expr="//notebook" position="inside">
 
         <page string="Dependents" name="sb_dependents">
-          <field name="sb_dependent_ids">
-            <tree editable="bottom">
-              <field name="name"/>
-              <field name="birth_date"/>
-              <field name="birth_place"/>
-              <field name="medical_insurance"/>
-              <field name="cover"/>
-            </tree>
-            <form>
-              <group col="4">
-                <field name="name"/>
-                <field name="birth_date"/>
-                <field name="birth_place"/>
-                <field name="medical_insurance"/>
-                <field name="cover"/>
-              </group>
-            </form>
-          </field>
+          <field name="sb_dependent_ids"/>
         </page>
 
         <page string="Warnings" name="sb_warnings">
-          <field name="sb_warning_ids">
-            <tree editable="bottom">
-              <field name="date"/>
-              <field name="warning_type"/>
-              <field name="reason"/>
-            </tree>
-            <form>
-              <group col="4">
-                <field name="date"/>
-                <field name="warning_type"/>
-                <field name="reason"/>
-              </group>
-            </form>
-          </field>
+          <field name="sb_warning_ids"/>
         </page>
 
         <page string="Previous Jobs" name="sb_previous_jobs">
-          <field name="sb_previous_job_ids">
-            <tree editable="bottom">
-              <field name="employer"/>
-              <field name="start_date"/>
-              <field name="end_date"/>
-              <field name="occupation"/>
-              <field name="termination_reason"/>
-            </tree>
-            <form>
-              <group col="4">
-                <field name="employer"/>
-                <field name="start_date"/>
-                <field name="end_date"/>
-                <field name="occupation"/>
-                <field name="termination_reason"/>
-              </group>
-            </form>
-          </field>
+          <field name="sb_previous_job_ids"/>
         </page>
 
         <page string="Education (Table)" name="sb_education">
-          <field name="sb_education_ids">
-            <tree editable="bottom">
-              <field name="year"/>
-              <field name="degree"/>
-              <field name="specialty"/>
-              <field name="institute"/>
-            </tree>
-            <form>
-              <group col="4">
-                <field name="year"/>
-                <field name="degree"/>
-                <field name="specialty"/>
-                <field name="institute"/>
-              </group>
-            </form>
-          </field>
+          <field name="sb_education_ids"/>
         </page>
 
         <page string="Official Documents (Table)" name="sb_official_docs">
-          <field name="sb_official_document_ids">
-            <tree editable="bottom">
-              <field name="doc_type"/>
-              <field name="number"/>
-              <field name="issue_place"/>
-              <field name="issue_date"/>
-              <field name="expiry_date"/>
-            </tree>
-            <form>
-              <group col="4">
-                <field name="doc_type"/>
-                <field name="number"/>
-                <field name="issue_place"/>
-                <field name="issue_date"/>
-                <field name="expiry_date"/>
-              </group>
-            </form>
-          </field>
+          <field name="sb_official_document_ids"/>
         </page>
 
         <page string="Career Movements" name="sb_career_moves">
-          <field name="sb_career_movement_ids">
-            <tree editable="bottom">
-              <field name="movement_type"/>
-              <field name="date"/>
-              <field name="old"/>
-              <field name="new"/>
-            </tree>
-            <form>
-              <group col="4">
-                <field name="movement_type"/>
-                <field name="date"/>
-                <field name="old"/>
-                <field name="new"/>
-              </group>
-            </form>
-          </field>
+          <field name="sb_career_movement_ids"/>
         </page>
 
       </xpath>
