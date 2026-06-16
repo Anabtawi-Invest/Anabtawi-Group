@@ -70,38 +70,34 @@ class PosSession(models.Model):
             )
             return self.env["account.move"]
 
-        hospitality_orders = self._get_hospitality_orders(hospitality_pm)
-        if not hospitality_orders:
+        hospitality_payments = self._get_hospitality_payments(hospitality_pm)
+        if not hospitality_payments:
             _logger.warning(
-                "[POS_HOSPITALITY_GIFT] Session %s skip: no hospitality orders found",
+                "[POS_HOSPITALITY_GIFT] Session %s skip: no hospitality payments found",
                 self.name,
             )
             return self.env["account.move"]
 
         company_currency = company.currency_id
         amount_company_currency = 0.0
-        for order in hospitality_orders:
-            converted_amount = order.currency_id._convert(
-                order.amount_total,
+        for payment in hospitality_payments:
+            converted_amount = payment.currency_id._convert(
+                payment.amount,
                 company_currency,
                 company,
-                fields.Date.to_date(order.date_order),
+                fields.Date.to_date(payment.payment_date),
             )
             _logger.warning(
-                "[POS_HOSPITALITY_GIFT] Session %s order %s included in settlement: amount_total=%s %s, converted=%s %s",
+                "[POS_HOSPITALITY_GIFT] Session %s payment %s included in settlement: order=%s, amount=%s %s, converted=%s %s",
                 self.name,
-                order.name,
-                order.amount_total,
-                order.currency_id.name,
+                payment.id,
+                payment.pos_order_id.name,
+                payment.amount,
+                payment.currency_id.name,
                 converted_amount,
                 company_currency.name,
             )
-            amount_company_currency += order.currency_id._convert(
-                order.amount_total,
-                company_currency,
-                company,
-                fields.Date.to_date(order.date_order),
-            )
+            amount_company_currency += converted_amount
 
         if company_currency.is_zero(amount_company_currency):
             _logger.warning(
@@ -151,17 +147,29 @@ class PosSession(models.Model):
         )
         return settlement_move
 
-    def _get_hospitality_orders(self, hospitality_payment_method):
+    def _get_hospitality_payments(self, hospitality_payment_method):
         self.ensure_one()
-        closed_orders = self._get_closed_orders().filtered(lambda o: o.amount_total > 0)
-        hospitality_orders = self.env["pos.order"]
+        closed_orders = self._get_closed_orders()
+        hospitality_payments = self.env["pos.payment"]
         for order in closed_orders:
-            is_hospitality_order = self._is_hospitality_order(order, hospitality_payment_method)
+            order_hospitality_payments = order.payment_ids.filtered(
+                lambda p: not p.is_change
+                and p.payment_method_id == hospitality_payment_method
+                and not p.currency_id.is_zero(p.amount)
+            )
             _logger.warning(
-                "[POS_HOSPITALITY_GIFT] Session %s order %s hospitality check=%s payments=%s",
+                "[POS_HOSPITALITY_GIFT] Session %s order %s hospitality_payments=%s payments=%s",
                 self.name,
                 order.name,
-                is_hospitality_order,
+                [
+                    {
+                        "id": p.id,
+                        "amount": p.amount,
+                        "method_id": p.payment_method_id.id,
+                        "method_name": p.payment_method_id.name,
+                    }
+                    for p in order_hospitality_payments
+                ],
                 [
                     {
                         "method_id": p.payment_method_id.id,
@@ -172,16 +180,5 @@ class PosSession(models.Model):
                     for p in order.payment_ids
                 ],
             )
-            if is_hospitality_order:
-                hospitality_orders |= order
-        return hospitality_orders
-
-    @staticmethod
-    def _is_hospitality_order(order, hospitality_payment_method):
-        non_change_payments = order.payment_ids.filtered(lambda p: not p.is_change)
-        if not non_change_payments:
-            return False
-        return all(
-            payment.payment_method_id == hospitality_payment_method
-            for payment in non_change_payments
-        )
+            hospitality_payments |= order_hospitality_payments
+        return hospitality_payments
