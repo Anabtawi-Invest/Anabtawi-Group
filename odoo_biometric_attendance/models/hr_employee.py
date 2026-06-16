@@ -9,7 +9,7 @@ class HrEmployee(models.Model):
     _inherit = "hr.employee"
 
     service_tag_ids = fields.Many2many("device.service.tag")
-    biometric_user_id = fields.Char("Biometric User ID", required=True)
+    biometric_user_id = fields.Char("Biometric User ID")
 
     def _check_update_device_config(self):
         return (

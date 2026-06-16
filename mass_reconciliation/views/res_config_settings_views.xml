@@ -4,22 +4,17 @@
     <field name="model">res.config.settings</field>
     <field name="inherit_id" ref="base.res_config_settings_view_form"/>
     <field name="arch" type="xml">
-      <xpath expr="//form//div[hasclass('settings')]" position="inside">
-        <div class="app_settings_block" string="Lateness Coverage" data-string="Lateness Coverage">
-          <h2>Lateness Coverage</h2>
-          <div class="row mt16 o_settings_container">
-            <div class="col-12 col-lg-6 o_setting_box">
-              <div class="o_setting_left_pane"/>
-              <div class="o_setting_right_pane">
-                <label for="annual_leave_type_id"/>
-                <div class="text-muted">
-                  Select the hour-based Annual Leave type that will be deducted when OT buckets are not enough.
-                </div>
-                <field name="annual_leave_type_id"/>
-              </div>
-            </div>
-          </div>
-        </div>
+      <xpath expr="//form" position="inside">
+        <app string="Lateness Coverage" name="lateness_coverage">
+          <block title="Lateness Coverage Settings">
+            <setting
+              string="Annual Leave Type"
+              help="Select the hour-based Annual Leave type that will be deducted when OT buckets are not enough."
+            >
+              <field name="annual_leave_type_id"/>
+            </setting>
+          </block>
+        </app>
       </xpath>
     </field>
   </record>
