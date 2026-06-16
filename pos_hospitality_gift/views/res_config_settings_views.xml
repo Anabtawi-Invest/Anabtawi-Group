@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_inherit_pos_hospitality_gift" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.pos.hospitality.gift</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='pos_payment_method_ids']/ancestor::setting[1]" position="after">
+                <setting
+                    id="pos_hospitality_payment_method_setting"
+                    string="Hospitality Payment Method"
+                    help="Payment method used when the company pays gifted orders."
+                >
+                    <field
+                        name="pos_hospitality_payment_method_id"
+                        options="{'no_create': True}"
+                        domain="[('id', 'in', pos_payment_method_ids)]"
+                    />
+                    <div class="content-group mt16">
+                        <field name="auto_suggest_hospitality_payment"/>
+                        <label for="auto_suggest_hospitality_payment" string="Auto Suggest on Gift Orders" class="fw-normal me-1"/>
+                    </div>
+                </setting>
+            </xpath>
+            <xpath expr="//block[@id='pos_accounting_section']/setting[@id='default_sales_tax_setting']" position="after">
+                <setting
+                    id="pos_hospitality_accounting_setting"
+                    string="Hospitality Accounting"
+                    help="Accounts used to settle company-sponsored gift orders at session closing."
+                >
+                    <div class="content-group mt16">
+                        <div class="row">
+                            <label for="hospitality_clearing_account_id" string="Hospitality Clearing" class="col-lg-3 o_light_label"/>
+                            <field name="hospitality_clearing_account_id" options="{'no_create': True}"/>
+                        </div>
+                        <div class="row mt16">
+                            <label for="gift_expense_account_id" string="Gift Expense" class="col-lg-3 o_light_label"/>
+                            <field name="gift_expense_account_id" options="{'no_create': True}"/>
+                        </div>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

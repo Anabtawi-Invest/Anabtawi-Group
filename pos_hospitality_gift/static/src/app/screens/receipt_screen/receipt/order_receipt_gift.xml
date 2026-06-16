@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension" owl="1">
+        <xpath expr="//OrderDisplay" position="after">
+            <t t-if="hasGiftLines">
+                <div class="pt-2 pb-2 text-center">
+                    <div>--------------------------------</div>
+                    <div><strong>* Complimentary Gift Items Included *</strong></div>
+                    <div>--------------------------------</div>
+                </div>
+                <div class="text-start" style="font-size: 90%;">
+                    <div><strong>Gift Items:</strong></div>
+                    <div t-foreach="giftLines" t-as="giftLine" t-key="giftLine.uuid">
+                        <span>🎁 </span><span t-esc="giftLine.full_product_name"/>
+                    </div>
+                </div>
+                <div class="pt-2">
+                    <div>
+                        Original Value:
+                        <span t-out="formatCurrency(order.amount_total)" class="pos-receipt-right-align font-monospace"/>
+                    </div>
+                    <div>
+                        Amount Paid by Customer:
+                        <span t-out="formatCurrency(customerPaidAmount)" class="pos-receipt-right-align font-monospace"/>
+                    </div>
+                    <div>
+                        Company Sponsored:
+                        <span t-out="formatCurrency(companySponsoredAmount)" class="pos-receipt-right-align font-monospace"/>
+                    </div>
+                </div>
+            </t>
+        </xpath>
+    </t>
+</templates>
