@@ -36,7 +36,9 @@ class HrEmployee(models.Model):
 
     def _sb_active_contract(self):
         self.ensure_one()
-        # hr_contract provides hr.contract
+        # `hr.contract` exists only when hr_contract is installed.
+        if "hr.contract" not in self.env:
+            return False
         contract = self.env["hr.contract"].search(
             [("employee_id", "=", self.id), ("state", "in", ("open", "draft"))],
             order="state asc, date_start desc, id desc",
@@ -49,13 +51,14 @@ class HrEmployee(models.Model):
         self.ensure_one()
         contract = self._sb_active_contract()
         wage = contract.wage if contract else 0.0
+        first_contract_date = self.first_contract_date if "first_contract_date" in self._fields else False
 
         # Map fields with fallback to standard fields when relevant
         payload = {
             "number": self.sb_employee_number or self.barcode or self.pin or "",
             "name": self.name or "",
             "alt_name": self.sb_alternate_name or "",
-            "start_date": (contract.date_start if contract else False) or self.first_contract_date or False,
+            "start_date": (contract.date_start if contract else False) or first_contract_date or False,
             "job": self.job_title or (self.job_id.name if self.job_id else ""),
             "type": self.employee_type or "",
             "religion": "",
