@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="work_entry_type_lateness" model="hr.work.entry.type">
+            <field name="name">Lateness</field>
+            <field name="display_code">LAT</field>
+            <field name="code">LAT</field>
+            <field name="color">2</field>
+            <field name="is_leave">False</field>
+        </record>
+    </data>
+</odoo>
