@@ -11,7 +11,7 @@
     'website': "https://www.hsxtech.net",
     'depends': ['base_setup', 'hr_attendance'],
     'external_dependencies': {
-        'python': ['zk'],
+        'python': ['pyzk'],
     },
     'data': [
         'security/ir.model.access.csv',
