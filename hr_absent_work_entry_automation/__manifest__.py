@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "HR Absent Work Entry Automation",
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "summary": "Auto-create absent work entries when no check in exists",
     "category": "Human Resources",
     "author":"Anabtawi",
