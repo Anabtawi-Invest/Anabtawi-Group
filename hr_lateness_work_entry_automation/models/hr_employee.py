@@ -229,12 +229,16 @@ class HrEmployee(models.Model):
 
             planned_hours = 0.0
             planned_start = False
+            planned_end = False
             for interval_start, interval_end in planning_intervals:
                 planned_hours += (interval_end - interval_start).total_seconds() / 3600.0
                 if not planned_start or interval_start < planned_start:
                     planned_start = interval_start
+                if not planned_end or interval_end > planned_end:
+                    planned_end = interval_end
 
             attendance_start = False
+            attendance_end = False
             for attendance in attendances:
                 if not attendance.check_in or not attendance.check_out:
                     continue
@@ -246,26 +250,54 @@ class HrEmployee(models.Model):
                     current_start = overlap_start
                     if not attendance_start or current_start < attendance_start:
                         attendance_start = current_start
+                    if not attendance_end or overlap_end > attendance_end:
+                        attendance_end = overlap_end
 
-            lateness_hours = 0.0
+            late_check_in_hours = 0.0
             if planned_start and attendance_start and attendance_start > planned_start:
-                lateness_hours = (attendance_start - planned_start).total_seconds() / 3600.0
+                late_check_in_hours = (attendance_start - planned_start).total_seconds() / 3600.0
+
+            early_check_out_hours = 0.0
+            if planned_end and attendance_end and planned_end > attendance_end:
+                early_check_out_hours = (planned_end - attendance_end).total_seconds() / 3600.0
+
+            lateness_hours = max(late_check_in_hours + early_check_out_hours, 0.0)
             should_have_lat = (
-                bool(planned_start and attendance_start)
+                bool(planned_start and planned_end and attendance_start and attendance_end)
                 and lateness_hours > grace_hours
             )
             _logger.info(
-                "[LAT] day_eval employee_id=%s employee=%s date=%s planned_start=%s attendance_start=%s planned_hours=%.4f lateness=%.4f grace=%.4f should_have_lat=%s existing_entries=%s",
+                "[LAT] day_eval employee_id=%s employee=%s date=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s planned_hours=%.4f late_check_in=%.4f early_check_out=%.4f lateness=%.4f grace=%.4f should_have_lat=%s existing_entries=%s",
                 self.id,
                 self.display_name,
                 day,
                 planned_start,
+                planned_end,
                 attendance_start,
+                attendance_end,
                 planned_hours,
+                late_check_in_hours,
+                early_check_out_hours,
                 lateness_hours,
                 grace_hours,
                 should_have_lat,
                 entries_by_day.get(day, self.env["hr.work.entry"]).ids,
+            )
+            _logger.warning(
+                "[LAT TRACE2] employee=%s(%s) date=%s source=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s late_in=%.4f early_out=%.4f total=%.4f grace=%.4f apply=%s",
+                self.display_name,
+                self.id,
+                day,
+                planned_source,
+                planned_start,
+                planned_end,
+                attendance_start,
+                attendance_end,
+                late_check_in_hours,
+                early_check_out_hours,
+                lateness_hours,
+                grace_hours,
+                should_have_lat,
             )
             _logger.info(
                 "[LAT] day_plan_source employee_id=%s employee=%s date=%s source=%s",
