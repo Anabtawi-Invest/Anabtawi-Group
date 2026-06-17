@@ -14,6 +14,62 @@ _logger = logging.getLogger(__name__)
 class HrAttendance(models.Model):
     _inherit = "hr.attendance"
 
+    def write(self, vals):
+        check_out_raw = vals.get("check_out") if "check_out" in vals else None
+        parsed_check_out = fields.Datetime.to_datetime(check_out_raw) if check_out_raw else None
+        if "check_out" in vals:
+            for attendance in self:
+                if not attendance.check_in or not parsed_check_out:
+                    continue
+                if parsed_check_out <= attendance.check_in:
+                    _logger.warning(
+                        "[PortalOTDebug] suspicious_check_out_write_before_save attendance_id=%s employee_id=%s "
+                        "check_in=%s incoming_check_out=%s out_mode_in_vals=%s existing_out_mode=%s "
+                        "request_id=%s request_status=%s request_qty=%s request_disable_auto_checkout=%s deadline=%s context=%s",
+                        attendance.id,
+                        attendance.employee_id.id,
+                        attendance.check_in,
+                        parsed_check_out,
+                        vals.get("out_mode"),
+                        attendance.out_mode,
+                        attendance.overtime_authorization_request_id.id if attendance.overtime_authorization_request_id else False,
+                        attendance.overtime_authorization_request_id.request_status if attendance.overtime_authorization_request_id else False,
+                        attendance.overtime_authorization_request_id.quantity if attendance.overtime_authorization_request_id else False,
+                        attendance.overtime_authorization_request_id.overtime_disable_auto_checkout
+                        if attendance.overtime_authorization_request_id else False,
+                        attendance.overtime_authorization_deadline,
+                        {
+                            "uid": self.env.uid,
+                            "is_cron": bool(self.env.context.get("cron_id")),
+                            "from_portal_check_in": self.env.context.get("from_portal_check_in"),
+                            "active_model": self.env.context.get("active_model"),
+                            "active_id": self.env.context.get("active_id"),
+                        },
+                    )
+
+        result = super().write(vals)
+
+        if "check_out" in vals:
+            for attendance in self.filtered("check_out"):
+                if attendance.check_in and attendance.check_out <= attendance.check_in:
+                    _logger.warning(
+                        "[PortalOTDebug] suspicious_check_out_persisted attendance_id=%s employee_id=%s "
+                        "check_in=%s persisted_check_out=%s out_mode=%s request_id=%s request_status=%s "
+                        "request_qty=%s request_disable_auto_checkout=%s deadline=%s",
+                        attendance.id,
+                        attendance.employee_id.id,
+                        attendance.check_in,
+                        attendance.check_out,
+                        attendance.out_mode,
+                        attendance.overtime_authorization_request_id.id if attendance.overtime_authorization_request_id else False,
+                        attendance.overtime_authorization_request_id.request_status if attendance.overtime_authorization_request_id else False,
+                        attendance.overtime_authorization_request_id.quantity if attendance.overtime_authorization_request_id else False,
+                        attendance.overtime_authorization_request_id.overtime_disable_auto_checkout
+                        if attendance.overtime_authorization_request_id else False,
+                        attendance.overtime_authorization_deadline,
+                    )
+        return result
+
     def _get_portal_approved_overtime_hours(self):
         """Return approved overtime hours to extend auto check-out threshold."""
         self.ensure_one()
