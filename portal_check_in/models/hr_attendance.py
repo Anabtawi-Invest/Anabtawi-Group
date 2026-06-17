@@ -13,6 +13,26 @@ _logger = logging.getLogger(__name__)
 class HrAttendance(models.Model):
     _inherit = "hr.attendance"
 
+    def _has_submitted_overtime_request(self):
+        self.ensure_one()
+        if not self.employee_id or not self.check_in:
+            return False
+
+        approval_model = self.env["approval.request"]
+        if "is_overtime_category" not in approval_model._fields:
+            return False
+
+        employee_tz = pytz.timezone(self.employee_id.tz or "UTC")
+        check_in_local_date = pytz.utc.localize(self.check_in).astimezone(employee_tz).date()
+        domain = [
+            ("is_overtime_category", "=", True),
+            ("overtime_employee_id", "=", self.employee_id.id),
+            ("request_status", "in", ("new", "pending")),
+            ("overtime_date_from", "<=", check_in_local_date),
+            ("overtime_date_to", ">=", check_in_local_date),
+        ]
+        return bool(approval_model.search_count(domain))
+
     def _get_portal_shift_end_with_grace_utc(self, grace_minutes=15):
         self.ensure_one()
         if not self.employee_id or not self.check_in:
@@ -53,6 +73,14 @@ class HrAttendance(models.Model):
             if auto_check_out_at <= attendance.check_in:
                 continue
             if now_utc < auto_check_out_at:
+                continue
+            if attendance._has_submitted_overtime_request():
+                _logger.info(
+                    "portal_check_in auto checkout skipped due to submitted overtime request: "
+                    "attendance_id=%s employee_id=%s",
+                    attendance.id,
+                    attendance.employee_id.id,
+                )
                 continue
 
             attendance.write({
@@ -81,6 +109,26 @@ _logger = logging.getLogger(__name__)
 class HrAttendance(models.Model):
     _inherit = "hr.attendance"
 
+    def _has_submitted_overtime_request(self):
+        self.ensure_one()
+        if not self.employee_id or not self.check_in:
+            return False
+
+        approval_model = self.env["approval.request"]
+        if "is_overtime_category" not in approval_model._fields:
+            return False
+
+        employee_tz = pytz.timezone(self.employee_id.tz or "UTC")
+        check_in_local_date = pytz.utc.localize(self.check_in).astimezone(employee_tz).date()
+        domain = [
+            ("is_overtime_category", "=", True),
+            ("overtime_employee_id", "=", self.employee_id.id),
+            ("request_status", "in", ("new", "pending")),
+            ("overtime_date_from", "<=", check_in_local_date),
+            ("overtime_date_to", ">=", check_in_local_date),
+        ]
+        return bool(approval_model.search_count(domain))
+
     def _get_portal_shift_end_with_grace_utc(self, grace_minutes=15):
         self.ensure_one()
         if not self.employee_id or not self.check_in:
@@ -121,6 +169,14 @@ class HrAttendance(models.Model):
             if auto_check_out_at <= attendance.check_in:
                 continue
             if now_utc < auto_check_out_at:
+                continue
+            if attendance._has_submitted_overtime_request():
+                _logger.info(
+                    "portal_check_in auto checkout skipped due to submitted overtime request: "
+                    "attendance_id=%s employee_id=%s",
+                    attendance.id,
+                    attendance.employee_id.id,
+                )
                 continue
 
             attendance.write({
