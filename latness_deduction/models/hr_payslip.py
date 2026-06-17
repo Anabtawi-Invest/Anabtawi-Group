@@ -1487,10 +1487,55 @@ class HrPayslip(models.Model):
             reset_done.action_rebuild_ot_wallet()
         return True
 
+    def _log_lateness_amount_trace(self):
+        """Fallback trace to always log lateness amount inputs on compute sheet."""
+        for slip in self:
+            if not slip.worked_days_line_ids:
+                continue
+            attendance_hours = sum(
+                wd.number_of_hours
+                for wd in slip.worked_days_line_ids
+                if not wd.work_entry_type_id.is_extra_hours
+            ) or 1.0
+            for worked_days in slip.worked_days_line_ids:
+                code = (worked_days.work_entry_type_id.code or "").strip()
+                if code not in DEFAULT_LATENESS_CODES:
+                    continue
+                version = slip.version_id
+                contract_wage = version.contract_wage if version else 0.0
+                if slip.wage_type == "hourly" and version:
+                    hourly_rate = version.hourly_wage
+                else:
+                    hourly_rate = contract_wage / attendance_hours
+                amount_rate = worked_days.work_entry_type_id.amount_rate
+                expected_amount = (
+                    hourly_rate * (worked_days.number_of_hours or 0.0) * amount_rate
+                    if worked_days.is_paid else 0.0
+                )
+                _logger.warning(
+                    "[LatenessAmountTrace] source=compute_sheet_fallback payslip_id=%s payslip=%s employee_id=%s "
+                    "code=%s contract_wage=%s attendance_hours=%s amount_rate=%s number_of_hours=%s "
+                    "hourly_rate=%s is_paid=%s expected_amount=%s stored_amount=%s",
+                    slip.id,
+                    slip.display_name,
+                    slip.employee_id.id if slip.employee_id else False,
+                    code,
+                    contract_wage,
+                    attendance_hours,
+                    amount_rate,
+                    worked_days.number_of_hours or 0.0,
+                    hourly_rate,
+                    worked_days.is_paid,
+                    expected_amount,
+                    worked_days.amount,
+                )
+
     def compute_sheet(self):
         self._assert_ot_payout_snapshot_integrity()
         self._recompute_ot_wallet_after_payout()
-        return super().compute_sheet()
+        result = super().compute_sheet()
+        self._log_lateness_amount_trace()
+        return result
 
 
 class HrEmployee(models.Model):
