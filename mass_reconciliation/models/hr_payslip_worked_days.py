@@ -16,8 +16,7 @@ class HrPayslipWorkedDays(models.Model):
                 continue
 
             code = (worked_days.code or "").strip()
-            lateness_codes = ("LAT", "LATE", "Lateness", "L")
-            if code not in lateness_codes:
+            if code not in ("LAT", "LATE", "Lateness", "L"):
                 continue
 
             attendance_hours = sum(
