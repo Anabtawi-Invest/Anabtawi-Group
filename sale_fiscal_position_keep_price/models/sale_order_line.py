@@ -1,6 +1,6 @@
 import logging
 
-from odoo import models
+from odoo import fields, models
 
 
 _logger = logging.getLogger(__name__)
@@ -57,3 +57,35 @@ class SaleOrderLine(models.Model):
                     line.tax_ids.ids,
                 )
         return res
+
+
+class PosOrder(models.Model):
+    _inherit = "pos.order"
+
+    manual_fiscal_position_applied = fields.Boolean(
+        copy=False,
+        help="True when cashier manually selected fiscal position in POS.",
+    )
+
+    def _process_saved_order(self, draft):
+        result = super()._process_saved_order(draft)
+        for order in self:
+            if draft or order.state != "paid":
+                continue
+            if not order.manual_fiscal_position_applied:
+                continue
+            if not order.partner_id or not order.fiscal_position_id:
+                continue
+            if order.fiscal_position_id.keep_pricelist_price_after_tax_mapping:
+                _logger.info(
+                    "[KEEP PRICE TRACE][POS] updating customer fiscal position from paid order %s: partner=%s(%s) from property_account_position_id=%s to=%s",
+                    order.name or order.id,
+                    order.partner_id.display_name,
+                    order.partner_id.id,
+                    order.partner_id.property_account_position_id.id,
+                    order.fiscal_position_id.id,
+                )
+                order.partner_id.sudo().write({
+                    "property_account_position_id": order.fiscal_position_id.id,
+                })
+        return result
