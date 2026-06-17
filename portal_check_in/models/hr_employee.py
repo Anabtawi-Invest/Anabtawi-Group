@@ -174,6 +174,29 @@ class HrEmployee(models.Model):
         deadline = False
         if not approval_request.overtime_disable_auto_checkout:
             deadline = action_date + timedelta(hours=approval_request.quantity)
+        quantity_hours = approval_request.quantity or 0.0
+        _logger.warning(
+            "[PortalOTDebug] authorized_check_in_prepare employee_id=%s approval_request_id=%s "
+            "request_status=%s quantity_hours=%s disable_auto_checkout=%s check_in=%s deadline=%s delta_seconds=%s",
+            self.id,
+            approval_request.id,
+            approval_request.request_status,
+            quantity_hours,
+            approval_request.overtime_disable_auto_checkout,
+            action_date,
+            deadline,
+            ((deadline - action_date).total_seconds() if deadline else False),
+        )
+        if deadline and deadline <= action_date:
+            _logger.warning(
+                "[PortalOTDebug] authorized_check_in_deadline_not_after_check_in employee_id=%s "
+                "approval_request_id=%s quantity_hours=%s check_in=%s deadline=%s",
+                self.id,
+                approval_request.id,
+                quantity_hours,
+                action_date,
+                deadline,
+            )
         vals = {
             "employee_id": self.id,
             "check_in": action_date,
@@ -187,13 +210,14 @@ class HrEmployee(models.Model):
         attendance = self.env["hr.attendance"].create(vals)
         approval_request._reserve_preauthorized_attendance(attendance)
         _logger.warning(
-            "portal_check_in authorized check-in: employee_id=%s attendance_id=%s request_id=%s "
-            "request_status=%s quantity=%s check_in=%s deadline=%s geo_keys=%s",
+            "[PortalOTDebug] authorized_check_in_created employee_id=%s attendance_id=%s request_id=%s "
+            "request_status=%s quantity=%s disable_auto_checkout=%s check_in=%s deadline=%s geo_keys=%s",
             self.id,
             attendance.id,
             approval_request.id,
             approval_request.request_status,
             approval_request.quantity,
+            approval_request.overtime_disable_auto_checkout,
             attendance.check_in,
             attendance.overtime_authorization_deadline,
             sorted(geo_information.keys()) if geo_information else [],
@@ -226,17 +250,31 @@ class HrEmployee(models.Model):
         ):
             check_out_date = min(action_date, attendance.overtime_authorization_deadline)
         _logger.warning(
-            "portal_check_in authorized check-out start: employee_id=%s attendance_id=%s request_id=%s "
-            "action_date=%s deadline=%s final_check_out=%s current_worked_hours=%s geo_keys=%s",
+            "[PortalOTDebug] authorized_check_out_prepare employee_id=%s attendance_id=%s request_id=%s "
+            "action_date=%s check_in=%s deadline=%s disable_auto_checkout=%s final_check_out=%s current_worked_hours=%s geo_keys=%s",
             self.id,
             attendance.id,
             attendance.overtime_authorization_request_id.id,
             action_date,
+            attendance.check_in,
             attendance.overtime_authorization_deadline,
+            attendance.overtime_authorization_request_id.overtime_disable_auto_checkout,
             check_out_date,
             attendance.worked_hours,
             sorted(geo_information.keys()) if geo_information else [],
         )
+        if check_out_date <= attendance.check_in:
+            _logger.warning(
+                "[PortalOTDebug] authorized_check_out_not_after_check_in employee_id=%s attendance_id=%s "
+                "request_id=%s check_in=%s final_check_out=%s deadline=%s disable_auto_checkout=%s",
+                self.id,
+                attendance.id,
+                attendance.overtime_authorization_request_id.id,
+                attendance.check_in,
+                check_out_date,
+                attendance.overtime_authorization_deadline,
+                attendance.overtime_authorization_request_id.overtime_disable_auto_checkout,
+            )
 
         vals = {"check_out": check_out_date}
         if geo_information:
@@ -247,7 +285,7 @@ class HrEmployee(models.Model):
             ["worked_hours", "linked_overtime_ids", "overtime_hours", "validated_overtime_hours", "overtime_status"]
         )
         _logger.warning(
-            "portal_check_in authorized check-out done: employee_id=%s attendance_id=%s request_id=%s "
+            "[PortalOTDebug] authorized_check_out_done employee_id=%s attendance_id=%s request_id=%s "
             "check_in=%s check_out=%s worked_hours=%s linked_overtime_ids=%s overtime_hours=%s "
             "validated_overtime_hours=%s overtime_status=%s",
             self.id,
