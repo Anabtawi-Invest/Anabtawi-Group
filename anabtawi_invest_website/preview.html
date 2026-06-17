@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anabtawi Invest - Local Preview</title>
+    
+    <!-- External Library CDNs -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Outfit:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom Style Bundle (Compiled from website_style.scss) -->
+    <style>
+        /* CSS Variables corresponding to SCSS variables */
+        :root {
+            --anabtawi-charcoal: #111111;
+            --anabtawi-matte: #1a1a1a;
+            --anabtawi-velvet: #0c0c0c;
+            --anabtawi-maroon: #5B1527;
+            --anabtawi-maroon-dark: #2B0C14;
+            --anabtawi-maroon-hover: #450f1d;
+            --anabtawi-gold: #C5A059;
+            --anabtawi-gold-hover: #B08D4B;
+            --anabtawi-gold-subtle: rgba(197, 160, 89, 0.25);
+            --anabtawi-text-white: #ffffff;
+            --anabtawi-text-muted: rgba(255, 255, 255, 0.7);
+        }
+
+        body {
+            background-color: var(--anabtawi-charcoal);
+            color: #e0e0e0;
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Scoped Theme styles */
+        .anabtawi-theme {
+            background-color: var(--anabtawi-charcoal) !important;
+            color: #e0e0e0 !important;
+        }
+
+        .anabtawi-theme h1, 
+        .anabtawi-theme h2, 
+        .anabtawi-theme h3, 
+        .anabtawi-theme h4, 
+        .anabtawi-theme h5, 
+        .anabtawi-theme h6,
+        .font-serif {
+            font-family: 'Cinzel', Georgia, serif !important;
+            color: var(--anabtawi-text-white) !important;
+            letter-spacing: 0.05em;
+        }
+
+        .anabtawi-theme p, 
+        .anabtawi-theme span, 
+        .anabtawi-theme div, 
+        .anabtawi-theme li, 
+        .anabtawi-theme ul, 
+        .anabtawi-theme a {
+            font-family: 'Outfit', sans-serif !important;
+        }
+
+        .py-6 {
+            padding-top: 6rem !important;
+            padding-bottom: 6rem !important;
+        }
+
+        .bg-charcoal {
+            background-color: var(--anabtawi-charcoal) !important;
+        }
+
+        .bg-matte {
+            background-color: var(--anabtawi-matte) !important;
+        }
+
+        .bg-dark-velvet {
+            background-color: var(--anabtawi-velvet) !important;
+        }
+
+        .brand-gold {
+            color: var(--anabtawi-gold) !important;
+        }
+
+        .text-muted-white {
+            color: var(--anabtawi-text-muted) !important;
+        }
+
+        .brand-gold-gradient {
+            background: linear-gradient(135deg, #ffffff 30%, var(--anabtawi-gold) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+
+        .tracking-widest {
+            letter-spacing: 0.3em !important;
+        }
+
+        .tracking-wider {
+            letter-spacing: 0.15em !important;
+        }
+
+        .font-size-sm {
+            font-size: 0.85rem !important;
+        }
+
+        .divider-gold {
+            width: 60px;
+            height: 2px;
+            background-color: var(--anabtawi-gold);
+        }
+
+        /* Custom Navigation Bar Mockup */
+        .anabtawi-navbar {
+            background-color: rgba(17, 17, 17, 0.95);
+            border-bottom: 1px solid var(--anabtawi-gold-subtle);
+            padding: 1.2rem 0;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .anabtawi-navbar .navbar-brand {
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            color: var(--anabtawi-gold) !important;
+            letter-spacing: 0.1em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.25rem;
+        }
+
+        .anabtawi-navbar .nav-link {
+            color: rgba(255, 255, 255, 0.8) !important;
+            font-size: 0.85rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            font-weight: 400;
+            padding: 0.5rem 1.2rem !important;
+            transition: all 0.3s ease;
+        }
+
+        .anabtawi-navbar .nav-link:hover,
+        .anabtawi-navbar .nav-item.active .nav-link {
+            color: var(--anabtawi-gold) !important;
+            text-shadow: 0 0 10px rgba(197, 160, 89, 0.4);
+        }
+
+        /* Buttons */
+        .btn-burgundy {
+            background-color: var(--anabtawi-maroon) !important;
+            border: 1px solid var(--anabtawi-maroon) !important;
+            color: var(--anabtawi-text-white) !important;
+            font-size: 0.85rem;
+            letter-spacing: 0.15em;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            border-radius: 0 !important;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-burgundy:hover {
+            background-color: var(--anabtawi-maroon-hover) !important;
+            border-color: var(--anabtawi-gold) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            color: var(--anabtawi-text-white) !important;
+        }
+
+        .btn-outline-gold {
+            background-color: transparent !important;
+            border: 1px solid var(--anabtawi-gold) !important;
+            color: var(--anabtawi-gold) !important;
+            font-size: 0.85rem;
+            letter-spacing: 0.15em;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            border-radius: 0 !important;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-outline-gold:hover {
+            background-color: rgba(197, 160, 89, 0.1) !important;
+            color: var(--anabtawi-text-white) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Hero & Header */
+        .anabtawi-hero-section, .anabtawi-page-header {
+            background-color: transparent;
+            min-height: 85vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .anabtawi-hero-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(91, 21, 39, 0.15) 0%, rgba(17, 17, 17, 0.9) 85%);
+            z-index: 1;
+        }
+
+        /* Emblem Placeholder with SVG */
+        .invest-emblem-placeholder {
+            width: 80px;
+            height: 80px;
+            color: var(--anabtawi-gold);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .invest-emblem-placeholder .anabtawi-logo-svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .invest-emblem-placeholder:hover {
+            transform: scale(1.1) rotate(10deg);
+            filter: drop-shadow(0 0 15px rgba(197, 160, 89, 0.75));
+        }
+
+        /* Marquee / Infinite Ticker scrolling */
+        .marquee-container {
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+            mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+            -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+        }
+
+        .marquee-track {
+            display: flex;
+            white-space: nowrap;
+            width: max-content;
+            animation: marquee-scroll 25s linear infinite;
+        }
+
+        .marquee-track:hover {
+            animation-play-state: paused;
+        }
+
+        .marquee-item {
+            width: 260px;
+            flex-shrink: 0;
+            margin: 0 40px;
+            display: inline-block;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .company-logo-placeholder {
+            width: 220px;
+            height: 220px;
+            background-color: var(--anabtawi-velvet);
+            border-radius: 4px;
+            border: 1px solid rgba(197, 160, 89, 0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.4s ease;
+            margin: 0 auto;
+            color: var(--anabtawi-gold);
+            padding: 20px;
+        }
+
+        .company-logo-placeholder svg {
+            width: 80px;
+            height: 80px;
+            transition: transform 0.4s ease;
+            opacity: 0.85;
+        }
+
+        .company-name {
+            font-size: 1.1rem;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .marquee-item:hover {
+            transform: translateY(-8px);
+        }
+
+        .marquee-item:hover .company-logo-placeholder {
+            border-color: var(--anabtawi-gold) !important;
+            background-color: var(--anabtawi-maroon-dark) !important;
+            box-shadow: 0 10px 25px rgba(91, 21, 36, 0.5);
+        }
+
+        .marquee-item:hover .company-logo-placeholder svg {
+            transform: scale(1.1);
+            opacity: 1;
+            filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.6));
+        }
+
+        .marquee-item:hover .company-name {
+            color: var(--anabtawi-gold) !important;
+        }
+
+        /* Decorative Border Accents */
+        .border-gold-accent {
+            position: relative;
+        }
+
+        .border-gold-accent::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 1px solid var(--anabtawi-gold);
+            transform: translate(-15px, 15px);
+            z-index: 1;
+            pointer-events: none;
+            transition: transform 0.5s ease;
+        }
+
+        .border-gold-accent:hover::before {
+            transform: translate(-8px, 8px);
+        }
+
+        .about-decorative-block {
+            position: relative;
+            z-index: 2;
+        }
+
+        .border-gold-accent-subtle {
+            border: 1px solid var(--anabtawi-gold-subtle) !important;
+        }
+
+        /* Maroon Footer */
+        .anabtawi-custom-footer {
+            border-top: 1px solid var(--anabtawi-gold-subtle);
+            position: relative;
+            z-index: 10;
+        }
+
+        .footer-maroon-bg {
+            background-color: var(--anabtawi-maroon-dark) !important;
+        }
+
+        .footer-links a {
+            color: var(--anabtawi-text-muted);
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .footer-links a i {
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            transform: translateX(-5px);
+        }
+
+        .footer-links a:hover {
+            color: var(--anabtawi-gold) !important;
+            padding-left: 6px;
+            text-decoration: none !important;
+        }
+
+        .footer-links a:hover i {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .footer-contact-info a.hover-gold {
+            color: var(--anabtawi-text-muted);
+            transition: color 0.3s ease;
+        }
+
+        .footer-contact-info a.hover-gold:hover {
+            color: var(--anabtawi-gold) !important;
+            text-decoration: none !important;
+        }
+
+        .social-icons a {
+            color: var(--anabtawi-gold);
+            border: 1px solid var(--anabtawi-gold);
+            transition: all 0.3s ease;
+        }
+
+        .social-icons a:hover {
+            background-color: var(--anabtawi-gold) !important;
+            border-color: var(--anabtawi-gold) !important;
+            color: var(--anabtawi-charcoal) !important;
+            transform: translateY(-3px);
+        }
+
+        .language-switcher-mockup span {
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .language-switcher-mockup span:hover {
+            color: var(--anabtawi-text-white) !important;
+        }
+
+        /* Scroll Animation Fades */
+        .scroll-fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .scroll-fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .scroll-fade-in.delay-1 { transition-delay: 0.15s; }
+        .scroll-fade-in.delay-2 { transition-delay: 0.3s; }
+        .scroll-fade-in.delay-3 { transition-delay: 0.45s; }
+
+        @keyframes marquee-scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* ==========================================================================
+           Dynamic Scroll-Driven Kunafa Stretch Background
+           ========================================================================== */
+        .kunafa-stretch-bg {
+            position: fixed;
+            bottom: -50px;
+            right: 2%;
+            width: 38vw;
+            max-width: 450px;
+            min-width: 280px;
+            aspect-ratio: 1 / 1;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.85;
+            user-select: none;
+        }
+
+        .kunafa-stretch-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .kunafa-layer {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: auto;
+            display: block;
+            pointer-events: none;
+        }
+
+        .kunafa-top {
+            top: 0;
+            z-index: 3;
+        }
+
+        .kunafa-cheese {
+            top: 41.5%;
+            transform-origin: top center;
+            z-index: 1;
+            transition: transform 0.1s linear;
+        }
+
+        .kunafa-bottom {
+            top: 64.4%;
+            z-index: 2;
+            transition: transform 0.1s linear;
+        }
+
+        /* ==========================================================================
+           Dynamic Scroll-Driven Video Scrubbing Section
+           ========================================================================== */
+        .scroll-video-section {
+            height: 250vh;
+            background-color: #111111;
+            position: relative;
+        }
+
+        .video-sticky-wrapper {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: #111111;
+        }
+
+        #scrub-canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .video-loader {
+            z-index: 5;
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.8s;
+            background-color: #111111 !important;
+            
+            &.loaded {
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+            }
+        }
+
+        // Preloader Pulse animations
+        @keyframes pulse-logo {
+            0%, 100% { opacity: 0.35; transform: scale(0.95); }
+            50% { opacity: 1; transform: scale(1.03); }
+        }
+
+        .animate-pulse {
+            animation: pulse-logo 2.2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-progress {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        .animate-pulse-progress {
+            animation: pulse-progress 1.5s infinite ease-in-out;
+        }
+
+        /* Section layout tweaks to showcase dynamic background */
+        section {
+            position: relative;
+            z-index: 2;
+        }
+    </style>
+</head>
+<body class="anabtawi-theme">
+
+    <!-- Dynamic Kunafa Stretch Background -->
+    <div class="kunafa-stretch-bg">
+        <div class="kunafa-stretch-wrapper">
+            <img src="static/src/img/kunafa_top.png" class="kunafa-layer kunafa-top" alt="Kunafa Top">
+            <img src="static/src/img/kunafa_cheese.png" class="kunafa-layer kunafa-cheese" alt="Kunafa Cheese">
+            <img src="static/src/img/kunafa_bottom.png" class="kunafa-layer kunafa-bottom" alt="Kunafa Bottom">
+        </div>
+    </div>
+
+    <!-- Header / Navigation -->
+    <nav class="navbar navbar-expand-lg anabtawi-navbar sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <svg viewBox="0 0 100 100" class="anabtawi-logo-svg" width="32" height="32">
+                    <g fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" />
+                        <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(120, 50, 50)" />
+                        <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(240, 50, 50)" />
+                    </g>
+                </svg>
+                ANABTAWI INVEST
+            </a>
+            <button class="navbar-toggler border-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+                <span class="fa fa-bars"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    <li class="nav-item active"><a class="nav-link" href="#">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#about">About Us</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#companies">Companies</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#products">Products</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#services">Services</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#careers">Careers</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#footer">Contact Us</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Cinematic Hero Section -->
+    <section class="anabtawi-hero-section position-relative overflow-hidden">
+        <div class="anabtawi-hero-overlay"></div>
+        <div class="container position-relative z-3 text-center text-white scroll-fade-in py-5">
+            <!-- Emblem Placeholder containing the Gold SVG Three-Petal Logo -->
+            <div class="invest-emblem-placeholder d-flex align-items-center justify-content-center mx-auto mb-4">
+                <svg viewBox="0 0 100 100" class="anabtawi-logo-svg" width="64" height="64">
+                    <g fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" />
+                        <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(120, 50, 50)" />
+                        <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(240, 50, 50)" />
+                    </g>
+                </svg>
+            </div>
+            <span class="text-uppercase tracking-widest brand-gold mb-3 d-inline-block font-weight-light font-size-sm">The Legacy of Excellence</span>
+            <h1 class="display-3 font-serif mb-4 font-weight-bold brand-gold-gradient">ANABTAWI INVEST</h1>
+            <p class="lead max-w-xl mx-auto mb-5 text-muted-white font-weight-light" style="max-width: 600px;">
+                Preserving legacy, cultivating future wealth. We invest in high-growth industries with the timeless precision of generational expertise.
+            </p>
+            <div class="d-flex justify-content-center gap-3 flex-wrap">
+                <a href="#about" class="btn btn-outline-gold px-4 py-3 text-uppercase tracking-wider">Explore Portfolio</a>
+                <a href="#footer" class="btn btn-burgundy px-4 py-3 text-uppercase tracking-wider text-white font-weight-bold">Connect With Us</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Scroll-Driven Video Scrubbing Section -->
+    <section class="scroll-video-section">
+        <div class="video-sticky-wrapper">
+            <!-- Canvas replacing video for smooth scrubbing -->
+            <canvas id="scrub-canvas"></canvas>
+            <!-- Inline Loader to show preloading state -->
+            <div class="video-loader d-flex flex-column align-items-center justify-content-center position-absolute top-0 start-0 w-100 h-100 bg-charcoal">
+                <svg viewBox="0 0 100 100" class="anabtawi-logo-svg brand-gold mb-3 animate-pulse" width="64" height="64">
+                    <g fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" />
+                        <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(120, 50, 50)" />
+                        <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(240, 50, 50)" />
+                    </g>
+                </svg>
+                <span class="text-uppercase tracking-wider brand-gold font-size-sm mb-2">Loading Experience</span>
+                <div class="progress animate-pulse-progress" style="width: 200px; height: 3px; background-color: rgba(197, 160, 89, 0.2); border-radius: 0;">
+                    <div class="progress-bar bg-gold" style="width: 0%; transition: width 0.1s linear;"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Us Section -->
+    <section id="about" class="py-6 bg-charcoal text-white">
+        <div class="container">
+            <div class="row align-items-center g-5">
+                <div class="col-lg-6 scroll-fade-in">
+                    <span class="text-uppercase tracking-wider brand-gold d-inline-block mb-2 font-weight-bold">Our Legacy</span>
+                    <h2 class="font-serif mb-4 font-weight-bold text-white">From Authenticity to Capital Growth</h2>
+                    <p class="lead text-muted-white font-weight-normal mb-4">
+                        Rooted in the authentic heritage of the Anabtawi family name, we have translated our legacy of quality, hospitality, and trust into a premium investment vehicle.
+                    </p>
+                    <p class="text-muted-white mb-4 font-weight-light">
+                        For decades, the name Anabtawi has stood for uncompromising dedication, craftsmanship, and community connection. Today, Anabtawi Invest channels these foundational values into diverse asset classes, backing high-conviction ventures across commercial real estate, strategic public markets, and high-potential private enterprises.
+                    </p>
+                    <p class="text-muted-white mb-4 font-weight-light">
+                        We do not just invest capital; we invest our name, our legacy, and our long-term vision. We partner with leaders who demonstrate high-grade execution and share our passion for creating value that endures for generations.
+                    </p>
+                </div>
+                <div class="col-lg-6 scroll-fade-in delay-2">
+                    <div class="position-relative p-4 border-gold-accent">
+                        <!-- Decorative Block with SVG logo -->
+                        <div class="about-decorative-block bg-dark-velvet d-flex flex-column align-items-center justify-content-center text-center p-5 border border-gold-accent-subtle shadow-lg" style="min-height: 400px;">
+                            <svg viewBox="0 0 100 100" class="anabtawi-logo-svg brand-gold mb-4 opacity-50" width="80" height="80">
+                                <g fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" />
+                                    <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(120, 50, 50)" />
+                                    <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(240, 50, 50)" />
+                                </g>
+                            </svg>
+                            <h3 class="font-serif brand-gold">ANABTAWI</h3>
+                            <p class="font-weight-light text-uppercase tracking-widest text-muted-white font-size-sm">Legacy of Trust</p>
+                            <div class="divider-gold my-3 mx-auto"></div>
+                            <p class="text-muted-white font-weight-light max-w-xs mx-auto">
+                                Est. 1954 - Preserving quality and values in generational growth.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Subsidiaries Section (Infinite Scrolling Ticker) -->
+    <section id="companies" class="py-6 bg-matte text-white">
+        <div class="container">
+            <div class="text-center mb-5 scroll-fade-in">
+                <span class="text-uppercase tracking-wider brand-gold d-inline-block mb-2 font-weight-bold">Our Subsidiaries</span>
+                <h2 class="h1 font-serif text-white font-weight-bold">Investment Sectors</h2>
+                <div class="divider-gold mx-auto my-3"></div>
+            </div>
+        </div>
+        
+        <!-- Infinite Scrolling Marquee Track with Beautiful Inline SVGs representing each Subsidiary -->
+        <div class="marquee-container py-4">
+            <div class="marquee-track">
+                
+                <!-- Subsidiary 1: Anabtawi Sweets -->
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <path d="M 20,70 L 20,45 L 35,55 L 50,35 L 65,55 L 80,45 L 80,70 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                            <circle cx="20" cy="40" r="4" fill="currentColor"/>
+                            <circle cx="35" cy="50" r="4" fill="currentColor"/>
+                            <circle cx="50" cy="30" r="4" fill="currentColor"/>
+                            <circle cx="65" cy="50" r="4" fill="currentColor"/>
+                            <circle cx="80" cy="40" r="4" fill="currentColor"/>
+                            <line x1="15" y1="75" x2="85" y2="75" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">Anabtawi Sweets</div>
+                    </div>
+                </div>
+
+                <!-- Subsidiary 2: United Food Trading -->
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <path d="M 50,15 C 25,15 25,50 50,85 C 75,50 75,15 50,15 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                            <line x1="50" y1="15" x2="50" y2="85" stroke="currentColor" stroke-width="2"/>
+                            <path d="M 32,40 C 42,45 58,45 68,40" fill="none" stroke="currentColor" stroke-width="2"/>
+                            <path d="M 30,55 C 40,60 60,60 70,55" fill="none" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">United Food</div>
+                    </div>
+                </div>
+
+                <!-- Subsidiary 3: Anabtawi Coffee -->
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <ellipse cx="50" cy="50" rx="25" ry="38" transform="rotate(-30 50 50)" fill="none" stroke="currentColor" stroke-width="4"/>
+                            <path d="M 35,25 C 45,35 40,65 65,75" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">Anabtawi Coffee</div>
+                    </div>
+                </div>
+
+                <!-- Subsidiary 4: Ein Jaloot -->
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <path d="M 20,80 L 20,30 L 32,30 L 32,40 L 44,40 L 44,30 L 56,30 L 56,40 L 68,40 L 68,30 L 80,30 L 80,80 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                            <path d="M 40,80 L 40,60 C 40,50 60,50 60,60 L 60,80" fill="none" stroke="currentColor" stroke-width="4"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">Ein Jaloot</div>
+                    </div>
+                </div>
+
+                <!-- Subsidiary 5: Tryaq Honey -->
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <polygon points="50,25 71,37 71,63 50,75 29,63 29,37" fill="none" stroke="currentColor" stroke-width="4"/>
+                            <polygon points="50,42 61,48 61,60 50,66 39,60 39,48" fill="none" stroke="currentColor" stroke-width="2"/>
+                            <line x1="50" y1="25" x2="50" y2="10" stroke="currentColor" stroke-width="3"/>
+                            <line x1="71" y1="63" x2="82" y2="70" stroke="currentColor" stroke-width="3"/>
+                            <line x1="29" y1="63" x2="18" y2="70" stroke="currentColor" stroke-width="3"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">Tryaq Honey</div>
+                    </div>
+                </div>
+
+                <!-- Subsidiary 6: Holy Land Sweets -->
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <path d="M 15,85 C 30,60 70,40 85,25" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                            <path d="M 50,52 C 55,42 68,38 72,44 C 76,50 66,58 50,52 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                            <path d="M 35,63 C 38,53 50,48 55,55 C 60,62 48,70 35,63 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                            <path d="M 62,44 C 68,32 80,30 82,38 C 84,46 72,50 62,44 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">Holy Land Sweets</div>
+                    </div>
+                </div>
+
+                <!-- DUPLICATES FOR INFINITE SCROLL LOOP -->
+                
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <path d="M 20,70 L 20,45 L 35,55 L 50,35 L 65,55 L 80,45 L 80,70 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                            <circle cx="20" cy="40" r="4" fill="currentColor"/>
+                            <circle cx="35" cy="50" r="4" fill="currentColor"/>
+                            <circle cx="50" cy="30" r="4" fill="currentColor"/>
+                            <circle cx="65" cy="50" r="4" fill="currentColor"/>
+                            <circle cx="80" cy="40" r="4" fill="currentColor"/>
+                            <line x1="15" y1="75" x2="85" y2="75" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">Anabtawi Sweets</div>
+                    </div>
+                </div>
+
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <path d="M 50,15 C 25,15 25,50 50,85 C 75,50 75,15 50,15 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                            <line x1="50" y1="15" x2="50" y2="85" stroke="currentColor" stroke-width="2"/>
+                            <path d="M 32,40 C 42,45 58,45 68,40" fill="none" stroke="currentColor" stroke-width="2"/>
+                            <path d="M 30,55 C 40,60 60,60 70,55" fill="none" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">United Food</div>
+                    </div>
+                </div>
+
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <ellipse cx="50" cy="50" rx="25" ry="38" transform="rotate(-30 50 50)" fill="none" stroke="currentColor" stroke-width="4"/>
+                            <path d="M 35,25 C 45,35 40,65 65,75" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">Anabtawi Coffee</div>
+                    </div>
+                </div>
+
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <path d="M 20,80 L 20,30 L 32,30 L 32,40 L 44,40 L 44,30 L 56,30 L 56,40 L 68,40 L 68,30 L 80,30 L 80,80 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                            <path d="M 40,80 L 40,60 C 40,50 60,50 60,60 L 60,80" fill="none" stroke="currentColor" stroke-width="4"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">Ein Jaloot</div>
+                    </div>
+                </div>
+
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <polygon points="50,25 71,37 71,63 50,75 29,63 29,37" fill="none" stroke="currentColor" stroke-width="4"/>
+                            <polygon points="50,42 61,48 61,60 50,66 39,60 39,48" fill="none" stroke="currentColor" stroke-width="2"/>
+                            <line x1="50" y1="25" x2="50" y2="10" stroke="currentColor" stroke-width="3"/>
+                            <line x1="71" y1="63" x2="82" y2="70" stroke="currentColor" stroke-width="3"/>
+                            <line x1="29" y1="63" x2="18" y2="70" stroke="currentColor" stroke-width="3"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">Tryaq Honey</div>
+                    </div>
+                </div>
+
+                <div class="marquee-item">
+                    <div class="company-logo-placeholder">
+                        <svg viewBox="0 0 100 100">
+                            <path d="M 15,85 C 30,60 70,40 85,25" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                            <path d="M 50,52 C 55,42 68,38 72,44 C 76,50 66,58 50,52 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                            <path d="M 35,63 C 38,53 50,48 55,55 C 60,62 48,70 35,63 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                            <path d="M 62,44 C 68,32 80,30 82,38 C 84,46 72,50 62,44 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                        </svg>
+                        <div class="company-name text-center mt-3 font-serif">Holy Land Sweets</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Investment Pillars Section -->
+    <section class="py-6 bg-charcoal border-top border-dark">
+        <div class="container">
+            <div class="text-center mb-5 scroll-fade-in">
+                <span class="text-uppercase tracking-wider brand-gold d-inline-block mb-2 font-weight-bold">Our Philosophy</span>
+                <h2 class="font-serif text-white font-weight-bold">Foundational Investment Pillars</h2>
+                <div class="divider-gold mx-auto my-3"></div>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4 scroll-fade-in">
+                    <div class="bg-matte p-5 h-100 shadow-sm border-top border-danger border-3">
+                        <div class="brand-gold mb-4"><i class="fa fa-shield fa-2x"></i></div>
+                        <h4 class="font-serif text-white font-weight-bold mb-3">Generational Wealth</h4>
+                        <p class="text-muted-white font-weight-light mb-0">
+                            We favor stability and resilience over short-term cycles, designing portfolios structured to safely compound value across decades.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4 scroll-fade-in delay-1">
+                    <div class="bg-matte p-5 h-100 shadow-sm border-top border-warning border-3" style="border-top-color: var(--anabtawi-gold) !important;">
+                        <div class="brand-gold mb-4"><i class="fa fa-line-chart fa-2x"></i></div>
+                        <h4 class="font-serif text-white font-weight-bold mb-3">Active Management</h4>
+                        <p class="text-muted-white font-weight-light mb-0">
+                            Leveraging our robust corporate network to actively accelerate growth, streamline operations, and scale our portfolio investments.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4 scroll-fade-in delay-2">
+                    <div class="bg-matte p-5 h-100 shadow-sm border-top border-danger border-3">
+                        <div class="brand-gold mb-4"><i class="fa fa-handshake-o fa-2x"></i></div>
+                        <h4 class="font-serif text-white font-weight-bold mb-3">Trust Partnerships</h4>
+                        <p class="text-muted-white font-weight-light mb-0">
+                            Built on a legacy of absolute integrity, our deals are structured with direct alignment and mutual respect as core principles.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Custom Footer -->
+    <footer id="footer" class="anabtawi-theme anabtawi-custom-footer">
+        <section class="footer-maroon-bg pt-5 pb-3">
+            <div class="container text-white">
+                <div class="row g-4">
+                    <!-- Column 1: Useful Links -->
+                    <div class="col-md-4">
+                        <h5 class="brand-gold text-uppercase tracking-wider mb-3 font-serif">Useful Links</h5>
+                        <ul class="list-unstyled footer-links">
+                            <li class="mb-2"><a href="#" class="text-muted-white text-decoration-none"><i class="fa fa-angle-right me-2"></i>Home</a></li>
+                            <li class="mb-2"><a href="#about" class="text-muted-white text-decoration-none"><i class="fa fa-angle-right me-2"></i>About Us</a></li>
+                            <li class="mb-2"><a href="#companies" class="text-muted-white text-decoration-none"><i class="fa fa-angle-right me-2"></i>Companies</a></li>
+                            <li class="mb-2"><a href="#products" class="text-muted-white text-decoration-none"><i class="fa fa-angle-right me-2"></i>Products</a></li>
+                            <li class="mb-2"><a href="#services" class="text-muted-white text-decoration-none"><i class="fa fa-angle-right me-2"></i>Services</a></li>
+                            <li class="mb-2"><a href="#careers" class="text-muted-white text-decoration-none"><i class="fa fa-angle-right me-2"></i>Careers</a></li>
+                            <li class="mb-2"><a href="#footer" class="text-muted-white text-decoration-none"><i class="fa fa-angle-right me-2"></i>Contact Us</a></li>
+                        </ul>
+                    </div>
+                    <!-- Column 2: Address -->
+                    <div class="col-md-4">
+                        <h5 class="brand-gold text-uppercase tracking-wider mb-3 font-serif">Address</h5>
+                        <p class="text-muted-white lh-lg font-weight-light">
+                            Anabtawi Sweets<br>
+                            Al Madina Al Monawara St.<br>
+                            Amman - Jordan
+                        </p>
+                    </div>
+                    <!-- Column 3: Connect with us -->
+                    <div class="col-md-4">
+                        <h5 class="brand-gold text-uppercase tracking-wider mb-3 font-serif">Connect With Us</h5>
+                        <ul class="list-unstyled footer-contact-info mb-4">
+                            <li class="mb-3">
+                                <a href="#" class="text-decoration-none brand-gold hover-gold font-weight-bold"><i class="fa fa-envelope-o me-2"></i>Contact Us Form</a>
+                            </li>
+                            <li class="mb-2">
+                                <a href="mailto:info@anabtawisweets.com" class="text-muted-white text-decoration-none hover-gold"><i class="fa fa-envelope me-2 brand-gold"></i>info@anabtawisweets.com</a>
+                            </li>
+                            <li class="mb-2">
+                                <a href="tel:+962797121121" class="text-muted-white text-decoration-none hover-gold"><i class="fa fa-phone me-2 brand-gold"></i>+962 7 97121121</a>
+                            </li>
+                        </ul>
+                        <div class="d-flex gap-2 social-icons">
+                            <a href="https://facebook.com" target="_blank" class="btn rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 38px; height: 38px;"><i class="fa fa-facebook"></i></a>
+                            <a href="https://twitter.com" target="_blank" class="btn rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 38px; height: 38px;"><i class="fa fa-twitter"></i></a>
+                            <a href="https://linkedin.com" target="_blank" class="btn rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 38px; height: 38px;"><i class="fa fa-linkedin"></i></a>
+                            <a href="#" class="btn rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 38px; height: 38px;"><i class="fa fa-home"></i></a>
+                        </div>
+                    </div>
+                </div>
+                <hr class="border-secondary my-4 opacity-25">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <p class="mb-0 text-muted-white font-size-sm font-weight-light">Copyright &copy; 2026 Anabtawi Invest. All rights reserved.</p>
+                    <div class="language-switcher-mockup font-size-sm brand-gold font-weight-bold">
+                        <span>EN</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </footer>
+
+    <!-- Bootstrap 5 Bundle JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JS Animations (Local Mockup of website_animation.js) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Scroll Animation Observer (Fade Ins)
+            if ('IntersectionObserver' in window) {
+                const observerOptions = {
+                    root: null,
+                    rootMargin: '0px 0px -8% 0px',
+                    threshold: 0.05
+                };
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            observer.unobserve(entry.target);
+                        }
+                    });
+                }, observerOptions);
+                
+                document.querySelectorAll('.scroll-fade-in').forEach(el => {
+                    observer.observe(el);
+                });
+            } else {
+                document.querySelectorAll('.scroll-fade-in').forEach(el => {
+                    el.classList.add('visible');
+                });
+            }
+
+            // ==========================================================================
+            // Local Interactive Kunafa Cheese-Stretch Scroll Animation
+            // ==========================================================================
+            const cheese = document.querySelector('.kunafa-cheese');
+            const bottom = document.querySelector('.kunafa-bottom');
+            
+            if (cheese && bottom) {
+                let initialCheeseHeight = cheese.offsetHeight || 120;
+                let ticking = false;
+
+                // Cache dimensions on resize to prevent layout thrashing
+                window.addEventListener('resize', () => {
+                    const tempTransform = cheese.style.transform;
+                    cheese.style.transform = 'none';
+                    initialCheeseHeight = cheese.offsetHeight || 120;
+                    cheese.style.transform = tempTransform;
+                }, { passive: true });
+
+                const handleScroll = () => {
+                    if (!ticking) {
+                        window.requestAnimationFrame(() => {
+                            const scrollY = window.scrollY;
+                            const docHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
+                            const viewportHeight = window.innerHeight;
+                            const maxScroll = Math.max(1, docHeight - viewportHeight);
+                            
+                            // Scroll fraction [0.0 to 1.0]
+                            const scrollFraction = Math.min(1.0, Math.max(0.0, scrollY / maxScroll));
+
+                            // scaleY stretches from 1.0 to 2.2 times
+                            const scaleY = 1.0 + (scrollFraction * 1.2);
+                            // scaleX thins out from 1.0 down to 0.85 for realistic volume preservation
+                            const scaleX = 1.0 - (scrollFraction * 0.15);
+
+                            // Apply cheese transformation
+                            cheese.style.transform = `scaleY(${scaleY}) scaleX(${scaleX})`;
+                            
+                            // Translate bottom tray by the exact height delta to maintain connection
+                            const deltaY = initialCheeseHeight * (scaleY - 1);
+                            bottom.style.transform = `translateY(${deltaY}px)`;
+
+                            ticking = false;
+                        });
+                        ticking = true;
+                    }
+                };
+
+                window.addEventListener('scroll', handleScroll, { passive: true });
+                
+                // Initial trigger
+                setTimeout(handleScroll, 100);
+            }
+
+            // ==========================================================================
+            // Local Interactive Scroll-Driven Video Scrubbing Animation (Canvas Frame Preloader)
+            // ==========================================================================
+            const videoContainer = document.querySelector('.scroll-video-section');
+            const canvas = document.querySelector('#scrub-canvas');
+
+            if (videoContainer && canvas) {
+                const ctx = canvas.getContext('2d');
+                const loader = document.querySelector('.video-loader');
+                const progressBar = document.querySelector('.progress-bar');
+
+                const totalFrames = 120;
+                const images = [];
+                let loadedCount = 0;
+                let targetFrame = 1;
+                let currentFrame = 1;
+                let lastDrawnFrame = 0;
+                const lerpFactor = 0.08;
+                let active = true;
+                let isTicking = false;
+
+                // Cache dimensions to avoid layout thrashing
+                let elementTopDoc = 0;
+                let elementHeight = 0;
+
+                const resizeCanvas = () => {
+                    const dpr = window.devicePixelRatio || 1;
+                    canvas.width = canvas.clientWidth * dpr;
+                    canvas.height = canvas.clientHeight * dpr;
+                };
+
+                const updateDimensions = () => {
+                    const rect = videoContainer.getBoundingClientRect();
+                    elementTopDoc = rect.top + window.scrollY;
+                    elementHeight = rect.height;
+                };
+
+                const drawFrame = (frameIndex) => {
+                    const img = images[frameIndex - 1];
+                    if (!img || !img.complete) return;
+
+                    const imgWidth = img.width;
+                    const imgHeight = img.height;
+                    const canvasWidth = canvas.width;
+                    const canvasHeight = canvas.height;
+
+                    const imgRatio = imgWidth / imgHeight;
+                    const canvasRatio = canvasWidth / canvasHeight;
+
+                    let drawWidth, drawHeight, offsetX, offsetY;
+
+                    if (canvasRatio > imgRatio) {
+                        drawWidth = canvasWidth;
+                        drawHeight = canvasWidth / imgRatio;
+                        offsetX = 0;
+                        offsetY = (canvasHeight - drawHeight) / 2;
+                    } else {
+                        drawWidth = canvasHeight * imgRatio;
+                        drawHeight = canvasHeight;
+                        offsetX = (canvasWidth - drawWidth) / 2;
+                        offsetY = 0;
+                    }
+
+                    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+                };
+
+                const onImageLoadedSuccess = (resolve) => {
+                    loadedCount++;
+                    if (progressBar) {
+                        const percent = Math.round((loadedCount / totalFrames) * 100);
+                        progressBar.style.width = `${percent}%`;
+                    }
+                    if (loadedCount === totalFrames) {
+                        if (loader) {
+                            loader.classList.add('loaded');
+                        }
+                        drawFrame(1);
+                        handleScroll(); // Initial draw based on load position
+                    }
+                    resolve();
+                };
+
+                const preloadImages = () => {
+                    for (let i = 1; i <= totalFrames; i++) {
+                        const img = new Image();
+                        const frameStr = String(i).padStart(4, '0');
+                        img.src = `static/src/img/frames/frame_${frameStr}.jpg`;
+
+                        const promise = new Promise((resolve) => {
+                            const handleLoaded = () => {
+                                if (typeof img.decode === 'function') {
+                                    img.decode()
+                                        .then(() => onImageLoadedSuccess(resolve))
+                                        .catch(() => onImageLoadedSuccess(resolve));
+                                } else {
+                                    onImageLoadedSuccess(resolve);
+                                }
+                            };
+
+                            img.addEventListener('load', handleLoaded);
+                            img.addEventListener('error', () => onImageLoadedSuccess(resolve));
+                        });
+                        images.push(img);
+                    }
+                };
+
+                resizeCanvas();
+                updateDimensions();
+                preloadImages();
+
+                window.addEventListener('resize', () => {
+                    resizeCanvas();
+                    updateDimensions();
+                    drawFrame(Math.round(currentFrame));
+                }, { passive: true });
+
+                const handleScroll = () => {
+                    if (loadedCount < totalFrames) return;
+
+                    const scrollY = window.scrollY;
+                    const viewportHeight = window.innerHeight;
+                    const totalScrollable = elementHeight - viewportHeight;
+
+                    if (totalScrollable <= 0) return;
+
+                    const scrolled = scrollY - elementTopDoc;
+                    const scrollFraction = Math.min(1.0, Math.max(0.0, scrolled / totalScrollable));
+
+                    targetFrame = 1 + scrollFraction * (totalFrames - 1);
+
+                    if (!isTicking) {
+                        isTicking = true;
+                        window.requestAnimationFrame(tick);
+                    }
+                };
+
+                window.addEventListener('scroll', handleScroll, { passive: true });
+
+                const tick = () => {
+                    if (!active) {
+                        isTicking = false;
+                        return;
+                    }
+
+                    const diff = targetFrame - currentFrame;
+                    if (Math.abs(diff) > 0.001) {
+                        currentFrame += diff * lerpFactor;
+                        const frameToDraw = Math.round(currentFrame);
+                        if (frameToDraw !== lastDrawnFrame) {
+                            drawFrame(frameToDraw);
+                            lastDrawnFrame = frameToDraw;
+                        }
+                        window.requestAnimationFrame(tick);
+                    } else {
+                        currentFrame = targetFrame;
+                        const frameToDraw = Math.round(currentFrame);
+                        if (frameToDraw !== lastDrawnFrame) {
+                            drawFrame(frameToDraw);
+                            lastDrawnFrame = frameToDraw;
+                        }
+                        isTicking = false;
+                    }
+                };
+            }
+        });
+    </script>
+</body>
+</html>

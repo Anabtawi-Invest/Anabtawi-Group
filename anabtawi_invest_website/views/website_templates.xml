@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Custom Navigation Menu Records to populate Odoo 19 top navigation menu (English only) -->
+    <!-- Update Standard Home Menu Name -->
+    <record id="website.menu_home" model="website.menu">
+        <field name="name">Home</field>
+    </record>
+    
+    <!-- Hide default Contact Us menu item from header -->
+    <record id="website.menu_contactus" model="website.menu">
+        <field name="parent_id" eval="False"/>
+    </record>
+
+    <!-- Custom Navigation Item: About Us -->
+    <record id="menu_about_us_custom" model="website.menu">
+        <field name="name">About Us</field>
+        <field name="url">/about-invest</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">20</field>
+    </record>
+
+    <!-- Custom Navigation Item: Companies -->
+    <record id="menu_companies_custom" model="website.menu">
+        <field name="name">Companies</field>
+        <field name="url">/#companies</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">30</field>
+    </record>
+
+    <!-- Custom Navigation Item: Products -->
+    <record id="menu_products_custom" model="website.menu">
+        <field name="name">Products</field>
+        <field name="url">/#products</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">40</field>
+    </record>
+
+    <!-- Custom Navigation Item: Services -->
+    <record id="menu_services_custom" model="website.menu">
+        <field name="name">Services</field>
+        <field name="url">/#services</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">50</field>
+    </record>
+
+    <!-- Custom Navigation Item: Careers -->
+    <record id="menu_careers_custom" model="website.menu">
+        <field name="name">Careers</field>
+        <field name="url">/#careers</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">60</field>
+    </record>
+
+
+    <!-- Inject Google Fonts into Layout Head (Prevents SCSS compiler remote-import issues) -->
+    <template id="layout_head_fonts" inherit_id="website.layout" name="Anabtawi Fonts">
+        <xpath expr="//head" position="inside">
+            <link rel="preconnect" href="https://fonts.googleapis.com"/>
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+            <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&amp;family=Outfit:wght@200;300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+        </xpath>
+    </template>
+
+    <!-- Custom Home Page Template -->
+    <template id="home_page_template" name="Anabtawi Invest Home" track="1">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure oe_empty anabtawi-theme bg-charcoal">
+                <!-- Cinematic Hero Section -->
+                <section class="anabtawi-hero-section d-flex align-items-center justify-content-center text-center position-relative overflow-hidden">
+                    <div class="anabtawi-hero-overlay"></div>
+                    <div class="container position-relative z-index-2 text-white scroll-fade-in py-5">
+                        <!-- Emblem Placeholder directly above Brand Text -->
+                        <div class="invest-emblem-placeholder d-flex align-items-center justify-content-center mx-auto mb-4">
+                            <svg viewBox="0 0 100 100" class="anabtawi-logo-svg" width="64" height="64">
+                                <g fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" />
+                                    <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(120, 50, 50)" />
+                                    <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(240, 50, 50)" />
+                                </g>
+                            </svg>
+                        </div>
+                        <span class="text-uppercase tracking-widest brand-gold mb-3 d-inline-block font-weight-light font-size-sm">The Legacy of Excellence</span>
+                        <h1 class="display-3 font-serif mb-4 font-weight-bold brand-gold-gradient">ANABTAWI INVEST</h1>
+                        <p class="lead max-w-xl mx-auto mb-5 text-muted-white font-weight-light">
+                            Preserving legacy, cultivating future wealth. We invest in high-growth industries with the timeless precision of generational expertise.
+                        </p>
+                        <div class="d-flex justify-content-center gap-3 flex-wrap">
+                            <a href="/about-invest" class="btn btn-outline-gold px-4 py-3 text-uppercase tracking-wider">Explore Portfolio</a>
+                            <a href="/contactus" class="btn btn-burgundy px-4 py-3 text-uppercase tracking-wider text-white font-weight-bold">Connect With Us</a>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Scroll-Driven Video Scrubbing Section -->
+                <section class="scroll-video-section">
+                    <div class="video-sticky-wrapper">
+                        <!-- Canvas replacing video for smooth scrubbing -->
+                        <canvas id="scrub-canvas"></canvas>
+                        <!-- Inline Loader to show preloading state -->
+                        <div class="video-loader d-flex flex-column align-items-center justify-content-center position-absolute top-0 start-0 w-100 h-100 bg-charcoal">
+                            <svg viewBox="0 0 100 100" class="anabtawi-logo-svg brand-gold mb-3 animate-pulse" width="64" height="64">
+                                <g fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" />
+                                    <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(120, 50, 50)" />
+                                    <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(240, 50, 50)" />
+                                </g>
+                            </svg>
+                            <span class="text-uppercase tracking-wider brand-gold font-size-sm mb-2">Loading Experience</span>
+                            <div class="progress animate-pulse-progress" style="width: 200px; height: 3px; background-color: rgba(197, 160, 89, 0.2); border-radius: 0;">
+                                <div class="progress-bar bg-gold" style="width: 0%; transition: width 0.1s linear;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Subsidiaries Loop Section (Infinite Scrolling Ticker) -->
+                <section id="companies" class="anabtawi-companies-section py-6 bg-matte text-white">
+                    <div class="container">
+                        <div class="text-center mb-5 scroll-fade-in">
+                            <span class="text-uppercase tracking-wider brand-gold d-inline-block mb-2 font-weight-bold">Our Subsidiaries</span>
+                            <h2 class="h1 font-serif text-white font-weight-bold">Investment Sectors</h2>
+                            <div class="divider-gold mx-auto my-3"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Scrolling Marquee Ticker Track (Loop Right to Left, english only, default Odoo image placeholder) -->
+                    <div class="marquee-container py-4 overflow-hidden position-relative">
+                        <div class="marquee-track d-flex">
+                            <!-- 6 original interactive cards -->
+                            <a href="/companies/anabtawi-sweets" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Anabtawi Sweets" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">Anabtawi Sweets</div>
+                            </a>
+                            <a href="/companies/united-food" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="United Food Trading" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">United Food Trading</div>
+                            </a>
+                            <a href="/companies/anabtawi-coffee" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Anabtawi Coffee" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">Anabtawi Coffee</div>
+                            </a>
+                            <a href="/companies/ein-jaloot" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Ein Jaloot" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">Ein Jaloot</div>
+                            </a>
+                            <a href="/companies/tryaq-honey" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Tryaq Honey" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">Tryaq Honey</div>
+                            </a>
+                            <a href="/companies/holy-land-sweets" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Holy Land Sweets" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">Holy Land Sweets</div>
+                            </a>
+                            
+                            <!-- Duplicate items to create a seamless infinite scrolling loop -->
+                            <a href="/companies/anabtawi-sweets" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Anabtawi Sweets" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">Anabtawi Sweets</div>
+                            </a>
+                            <a href="/companies/united-food" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="United Food Trading" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">United Food Trading</div>
+                            </a>
+                            <a href="/companies/anabtawi-coffee" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Anabtawi Coffee" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">Anabtawi Coffee</div>
+                            </a>
+                            <a href="/companies/ein-jaloot" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Ein Jaloot" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">Ein Jaloot</div>
+                            </a>
+                            <a href="/companies/tryaq-honey" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Tryaq Honey" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">Tryaq Honey</div>
+                            </a>
+                            <a href="/companies/holy-land-sweets" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Holy Land Sweets" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3 font-serif text-white">Holy Land Sweets</div>
+                            </a>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <!-- Custom About Page Template -->
+    <template id="about_page_template" name="About Anabtawi Invest" track="1">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure oe_empty anabtawi-theme bg-charcoal">
+                <!-- Page Title / Header -->
+                <section class="anabtawi-page-header py-6 text-center text-white position-relative overflow-hidden">
+                    <div class="anabtawi-hero-overlay"></div>
+                    <div class="container position-relative z-index-2 scroll-fade-in">
+                        <span class="text-uppercase tracking-widest brand-gold mb-2 d-inline-block font-weight-light">Corporate Portfolio</span>
+                        <h1 class="display-4 font-serif font-weight-bold brand-gold-gradient">ABOUT ANABTAWI INVEST</h1>
+                        <div class="divider-gold mx-auto my-3"></div>
+                    </div>
+                </section>
+
+                <!-- Core narrative section -->
+                <section class="py-6 bg-charcoal text-white">
+                    <div class="container">
+                        <div class="row align-items-center g-5">
+                            <div class="col-lg-6 scroll-fade-in">
+                                <span class="text-uppercase tracking-wider brand-gold d-inline-block mb-2 font-weight-bold">Our Legacy</span>
+                                <h2 class="font-serif text-gold mb-4 font-weight-bold text-white">From Authenticity to Capital Growth</h2>
+                                <p class="lead text-muted-white font-weight-normal mb-4">
+                                    Rooted in the authentic heritage of the Anabtawi family name, we have translated our legacy of quality, hospitality, and trust into a premium investment vehicle.
+                                </p>
+                                <p class="text-muted-white mb-4 font-weight-light">
+                                    For decades, the name Anabtawi has stood for uncompromising dedication, craftsmanship, and community connection. Today, Anabtawi Invest channels these foundational values into diverse asset classes, backing high-conviction ventures across commercial real estate, strategic public markets, and high-potential private enterprises.
+                                </p>
+                                <p class="text-muted-white mb-4 font-weight-light">
+                                    We do not just invest capital; we invest our name, our legacy, and our long-term vision. We partner with leaders who demonstrate high-grade execution and share our passion for creating value that endures for generations.
+                                </p>
+                            </div>
+                            <div class="col-lg-6 scroll-fade-in">
+                                <div class="position-relative p-4 border-gold-accent">
+                                    <!-- Solid CSS decorative block -->
+                                    <div class="about-decorative-block bg-dark-velvet d-flex flex-column align-items-center justify-content-center text-center p-5 border border-gold-accent-subtle shadow-lg" style="min-height: 400px;">
+                                        <svg viewBox="0 0 100 100" class="anabtawi-logo-svg brand-gold mb-4 opacity-50" width="80" height="80">
+                                            <g fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" />
+                                                <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(120, 50, 50)" />
+                                                <path d="M 50,48 C 42,38 30,24 30,15 C 30,6 38,2 50,2 C 62,2 70,6 70,15 C 70,24 58,38 50,48 Z" transform="rotate(240, 50, 50)" />
+                                            </g>
+                                        </svg>
+                                        <h3 class="font-serif brand-gold">ANABTAWI</h3>
+                                        <p class="font-weight-light text-uppercase tracking-widest text-muted-white font-size-sm">Legacy of Trust</p>
+                                        <div class="divider-gold my-3"></div>
+                                        <p class="text-muted-white font-weight-light max-w-xs mx-auto">
+                                            Est. 1954 - Preserving quality and values in generational growth.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Investment Philosophy / Value Grid -->
+                <section class="py-6 bg-matte border-top border-dark">
+                    <div class="container">
+                        <div class="text-center mb-5 scroll-fade-in">
+                            <span class="text-uppercase tracking-wider brand-gold d-inline-block mb-2 font-weight-bold">Our Philosophy</span>
+                            <h2 class="font-serif text-white font-weight-bold">Foundational Investment Pillars</h2>
+                            <div class="divider-gold mx-auto my-3"></div>
+                        </div>
+                        <div class="row g-4">
+                            <div class="col-md-4 scroll-fade-in">
+                                <div class="bg-charcoal p-5 h-100 shadow-sm border-top border-burgundy border-3">
+                                    <div class="brand-gold mb-3"><i class="fa fa-shield fa-2x"></i></div>
+                                    <h4 class="font-serif text-white font-weight-bold mb-3">Generational Wealth</h4>
+                                    <p class="text-muted-white font-weight-light mb-0">
+                                        We favor stability and resilience over short-term cycles, designing portfolios structured to safely compound value across decades.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="col-md-4 scroll-fade-in">
+                                <div class="bg-charcoal p-5 h-100 shadow-sm border-top border-gold border-3">
+                                    <div class="brand-gold mb-3"><i class="fa fa-line-chart fa-2x"></i></div>
+                                    <h4 class="font-serif text-white font-weight-bold mb-3">Active Management</h4>
+                                    <p class="text-muted-white font-weight-light mb-0">
+                                        Leveraging our robust corporate network to actively accelerate growth, streamline operations, and scale our portfolio investments.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="col-md-4 scroll-fade-in">
+                                <div class="bg-charcoal p-5 h-100 shadow-sm border-top border-burgundy border-3">
+                                    <div class="brand-gold mb-3"><i class="fa fa-handshake-o fa-2x"></i></div>
+                                    <h4 class="font-serif text-white font-weight-bold mb-3">Trust Partnerships</h4>
+                                    <p class="text-muted-white font-weight-light mb-0">
+                                        Built on a legacy of absolute integrity, our deals are structured with direct alignment and mutual respect as core principles.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <!-- Custom Footer Refactoring -->
+    <template id="custom_footer" inherit_id="website.layout" name="Anabtawi Custom Footer" priority="50">
+        <!-- Replace the standard footer content with our custom one (English only) -->
+        <xpath expr="//div[@id='footer']" position="replace">
+            <div id="footer" class="oe_structure text-break anabtawi-theme anabtawi-custom-footer" t-ignore="true" t-if="not no_footer">
+                <section class="footer-maroon-bg pt-5 pb-3">
+                    <div class="container text-white">
+                        <div class="row g-4">
+                            <!-- Column 1: Useful Links -->
+                            <div class="col-md-4">
+                                <h5 class="brand-gold text-uppercase tracking-wider mb-3 font-serif">Useful Links</h5>
+                                <ul class="list-unstyled footer-links">
+                                    <li class="mb-2"><a href="/" class="text-muted-white text-decoration-none hover-gold"><i class="fa fa-angle-right me-2"></i>Home</a></li>
+                                    <li class="mb-2"><a href="/about-invest" class="text-muted-white text-decoration-none hover-gold"><i class="fa fa-angle-right me-2"></i>About Us</a></li>
+                                    <li class="mb-2"><a href="/#companies" class="text-muted-white text-decoration-none hover-gold"><i class="fa fa-angle-right me-2"></i>Companies</a></li>
+                                    <li class="mb-2"><a href="/#products" class="text-muted-white text-decoration-none hover-gold"><i class="fa fa-angle-right me-2"></i>Products</a></li>
+                                    <li class="mb-2"><a href="/#services" class="text-muted-white text-decoration-none hover-gold"><i class="fa fa-angle-right me-2"></i>Services</a></li>
+                                    <li class="mb-2"><a href="/#careers" class="text-muted-white text-decoration-none hover-gold"><i class="fa fa-angle-right me-2"></i>Careers</a></li>
+                                    <li class="mb-2"><a href="/contactus" class="text-muted-white text-decoration-none hover-gold"><i class="fa fa-angle-right me-2"></i>Contact Us</a></li>
+                                </ul>
+                            </div>
+                            <!-- Column 2: Address -->
+                            <div class="col-md-4">
+                                <h5 class="brand-gold text-uppercase tracking-wider mb-3 font-serif">Address</h5>
+                                <p class="text-muted-white lh-lg font-weight-light">
+                                    Anabtawi Sweets<br/>
+                                    Al Madina Al Monawara St.<br/>
+                                    Amman - Jordan
+                                </p>
+                            </div>
+                            <!-- Column 3: Connect with us -->
+                            <div class="col-md-4">
+                                <h5 class="brand-gold text-uppercase tracking-wider mb-3 font-serif">Connect With Us</h5>
+                                <ul class="list-unstyled footer-contact-info mb-4">
+                                    <li class="mb-3">
+                                        <a href="/contactus" class="text-decoration-none brand-gold hover-gold font-weight-bold"><i class="fa fa-envelope-o me-2"></i>Contact Us Form</a>
+                                    </li>
+                                    <li class="mb-2">
+                                        <a href="mailto:info@anabtawisweets.com" class="text-muted-white text-decoration-none hover-gold"><i class="fa fa-envelope me-2 brand-gold"></i>info@anabtawisweets.com</a>
+                                    </li>
+                                    <li class="mb-2">
+                                        <a href="tel:+962797121121" class="text-muted-white text-decoration-none hover-gold"><i class="fa fa-phone me-2 brand-gold"></i>+962 7 97121121</a>
+                                    </li>
+                                </ul>
+                                <div class="d-flex gap-2 social-icons">
+                                    <a href="https://facebook.com" class="btn btn-outline-gold rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 38px; height: 38px;"><i class="fa fa-facebook"></i></a>
+                                    <a href="https://twitter.com" class="btn btn-outline-gold rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 38px; height: 38px;"><i class="fa fa-twitter"></i></a>
+                                    <a href="https://linkedin.com" class="btn btn-outline-gold rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 38px; height: 38px;"><i class="fa fa-linkedin"></i></a>
+                                    <a href="/" class="btn btn-outline-gold rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 38px; height: 38px;"><i class="fa fa-home"></i></a>
+                                </div>
+                            </div>
+                        </div>
+                        <hr class="border-secondary my-4 opacity-25"/>
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                            <p class="mb-0 text-muted-white font-size-sm font-weight-light">Copyright &amp;copy; 2026 Anabtawi Invest. All rights reserved.</p>
+                            <div class="language-switcher-mockup font-size-sm brand-gold font-weight-bold">
+                                <span>EN</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </xpath>
+
+        <!-- Completely eliminate Odoo's default footer copyright layout row to avoid duplication -->
+        <xpath expr="//div[hasclass('o_footer_copyright')]" position="replace">
+            <!-- Completely removed to prevent duplication -->
+        </xpath>
+    </template>
+
+    <!-- Inject Kunafa Stretch Background into Layout Body -->
+    <template id="layout_kunafa_background" inherit_id="website.layout" name="Anabtawi Kunafa Background">
+        <xpath expr="//div[@id='wrapwrap']" position="inside">
+            <div class="kunafa-stretch-bg">
+                <div class="kunafa-stretch-wrapper">
+                    <img src="/anabtawi_invest_website/static/src/img/kunafa_top.png" class="kunafa-layer kunafa-top" alt="Kunafa Top"/>
+                    <img src="/anabtawi_invest_website/static/src/img/kunafa_cheese.png" class="kunafa-layer kunafa-cheese" alt="Kunafa Cheese"/>
+                    <img src="/anabtawi_invest_website/static/src/img/kunafa_bottom.png" class="kunafa-layer kunafa-bottom" alt="Kunafa Bottom"/>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>
