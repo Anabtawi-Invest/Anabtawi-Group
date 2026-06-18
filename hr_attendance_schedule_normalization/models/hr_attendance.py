@@ -91,24 +91,9 @@ class HrAttendance(models.Model):
         return day_start.astimezone(pytz.UTC).replace(tzinfo=None)
 
     def _normalize_check_out_time(self, employee, check_out_dt, check_in_dt=None):
-        tz = self._get_employee_timezone(employee)
-        day_bounds = self._get_employee_schedule_day_bounds(
-            employee=employee,
-            reference_dt=check_out_dt,
-            check_in_dt=check_in_dt,
-        )
-        if not day_bounds:
-            return check_out_dt
-
-        _day_start, day_end = day_bounds
-        check_out_local = self._convert_utc_naive_to_tz(check_out_dt, tz)
-        if check_out_local <= day_end:
-            return check_out_dt
-
-        normalized_check_out = day_end.astimezone(pytz.UTC).replace(tzinfo=None)
-        if check_in_dt and normalized_check_out < check_in_dt:
-            return check_in_dt
-        return normalized_check_out
+        del employee, check_in_dt
+        # Disable schedule-based clipping for check-out.
+        return check_out_dt
 
     def _get_employee_schedule_day_bounds(self, employee, reference_dt, check_in_dt=None):
         if not employee.resource_calendar_id:
@@ -158,3 +143,4 @@ class HrAttendance(models.Model):
         if naive_utc_dt.tzinfo:
             return naive_utc_dt.astimezone(tz)
         return pytz.UTC.localize(naive_utc_dt).astimezone(tz)
+
