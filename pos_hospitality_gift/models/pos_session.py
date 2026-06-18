@@ -19,8 +19,16 @@ class PosSession(models.Model):
         self.ensure_one()
         move_line_model = data.get("MoveLine")
         if not move_line_model:
+            move_line_model = self.env["account.move.line"].with_context(
+                check_move_validity=False, skip_invoice_sync=True
+            )
             _logger.warning(
-                "[POS_HOSPITALITY_GIFT] Session %s skip gift stock reclass: MoveLine model not found in data",
+                "[POS_HOSPITALITY_GIFT] Session %s MoveLine missing in data, using fallback env['account.move.line']",
+                self.name,
+            )
+        if not self.move_id:
+            _logger.warning(
+                "[POS_HOSPITALITY_GIFT] Session %s skip gift stock reclass: session move_id is missing",
                 self.name,
             )
             return
