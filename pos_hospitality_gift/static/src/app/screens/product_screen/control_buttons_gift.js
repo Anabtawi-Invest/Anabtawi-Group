@@ -15,6 +15,19 @@ patch(ControlButtons.prototype, {
             return;
         }
 
-        selectedLine.update({ is_gift: !selectedLine.is_gift });
+        const wasGift = Boolean(selectedLine.is_gift);
+        if (!wasGift) {
+            selectedLine._gift_previous_discount = selectedLine.discount || 0;
+            selectedLine.set_discount(100);
+        } else {
+            const previousDiscount =
+                typeof selectedLine._gift_previous_discount === "number"
+                    ? selectedLine._gift_previous_discount
+                    : 0;
+            selectedLine.set_discount(previousDiscount);
+            delete selectedLine._gift_previous_discount;
+        }
+
+        selectedLine.update({ is_gift: !wasGift });
     },
 });

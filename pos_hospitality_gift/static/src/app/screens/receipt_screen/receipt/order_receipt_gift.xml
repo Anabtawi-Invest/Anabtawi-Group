@@ -14,20 +14,6 @@
                         <span>🎁 </span><span t-esc="giftLine.full_product_name"/>
                     </div>
                 </div>
-                <div class="pt-2">
-                    <div>
-                        Original Value:
-                        <span t-out="formatCurrency(order.amount_total)" class="pos-receipt-right-align font-monospace"/>
-                    </div>
-                    <div>
-                        Amount Paid by Customer:
-                        <span t-out="formatCurrency(customerPaidAmount)" class="pos-receipt-right-align font-monospace"/>
-                    </div>
-                    <div>
-                        Company Sponsored:
-                        <span t-out="formatCurrency(companySponsoredAmount)" class="pos-receipt-right-align font-monospace"/>
-                    </div>
-                </div>
             </t>
         </xpath>
     </t>

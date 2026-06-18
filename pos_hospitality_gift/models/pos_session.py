@@ -1,6 +1,8 @@
 import logging
+from collections import defaultdict
 
-from odoo import Command, _, fields, models
+from odoo import _, models
+from odoo.tools import float_is_zero
 
 _logger = logging.getLogger(__name__)
 
@@ -8,177 +10,107 @@ _logger = logging.getLogger(__name__)
 class PosSession(models.Model):
     _inherit = "pos.session"
 
-    hospitality_settlement_move_id = fields.Many2one(
-        "account.move",
-        string="Hospitality Settlement Move",
-        copy=False,
-        readonly=True,
-    )
+    def _create_non_reconciliable_move_lines(self, data):
+        data = super()._create_non_reconciliable_move_lines(data)
+        self._create_gift_stock_expense_reclass_lines(data)
+        return data
 
-    def _validate_session(
-        self, balancing_account=False, amount_to_balance=0, bank_payment_method_diffs=None
-    ):
-        result = super()._validate_session(
-            balancing_account=balancing_account,
-            amount_to_balance=amount_to_balance,
-            bank_payment_method_diffs=bank_payment_method_diffs,
-        )
-        for session in self:
-            if session.state == "closed":
-                _logger.warning(
-                    "[POS_HOSPITALITY_GIFT] Session %s closed, attempting hospitality settlement",
-                    session.name,
-                )
-                session._create_hospitality_settlement_move()
-            else:
-                _logger.warning(
-                    "[POS_HOSPITALITY_GIFT] Session %s is not closed (state=%s), skip settlement",
-                    session.name,
-                    session.state,
-                )
-        return result
-
-    def _create_hospitality_settlement_move(self):
+    def _create_gift_stock_expense_reclass_lines(self, data):
         self.ensure_one()
-        if self.hospitality_settlement_move_id:
-            _logger.warning(
-                "[POS_HOSPITALITY_GIFT] Session %s already linked to settlement move %s (state=%s)",
-                self.name,
-                self.hospitality_settlement_move_id.name,
-                self.hospitality_settlement_move_id.state,
-            )
-            if self.hospitality_settlement_move_id.state == "draft":
-                _logger.warning(
-                    "[POS_HOSPITALITY_GIFT] Posting existing draft settlement move %s",
-                    self.hospitality_settlement_move_id.name,
-                )
-                self.hospitality_settlement_move_id._post()
-            return self.hospitality_settlement_move_id
-
+        move_line_model = data.get("MoveLine")
+        if not move_line_model:
+            return
         company = self.company_id
-        hospitality_pm = company.hospitality_payment_method_id
-        clearing_account = company.hospitality_clearing_account_id
         expense_account = company.gift_expense_account_id
-        if not (hospitality_pm and clearing_account and expense_account):
+        if not expense_account:
             _logger.warning(
-                "[POS_HOSPITALITY_GIFT] Session %s skip: missing configuration "
-                "(hospitality_pm=%s, clearing_account=%s, expense_account=%s)",
-                self.name,
-                hospitality_pm.id if hospitality_pm else False,
-                clearing_account.id if clearing_account else False,
-                expense_account.id if expense_account else False,
-            )
-            return self.env["account.move"]
-
-        hospitality_payments = self._get_hospitality_payments(hospitality_pm)
-        if not hospitality_payments:
-            _logger.warning(
-                "[POS_HOSPITALITY_GIFT] Session %s skip: no hospitality payments found",
+                "[POS_HOSPITALITY_GIFT] Session %s skip gift stock reclass: missing hospitality expense account",
                 self.name,
             )
-            return self.env["account.move"]
+            return
 
-        company_currency = company.currency_id
-        amount_company_currency = 0.0
-        for payment in hospitality_payments:
-            converted_amount = payment.currency_id._convert(
-                payment.amount,
-                company_currency,
-                company,
-                fields.Date.to_date(payment.payment_date),
-            )
-            _logger.warning(
-                "[POS_HOSPITALITY_GIFT] Session %s payment %s included in settlement: order=%s, amount=%s %s, converted=%s %s",
-                self.name,
-                payment.id,
-                payment.pos_order_id.name,
-                payment.amount,
-                payment.currency_id.name,
-                converted_amount,
-                company_currency.name,
-            )
-            amount_company_currency += converted_amount
+        amount_precision = company.currency_id.rounding
+        amounts_by_source = defaultdict(float)
+        closed_orders = self._get_closed_orders().filtered(
+            lambda order: not order.is_invoiced and not order.shipping_date
+        )
+        gift_lines = closed_orders.mapped("lines").filtered(
+            lambda line: line.is_gift
+            and line.product_id.is_storable
+            and line.product_id.valuation == "real_time"
+        )
+        for line in gift_lines:
+            source_account = line.product_id._get_product_accounts().get("expense")
+            if not source_account or source_account == expense_account:
+                continue
+            if float_is_zero(line.total_cost, precision_rounding=amount_precision):
+                continue
+            amounts_by_source[source_account] += line.total_cost
 
-        if company_currency.is_zero(amount_company_currency):
-            _logger.warning(
-                "[POS_HOSPITALITY_GIFT] Session %s skip: aggregated amount is zero (%s %s)",
-                self.name,
-                amount_company_currency,
-                company_currency.name,
-            )
-            return self.env["account.move"]
+        if not amounts_by_source:
+            return
 
-        settlement_move = self.env["account.move"].create(
-            {
-                "journal_id": self.config_id.journal_id.id,
-                "date": fields.Date.context_today(self),
-                "ref": _("Hospitality settlement - %s", self.name),
-                "line_ids": [
-                    Command.create(
+        line_vals = []
+        for source_account, amount in amounts_by_source.items():
+            if float_is_zero(amount, precision_rounding=amount_precision):
+                continue
+            amount_abs = abs(amount)
+            description = _("Gift stock expense reclass")
+            if amount > 0:
+                line_vals.append(
+                    self._debit_amounts(
                         {
-                            "name": _("Hospitality settlement expense"),
+                            "name": description,
                             "account_id": expense_account.id,
-                            "debit": amount_company_currency,
-                            "credit": 0.0,
-                        }
-                    ),
-                    Command.create(
+                            "move_id": self.move_id.id,
+                        },
+                        amount_abs,
+                        amount_abs,
+                        force_company_currency=True,
+                    )
+                )
+                line_vals.append(
+                    self._credit_amounts(
                         {
-                            "name": _("Hospitality settlement clearing"),
-                            "account_id": clearing_account.id,
-                            "debit": 0.0,
-                            "credit": amount_company_currency,
-                        }
-                    ),
-                ],
-            }
-        )
-        settlement_move._post()
-        self.hospitality_settlement_move_id = settlement_move
-        _logger.warning(
-            "[POS_HOSPITALITY_GIFT] Session %s settlement move created: %s, amount=%s %s",
-            self.name,
-            settlement_move.name,
-            amount_company_currency,
-            company_currency.name,
-        )
-        settlement_move.message_post(
-            body=_("Related POS Session: %s", self._get_html_link())
-        )
-        return settlement_move
+                            "name": description,
+                            "account_id": source_account.id,
+                            "move_id": self.move_id.id,
+                        },
+                        amount_abs,
+                        amount_abs,
+                        force_company_currency=True,
+                    )
+                )
+            else:
+                line_vals.append(
+                    self._debit_amounts(
+                        {
+                            "name": description,
+                            "account_id": source_account.id,
+                            "move_id": self.move_id.id,
+                        },
+                        amount_abs,
+                        amount_abs,
+                        force_company_currency=True,
+                    )
+                )
+                line_vals.append(
+                    self._credit_amounts(
+                        {
+                            "name": description,
+                            "account_id": expense_account.id,
+                            "move_id": self.move_id.id,
+                        },
+                        amount_abs,
+                        amount_abs,
+                        force_company_currency=True,
+                    )
+                )
 
-    def _get_hospitality_payments(self, hospitality_payment_method):
-        self.ensure_one()
-        closed_orders = self._get_closed_orders()
-        hospitality_payments = self.env["pos.payment"]
-        for order in closed_orders:
-            order_hospitality_payments = order.payment_ids.filtered(
-                lambda p: not p.is_change
-                and p.payment_method_id == hospitality_payment_method
-                and not p.currency_id.is_zero(p.amount)
-            )
+        if line_vals:
+            move_line_model.create(line_vals)
             _logger.warning(
-                "[POS_HOSPITALITY_GIFT] Session %s order %s hospitality_payments=%s payments=%s",
+                "[POS_HOSPITALITY_GIFT] Session %s gift stock reclass posted for %s source account(s)",
                 self.name,
-                order.name,
-                [
-                    {
-                        "id": p.id,
-                        "amount": p.amount,
-                        "method_id": p.payment_method_id.id,
-                        "method_name": p.payment_method_id.name,
-                    }
-                    for p in order_hospitality_payments
-                ],
-                [
-                    {
-                        "method_id": p.payment_method_id.id,
-                        "method_name": p.payment_method_id.name,
-                        "amount": p.amount,
-                        "is_change": p.is_change,
-                    }
-                    for p in order.payment_ids
-                ],
+                len(amounts_by_source),
             )
-            hospitality_payments |= order_hospitality_payments
-        return hospitality_payments
