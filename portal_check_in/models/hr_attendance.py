@@ -105,6 +105,37 @@ class HrAttendance(models.Model):
         overtime_hours = sum(max(req.quantity or 0.0, 0.0) for req in approved_requests)
         return overtime_hours
 
+    def _has_portal_open_overtime_request(self):
+        """Submitted/Pending overtime request blocks auto check-out."""
+        self.ensure_one()
+        if not self.employee_id or not self.check_in:
+            return False
+
+        approval_model = self.env["approval.request"]
+        required_fields = {
+            "is_overtime_category",
+            "overtime_employee_id",
+            "request_status",
+            "overtime_date_from",
+            "overtime_date_to",
+        }
+        if not required_fields.issubset(set(approval_model._fields)):
+            return False
+
+        employee_tz = pytz.timezone(self.employee_id.tz or "UTC")
+        target_date = pytz.utc.localize(self.check_in).astimezone(employee_tz).date()
+        open_request = approval_model.search(
+            [
+                ("is_overtime_category", "=", True),
+                ("overtime_employee_id", "=", self.employee_id.id),
+                ("request_status", "in", ("new", "pending")),
+                ("overtime_date_from", "<=", target_date),
+                ("overtime_date_to", ">=", target_date),
+            ],
+            limit=1,
+        )
+        return bool(open_request)
+
     def _get_portal_shift_end_with_grace_utc(self, grace_minutes=15):
         self.ensure_one()
         if not self.employee_id or not self.check_in:
@@ -150,6 +181,15 @@ class HrAttendance(models.Model):
             return
 
         for attendance in open_attendances:
+            if attendance._has_portal_open_overtime_request():
+                _logger.info(
+                    "portal_check_in auto checkout skipped due to open overtime request: "
+                    "attendance_id=%s employee_id=%s check_in=%s",
+                    attendance.id,
+                    attendance.employee_id.id,
+                    attendance.check_in,
+                )
+                continue
             auto_check_out_at = attendance._get_portal_shift_end_with_grace_utc(grace_minutes=15)
             if not auto_check_out_at:
                 continue
