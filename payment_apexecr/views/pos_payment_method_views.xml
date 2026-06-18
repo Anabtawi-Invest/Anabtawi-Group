@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pos_payment_method_view_form_inherit_apexecr_integration" model="ir.ui.view">
+        <field name="name">pos.payment.method.form.inherit.apexecr</field>
+        <field name="model">pos.payment.method</field>
+        <field name="inherit_id" ref="point_of_sale.pos_payment_method_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='Payment methods']/group[1]" position="after">
+                <group string="ApexECR" invisible="use_payment_terminal != 'apexecr'">
+                    <group col="2">
+                        <field name="apexecr_endpoint_url" required="use_payment_terminal == 'apexecr'"/>
+                        <field name="apexecr_timeout_sec"/>
+                        <field name="apexecr_retry_count"/>
+                    </group>
+                    <group string="Merchant Configuration" col="2">
+                        <field name="apexecr_mid" required="use_payment_terminal == 'apexecr'"/>
+                        <field name="apexecr_tid" required="use_payment_terminal == 'apexecr'"/>
+                        <field name="apexecr_merchant_secure_key" password="True" required="use_payment_terminal == 'apexecr'"/>
+                        <field name="apexecr_currency_code"/>
+                    </group>
+                    <group string="Tiller and Printing" col="2">
+                        <field name="apexecr_tiller_username"/>
+                        <field name="apexecr_tiller_full_name"/>
+                        <field name="apexecr_enable_print_pos_receipt"/>
+                        <field name="apexecr_enable_print_receipt_note"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+
