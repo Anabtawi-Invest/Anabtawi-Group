@@ -18,13 +18,21 @@ patch(ControlButtons.prototype, {
         const wasGift = Boolean(selectedLine.is_gift);
         if (!wasGift) {
             selectedLine._gift_previous_discount = selectedLine.discount || 0;
-            selectedLine.set_discount(100);
+            if (typeof selectedLine.setDiscount === "function") {
+                selectedLine.setDiscount(100);
+            } else {
+                selectedLine.update({ discount: 100 });
+            }
         } else {
             const previousDiscount =
                 typeof selectedLine._gift_previous_discount === "number"
                     ? selectedLine._gift_previous_discount
                     : 0;
-            selectedLine.set_discount(previousDiscount);
+            if (typeof selectedLine.setDiscount === "function") {
+                selectedLine.setDiscount(previousDiscount);
+            } else {
+                selectedLine.update({ discount: previousDiscount });
+            }
             delete selectedLine._gift_previous_discount;
         }
 
