@@ -54,6 +54,22 @@ class HrAttendance(models.Model):
             )
             attendance.overtime_authorization_request_id._sync_authorized_attendance_overtime()
 
+    def _update_overtime(self, attendance_domain=None):
+        """Guard against core min()/max() crash on empty attendance dates."""
+        try:
+            return super()._update_overtime(attendance_domain=attendance_domain)
+        except ValueError as err:
+            if "min() iterable argument is empty" not in str(err):
+                raise
+            _logger.warning(
+                "Skipped overtime recomputation due to empty attendance dates: "
+                "attendance_ids=%s domain=%s error=%s",
+                self.ids,
+                attendance_domain,
+                err,
+            )
+            return
+
     def _cron_auto_check_out_overtime_authorizations(self):
         deadline_now = fields.Datetime.now()
         attendances = self.search(
