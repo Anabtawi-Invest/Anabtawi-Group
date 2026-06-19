@@ -1,12 +1,79 @@
 import logging
+from datetime import timedelta
 
-from odoo import api, models
+import pytz
+
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
 
 class HrAttendance(models.Model):
     _inherit = "hr.attendance"
+
+    @api.model
+    def _pe_is_planning_work_entry_source(self, employee):
+        version = employee.version_id or employee.current_version_id
+        return bool(version and (version.work_entry_source or "").strip() == "planning")
+
+    @api.model
+    def _pe_get_employee_day_bounds_utc(self, employee, check_in_dt):
+        employee_tz = pytz.timezone(employee.tz or "UTC")
+        check_in_local = pytz.utc.localize(check_in_dt).astimezone(employee_tz)
+        day_start_local = check_in_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end_local = day_start_local + timedelta(days=1)
+        return (
+            day_start_local.astimezone(pytz.utc).replace(tzinfo=None),
+            day_end_local.astimezone(pytz.utc).replace(tzinfo=None),
+        )
+
+    @api.model
+    def _pe_adjust_early_check_in_to_first_published_slot(self, vals_list):
+        adjusted_vals_list = []
+        PlanningSlot = self.env["planning.slot"].sudo()
+        Employee = self.env["hr.employee"].sudo()
+
+        for vals in vals_list:
+            new_vals = dict(vals)
+            employee_id = new_vals.get("employee_id")
+            raw_check_in = new_vals.get("check_in")
+            raw_check_out = new_vals.get("check_out")
+            check_in_dt = fields.Datetime.to_datetime(raw_check_in) if raw_check_in else False
+            check_out_dt = fields.Datetime.to_datetime(raw_check_out) if raw_check_out else False
+            if not employee_id or not check_in_dt or check_out_dt:
+                adjusted_vals_list.append(new_vals)
+                continue
+
+            employee = Employee.browse(employee_id).exists()
+            if not employee or not employee.resource_id or not self._pe_is_planning_work_entry_source(employee):
+                adjusted_vals_list.append(new_vals)
+                continue
+
+            day_start_utc, day_end_utc = self._pe_get_employee_day_bounds_utc(employee, check_in_dt)
+            first_slot = PlanningSlot.search(
+                [
+                    ("resource_id", "=", employee.resource_id.id),
+                    ("state", "=", "published"),
+                    ("start_datetime", ">=", day_start_utc),
+                    ("start_datetime", "<", day_end_utc),
+                ],
+                order="start_datetime asc, id asc",
+                limit=1,
+            )
+            if first_slot and check_in_dt < first_slot.start_datetime:
+                new_vals["check_in"] = fields.Datetime.to_string(first_slot.start_datetime)
+                _logger.warning(
+                    "[planning_enhancement][early_checkin_align] employee_id=%s attendance_check_in_original=%s "
+                    "attendance_check_in_aligned=%s first_slot_id=%s first_slot_start=%s",
+                    employee.id,
+                    check_in_dt,
+                    first_slot.start_datetime,
+                    first_slot.id,
+                    first_slot.start_datetime,
+                )
+            adjusted_vals_list.append(new_vals)
+
+        return adjusted_vals_list
 
     def _ensure_default_ruleset_and_recompute_overtime(self):
         """
@@ -108,6 +175,7 @@ class HrAttendance(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        vals_list = self._pe_adjust_early_check_in_to_first_published_slot(vals_list)
         records = super().create(vals_list)
         records._ensure_default_ruleset_and_recompute_overtime()
         records._debug_log_extra_hours_reason("create")

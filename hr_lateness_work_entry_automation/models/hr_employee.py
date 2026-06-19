@@ -12,6 +12,11 @@ _logger = logging.getLogger(__name__)
 class HrEmployee(models.Model):
     _inherit = "hr.employee"
 
+    def _lat_get_work_entry_source(self):
+        self.ensure_one()
+        version = self.version_id or self.current_version_id
+        return (version.work_entry_source or "").strip() if version else ""
+
     @api.model
     def _lat_days_in_range(self, date_start, date_stop):
         start = fields.Date.to_date(date_start)
@@ -208,9 +213,12 @@ class HrEmployee(models.Model):
         utc_start = min(start for start, _end in day_bounds.values())
         utc_end = max(end for _start, end in day_bounds.values())
 
+        work_entry_source = self._lat_get_work_entry_source()
+        planning_only_mode = work_entry_source == "planning"
+        slot_states = ["published"] if planning_only_mode else ["draft", "published"]
         slots = self.env["planning.slot"].sudo().search([
             ("resource_id", "=", self.resource_id.id),
-            ("state", "in", ["draft", "published"]),
+            ("state", "in", slot_states),
             ("start_datetime", "<", utc_end),
             ("end_datetime", ">", utc_start),
         ]) if self.resource_id else self.env["planning.slot"]
@@ -251,7 +259,9 @@ class HrEmployee(models.Model):
                 if overlap_end > overlap_start:
                     planning_intervals.append((overlap_start, overlap_end))
 
-            if not planning_intervals:
+            if not planning_intervals and planning_only_mode:
+                planned_source = "planning_published_only_no_slot"
+            elif not planning_intervals:
                 calendar_intervals = self._lat_get_calendar_intervals_on_day(day, day_start, day_end)
                 if calendar_intervals:
                     planning_intervals = calendar_intervals
