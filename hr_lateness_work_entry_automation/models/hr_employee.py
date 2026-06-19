@@ -293,14 +293,16 @@ class HrEmployee(models.Model):
             if planned_end and attendance_end and planned_end > attendance_end:
                 early_check_out_hours = (planned_end - attendance_end).total_seconds() / 3600.0
 
+            late_check_in_effective_hours = max(late_check_in_hours - grace_hours, 0.0)
+            early_check_out_effective_hours = max(early_check_out_hours, 0.0)
             lateness_hours = max(late_check_in_hours + early_check_out_hours, 0.0)
-            effective_lateness_hours = max(lateness_hours - grace_hours, 0.0)
+            effective_lateness_hours = late_check_in_effective_hours + early_check_out_effective_hours
             should_have_lat = (
                 bool(planned_start and planned_end and attendance_start and attendance_end)
                 and effective_lateness_hours > 0.0
             )
             _logger.info(
-                "[LAT] day_eval employee_id=%s employee=%s date=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s planned_hours=%.4f late_check_in=%.4f early_check_out=%.4f lateness=%.4f grace=%.4f effective_lateness=%.4f should_have_lat=%s existing_entries=%s",
+                "[LAT] day_eval employee_id=%s employee=%s date=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s planned_hours=%.4f late_check_in=%.4f early_check_out=%.4f lateness=%.4f grace=%.4f late_check_in_effective=%.4f early_check_out_effective=%.4f effective_lateness=%.4f should_have_lat=%s existing_entries=%s",
                 self.id,
                 self.display_name,
                 day,
@@ -313,12 +315,14 @@ class HrEmployee(models.Model):
                 early_check_out_hours,
                 lateness_hours,
                 grace_hours,
+                late_check_in_effective_hours,
+                early_check_out_effective_hours,
                 effective_lateness_hours,
                 should_have_lat,
                 entries_by_day.get(day, self.env["hr.work.entry"]).ids,
             )
             _logger.warning(
-                "[LAT TRACE2] employee=%s(%s) date=%s source=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s late_in=%.4f early_out=%.4f total=%.4f grace=%.4f effective=%.4f apply=%s",
+                "[LAT TRACE2] employee=%s(%s) date=%s source=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s late_in=%.4f early_out=%.4f total=%.4f grace=%.4f late_in_effective=%.4f early_out_effective=%.4f effective=%.4f apply=%s",
                 self.display_name,
                 self.id,
                 day,
@@ -331,6 +335,8 @@ class HrEmployee(models.Model):
                 early_check_out_hours,
                 lateness_hours,
                 grace_hours,
+                late_check_in_effective_hours,
+                early_check_out_effective_hours,
                 effective_lateness_hours,
                 should_have_lat,
             )
