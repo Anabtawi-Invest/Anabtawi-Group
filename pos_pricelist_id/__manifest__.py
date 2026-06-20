@@ -11,6 +11,7 @@
     'depends': ['point_of_sale', 'pos_sale', 'account', 'hr'],
     'data': [
         "views/product_pricelist.xml",
+        "views/pos_order_views.xml",
 
     ],
     "assets": {

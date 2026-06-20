@@ -6,9 +6,11 @@ import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { TextInputPopup } from "@point_of_sale/app/components/popups/text_input_popup/text_input_popup";
 import OrderPaymentValidation from "@point_of_sale/app/utils/order_payment_validation";
+import { PosOrderAccounting } from "@point_of_sale/app/models/accounting/pos_order_accounting";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
 console.log("[POS_PRICELIST_ID] id_number_validation.js loaded");
+console.log("[POS_PRICELIST_ID] Registering patches: OrderPaymentValidation + PosOrder.serializeForORM");
 
 function extractPricelistId(value) {
     if (!value) {
@@ -180,29 +182,29 @@ patch(OrderPaymentValidation.prototype, {
     },
 });
 
-patch(PosOrder.prototype, {
-    setup(vals) {
-        super.setup(vals);
-        // Preserve the value entered in POS even if the order is updated from backend data.
-        this.customer_id_number = vals?.customer_id_number || this.customer_id_number || "";
-        console.log("[POS_PRICELIST_ID] PosOrder.setup customer_id_number", this.customer_id_number);
-    },
+patch(PosOrderAccounting.prototype, {
+    _computeAllPrices(opts = {}) {
+        const safeOpts = { ...opts };
+        const sourceLines = safeOpts.lines ?? this.lines;
 
-    updatePricelistAndFiscalPosition(newPartner) {
-        const lockedPricelist = this.pricelist_id || this.config?.pricelist_id || false;
-        super.updatePricelistAndFiscalPosition(newPartner);
-
-        if (!lockedPricelist) {
-            return;
-        }
-
-        if (extractPricelistId(this.pricelist_id) !== extractPricelistId(lockedPricelist)) {
-            this.setPricelist(lockedPricelist);
-            logJson("[POS_PRICELIST_ID] Restored session/order pricelist after partner change", {
-                partnerId: newPartner?.id || null,
-                lockedPricelist: describePricelistValue(lockedPricelist),
-                currentPricelist: describePricelistValue(this.pricelist_id),
+        if (!Array.isArray(sourceLines)) {
+            console.warn("[POS_PRICELIST_ID] Missing order lines while computing prices, using empty list", {
+                orderUuid: this.uuid,
+                receivedLinesType: typeof sourceLines,
             });
+            safeOpts.lines = [];
+        } else {
+            safeOpts.lines = sourceLines;
         }
+
+        return super._computeAllPrices(safeOpts);
+    },
+});
+
+patch(PosOrder.prototype, {
+    serializeForORM(opts = {}) {
+        const data = super.serializeForORM(opts);
+        data.customer_id_number = this.customer_id_number || false;
+        return data;
     },
 });
