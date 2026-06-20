@@ -27,6 +27,7 @@ class HrAttendance(models.Model):
 
         overtime_line_model = self.env["hr.attendance.overtime.line"]
         planning_slot_model = self.env["planning.slot"].sudo()
+        touched_attendances = self.env["hr.attendance"]
 
         for attendance in attendances:
             employee = attendance.employee_id
@@ -118,6 +119,7 @@ class HrAttendance(models.Model):
 
             if direct_overtime <= 0.0:
                 overtime_lines.unlink()
+                touched_attendances |= attendance
                 _logger.warning(
                     "[planning_direct_overtime] action=unlink attendance_id=%s removed_overtime_line_ids=%s",
                     attendance.id,
@@ -135,6 +137,7 @@ class HrAttendance(models.Model):
                     }
                 )
                 extra_lines.unlink()
+                touched_attendances |= attendance
                 _logger.warning(
                     "[planning_direct_overtime] action=update attendance_id=%s primary_line_id=%s "
                     "new_duration=%.6f removed_extra_line_ids=%s",
@@ -159,11 +162,34 @@ class HrAttendance(models.Model):
                 vals["rule_ids"] = [(6, 0, default_rule.ids)]
                 vals.update(default_rule._extra_overtime_vals())
             created_line = overtime_line_model.create(vals)
+            touched_attendances |= attendance
             _logger.warning(
                 "[planning_direct_overtime] action=create attendance_id=%s created_line_id=%s duration=%.6f vals=%s",
                 attendance.id,
                 created_line.id,
                 direct_overtime,
                 vals,
+            )
+
+        if touched_attendances:
+            self.env.add_to_compute(
+                touched_attendances._fields["overtime_hours"],
+                touched_attendances,
+            )
+            self.env.add_to_compute(
+                touched_attendances._fields["validated_overtime_hours"],
+                touched_attendances,
+            )
+            self.env.add_to_compute(
+                touched_attendances._fields["overtime_status"],
+                touched_attendances,
+            )
+            if hasattr(touched_attendances, "_recompute_recordset"):
+                touched_attendances._recompute_recordset(
+                    fnames=["overtime_hours", "validated_overtime_hours", "overtime_status"]
+                )
+            _logger.warning(
+                "[planning_direct_overtime] recompute attendance_ids=%s",
+                touched_attendances.ids,
             )
 
