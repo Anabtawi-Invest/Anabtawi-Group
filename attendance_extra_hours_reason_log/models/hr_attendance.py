@@ -326,6 +326,29 @@ class HrAttendanceOvertimeRule(models.Model):
         attendance = first_interval[2]
         return attendance.id if attendance else False
 
+    @staticmethod
+    def _aer_get_calendar_day_lines(calendar, period_start):
+        if not calendar or not period_start:
+            return []
+        target_dayofweek = str(period_start.weekday())
+        day_lines = calendar.attendance_ids.filtered(lambda line: line.dayofweek == target_dayofweek)
+        ordered_lines = day_lines.sorted(key=lambda line: (line.hour_from or 0.0, line.id))
+        return [
+            {
+                "id": line.id,
+                "name": line.name,
+                "dayofweek": line.dayofweek,
+                "week_type": line.week_type,
+                "day_period": line.day_period,
+                "hour_from": line.hour_from,
+                "hour_to": line.hour_to,
+                "duration_hours": line.duration_hours,
+                "display_type": line.display_type,
+                "work_entry_type_id": line.work_entry_type_id.id if line.work_entry_type_id else False,
+            }
+            for line in ordered_lines
+        ]
+
     def _get_daterange_overtime_undertime_intervals_for_quantity_rule(self, start, stop, attendance_intervals, schedule):
         self.ensure_one()
         expected_duration = self.expected_hours
@@ -361,6 +384,7 @@ class HrAttendanceOvertimeRule(models.Model):
             version = False
             calendar = False
             contract_id = False
+            calendar_day_lines = []
             if employee_for_log:
                 sample_attendance = target_employee_attendances.sorted("check_in")[:1]
                 version = (
@@ -370,11 +394,13 @@ class HrAttendanceOvertimeRule(models.Model):
                 )
                 contract_id = version.id if version else False
                 calendar = version.resource_calendar_id if version else employee_for_log.resource_calendar_id
+                calendar_day_lines = self._aer_get_calendar_day_lines(calendar, start)
             _logger.warning(
                 (
                     "[attendance_extra_hours_reason_log][quantity_rule_trace] "
                     "target_attendance_id=%s rule_id=%s rule_name=%s "
                     "employee_id=%s contract_id=%s resource_calendar_id=%s "
+                    "resource_calendar_name=%s calendar_day_lines=%s "
                     "period_start=%s period_stop=%s "
                     "schedule_work=%s schedule_leave=%s schedule_lunch=%s "
                     "period_schedule=%s expected_duration=%s "
@@ -386,6 +412,8 @@ class HrAttendanceOvertimeRule(models.Model):
                 employee_for_log.id if employee_for_log else False,
                 contract_id,
                 calendar.id if calendar else False,
+                calendar.name if calendar else False,
+                calendar_day_lines,
                 start,
                 stop,
                 self._aer_format_intervals(schedule.get("work", Intervals([]))),
