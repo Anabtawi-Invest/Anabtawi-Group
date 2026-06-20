@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Hospitality Gift",
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "category": "Point of Sale",
     "summary": "Gift lines with 100% discount and hospitality expense posting",
     "author": "Anabtawi",
