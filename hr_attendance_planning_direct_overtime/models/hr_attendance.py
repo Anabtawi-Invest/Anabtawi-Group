@@ -1,4 +1,8 @@
+import logging
+
 from odoo import models
+
+_logger = logging.getLogger(__name__)
 
 
 class HrAttendance(models.Model):
@@ -9,6 +13,11 @@ class HrAttendance(models.Model):
         impacted_attendances = (
             self | self.env["hr.attendance"].search(attendance_domain or [])
         ).filtered(lambda att: att.check_in and att.check_out and att.employee_id)
+        _logger.warning(
+            "[planning_direct_overtime] trigger=_update_overtime domain=%s attendance_ids=%s",
+            attendance_domain,
+            impacted_attendances.ids,
+        )
         self._apply_planning_direct_overtime(impacted_attendances)
         return result
 
@@ -22,6 +31,10 @@ class HrAttendance(models.Model):
         for attendance in attendances:
             employee = attendance.employee_id
             if not employee.resource_id:
+                _logger.warning(
+                    "[planning_direct_overtime] skip attendance_id=%s reason=no_employee_resource",
+                    attendance.id,
+                )
                 continue
 
             version = (
@@ -30,10 +43,26 @@ class HrAttendance(models.Model):
                 else employee.version_id
             )
             if not version:
+                _logger.warning(
+                    "[planning_direct_overtime] skip attendance_id=%s employee_id=%s reason=no_version",
+                    attendance.id,
+                    employee.id,
+                )
                 continue
             if (version.work_entry_source or "").strip() != "planning":
+                _logger.warning(
+                    "[planning_direct_overtime] skip attendance_id=%s employee_id=%s reason=not_planning_source source=%s",
+                    attendance.id,
+                    employee.id,
+                    version.work_entry_source,
+                )
                 continue
             if not version.overtime_from_attendance:
+                _logger.warning(
+                    "[planning_direct_overtime] skip attendance_id=%s employee_id=%s reason=overtime_from_attendance_false",
+                    attendance.id,
+                    employee.id,
+                )
                 continue
 
             slots = planning_slot_model.search(
@@ -46,6 +75,13 @@ class HrAttendance(models.Model):
                 order="start_datetime asc, id asc",
             )
             if not slots:
+                _logger.warning(
+                    "[planning_direct_overtime] skip attendance_id=%s employee_id=%s reason=no_published_slots check_in=%s check_out=%s",
+                    attendance.id,
+                    employee.id,
+                    attendance.check_in,
+                    attendance.check_out,
+                )
                 continue
 
             plan_start = min(slots.mapped("start_datetime"))
@@ -69,9 +105,30 @@ class HrAttendance(models.Model):
                 ],
                 order="id asc",
             )
+            _logger.warning(
+                "[planning_direct_overtime] attendance_id=%s employee_id=%s slot_ids=%s "
+                "check_in=%s check_out=%s plan_start=%s plan_end=%s "
+                "early_extra=%.6f late_extra=%.6f direct_overtime=%.6f existing_overtime_line_ids=%s",
+                attendance.id,
+                employee.id,
+                slots.ids,
+                attendance.check_in,
+                attendance.check_out,
+                plan_start,
+                plan_end,
+                early_extra,
+                late_extra,
+                direct_overtime,
+                overtime_lines.ids,
+            )
 
             if direct_overtime <= 0.0:
                 overtime_lines.unlink()
+                _logger.warning(
+                    "[planning_direct_overtime] action=unlink attendance_id=%s removed_overtime_line_ids=%s",
+                    attendance.id,
+                    overtime_lines.ids,
+                )
                 continue
 
             if overtime_lines:
@@ -84,6 +141,14 @@ class HrAttendance(models.Model):
                     }
                 )
                 extra_lines.unlink()
+                _logger.warning(
+                    "[planning_direct_overtime] action=update attendance_id=%s primary_line_id=%s "
+                    "new_duration=%.6f removed_extra_line_ids=%s",
+                    attendance.id,
+                    primary_line.id,
+                    direct_overtime,
+                    extra_lines.ids,
+                )
                 continue
 
             vals = {
@@ -99,5 +164,12 @@ class HrAttendance(models.Model):
             if default_rule:
                 vals["rule_ids"] = [(6, 0, default_rule.ids)]
                 vals.update(default_rule._extra_overtime_vals())
-            overtime_line_model.create(vals)
+            created_line = overtime_line_model.create(vals)
+            _logger.warning(
+                "[planning_direct_overtime] action=create attendance_id=%s created_line_id=%s duration=%.6f vals=%s",
+                attendance.id,
+                created_line.id,
+                direct_overtime,
+                vals,
+            )
 
