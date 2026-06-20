@@ -11,6 +11,7 @@ from odoo.tools.float_utils import float_compare
 from odoo.tools.intervals import Intervals
 
 _logger = logging.getLogger(__name__)
+AER_TARGET_EMPLOYEE_ID = 2344
 
 
 class HrAttendance(models.Model):
@@ -73,6 +74,8 @@ class HrAttendance(models.Model):
         for attendance in attendances:
             employee = attendance.employee_id
             if not employee:
+                continue
+            if employee.id != AER_TARGET_EMPLOYEE_ID:
                 continue
             employee_tz_name = employee._get_tz() or employee.tz or "UTC"
             employee_tz = pytz.timezone(employee_tz_name)
@@ -260,6 +263,8 @@ class HrAttendanceOvertimeLine(models.Model):
         source, stack_tail = self._aer_infer_source_from_stack()
         vals_payload = vals_list if vals_list is not None else []
         for line in records:
+            if line.employee_id.id != AER_TARGET_EMPLOYEE_ID:
+                continue
             _logger.warning(
                 (
                     "[attendance_extra_hours_reason_log][line_source] action=%s source=%s "
@@ -344,22 +349,27 @@ class HrAttendanceOvertimeRule(models.Model):
         actual_duration = sum_intervals(Intervals(attendances_interval_without_lunch))
         overtime_amount = actual_duration - expected_duration
         employee = attendances.employee_id
+        target_employee_attendances = attendances.filtered(lambda att: att.employee_id.id == AER_TARGET_EMPLOYEE_ID)
+        target_employee = target_employee_attendances[:1].employee_id
+        employee_for_log = target_employee or employee[:1]
         company = self.company_id or employee.company_id
 
         target_attendance_id = self._aer_trace_target_attendance_id(attendance_intervals)
-        if attendance_intervals:
+        if target_employee_attendances:
+            target_attendance_id = target_employee_attendances.sorted("check_in")[:1].id
+        if attendance_intervals and target_employee:
             version = False
             calendar = False
             contract_id = False
-            if employee:
-                sample_attendance = attendances.sorted("check_in")[:1]
+            if employee_for_log:
+                sample_attendance = target_employee_attendances.sorted("check_in")[:1]
                 version = (
-                    employee.sudo()._get_version(sample_attendance.check_in.date())
-                    if sample_attendance and hasattr(employee, "_get_version")
-                    else employee.version_id
+                    employee_for_log.sudo()._get_version(sample_attendance.check_in.date())
+                    if sample_attendance and hasattr(employee_for_log, "_get_version")
+                    else employee_for_log.version_id
                 )
                 contract_id = version.id if version else False
-                calendar = version.resource_calendar_id if version else employee.resource_calendar_id
+                calendar = version.resource_calendar_id if version else employee_for_log.resource_calendar_id
             _logger.warning(
                 (
                     "[attendance_extra_hours_reason_log][quantity_rule_trace] "
@@ -373,7 +383,7 @@ class HrAttendanceOvertimeRule(models.Model):
                 target_attendance_id,
                 self.id,
                 self.name,
-                employee.id if employee else False,
+                employee_for_log.id if employee_for_log else False,
                 contract_id,
                 calendar.id if calendar else False,
                 start,
