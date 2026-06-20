@@ -177,6 +177,5 @@ class PosSession(models.Model):
         )
 
     def _get_gift_accounting_label(self):
-        branch_name = (self.company_id.name or "").strip()
         pos_name = (self.config_id.name or "").strip()
-        return f"هدية من فرع ({branch_name}) {pos_name}".strip()
+        return f"هدية من ({pos_name})".strip()
