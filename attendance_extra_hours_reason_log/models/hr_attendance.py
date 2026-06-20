@@ -68,6 +68,18 @@ class HrAttendance(models.Model):
             employee = attendance.employee_id
             if not employee:
                 continue
+            employee_tz_name = employee._get_tz() or employee.tz or "UTC"
+            employee_tz = pytz.timezone(employee_tz_name)
+            check_in_local = (
+                pytz.utc.localize(attendance.check_in).astimezone(employee_tz)
+                if attendance.check_in
+                else False
+            )
+            check_out_local = (
+                pytz.utc.localize(attendance.check_out).astimezone(employee_tz)
+                if attendance.check_out
+                else False
+            )
 
             overtime_lines = overtime_line_model.search([
                 ("employee_id", "=", employee.id),
@@ -94,7 +106,8 @@ class HrAttendance(models.Model):
             _logger.warning(
                 (
                     "[attendance_extra_hours_reason_log] trigger=%s attendance_id=%s employee_id=%s employee=%s "
-                    "check_in=%s check_out=%s worked_hours=%.4f expected_hours=%.4f expected_source=%s "
+                    "check_in_utc=%s check_out_utc=%s check_in_local=%s check_out_local=%s "
+                    "employee_tz=%s worked_hours=%.4f expected_hours=%.4f expected_source=%s "
                     "delta_worked_minus_expected=%.4f overtime_hours=%.4f validated_overtime_hours=%.4f "
                     "attendance_overtime_hours_field=%.4f attendance_validated_field=%.4f "
                     "overtime_lines=%s expected_details=%s reasons=%s"
@@ -105,6 +118,9 @@ class HrAttendance(models.Model):
                 employee.display_name,
                 attendance.check_in,
                 attendance.check_out,
+                check_in_local,
+                check_out_local,
+                employee_tz_name,
                 worked_hours,
                 expected_hours,
                 expected_source,
@@ -121,6 +137,19 @@ class HrAttendance(models.Model):
                         "duration": line.duration,
                         "manual_duration": line.manual_duration,
                         "amount_rate": line.amount_rate,
+                        "time_start_utc": line.time_start,
+                        "time_stop_utc": line.time_stop,
+                        "time_start_local": (
+                            pytz.utc.localize(line.time_start).astimezone(employee_tz)
+                            if line.time_start
+                            else False
+                        ),
+                        "time_stop_local": (
+                            pytz.utc.localize(line.time_stop).astimezone(employee_tz)
+                            if line.time_stop
+                            else False
+                        ),
+                        "line_tz": employee_tz_name,
                         "rules": [
                             {
                                 "id": rule.id,
