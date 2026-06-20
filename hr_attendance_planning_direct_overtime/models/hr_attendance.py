@@ -49,14 +49,6 @@ class HrAttendance(models.Model):
                     employee.id,
                 )
                 continue
-            if (version.work_entry_source or "").strip() != "planning":
-                _logger.warning(
-                    "[planning_direct_overtime] skip attendance_id=%s employee_id=%s reason=not_planning_source source=%s",
-                    attendance.id,
-                    employee.id,
-                    version.work_entry_source,
-                )
-                continue
             if not version.overtime_from_attendance:
                 _logger.warning(
                     "[planning_direct_overtime] skip attendance_id=%s employee_id=%s reason=overtime_from_attendance_false",
@@ -76,9 +68,11 @@ class HrAttendance(models.Model):
             )
             if not slots:
                 _logger.warning(
-                    "[planning_direct_overtime] skip attendance_id=%s employee_id=%s reason=no_published_slots check_in=%s check_out=%s",
+                    "[planning_direct_overtime] skip attendance_id=%s employee_id=%s reason=no_published_slots "
+                    "source=%s check_in=%s check_out=%s",
                     attendance.id,
                     employee.id,
+                    version.work_entry_source,
                     attendance.check_in,
                     attendance.check_out,
                 )
