@@ -110,7 +110,7 @@ class HrAttendance(models.Model):
                     "employee_tz=%s worked_hours=%.4f expected_hours=%.4f expected_source=%s "
                     "delta_worked_minus_expected=%.4f overtime_hours=%.4f validated_overtime_hours=%.4f "
                     "attendance_overtime_hours_field=%.4f attendance_validated_field=%.4f "
-                    "overtime_lines=%s expected_details=%s reasons=%s"
+                    "attendance_authorization_request=%s overtime_lines=%s expected_details=%s reasons=%s"
                 ),
                 trigger,
                 attendance.id,
@@ -129,6 +129,18 @@ class HrAttendance(models.Model):
                 approved_overtime_hours,
                 attendance.overtime_hours or 0.0,
                 attendance.validated_overtime_hours or 0.0,
+                (
+                    {
+                        "id": attendance.overtime_authorization_request_id.id,
+                        "status": attendance.overtime_authorization_request_id.request_status,
+                        "quantity": attendance.overtime_authorization_request_id.quantity,
+                        "preauthorization": attendance.overtime_authorization_request_id.overtime_preauthorization,
+                        "consumed": attendance.overtime_authorization_request_id.overtime_authorization_consumed,
+                    }
+                    if hasattr(attendance, "overtime_authorization_request_id")
+                    and attendance.overtime_authorization_request_id
+                    else False
+                ),
                 [
                     {
                         "id": line.id,
@@ -150,6 +162,17 @@ class HrAttendance(models.Model):
                             else False
                         ),
                         "line_tz": employee_tz_name,
+                        "approval_request_ids": line.approval_request_ids.ids,
+                        "approval_requests": [
+                            {
+                                "id": req.id,
+                                "status": req.request_status,
+                                "quantity": req.quantity,
+                                "preauthorization": req.overtime_preauthorization,
+                                "consumed": req.overtime_authorization_consumed,
+                            }
+                            for req in line.approval_request_ids
+                        ],
                         "rules": [
                             {
                                 "id": rule.id,
