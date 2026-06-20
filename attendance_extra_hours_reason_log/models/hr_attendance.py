@@ -313,7 +313,13 @@ class HrAttendanceOvertimeRule(models.Model):
 
     @staticmethod
     def _aer_trace_target_attendance_id(attendance_intervals):
-        return attendance_intervals[0][2].id if attendance_intervals else False
+        if not attendance_intervals:
+            return False
+        first_interval = next(iter(attendance_intervals), False)
+        if not first_interval:
+            return False
+        attendance = first_interval[2]
+        return attendance.id if attendance else False
 
     def _get_daterange_overtime_undertime_intervals_for_quantity_rule(self, start, stop, attendance_intervals, schedule):
         self.ensure_one()
