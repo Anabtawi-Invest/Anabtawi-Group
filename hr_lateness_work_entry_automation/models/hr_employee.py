@@ -303,8 +303,9 @@ class HrEmployee(models.Model):
             if planned_end and attendance_end and planned_end > attendance_end:
                 early_check_out_hours = (planned_end - attendance_end).total_seconds() / 3600.0
 
+            # Apply the same grace window to both late check-in and early check-out.
             late_check_in_effective_hours = max(late_check_in_hours - grace_hours, 0.0)
-            early_check_out_effective_hours = max(early_check_out_hours, 0.0)
+            early_check_out_effective_hours = max(early_check_out_hours - grace_hours, 0.0)
             lateness_hours = max(late_check_in_hours + early_check_out_hours, 0.0)
             effective_lateness_hours = late_check_in_effective_hours + early_check_out_effective_hours
             should_have_lat = (
