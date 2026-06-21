@@ -48,16 +48,16 @@
     </record>
 
     <!-- sales.visit.lead List View -->
-    <record id="view_sales_visit_lead_tree" model="ir.ui.view">
-        <field name="name">sales.visit.lead.tree</field>
+    <record id="view_sales_visit_lead_list" model="ir.ui.view">
+        <field name="name">sales.visit.lead.list</field>
         <field name="model">sales.visit.lead</field>
         <field name="arch" type="xml">
-            <tree string="Leads" decoration-info="status == 'revisit'" decoration-success="status == 'approved'" decoration-danger="status == 'rejected'">
+            <list string="Leads" decoration-info="status == 'revisit'" decoration-success="status == 'approved'" decoration-danger="status == 'rejected'">
                 <field name="name"/>
                 <field name="mobile"/>
                 <field name="user_id" widget="many2one_avatar_user"/>
                 <field name="status" widget="badge" decoration-info="status == 'revisit'" decoration-success="status == 'approved'" decoration-danger="status == 'rejected'" decoration-muted="status == 'lead'"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -88,7 +88,7 @@
     <record id="action_sales_visit_lead" model="ir.actions.act_window">
         <field name="name">Leads</field>
         <field name="res_model">sales.visit.lead</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_sales_visit_lead_search"/>
         <field name="context">{'search_default_active_leads': 1}</field>
         <field name="help" type="html">
