@@ -35,6 +35,54 @@ class HrAttendance(models.Model):
         for leave in leaves:
             if leave.date_to > leave.date_from:
                 intervals.append((leave.date_from, leave.date_to))
+        all_overlapping_leaves = leave_model.search(
+            [
+                ("date_from", "<", attendance.check_out),
+                ("date_to", ">", attendance.check_in),
+                "|",
+                ("resource_id", "=", False),
+                ("resource_id", "=", resource.id),
+            ]
+        )
+        _logger.warning(
+            "[planning_direct_overtime] holiday_scan attendance_id=%s employee_id=%s "
+            "calendar_id=%s calendar_name=%s matching_leave_ids=%s matching_leave_rows=%s "
+            "all_overlapping_leave_ids=%s all_overlapping_leave_rows=%s",
+            attendance.id,
+            attendance.employee_id.id,
+            calendar.id,
+            calendar.name,
+            leaves.ids,
+            [
+                {
+                    "id": leave.id,
+                    "calendar_id": leave.calendar_id.id,
+                    "calendar_name": leave.calendar_id.name,
+                    "resource_id": leave.resource_id.id if leave.resource_id else False,
+                    "resource_name": leave.resource_id.display_name if leave.resource_id else False,
+                    "date_from": leave.date_from,
+                    "date_to": leave.date_to,
+                    "work_entry_type_id": leave.work_entry_type_id.id if leave.work_entry_type_id else False,
+                    "work_entry_type_name": leave.work_entry_type_id.name if leave.work_entry_type_id else False,
+                }
+                for leave in leaves
+            ],
+            all_overlapping_leaves.ids,
+            [
+                {
+                    "id": leave.id,
+                    "calendar_id": leave.calendar_id.id,
+                    "calendar_name": leave.calendar_id.name,
+                    "resource_id": leave.resource_id.id if leave.resource_id else False,
+                    "resource_name": leave.resource_id.display_name if leave.resource_id else False,
+                    "date_from": leave.date_from,
+                    "date_to": leave.date_to,
+                    "work_entry_type_id": leave.work_entry_type_id.id if leave.work_entry_type_id else False,
+                    "work_entry_type_name": leave.work_entry_type_id.name if leave.work_entry_type_id else False,
+                }
+                for leave in all_overlapping_leaves
+            ],
+        )
         return leaves, intervals
 
     def _update_overtime(self, attendance_domain=None):
@@ -84,6 +132,22 @@ class HrAttendance(models.Model):
                 (version and version.resource_calendar_id)
                 or employee.resource_calendar_id
                 or employee.company_id.resource_calendar_id
+            )
+            _logger.warning(
+                "[planning_direct_overtime] attendance_context attendance_id=%s employee_id=%s "
+                "employee_resource_id=%s version_id=%s work_entry_source=%s overtime_from_attendance=%s "
+                "version_calendar_id=%s employee_calendar_id=%s company_calendar_id=%s chosen_calendar_id=%s chosen_calendar_name=%s",
+                attendance.id,
+                employee.id,
+                employee.resource_id.id if employee.resource_id else False,
+                version.id if version else False,
+                version.work_entry_source if version else False,
+                version.overtime_from_attendance if version else False,
+                version.resource_calendar_id.id if version and version.resource_calendar_id else False,
+                employee.resource_calendar_id.id if employee.resource_calendar_id else False,
+                employee.company_id.resource_calendar_id.id if employee.company_id.resource_calendar_id else False,
+                calendar.id if calendar else False,
+                calendar.name if calendar else False,
             )
             if not calendar:
                 _logger.warning(
