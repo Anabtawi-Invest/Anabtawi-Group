@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="sales_visit_tracking.SalesRouteMap">
+        <div class="o_sales_route_map_action">
+            <!-- Sidebar Filters -->
+            <div class="o_map_sidebar">
+                <h2>Route Filters</h2>
+                
+                <div class="filter_group">
+                    <label for="select_employee">Sales Representative</label>
+                    <select id="select_employee" t-model="state.selectedEmployee">
+                        <option value="">-- All Representatives --</option>
+                        <t t-foreach="state.employees" t-as="emp" t-key="emp.id">
+                            <option t-att-value="emp.id"><t t-out="emp.name"/></option>
+                        </t>
+                    </select>
+                </div>
+
+                <div class="filter_group">
+                    <label for="input_date">Date</label>
+                    <input type="date" id="input_date" t-model="state.selectedDate"/>
+                </div>
+
+                <button class="btn-filter" t-on-click="onApplyFilters">
+                    <i class="fa fa-filter me-1"></i> Apply Filters
+                </button>
+            </div>
+
+            <!-- Map Viewport -->
+            <div class="o_map_canvas_container">
+                <div class="o_map_canvas" t-ref="map_canvas"></div>
+            </div>
+        </div>
+    </t>
+</templates>
