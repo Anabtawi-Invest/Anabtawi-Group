@@ -26,7 +26,7 @@
                     <separator string="Timeline of Visits"/>
 
                     <field name="visit_ids" readonly="1">
-                        <tree string="Visits History">
+                        <list string="Visits History">
                             <field name="check_in_time" string="Arrival Time"/>
                             <field name="check_out_time" string="Departure Time"/>
                             <field name="duration" widget="float_time" string="Duration"/>
@@ -43,7 +43,7 @@
                                    decoration-warning="result == 'revisit'"
                                    decoration-danger="result == 'rejected'"
                                    string="Result"/>
-                        </tree>
+                        </list>
                     </field>
 
                 </page>
