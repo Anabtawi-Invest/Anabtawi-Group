@@ -169,15 +169,16 @@ class SalesVisit(models.Model):
         else:
             verif_status = 'invalid'
 
-        visit = self.create({
-            'lead_id': lead.id,
-            'user_id': self.env.user.id,
-            'check_in_time': fields.Datetime.now(),
-            'check_in_latitude': latitude,
-            'check_in_longitude': longitude,
-            'distance_from_customer': distance,
-            'verification_status': verif_status,
-        })
+      visit = self.create({
+    'lead_id': lead.id,
+    'partner_id': lead.partner_id.id if lead.partner_id else False,
+    'user_id': self.env.user.id,
+    'check_in_time': fields.Datetime.now(),
+    'check_in_latitude': latitude,
+    'check_in_longitude': longitude,
+    'distance_from_customer': distance,
+    'verification_status': verif_status,
+})
 
         # Automatically log background route point
         if visit.employee_id:
