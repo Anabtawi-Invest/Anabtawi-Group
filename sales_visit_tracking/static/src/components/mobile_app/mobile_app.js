@@ -2,6 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { user } from "@web/core/user";
 import { Component, onWillStart, onWillUnmount, useState } from "@odoo/owl";
 
 export class SalesVisitMobileApp extends Component {
@@ -10,7 +11,6 @@ export class SalesVisitMobileApp extends Component {
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
-        this.user = useService("user");
 
         this.state = useState({
             view: 'home', // 'home', 'visiting', 'result'
@@ -39,7 +39,7 @@ export class SalesVisitMobileApp extends Component {
         try {
             const domain = [
                 ['status', 'in', ['lead', 'revisit']],
-                ['user_id', '=', this.user.userId]
+                ['user_id', '=', user.userId]
             ];
             this.state.leads = await this.orm.searchRead(
                 'sales.visit.lead',
