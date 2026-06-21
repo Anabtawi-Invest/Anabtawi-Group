@@ -134,6 +134,27 @@ class HrEmployee(models.Model):
                 ))
         return normalized_intervals
 
+    def _lat_has_public_holiday_on_day(self, target_date, day_start, day_end):
+        self.ensure_one()
+        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
+        calendar = (
+            version.resource_calendar_id
+            or self.resource_calendar_id
+            or self.company_id.resource_calendar_id
+        )
+        if not calendar or not self.resource_id:
+            return False, self.env["resource.calendar.leaves"]
+
+        holiday_leaves = self.env["resource.calendar.leaves"].sudo().search([
+            ("calendar_id", "=", calendar.id),
+            ("date_from", "<", day_end),
+            ("date_to", ">", day_start),
+            "|",
+            ("resource_id", "=", False),
+            ("resource_id", "=", self.resource_id.id),
+        ])
+        return bool(holiday_leaves), holiday_leaves
+
     def _lat_iter_days_from_interval(self, dt_start, dt_end):
         self.ensure_one()
         if not dt_start or not dt_end or dt_end <= dt_start:
@@ -251,6 +272,7 @@ class HrEmployee(models.Model):
         grace_hours = self._lat_grace_hours()
         for day in target_days:
             day_start, day_end = day_bounds[day]
+            has_public_holiday, holiday_leaves = self._lat_has_public_holiday_on_day(day, day_start, day_end)
             planning_intervals = []
             planned_source = "planning"
             for slot in slots:
@@ -318,8 +340,10 @@ class HrEmployee(models.Model):
                 bool(planned_start and planned_end and attendance_start and attendance_end)
                 and effective_lateness_hours > 0.0
             )
+            if has_public_holiday:
+                should_have_lat = False
             _logger.info(
-                "[LAT] day_eval employee_id=%s employee=%s date=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s planned_hours=%.4f late_check_in=%.4f early_check_out=%.4f lateness=%.4f grace=%.4f late_check_in_effective=%.4f early_check_out_effective=%.4f effective_lateness=%.4f should_have_lat=%s existing_entries=%s",
+                "[LAT] day_eval employee_id=%s employee=%s date=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s planned_hours=%.4f late_check_in=%.4f early_check_out=%.4f lateness=%.4f grace=%.4f late_check_in_effective=%.4f early_check_out_effective=%.4f effective_lateness=%.4f has_public_holiday=%s holiday_leave_ids=%s should_have_lat=%s existing_entries=%s",
                 self.id,
                 self.display_name,
                 day,
@@ -335,11 +359,13 @@ class HrEmployee(models.Model):
                 late_check_in_effective_hours,
                 early_check_out_effective_hours,
                 effective_lateness_hours,
+                has_public_holiday,
+                holiday_leaves.ids,
                 should_have_lat,
                 entries_by_day.get(day, self.env["hr.work.entry"]).ids,
             )
             _logger.warning(
-                "[LAT TRACE2] employee=%s(%s) date=%s source=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s late_in=%.4f early_out=%.4f total=%.4f grace=%.4f late_in_effective=%.4f early_out_effective=%.4f effective=%.4f apply=%s",
+                "[LAT TRACE2] employee=%s(%s) date=%s source=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s late_in=%.4f early_out=%.4f total=%.4f grace=%.4f late_in_effective=%.4f early_out_effective=%.4f effective=%.4f has_public_holiday=%s holiday_leave_ids=%s apply=%s",
                 self.display_name,
                 self.id,
                 day,
@@ -355,6 +381,8 @@ class HrEmployee(models.Model):
                 late_check_in_effective_hours,
                 early_check_out_effective_hours,
                 effective_lateness_hours,
+                has_public_holiday,
+                holiday_leaves.ids,
                 should_have_lat,
             )
             _logger.info(
