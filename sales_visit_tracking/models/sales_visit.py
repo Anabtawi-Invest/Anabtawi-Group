@@ -27,7 +27,7 @@ class SalesVisit(models.Model):
         ondelete='cascade',
         index=True
     )
-    partner_id = fields.Many2one(
+   partner_id = fields.Many2one(
     'res.partner',
     string='Customer',
     index=True,
@@ -151,48 +151,56 @@ class SalesVisit(models.Model):
         c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
         return R * c
 
-    @api.model
-    def action_start_visit(self, lead_id, latitude, longitude):
-        """Starts a visit, computes GPS verification, and creates a visit log."""
-        lead = self.env['sales.visit.lead'].browse(lead_id)
-        if not lead.exists():
-            raise UserError(_("Lead record does not exist."))
+   @api.model
+def action_start_visit(self, lead_id, latitude, longitude):
+    """Starts a visit, computes GPS verification, and creates a visit log."""
+    lead = self.env['sales.visit.lead'].browse(lead_id)
 
-        distance = self.haversine_distance(latitude, longitude, lead.latitude, lead.longitude)
-        allowed_radius_param = self.env['ir.config_parameter'].sudo().get_param('sales_visit_tracking.allowed_radius')
-        allowed_radius = float(allowed_radius_param) if allowed_radius_param else 100.0
+    if not lead.exists():
+        raise UserError(_("Lead record does not exist."))
 
-        if distance <= allowed_radius:
-            verif_status = 'valid'
-        elif distance <= 300.0:
-            verif_status = 'warning'
-        else:
-            verif_status = 'invalid'
+    distance = self.haversine_distance(
+        latitude,
+        longitude,
+        lead.latitude,
+        lead.longitude
+    )
 
-      visit = self.create({
-    'lead_id': lead.id,
-    'partner_id': lead.partner_id.id if lead.partner_id else False,
-    'user_id': self.env.user.id,
-    'check_in_time': fields.Datetime.now(),
-    'check_in_latitude': latitude,
-    'check_in_longitude': longitude,
-    'distance_from_customer': distance,
-    'verification_status': verif_status,
-})
+    allowed_radius_param = self.env['ir.config_parameter'].sudo().get_param(
+        'sales_visit_tracking.allowed_radius'
+    )
+    allowed_radius = float(allowed_radius_param) if allowed_radius_param else 100.0
 
-        # Automatically log background route point
-        if visit.employee_id:
-            self.env['sales.route.point'].create({
-                'employee_id': visit.employee_id.id,
-                'visit_id': visit.id,
-                'timestamp': fields.Datetime.now(),
-                'latitude': latitude,
-                'longitude': longitude,
-                'speed': 0.0,
-                'heading': 0.0
-            })
+    if distance <= allowed_radius:
+        verif_status = 'valid'
+    elif distance <= 300.0:
+        verif_status = 'warning'
+    else:
+        verif_status = 'invalid'
 
-        return visit.id
+    visit = self.create({
+        'lead_id': lead.id,
+        'partner_id': lead.partner_id.id if lead.partner_id else False,
+        'user_id': self.env.user.id,
+        'check_in_time': fields.Datetime.now(),
+        'check_in_latitude': latitude,
+        'check_in_longitude': longitude,
+        'distance_from_customer': distance,
+        'verification_status': verif_status,
+    })
+
+    if visit.employee_id:
+        self.env['sales.route.point'].create({
+            'employee_id': visit.employee_id.id,
+            'visit_id': visit.id,
+            'timestamp': fields.Datetime.now(),
+            'latitude': latitude,
+            'longitude': longitude,
+            'speed': 0.0,
+            'heading': 0.0,
+        })
+
+    return visit.id
 
     def action_end_visit(self, latitude, longitude, result, next_visit_date=None, rejection_reason=None):
         """Ends a visit, updates lead status, and converts/stores final outcome choices."""
