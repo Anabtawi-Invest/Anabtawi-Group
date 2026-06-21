@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="sales_visit_tracking.SalesVisitMobileApp">
+        <div class="o_sales_visit_mobile_action">
+            <!-- Loading Indicator Overlay -->
+            <div t-if="state.loading" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75" style="z-index: 1050;">
+                <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+
+            <!-- Header -->
+            <div class="mobile_header">
+                <div class="user_info">
+                    <h3>My Daily Visits</h3>
+                    <p>Today's Route Schedule</p>
+                </div>
+                <button class="refresh_btn" t-on-click="onRefresh" title="Refresh list">
+                    <i class="fa fa-refresh"></i>
+                </button>
+            </div>
+
+            <!-- View 1: Lead List (Home) -->
+            <t t-if="state.view === 'home'">
+                <div class="lead_list">
+                    <t t-foreach="state.leads" t-as="lead" t-key="lead.id">
+                        <div class="lead_card">
+                            <div class="lead_info">
+                                <div class="lead_name"><t t-out="lead.name"/></div>
+                                <div class="lead_phone"><i class="fa fa-phone me-1"></i> <t t-out="lead.mobile"/></div>
+                                <span t-attf-class="lead_badge badge_#{lead.status}">
+                                    <t t-out="lead.status"/>
+                                </span>
+                            </div>
+                            <div class="lead_actions">
+                                <button class="btn_navigate" t-on-click="() => this.onNavigate(lead)">
+                                    <i class="fa fa-map-marker"></i> Navigate
+                                </button>
+                                <button class="btn_start" t-on-click="() => this.onStartVisit(lead)">
+                                    <i class="fa fa-play"></i> Start Visit
+                                </button>
+                            </div>
+                        </div>
+                    </t>
+                    <t t-if="state.leads.length === 0">
+                        <div class="text-center text-muted py-5">
+                            <i class="fa fa-check-circle fa-3x text-success mb-3"></i>
+                            <div>All visits completed for today!</div>
+                        </div>
+                    </t>
+                </div>
+            </t>
+
+            <!-- View 2: Active Visit -->
+            <t t-if="state.view === 'visiting'">
+                <div class="active_visit_container">
+                    <div class="visit_card">
+                        <div class="customer_name"><t t-out="state.activeLead.name"/></div>
+                        <div class="timer_box">
+                            <div class="timer_label">Active Visit Duration</div>
+                            <div class="timer_value"><t t-out="state.timeElapsed"/></div>
+                        </div>
+                        <button class="btn_end" t-on-click="onEndVisit">
+                            <i class="fa fa-stop me-2"></i> END VISIT
+                        </button>
+                    </div>
+                </div>
+            </t>
+
+            <!-- View 3: Visit Result Outcome Selector -->
+            <t t-if="state.view === 'result'">
+                <div class="outcome_selection_container">
+                    <h2>Select Visit Outcome</h2>
+                    <p class="text-center text-muted mb-4">Choose final result for <t t-out="state.activeLead.name"/></p>
+
+                    <!-- Selection screen -->
+                    <t t-if="state.selectedOutcome === ''">
+                        <div class="choices_grid">
+                            <button class="btn_choice choice_revisit" t-on-click="() => this.selectOutcome('revisit')">
+                                <i class="fa fa-calendar-repeat fa-lg"></i> REVISIT (Follow-up)
+                            </button>
+                            <button class="btn_choice choice_approved" t-on-click="() => this.selectOutcome('approved')">
+                                <i class="fa fa-check-circle fa-lg"></i> APPROVED (Contract Signed)
+                            </button>
+                            <button class="btn_choice choice_rejected" t-on-click="() => this.selectOutcome('rejected')">
+                                <i class="fa fa-times-circle fa-lg"></i> REJECTED (Not Interested)
+                            </button>
+                        </div>
+                    </t>
+
+                    <!-- Details Input Form for Revisit -->
+                    <t t-if="state.selectedOutcome === 'revisit'">
+                        <div class="outcome_details_form">
+                            <div class="form_group">
+                                <label for="revisit_date">Choose Next Visit Date</label>
+                                <input type="date" id="revisit_date" t-model="state.revisitDate" required="1"/>
+                            </div>
+                            <div class="form_actions">
+                                <button class="btn_cancel" t-on-click="onCancelDetails">Cancel</button>
+                                <button class="btn_submit" t-on-click="onSubmitDetails">Submit</button>
+                            </div>
+                        </div>
+                    </t>
+
+                    <!-- Details Input Form for Rejection -->
+                    <t t-if="state.selectedOutcome === 'rejected'">
+                        <div class="outcome_details_form">
+                            <div class="form_group">
+                                <label for="rejection_reason">Reason for Rejection</label>
+                                <select id="rejection_reason" t-model="state.rejectionReason">
+                                    <option value="price">Price too high</option>
+                                    <option value="competitor">Prefers Competitor</option>
+                                    <option value="not_interested">Not Interested</option>
+                                    <option value="no_budget">No Budget</option>
+                                    <option value="other">Other Reason</option>
+                                </select>
+                            </div>
+                            <div class="form_actions">
+                                <button class="btn_cancel" t-on-click="onCancelDetails">Cancel</button>
+                                <button class="btn_submit" t-on-click="onSubmitDetails">Submit</button>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>
