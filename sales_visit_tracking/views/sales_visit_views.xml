@@ -46,8 +46,8 @@
     </record>
 
     <!-- sales.visit List View -->
-    <record id="view_sales_visit_list" model="ir.ui.view">
-        <field name="name">sales.visit.list</field>
+    <record id="view_sales_visit_tree" model="ir.ui.view">
+        <field name="name">sales.visit.tree</field>
         <field name="model">sales.visit</field>
         <field name="arch" type="xml">
             <list string="Visit Logs" create="false" edit="false" delete="true">
@@ -75,7 +75,6 @@
                 <filter string="Valid Visits" name="valid" domain="[('verification_status', '=', 'valid')]"/>
                 <filter string="Warning Visits" name="warning" domain="[('verification_status', '=', 'warning')]"/>
                 <filter string="Invalid Visits" name="invalid" domain="[('verification_status', '=', 'invalid')]"/>
-                <separator/>
                 <filter string="Approved" name="approved" domain="[('result', '=', 'approved')]"/>
                 <filter string="Revisit" name="revisit" domain="[('result', '=', 'revisit')]"/>
                 <filter string="Rejected" name="rejected" domain="[('result', '=', 'rejected')]"/>
