@@ -3,10 +3,15 @@ import logging
 from odoo import models
 
 _logger = logging.getLogger(__name__)
+LOG_TARGET_EMPLOYEE_ID = 2344
 
 
 class HrAttendance(models.Model):
     _inherit = "hr.attendance"
+
+    @staticmethod
+    def _should_log_for_employee(employee):
+        return bool(employee and employee.id == LOG_TARGET_EMPLOYEE_ID)
 
     @staticmethod
     def _get_overlap_hours(range_start, range_stop, intervals):
@@ -18,10 +23,10 @@ class HrAttendance(models.Model):
                 total += (overlap_stop - overlap_start).total_seconds() / 3600.0
         return total
 
-    def _get_public_holiday_intervals(self, attendance, calendar):
+    def _get_public_holiday_intervals(self, attendance, calendar, log_enabled=False):
         leave_model = self.env["resource.calendar.leaves"].sudo()
         resource = attendance.employee_id.resource_id
-        leaves = leave_model.search(
+        matching_leaves = leave_model.search(
             [
                 ("calendar_id", "=", calendar.id),
                 ("date_from", "<", attendance.check_out),
@@ -31,10 +36,6 @@ class HrAttendance(models.Model):
                 ("resource_id", "=", resource.id),
             ]
         )
-        intervals = []
-        for leave in leaves:
-            if leave.date_to > leave.date_from:
-                intervals.append((leave.date_from, leave.date_to))
         all_overlapping_leaves = leave_model.search(
             [
                 ("date_from", "<", attendance.check_out),
@@ -44,57 +45,86 @@ class HrAttendance(models.Model):
                 ("resource_id", "=", resource.id),
             ]
         )
-        _logger.warning(
-            "[planning_direct_overtime] holiday_scan attendance_id=%s employee_id=%s "
-            "calendar_id=%s calendar_name=%s matching_leave_ids=%s matching_leave_rows=%s "
-            "all_overlapping_leave_ids=%s all_overlapping_leave_rows=%s",
-            attendance.id,
-            attendance.employee_id.id,
-            calendar.id,
-            calendar.name,
-            leaves.ids,
-            [
-                {
-                    "id": leave.id,
-                    "calendar_id": leave.calendar_id.id,
-                    "calendar_name": leave.calendar_id.name,
-                    "resource_id": leave.resource_id.id if leave.resource_id else False,
-                    "resource_name": leave.resource_id.display_name if leave.resource_id else False,
-                    "date_from": leave.date_from,
-                    "date_to": leave.date_to,
-                    "work_entry_type_id": leave.work_entry_type_id.id if leave.work_entry_type_id else False,
-                    "work_entry_type_name": leave.work_entry_type_id.name if leave.work_entry_type_id else False,
-                }
-                for leave in leaves
-            ],
-            all_overlapping_leaves.ids,
-            [
-                {
-                    "id": leave.id,
-                    "calendar_id": leave.calendar_id.id,
-                    "calendar_name": leave.calendar_id.name,
-                    "resource_id": leave.resource_id.id if leave.resource_id else False,
-                    "resource_name": leave.resource_id.display_name if leave.resource_id else False,
-                    "date_from": leave.date_from,
-                    "date_to": leave.date_to,
-                    "work_entry_type_id": leave.work_entry_type_id.id if leave.work_entry_type_id else False,
-                    "work_entry_type_name": leave.work_entry_type_id.name if leave.work_entry_type_id else False,
-                }
-                for leave in all_overlapping_leaves
-            ],
-        )
-        return leaves, intervals
+        selected_leaves = matching_leaves or all_overlapping_leaves
+        selection_mode = "matching_calendar" if matching_leaves else "all_overlapping_fallback"
+
+        intervals = []
+        for leave in selected_leaves:
+            if leave.date_to > leave.date_from:
+                intervals.append((leave.date_from, leave.date_to))
+        if log_enabled:
+            _logger.warning(
+                "[planning_direct_overtime] holiday_scan attendance_id=%s employee_id=%s "
+                "calendar_id=%s calendar_name=%s selection_mode=%s selected_leave_ids=%s selected_leave_rows=%s "
+                "matching_leave_ids=%s matching_leave_rows=%s "
+                "all_overlapping_leave_ids=%s all_overlapping_leave_rows=%s",
+                attendance.id,
+                attendance.employee_id.id,
+                calendar.id,
+                calendar.name,
+                selection_mode,
+                selected_leaves.ids,
+                [
+                    {
+                        "id": leave.id,
+                        "calendar_id": leave.calendar_id.id,
+                        "calendar_name": leave.calendar_id.name,
+                        "resource_id": leave.resource_id.id if leave.resource_id else False,
+                        "resource_name": leave.resource_id.display_name if leave.resource_id else False,
+                        "date_from": leave.date_from,
+                        "date_to": leave.date_to,
+                        "work_entry_type_id": leave.work_entry_type_id.id if leave.work_entry_type_id else False,
+                        "work_entry_type_name": leave.work_entry_type_id.name if leave.work_entry_type_id else False,
+                    }
+                    for leave in selected_leaves
+                ],
+                matching_leaves.ids,
+                [
+                    {
+                        "id": leave.id,
+                        "calendar_id": leave.calendar_id.id,
+                        "calendar_name": leave.calendar_id.name,
+                        "resource_id": leave.resource_id.id if leave.resource_id else False,
+                        "resource_name": leave.resource_id.display_name if leave.resource_id else False,
+                        "date_from": leave.date_from,
+                        "date_to": leave.date_to,
+                        "work_entry_type_id": leave.work_entry_type_id.id if leave.work_entry_type_id else False,
+                        "work_entry_type_name": leave.work_entry_type_id.name if leave.work_entry_type_id else False,
+                    }
+                    for leave in matching_leaves
+                ],
+                all_overlapping_leaves.ids,
+                [
+                    {
+                        "id": leave.id,
+                        "calendar_id": leave.calendar_id.id,
+                        "calendar_name": leave.calendar_id.name,
+                        "resource_id": leave.resource_id.id if leave.resource_id else False,
+                        "resource_name": leave.resource_id.display_name if leave.resource_id else False,
+                        "date_from": leave.date_from,
+                        "date_to": leave.date_to,
+                        "work_entry_type_id": leave.work_entry_type_id.id if leave.work_entry_type_id else False,
+                        "work_entry_type_name": leave.work_entry_type_id.name if leave.work_entry_type_id else False,
+                    }
+                    for leave in all_overlapping_leaves
+                ],
+            )
+        return selected_leaves, intervals
 
     def _update_overtime(self, attendance_domain=None):
         result = super()._update_overtime(attendance_domain=attendance_domain)
         impacted_attendances = (
             self | self.env["hr.attendance"].search(attendance_domain or [])
         ).filtered(lambda att: att.check_in and att.check_out and att.employee_id)
-        _logger.warning(
-            "[planning_direct_overtime] trigger=_update_overtime domain=%s attendance_ids=%s",
-            attendance_domain,
-            impacted_attendances.ids,
-        )
+        target_attendance_ids = impacted_attendances.filtered(
+            lambda att: self._should_log_for_employee(att.employee_id)
+        ).ids
+        if target_attendance_ids:
+            _logger.warning(
+                "[planning_direct_overtime] trigger=_update_overtime domain=%s attendance_ids=%s",
+                attendance_domain,
+                target_attendance_ids,
+            )
         self._apply_planning_direct_overtime(impacted_attendances)
         return result
 
@@ -108,11 +138,13 @@ class HrAttendance(models.Model):
 
         for attendance in attendances:
             employee = attendance.employee_id
+            log_enabled = self._should_log_for_employee(employee)
             if not employee.resource_id:
-                _logger.warning(
+                if log_enabled:
+                    _logger.warning(
                     "[planning_direct_overtime] skip attendance_id=%s reason=no_employee_resource",
                     attendance.id,
-                )
+                    )
                 continue
 
             version = (
@@ -121,11 +153,12 @@ class HrAttendance(models.Model):
                 else employee.version_id
             )
             if version and not version.overtime_from_attendance:
-                _logger.warning(
+                if log_enabled:
+                    _logger.warning(
                     "[planning_direct_overtime] skip attendance_id=%s employee_id=%s reason=overtime_from_attendance_false",
                     attendance.id,
                     employee.id,
-                )
+                    )
                 continue
 
             calendar = (
@@ -133,31 +166,35 @@ class HrAttendance(models.Model):
                 or employee.resource_calendar_id
                 or employee.company_id.resource_calendar_id
             )
-            _logger.warning(
-                "[planning_direct_overtime] attendance_context attendance_id=%s employee_id=%s "
-                "employee_resource_id=%s version_id=%s work_entry_source=%s overtime_from_attendance=%s "
-                "version_calendar_id=%s employee_calendar_id=%s company_calendar_id=%s chosen_calendar_id=%s chosen_calendar_name=%s",
-                attendance.id,
-                employee.id,
-                employee.resource_id.id if employee.resource_id else False,
-                version.id if version else False,
-                version.work_entry_source if version else False,
-                version.overtime_from_attendance if version else False,
-                version.resource_calendar_id.id if version and version.resource_calendar_id else False,
-                employee.resource_calendar_id.id if employee.resource_calendar_id else False,
-                employee.company_id.resource_calendar_id.id if employee.company_id.resource_calendar_id else False,
-                calendar.id if calendar else False,
-                calendar.name if calendar else False,
-            )
-            if not calendar:
+            if log_enabled:
                 _logger.warning(
+                    "[planning_direct_overtime] attendance_context attendance_id=%s employee_id=%s "
+                    "employee_resource_id=%s version_id=%s work_entry_source=%s overtime_from_attendance=%s "
+                    "version_calendar_id=%s employee_calendar_id=%s company_calendar_id=%s chosen_calendar_id=%s chosen_calendar_name=%s",
+                    attendance.id,
+                    employee.id,
+                    employee.resource_id.id if employee.resource_id else False,
+                    version.id if version else False,
+                    version.work_entry_source if version else False,
+                    version.overtime_from_attendance if version else False,
+                    version.resource_calendar_id.id if version and version.resource_calendar_id else False,
+                    employee.resource_calendar_id.id if employee.resource_calendar_id else False,
+                    employee.company_id.resource_calendar_id.id if employee.company_id.resource_calendar_id else False,
+                    calendar.id if calendar else False,
+                    calendar.name if calendar else False,
+                )
+            if not calendar:
+                if log_enabled:
+                    _logger.warning(
                     "[planning_direct_overtime] skip attendance_id=%s employee_id=%s reason=no_calendar",
                     attendance.id,
                     employee.id,
-                )
+                    )
                 continue
 
-            holiday_leaves, holiday_intervals = self._get_public_holiday_intervals(attendance, calendar)
+            holiday_leaves, holiday_intervals = self._get_public_holiday_intervals(
+                attendance, calendar, log_enabled=log_enabled
+            )
             holiday_overlap_hours = self._get_overlap_hours(
                 attendance.check_in,
                 attendance.check_out,
@@ -174,7 +211,8 @@ class HrAttendance(models.Model):
                 order="start_datetime asc, id asc",
             )
             if not slots and holiday_overlap_hours <= 0.0:
-                _logger.warning(
+                if log_enabled:
+                    _logger.warning(
                     "[planning_direct_overtime] skip attendance_id=%s employee_id=%s reason=no_published_slots_and_no_public_holiday "
                     "source=%s check_in=%s check_out=%s holiday_leave_ids=%s holiday_overlap_hours=%.6f",
                     attendance.id,
@@ -184,7 +222,7 @@ class HrAttendance(models.Model):
                     attendance.check_out,
                     holiday_leaves.ids,
                     holiday_overlap_hours,
-                )
+                    )
                 continue
 
             plan_start = min(slots.mapped("start_datetime")) if slots else False
@@ -209,35 +247,37 @@ class HrAttendance(models.Model):
                 ],
                 order="id asc",
             )
-            _logger.warning(
-                "[planning_direct_overtime] attendance_id=%s employee_id=%s slot_ids=%s holiday_leave_ids=%s "
-                "check_in=%s check_out=%s plan_start=%s plan_end=%s "
-                "early_extra=%.6f late_extra=%.6f holiday_overlap_hours=%.6f "
-                "outside_plan_extra=%.6f direct_overtime=%.6f existing_overtime_line_ids=%s",
-                attendance.id,
-                employee.id,
-                slots.ids,
-                holiday_leaves.ids,
-                attendance.check_in,
-                attendance.check_out,
-                plan_start,
-                plan_end,
-                early_extra,
-                late_extra,
-                holiday_overlap_hours,
-                outside_plan_extra,
-                direct_overtime,
-                overtime_lines.ids,
-            )
+            if log_enabled:
+                _logger.warning(
+                    "[planning_direct_overtime] attendance_id=%s employee_id=%s slot_ids=%s holiday_leave_ids=%s "
+                    "check_in=%s check_out=%s plan_start=%s plan_end=%s "
+                    "early_extra=%.6f late_extra=%.6f holiday_overlap_hours=%.6f "
+                    "outside_plan_extra=%.6f direct_overtime=%.6f existing_overtime_line_ids=%s",
+                    attendance.id,
+                    employee.id,
+                    slots.ids,
+                    holiday_leaves.ids,
+                    attendance.check_in,
+                    attendance.check_out,
+                    plan_start,
+                    plan_end,
+                    early_extra,
+                    late_extra,
+                    holiday_overlap_hours,
+                    outside_plan_extra,
+                    direct_overtime,
+                    overtime_lines.ids,
+                )
 
             if direct_overtime <= 0.0:
                 overtime_lines.unlink()
                 touched_attendances |= attendance
-                _logger.warning(
-                    "[planning_direct_overtime] action=unlink attendance_id=%s removed_overtime_line_ids=%s",
-                    attendance.id,
-                    overtime_lines.ids,
-                )
+                if log_enabled:
+                    _logger.warning(
+                        "[planning_direct_overtime] action=unlink attendance_id=%s removed_overtime_line_ids=%s",
+                        attendance.id,
+                        overtime_lines.ids,
+                    )
                 continue
 
             if overtime_lines:
@@ -251,14 +291,15 @@ class HrAttendance(models.Model):
                 )
                 extra_lines.unlink()
                 touched_attendances |= attendance
-                _logger.warning(
-                    "[planning_direct_overtime] action=update attendance_id=%s primary_line_id=%s "
-                    "new_duration=%.6f removed_extra_line_ids=%s",
-                    attendance.id,
-                    primary_line.id,
-                    direct_overtime,
-                    extra_lines.ids,
-                )
+                if log_enabled:
+                    _logger.warning(
+                        "[planning_direct_overtime] action=update attendance_id=%s primary_line_id=%s "
+                        "new_duration=%.6f removed_extra_line_ids=%s",
+                        attendance.id,
+                        primary_line.id,
+                        direct_overtime,
+                        extra_lines.ids,
+                    )
                 continue
 
             vals = {
@@ -280,13 +321,14 @@ class HrAttendance(models.Model):
                 vals.update(default_rule._extra_overtime_vals())
             created_line = overtime_line_model.create(vals)
             touched_attendances |= attendance
-            _logger.warning(
-                "[planning_direct_overtime] action=create attendance_id=%s created_line_id=%s duration=%.6f vals=%s",
-                attendance.id,
-                created_line.id,
-                direct_overtime,
-                vals,
-            )
+            if log_enabled:
+                _logger.warning(
+                    "[planning_direct_overtime] action=create attendance_id=%s created_line_id=%s duration=%.6f vals=%s",
+                    attendance.id,
+                    created_line.id,
+                    direct_overtime,
+                    vals,
+                )
 
         if touched_attendances:
             self.env.add_to_compute(
@@ -305,8 +347,12 @@ class HrAttendance(models.Model):
                 touched_attendances._recompute_recordset(
                     fnames=["overtime_hours", "validated_overtime_hours", "overtime_status"]
                 )
-            _logger.warning(
-                "[planning_direct_overtime] recompute attendance_ids=%s",
-                touched_attendances.ids,
-            )
+            target_recompute_ids = touched_attendances.filtered(
+                lambda att: self._should_log_for_employee(att.employee_id)
+            ).ids
+            if target_recompute_ids:
+                _logger.warning(
+                    "[planning_direct_overtime] recompute attendance_ids=%s",
+                    target_recompute_ids,
+                )
 
