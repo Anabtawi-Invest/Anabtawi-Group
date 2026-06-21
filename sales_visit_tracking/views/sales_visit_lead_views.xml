@@ -2,9 +2,9 @@
 <odoo>
     <!-- sales.visit.lead Form View -->
     <record id="view_sales_visit_lead_form" model="ir.ui.view">
-        <name>sales.visit.lead.form</name>
-        <model>sales.visit.lead</model>
-        <arch type="xml">
+        <field name="name">sales.visit.lead.form</field>
+        <field name="model">sales.visit.lead</field>
+        <field name="arch" type="xml">
             <form string="Lead Detail">
                 <header>
                     <field name="status" widget="statusbar" statusbar_visible="lead,revisit,approved,rejected"/>
@@ -44,28 +44,28 @@
                     <field name="message_ids"/>
                 </div>
             </form>
-        </arch>
+        </field>
     </record>
 
     <!-- sales.visit.lead List View -->
     <record id="view_sales_visit_lead_tree" model="ir.ui.view">
-        <name>sales.visit.lead.tree</name>
-        <model>sales.visit.lead</model>
-        <arch type="xml">
+        <field name="name">sales.visit.lead.tree</field>
+        <field name="model">sales.visit.lead</field>
+        <field name="arch" type="xml">
             <tree string="Leads" decoration-info="status == 'revisit'" decoration-success="status == 'approved'" decoration-danger="status == 'rejected'">
                 <field name="name"/>
                 <field name="mobile"/>
                 <field name="user_id" widget="many2one_avatar_user"/>
                 <field name="status" widget="badge" decoration-info="status == 'revisit'" decoration-success="status == 'approved'" decoration-danger="status == 'rejected'" decoration-muted="status == 'lead'"/>
             </tree>
-        </arch>
+        </field>
     </record>
 
     <!-- sales.visit.lead Search View -->
     <record id="view_sales_visit_lead_search" model="ir.ui.view">
-        <name>sales.visit.lead.search</name>
-        <model>sales.visit.lead</model>
-        <arch type="xml">
+        <field name="name">sales.visit.lead.search</field>
+        <field name="model">sales.visit.lead</field>
+        <field name="arch" type="xml">
             <search string="Search Leads">
                 <field name="name" string="Customer Name"/>
                 <field name="mobile" string="Mobile Number"/>
@@ -81,7 +81,7 @@
                     <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
                 </group>
             </search>
-        </arch>
+        </field>
     </record>
 
     <!-- Window Action -->
