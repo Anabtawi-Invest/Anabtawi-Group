@@ -13,51 +13,56 @@ class SalesVisit(models.Model):
     _description = 'Salesperson Customer Visit'
     _order = 'check_in_time desc, id desc'
 
-    name = fields.Char(
+        name = fields.Char(
         string='Visit Reference',
         required=True,
         copy=False,
         readonly=True,
         default='/'
     )
- lead_id = fields.Many2one(
-    'sales.visit.lead',
-    string='Lead',
-    required=True,
-    ondelete='cascade',
-    index=True
-)
 
-partner_id = fields.Many2one(
-    'res.partner',
-    string='Customer',
-    index=True,
-    ondelete='set null'
-)
+    lead_id = fields.Many2one(
+        'sales.visit.lead',
+        string='Lead',
+        required=True,
+        ondelete='cascade',
+        index=True
+    )
 
-user_id = fields.Many2one(
-    'res.users',
-    string='Salesperson',
-    required=True,
-    default=lambda self: self.env.user,
-    index=True
-)
-employee_id = fields.Many2one(
-    'hr.employee',
-    string='Salesperson Employee',
-    compute='_compute_employee_id',
-    store=True,
-    index=True
-)
-check_in_time = fields.Datetime(
-     string='Arrival Time',
-     readonly=True
-)
+    partner_id = fields.Many2one(
+        'res.partner',
+        string='Customer',
+        index=True,
+        ondelete='set null'
+    )
+
+    user_id = fields.Many2one(
+        'res.users',
+        string='Salesperson',
+        required=True,
+        default=lambda self: self.env.user,
+        index=True
+    )
+
+    employee_id = fields.Many2one(
+        'hr.employee',
+        string='Salesperson Employee',
+        compute='_compute_employee_id',
+        store=True,
+        index=True
+    )
+
+    check_in_time = fields.Datetime(
+        string='Arrival Time',
+        readonly=True
+    )
+
     check_in_latitude = fields.Float(
         string='Check-In Latitude',
         digits=(10, 7),
         readonly=True
     )
+
     check_in_longitude = fields.Float(
         string='Check-In Longitude',
         digits=(10, 7),
@@ -153,56 +158,56 @@ check_in_time = fields.Datetime(
         c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
         return R * c
 
-   @api.model
-def action_start_visit(self, lead_id, latitude, longitude):
-    """Starts a visit, computes GPS verification, and creates a visit log."""
-    lead = self.env['sales.visit.lead'].browse(lead_id)
+       @api.model
+    def action_start_visit(self, lead_id, latitude, longitude):
+        """Starts a visit, computes GPS verification, and creates a visit log."""
+        lead = self.env['sales.visit.lead'].browse(lead_id)
 
-    if not lead.exists():
-        raise UserError(_("Lead record does not exist."))
+        if not lead.exists():
+            raise UserError(_("Lead record does not exist."))
 
-    distance = self.haversine_distance(
-        latitude,
-        longitude,
-        lead.latitude,
-        lead.longitude
-    )
+        distance = self.haversine_distance(
+            latitude,
+            longitude,
+            lead.latitude,
+            lead.longitude
+        )
 
-    allowed_radius_param = self.env['ir.config_parameter'].sudo().get_param(
-        'sales_visit_tracking.allowed_radius'
-    )
-    allowed_radius = float(allowed_radius_param) if allowed_radius_param else 100.0
+        allowed_radius_param = self.env['ir.config_parameter'].sudo().get_param(
+            'sales_visit_tracking.allowed_radius'
+        )
+        allowed_radius = float(allowed_radius_param) if allowed_radius_param else 100.0
 
-    if distance <= allowed_radius:
-        verif_status = 'valid'
-    elif distance <= 300.0:
-        verif_status = 'warning'
-    else:
-        verif_status = 'invalid'
+        if distance <= allowed_radius:
+            verif_status = 'valid'
+        elif distance <= 300.0:
+            verif_status = 'warning'
+        else:
+            verif_status = 'invalid'
 
-    visit = self.create({
-        'lead_id': lead.id,
-        'partner_id': lead.partner_id.id if lead.partner_id else False,
-        'user_id': self.env.user.id,
-        'check_in_time': fields.Datetime.now(),
-        'check_in_latitude': latitude,
-        'check_in_longitude': longitude,
-        'distance_from_customer': distance,
-        'verification_status': verif_status,
-    })
-
-    if visit.employee_id:
-        self.env['sales.route.point'].create({
-            'employee_id': visit.employee_id.id,
-            'visit_id': visit.id,
-            'timestamp': fields.Datetime.now(),
-            'latitude': latitude,
-            'longitude': longitude,
-            'speed': 0.0,
-            'heading': 0.0,
+        visit = self.create({
+            'lead_id': lead.id,
+            'partner_id': lead.partner_id.id if lead.partner_id else False,
+            'user_id': self.env.user.id,
+            'check_in_time': fields.Datetime.now(),
+            'check_in_latitude': latitude,
+            'check_in_longitude': longitude,
+            'distance_from_customer': distance,
+            'verification_status': verif_status,
         })
 
-    return visit.id
+        if visit.employee_id:
+            self.env['sales.route.point'].create({
+                'employee_id': visit.employee_id.id,
+                'visit_id': visit.id,
+                'timestamp': fields.Datetime.now(),
+                'latitude': latitude,
+                'longitude': longitude,
+                'speed': 0.0,
+                'heading': 0.0,
+            })
+
+        return visit.id
 
     def action_end_visit(self, latitude, longitude, result, next_visit_date=None, rejection_reason=None):
         """Ends a visit, updates lead status, and converts/stores final outcome choices."""
