@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="sales_visit_tracking.SalesVisitDashboard">
+        <div class="o_sales_visit_dashboard_action">
+            <div class="o_dashboard_header">
+                <div class="title_area">
+                    <h1>Visits Analytics Dashboard</h1>
+                    <div class="subtitle">Anabtawi Sales Visits Tracking &amp; Route Performance</div>
+                </div>
+                <div class="header_actions">
+                    <div class="live_indicator">
+                        <span class="dot"></span>
+                        <span>LIVE UPDATE ACTIVE</span>
+                    </div>
+                    <button class="btn_refresh" t-on-click="onRefresh">
+                        <i class="fa fa-refresh me-1"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- KPIs Cards -->
+            <div class="o_kpis_grid">
+                <div class="kpi_card">
+                    <div class="kpi_content">
+                        <div class="kpi_label">Active Reps Today</div>
+                        <div class="kpi_value"><t t-out="state.kpis.active_reps"/></div>
+                    </div>
+                    <div class="kpi_icon bg_blue">
+                        <i class="fa fa-users"></i>
+                    </div>
+                </div>
+                <div class="kpi_card">
+                    <div class="kpi_content">
+                        <div class="kpi_label">Today's Total Visits</div>
+                        <div class="kpi_value"><t t-out="state.kpis.today_visits"/></div>
+                    </div>
+                    <div class="kpi_icon bg_purple">
+                        <i class="fa fa-map-signs"></i>
+                    </div>
+                </div>
+                <div class="kpi_card">
+                    <div class="kpi_content">
+                        <div class="kpi_label">Completed Visits</div>
+                        <div class="kpi_value"><t t-out="state.kpis.completed_visits"/></div>
+                    </div>
+                    <div class="kpi_icon bg_green">
+                        <i class="fa fa-check-circle"></i>
+                    </div>
+                </div>
+                <div class="kpi_card">
+                    <div class="kpi_content">
+                        <div class="kpi_label">Missed Visits</div>
+                        <div class="kpi_value"><t t-out="state.kpis.missed_visits"/></div>
+                    </div>
+                    <div class="kpi_icon bg_red">
+                        <i class="fa fa-exclamation-triangle"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Outcomes grid & Compliance -->
+            <div class="o_dashboard_details">
+                <!-- Outcomes Breakdown -->
+                <div class="dashboard_section">
+                    <h3>Today's Leads Outcomes</h3>
+                    <div class="o_kpis_grid border-0 p-0 shadow-none" style="grid-template-columns: repeat(3, 1fr);">
+                        <div class="kpi_card" style="box-shadow: none; border: 1px solid #e5e7eb;">
+                            <div class="kpi_content">
+                                <div class="kpi_label text-warning">Revisiting Needed</div>
+                                <div class="kpi_value"><t t-out="state.kpis.revisit_count"/></div>
+                            </div>
+                        </div>
+                        <div class="kpi_card" style="box-shadow: none; border: 1px solid #e5e7eb;">
+                            <div class="kpi_content">
+                                <div class="kpi_label text-success">Approved / Converted</div>
+                                <div class="kpi_value"><t t-out="state.kpis.approved_count"/></div>
+                            </div>
+                        </div>
+                        <div class="kpi_card" style="box-shadow: none; border: 1px solid #e5e7eb;">
+                            <div class="kpi_content">
+                                <div class="kpi_label text-danger">Rejected Leads</div>
+                                <div class="kpi_value"><t t-out="state.kpis.rejected_count"/></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GPS Compliance meter -->
+                <div class="dashboard_section d-flex flex-column align-items-center justify-content-center">
+                    <div class="compliance_meter_container">
+                        <div class="compliance_radial">
+                            <svg>
+                                <circle class="bg_circle" cx="80" cy="80" r="70"></circle>
+                                <circle class="fill_circle" cx="80" cy="80" r="70"
+                                        t-att-style="'stroke-dashoffset: ' + (440 - (440 * state.kpis.gps_compliance / 100)) + ';'"></circle>
+                            </svg>
+                            <div class="percentage_text"><t t-out="state.kpis.gps_compliance"/>%</div>
+                        </div>
+                        <div class="compliance_legend text-center">
+                            <div class="compliance_heading">GPS Geofence Compliance</div>
+                            <div class="compliance_sub">Percent of check-ins within allowed radius</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>
