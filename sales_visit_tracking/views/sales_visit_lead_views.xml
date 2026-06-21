@@ -48,8 +48,8 @@
     </record>
 
     <!-- sales.visit.lead List View -->
-    <record id="view_sales_visit_lead_list" model="ir.ui.view">
-        <field name="name">sales.visit.lead.list</field>
+    <record id="view_sales_visit_lead_tree" model="ir.ui.view">
+        <field name="name">sales.visit.lead.tree</field>
         <field name="model">sales.visit.lead</field>
         <field name="arch" type="xml">
             <list string="Leads" decoration-info="status == 'revisit'" decoration-success="status == 'approved'" decoration-danger="status == 'rejected'">
@@ -71,8 +71,7 @@
                 <field name="mobile" string="Mobile Number"/>
                 <field name="user_id" string="Salesperson"/>
                 <filter string="My Leads" name="my_leads" domain="[('user_id', '=', uid)]"/>
-                <separator/>
-                <filter string="Active Leads" name="active_leads" domain="[('status', 'in', ('lead', 'revisit'))]"/>
+                <filter string="Active Leads" name="active_leads" domain="[('status', 'in', ['lead', 'revisit'])]"/>
                 <filter string="Revisit Required" name="revisit" domain="[('status', '=', 'revisit')]"/>
                 <filter string="Approved (Converted)" name="approved" domain="[('status', '=', 'approved')]"/>
                 <filter string="Rejected" name="rejected" domain="[('status', '=', 'rejected')]"/>
