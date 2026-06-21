@@ -20,37 +20,39 @@ class SalesVisit(models.Model):
         readonly=True,
         default='/'
     )
-    lead_id = fields.Many2one(
-        'sales.visit.lead',
-        string='Lead',
-        required=True,
-        ondelete='cascade',
-        index=True
-    )
-   partner_id = fields.Many2one(
+ lead_id = fields.Many2one(
+    'sales.visit.lead',
+    string='Lead',
+    required=True,
+    ondelete='cascade',
+    index=True
+)
+
+partner_id = fields.Many2one(
     'res.partner',
     string='Customer',
     index=True,
     ondelete='set null'
 )
-    user_id = fields.Many2one(
-        'res.users',
-        string='Salesperson',
-        required=True,
-        default=lambda self: self.env.user,
-        index=True
-    )
-    employee_id = fields.Many2one(
-        'hr.employee',
-        string='Salesperson Employee',
-        compute='_compute_employee_id',
-        store=True,
-        index=True
-    )
-    check_in_time = fields.Datetime(
-        string='Arrival Time',
-        readonly=True
-    )
+
+user_id = fields.Many2one(
+    'res.users',
+    string='Salesperson',
+    required=True,
+    default=lambda self: self.env.user,
+    index=True
+)
+employee_id = fields.Many2one(
+    'hr.employee',
+    string='Salesperson Employee',
+    compute='_compute_employee_id',
+    store=True,
+    index=True
+)
+check_in_time = fields.Datetime(
+     string='Arrival Time',
+     readonly=True
+)
     check_in_latitude = fields.Float(
         string='Check-In Latitude',
         digits=(10, 7),
