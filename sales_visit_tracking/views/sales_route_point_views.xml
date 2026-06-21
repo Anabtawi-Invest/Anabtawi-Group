@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- sales.route.point List View -->
-    <record id="view_sales_route_point_list" model="ir.ui.view">
-        <field name="name">sales.route.point.list</field>
+    <record id="view_sales_route_point_tree" model="ir.ui.view">
+        <field name="name">sales.route.point.tree</field>
         <field name="model">sales.route.point</field>
         <field name="arch" type="xml">
             <list string="Route Coordinates Logs" create="false" edit="false" delete="true">
