@@ -46,11 +46,11 @@
     </record>
 
     <!-- sales.visit List View -->
-    <record id="view_sales_visit_tree" model="ir.ui.view">
-        <field name="name">sales.visit.tree</field>
+    <record id="view_sales_visit_list" model="ir.ui.view">
+        <field name="name">sales.visit.list</field>
         <field name="model">sales.visit</field>
         <field name="arch" type="xml">
-            <tree string="Visit Logs" create="false" edit="false" delete="true">
+            <list string="Visit Logs" create="false" edit="false" delete="true">
                 <field name="name"/>
                 <field name="lead_id" string="Customer"/>
                 <field name="user_id" widget="many2one_avatar_user"/>
@@ -59,7 +59,7 @@
                 <field name="duration" widget="float_time"/>
                 <field name="verification_status" widget="badge" decoration-success="verification_status == 'valid'" decoration-warning="verification_status == 'warning'" decoration-danger="verification_status == 'invalid'"/>
                 <field name="result" widget="badge" decoration-success="result == 'approved'" decoration-warning="result == 'revisit'" decoration-danger="result == 'rejected'"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -93,7 +93,7 @@
     <record id="action_sales_visit" model="ir.actions.act_window">
         <field name="name">Customer Visits Log</field>
         <field name="res_model">sales.visit</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_sales_visit_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
