@@ -1,79 +1,71 @@
-<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- sales.route.point List View -->
-    <record id="view_sales_route_point_tree" model="ir.ui.view">
-        <name>sales.route.point.tree</name>
-        <model>sales.route.point</model>
-        <arch type="xml">
-            <tree string="Route Coordinates Logs" create="false" edit="false" delete="true">
-                <field name="timestamp"/>
-                <field name="employee_id"/>
-                <field name="visit_id"/>
-                <field name="latitude"/>
-                <field name="longitude"/>
-                <field name="speed"/>
-                <field name="heading"/>
-            </tree>
-        </arch>
-    </record>
-
-    <!-- sales.route.point Form View -->
-    <record id="view_sales_route_point_form" model="ir.ui.view">
-        <name>sales.route.point.form</name>
-        <model>sales.route.point</model>
-        <arch type="xml">
-            <form string="Route Coordinate Log" create="false" edit="false">
-                <sheet>
-                    <group>
-                        <group string="Employee Info">
-                            <field name="employee_id"/>
-                            <field name="visit_id"/>
-                            <field name="timestamp"/>
-                        </group>
-                        <group string="GPS Coordinate Detail">
-                            <field name="latitude"/>
-                            <field name="longitude"/>
-                            <field name="speed"/>
-                            <field name="heading"/>
-                            <field name="company_id" groups="base.group_multi_company"/>
-                        </group>
-                    </group>
-                </sheet>
-            </form>
-        </arch>
-    </record>
-
-    <!-- sales.route.point Search View -->
-    <record id="view_sales_route_point_search" model="ir.ui.view">
-        <name>sales.route.point.search</name>
-        <model>sales.route.point</model>
-        <arch type="xml">
-            <search string="Search Route Logs">
-                <field name="employee_id"/>
-                <field name="visit_id"/>
-                <filter string="Today Logs" name="today_logs" domain="[('timestamp', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')), ('timestamp', '&lt;=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
-                <group expand="0" string="Group By">
-                    <filter string="Employee" name="group_employee" context="{'group_by': 'employee_id'}"/>
-                    <filter string="Visit" name="group_visit" context="{'group_by': 'visit_id'}"/>
-                    <filter string="Date" name="group_date" context="{'group_by': 'timestamp'}"/>
-                </group>
-            </search>
-        </arch>
-    </record>
-
-    <!-- Window Action -->
-    <record id="action_sales_route_point" model="ir.actions.act_window">
-        <field name="name">Route Logs</field>
-        <field name="res_model">sales.route.point</field>
-        <field name="view_mode">tree,form</field>
-        <field name="search_view_id" ref="view_sales_route_point_search"/>
-        <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">
-                Route coordinate logs.
-            </p>
-            <p>
-                GPS pings logged by sales representatives' devices are recorded here.
-            </p>
-        </field>
-    </record>
+<!--  sales.route.point List View  -->
+<record id="view_sales_route_point_tree" model="ir.ui.view">
+<field name="name">sales.route.point.tree</field>
+<field name="model">sales.route.point</field>
+<field name="arch" type="xml">
+<tree string="Route Coordinates Logs" create="false" edit="false" delete="true">
+<field name="timestamp"/>
+<field name="employee_id"/>
+<field name="visit_id"/>
+<field name="latitude"/>
+<field name="longitude"/>
+<field name="speed"/>
+<field name="heading"/>
+</tree>
+</field>
+</record>
+<!--  sales.route.point Form View  -->
+<record id="view_sales_route_point_form" model="ir.ui.view">
+<field name="name">sales.route.point.form</field>
+<field name="model">sales.route.point</field>
+<field name="arch" type="xml">
+<form string="Route Coordinate Log" create="false" edit="false">
+<sheet>
+<group>
+<group string="Employee Info">
+<field name="employee_id"/>
+<field name="visit_id"/>
+<field name="timestamp"/>
+</group>
+<group string="GPS Coordinate Detail">
+<field name="latitude"/>
+<field name="longitude"/>
+<field name="speed"/>
+<field name="heading"/>
+<field name="company_id" groups="base.group_multi_company"/>
+</group>
+</group>
+</sheet>
+</form>
+</field>
+</record>
+<!--  sales.route.point Search View  -->
+<record id="view_sales_route_point_search" model="ir.ui.view">
+<field name="name">sales.route.point.search</field>
+<field name="model">sales.route.point</field>
+<field name="arch" type="xml">
+<search string="Search Route Logs">
+<field name="employee_id"/>
+<field name="visit_id"/>
+<filter string="Today Logs" name="today_logs" domain="[('timestamp', '>=', context_today().strftime('%Y-%m-%d 00:00:00')), ('timestamp', '<=', context_today().strftime('%Y-%m-%d 23:59:59'))]"/>
+<group expand="0" string="Group By">
+<filter string="Employee" name="group_employee" context="{'group_by': 'employee_id'}"/>
+<filter string="Visit" name="group_visit" context="{'group_by': 'visit_id'}"/>
+<filter string="Date" name="group_date" context="{'group_by': 'timestamp'}"/>
+</group>
+</search>
+</field>
+</record>
+<!--  Window Action  -->
+<record id="action_sales_route_point" model="ir.actions.act_window">
+<field name="name">Route Logs</field>
+<field name="res_model">sales.route.point</field>
+<field name="view_mode">tree,form</field>
+<field name="search_view_id" ref="view_sales_route_point_search"/>
+<field name="help" type="html">
+<p class="o_view_nocontent_smiling_face"> Route coordinate logs. </p>
+<p> GPS pings logged by sales representatives' devices are recorded here. </p>
+</field>
+</record>
 </odoo>
