@@ -4,26 +4,58 @@
     'version': '19.0.2.0.0',
     'summary': 'Simplified Sales representative customer visits tracking, geofence check-ins, and routing.',
     'description': """
-Anabtawi Sales Visit Tracking Module - Full Step-by-Step Workflow
-================================================================
+Anabtawi Sales Visit Tracking & Route Management (V2) - Complete Business Workflow
+===================================================================================
 
-The module implements a simplified workflow designed for non-technical salespeople, learnable in under 5 minutes:
+This module implements a streamlined field sales tracking and routing system designed for Anabtawi Group.
+It keeps the salesperson mobile interface extremely simple (learnable in under 5 minutes) while giving managers comprehensive dashboard analytics, live GPS validation, and immutable auditing.
 
-Step-by-Step Salesperson Workflow:
-----------------------------------
-1. **View Today's Leads**: The salesperson opens the single-page mobile app in Odoo and views all assigned leads for the day under "My Daily Visits".
-2. **Navigate**: They click "Navigate" on a lead card to open Google Maps navigation to the customer's coordinates.
-3. **Arrival & Check-In**: Upon arrival at the customer's location, they click "Start Visit". The system captures their GPS coordinates, verifies geofencing validation (Valid: <= 100m, Warning: 101-300m, Invalid: > 300m), and starts an active visit timer.
-4. **End Visit**: After conducting the visit, they click "End Visit". The system captures the checkout GPS coordinates and stops the timer.
-5. **Select Outcome**: They choose one of the three simplified outcomes:
-   - **Approved**: Prompts to save and automatically converts the lead into a standard Odoo Contact (res.partner).
-   - **Revisit**: Prompts the user to select the "Next Visit Date" and updates the schedule.
-   - **Rejected**: Prompts the user to select a "Rejection Reason" (Price, Competitor, Not Interested, No Budget, or Other) and logs it.
+1. SALESPERSON MOBILE WORKFLOW (OWL UI)
+--------------------------------------
+Salespeople open the responsive "My Daily Visits" dashboard directly on their mobile device:
 
-Manager & Supervisor Features:
-------------------------------
-- **KPI Dashboard**: View real-time visits, GPS compliance percentage, active representatives, and outcomes.
-- **Live Route Tracking Map**: Display customers, check-in markers with verification status, and background route travel points.
+- **Assigned Visits List**: Shows active, assigned customer or lead visits for the current day.
+- **GPS Navigation**: A single button clicks out to external navigation maps using the partner/lead coordinates.
+- **Lead Capture & Coordinate Locking**:
+  * For New Leads (coordinates at 0.0), clicking "Save Location" captures the current GPS coordinates.
+  * These coordinates are immediately **locked** on the lead record. Representative users cannot edit coordinates once locked; only Managers/Admins can modify them.
+  * Saving the location automatically checks the salesperson in.
+- **Strict Geofencing Check-In**:
+  * For Existing Customers and Revisit Leads, clicking "Check In" calculates the distance between the salesperson's current coordinates and the registered customer coordinates.
+  * **Strict 50-meter restriction**: If the salesperson is further than 50 meters from the destination, the check-in is **blocked** and throws a validation error.
+  * A record of the blocked check-in attempt is logged in the system for supervisor review.
+  * If within 50 meters, the check-in succeeds, transitioning the state to "In Progress" and tracking duration.
+- **Simplified Outcomes (Max 3 actions per screen)**:
+  * **For Leads**:
+    - **[ Approved ]**: Converts the lead into a standard Odoo Customer Contact (res.partner) automatically.
+    - **[ Revisit ]**: Prompts to choose a date and automatically schedules the next visit assignment.
+    - **[ Rejected ]**: Prompts for a rejection reason (Price, Competitor, Not Interested, No Budget, or Other) and logs it.
+  * **For Customers**:
+    - **[ ORDER ]**: Automatically opens the standard Odoo Sales Order/Quotation form with pre-filled customer context. The new Sales Order is linked back to the visit.
+    - **[ REVISIT ]**: Prompts to choose a date and automatically schedules the next visit.
+    - **[ ISSUE ]**: Logs customer complaints, feedback, or issues and flags the manager.
+
+2. MANAGER & SUPERVISOR ANALYTICS DASHBOARDS
+-------------------------------------------
+An interactive tabbed dashboard tailored for management:
+
+- **Assignments Dashboard**: Counters and metrics for Assigned, Pending, Completed, Missed, and Revisit Schedule visits with quick scheduling lists.
+- **Live Route Map**:
+  * Interactive Leaflet map displaying Customer markers (blue), Lead markers (yellow), Revisit markers (orange), and Successful check-ins (green).
+  * Renders live rep positions and route trail dots connecting consecutive check-ins to map daily coverage.
+- **Performance Analytics**:
+  * Tracks total completed visits, converted leads, generated revenue, and Conversion Rate.
+  * **GPS Compliance %**: A computed compliance rating representing the percentage of successful check-ins out of total check-in attempts (successful + blocked attempts).
+- **Customer Coverage**:
+  * Displays a list of customers who haven't been visited in 30, 60, or 90+ days to prevent client neglect.
+
+3. IMMUTABILITY & AUDITING
+---------------------------
+- **Sales Visit Audit Log**:
+  * Captures every check-in, checkout, coordinate locking, reassignment, and blocked cheat attempt.
+  * Strict database-level rules completely prevent write or unlink (delete) operations on audit logs, making them entirely tamper-proof.
+- **Automated Sweep Cron**:
+  * Runs automatically every night at midnight to check for uncompleted past-due visits and marks them as "Missed".
     """,
     'category': 'Sales',
     'author': 'Anabtawi Group',
