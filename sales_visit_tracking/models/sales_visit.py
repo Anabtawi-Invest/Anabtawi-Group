@@ -27,6 +27,12 @@ class SalesVisit(models.Model):
         ondelete='cascade',
         index=True
     )
+    partner_id = fields.Many2one(
+    'res.partner',
+    string='Customer',
+    index=True,
+    ondelete='set null'
+)
     user_id = fields.Many2one(
         'res.users',
         string='Salesperson',
