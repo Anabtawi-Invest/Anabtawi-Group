@@ -2,9 +2,9 @@
 <odoo>
     <!-- sales.visit Form View -->
     <record id="view_sales_visit_form" model="ir.ui.view">
-        <name>sales.visit.form</name>
-        <model>sales.visit</model>
-        <arch type="xml">
+        <field name="name">sales.visit.form</field>
+        <field name="model">sales.visit</field>
+        <field name="arch" type="xml">
             <form string="Visit Log" create="false" edit="false">
                 <sheet>
                     <div class="oe_title">
@@ -42,14 +42,14 @@
                     </group>
                 </sheet>
             </form>
-        </arch>
+        </field>
     </record>
 
     <!-- sales.visit List View -->
     <record id="view_sales_visit_tree" model="ir.ui.view">
-        <name>sales.visit.tree</name>
-        <model>sales.visit</model>
-        <arch type="xml">
+        <field name="name">sales.visit.tree</field>
+        <field name="model">sales.visit</field>
+        <field name="arch" type="xml">
             <tree string="Visit Logs" create="false" edit="false" delete="true">
                 <field name="name"/>
                 <field name="lead_id" string="Customer"/>
@@ -60,14 +60,14 @@
                 <field name="verification_status" widget="badge" decoration-success="verification_status == 'valid'" decoration-warning="verification_status == 'warning'" decoration-danger="verification_status == 'invalid'"/>
                 <field name="result" widget="badge" decoration-success="result == 'approved'" decoration-warning="result == 'revisit'" decoration-danger="result == 'rejected'"/>
             </tree>
-        </arch>
+        </field>
     </record>
 
     <!-- sales.visit Search View -->
     <record id="view_sales_visit_search" model="ir.ui.view">
-        <name>sales.visit.search</name>
-        <model>sales.visit</model>
-        <arch type="xml">
+        <field name="name">sales.visit.search</field>
+        <field name="model">sales.visit</field>
+        <field name="arch" type="xml">
             <search string="Search Visits">
                 <field name="name"/>
                 <field name="lead_id" string="Customer"/>
@@ -86,7 +86,7 @@
                     <filter string="GPS Validation" name="group_verification" context="{'group_by': 'verification_status'}"/>
                 </group>
             </search>
-        </arch>
+        </field>
     </record>
 
     <!-- Window Action -->
