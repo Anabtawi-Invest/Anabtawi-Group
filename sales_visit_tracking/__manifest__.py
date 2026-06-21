@@ -44,6 +44,7 @@ Manager & Supervisor Features:
         'security/sales_visit_security.xml',
         'security/ir.model.access.csv',
         'data/ir_sequence_data.xml',
+        'data/ir_cron_data.xml',
         'views/res_config_settings_views.xml',
         'views/res_partner_views.xml',
         'views/sales_visit_lead_views.xml',

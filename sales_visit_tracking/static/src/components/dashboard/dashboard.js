@@ -2,23 +2,45 @@
 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { SalesRouteMap } from "../map/map";
 import { Component, onWillStart, onMounted, onWillUnmount, useState } from "@odoo/owl";
 
 export class SalesVisitDashboard extends Component {
     static template = "sales_visit_tracking.SalesVisitDashboard";
-    
+    static components = { SalesRouteMap };
+
     setup() {
         this.orm = useService("orm");
+        this.action = useService("action");
         this.state = useState({
-            kpis: {
-                today_visits: 0,
-                completed_visits: 0,
-                missed_visits: 0,
-                revisit_count: 0,
-                approved_count: 0,
-                rejected_count: 0,
-                gps_compliance: 100,
-                active_reps: 0
+            activeTab: 'assignments', // 'assignments', 'map', 'performance', 'coverage'
+            data: {
+                assignments: {
+                    assigned: 0,
+                    pending: 0,
+                    completed: 0,
+                    missed: 0,
+                    revisit_schedule: []
+                },
+                performance: {
+                    assigned_visits: 0,
+                    completed_visits: 0,
+                    new_leads_visited: 0,
+                    approved_leads: 0,
+                    rejected_leads: 0,
+                    revisit_leads: 0,
+                    customer_visits: 0,
+                    orders_generated: 0,
+                    revenue_generated: 0.0,
+                    conversion_rate: 0.0,
+                    gps_compliance: 100.0,
+                    active_reps: 0
+                },
+                coverage: {
+                    not_visited_30: [],
+                    not_visited_60: [],
+                    not_visited_90: []
+                }
             }
         });
 
@@ -41,14 +63,41 @@ export class SalesVisitDashboard extends Component {
 
     async loadData() {
         try {
-            this.state.kpis = await this.orm.call("sales.visit", "get_dashboard_data", []);
+            const res = await this.orm.call("sales.visit", "get_dashboard_data", []);
+            this.state.data = res;
         } catch (error) {
-            console.error("Failed to load dashboard KPIs", error);
+            console.error("Failed to load dashboard data", error);
         }
     }
 
     onRefresh() {
         this.loadData();
+    }
+
+    switchTab(tab) {
+        this.state.activeTab = tab;
+    }
+
+    onSchedule() {
+        this.action.doAction({
+            type: 'ir.actions.act_window',
+            name: 'Schedule New Visit',
+            res_model: 'sales.visit',
+            views: [[false, 'form']],
+            target: 'new',
+            context: {}
+        });
+    }
+
+    onAssign() {
+        this.action.doAction({
+            type: 'ir.actions.act_window',
+            name: 'Manage Visit Assignments',
+            res_model: 'sales.visit',
+            views: [[false, 'list'], [false, 'form']],
+            target: 'current',
+            context: {'search_default_assigned': 1}
+        });
     }
 }
 

@@ -23,8 +23,9 @@
                             <field name="partner_id" invisible="not partner_id"/>
                         </group>
                         <group string="Coordinates &amp; Location">
-                            <field name="latitude"/>
-                            <field name="longitude"/>
+                            <field name="latitude" readonly="is_location_locked"/>
+                            <field name="longitude" readonly="is_location_locked"/>
+                            <field name="is_location_locked" groups="sales_visit_tracking.group_sales_manager"/>
                         </group>
                     </group>
                     <group string="Outcome Details" invisible="status not in ('revisit', 'rejected')">

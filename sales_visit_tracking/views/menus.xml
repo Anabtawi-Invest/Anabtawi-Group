@@ -86,4 +86,10 @@
               parent="menu_sales_visit_config"
               action="sale.action_sale_config_settings"
               sequence="10"/>
+
+    <menuitem id="menu_sales_visit_audit_logs"
+              name="Audit Logs"
+              parent="menu_sales_visit_config"
+              action="action_sales_visit_audit_log"
+              sequence="20"/>
 </odoo>

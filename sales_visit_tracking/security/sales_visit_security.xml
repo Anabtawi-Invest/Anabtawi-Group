@@ -130,5 +130,35 @@
             <field name="groups" eval="[(4, ref('group_sales_manager'))]"/>
         </record>
 
+        <!-- Audit Log Multi-Company -->
+        <record id="sales_visit_audit_log_multicompany_rule" model="ir.rule">
+            <field name="name">Sales Visit Audit Log Multi-Company</field>
+            <field name="model_id" ref="model_sales_visit_audit_log"/>
+            <field name="domain_force">[('user_id.company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <!-- Audit Log Rules -->
+        <record id="sales_visit_audit_log_rule_representative" model="ir.rule">
+            <field name="name">Sales Representative Audit Logs</field>
+            <field name="model_id" ref="model_sales_visit_audit_log"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sales_representative'))]"/>
+        </record>
+
+        <record id="sales_visit_audit_log_rule_supervisor" model="ir.rule">
+            <field name="name">Sales Supervisor Audit Logs</field>
+            <field name="model_id" ref="model_sales_visit_audit_log"/>
+            <field name="domain_force">['|', ('user_id', '=', user.id), ('user_id.employee_id.parent_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_sales_supervisor'))]"/>
+        </record>
+
+        <record id="sales_visit_audit_log_rule_manager" model="ir.rule">
+            <field name="name">Sales Manager Audit Logs (Global)</field>
+            <field name="model_id" ref="model_sales_visit_audit_log"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_sales_manager'))]"/>
+        </record>
+
     </data>
 </odoo>

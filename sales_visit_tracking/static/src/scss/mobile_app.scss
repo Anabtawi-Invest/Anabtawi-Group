@@ -65,9 +65,10 @@
                     color: #111827;
                     margin-bottom: 0.25rem;
                 }
-                .lead_phone {
+                .lead_phone, .lead_date {
                     font-size: 0.9rem;
                     color: #4b5563;
+                    margin-bottom: 0.15rem;
                 }
                 .lead_badge {
                     display: inline-block;
@@ -79,7 +80,8 @@
                     text-transform: uppercase;
 
                     &.badge_lead { background-color: #eff6ff; color: #1e40af; }
-                    &.badge_revisit { background-color: #fef3c7; color: #92400e; }
+                    &.badge_revisit { background-color: #fffbeb; color: #b45309; }
+                    &.badge_customer { background-color: #f0fdf4; color: #15803d; }
                 }
             }
 
@@ -110,6 +112,10 @@
                     &.btn_start {
                         background-color: #10b981;
                         color: white;
+
+                        &.btn_save_location {
+                            background-color: #3b82f6;
+                        }
                     }
                 }
             }
@@ -224,6 +230,16 @@
                     color: #dc2626;
                     border: 2px solid #fecaca;
                 }
+                &.choice_order {
+                    background-color: #f5f3ff;
+                    color: #7c3aed;
+                    border: 2px solid #ddd6fe;
+                }
+                &.choice_issue {
+                    background-color: #fdf2f8;
+                    color: #db2777;
+                    border: 2px solid #fbcfe8;
+                }
             }
         }
 
@@ -236,13 +252,21 @@
             flex-direction: column;
             gap: 1rem;
 
+            h3 {
+                font-size: 1.1rem;
+                font-weight: 700;
+                color: #111827;
+                text-align: center;
+                margin: 0;
+            }
+
             label {
                 font-size: 0.9rem;
                 font-weight: 600;
                 color: #374151;
             }
 
-            select, input[type="date"] {
+            select, input[type="date"], textarea {
                 width: 100%;
                 padding: 0.75rem;
                 border: 1px solid #d1d5db;
@@ -250,6 +274,14 @@
                 font-size: 1rem;
                 background-color: #f9fafb;
                 min-height: 48px;
+                font-family: inherit;
+            }
+
+            .order_actions_grid {
+                display: flex;
+                flex-direction: column;
+                gap: 0.75rem;
+                width: 100%;
             }
 
             .form_actions {

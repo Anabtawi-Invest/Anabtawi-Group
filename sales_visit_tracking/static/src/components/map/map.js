@@ -17,7 +17,8 @@ export class SalesRouteMap extends Component {
             mapData: {
                 customers: [],
                 visits: [],
-                routes: []
+                routes: [],
+                reps: []
             }
         });
 
@@ -59,7 +60,7 @@ export class SalesRouteMap extends Component {
             return;
         }
 
-        // Default to Amman, Jordan (Center coordinates for Anabtawi Group HQ)
+        // Default to Amman, Jordan (Center coordinates for HQ)
         this.map = window.L.map(el).setView([31.9522, 35.9106], 10);
         
         window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -85,9 +86,19 @@ export class SalesRouteMap extends Component {
         const L = window.L;
         const bounds = [];
 
-        // 1. Render Customers (Blue Pins)
+        // 1. Render Customers / Leads (Blue, Yellow, and Orange Pins)
         this.state.mapData.customers.forEach(c => {
-            const markerHtml = `<div class="custom-marker-partner" style="width: 24px; height: 24px; border-radius: 50%; background: #3b82f6; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white;"><i class="fa fa-building" style="font-size: 10px;"></i></div>`;
+            let color = "#3b82f6"; // Customer (Blue)
+            let iconClass = "fa-building";
+            if (c.status === 'LEAD') {
+                color = "#eab308"; // Lead (Yellow)
+                iconClass = "fa-star";
+            } else if (c.status === 'REVISIT') {
+                color = "#f97316"; // Revisit (Orange)
+                iconClass = "fa-refresh";
+            }
+
+            const markerHtml = `<div class="custom-marker-partner" style="width: 24px; height: 24px; border-radius: 50%; background: ${color}; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white;"><i class="fa ${iconClass}" style="font-size: 10px;"></i></div>`;
             const icon = L.divIcon({
                 html: markerHtml,
                 className: 'custom-div-icon',
@@ -95,7 +106,7 @@ export class SalesRouteMap extends Component {
                 iconAnchor: [12, 12]
             });
             const m = L.marker([c.lat, c.lon], { icon: icon })
-                .bindPopup(`<b>Customer:</b> ${c.name}<br/><b>Verified:</b> ${c.verified ? 'Yes' : 'No'}`)
+                .bindPopup(`<b>Name:</b> ${c.name}<br/><b>Type:</b> ${c.status}`)
                 .addTo(this.map);
             this.markers.push(m);
             bounds.push([c.lat, c.lon]);
@@ -104,7 +115,7 @@ export class SalesRouteMap extends Component {
         // 2. Render Check-in / Check-out locations (Green Pins)
         this.state.mapData.visits.forEach(v => {
             if (v.lat && v.lon) {
-                const markerHtml = `<div class="custom-marker-rep" style="width: 24px; height: 24px; border-radius: 50%; background: #10b981; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white;"><i class="fa fa-sign-in" style="font-size: 10px;"></i></div>`;
+                const markerHtml = `<div class="custom-marker-checkin" style="width: 24px; height: 24px; border-radius: 50%; background: #10b981; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white;"><i class="fa fa-sign-in" style="font-size: 10px;"></i></div>`;
                 const icon = L.divIcon({
                     html: markerHtml,
                     className: 'custom-div-icon',
@@ -112,14 +123,14 @@ export class SalesRouteMap extends Component {
                     iconAnchor: [12, 12]
                 });
                 const m = L.marker([v.lat, v.lon], { icon: icon })
-                    .bindPopup(`<b>Check-In for:</b> ${v.name}<br/><b>Customer:</b> ${v.customer}<br/><b>Salesperson:</b> ${v.salesperson}`)
+                    .bindPopup(`<b>Check-In:</b> ${v.name}<br/><b>Salesperson:</b> ${v.salesperson}<br/><b>Status:</b> ${v.status}<br/><b>Outcome:</b> ${v.outcome}`)
                     .addTo(this.map);
                 this.markers.push(m);
                 bounds.push([v.lat, v.lon]);
             }
         });
 
-        // 3. Render Route path line (Red Pings)
+        // 3. Render Route path line (Small Red Dots)
         const routeCoords = [];
         this.state.mapData.routes.forEach(r => {
             routeCoords.push([r.lat, r.lon]);
@@ -141,6 +152,22 @@ export class SalesRouteMap extends Component {
         if (routeCoords.length > 1) {
             this.routeLine = L.polyline(routeCoords, { color: '#7c5dfa', weight: 4, opacity: 0.8 }).addTo(this.map);
         }
+
+        // 4. Render Live Salesperson Positions (Indigo Pins)
+        this.state.mapData.reps.forEach(rep => {
+            const markerHtml = `<div class="custom-marker-rep-live" style="width: 28px; height: 28px; border-radius: 50%; background: #4f46e5; border: 2.5px solid white; box-shadow: 0 3px 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; color: white;"><i class="fa fa-user" style="font-size: 11px;"></i></div>`;
+            const icon = L.divIcon({
+                html: markerHtml,
+                className: 'custom-div-icon',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+            const m = L.marker([rep.lat, rep.lon], { icon: icon })
+                .bindPopup(`<b>Sales Representative:</b> ${rep.name}<br/><b>Last Active:</b> ${rep.time}`)
+                .addTo(this.map);
+            this.markers.push(m);
+            bounds.push([rep.lat, rep.lon]);
+        });
 
         if (bounds.length > 0) {
             this.map.fitBounds(bounds, { padding: [50, 50] });
