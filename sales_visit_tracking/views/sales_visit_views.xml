@@ -5,7 +5,7 @@
         <field name="name">sales.visit.form</field>
         <field name="model">sales.visit</field>
         <field name="arch" type="xml">
-            <form string="Visit Log" create="false">
+            <form string="Visit Log" create="true">
                 <header>
                     <field name="state" widget="statusbar" statusbar_visible="assigned,in_progress,completed,missed"/>
                 </header>
@@ -17,12 +17,13 @@
                     </div>
                     <group>
                         <group string="Basic Information">
-                            <field name="lead_id" invisible="customer_type == 'customer'"/>
-                            <field name="partner_id" invisible="customer_type != 'customer'"/>
+                            <field name="assignment_type" widget="radio" options="{'horizontal': true}" readonly="state != 'assigned'"/>
+                            <field name="lead_id" invisible="assignment_type != 'lead'" required="assignment_type == 'lead'" readonly="state != 'assigned'"/>
+                            <field name="partner_id" invisible="assignment_type != 'customer'" required="assignment_type == 'customer'" readonly="state != 'assigned'"/>
                             <field name="customer_type"/>
-                            <field name="user_id" widget="many2one_avatar_user"/>
+                            <field name="user_id" widget="many2one_avatar_user" readonly="state in ('completed', 'missed')"/>
                             <field name="employee_id"/>
-                            <field name="visit_date"/>
+                            <field name="visit_date" readonly="state in ('completed', 'missed')"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                         <group string="Outcome Summary">

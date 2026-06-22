@@ -21,6 +21,10 @@ class SalesVisit(models.Model):
         readonly=True,
         default='/'
     )
+    assignment_type = fields.Selection([
+        ('lead', 'Sales Lead'),
+        ('customer', 'Existing Customer')
+    ], string='Assignment Type', default='lead', required=True, tracking=True)
     lead_id = fields.Many2one(
         'sales.visit.lead',
         string='Lead',
@@ -154,6 +158,25 @@ class SalesVisit(models.Model):
             order = self.env['sale.order'].search([('visit_id', '=', visit.id)], limit=1)
             visit.sale_order_id = order.id if order else False
 
+    @api.onchange('assignment_type')
+    def _onchange_assignment_type(self):
+        if self.assignment_type == 'lead':
+            self.partner_id = False
+        elif self.assignment_type == 'customer':
+            self.lead_id = False
+
+    @api.onchange('lead_id')
+    def _onchange_lead_id(self):
+        if self.lead_id:
+            self.partner_id = False
+            self.assignment_type = 'lead'
+
+    @api.onchange('partner_id')
+    def _onchange_partner_id(self):
+        if self.partner_id:
+            self.lead_id = False
+            self.assignment_type = 'customer'
+
 
     @api.depends('user_id')
     def _compute_employee_id(self):
@@ -192,7 +215,14 @@ class SalesVisit(models.Model):
         for vals in vals_list:
             if vals.get('name', '/') == '/':
                 vals['name'] = self.env['ir.sequence'].next_by_code('sales.visit') or '/'
+            # Infer assignment_type if not provided
+            if not vals.get('assignment_type'):
+                if vals.get('partner_id'):
+                    vals['assignment_type'] = 'customer'
+                else:
+                    vals['assignment_type'] = 'lead'
         return super(SalesVisit, self).create(vals_list)
+
 
     def write(self, vals):
         if 'user_id' in vals or 'visit_date' in vals:

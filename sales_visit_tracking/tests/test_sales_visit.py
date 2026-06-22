@@ -211,5 +211,33 @@ class TestSalesVisitWorkflow(common.TransactionCase):
         data = self.env['sales.visit'].get_dashboard_data()
         self.assertEqual(data['assignments']['completed'], 1)
         self.assertEqual(data['performance']['approved_leads'], 1)
-        # 1 success check-in / (1 success + 1 blocked) = 50% GPS compliance
         self.assertEqual(data['performance']['gps_compliance'], 50.0)
+
+    def test_06_assignment_type_inference(self):
+        """Test that assignment_type is correctly inferred on creation."""
+        lead = self.env['sales.visit.lead'].create({
+            'name': 'Test Lead Inf',
+            'mobile': '0790000000',
+            'user_id': self.rep_user.id,
+        })
+        
+        # Create with lead
+        visit_lead = self.env['sales.visit'].create({
+            'lead_id': lead.id,
+            'user_id': self.rep_user.id,
+            'visit_date': fields.Date.today(),
+        })
+        self.assertEqual(visit_lead.assignment_type, 'lead')
+
+        # Create with partner
+        partner = self.env['res.partner'].create({
+            'name': 'Test Partner Inf',
+            'user_id': self.rep_user.id,
+        })
+        visit_customer = self.env['sales.visit'].create({
+            'partner_id': partner.id,
+            'user_id': self.rep_user.id,
+            'visit_date': fields.Date.today(),
+        })
+        self.assertEqual(visit_customer.assignment_type, 'customer')
+
