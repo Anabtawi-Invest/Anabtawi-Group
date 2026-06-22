@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="point_of_sale.Orderline" t-inherit-mode="extension" owl="1">
+        <xpath expr="//span[hasclass('text-wrap')]/t[@t-esc='vals.name']" position="before">
+            <span t-if="line.is_gift" class="me-1">🎁</span>
+        </xpath>
+    </t>
+</templates>
