@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_delivery_transaction">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <h2>Deliveries</h2>
+
+                    <table class="table table-sm o_main_table">
+                        <tbody>
+                            <tr>
+                                <td><strong>Business Date</strong></td>
+                                <td>
+                                    <span t-esc="format_date(report_date)"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Locations</strong></td>
+                                <td>
+                                    <span t-esc="selected_location"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <table class="table table-sm o_main_table">
+                        <thead>
+                            <tr>
+                                <th>Location</th>
+                                <th>Transaction Time</th>
+                                <th>Employee</th>
+                                <th>Reference Info</th>
+                                <th class="text-end">Tender Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Delivery Amount</strong></td>
+                                <td/>
+                                <td/>
+                                <td/>
+                                <td class="text-end">
+                                    <strong t-esc="format_amount(company, total_tender, currency)"/>
+                                </td>
+                            </tr>
+                            <t t-foreach="lines" t-as="line">
+                                <tr>
+                                    <td t-esc="line['location_name']"/>
+                                    <td>
+                                        <span t-esc="format_datetime(context_timestamp(line['transaction_time']), dt_format='M/d/y h:mm a')"/>
+                                    </td>
+                                    <td t-esc="line['employee_name']"/>
+                                    <td t-esc="line['reference_info']"/>
+                                    <td class="text-end" t-esc="format_amount(company, line['tender_total'], currency)"/>
+                                </tr>
+                            </t>
+                            <tr t-if="not lines">
+                                <td colspan="5" class="text-center">No transactions found for the selected filters.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
