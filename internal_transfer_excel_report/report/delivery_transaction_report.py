@@ -6,9 +6,8 @@ from odoo import fields, models
 
 
 class ReportDeliveryTransaction(models.AbstractModel):
-    _name = "report.internal_transfer_excel_report.report_delivery_transaction"
+    _name = "report.internal_transfer_excel_report.delivery_txn"
     _description = "Delivery Transaction Report"
-    _table = "itr_report_delivery_txn"
 
     def _get_report_values(self, docids, data=None):
         data = data or {}
