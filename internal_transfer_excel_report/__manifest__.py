@@ -1,6 +1,6 @@
 {
     'name': 'Internal Transfer Excel Report-Anabtawi',
-    'version': '1.1',
+    'version': '1.2',
     "author":"Anabtawi",
     'depends': ['stock', 'point_of_sale'],
     'data': [
