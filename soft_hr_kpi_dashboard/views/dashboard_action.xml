@@ -1,6 +1,0 @@
-<odoo>
-<record id="action_hr_kpi_dashboard" model="ir.actions.client">
-<field name="name">HR KPI Dashboard</field>
-<field name="tag">soft_hr_kpi_dashboard.dashboard</field>
-</record>
-</odoo>
