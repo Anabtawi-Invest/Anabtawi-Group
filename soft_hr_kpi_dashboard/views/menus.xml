@@ -1,0 +1,3 @@
+<odoo>
+<menuitem id="menu_hr_kpi_dashboard" name="HR KPI Dashboard" action="action_hr_kpi_dashboard"/>
+</odoo>
