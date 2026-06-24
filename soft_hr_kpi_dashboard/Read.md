@@ -1,4 +1,4 @@
-# HR KPI Dashboard Module
+# HR KPI Dashboard Module 
 
 ## Overview
 The HR KPI Dashboard is a comprehensive Odoo 19 module that provides dynamic KPI tracking and analytics for Human Resources departments. It allows organizations to monitor key performance indicators across multiple dimensions.
