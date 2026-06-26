@@ -74,20 +74,15 @@ class ProductPricelist(models.Model):
                                 rule.compute_price,
                                 rule.cap_eligible,
                             )
-                            discounted_unit_price = rule._compute_price(
-                                product,
-                                qty,
-                                product.uom_id,
-                                date,
-                                pricelist.currency_id,
-                            )
-                            base_unit_price = rule._compute_price_before_discount(
-                                product,
-                                qty,
-                                product.uom_id,
-                                date,
-                                pricelist.currency_id,
-                            )
+                            price_kwargs = {
+                                "product": product,
+                                "quantity": qty,
+                                "uom": product.uom_id,
+                                "date": date,
+                                "currency": pricelist.currency_id,
+                            }
+                            discounted_unit_price = rule._compute_price(**price_kwargs)
+                            base_unit_price = rule._compute_price_before_discount(**price_kwargs)
                             cap_eligible = bool(rule.cap_eligible)
                         else:
                             discounted_unit_price, _rule_id = pricelist._get_product_price_rule(
