@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Custom Hero Snippet Markup (English Only) -->
+    <template id="snippet_anabtawi_hero" name="Anabtawi Invest Hero">
+        <section class="anabtawi-hero-section d-flex align-items-center justify-content-center text-center position-relative overflow-hidden bg-charcoal" style="min-height: 80vh;">
+            <div class="anabtawi-hero-overlay"></div>
+            <div class="container position-relative z-index-2 text-white scroll-fade-in py-5">
+                <!-- Emblem Placeholder -->
+                <div class="invest-emblem-placeholder d-flex align-items-center justify-content-center mx-auto mb-4">
+                    <svg viewBox="0 0 100 100" class="anabtawi-logo-svg" width="64" height="64">
+                        <path d="M 5.00 78.53 L 7.87 80.52 L 12.08 82.51 L 19.15 84.50 L 28.44 84.50 L 32.64 83.39 L 36.18 81.84 L 41.71 78.08 L 46.57 73.00 L 39.94 70.57 L 39.28 69.90 L 38.39 69.90 L 35.96 72.56 L 30.87 75.65 L 27.33 76.76 L 21.36 76.76 L 15.61 74.77 L 18.49 71.01 L 21.36 68.57 L 24.46 66.81 L 27.11 65.92 L 32.64 65.26 L 37.95 65.92 L 45.25 68.57 L 46.57 69.46 L 48.12 71.67 L 51.88 75.43 L 58.73 80.52 L 64.93 83.17 L 68.91 84.05 L 75.98 84.05 L 82.40 82.29 L 86.38 80.29 L 91.02 77.20 L 95.00 73.44 L 90.58 67.47 L 86.60 63.71 L 80.18 59.95 L 75.54 58.40 L 70.23 57.74 L 63.38 58.40 L 59.40 59.51 L 54.75 61.50 L 60.95 67.69 L 63.38 66.58 L 67.36 65.70 L 72.22 65.70 L 77.09 67.25 L 80.63 69.90 L 80.85 69.68 L 83.72 72.56 L 81.51 74.10 L 78.86 75.21 L 74.88 76.09 L 70.68 76.09 L 66.03 74.99 L 62.71 73.44 L 58.96 70.79 L 53.43 65.04 L 51.88 62.83 L 56.74 56.19 L 58.96 51.99 L 60.72 46.90 L 61.61 40.49 L 61.39 36.73 L 60.28 32.09 L 57.63 26.34 L 53.43 21.03 L 48.12 16.17 L 46.79 15.50 L 41.71 20.59 L 37.29 28.11 L 35.52 34.08 L 35.29 41.38 L 37.29 49.34 L 40.16 54.86 L 41.93 56.86 L 46.79 50.00 L 43.70 44.03 L 43.03 40.71 L 43.03 36.73 L 44.80 30.98 L 46.57 28.11 L 47.90 26.78 L 50.33 29.66 L 52.10 32.97 L 53.43 38.72 L 52.99 44.47 L 52.10 47.35 L 49.67 52.21 L 47.01 55.97 L 43.92 59.29 L 36.62 57.52 L 29.55 57.30 L 24.68 58.18 L 20.04 59.95 L 14.95 63.49 L 10.97 67.69 L 8.10 71.89 Z" fill="currentColor" />
+                    </svg>
+                </div>
+                <span class="text-uppercase tracking-widest brand-gold mb-3 d-inline-block font-weight-light font-size-sm">The Legacy of Excellence</span>
+                <h1 class="display-3 font-serif mb-4 font-weight-bold brand-gold-gradient">ANABTAWI INVEST</h1>
+                <p class="lead max-w-xl mx-auto mb-5 text-muted-white font-weight-light">
+                    Preserving legacy, cultivating future wealth. We invest in high-growth industries with the timeless precision of generational expertise.
+                </p>
+                <div class="d-flex justify-content-center gap-3 flex-wrap">
+                    <a href="/about-invest" class="btn btn-outline-gold px-4 py-3 text-uppercase tracking-wider">Explore Portfolio</a>
+                    <a href="/contactus" class="btn btn-burgundy px-4 py-3 text-uppercase tracking-wider text-white font-weight-bold">Connect With Us</a>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <!-- Custom Subsidiaries Marquee Snippet Markup (English Only) -->
+    <template id="snippet_anabtawi_portfolio" name="Anabtawi Companies Loop">
+        <section class="anabtawi-companies-section py-6 bg-matte text-white">
+            <div class="container">
+                <div class="text-center mb-5 scroll-fade-in">
+                    <span class="text-uppercase tracking-wider brand-gold d-inline-block mb-2 font-weight-bold">Our Subsidiaries</span>
+                    <h2 class="h1 font-serif text-white font-weight-bold">Investment Sectors</h2>
+                    <div class="divider-gold mx-auto my-3"></div>
+                </div>
+            </div>
+            
+            <!-- Scrolling Marquee Ticker Track (Loop Right to Left, English only) -->
+            <div class="marquee-container py-4 overflow-hidden position-relative">
+                <div class="marquee-track d-flex">
+                    <!-- 6 original interactive cards -->
+                    <a href="/companies/anabtawi-sweets" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="Anabtawi Sweets" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">Anabtawi Sweets</div>
+                    </a>
+                    <a href="/companies/united-food" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="United Food Trading" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">United Food Trading</div>
+                    </a>
+                    <a href="/companies/anabtawi-coffee" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="Anabtawi Coffee" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">Anabtawi Coffee</div>
+                    </a>
+                    <a href="/companies/ein-jaloot" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="Ein Jaloot" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">Ein Jaloot</div>
+                    </a>
+                    <a href="/companies/tryaq-honey" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="Tryaq Honey" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">Tryaq Honey</div>
+                    </a>
+                    <a href="/companies/holy-land-sweets" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="Holy Land Sweets" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">Holy Land Sweets</div>
+                    </a>
+                    
+                    <!-- Duplicate items to create a seamless infinite scrolling loop -->
+                    <a href="/companies/anabtawi-sweets" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="Anabtawi Sweets" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">Anabtawi Sweets</div>
+                    </a>
+                    <a href="/companies/united-food" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="United Food Trading" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">United Food Trading</div>
+                    </a>
+                    <a href="/companies/anabtawi-coffee" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="Anabtawi Coffee" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">Anabtawi Coffee</div>
+                    </a>
+                    <a href="/companies/ein-jaloot" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="Ein Jaloot" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">Ein Jaloot</div>
+                    </a>
+                    <a href="/companies/tryaq-honey" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="Tryaq Honey" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">Tryaq Honey</div>
+                    </a>
+                    <a href="/companies/holy-land-sweets" class="marquee-item text-decoration-none flex-shrink-0">
+                        <div class="company-logo-placeholder">
+                            <img src="/web/static/img/placeholder.png" alt="Holy Land Sweets" class="company-logo-img"/>
+                        </div>
+                        <div class="company-name text-center mt-3 font-serif text-white">Holy Land Sweets</div>
+                    </a>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <!-- Register custom snippets in the website editor sidebar under 'Anabtawi Invest' category -->
+    <template id="snippets" inherit_id="website.snippets" name="Anabtawi Invest Snippets">
+        <xpath expr="//t[@id='installed_snippets_hook']" position="after">
+            <t snippet-group="anabtawi" t-snippet="website.s_snippet_group" string="Anabtawi Invest"
+               t-thumbnail="/website/static/src/img/snippets_thumbs/s_cover.svg"/>
+        </xpath>
+        <xpath expr="//snippets[@id='snippet_structure']" position="inside">
+            <t t-snippet="anabtawi_invest_website.snippet_anabtawi_hero"
+               string="Anabtawi Invest Hero"
+               group="anabtawi"
+               t-thumbnail="/website/static/src/img/snippets_thumbs/s_cover.svg"/>
+            <t t-snippet="anabtawi_invest_website.snippet_anabtawi_portfolio"
+               string="Anabtawi Companies Loop"
+               group="anabtawi"
+               t-thumbnail="/website/static/src/img/snippets_thumbs/s_three_columns.svg"/>
+        </xpath>
+    </template>
+</odoo>

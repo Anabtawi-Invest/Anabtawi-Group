@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="anabtawi_homepage" inherit_id="website.homepage" name="Anabtawi Homepage">
+        <xpath expr="//div[@id='wrap']" position="replace">
+            <div id="wrap" class="oe_structure">
+                
+                <!-- Hero Static Banner Section (No Video) -->
+                <section class="hero-static text-center text-md-start">
+                    <!-- Rotating Decorative Frame -->
+                    <div class="art-header d-none d-md-block">
+                        <img alt="anabtawi decoration" src="https://anabtawisweets.com/images/art.png" class="img-fluid" />
+                    </div>
+                    <div class="container" style="position: relative; z-index: 5;">
+                        <div class="row align-items-center">
+                            <div class="col-md-7 text-end py-5">
+                                <h1 class="hero-static-title mb-4">عراقة المذاق وسحر <span>الحلويات الشرقية</span></h1>
+                                <p class="hero-static-text mb-4 text-muted">
+                                    تأسست شركة حلويات عنبتاوي في عام 1983، وقد ترسخت كرمز للتميز في صناعة الحلويات العربية والغربية الفاخرة المحضرة بشغف وحرفية عالية لترضي جميع الأذواق.
+                                </p>
+                                <div class="d-flex flex-wrap gap-3 justify-content-start">
+                                    <a href="/our-catalog" class="btn btn-more">تصفح المنتجات</a>
+                                    <a href="/branches" class="btn btn-anabtawi-primary">فروعنا</a>
+                                </div>
+                            </div>
+                            <div class="col-md-5 text-center d-none d-md-block">
+                                <img src="https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&amp;fit=crop&amp;w=600&amp;q=80" alt="حلويات عنبتاوي فاخرة" class="img-fluid rounded shadow-sm border border-light" style="max-width: 85%; transform: rotate(1deg);" />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Scroll-Driven Video Scrubbing Section -->
+                <section class="scroll-video-section">
+                    <div class="video-sticky-wrapper">
+                        <!-- Canvas replacing video for smooth scrubbing -->
+                        <canvas id="scrub-canvas"></canvas>
+                        <!-- Inline Loader to show preloading state -->
+                        <div class="video-loader d-flex flex-column align-items-center justify-content-center position-absolute top-0 start-0 w-100 h-100 bg-charcoal">
+                            <svg viewBox="0 0 100 100" class="anabtawi-logo-svg brand-gold mb-3 animate-pulse" width="64" height="64" style="color: #c89211;">
+                                <path d="M 5.00 78.53 L 7.87 80.52 L 12.08 82.51 L 19.15 84.50 L 28.44 84.50 L 32.64 83.39 L 36.18 81.84 L 41.71 78.08 L 46.57 73.00 L 39.94 70.57 L 39.28 69.90 L 38.39 69.90 L 35.96 72.56 L 30.87 75.65 L 27.33 76.76 L 21.36 76.76 L 15.61 74.77 L 18.49 71.01 L 21.36 68.57 L 24.46 66.81 L 27.11 65.92 L 32.64 65.26 L 37.95 65.92 L 45.25 68.57 L 46.57 69.46 L 48.12 71.67 L 51.88 75.43 L 58.73 80.52 L 64.93 83.17 L 68.91 84.05 L 75.98 84.05 L 82.40 82.29 L 86.38 80.29 L 91.02 77.20 L 95.00 73.44 L 90.58 67.47 L 86.60 63.71 L 80.18 59.95 L 75.54 58.40 L 70.23 57.74 L 63.38 58.40 L 59.40 59.51 L 54.75 61.50 L 60.95 67.69 L 63.38 66.58 L 67.36 65.70 L 72.22 65.70 L 77.09 67.25 L 80.63 69.90 L 80.85 69.68 L 83.72 72.56 L 81.51 74.10 L 78.86 75.21 L 74.88 76.09 L 70.68 76.09 L 66.03 74.99 L 62.71 73.44 L 58.96 70.79 L 53.43 65.04 L 51.88 62.83 L 56.74 56.19 L 58.96 51.99 L 60.72 46.90 L 61.61 40.49 L 61.39 36.73 L 60.28 32.09 L 57.63 26.34 L 53.43 21.03 L 48.12 16.17 L 46.79 15.50 L 41.71 20.59 L 37.29 28.11 L 35.52 34.08 L 35.29 41.38 L 37.29 49.34 L 40.16 54.86 L 41.93 56.86 L 46.79 50.00 L 43.70 44.03 L 43.03 40.71 L 43.03 36.73 L 44.80 30.98 L 46.57 28.11 L 47.90 26.78 L 50.33 29.66 L 52.10 32.97 L 53.43 38.72 L 52.99 44.47 L 52.10 47.35 L 49.67 52.21 L 47.01 55.97 L 43.92 59.29 L 36.62 57.52 L 29.55 57.30 L 24.68 58.18 L 20.04 59.95 L 14.95 63.49 L 10.97 67.69 L 8.10 71.89 Z" fill="currentColor" />
+                            </svg>
+                            <span class="text-uppercase tracking-wider brand-gold font-size-sm mb-2" style="color: #c89211; font-weight: bold; font-size: 0.85rem; letter-spacing: 0.15em;">Loading Experience</span>
+                            <div class="progress animate-pulse-progress" style="width: 200px; height: 3px; background-color: rgba(200, 146, 17, 0.2); border-radius: 0;">
+                                <div class="progress-bar" style="width: 0%; transition: width 0.1s linear; background-color: #c89211;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Categories Section -->
+                <section class="welcome py-5">
+                    <div class="art-body d-none d-lg-block">
+                        <img alt="anabtawi decoration" src="https://anabtawisweets.com/images/art.png" class="img-fluid" />
+                    </div>
+                    <div class="container text-center">
+                        <div class="title-small">
+                            <span>الفئات</span>
+                        </div>
+                        <h2 class="title mt-3">الفئات الرئيسية</h2>
+                        
+                        <div class="row g-4 mt-4">
+                            <!-- Category 1 -->
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog">
+                                            <img alt="كنافة و وربات" src="https://anabtawisweets.com/Admin_Site/Categories/Images/f97e8eb6-6fb8-4686-bce4-220e8cd647b1.png" class="img-fluid" />
+                                        </a>
+                                        <div class="amazingcarousel-title">كنافة و وربات</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Category 2 -->
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog">
+                                            <img alt="حلويات مشكلة" src="https://anabtawisweets.com/Admin_Site/Categories/Images/a7363817-c0ab-43fa-bd90-df80cf4dd957.png" class="img-fluid" />
+                                        </a>
+                                        <div class="amazingcarousel-title">حلويات مشكلة</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Category 3 -->
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog">
+                                            <img alt="كيك و حلويات غربية" src="https://anabtawisweets.com/Admin_Site/Categories/Images/e4f63e6f-8831-42cf-821d-9875ae691ae2.png" class="img-fluid" />
+                                        </a>
+                                        <div class="amazingcarousel-title">كيك و حلويات غربية</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Category 4 -->
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog">
+                                            <img alt="حلويات شرقية" src="https://anabtawisweets.com/Admin_Site/Categories/Images/be7e94e7-53b0-4b94-b95d-b0cd392d9d3f.png" class="img-fluid" />
+                                        </a>
+                                        <div class="amazingcarousel-title">حلويات شرقية</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Category 5 -->
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog">
+                                            <img alt="شوكولاته و هدايا" src="https://anabtawisweets.com/Admin_Site/Categories/Images/50fa5218-6f32-48a8-96fc-e92bdfe2717e.png" class="img-fluid" />
+                                        </a>
+                                        <div class="amazingcarousel-title">شوكولاته و هدايا</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Category 6 -->
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog">
+                                            <img alt="قهوة" src="https://anabtawisweets.com/Admin_Site/Categories/Images/28c43f2b-2cb9-48ea-a575-6d3888c38cb7.png" class="img-fluid" />
+                                        </a>
+                                        <div class="amazingcarousel-title">قهوة</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Category 7 -->
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog">
+                                            <img alt="عسل الترياق" src="https://anabtawisweets.com/Admin_Site/Categories/Images/ecf685d5-acab-4bac-bf51-4749efead605.png" class="img-fluid" />
+                                        </a>
+                                        <div class="amazingcarousel-title">عسل الترياق​</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Category 8 -->
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog">
+                                            <img alt="كعك و معمول" src="https://anabtawisweets.com/Admin_Site/Categories/Images/8b0152bc-77f7-4a06-9945-98aaf79bae21.png" class="img-fluid" />
+                                        </a>
+                                        <div class="amazingcarousel-title">كعك و معمول</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Latest News Section -->
+                <section class="news bg-anabtawi-gray py-5">
+                    <div class="art-body2 d-none d-lg-block">
+                        <img alt="anabtawi decoration" src="https://anabtawisweets.com/images/art.png" class="img-fluid" />
+                    </div>
+                    <div class="container text-center">
+                        <div class="title-small">
+                            <span>المدونة والأحداث</span>
+                        </div>
+                        <h2 class="title mt-3">آخر الأخبار لدينا</h2>
+                        
+                        <div class="row g-4 justify-content-center mt-4">
+                            <!-- Article 1 -->
+                            <div class="col-md-4">
+                                <div class="news-card-li h-100 text-end">
+                                    <img alt="Youth For Growth" src="https://anabtawisweets.com/Admin_Site/Articles/Images/5/0/dd27d0a3-559e-47f9-b517-754daf1b24ff.png" class="img-fluid mb-3" />
+                                    <div class="title-1">24, Jun, 2024</div>
+                                    <div class="text">Youth For Growth</div>
+                                    <a href="/aboutus" class="btn-more mt-2">إقرأ المزيد</a>
+                                </div>
+                            </div>
+                            
+                            <!-- Article 2 -->
+                            <div class="col-md-4">
+                                <div class="news-card-li h-100 text-end">
+                                    <img alt="Sial Canada 2024" src="https://anabtawisweets.com/Admin_Site/Articles/Images/5/0/dcce2016-1c2b-48cf-95e4-64a6fa6d711d.png" class="img-fluid mb-3" />
+                                    <div class="title-1">15, May, 2024</div>
+                                    <div class="text">Sial Canada 2024</div>
+                                    <a href="/aboutus" class="btn-more mt-2">إقرأ المزيد</a>
+                                </div>
+                            </div>
+                            
+                            <!-- Article 3 -->
+                            <div class="col-md-4">
+                                <div class="news-card-li h-100 text-end">
+                                    <img alt="Ramadan Iftar" src="https://anabtawisweets.com/Admin_Site/Articles/Images/5/0/7d565e81-5025-4d4b-8122-201d354619ea.png" class="img-fluid mb-3" />
+                                    <div class="title-1">30, Mar, 2024</div>
+                                    <div class="text">Ramadan Iftar</div>
+                                    <a href="/aboutus" class="btn-more mt-2">إقرأ المزيد</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Partner Banner Section -->
+                <section class="offer-banner" style="background: url('https://anabtawisweets.com/Admin_Site/Articles/Images/4/0/882568f9-9b7c-4dfe-b0a4-d3741732ed3f.png') no-repeat left center;">
+                    <div class="container text-center text-white">
+                        <div class="title2-gold2">
+                            <h1>حلويات العنبتاوي</h1>
+                        </div>
+                        <div class="title-gold2"><span>كن</span> شريكا</div>
+                        <p>هل أنت مستعد لتوسيع آفاقك والاستفادة من الإمكانات الهائلة للأسواق الدولية؟ انضم إلى شبكتنا من الشركاء وابدأ رحلة التصدير مع عنبتاوي. نحن نؤمن بقوة التصدير وقدرته على دعم النمو وزيادة الإيرادات وفتح الأبواب أمام آفاق أعمال جديدة. كن شريكًا لنا ، وافتح عالماً من الاحتمالات اللانهائية.</p>
+                        <div class="contacts d-flex flex-wrap justify-content-center align-items-center gap-3">
+                            <div><i class="fa fa-phone me-2"></i>+962 7 9910 7555</div>
+                            <div class="partner"><a href="/contactus">تواصل معنا الان</a></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sister Brands / Infinite Scrolling Marquee Section -->
+                <section id="companies" class="py-5 text-white" style="background-color: #1a1a1a;">
+                    <div class="container">
+                        <div class="text-center mb-5">
+                            <span class="text-uppercase tracking-wider d-inline-block mb-2 font-weight-bold" style="color: #c89211; letter-spacing: 0.15em; font-size: 0.9rem;">OUR WEBSITES</span>
+                            <h2 class="h1 font-serif text-white font-weight-bold" style="font-family: 'Cairo', 'Tajawal', sans-serif;">مواقعنا</h2>
+                            <div class="divider-gold mx-auto my-3" style="width: 60px; height: 2px; background-color: #c89211;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Infinite Scrolling Marquee Track -->
+                    <div class="marquee-container py-4" dir="ltr">
+                        <div class="marquee-track">
+                            
+                            <!-- Subsidiary 1: Anabtawi Sweets -->
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <path d="M 20,70 L 20,45 L 35,55 L 50,35 L 65,55 L 80,45 L 80,70 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                                        <circle cx="20" cy="40" r="4" fill="currentColor"/>
+                                        <circle cx="35" cy="50" r="4" fill="currentColor"/>
+                                        <circle cx="50" cy="30" r="4" fill="currentColor"/>
+                                        <circle cx="65" cy="50" r="4" fill="currentColor"/>
+                                        <circle cx="80" cy="40" r="4" fill="currentColor"/>
+                                        <line x1="15" y1="75" x2="85" y2="75" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">Anabtawi Sweets</div>
+                                </div>
+                            </div>
+
+                            <!-- Subsidiary 2: United Food Trading -->
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <path d="M 50,15 C 25,15 25,50 50,85 C 75,50 75,15 50,15 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                                        <line x1="50" y1="15" x2="50" y2="85" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M 32,40 C 42,45 58,45 68,40" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M 30,55 C 40,60 60,60 70,55" fill="none" stroke="currentColor" stroke-width="2"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">United Food</div>
+                                </div>
+                            </div>
+
+                            <!-- Subsidiary 3: Anabtawi Coffee -->
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <ellipse cx="50" cy="50" rx="25" ry="38" transform="rotate(-30 50 50)" fill="none" stroke="currentColor" stroke-width="4"/>
+                                        <path d="M 35,25 C 45,35 40,65 65,75" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">Anabtawi Coffee</div>
+                                </div>
+                            </div>
+
+                            <!-- Subsidiary 4: Ein Jaloot -->
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <path d="M 20,80 L 20,30 L 32,30 L 32,40 L 44,40 L 44,30 L 56,30 L 56,40 L 68,40 L 68,30 L 80,30 L 80,80 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                                        <path d="M 40,80 L 40,60 C 40,50 60,50 60,60 L 60,80" fill="none" stroke="currentColor" stroke-width="4"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">Ein Jaloot</div>
+                                </div>
+                            </div>
+
+                            <!-- Subsidiary 5: Tryaq Honey -->
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <polygon points="50,25 71,37 71,63 50,75 29,63 29,37" fill="none" stroke="currentColor" stroke-width="4"/>
+                                        <polygon points="50,42 61,48 61,60 50,66 39,60 39,48" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <line x1="50" y1="25" x2="50" y2="10" stroke="currentColor" stroke-width="3"/>
+                                        <line x1="71" y1="63" x2="82" y2="70" stroke="currentColor" stroke-width="3"/>
+                                        <line x1="29" y1="63" x2="18" y2="70" stroke="currentColor" stroke-width="3"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">Tryaq Honey</div>
+                                </div>
+                            </div>
+
+                            <!-- Subsidiary 6: Holy Land Sweets -->
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <path d="M 15,85 C 30,60 70,40 85,25" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                                        <path d="M 50,52 C 55,42 68,38 72,44 C 76,50 66,58 50,52 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                                        <path d="M 35,63 C 38,53 50,48 55,55 C 60,62 48,70 35,63 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                                        <path d="M 62,44 C 68,32 80,30 82,38 C 84,46 72,50 62,44 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">Holy Land Sweets</div>
+                                </div>
+                            </div>
+
+                            <!-- DUPLICATES FOR INFINITE SCROLL LOOP -->
+                            
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <path d="M 20,70 L 20,45 L 35,55 L 50,35 L 65,55 L 80,45 L 80,70 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                                        <circle cx="20" cy="40" r="4" fill="currentColor"/>
+                                        <circle cx="35" cy="50" r="4" fill="currentColor"/>
+                                        <circle cx="50" cy="30" r="4" fill="currentColor"/>
+                                        <circle cx="65" cy="50" r="4" fill="currentColor"/>
+                                        <circle cx="80" cy="40" r="4" fill="currentColor"/>
+                                        <line x1="15" y1="75" x2="85" y2="75" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">Anabtawi Sweets</div>
+                                </div>
+                            </div>
+
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <path d="M 50,15 C 25,15 25,50 50,85 C 75,50 75,15 50,15 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                                        <line x1="50" y1="15" x2="50" y2="85" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M 32,40 C 42,45 58,45 68,40" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M 30,55 C 40,60 60,60 70,55" fill="none" stroke="currentColor" stroke-width="2"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">United Food</div>
+                                </div>
+                            </div>
+
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <ellipse cx="50" cy="50" rx="25" ry="38" transform="rotate(-30 50 50)" fill="none" stroke="currentColor" stroke-width="4"/>
+                                        <path d="M 35,25 C 45,35 40,65 65,75" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">Anabtawi Coffee</div>
+                                </div>
+                            </div>
+
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <path d="M 20,80 L 20,30 L 32,30 L 32,40 L 44,40 L 44,30 L 56,30 L 56,40 L 68,40 L 68,30 L 80,30 L 80,80 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+                                        <path d="M 40,80 L 40,60 C 40,50 60,50 60,60 L 60,80" fill="none" stroke="currentColor" stroke-width="4"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">Ein Jaloot</div>
+                                </div>
+                            </div>
+
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <polygon points="50,25 71,37 71,63 50,75 29,63 29,37" fill="none" stroke="currentColor" stroke-width="4"/>
+                                        <polygon points="50,42 61,48 61,60 50,66 39,60 39,48" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <line x1="50" y1="25" x2="50" y2="10" stroke="currentColor" stroke-width="3"/>
+                                        <line x1="71" y1="63" x2="82" y2="70" stroke="currentColor" stroke-width="3"/>
+                                        <line x1="29" y1="63" x2="18" y2="70" stroke="currentColor" stroke-width="3"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">Tryaq Honey</div>
+                                </div>
+                            </div>
+
+                            <div class="marquee-item">
+                                <div class="company-logo-placeholder">
+                                    <svg viewBox="0 0 100 100">
+                                        <path d="M 15,85 C 30,60 70,40 85,25" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                                        <path d="M 50,52 C 55,42 68,38 72,44 C 76,50 66,58 50,52 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                                        <path d="M 35,63 C 38,53 50,48 55,55 C 60,62 48,70 35,63 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                                        <path d="M 62,44 C 68,32 80,30 82,38 C 84,46 72,50 62,44 Z" fill="none" stroke="currentColor" stroke-width="3"/>
+                                    </svg>
+                                    <div class="company-name text-center mt-3 font-serif">Holy Land Sweets</div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </xpath>
+    </template>
+</odoo>

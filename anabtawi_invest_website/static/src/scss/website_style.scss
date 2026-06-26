@@ -1,0 +1,426 @@
+/* ==========================================================================
+   Anabtawi Invest Premium Sweets-Inspired Luxury Dark Theme
+   ========================================================================== */
+
+// Brand Style Variables (Inspired by anabtawisweets.com official corporate layout)
+$anabtawi-charcoal: #111111;
+$anabtawi-matte: #1a1a1a;
+$anabtawi-velvet: #0c0c0c;
+$anabtawi-maroon: #5B1527;
+$anabtawi-maroon-dark: #2B0C14;
+$anabtawi-maroon-hover: #450f1d;
+$anabtawi-gold: #C5A059;
+$anabtawi-gold-hover: #B08D4B;
+$anabtawi-gold-subtle: rgba(197, 160, 89, 0.25);
+$anabtawi-text-white: #ffffff;
+$anabtawi-text-muted: rgba(255, 255, 255, 0.7);
+
+// Scoped Theme Wrapping Overrides (Ensures zero interference with Odoo backend)
+.anabtawi-theme {
+    background-color: $anabtawi-charcoal !important;
+    color: #e0e0e0 !important;
+    font-family: 'Outfit', sans-serif !important;
+
+    // Headings Override
+    h1, h2, h3, h4, h5, h6,
+    .h1, .h2, .h3, .h4, .h5, .h6 {
+        font-family: 'Cinzel', Georgia, serif !important;
+        color: $anabtawi-text-white !important;
+        letter-spacing: 0.05em;
+    }
+
+    // Paragraphs and Normal text overrides
+    p, span, div, li, ul, label, a {
+        font-family: 'Outfit', sans-serif !important;
+    }
+
+    // Helper Spacing Utility (generous padding for premium look)
+    &.py-6, .py-6 {
+        padding-top: 6rem !important;
+        padding-bottom: 6rem !important;
+    }
+
+    // Specific Layout Colors
+    .bg-charcoal {
+        background-color: $anabtawi-charcoal !important;
+    }
+
+    .bg-matte {
+        background-color: $anabtawi-matte !important;
+    }
+
+    .bg-dark-velvet {
+        background-color: $anabtawi-velvet !important;
+    }
+
+    .brand-gold {
+        color: $anabtawi-gold !important;
+    }
+
+    .text-muted-white {
+        color: $anabtawi-text-muted !important;
+    }
+
+    // Gradient Text Effect for Main Branding Titles
+    .brand-gold-gradient {
+        background: linear-gradient(135deg, #ffffff 30%, $anabtawi-gold 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
+    }
+
+    // Typography Accents
+    .tracking-widest {
+        letter-spacing: 0.3em !important;
+    }
+
+    .tracking-wider {
+        letter-spacing: 0.15em !important;
+    }
+
+    .font-size-sm {
+        font-size: 0.85rem !important;
+    }
+
+    // Elegant Divider
+    .divider-gold {
+        width: 60px;
+        height: 2px;
+        background-color: $anabtawi-gold;
+    }
+
+    // Premium Buttons
+    .btn-burgundy {
+        background-color: $anabtawi-maroon !important;
+        border: 1px solid $anabtawi-maroon !important;
+        color: $anabtawi-text-white !important;
+        font-family: 'Outfit', sans-serif !important;
+        font-size: 0.85rem;
+        letter-spacing: 0.15em;
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        border-radius: 0 !important;
+
+        &:hover {
+            background-color: $anabtawi-maroon-hover !important;
+            border-color: $anabtawi-gold !important;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+    }
+
+    .btn-outline-gold {
+        background-color: transparent !important;
+        border: 1px solid $anabtawi-gold !important;
+        color: $anabtawi-gold !important;
+        font-family: 'Outfit', sans-serif !important;
+        font-size: 0.85rem;
+        letter-spacing: 0.15em;
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        border-radius: 0 !important;
+
+        &:hover {
+            background-color: rgba(197, 160, 89, 0.1) !important;
+            color: $anabtawi-text-white !important;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+    }
+
+    // Cinematic Hero Options
+    .anabtawi-hero-section, .anabtawi-page-header {
+        background-color: $anabtawi-charcoal;
+        min-height: 70vh;
+        position: relative;
+        border-bottom: 1px solid $anabtawi-gold-subtle;
+    }
+
+    .anabtawi-hero-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle, rgba(91, 21, 39, 0.2) 0%, rgba(17, 17, 17, 0.95) 85%);
+        z-index: 1;
+    }
+
+    // Emblem Placeholder above hero title
+    .invest-emblem-placeholder {
+        width: 80px;
+        height: 80px;
+        color: $anabtawi-gold;
+        transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+
+        .anabtawi-logo-svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        &:hover {
+            transform: scale(1.1) rotate(10deg);
+            filter: drop-shadow(0 0 15px rgba(197, 160, 89, 0.75));
+        }
+    }
+
+    // Infinite Scrolling Ticker (Marquee) - Refactored for a single ultra-smooth horizontal row
+    .marquee-container {
+        width: 100%;
+        overflow: hidden;
+        position: relative;
+        mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+        -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    }
+
+    .marquee-track {
+        display: flex;
+        white-space: nowrap;
+        width: max-content;
+        animation: marquee-scroll 25s linear infinite;
+
+        &:hover {
+            animation-play-state: paused;
+        }
+    }
+
+    .marquee-item {
+        width: 260px; // Significantly larger marquee items
+        flex-shrink: 0; // Prevent stacking or breaking into two rows
+        margin: 0 40px; // Cleanly spaced margins
+        display: inline-block;
+        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+
+        // Dark, elegantly bordered card container logo placeholder
+        .company-logo-placeholder {
+            width: 220px;
+            height: 220px;
+            background-color: $anabtawi-velvet;
+            border-radius: 4px;
+            border: 1px solid rgba(197, 160, 89, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.4s ease;
+            margin: 0 auto;
+
+            // Enforce strict logo scaling rules
+            img.company-logo-img {
+                width: 160px;
+                height: 160px;
+                object-fit: contain;
+                display: block;
+                margin: 0 auto;
+                transition: transform 0.4s ease;
+            }
+        }
+
+        .company-name {
+            font-size: 1.1rem;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        &:hover {
+            transform: translateY(-8px);
+
+            .company-logo-placeholder {
+                border-color: $anabtawi-gold !important;
+                background-color: $anabtawi-maroon-dark !important;
+                box-shadow: 0 10px 25px rgba(91, 21, 36, 0.5);
+
+                img.company-logo-img {
+                    transform: scale(1.08);
+                }
+            }
+
+            .company-name {
+                color: $anabtawi-gold !important;
+            }
+        }
+    }
+
+    // Corporate Maroon Footer
+    .footer-maroon-bg {
+        background-color: $anabtawi-maroon-dark !important;
+        border-top: 1px solid $anabtawi-gold-subtle;
+    }
+
+    .footer-links {
+        a {
+            color: $anabtawi-text-muted;
+            transition: all 0.3s ease;
+            display: inline-block;
+
+            i {
+                font-size: 0.8rem;
+                opacity: 0;
+                transition: transform 0.3s ease, opacity 0.3s ease;
+                transform: translateX(-5px);
+            }
+
+            &:hover {
+                color: $anabtawi-gold !important;
+                padding-left: 6px;
+                text-decoration: none !important;
+
+                i {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+            }
+        }
+    }
+
+    .footer-contact-info {
+        li {
+            font-weight: 300;
+        }
+        
+        a.hover-gold {
+            color: $anabtawi-text-muted;
+            transition: color 0.3s ease;
+
+            &:hover {
+                color: $anabtawi-gold !important;
+                text-decoration: none !important;
+            }
+        }
+    }
+
+    .social-icons {
+        a {
+            transition: all 0.3s ease;
+
+            &:hover {
+                background-color: $anabtawi-gold !important;
+                border-color: $anabtawi-gold !important;
+                color: $anabtawi-charcoal !important;
+                transform: translateY(-3px);
+            }
+        }
+    }
+
+    .language-switcher-mockup {
+        span {
+            cursor: pointer;
+            transition: color 0.3s ease;
+
+            &:hover {
+                color: $anabtawi-text-white !important;
+            }
+        }
+    }
+
+    // Border Accent Decorations
+    .border-gold-accent {
+        position: relative;
+        
+        &::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 1px solid $anabtawi-gold;
+            transform: translate(-15px, 15px);
+            z-index: 1;
+            pointer-events: none;
+            transition: transform 0.5s ease;
+        }
+
+        &:hover::before {
+            transform: translate(-8px, 8px);
+        }
+        
+        .about-decorative-block {
+            position: relative;
+            z-index: 2;
+        }
+    }
+
+    .border-gold-accent-subtle {
+        border: 1px solid $anabtawi-gold-subtle !important;
+    }
+
+    // Scroll animation triggers
+    .scroll-fade-in {
+        opacity: 0;
+        transform: translateY(30px);
+        transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+        
+        &.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    // Delayed child animation utilities
+    .scroll-fade-in {
+        &.delay-1 { transition-delay: 0.15s; }
+        &.delay-2 { transition-delay: 0.3s; }
+        &.delay-3 { transition-delay: 0.45s; }
+    }
+}
+
+// Right to Left Marquee scrolling keyframes
+@keyframes marquee-scroll {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+/* ==========================================================================
+   Dynamic Scroll-Driven Kunafa Stretch Background
+   ========================================================================== */
+.kunafa-stretch-bg {
+    position: fixed;
+    bottom: -20px;
+    right: 2%;
+    width: 38vw;
+    max-width: 450px;
+    min-width: 280px;
+    aspect-ratio: 1 / 1;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.9;
+    user-select: none;
+}
+
+.kunafa-stretch-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.kunafa-layer {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: auto;
+    display: block;
+    pointer-events: none;
+}
+
+.kunafa-top {
+    top: 0;
+    z-index: 3;
+}
+
+.kunafa-cheese {
+    top: 41.5%;
+    transform-origin: top center;
+    z-index: 1;
+    transition: transform 0.1s linear;
+}
+
+.kunafa-bottom {
+    top: 64.4%;
+    z-index: 2;
+    transition: transform 0.1s linear;
+}
+
+
