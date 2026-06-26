@@ -47,31 +47,80 @@ patch(PosStore.prototype, {
         if (!canContinue) {
             return;
         }
-        if (this._reloadBeforePaymentPage()) {
-            return;
+        const order = this.getOrder();
+        const pricelist = order?.pricelist_id;
+        if (order && pricelist?.cap_enabled) {
+            if (await this._reloadBeforePaymentPage(order)) {
+                return;
+            }
         }
         return super.pay(...arguments);
     },
 
-    _reloadBeforePaymentPage() {
-        const order = this.getOrder();
-        const pricelist = order?.pricelist_id;
-        if (!order || !pricelist?.cap_enabled || typeof window === "undefined") {
+    _reapplyCapLines(order, capLines) {
+        const byLineUuid = new Map((capLines || []).map((line) => [line.line_uuid, line]));
+        let hasChanges = false;
+
+        for (const line of order.getOrderlines()) {
+            const data = byLineUuid.get(line.uuid);
+            if (!data) {
+                continue;
+            }
+            const targetUnitPrice = toNumber(data.price_unit);
+            const targetDiscount = toNumber(data.discount);
+
+            if (Math.abs(toNumber(line.price_unit) - targetUnitPrice) > 1e-6) {
+                line.setUnitPrice(targetUnitPrice);
+                hasChanges = true;
+            }
+            if (Math.abs(toNumber(line.getDiscount()) - targetDiscount) > 1e-6) {
+                line.setDiscount(targetDiscount);
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges) {
+            order.triggerRecomputeAllPrices?.();
+            order._markDirty?.();
+        }
+    },
+
+    async _reloadBeforePaymentPage(order) {
+        if (!order || typeof window === "undefined") {
             return false;
         }
 
+        const capLines = order.getOrderlines().map((line) => ({
+            line_uuid: line.uuid,
+            product_id: line.product_id?.id,
+            price_unit: toNumber(line.price_unit),
+            discount: toNumber(line.getDiscount()),
+            qty: line.getQuantity(),
+        }));
+
+        order._markDirty?.();
+
         try {
+            await this.data.synchronizeLocalDataInIndexedDB();
             window.sessionStorage.setItem(
                 PAYMENT_RELOAD_KEY,
                 JSON.stringify({
                     orderUuid: order.uuid,
                     at: Date.now(),
                     state: "reloaded",
+                    lines: capLines,
                 })
             );
-            window.location.reload();
+            const url = new URL(window.location.href);
+            url.searchParams.set("limited_loading", "0");
+            window.location.href = url.href;
             return true;
-        } catch {
+        } catch (error) {
+            console.error("[pos_discount_cap] Reload before payment failed", {
+                orderUuid: order.uuid,
+                capLines,
+                error,
+            });
             return false;
         }
     },
@@ -89,18 +138,27 @@ patch(PosStore.prototype, {
         try {
             payload = JSON.parse(raw);
         } catch {
+            window.sessionStorage.removeItem(PAYMENT_RELOAD_KEY);
             return;
         }
         if (!payload?.orderUuid || Date.now() - toNumber(payload.at) > 120000) {
             window.sessionStorage.removeItem(PAYMENT_RELOAD_KEY);
             return;
         }
+        if (payload.state !== "reloaded") {
+            return;
+        }
 
         const order = this.models["pos.order"].getBy("uuid", payload.orderUuid);
         if (!order) {
-            window.sessionStorage.removeItem(PAYMENT_RELOAD_KEY);
+            console.warn("[pos_discount_cap] Order not found after reload", {
+                orderUuid: payload.orderUuid,
+                lines: payload.lines,
+            });
             return;
         }
+
+        this._reapplyCapLines(order, payload.lines);
         this.setOrder(order);
     },
 
