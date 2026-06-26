@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_payment_summary_wizard" model="ir.ui.view">
+        <field name="name">pos.payment.summary.wizard.form</field>
+        <field name="model">pos.payment.summary.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Payment Summary Report">
+                <group>
+                    <field name="date_from"/>
+                    <field name="date_to"/>
+                    <field name="all_pos"/>
+                    <field name="pos_config_id" invisible="all_pos" required="not all_pos"/>
+                </group>
+                <footer>
+                    <button name="action_print_pdf"
+                            type="object"
+                            string="Print PDF"
+                            class="btn-primary"/>
+                    <button name="action_export_excel"
+                            type="object"
+                            string="Export Excel"
+                            class="btn-secondary"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pos_payment_summary_wizard" model="ir.actions.act_window">
+        <field name="name">Payment Summary</field>
+        <field name="res_model">pos.payment.summary.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_pos_payment_summary_report"
+              name="Payment Summary"
+              parent="point_of_sale.menu_point_rep"
+              action="action_pos_payment_summary_wizard"
+              sequence="6"/>
+</odoo>

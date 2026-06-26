@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_pos_payment_summary" model="ir.actions.report">
+        <field name="name">Payment Summary</field>
+        <field name="model">pos.payment.summary.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">pos_payment_summary_report.report_payment_summary</field>
+        <field name="report_file">pos_payment_summary_report.report_payment_summary</field>
+    </record>
+
+    <template id="report_payment_summary">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <h2 class="text-center">Payment Summary Report</h2>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <strong>Date From:</strong>
+                            <span t-esc="date_from"/>
+                        </div>
+                        <div class="col-6">
+                            <strong>Date To:</strong>
+                            <span t-esc="date_to"/>
+                        </div>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <strong>Point of Sale:</strong>
+                            <span t-esc="pos_config_name"/>
+                        </div>
+                    </div>
+
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Session Opening Date</th>
+                                <th>POS Name</th>
+                                <th>Payment Method</th>
+                                <th class="text-end">Total Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-if="not lines">
+                                <tr>
+                                    <td colspan="4">No data for selected filters.</td>
+                                </tr>
+                            </t>
+                            <t t-else="">
+                                <tr t-foreach="lines" t-as="line">
+                                    <td>
+                                        <span t-if="line['session_opening_date']"
+                                              t-esc="line['session_opening_date']"
+                                              t-options="{'widget': 'datetime'}"/>
+                                    </td>
+                                    <td t-esc="line['pos_name']"/>
+                                    <td t-esc="line['payment_method']"/>
+                                    <td class="text-end">
+                                        <span t-esc="line['total_sales']"
+                                              t-options="{'widget': 'monetary', 'display_currency': line['currency']}"/>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
