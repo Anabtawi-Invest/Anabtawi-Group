@@ -148,11 +148,34 @@ patch(PosStore.prototype, {
 
         let evaluations;
         try {
+            console.info("[pos_discount_cap] Evaluating discount cap", {
+                pricelistId: pricelist.id,
+                capAmount,
+                capEnabled: pricelist.cap_enabled,
+                lineCount: lines.length,
+                lines,
+            });
             evaluations = await this.data.call("product.pricelist", "get_pos_cap_evaluations", [
                 pricelist.id,
                 lines,
             ]);
+            console.info("[pos_discount_cap] Discount cap evaluation succeeded", {
+                pricelistId: pricelist.id,
+                evaluations,
+            });
         } catch (error) {
+            console.error("[pos_discount_cap] Discount cap evaluation failed", {
+                pricelistId: pricelist.id,
+                capAmount,
+                capEnabled: pricelist.cap_enabled,
+                lineCount: lines.length,
+                lines,
+                error,
+                message: error?.message,
+                name: error?.name,
+                data: error?.data,
+                cause: error?.cause,
+            });
             this.dialog.add(AlertDialog, {
                 title: _t("Discount Cap Error"),
                 body: _t("Could not evaluate the discount cap. Please try again."),

@@ -1,5 +1,9 @@
+import logging
+
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class ProductPricelist(models.Model):
@@ -22,70 +26,134 @@ class ProductPricelist(models.Model):
 
     @api.model
     def get_pos_cap_evaluations(self, pricelist_id, lines):
-        pricelist = self.browse(pricelist_id).exists()
-        if not pricelist:
-            return []
-        pricelist.ensure_one()
+        _logger.info(
+            "POS discount cap evaluation started: pricelist_id=%s, line_count=%s, lines=%s",
+            pricelist_id,
+            len(lines or []),
+            lines,
+        )
+        try:
+            pricelist = self.browse(pricelist_id).exists()
+            if not pricelist:
+                _logger.warning(
+                    "POS discount cap evaluation aborted: pricelist %s not found",
+                    pricelist_id,
+                )
+                return []
+            pricelist.ensure_one()
 
-        Product = self.env["product.product"]
-        Rule = self.env["product.pricelist.item"]
-        date = fields.Datetime.now()
-        result = []
+            Product = self.env["product.product"]
+            date = fields.Datetime.now()
+            result = []
 
-        for line in lines or []:
-            product = Product.browse(line.get("product_id")).exists()
-            qty = abs(float(line.get("qty") or 0.0))
-            is_original_price = line.get("price_type", "original") == "original"
-            can_apply_cap = bool(product and qty > 0 and is_original_price)
+            for line in lines or []:
+                line_uuid = line.get("line_uuid")
+                product_id = line.get("product_id")
+                try:
+                    product = Product.browse(product_id).exists()
+                    qty = abs(float(line.get("qty") or 0.0))
+                    price_type = line.get("price_type", "original")
+                    is_original_price = price_type == "original"
+                    can_apply_cap = bool(product and qty > 0 and is_original_price)
 
-            discounted_unit_price = 0.0
-            base_unit_price = 0.0
-            cap_eligible = False
-            rule_id = False
+                    discounted_unit_price = 0.0
+                    base_unit_price = 0.0
+                    cap_eligible = False
+                    rule_id = False
 
-            if product and qty > 0:
-                rule = pricelist._get_pos_preferred_rule(product, qty, date=date)
-                if rule:
-                    rule_id = rule.id
-                    discounted_unit_price = rule._compute_price(
-                        product,
-                        qty,
-                        product.uom_id,
-                        date,
-                        pricelist.currency_id,
+                    if product and qty > 0:
+                        rule = pricelist._get_pos_preferred_rule(product, qty, date=date)
+                        if rule:
+                            rule_id = rule.id
+                            _logger.debug(
+                                "POS discount cap line %s: product_id=%s, rule_id=%s, "
+                                "compute_price=%s, cap_eligible=%s",
+                                line_uuid,
+                                product_id,
+                                rule_id,
+                                rule.compute_price,
+                                rule.cap_eligible,
+                            )
+                            discounted_unit_price = rule._compute_price(
+                                product,
+                                qty,
+                                product.uom_id,
+                                date,
+                                pricelist.currency_id,
+                            )
+                            base_unit_price = rule._compute_price_before_discount(
+                                product,
+                                qty,
+                                product.uom_id,
+                                date,
+                                pricelist.currency_id,
+                            )
+                            cap_eligible = bool(rule.cap_eligible)
+                        else:
+                            discounted_unit_price, _rule_id = pricelist._get_product_price_rule(
+                                product,
+                                qty,
+                                uom=product.uom_id,
+                                date=date,
+                            )
+                            rule_id = _rule_id
+                            base_unit_price = discounted_unit_price
+                            _logger.debug(
+                                "POS discount cap line %s: product_id=%s, no preferred rule, "
+                                "fallback rule_id=%s, price=%s",
+                                line_uuid,
+                                product_id,
+                                rule_id,
+                                discounted_unit_price,
+                            )
+                    else:
+                        _logger.debug(
+                            "POS discount cap line %s skipped: product_id=%s, product_exists=%s, "
+                            "qty=%s, price_type=%s",
+                            line_uuid,
+                            product_id,
+                            bool(product),
+                            qty,
+                            price_type,
+                        )
+
+                    line_base_amount = (
+                        qty * base_unit_price if cap_eligible and can_apply_cap else 0.0
                     )
-                    base_unit_price = rule._compute_price_before_discount(
-                        product,
-                        qty,
-                        product.uom_id,
-                        date,
-                        pricelist.currency_id,
+                    result.append(
+                        {
+                            "line_uuid": line_uuid,
+                            "cap_eligible": cap_eligible,
+                            "can_apply_cap": can_apply_cap,
+                            "line_base_amount": line_base_amount,
+                            "discounted_unit_price": discounted_unit_price,
+                            "base_unit_price": base_unit_price,
+                            "rule_id": rule_id,
+                        }
                     )
-                    cap_eligible = bool(rule.cap_eligible)
-                else:
-                    discounted_unit_price, _rule_id = pricelist._get_product_price_rule(
-                        product,
-                        qty,
-                        uom=product.uom_id,
-                        date=date,
+                except Exception:
+                    _logger.exception(
+                        "POS discount cap evaluation failed for line_uuid=%s, product_id=%s, "
+                        "line_payload=%s",
+                        line_uuid,
+                        product_id,
+                        line,
                     )
-                    rule_id = _rule_id
-                    base_unit_price = discounted_unit_price
+                    raise
 
-            line_base_amount = qty * base_unit_price if cap_eligible and can_apply_cap else 0.0
-            result.append(
-                {
-                    "line_uuid": line.get("line_uuid"),
-                    "cap_eligible": cap_eligible,
-                    "can_apply_cap": can_apply_cap,
-                    "line_base_amount": line_base_amount,
-                    "discounted_unit_price": discounted_unit_price,
-                    "base_unit_price": base_unit_price,
-                    "rule_id": rule_id,
-                }
+            _logger.info(
+                "POS discount cap evaluation completed: pricelist_id=%s, result=%s",
+                pricelist_id,
+                result,
             )
-
-        return result
+            return result
+        except Exception:
+            _logger.exception(
+                "POS discount cap evaluation failed: pricelist_id=%s, lines=%s",
+                pricelist_id,
+                lines,
+            )
+            raise
 
     def _get_pos_preferred_rule(self, product, quantity, date=False):
         self.ensure_one()
