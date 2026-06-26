@@ -1,9 +1,5 @@
-import logging
-
 from odoo import api, fields, models
 from odoo.tools.float_utils import float_compare
-
-_logger = logging.getLogger(__name__)
 
 
 class StockTransferDiscrepancy(models.Model):
@@ -52,12 +48,6 @@ class StockTransferDiscrepancy(models.Model):
         ondelete="restrict",
         domain=[("usage", "=", "internal")],
     )
-    driver_id = fields.Many2one(
-        "stock.transfer.driver",
-        string="Driver",
-        index=True,
-        ondelete="set null",
-    )
 
     # New flow:
     # - under_investigation: created at picking validation time, truck is still allowed
@@ -75,7 +65,7 @@ class StockTransferDiscrepancy(models.Model):
         index=True,
     )
 
-    # Set at picking validation time (wizard confirm); length of grace window is set in the wizard (e.g. 1 min for tests, 48h prod).
+    # Set at picking validation time (wizard confirm) and used for 48-hour grace window.
     validated_at = fields.Datetime(string="Validated At", index=True)
     investigation_deadline = fields.Datetime(string="Investigation Deadline", index=True)
 
@@ -111,14 +101,11 @@ class StockTransferDiscrepancy(models.Model):
     def _cron_expire_investigations(self):
         """Move discrepancies from under_investigation to open after deadline.
 
-        Once a discrepancy becomes 'open', stock.transfer.driver.is_blocked is updated;
-        stock.location.has_open_discrepancy is still recomputed for reporting.
+        We intentionally keep the existing 'truck blocking' logic unchanged:
+        stock.location.has_open_discrepancy checks only state='open'.
+        So, once a discrepancy becomes 'open', the truck will be blocked as before.
         """
         now = fields.Datetime.now()
-        _logger.info(
-            "[DISCREPANCY_CRON] _cron_expire_investigations started, server_now=%s",
-            now,
-        )
         recs = self.search(
             [
                 ("state", "=", "under_investigation"),
@@ -126,103 +113,14 @@ class StockTransferDiscrepancy(models.Model):
                 ("investigation_deadline", "<=", now),
             ]
         )
-        _logger.info(
-            "[DISCREPANCY_CRON] candidates (under_investigation, deadline passed): count=%s ids=%s",
-            len(recs),
-            recs.ids,
-        )
-        for r in recs:
-            _logger.info(
-                "[DISCREPANCY_CRON]   id=%s picking=%s driver_id=%s driver=%s deadline=%s "
-                "diff_qty=%s resolved_qty=%s state=%s",
-                r.id,
-                r.picking_id.display_name,
-                r.driver_id.id if r.driver_id else None,
-                r.driver_id.display_name if r.driver_id else None,
-                r.investigation_deadline,
-                r.difference_qty,
-                r.resolved_qty,
-                r.state,
-            )
-
         # Only escalate to OPEN if still not fully resolved.
-        to_open = recs.filtered(
-            lambda r: float_compare(
-                (r.difference_qty or 0.0),
-                (r.resolved_qty or 0.0),
-                precision_rounding=r.product_id.uom_id.rounding,
-            )
-            > 0
-        )
-        skipped_resolved = recs - to_open
-        if skipped_resolved:
-            _logger.info(
-                "[DISCREPANCY_CRON] skipped (already fully resolved vs difference): ids=%s",
-                skipped_resolved.ids,
-            )
-
+        to_open = recs.filtered(lambda r: (r.difference_qty or 0.0) > (r.resolved_qty or 0.0))
         if not to_open:
-            if not recs:
-                all_ui = self.search([("state", "=", "under_investigation")])
-                still_future = all_ui.filtered(
-                    lambda r: r.investigation_deadline and r.investigation_deadline > now
-                )
-                no_deadline = all_ui.filtered(lambda r: not r.investigation_deadline)
-                for r in still_future:
-                    _logger.warning(
-                        "[DISCREPANCY_CRON] NOT escalating id=%s: investigation_deadline=%s is AFTER "
-                        "server_now=%s (wait until deadline in UTC, or shorten deadline for testing). "
-                        "picking=%s driver_id=%s",
-                        r.id,
-                        r.investigation_deadline,
-                        now,
-                        r.picking_id.display_name,
-                        r.driver_id.id if r.driver_id else None,
-                    )
-                _logger.warning(
-                    "[DISCREPANCY_CRON] nothing to escalate: no under_investigation row has "
-                    "investigation_deadline <= server_now. counts: all_under_investigation=%s "
-                    "still_future_deadline=%s missing_deadline=%s server_now=%s",
-                    len(all_ui),
-                    len(still_future),
-                    len(no_deadline),
-                    now,
-                )
-            else:
-                _logger.info(
-                    "[DISCREPANCY_CRON] deadline passed for ids=%s but none escalated: "
-                    "all already fully resolved (difference_qty <= resolved_qty)",
-                    recs.ids,
-                )
             return
 
-        _logger.info(
-            "[DISCREPANCY_CRON] escalating to state=open: ids=%s",
-            to_open.ids,
-        )
         to_open.write({"state": "open"})
+        # Ensure the computed flag is updated for selection domain / constraints
         to_open.mapped("truck_location_id")._compute_has_open_discrepancy()
-        drivers = to_open.mapped("driver_id").filtered(lambda d: d)
-        missing_driver = to_open.filtered(lambda r: not r.driver_id)
-        if missing_driver:
-            _logger.warning(
-                "[DISCREPANCY_CRON] escalated rows have NO driver_id — is_blocked will NOT update "
-                "for any driver. discrepancy_ids=%s pickings=%s",
-                missing_driver.ids,
-                missing_driver.mapped("picking_id.name"),
-            )
-        _logger.info(
-            "[DISCREPANCY_CRON] drivers to recompute is_blocked: ids=%s names=%s",
-            drivers.ids,
-            drivers.mapped("display_name"),
-        )
-        if drivers:
-            drivers._compute_is_blocked()
-        else:
-            _logger.warning(
-                "[DISCREPANCY_CRON] no driver records on escalated discrepancies; "
-                "_compute_is_blocked not called",
-            )
 
     @api.model
     def apply_resolution(
@@ -268,9 +166,6 @@ class StockTransferDiscrepancy(models.Model):
         # Trigger recompute once at the end for better performance
         if discrepancies:
             truck_location._compute_has_open_discrepancy()
-            drivers = discrepancies.mapped("driver_id").filtered(lambda d: d)
-            if drivers:
-                drivers._compute_is_blocked()
 
     def _apply_resolution(self, qty_in_product_uom, skip_recompute=False):
         """Allocate resolution quantity to this discrepancy and update state.
@@ -285,11 +180,8 @@ class StockTransferDiscrepancy(models.Model):
         remaining = max((self.difference_qty or 0.0) - (self.resolved_qty or 0.0), 0.0)
         if float_compare(remaining, 0.0, precision_rounding=rounding) <= 0:
             self.sudo().write({"state": "settled"})
-            if not skip_recompute:
-                if self.truck_location_id:
-                    self.truck_location_id._compute_has_open_discrepancy()
-                if self.driver_id:
-                    self.driver_id._compute_is_blocked()
+            if not skip_recompute and self.truck_location_id:
+                self.truck_location_id._compute_has_open_discrepancy()
             return
 
         to_apply = min(qty_in_product_uom, remaining)
@@ -302,11 +194,8 @@ class StockTransferDiscrepancy(models.Model):
             vals["state"] = "settled"
 
         self.sudo().write(vals)
-        if not skip_recompute:
-            if self.truck_location_id:
-                self.truck_location_id._compute_has_open_discrepancy()
-            if self.driver_id:
-                self.driver_id._compute_is_blocked()
+        if not skip_recompute and self.truck_location_id:
+            self.truck_location_id._compute_has_open_discrepancy()
 
     def action_create_scrap(self):
         """Open a new scrap form prefilled from the discrepancy."""

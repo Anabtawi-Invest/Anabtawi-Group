@@ -76,6 +76,19 @@ class HrAttendance(models.Model):
 
     def _normalize_check_in_time(self, employee, check_in_dt):
         tz = self._get_employee_timezone(employee)
+        check_in_local = self._convert_utc_naive_to_tz(check_in_dt, tz)
+
+        # For planning-based contracts, align early check-in to first published slot start.
+        first_slot_start_local = self._get_planning_first_published_slot_start_local(
+            employee=employee,
+            reference_local_dt=check_in_local,
+            tz=tz,
+        )
+        if first_slot_start_local:
+            if check_in_local >= first_slot_start_local:
+                return check_in_dt
+            return first_slot_start_local.astimezone(pytz.UTC).replace(tzinfo=None)
+
         day_bounds = self._get_employee_schedule_day_bounds(
             employee=employee,
             reference_dt=check_in_dt,
@@ -85,30 +98,42 @@ class HrAttendance(models.Model):
             return check_in_dt
 
         day_start, _day_end = day_bounds
-        check_in_local = self._convert_utc_naive_to_tz(check_in_dt, tz)
         if check_in_local >= day_start:
             return check_in_dt
         return day_start.astimezone(pytz.UTC).replace(tzinfo=None)
 
-    def _normalize_check_out_time(self, employee, check_out_dt, check_in_dt=None):
-        tz = self._get_employee_timezone(employee)
-        day_bounds = self._get_employee_schedule_day_bounds(
-            employee=employee,
-            reference_dt=check_out_dt,
-            check_in_dt=check_in_dt,
+    def _get_planning_first_published_slot_start_local(self, employee, reference_local_dt, tz):
+        version = employee.version_id or employee.current_version_id
+        if not version or (version.work_entry_source or "").strip() != "planning":
+            return False
+        if not employee.resource_id:
+            return False
+        if "planning.slot" not in self.env:
+            return False
+
+        day_start_local = reference_local_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end_local = day_start_local + timedelta(days=1)
+        day_start_utc = day_start_local.astimezone(pytz.UTC).replace(tzinfo=None)
+        day_end_utc = day_end_local.astimezone(pytz.UTC).replace(tzinfo=None)
+
+        first_slot = self.env["planning.slot"].sudo().search(
+            [
+                ("resource_id", "=", employee.resource_id.id),
+                ("state", "=", "published"),
+                ("start_datetime", ">=", day_start_utc),
+                ("start_datetime", "<", day_end_utc),
+            ],
+            order="start_datetime asc, id asc",
+            limit=1,
         )
-        if not day_bounds:
-            return check_out_dt
+        if not first_slot:
+            return False
+        return self._convert_utc_naive_to_tz(first_slot.start_datetime, tz)
 
-        _day_start, day_end = day_bounds
-        check_out_local = self._convert_utc_naive_to_tz(check_out_dt, tz)
-        if check_out_local <= day_end:
-            return check_out_dt
-
-        normalized_check_out = day_end.astimezone(pytz.UTC).replace(tzinfo=None)
-        if check_in_dt and normalized_check_out < check_in_dt:
-            return check_in_dt
-        return normalized_check_out
+    def _normalize_check_out_time(self, employee, check_out_dt, check_in_dt=None):
+        del employee, check_in_dt
+        # Disable schedule-based clipping for check-out.
+        return check_out_dt
 
     def _get_employee_schedule_day_bounds(self, employee, reference_dt, check_in_dt=None):
         if not employee.resource_calendar_id:
@@ -158,3 +183,4 @@ class HrAttendance(models.Model):
         if naive_utc_dt.tzinfo:
             return naive_utc_dt.astimezone(tz)
         return pytz.UTC.localize(naive_utc_dt).astimezone(tz)
+

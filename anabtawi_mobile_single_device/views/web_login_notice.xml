@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="web_login_single_device_notice" inherit_id="web.login" name="Single device login notice">
+        <xpath expr="//p[@t-if='message']" position="after">
+            <p class="alert alert-warning" role="note">
+                For security reasons, your account may be limited to one device only.
+                If you try to log in from another device, access can be denied.
+            </p>
+        </xpath>
+    </template>
+</odoo>

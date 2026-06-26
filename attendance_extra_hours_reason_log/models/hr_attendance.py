@@ -320,12 +320,11 @@ class HrAttendanceOvertimeRule(models.Model):
     def _aer_trace_target_attendance_id(attendance_intervals):
         if not attendance_intervals:
             return False
-        attendances = None
-        for _start, _stop, attendance in attendance_intervals:
-            if not attendance:
-                continue
-            attendances = attendance if attendances is None else (attendances | attendance)
-        return attendances.sorted("check_in")[:1].id if attendances else False
+        first_interval = next(iter(attendance_intervals), False)
+        if not first_interval:
+            return False
+        attendance = first_interval[2]
+        return attendance.id if attendance else False
 
     @staticmethod
     def _aer_get_calendar_day_lines(calendar, period_start):
@@ -428,10 +427,7 @@ class HrAttendanceOvertimeRule(models.Model):
             )
 
         if company.absence_management and float_compare(overtime_amount, -self.employee_tolerance, 5) == -1:
-            last_attendance = max(
-                intervals_attendance_by_attendance,
-                key=lambda att: max(att.mapped("check_out") or [False]),
-            )
+            last_attendance = sorted(intervals_attendance_by_attendance.keys(), key=lambda att: att.check_out)[-1]
             return {}, {last_attendance: [(overtime_amount, self)]}
 
         if float_compare(overtime_amount, self.employer_tolerance, 5) != 1:

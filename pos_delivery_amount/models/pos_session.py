@@ -22,12 +22,6 @@ class PosSession(models.Model):
         copy=False,
         tracking=True,
     )
-    delivery_report_line_id = fields.Many2one(
-        "pos.delivery.amount.report.line",
-        string="Delivery Report Line",
-        readonly=True,
-        copy=False,
-    )
 
     def _get_delivery_closing_date(self):
         self.ensure_one()

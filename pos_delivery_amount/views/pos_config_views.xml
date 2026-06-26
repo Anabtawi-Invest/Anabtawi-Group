@@ -24,22 +24,6 @@
                                 <field name="delivery_journal_id"/>
                             </div>
                         </div>
-                        <div class="row mt-2">
-                            <div class="col-lg-4 o_light_label">
-                                <label for="main_holding_cash_fund_account_id"/>
-                            </div>
-                            <div class="col-lg-8">
-                                <field name="main_holding_cash_fund_account_id"/>
-                            </div>
-                        </div>
-                        <div class="row mt-2">
-                            <div class="col-lg-4 o_light_label">
-                                <label for="delivery_amount_difference_account_id"/>
-                            </div>
-                            <div class="col-lg-8">
-                                <field name="delivery_amount_difference_account_id"/>
-                            </div>
-                        </div>
                     </div>
                 </setting>
             </xpath>

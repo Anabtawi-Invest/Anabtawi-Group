@@ -1,6 +1,6 @@
 # Translation of Odoo Server.
 # This file contains the translation of the following modules:
-# 	* stock_transfer_discrepancy
+# 	* stock_transfer_discrepancy_new
 #
 msgid ""
 msgstr ""
@@ -448,3 +448,51 @@ msgstr "المعالج"
 #: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy.report_transfer_discrepancy
 msgid "by"
 msgstr "بواسطة"
+
+#. module: stock_transfer_discrepancy_new
+#: model:ir.actions.act_window,name:stock_transfer_discrepancy_new.stock_transfer_discrepancy_action
+#: model:ir.ui.menu,name:stock_transfer_discrepancy_new.menu_stock_transfer_discrepancy_root
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy_new.stock_transfer_discrepancy_view_tree
+msgid "Transfer Discrepancies"
+msgstr "تناقضات النقل"
+
+#. module: stock_transfer_discrepancy_new
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy_new.stock_transfer_discrepancy_view_form
+msgid "Transfer Discrepancy"
+msgstr "تناقض النقل"
+
+#. module: stock_transfer_discrepancy_new
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy_new.stock_transfer_discrepancy_view_form
+msgid "Print Report"
+msgstr "طباعة التقرير"
+
+#. module: stock_transfer_discrepancy_new
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy_new.stock_transfer_discrepancy_view_form
+msgid "Enter discrepancy reason..."
+msgstr "أدخل سبب التناقض..."
+
+#. module: stock_transfer_discrepancy_new
+#: model_terms:ir.ui.view,arch_db:stock_transfer_discrepancy_new.stock_transfer_discrepancy_view_form
+msgid "Create Scrap Order"
+msgstr "إنشاء أمر هالك"
+
+#. module: stock_transfer_discrepancy_new
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy_new.field_stock_transfer_discrepancy__validated_at
+msgid "Validated At"
+msgstr "تم الاعتماد في"
+
+#. module: stock_transfer_discrepancy_new
+#: model:ir.model.fields,field_description:stock_transfer_discrepancy_new.field_stock_transfer_discrepancy__investigation_deadline
+msgid "Investigation Deadline"
+msgstr "موعد انتهاء التحقيق"
+
+#. module: stock_transfer_discrepancy_new
+#: model:ir.model.fields.selection,name:stock_transfer_discrepancy_new.selection__stock_transfer_discrepancy__state__under_investigation
+msgid "Under Investigation"
+msgstr "قيد التحقيق"
+
+#. module: stock_transfer_discrepancy_new
+#. odoo-python
+#: code:addons/stock_transfer_discrepancy_new/models/stock_transfer_discrepancy.py:0
+msgid "Scrap Order"
+msgstr "أمر هالك"

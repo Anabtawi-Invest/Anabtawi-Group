@@ -12,6 +12,11 @@ _logger = logging.getLogger(__name__)
 class HrEmployee(models.Model):
     _inherit = "hr.employee"
 
+    def _lat_get_work_entry_source(self):
+        self.ensure_one()
+        version = self.version_id or self.current_version_id
+        return (version.work_entry_source or "").strip() if version else ""
+
     @api.model
     def _lat_days_in_range(self, date_start, date_stop):
         start = fields.Date.to_date(date_start)
@@ -129,6 +134,27 @@ class HrEmployee(models.Model):
                 ))
         return normalized_intervals
 
+    def _lat_has_public_holiday_on_day(self, target_date, day_start, day_end):
+        self.ensure_one()
+        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
+        calendar = (
+            version.resource_calendar_id
+            or self.resource_calendar_id
+            or self.company_id.resource_calendar_id
+        )
+        if not calendar or not self.resource_id:
+            return False, self.env["resource.calendar.leaves"]
+
+        holiday_leaves = self.env["resource.calendar.leaves"].sudo().search([
+            ("calendar_id", "=", calendar.id),
+            ("date_from", "<", day_end),
+            ("date_to", ">", day_start),
+            "|",
+            ("resource_id", "=", False),
+            ("resource_id", "=", self.resource_id.id),
+        ])
+        return bool(holiday_leaves), holiday_leaves
+
     def _lat_iter_days_from_interval(self, dt_start, dt_end):
         self.ensure_one()
         if not dt_start or not dt_end or dt_end <= dt_start:
@@ -208,9 +234,12 @@ class HrEmployee(models.Model):
         utc_start = min(start for start, _end in day_bounds.values())
         utc_end = max(end for _start, end in day_bounds.values())
 
+        work_entry_source = self._lat_get_work_entry_source()
+        planning_only_mode = work_entry_source == "planning"
+        slot_states = ["published"] if planning_only_mode else ["draft", "published"]
         slots = self.env["planning.slot"].sudo().search([
             ("resource_id", "=", self.resource_id.id),
-            ("state", "in", ["draft", "published"]),
+            ("state", "in", slot_states),
             ("start_datetime", "<", utc_end),
             ("end_datetime", ">", utc_start),
         ]) if self.resource_id else self.env["planning.slot"]
@@ -243,6 +272,7 @@ class HrEmployee(models.Model):
         grace_hours = self._lat_grace_hours()
         for day in target_days:
             day_start, day_end = day_bounds[day]
+            has_public_holiday, holiday_leaves = self._lat_has_public_holiday_on_day(day, day_start, day_end)
             planning_intervals = []
             planned_source = "planning"
             for slot in slots:
@@ -251,7 +281,9 @@ class HrEmployee(models.Model):
                 if overlap_end > overlap_start:
                     planning_intervals.append((overlap_start, overlap_end))
 
-            if not planning_intervals:
+            if not planning_intervals and planning_only_mode:
+                planned_source = "planning_published_only_no_slot"
+            elif not planning_intervals:
                 calendar_intervals = self._lat_get_calendar_intervals_on_day(day, day_start, day_end)
                 if calendar_intervals:
                     planning_intervals = calendar_intervals
@@ -293,13 +325,25 @@ class HrEmployee(models.Model):
             if planned_end and attendance_end and planned_end > attendance_end:
                 early_check_out_hours = (planned_end - attendance_end).total_seconds() / 3600.0
 
+            # Threshold logic:
+            # - <= grace: no lateness
+            # - > grace: count the full lateness (including the first grace minutes)
+            late_check_in_effective_hours = (
+                late_check_in_hours if late_check_in_hours > grace_hours else 0.0
+            )
+            early_check_out_effective_hours = (
+                early_check_out_hours if early_check_out_hours > grace_hours else 0.0
+            )
             lateness_hours = max(late_check_in_hours + early_check_out_hours, 0.0)
+            effective_lateness_hours = late_check_in_effective_hours + early_check_out_effective_hours
             should_have_lat = (
                 bool(planned_start and planned_end and attendance_start and attendance_end)
-                and lateness_hours > grace_hours
+                and effective_lateness_hours > 0.0
             )
+            if has_public_holiday:
+                should_have_lat = False
             _logger.info(
-                "[LAT] day_eval employee_id=%s employee=%s date=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s planned_hours=%.4f late_check_in=%.4f early_check_out=%.4f lateness=%.4f grace=%.4f should_have_lat=%s existing_entries=%s",
+                "[LAT] day_eval employee_id=%s employee=%s date=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s planned_hours=%.4f late_check_in=%.4f early_check_out=%.4f lateness=%.4f grace=%.4f late_check_in_effective=%.4f early_check_out_effective=%.4f effective_lateness=%.4f has_public_holiday=%s holiday_leave_ids=%s should_have_lat=%s existing_entries=%s",
                 self.id,
                 self.display_name,
                 day,
@@ -312,11 +356,16 @@ class HrEmployee(models.Model):
                 early_check_out_hours,
                 lateness_hours,
                 grace_hours,
+                late_check_in_effective_hours,
+                early_check_out_effective_hours,
+                effective_lateness_hours,
+                has_public_holiday,
+                holiday_leaves.ids,
                 should_have_lat,
                 entries_by_day.get(day, self.env["hr.work.entry"]).ids,
             )
             _logger.warning(
-                "[LAT TRACE2] employee=%s(%s) date=%s source=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s late_in=%.4f early_out=%.4f total=%.4f grace=%.4f apply=%s",
+                "[LAT TRACE2] employee=%s(%s) date=%s source=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s late_in=%.4f early_out=%.4f total=%.4f grace=%.4f late_in_effective=%.4f early_out_effective=%.4f effective=%.4f has_public_holiday=%s holiday_leave_ids=%s apply=%s",
                 self.display_name,
                 self.id,
                 day,
@@ -329,6 +378,11 @@ class HrEmployee(models.Model):
                 early_check_out_hours,
                 lateness_hours,
                 grace_hours,
+                late_check_in_effective_hours,
+                early_check_out_effective_hours,
+                effective_lateness_hours,
+                has_public_holiday,
+                holiday_leaves.ids,
                 should_have_lat,
             )
             _logger.info(
@@ -340,7 +394,7 @@ class HrEmployee(models.Model):
             )
             self._lat_sync_work_entry_for_day(
                 target_date=day,
-                late_hours=lateness_hours,
+                late_hours=effective_lateness_hours,
                 should_have_lat=should_have_lat,
                 lat_type=lat_type,
                 existing_entries=entries_by_day.get(day, self.env["hr.work.entry"]),

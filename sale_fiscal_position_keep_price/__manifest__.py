@@ -1,7 +1,7 @@
 {
-    "name": "Sale Fiscal Position Keep Pricelist Price",
+    "name": "In Point of Sale , Fiscal Position Keep Pricelist Price",
     "summary": "Keep sale pricelist unit price unchanged with selected fiscal positions.",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.2.0",
     "category": "Sales/Sales",
     "license": "LGPL-3",
     "author": "Anabtawi",

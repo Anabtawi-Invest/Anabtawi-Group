@@ -1,3 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_pos_purge_wizard,pos.purge.wizard,model_pos_purge_wizard,group_pos_historical_purge,1,1,1,1
-access_pos_purge_report_line,pos.purge.report.line,model_pos_purge_report_line,group_pos_historical_purge,1,1,1,1

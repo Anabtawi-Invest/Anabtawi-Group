@@ -1,6 +1,6 @@
 import logging
 
-from odoo import _, api, fields, models
+from odoo import _, api, models
 from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
@@ -8,73 +8,6 @@ _logger = logging.getLogger(__name__)
 
 class StockPicking(models.Model):
     _inherit = "stock.picking"
-
-    driver_id = fields.Many2one(
-        "stock.transfer.driver",
-        string="Driver",
-        check_company=True,
-    )
-    destination_is_truck = fields.Boolean(
-        string="Destination Is Truck",
-        related="location_dest_id.is_truck",
-        readonly=True,
-    )
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        """Ensure backorders inherit driver before constraints run.
-
-        During partial validation, Odoo may create backorders. If destination is truck,
-        we want driver_id copied from the parent backorder record so the
-        truck/driver constraint doesn't fail unexpectedly.
-        """
-        for vals in vals_list:
-            if vals.get("driver_id"):
-                continue
-            backorder_id = vals.get("backorder_id")
-            if not backorder_id:
-                continue
-            parent = self.browse(backorder_id)
-            if parent and parent.driver_id:
-                vals["driver_id"] = parent.driver_id.id
-                _logger.info(
-                    "[DISCREPANCY CREATE] Auto-filled driver_id=%s from backorder parent picking_id=%s",
-                    parent.driver_id.id,
-                    parent.id,
-                )
-        return super().create(vals_list)
-
-    def _infer_driver_from_related_pickings(self):
-        """Best-effort driver inference for system-generated internal pickings."""
-        self.ensure_one()
-
-        # 1) Direct backorder parent.
-        if self.backorder_id and self.backorder_id.driver_id:
-            return self.backorder_id.driver_id
-
-        # 2) Origin reference (can contain one or more comma-separated names).
-        if self.origin:
-            origin_names = [name.strip() for name in self.origin.split(",") if name.strip()]
-            if origin_names:
-                origin_pick = self.search(
-                    [("name", "in", origin_names), ("driver_id", "!=", False)],
-                    limit=1,
-                    order="id desc",
-                )
-                if origin_pick:
-                    return origin_pick.driver_id
-
-        # 3) Upstream pickings linked via move chain.
-        upstream_pickings = self.move_ids.move_orig_ids.picking_id
-        # Compatibility: some Odoo versions don't have move_ids_without_package on stock.picking.
-        extra_moves = getattr(self, "move_ids_without_package", self.env["stock.move"])
-        if extra_moves:
-            upstream_pickings |= extra_moves.move_orig_ids.picking_id
-        upstream_pickings = upstream_pickings.filtered(lambda p: p.driver_id)
-        if upstream_pickings:
-            return upstream_pickings[0].driver_id
-
-        return False
 
     def _get_transfer_discrepancy_move_vals(self):
         """Return list of dicts for moves where actual < expected.
@@ -100,19 +33,19 @@ class StockPicking(models.Model):
             self.location_dest_id.is_truck,
         )
 
-        # Only apply discrepancy flow when truck is the DESTINATION location.
-        if not self.location_dest_id.is_truck:
+        # Only apply discrepancy flow when truck is the SOURCE location.
+        if not self.location_id.is_truck:
             _logger.warning(
-                "[DISCREPANCY] Skipping: destination is not truck. Source is_truck=%s, Dest is_truck=%s",
+                "[DISCREPANCY] Skipping: source is not truck. Source is_truck=%s, Dest is_truck=%s",
                 self.location_id.is_truck,
                 self.location_dest_id.is_truck,
             )
             return []
 
-        truck_location = self.location_dest_id
-        stage = "dispatch"
+        truck_location = self.location_id
+        stage = "receipt"
         _logger.info(
-            "[DISCREPANCY] Truck found at DESTINATION: %s (stage: dispatch)",
+            "[DISCREPANCY] Truck found at SOURCE: %s (stage: receipt)",
             truck_location.name,
         )
 
@@ -153,7 +86,6 @@ class StockPicking(models.Model):
                         "difference_qty": expected - actual,
                         "truck_location_id": truck_location.id,
                         "stage": stage,
-                        "driver_id": self.driver_id.id if self.driver_id else False,
                     }
                 )
             else:
@@ -253,9 +185,8 @@ class StockPicking(models.Model):
 
     def _action_done(self):
         res = super()._action_done()
-        # Settlement via internal transfers:
-        # - Moving OUT OF a truck resolves RECEIPT discrepancies.
-        # - Moving INTO a truck resolves DISPATCH discrepancies.
+        # Settlement via internal transfers when truck is SOURCE only.
+        # Moving OUT OF a truck resolves RECEIPT discrepancies.
         Discrepancy = self.env["stock.transfer.discrepancy"]
         truck_locations_to_recompute = set()
         for picking in self.filtered(lambda p: p.picking_type_code == "internal"):
@@ -273,23 +204,6 @@ class StockPicking(models.Model):
                         truck, move.product_id, qty_prod_uom, stage="receipt", exclude_picking_ids=[picking.id]
                     )
                     truck_locations_to_recompute.add(truck)
-            if (
-                picking.location_dest_id.is_truck
-                and picking.location_dest_id != picking.location_id
-            ):
-                truck = picking.location_dest_id
-                for move in done_moves:
-                    qty_prod_uom = move.product_uom._compute_quantity(
-                        move.quantity, move.product_id.uom_id, round=False
-                    )
-                    Discrepancy.apply_resolution(
-                        truck,
-                        move.product_id,
-                        qty_prod_uom,
-                        stage="dispatch",
-                        exclude_picking_ids=[picking.id],
-                    )
-                    truck_locations_to_recompute.add(truck)
 
         # Trigger recompute of has_open_discrepancy on all affected truck locations
         if truck_locations_to_recompute:
@@ -298,149 +212,99 @@ class StockPicking(models.Model):
 
         return res
 
-    @api.onchange("picking_type_id", "location_id", "location_dest_id", "driver_id")
+    @api.onchange("picking_type_id", "location_id", "location_dest_id")
     def _onchange_picking_type_id_discrepancy_truck_domain(self):
-        """Internal transfers: locations not blocked by discrepancy; drivers exclude blocked."""
+        """Block selecting trucks with open discrepancies on internal transfers."""
         _logger.info(
             "[DISCREPANCY DOMAIN] _onchange called. picking_type_code=%s",
             self.picking_type_code,
-        )
-        _logger.info(
-            "[DISCREPANCY DOMAIN] picking=%s id=%s company_id=%s source=%s(%s,is_truck=%s) "
-            "dest=%s(%s,is_truck=%s) driver=%s(%s,blocked=%s,company=%s)",
-            self.name,
-            self.id,
-            self.company_id.id if self.company_id else None,
-            self.location_id.display_name if self.location_id else None,
-            self.location_id.id if self.location_id else None,
-            self.location_id.is_truck if self.location_id else None,
-            self.location_dest_id.display_name if self.location_dest_id else None,
-            self.location_dest_id.id if self.location_dest_id else None,
-            self.location_dest_id.is_truck if self.location_dest_id else None,
-            self.driver_id.display_name if self.driver_id else None,
-            self.driver_id.id if self.driver_id else None,
-            self.driver_id.is_blocked if self.driver_id else None,
-            self.driver_id.company_id.id if self.driver_id and self.driver_id.company_id else None,
         )
         if self.picking_type_code != "internal":
             _logger.info(
                 "[DISCREPANCY DOMAIN] Not internal transfer, skipping domain restriction"
             )
             return {}
-        source_domain = [("usage", "=", "internal")]
-        dest_domain = [("usage", "=", "internal")]
-        company_id = self.company_id.id if self.company_id else False
-        driver_domain = [
-            ("is_blocked", "=", False),
+        source_domain = [
+            ("usage", "=", "internal"),
             "|",
-            ("company_id", "=", False),
-            ("company_id", "=", company_id),
+            ("is_truck", "=", False),
+            ("has_open_discrepancy", "=", False),
         ]
-        warning_msg = None
-        if self.driver_id and self.driver_id.is_blocked:
-            drv_name = (
-                self.driver_id.employee_id.name
-                if self.driver_id.employee_id
-                else self.driver_id.display_name
-            )
-            _logger.warning(
-                "[DISCREPANCY DOMAIN] Clearing driver_id=%s (%s): driver is blocked by open discrepancies",
-                self.driver_id.id,
-                drv_name,
-            )
-            warning_msg = _(
-                "Driver '%s' is blocked due to open transfer discrepancies. Choose another driver or settle first.",
-                drv_name,
-            )
-            self.driver_id = False
-        if (
-            self.driver_id
-            and self.driver_id.company_id
-            and self.company_id
-            and self.driver_id.company_id != self.company_id
-        ):
-            _logger.warning(
-                "[DISCREPANCY DOMAIN] Selected driver_id=%s company=%s does not match picking company=%s. "
-                "UI domain may reject this value.",
-                self.driver_id.id,
-                self.driver_id.company_id.id,
-                self.company_id.id,
-            )
-        if self.location_dest_id and not self.location_dest_id.is_truck:
-            _logger.info(
-                "[DISCREPANCY DOMAIN] Destination location is not truck (destination_location_id=%s). "
-                "Driver remains optional and will not be auto-cleared.",
-                self.location_dest_id.id,
-            )
+        dest_domain = [("usage", "=", "internal")]
         _logger.info(
-            "[DISCREPANCY DOMAIN] Computed domains: location_id=%s location_dest_id=%s driver_id=%s",
+            "[DISCREPANCY DOMAIN] Applying source domain on location_id only: %s",
             source_domain,
-            dest_domain,
-            driver_domain,
         )
-        _logger.info(
-            "[DISCREPANCY DOMAIN] Resulting driver after onchange: driver_id=%s",
-            self.driver_id.id if self.driver_id else None,
-        )
-        result = {
-            "domain": {
-                "location_id": source_domain,
-                "location_dest_id": dest_domain,
-                "driver_id": driver_domain,
-            }
-        }
+        
+        warning_msg = None
+        if self.location_id:
+            _logger.info(
+                "[DISCREPANCY DOMAIN] Current location_id: %s (ID: %s, is_truck: %s, has_open_discrepancy: %s)",
+                self.location_id.name,
+                self.location_id.id,
+                self.location_id.is_truck,
+                self.location_id.has_open_discrepancy,
+            )
+            if self.location_id.is_truck and self.location_id.has_open_discrepancy:
+                warning_msg = _(
+                    "Cannot use truck location '%s' as source location: it has open discrepancies. "
+                    "Please settle the discrepancies first or choose another location.",
+                    self.location_id.name,
+                )
+                _logger.warning(
+                    "[DISCREPANCY DOMAIN] Warning: Source location %s has open discrepancy",
+                    self.location_id.name,
+                )
+                # Clear the location to force user to choose another one
+                self.location_id = False
+        
+        result = {"domain": {"location_id": source_domain, "location_dest_id": dest_domain}}
         if warning_msg:
             result["warning"] = {
-                "title": _("Blocked driver"),
+                "title": _("Truck Location with Open Discrepancy"),
                 "message": warning_msg,
             }
         return result
 
-    def button_validate(self):
+    @api.constrains("location_id", "location_dest_id", "picking_type_code")
+    def _check_truck_open_discrepancy(self):
+        """Prevent using trucks with open discrepancies in internal transfers."""
         for picking in self:
             if picking.picking_type_code != "internal":
                 continue
-            if picking.location_dest_id.is_truck:
-                if not picking.driver_id:
-                    # Backorder flows may create/update internal truck pickings without
-                    # explicitly passing driver_id. Recover it from parent when possible.
-                    inferred_driver = picking._infer_driver_from_related_pickings()
-                    if inferred_driver:
-                        picking.driver_id = inferred_driver.id
-                        _logger.info(
-                            "[DISCREPANCY CONSTRAINT] Auto-filled missing driver_id=%s for picking_id=%s (%s) "
-                            "using related picking fallback (backorder/origin/move chain).",
-                            picking.driver_id.id,
-                            picking.id,
-                            picking.name,
-                        )
-                        continue
-                    _logger.warning(
-                        "[DISCREPANCY VALIDATE] Rejecting picking_id=%s (%s): destination is truck but driver is "
-                        "missing. backorder_id=%s origin=%s",
-                        picking.id,
-                        picking.name,
-                        picking.backorder_id.id if picking.backorder_id else None,
-                        picking.origin,
+
+            if picking.location_id.is_truck and picking.location_id.has_open_discrepancy:
+                _logger.warning(
+                    "[DISCREPANCY DOMAIN] Constraint violation: Source location %s (ID: %s) is truck with open discrepancy",
+                    picking.location_id.name,
+                    picking.location_id.id,
+                )
+                raise ValidationError(
+                    _(
+                        "Cannot use truck location '%s' as source location: it has open discrepancies. "
+                        "Please settle the discrepancies first or choose another location.",
+                        picking.location_id.name,
                     )
-                    raise ValidationError(_("A driver is required when the destination location is a truck."))
-                if picking.driver_id.is_blocked:
-                    drv_name = (
-                        picking.driver_id.employee_id.name
-                        if picking.driver_id.employee_id
-                        else picking.driver_id.display_name
+                )
+
+    @api.constrains("location_id", "location_dest_id", "picking_type_code")
+    def _check_truck_open_discrepancy(self):
+        """Prevent using trucks with open discrepancies in internal transfers."""
+        for picking in self:
+            if picking.picking_type_code != "internal":
+                continue
+
+            if picking.location_id.is_truck and picking.location_id.has_open_discrepancy:
+                _logger.warning(
+                    "[DISCREPANCY DOMAIN] Constraint violation: Source location %s (ID: %s) is truck with open discrepancy",
+                    picking.location_id.name,
+                    picking.location_id.id,
+                )
+                raise ValidationError(
+                    _(
+                        "Cannot use truck location '%s' as source location: it has open discrepancies. "
+                        "Please settle the discrepancies first or choose another location.",
+                        picking.location_id.name,
                     )
-                    _logger.warning(
-                        "[DISCREPANCY VALIDATE] Rejecting picking_id=%s (%s): driver_id=%s (%s) is blocked.",
-                        picking.id,
-                        picking.name,
-                        picking.driver_id.id,
-                        drv_name,
-                    )
-                    raise ValidationError(
-                        _(
-                            "Driver '%s' cannot be assigned until open transfer discrepancies are settled.",
-                            drv_name,
-                        )
-                    )
-        return super().button_validate()
+                )
+

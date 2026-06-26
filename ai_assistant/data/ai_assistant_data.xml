@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <!-- Default parameters are created by post_init_hook (install only).
-         Do not use <record> on ir.config_parameter here: keys may already
-         exist from Settings and would cause UniqueViolation on upgrade. -->
-</odoo>
