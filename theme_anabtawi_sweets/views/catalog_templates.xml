@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="catalog_template" name="Anabtawi Catalog">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure">
+                <!-- Page Banner -->
+                <section class="anabtawi-page-banner">
+                    <div class="container py-3">
+                        <h1 class="mb-3" style="color: var(--anabtawi-primary); font-weight: 800; font-family: 'Cairo';">كتالوج المنتجات</h1>
+                        <p class="lead text-muted col-md-8 mx-auto" style="font-size: 1.1rem;">
+                            قائمة منسقة بأشهى المأكولات والضيافة والحلويات المحضرة طازجة يومياً من أجلكم.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Products Catalog Grid -->
+                <section class="py-5 bg-white">
+                    <div class="container">
+                        <!-- Navigation tabs for categorization -->
+                        <div class="d-flex justify-content-center flex-wrap gap-2 mb-5">
+                            <button class="btn btn-more btn-sm">عرض الكل</button>
+                            <button class="btn btn-anabtawi-primary btn-sm">حلويات شرقية</button>
+                            <button class="btn btn-anabtawi-primary btn-sm">كنافة ووربات</button>
+                            <button class="btn btn-anabtawi-primary btn-sm">شوكولاتة فاخرة</button>
+                            <button class="btn btn-anabtawi-primary btn-sm">كيك ومناسبات</button>
+                            <button class="btn btn-anabtawi-primary btn-sm">البن والقهوة</button>
+                        </div>
+                        
+                        <div class="row g-4 text-end">
+                            <!-- Product 1 -->
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="كنافة خشنة بالجبنة البلدية" src="https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;" />
+                                    <span class="badge-category mb-2">كنافة ووربات</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">كنافة خشنة بالجبنة البلدية</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">كنافة خشنة مغطاة بالفستق الحلبي الفاخر ومحشية بأجود أنواع الأجبان النابلسية المنقوعة.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Product 2 -->
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="تشيز كيك بالفراولة والكراميل" src="https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;" />
+                                    <span class="badge-category mb-2">كيك ومناسبات</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">تشيز كيك بالفراولة والكراميل</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">قالب تشيز كيك كريمي مخبوز على الطريقة الأوروبية الأصلية مع طبقة فراولة طازجة غنية.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Product 3 -->
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="بوكس شوكولاتة بلجيكية مشكلة" src="https://images.unsplash.com/photo-1548907040-4d42b52115ca?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;" />
+                                    <span class="badge-category mb-2">شوكولاتة فاخرة</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">بوكس شوكولاتة بلجيكية مشكلة</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">مجموعة حصرية من قطع الشوكولاتة المحشية بالكراميل والمكسرات واللوز المحمص للهدايا والمناسبات.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Product 4 -->
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="بن عنبتاوي أشقر (خلطة عربية)" src="https://images.unsplash.com/photo-1507133750040-4a8f57021571?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;" />
+                                    <span class="badge-category mb-2">البن والقهوة</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">بن عنبتاوي أشقر (خلطة عربية)</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">خلطة قهوة عربية بالهيل الطبيعي الفاخر، محمصة بعناية فائقة لتعدل مزاج ضيوفك وجلساتك العائلية.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Product 5 -->
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="صحن مشكل بقلاوة وفستقية" src="https://images.unsplash.com/photo-1514517604298-cf80e0fb7f1e?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;" />
+                                    <span class="badge-category mb-2">حلويات شرقية</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">صحن مشكل بقلاوة وفستقية</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">تشكيلة غنية ومقرمشة من البقلاوة، كول وشكور، وأصابع الفستق الحلبي الغنية بقطر السكر الخفيف الفاخر.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Product 6 -->
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="معمول فاخر بالتمر البلدي" src="https://images.unsplash.com/photo-1558961309-dbdf71799f5a?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;" />
+                                    <span class="badge-category mb-2">حلويات شرقية</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">معمول فاخر بالتمر البلدي</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">قطع المعمول التقليدي الهش المحشو بأجود أنواع التمور الطبيعية منتقاة بعناية ورشات السكر الناعم.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <record id="catalog_page" model="website.page">
+        <field name="name">الكتالوج والمنتجات</field>
+        <field name="url">/our-catalog</field>
+        <field name="view_id" ref="catalog_template"/>
+        <field name="is_published">True</field>
+        <field name="website_indexed">True</field>
+    </record>
+</odoo>
