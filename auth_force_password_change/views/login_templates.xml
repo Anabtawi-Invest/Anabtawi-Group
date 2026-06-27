@@ -2,7 +2,7 @@
 <odoo>
 
     <template id="login_force_change_password" inherit_id="web.login" name="Login - Force Password Change">
-        <xpath expr="//input[@name='type'][@value='password']/.." position="attributes">
+        <xpath expr="//input[@name='login']/ancestor::form[1]" position="attributes">
             <attribute name="t-attf-class">oe_login_form #{'d-none' if force_change_password else ('' if login else 'd-none')}</attribute>
         </xpath>
 
