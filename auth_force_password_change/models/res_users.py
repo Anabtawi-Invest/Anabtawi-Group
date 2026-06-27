@@ -8,8 +8,9 @@ class ResUsers(models.Model):
 
     must_change_password = fields.Boolean(
         string='Must Change Password',
-        default=False,
-        help='When enabled, the user must set a new password on next login.',
+        default=True,
+        help='When enabled, the user must set a new password on next login. '
+             'Set to False automatically after they change it.',
     )
 
     @api.model_create_multi
