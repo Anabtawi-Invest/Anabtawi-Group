@@ -1,0 +1,38 @@
+# -*- coding: utf-8 -*-
+from odoo import http
+from odoo.http import request
+
+
+class AnabtawiSweetsController(http.Controller):
+
+    @http.route('/aboutus', type='http', auth='public', website=True, sitemap=True)
+    def aboutus(self, **kw):
+        """
+        About Us page route.
+        Renders the Anabtawi Sweets story, mission, and milestones.
+        """
+        return request.render('theme_anabtawi_sweets.aboutus_template')
+
+    @http.route('/branches', type='http', auth='public', website=True, sitemap=True)
+    def branches(self, **kw):
+        """
+        Branches page route.
+        Renders all Jordan and Palestine branch locations.
+        """
+        return request.render('theme_anabtawi_sweets.branches_template')
+
+    @http.route('/our-catalog', type='http', auth='public', website=True, sitemap=True)
+    def catalog(self, **kw):
+        """
+        Products Catalog page route.
+        Renders the full product catalog with categories.
+        """
+        return request.render('theme_anabtawi_sweets.catalog_template')
+
+    @http.route('/contactus', type='http', auth='public', website=True, sitemap=True)
+    def contactus(self, **kw):
+        """
+        Contact Us page route.
+        Renders contact information and contact form.
+        """
+        return request.render('theme_anabtawi_sweets.contact_template')

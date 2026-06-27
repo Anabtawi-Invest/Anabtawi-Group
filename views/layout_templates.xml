@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ==========================================================================
+         Navigation Menu Records - Populate Odoo top navigation menu
+         ========================================================================== -->
+
+    <!-- Update Standard Home Menu Name to Arabic -->
+    <record id="website.menu_home" model="website.menu">
+        <field name="name">الرئيسية</field>
+    </record>
+
+    <!-- Hide default Contact Us menu item from header (we add our own) -->
+    <record id="website.menu_contactus" model="website.menu">
+        <field name="parent_id" eval="False"/>
+    </record>
+
+    <!-- Custom Navigation: من نحن (About Us) -->
+    <record id="menu_aboutus_custom" model="website.menu">
+        <field name="name">من نحن</field>
+        <field name="url">/aboutus</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">20</field>
+    </record>
+
+    <!-- Custom Navigation: فروعنا (Branches) -->
+    <record id="menu_branches_custom" model="website.menu">
+        <field name="name">فروعنا</field>
+        <field name="url">/branches</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">30</field>
+    </record>
+
+    <!-- Custom Navigation: كتالوج المنتجات (Catalog) -->
+    <record id="menu_catalog_custom" model="website.menu">
+        <field name="name">كتالوج المنتجات</field>
+        <field name="url">/our-catalog</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">40</field>
+    </record>
+
+    <!-- Custom Navigation: اتصل بنا (Contact) -->
+    <record id="menu_contact_custom" model="website.menu">
+        <field name="name">اتصل بنا</field>
+        <field name="url">/contactus</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">50</field>
+    </record>
+
+    <!-- ==========================================================================
+         Inject Google Fonts into Layout Head
+         (Avoids SCSS compiler remote-import issues)
+         ========================================================================== -->
+    <template id="layout_head_fonts" inherit_id="website.layout" name="Anabtawi Sweets Fonts">
+        <xpath expr="//head" position="inside">
+            <link rel="preconnect" href="https://fonts.googleapis.com"/>
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+            <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&amp;family=Tajawal:wght@300;400;500;700;800;900&amp;display=swap" rel="stylesheet"/>
+            <!-- Direction support for RTL -->
+            <style>
+                html, body { direction: rtl; }
+            </style>
+        </xpath>
+    </template>
+
+    <!-- ==========================================================================
+         Custom Layout: Inject Top Bar and Floating Social Sidebar
+         ========================================================================== -->
+    <template id="anabtawi_layout_header_top" inherit_id="website.layout" name="Anabtawi Top Bar and Sidebar">
+        <!-- Inject Top Bar before Header -->
+        <xpath expr="//header" position="before">
+            <div class="top menu5 d-none d-lg-block">
+                <div class="container-fluid" style="padding-right: 50px; padding-left: 50px;">
+                    <div class="row align-items-center">
+                        <div class="col-lg-3">
+                            <i class="fa fa-phone" aria-hidden="true"/>
+                            <a href="tel:+96265311200">+962 7 9712 1121</a>
+                        </div>
+                        <div class="col-lg-3">
+                            <i class="fa fa-envelope" aria-hidden="true"/>
+                            <a href="mailto:info@anabtawisweets.com">info@anabtawisweets.com</a>
+                        </div>
+                        <div class="col-lg-4">
+                            <i class="fa fa-map-marker"/>
+                            <a href="https://maps.app.goo.gl/toEHJ12FdDjEQBiq5" target="_blank">حلويات عنبتاوي - شارع المدينة المنورة - عمان - الأردن</a>
+                        </div>
+                        <div class="col-lg-2 text-start">
+                            <i class="fa fa-globe" aria-hidden="true"/>
+                            <a href="/our-catalog">متجر دولي</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Floating Social Sidebar -->
+            <div id="main">
+                <ul id="navigationMenu">
+                    <li><a id="HyperLink7" title="whatsapp" class="whatsapp" href="https://api.whatsapp.com/send?phone=962795212989" target="_blank"><i class="fa fa-whatsapp"/></a></li>
+                    <li><a id="HyperLink1" title="Facebook" class="facebook" href="https://facebook.com/anabtawisweets/?_rdc=1&amp;_rdr" target="_blank"><i class="fa fa-facebook"/></a></li>
+                    <li><a id="HyperLink3" title="Twitter" class="twitter" href="https://twitter.com/Anabtawi_Sweets" target="_blank"><i class="fa fa-twitter"/></a></li>
+                    <li><a id="HyperLink4" title="LinkedIn" class="linkedin" href="http://www.linkedin.com/company/anabtawi-sweets/" target="_blank"><i class="fa fa-linkedin"/></a></li>
+                    <li><a id="HyperLink5" title="youtube" class="youtube" href="http://www.youtube.com/channel/UC6gc4a36YIUJ_kbroeenULw" target="_blank"><i class="fa fa-youtube"/></a></li>
+                    <li><a id="HyperLink6" title="instagram" class="instagram" href="http://www.instagram.com/anabtawisweets/" target="_blank"><i class="fa fa-instagram"/></a></li>
+                </ul>
+            </div>
+        </xpath>
+    </template>
+
+    <!-- ==========================================================================
+         Custom Layout: Replace Odoo Default Footer with Anabtawi Footer
+         ========================================================================== -->
+    <template id="anabtawi_layout_footer" inherit_id="website.layout" name="Anabtawi Custom Layout Footer" priority="50">
+        <!-- Replace the standard footer with our custom one -->
+        <xpath expr="//div[@id='footer']" position="replace">
+            <div id="footer" class="oe_structure text-break" t-ignore="true" t-if="not no_footer">
+                <footer class="footer">
+                    <div class="container">
+                        <div class="row">
+                            <!-- Newsletter Column -->
+                            <div class="col-sm-12 col-md-4 mb-4">
+                                <div class="newletter">
+                                    <div class="footer-title-newsletter">حلويات مميزة للحظات مميزة</div>
+                                    <div class="mb-3">الاشتراك في الرسائل الإخبارية</div>
+                                    <div class="position-relative" style="max-width: 320px;">
+                                        <input type="text" class="form-control" placeholder="أدخل عنوان بريدك الالكتروني"/>
+                                        <button class="btn-newsletter"><i class="fa fa-arrow-left"/></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-1 d-none d-md-block"/>
+
+                            <!-- Address Column -->
+                            <div class="col-sm-6 col-md-3 mb-4">
+                                <div class="footer-title">العنوان</div>
+                                <div class="mb-3">
+                                    <a href="https://maps.app.goo.gl/zDonDarr9R6AEv2w9" target="_blank" style="font-size: 14px; line-height: 1.6;">
+                                        حلويات عنبتاوي - شارع المدينة المنورة - عمان - الأردن
+                                    </a>
+                                </div>
+                                <span class="socials">
+                                    <ul>
+                                        <li><a id="HL_Fb" title="Facebook" href="https://facebook.com/anabtawisweets/?_rdc=1&amp;_rdr" target="_blank"><i class="fa fa-facebook"/></a></li>
+                                        <li><a id="HL_t" title="Twitter" href="https://twitter.com/Anabtawi_Sweets" target="_blank"><i class="fa fa-twitter"/></a></li>
+                                        <li><a id="HL_in" title="LinkedIn" href="http://www.linkedin.com/company/anabtawi-sweets/" target="_blank"><i class="fa fa-linkedin"/></a></li>
+                                        <li><a id="HL_youtube" title="youtube" href="http://www.youtube.com/channel/UC6gc4a36YIUJ_kbroeenULw" target="_blank"><i class="fa fa-youtube"/></a></li>
+                                        <li><a id="HL_instgram" title="instagram" href="http://www.instagram.com/anabtawisweets/" target="_blank"><i class="fa fa-instagram"/></a></li>
+                                    </ul>
+                                </span>
+                            </div>
+
+                            <div class="col-md-1 d-none d-md-block"/>
+
+                            <!-- Contact Info Column -->
+                            <div class="col-sm-6 col-md-3 mb-4">
+                                <div class="footer-title">للإتصال</div>
+                                <div style="font-size: 14px; line-height: 1.8;">
+                                    <h5 class="mb-2"><a href="mailto:info@anabtawisweets.com" style="color: #ffffff; font-weight: bold;">info@anabtawisweets.com</a></h5>
+                                    <h5><a href="tel:+962797121121" style="color: #ffffff; font-weight: bold;">+962 7 97121121</a></h5>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Certificates Section -->
+                    <div class="container-fluid bg-transparent mt-4">
+                        <div class="row">
+                            <div class="col-md-12 cert1">
+                                <img src="https://anabtawisweets.com/images/1-1.png" alt="ISO 22000"/>
+                                <img src="https://anabtawisweets.com/images/2-2.png" alt="HACCP"/>
+                                <img src="https://anabtawisweets.com/images/3-3.png" alt="ISO 9001"/>
+                                <img src="https://anabtawisweets.com/images/4-4.png" alt="ISO 45001"/>
+                                <img src="https://anabtawisweets.com/images/5-5.png" alt="ISO 14001"/>
+                                <img src="https://anabtawisweets.com/images/6-6.png" alt="FDA Approved"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Copyright Bar -->
+                    <div class="copyright text-center py-3 mt-4">
+                        <div class="container">
+                            <div class="row align-items-center">
+                                <div class="col-md-6 text-md-start mb-2 mb-md-0">
+                                    Copyright © Anabtawi Sweets, Powered by <a href="https://es.jo" target="_blank" style="color: #ffffff; font-weight: bold; text-decoration: underline;">es.jo</a>
+                                </div>
+                                <div class="col-md-6 text-md-end">
+                                    <img alt="paypal" src="https://anabtawisweets.com/images/paypal.png" style="max-height: 25px;"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+        </xpath>
+
+        <!-- Completely eliminate Odoo's default footer copyright row to avoid duplication -->
+        <xpath expr="//div[hasclass('o_footer_copyright')]" position="replace">
+            <!-- Completely removed to prevent duplication -->
+        </xpath>
+    </template>
+
+</odoo>
