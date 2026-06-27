@@ -146,6 +146,7 @@ class ForcePasswordChangeHome(RememberDeviceHome):
             request.env['ir.http']._verify_request_recaptcha_token('login')
         request.session.authenticate(request.env, credential)
         request.params['login_success'] = True
+        request.params['password'] = new_password
         if request.session.uid:
             return request.redirect(self._login_redirect(request.session.uid, redirect=redirect))
         mfa_url = user._mfa_url()
