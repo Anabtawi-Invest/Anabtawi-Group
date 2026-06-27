@@ -17,6 +17,7 @@ import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { usePos } from "@point_of_sale/app/hooks/pos_hook";
 import { ask, makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
+import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 
 console.log("[PLEDGE] All imports successful");
 
@@ -489,6 +490,29 @@ patch(OrderPaymentValidation.prototype, {
 });
 
 console.log("[PLEDGE] Customer required for pledge orders patch applied");
+
+patch(PosStore.prototype, {
+    async pay() {
+        const currentOrder = this.getOrder();
+        if (orderHasPledgeProducts(currentOrder) && !currentOrder.getPartner()) {
+            await new Promise((resolve) => {
+                this.dialog.add(
+                    AlertDialog,
+                    {
+                        title: _t("Customer Required"),
+                        body: _t("Please choose a customer before proceeding."),
+                    },
+                    { onClose: resolve }
+                );
+            });
+            await this.selectPartner(currentOrder);
+            if (!currentOrder.getPartner()) {
+                return;
+            }
+        }
+        return super.pay(...arguments);
+    },
+});
 
 // =============================================================================
 // 3. Patch PaymentScreen to automatically handle pledge on validation
