@@ -21,6 +21,7 @@ class ReportPosPaymentSummary(models.AbstractModel):
                 'date_from': data.get('date_from'),
                 'date_to': data.get('date_to'),
                 'pos_config_name': data.get('pos_config_name'),
+                'group_by': data.get('group_by', 'session'),
             }
 
         return {
@@ -33,4 +34,5 @@ class ReportPosPaymentSummary(models.AbstractModel):
             'pos_config_name': data.get('pos_config_name') or (
                 wizard.pos_config_id.name if wizard.pos_config_id else _('All POS')
             ),
+            'group_by': data.get('group_by') or wizard.group_by,
         }

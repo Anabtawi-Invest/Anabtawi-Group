@@ -24,15 +24,25 @@
                         </div>
                     </div>
                     <div class="row mb-4">
-                        <div class="col-12">
+                        <div class="col-6">
                             <strong>Point of Sale:</strong>
                             <span t-esc="pos_config_name"/>
+                        </div>
+                        <div class="col-6">
+                            <strong>Group By:</strong>
+                            <span t-if="group_by == 'opening_day'">Opening Day</span>
+                            <span t-else="">Session</span>
                         </div>
                     </div>
 
                     <table class="table table-sm table-bordered">
                         <thead>
-                            <tr>
+                            <tr t-if="group_by == 'opening_day'">
+                                <th>Opening Day</th>
+                                <th>Payment Method</th>
+                                <th class="text-end">Total Sales</th>
+                            </tr>
+                            <tr t-else="">
                                 <th>Session Opening Date</th>
                                 <th>POS Name</th>
                                 <th>Payment Method</th>
@@ -42,7 +52,23 @@
                         <tbody>
                             <t t-if="not lines">
                                 <tr>
-                                    <td colspan="4">No data for selected filters.</td>
+                                    <td t-att-colspan="3 if group_by == 'opening_day' else 4">
+                                        No data for selected filters.
+                                    </td>
+                                </tr>
+                            </t>
+                            <t t-elif="group_by == 'opening_day'">
+                                <tr t-foreach="lines" t-as="line">
+                                    <td>
+                                        <span t-if="line['opening_day']"
+                                              t-esc="line['opening_day']"
+                                              t-options="{'widget': 'date'}"/>
+                                    </td>
+                                    <td t-esc="line['payment_method']"/>
+                                    <td class="text-end">
+                                        <span t-esc="line['total_sales']"
+                                              t-options="{'widget': 'monetary', 'display_currency': line['currency']}"/>
+                                    </td>
                                 </tr>
                             </t>
                             <t t-else="">
