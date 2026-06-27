@@ -130,7 +130,7 @@ class ForcePasswordChangeHome(RememberDeviceHome):
         if not new_password:
             raise UserError(_("Setting empty passwords is not allowed for security reasons!"))
 
-        user.write({
+        user.with_context(auth_force_password_change_done=True).write({
             'password': new_password,
             'must_change_password': False,
         })

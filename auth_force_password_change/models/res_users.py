@@ -18,6 +18,17 @@ class ResUsers(models.Model):
             vals.setdefault('must_change_password', True)
         return super().create(vals_list)
 
+    def write(self, vals):
+        if (
+            'password' in vals
+            and not self.env.context.get('auth_force_password_change_done')
+            and vals.get('must_change_password') is not False
+        ):
+            others = self.filtered(lambda user: user.id != self.env.uid)
+            if others:
+                vals = dict(vals, must_change_password=True)
+        return super().write(vals)
+
     def must_reset_password_on_login(self):
         self.ensure_one()
         return self.must_change_password or not self.log_ids
