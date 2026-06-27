@@ -11,11 +11,12 @@ import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { PledgeListPopup } from "@pos_pledge_order/js/pledge_list_popup";
 import { EmployeeSelectionPopup } from "@pos_pledge_order/js/employee_selection_popup";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
+import OrderPaymentValidation from "@point_of_sale/app/utils/order_payment_validation";
 import { patch } from "@web/core/utils/patch";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { usePos } from "@point_of_sale/app/hooks/pos_hook";
-import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
+import { ask, makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 
 console.log("[PLEDGE] All imports successful");
 
@@ -56,6 +57,21 @@ function printHtmlReceipt(html, title = 'Receipt') {
         </html>
     `);
     printWindow.document.close();
+}
+
+function orderHasPledgeProducts(order) {
+    if (!order) {
+        return false;
+    }
+    const lines = order.getOrderlines ? order.getOrderlines() : order.lines || [];
+    return lines.some((line) => {
+        const product =
+            (line.get_product && line.get_product()) ||
+            (line.getProduct && line.getProduct()) ||
+            line.product_id ||
+            line.product;
+        return product?.has_pledge === true;
+    });
 }
 
 function getOrderPricelistName(order, pos) {
@@ -434,6 +450,47 @@ patch(PosOrder.prototype, {
 console.log("[PLEDGE] PosOrder patch applied");
 
 // =============================================================================
+// 2.6. Require customer when order contains pledge products
+// =============================================================================
+patch(PosOrder.prototype, {
+    get isCustomerRequired() {
+        if (!this.partner_id && orderHasPledgeProducts(this)) {
+            return true;
+        }
+        if (this.partner_id) {
+            return false;
+        }
+        const splitPayment = this.payment_ids.some(
+            (payment) => payment.payment_method_id.split_transactions
+        );
+        const invalidPartnerPreset =
+            (this.preset_id?.needsName && !this.floating_order_name) ||
+            this.preset_id?.needsPartner;
+        return invalidPartnerPreset || this.isToInvoice() || Boolean(splitPayment);
+    },
+});
+
+patch(OrderPaymentValidation.prototype, {
+    async isOrderValid(isForceValidate) {
+        if (orderHasPledgeProducts(this.order) && !this.order.getPartner()) {
+            const confirmed = await ask(this.pos.dialog, {
+                title: _t("Please select the Customer"),
+                body: _t(
+                    "You need to select a customer before validating an order with pledge products."
+                ),
+            });
+            if (confirmed) {
+                this.pos.selectPartner();
+            }
+            return false;
+        }
+        return super.isOrderValid(isForceValidate);
+    },
+});
+
+console.log("[PLEDGE] Customer required for pledge orders patch applied");
+
+// =============================================================================
 // 3. Patch PaymentScreen to automatically handle pledge on validation
 // =============================================================================
 patch(PaymentScreen.prototype, {
@@ -477,6 +534,15 @@ patch(PaymentScreen.prototype, {
             console.log("[PLEDGE] ⚠️ Order has employee service but no employee selected");
             this.notification.add(
                 _t("Please select an employee before validating this order. The order contains employee service products."),
+                { type: "warning" }
+            );
+            return; // Prevent validation
+        }
+
+        if (orderHasPledgeProducts(order) && !order.getPartner?.()) {
+            console.log("[PLEDGE] ⚠️ Order has pledge products but no customer selected");
+            this.notification.add(
+                _t("Please select a customer before validating this order. The order contains pledge products."),
                 { type: "warning" }
             );
             return; // Prevent validation
