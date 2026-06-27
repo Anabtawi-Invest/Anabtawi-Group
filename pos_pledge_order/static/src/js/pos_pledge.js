@@ -475,9 +475,9 @@ patch(OrderPaymentValidation.prototype, {
     async isOrderValid(isForceValidate) {
         if (orderHasPledgeProducts(this.order) && !this.order.getPartner()) {
             const confirmed = await ask(this.pos.dialog, {
-                title: _t("Please select the Customer"),
+                title: _t("Customer Required"),
                 body: _t(
-                    "You need to select a customer before validating an order with pledge products."
+                    "This order has a pledge. Please choose a customer before proceeding."
                 ),
             });
             if (confirmed) {
@@ -500,7 +500,9 @@ patch(PosStore.prototype, {
                     AlertDialog,
                     {
                         title: _t("Customer Required"),
-                        body: _t("Please choose a customer before proceeding."),
+                        body: _t(
+                            "This order has a pledge. Please choose a customer before proceeding."
+                        ),
                     },
                     { onClose: resolve }
                 );
@@ -566,7 +568,7 @@ patch(PaymentScreen.prototype, {
         if (orderHasPledgeProducts(order) && !order.getPartner?.()) {
             console.log("[PLEDGE] ⚠️ Order has pledge products but no customer selected");
             this.notification.add(
-                _t("Please select a customer before validating this order. The order contains pledge products."),
+                _t("This order has a pledge. Please choose a customer before proceeding."),
                 { type: "warning" }
             );
             return; // Prevent validation
