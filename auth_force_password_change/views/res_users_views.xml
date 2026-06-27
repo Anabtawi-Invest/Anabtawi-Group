@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="res_users_view_form_force_password_change" model="ir.ui.view">
+        <field name="name">res.users.form.force.password.change</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='preferences']" position="inside">
+                <group string="Password Policy">
+                    <field name="must_change_password"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
