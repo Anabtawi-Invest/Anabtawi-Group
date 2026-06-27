@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="login_force_change_password" inherit_id="web.login" name="Login - Force Password Change">
+        <xpath expr="//form[hasclass('oe_login_form')]" position="attributes">
+            <attribute name="t-attf-class">oe_login_form #{'d-none' if force_change_password else ('' if login else 'd-none')}</attribute>
+        </xpath>
+
+        <xpath expr="//form[hasclass('oe_login_form')]" position="after">
+            <form t-if="force_change_password"
+                  class="oe_login_form oe_force_change_password_form"
+                  role="form"
+                  action="/web/login"
+                  method="post"
+                  onsubmit="this.action = '/web/login' + location.hash">
+                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                <input type="hidden" name="redirect" t-att-value="redirect"/>
+
+                <p class="alert alert-warning mb-3" role="status">
+                    Please reset your password before continuing.
+                </p>
+
+                <div class="mb-3 field-new_password o_caps_lock_warning">
+                    <label for="new_password" class="form-label">New Password</label>
+                    <div class="input-group mb-1">
+                        <input type="password"
+                               name="new_password"
+                               id="new_password"
+                               class="form-control"
+                               required="required"
+                               autofocus="autofocus"
+                               autocomplete="new-password"
+                               placeholder="Enter your new password"
+                               maxlength="4096"/>
+                        <button type="button" class="btn btn-sm border border-start-0 o_show_password">
+                            <i class="fa fa-eye"/>
+                        </button>
+                    </div>
+                </div>
+
+                <p class="alert alert-danger" t-if="error" role="alert">
+                    <t t-esc="error"/>
+                </p>
+
+                <div class="oe_login_buttons text-center d-grid mb-1 pt-3">
+                    <button type="submit" class="btn btn-primary">Save and continue</button>
+                </div>
+            </form>
+        </xpath>
+    </template>
+
+</odoo>
