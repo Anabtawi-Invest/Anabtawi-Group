@@ -1,0 +1,748 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Navigation Menu Records -->
+    <record id="website.menu_home" model="website.menu">
+        <field name="name">الرئيسية</field>
+    </record>
+
+    <record id="website.menu_contactus" model="website.menu">
+        <field name="parent_id" eval="False"/>
+    </record>
+
+    <record id="menu_aboutus_custom" model="website.menu">
+        <field name="name">من نحن</field>
+        <field name="url">/aboutus</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">20</field>
+    </record>
+
+    <record id="menu_branches_custom" model="website.menu">
+        <field name="name">فروعنا</field>
+        <field name="url">/branches</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">30</field>
+    </record>
+
+    <record id="menu_catalog_custom" model="website.menu">
+        <field name="name">كتالوج المنتجات</field>
+        <field name="url">/our-catalog</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">40</field>
+    </record>
+
+    <record id="menu_contact_custom" model="website.menu">
+        <field name="name">اتصل بنا</field>
+        <field name="url">/contactus</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">50</field>
+    </record>
+
+    <!-- Inject Google Fonts into Layout Head -->
+    <template id="layout_head_fonts" inherit_id="website.layout" name="Anabtawi Sweets Fonts">
+        <xpath expr="//head" position="inside">
+            <link rel="preconnect" href="https://fonts.googleapis.com"/>
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+            <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&amp;family=Tajawal:wght@300;400;500;700;800;900&amp;display=swap" rel="stylesheet"/>
+        </xpath>
+    </template>
+
+    <!-- Inject Top Bar and Floating Social Sidebar before header -->
+    <template id="anabtawi_layout_header_top" inherit_id="website.layout" name="Anabtawi Top Bar and Sidebar">
+        <xpath expr="//header" position="before">
+            <div class="top menu5 d-none d-lg-block">
+                <div class="container-fluid" style="padding-right: 50px; padding-left: 50px;">
+                    <div class="row align-items-center">
+                        <div class="col-lg-3">
+                            <i class="fa fa-phone" aria-hidden="true"/>
+                            <a href="tel:+96265311200">+962 7 9712 1121</a>
+                        </div>
+                        <div class="col-lg-3">
+                            <i class="fa fa-envelope" aria-hidden="true"/>
+                            <a href="mailto:info@anabtawisweets.com">info@anabtawisweets.com</a>
+                        </div>
+                        <div class="col-lg-4">
+                            <i class="fa fa-map-marker"/>
+                            <a href="https://maps.app.goo.gl/toEHJ12FdDjEQBiq5" target="_blank">حلويات عنبتاوي - شارع المدينة المنورة - عمان - الأردن</a>
+                        </div>
+                        <div class="col-lg-2 text-start">
+                            <i class="fa fa-globe" aria-hidden="true"/>
+                            <a href="/our-catalog">متجر دولي</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="main">
+                <ul id="navigationMenu">
+                    <li><a id="HyperLink7" title="whatsapp" class="whatsapp" href="https://api.whatsapp.com/send?phone=962795212989" target="_blank"><i class="fa fa-whatsapp"/></a></li>
+                    <li><a id="HyperLink1" title="Facebook" class="facebook" href="https://facebook.com/anabtawisweets/?_rdc=1&amp;_rdr" target="_blank"><i class="fa fa-facebook"/></a></li>
+                    <li><a id="HyperLink3" title="Twitter" class="twitter" href="https://twitter.com/Anabtawi_Sweets" target="_blank"><i class="fa fa-twitter"/></a></li>
+                    <li><a id="HyperLink4" title="LinkedIn" class="linkedin" href="http://www.linkedin.com/company/anabtawi-sweets/" target="_blank"><i class="fa fa-linkedin"/></a></li>
+                    <li><a id="HyperLink5" title="youtube" class="youtube" href="http://www.youtube.com/channel/UC6gc4a36YIUJ_kbroeenULw" target="_blank"><i class="fa fa-youtube"/></a></li>
+                    <li><a id="HyperLink6" title="instagram" class="instagram" href="http://www.instagram.com/anabtawisweets/" target="_blank"><i class="fa fa-instagram"/></a></li>
+                </ul>
+            </div>
+        </xpath>
+    </template>
+
+    <!-- Replace Odoo Footer - MUST use div[@id='footer'] NOT //footer -->
+    <template id="anabtawi_layout_footer" inherit_id="website.layout" name="Anabtawi Custom Footer" priority="50">
+        <xpath expr="//div[@id='footer']" position="replace">
+            <div id="footer" class="oe_structure text-break" t-ignore="true" t-if="not no_footer">
+                <footer class="footer">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col-sm-12 col-md-4 mb-4">
+                                <div class="newletter">
+                                    <div class="footer-title-newsletter">حلويات مميزة للحظات مميزة</div>
+                                    <div class="mb-3">الاشتراك في الرسائل الإخبارية</div>
+                                    <div class="position-relative" style="max-width: 320px;">
+                                        <input type="text" class="form-control" placeholder="أدخل عنوان بريدك الالكتروني"/>
+                                        <button class="btn-newsletter"><i class="fa fa-arrow-left"/></button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-1 d-none d-md-block"/>
+                            <div class="col-sm-6 col-md-3 mb-4">
+                                <div class="footer-title">العنوان</div>
+                                <div class="mb-3">
+                                    <a href="https://maps.app.goo.gl/zDonDarr9R6AEv2w9" target="_blank" style="font-size: 14px; line-height: 1.6;">
+                                        حلويات عنبتاوي - شارع المدينة المنورة - عمان - الأردن
+                                    </a>
+                                </div>
+                                <span class="socials">
+                                    <ul>
+                                        <li><a id="HL_Fb" title="Facebook" href="https://facebook.com/anabtawisweets/?_rdc=1&amp;_rdr" target="_blank"><i class="fa fa-facebook"/></a></li>
+                                        <li><a id="HL_t" title="Twitter" href="https://twitter.com/Anabtawi_Sweets" target="_blank"><i class="fa fa-twitter"/></a></li>
+                                        <li><a id="HL_in" title="LinkedIn" href="http://www.linkedin.com/company/anabtawi-sweets/" target="_blank"><i class="fa fa-linkedin"/></a></li>
+                                        <li><a id="HL_youtube" title="youtube" href="http://www.youtube.com/channel/UC6gc4a36YIUJ_kbroeenULw" target="_blank"><i class="fa fa-youtube"/></a></li>
+                                        <li><a id="HL_instgram" title="instagram" href="http://www.instagram.com/anabtawisweets/" target="_blank"><i class="fa fa-instagram"/></a></li>
+                                    </ul>
+                                </span>
+                            </div>
+                            <div class="col-md-1 d-none d-md-block"/>
+                            <div class="col-sm-6 col-md-3 mb-4">
+                                <div class="footer-title">للإتصال</div>
+                                <div style="font-size: 14px; line-height: 1.8;">
+                                    <h5 class="mb-2"><a href="mailto:info@anabtawisweets.com" style="color: #ffffff; font-weight: bold;">info@anabtawisweets.com</a></h5>
+                                    <h5><a href="tel:+962797121121" style="color: #ffffff; font-weight: bold;">+962 7 97121121</a></h5>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="container-fluid bg-transparent mt-4">
+                        <div class="row">
+                            <div class="col-md-12 cert1">
+                                <img src="https://anabtawisweets.com/images/1-1.png" alt="ISO 22000"/>
+                                <img src="https://anabtawisweets.com/images/2-2.png" alt="HACCP"/>
+                                <img src="https://anabtawisweets.com/images/3-3.png" alt="ISO 9001"/>
+                                <img src="https://anabtawisweets.com/images/4-4.png" alt="ISO 45001"/>
+                                <img src="https://anabtawisweets.com/images/5-5.png" alt="ISO 14001"/>
+                                <img src="https://anabtawisweets.com/images/6-6.png" alt="FDA Approved"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="copyright text-center py-3 mt-4">
+                        <div class="container">
+                            <div class="row align-items-center">
+                                <div class="col-md-6 text-md-start mb-2 mb-md-0">
+                                    Copyright © Anabtawi Sweets, Powered by <a href="https://es.jo" target="_blank" style="color: #ffffff; font-weight: bold; text-decoration: underline;">es.jo</a>
+                                </div>
+                                <div class="col-md-6 text-md-end">
+                                    <img alt="paypal" src="https://anabtawisweets.com/images/paypal.png" style="max-height: 25px;"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+        </xpath>
+    </template>
+
+    <!-- ========== HOME PAGE TEMPLATE ========== -->
+    <template id="home_page_template" name="Anabtawi Sweets Home" track="1">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure oe_empty">
+
+                <section class="hero-static text-center text-md-start">
+                    <div class="art-header d-none d-md-block">
+                        <img alt="anabtawi decoration" src="https://anabtawisweets.com/images/art.png" class="img-fluid"/>
+                    </div>
+                    <div class="container" style="position: relative; z-index: 5;">
+                        <div class="row align-items-center">
+                            <div class="col-md-7 text-end py-5">
+                                <h1 class="hero-static-title mb-4">عراقة المذاق وسحر <span>الحلويات الشرقية</span></h1>
+                                <p class="hero-static-text mb-4 text-muted">
+                                    تأسست شركة حلويات عنبتاوي في عام 1983، وقد ترسخت كرمز للتميز في صناعة الحلويات العربية والغربية الفاخرة المحضرة بشغف وحرفية عالية لترضي جميع الأذواق.
+                                </p>
+                                <div class="d-flex flex-wrap gap-3 justify-content-end">
+                                    <a href="/our-catalog" class="btn btn-more">تصفح المنتجات</a>
+                                    <a href="/branches" class="btn btn-anabtawi-primary">فروعنا</a>
+                                </div>
+                            </div>
+                            <div class="col-md-5 text-center d-none d-md-block">
+                                <img src="https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&amp;fit=crop&amp;w=600&amp;q=80" alt="حلويات عنبتاوي فاخرة" class="img-fluid rounded shadow-sm border border-light" style="max-width: 85%; transform: rotate(1deg);"/>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="scroll-video-section">
+                    <div class="video-sticky-wrapper">
+                        <canvas id="scrub-canvas"></canvas>
+                        <div class="video-loader d-flex flex-column align-items-center justify-content-center position-absolute top-0 start-0 w-100 h-100">
+                            <svg viewBox="0 0 100 100" width="64" height="64" style="color: #c89211;" class="mb-3 animate-pulse">
+                                <path d="M 5.00 78.53 L 7.87 80.52 L 12.08 82.51 L 19.15 84.50 L 28.44 84.50 L 32.64 83.39 L 36.18 81.84 L 41.71 78.08 L 46.57 73.00 L 39.94 70.57 L 39.28 69.90 L 38.39 69.90 L 35.96 72.56 L 30.87 75.65 L 27.33 76.76 L 21.36 76.76 L 15.61 74.77 L 18.49 71.01 L 21.36 68.57 L 24.46 66.81 L 27.11 65.92 L 32.64 65.26 L 37.95 65.92 L 45.25 68.57 L 46.57 69.46 L 48.12 71.67 L 51.88 75.43 L 58.73 80.52 L 64.93 83.17 L 68.91 84.05 L 75.98 84.05 L 82.40 82.29 L 86.38 80.29 L 91.02 77.20 L 95.00 73.44 L 90.58 67.47 L 86.60 63.71 L 80.18 59.95 L 75.54 58.40 L 70.23 57.74 L 63.38 58.40 L 59.40 59.51 L 54.75 61.50 L 60.95 67.69 L 63.38 66.58 L 67.36 65.70 L 72.22 65.70 L 77.09 67.25 L 80.63 69.90 L 80.85 69.68 L 83.72 72.56 L 81.51 74.10 L 78.86 75.21 L 74.88 76.09 L 70.68 76.09 L 66.03 74.99 L 62.71 73.44 L 58.96 70.79 L 53.43 65.04 L 51.88 62.83 L 56.74 56.19 L 58.96 51.99 L 60.72 46.90 L 61.61 40.49 L 61.39 36.73 L 60.28 32.09 L 57.63 26.34 L 53.43 21.03 L 48.12 16.17 L 46.79 15.50 L 41.71 20.59 L 37.29 28.11 L 35.52 34.08 L 35.29 41.38 L 37.29 49.34 L 40.16 54.86 L 41.93 56.86 L 46.79 50.00 L 43.70 44.03 L 43.03 40.71 L 43.03 36.73 L 44.80 30.98 L 46.57 28.11 L 47.90 26.78 L 50.33 29.66 L 52.10 32.97 L 53.43 38.72 L 52.99 44.47 L 52.10 47.35 L 49.67 52.21 L 47.01 55.97 L 43.92 59.29 L 36.62 57.52 L 29.55 57.30 L 24.68 58.18 L 20.04 59.95 L 14.95 63.49 L 10.97 67.69 L 8.10 71.89 Z" fill="currentColor"/>
+                            </svg>
+                            <span style="color: #c89211; font-weight: bold; font-size: 0.85rem; letter-spacing: 0.15em; text-transform: uppercase;">Loading Experience</span>
+                            <div class="progress mt-3 animate-pulse-progress" style="width: 200px; height: 3px; background-color: rgba(200, 146, 17, 0.2); border-radius: 0;">
+                                <div class="progress-bar" style="width: 0%; transition: width 0.1s linear; background-color: #c89211;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="welcome py-5">
+                    <div class="art-body d-none d-lg-block">
+                        <img alt="anabtawi decoration" src="https://anabtawisweets.com/images/art.png" class="img-fluid"/>
+                    </div>
+                    <div class="container text-center">
+                        <div class="title-small"><span>الفئات</span></div>
+                        <h2 class="title mt-3">الفئات الرئيسية</h2>
+                        <div class="row g-4 mt-4">
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog"><img alt="كنافة و وربات" src="https://anabtawisweets.com/Admin_Site/Categories/Images/f97e8eb6-6fb8-4686-bce4-220e8cd647b1.png" class="img-fluid"/></a>
+                                        <div class="amazingcarousel-title">كنافة و وربات</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog"><img alt="حلويات مشكلة" src="https://anabtawisweets.com/Admin_Site/Categories/Images/a7363817-c0ab-43fa-bd90-df80cf4dd957.png" class="img-fluid"/></a>
+                                        <div class="amazingcarousel-title">حلويات مشكلة</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog"><img alt="كيك و حلويات غربية" src="https://anabtawisweets.com/Admin_Site/Categories/Images/e4f63e6f-8831-42cf-821d-9875ae691ae2.png" class="img-fluid"/></a>
+                                        <div class="amazingcarousel-title">كيك و حلويات غربية</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog"><img alt="حلويات شرقية" src="https://anabtawisweets.com/Admin_Site/Categories/Images/be7e94e7-53b0-4b94-b95d-b0cd392d9d3f.png" class="img-fluid"/></a>
+                                        <div class="amazingcarousel-title">حلويات شرقية</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog"><img alt="شوكولاته و هدايا" src="https://anabtawisweets.com/Admin_Site/Categories/Images/50fa5218-6f32-48a8-96fc-e92bdfe2717e.png" class="img-fluid"/></a>
+                                        <div class="amazingcarousel-title">شوكولاته و هدايا</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog"><img alt="قهوة" src="https://anabtawisweets.com/Admin_Site/Categories/Images/28c43f2b-2cb9-48ea-a575-6d3888c38cb7.png" class="img-fluid"/></a>
+                                        <div class="amazingcarousel-title">قهوة</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog"><img alt="عسل الترياق" src="https://anabtawisweets.com/Admin_Site/Categories/Images/ecf685d5-acab-4bac-bf51-4749efead605.png" class="img-fluid"/></a>
+                                        <div class="amazingcarousel-title">عسل الترياق</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="amazingcarousel-item-container">
+                                    <div class="amazingcarousel-image">
+                                        <a href="/our-catalog"><img alt="كعك و معمول" src="https://anabtawisweets.com/Admin_Site/Categories/Images/8b0152bc-77f7-4a06-9945-98aaf79bae21.png" class="img-fluid"/></a>
+                                        <div class="amazingcarousel-title">كعك و معمول</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="news bg-anabtawi-gray py-5">
+                    <div class="container text-center">
+                        <div class="title-small"><span>المدونة والأحداث</span></div>
+                        <h2 class="title mt-3">آخر الأخبار لدينا</h2>
+                        <div class="row g-4 justify-content-center mt-4">
+                            <div class="col-md-4">
+                                <div class="news-card-li h-100 text-end">
+                                    <img alt="Youth For Growth" src="https://anabtawisweets.com/Admin_Site/Articles/Images/5/0/dd27d0a3-559e-47f9-b517-754daf1b24ff.png" class="img-fluid mb-3"/>
+                                    <div class="title-1">24, Jun, 2024</div>
+                                    <div class="text">Youth For Growth</div>
+                                    <a href="/aboutus" class="btn-more mt-2">إقرأ المزيد</a>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="news-card-li h-100 text-end">
+                                    <img alt="Sial Canada 2024" src="https://anabtawisweets.com/Admin_Site/Articles/Images/5/0/dcce2016-1c2b-48cf-95e4-64a6fa6d711d.png" class="img-fluid mb-3"/>
+                                    <div class="title-1">15, May, 2024</div>
+                                    <div class="text">Sial Canada 2024</div>
+                                    <a href="/aboutus" class="btn-more mt-2">إقرأ المزيد</a>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="news-card-li h-100 text-end">
+                                    <img alt="Ramadan Iftar" src="https://anabtawisweets.com/Admin_Site/Articles/Images/5/0/7d565e81-5025-4d4b-8122-201d354619ea.png" class="img-fluid mb-3"/>
+                                    <div class="title-1">30, Mar, 2024</div>
+                                    <div class="text">Ramadan Iftar</div>
+                                    <a href="/aboutus" class="btn-more mt-2">إقرأ المزيد</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="offer-banner" style="background: url('https://anabtawisweets.com/Admin_Site/Articles/Images/4/0/882568f9-9b7c-4dfe-b0a4-d3741732ed3f.png') no-repeat left center;">
+                    <div class="container text-center text-white">
+                        <div class="title2-gold2"><h2>حلويات العنبتاوي</h2></div>
+                        <div class="title-gold2"><span>كن</span> شريكا</div>
+                        <p>هل أنت مستعد لتوسيع آفاقك والاستفادة من الإمكانات الهائلة للأسواق الدولية؟ انضم إلى شبكتنا من الشركاء وابدأ رحلة التصدير مع عنبتاوي.</p>
+                        <div class="contacts d-flex flex-wrap justify-content-center align-items-center gap-3">
+                            <div><i class="fa fa-phone me-2"/>+962 7 9910 7555</div>
+                            <div class="partner"><a href="/contactus">تواصل معنا الان</a></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="companies" class="py-5 text-white" style="background-color: #1a1a1a;">
+                    <div class="container">
+                        <div class="text-center mb-5">
+                            <span class="text-uppercase d-inline-block mb-2 font-weight-bold" style="color: #c89211; letter-spacing: 0.15em; font-size: 0.9rem;">OUR WEBSITES</span>
+                            <h2 class="h1 font-weight-bold" style="font-family: 'Cairo', 'Tajawal', sans-serif;">مواقعنا</h2>
+                            <div style="width: 60px; height: 2px; background-color: #c89211; margin: 10px auto;"/>
+                        </div>
+                    </div>
+                    <div class="marquee-container py-4" dir="ltr">
+                        <div class="marquee-track">
+                            <a href="https://anabtawisweets.com" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Anabtawi Sweets" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">Anabtawi Sweets</div>
+                            </a>
+                            <a href="#" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="United Food Trading" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">United Food Trading</div>
+                            </a>
+                            <a href="#" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Anabtawi Coffee" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">Anabtawi Coffee</div>
+                            </a>
+                            <a href="#" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Ein Jaloot" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">Ein Jaloot</div>
+                            </a>
+                            <a href="#" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Tryaq Honey" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">Tryaq Honey</div>
+                            </a>
+                            <a href="#" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Holy Land Sweets" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">Holy Land Sweets</div>
+                            </a>
+                            <!-- Duplicates for infinite loop -->
+                            <a href="https://anabtawisweets.com" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Anabtawi Sweets" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">Anabtawi Sweets</div>
+                            </a>
+                            <a href="#" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="United Food Trading" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">United Food Trading</div>
+                            </a>
+                            <a href="#" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Anabtawi Coffee" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">Anabtawi Coffee</div>
+                            </a>
+                            <a href="#" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Ein Jaloot" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">Ein Jaloot</div>
+                            </a>
+                            <a href="#" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Tryaq Honey" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">Tryaq Honey</div>
+                            </a>
+                            <a href="#" class="marquee-item text-decoration-none flex-shrink-0">
+                                <div class="company-logo-placeholder">
+                                    <img src="/web/static/img/placeholder.png" alt="Holy Land Sweets" class="company-logo-img"/>
+                                </div>
+                                <div class="company-name text-center mt-3">Holy Land Sweets</div>
+                            </a>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </t>
+    </template>
+
+    <!-- ========== ABOUT PAGE TEMPLATE ========== -->
+    <template id="about_page_template" name="About Anabtawi Sweets" track="1">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure oe_empty">
+                <section class="anabtawi-page-banner">
+                    <div class="container py-3">
+                        <h1 class="mb-3" style="color: var(--anabtawi-primary); font-weight: 800; font-family: 'Cairo';">من نحن</h1>
+                        <p class="lead text-muted col-md-8 mx-auto" style="font-size: 1.1rem;">
+                            تعرف على قصة شغفنا بالحلويات الشرقية ومسيرتنا في تقديم الجودة والأصالة على مدار العقود.
+                        </p>
+                    </div>
+                </section>
+                <section class="py-5 bg-white">
+                    <div class="container">
+                        <div class="row align-items-center">
+                            <div class="col-lg-6 mb-4 mb-lg-0 text-end">
+                                <h2 class="mb-4" style="color: var(--anabtawi-primary); font-weight: 700; font-family: 'Cairo';">بداياتنا منذ عام 1984</h2>
+                                <p class="mb-3 text-muted" style="line-height: 1.8; font-size: 1.05rem;">
+                                    تأسست حلويات عنبتاوي عام 1984 كأحد الرواد في صناعة الحلويات الفاخرة بالأردن. كان الشغف بتقديم المذاق الأصيل هو دافعنا الدائم، حيث اعتمدنا على أجود المكونات الطبيعية والوصفات التقليدية المتوارثة.
+                                </p>
+                                <p class="mb-4 text-muted" style="line-height: 1.8; font-size: 1.05rem;">
+                                    نحرص في كل قطعة حلوى نعدها على نقل إرث شرقي عريق يحاكي الضيافة العربية الكريمة، مدمجاً بأحدث التقنيات وأعلى معايير سلامة الغذاء العالمية.
+                                </p>
+                            </div>
+                            <div class="col-lg-6 text-center">
+                                <img src="https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&amp;fit=crop&amp;w=600&amp;q=80" alt="تاريخ صناعتنا" class="img-fluid rounded shadow-sm" style="max-width: 90%; border: 1px solid #efebe9;"/>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section class="py-5 bg-anabtawi-gray">
+                    <div class="container text-center">
+                        <div class="row g-4">
+                            <div class="col-md-4">
+                                <div class="amazingcarousel-item-container p-4">
+                                    <div class="mb-3" style="font-size: 2.5rem; color: var(--anabtawi-gold);"><i class="fa fa-eye"/></div>
+                                    <h3 class="amazingcarousel-title mb-3">رؤيتنا</h3>
+                                    <p class="text-muted" style="font-size: 0.95rem; line-height: 1.6;">أن نكون الخيار الأول والوجهة العالمية المفضلة لعشاق الحلويات الشرقية والغربية الفاخرة في جميع أنحاء العالم.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="amazingcarousel-item-container p-4">
+                                    <div class="mb-3" style="font-size: 2.5rem; color: var(--anabtawi-gold);"><i class="fa fa-rocket"/></div>
+                                    <h3 class="amazingcarousel-title mb-3">رسالتنا</h3>
+                                    <p class="text-muted" style="font-size: 0.95rem; line-height: 1.6;">تقديم حلويات عالية الجودة بمذاق أصيل لا يُنسى، مع الحفاظ على النكهة التقليدية والابتكار المستمر لإسعاد زبائننا.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="amazingcarousel-item-container p-4">
+                                    <div class="mb-3" style="font-size: 2.5rem; color: var(--anabtawi-gold);"><i class="fa fa-heart"/></div>
+                                    <h3 class="amazingcarousel-title mb-3">قيمنا</h3>
+                                    <p class="text-muted" style="font-size: 0.95rem; line-height: 1.6;">الجودة والاتقان، النزاهة والأمانة، الابتكار، وإسعاد العملاء والشركاء والموظفين في كل تفصيل نقوم به.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section class="py-5 bg-white">
+                    <div class="container">
+                        <h2 class="title text-center mb-5" style="font-family: 'Cairo';">محطات رئيسية في مسيرتنا</h2>
+                        <div class="row">
+                            <div class="col-md-3 text-center mb-4">
+                                <h1 class="display-4 font-weight-bold" style="color: var(--anabtawi-gold); font-weight: 800;">1984</h1>
+                                <h5 class="font-weight-bold" style="color: var(--anabtawi-primary);">التأسيس والبداية</h5>
+                                <p class="text-muted" style="font-size: 0.9rem;">افتتاح الفرع الأول في الأردن لتقديم الكنافة النابلسية الشهيرة.</p>
+                            </div>
+                            <div class="col-md-3 text-center mb-4">
+                                <h1 class="display-4 font-weight-bold" style="color: var(--anabtawi-gold); font-weight: 800;">2000</h1>
+                                <h5 class="font-weight-bold" style="color: var(--anabtawi-primary);">التوسع المحلي</h5>
+                                <p class="text-muted" style="font-size: 0.9rem;">الوصول إلى 10 فروع داخل الأردن وتوسيع خطوط المنتجات.</p>
+                            </div>
+                            <div class="col-md-3 text-center mb-4">
+                                <h1 class="display-4 font-weight-bold" style="color: var(--anabtawi-gold); font-weight: 800;">2015</h1>
+                                <h5 class="font-weight-bold" style="color: var(--anabtawi-primary);">تصدير دولي</h5>
+                                <p class="text-muted" style="font-size: 0.9rem;">إطلاق خط الشحن الدولي والتصدير لأكثر من 40 دولة.</p>
+                            </div>
+                            <div class="col-md-3 text-center mb-4">
+                                <h1 class="display-4 font-weight-bold" style="color: var(--anabtawi-gold); font-weight: 800;">2026</h1>
+                                <h5 class="font-weight-bold" style="color: var(--anabtawi-primary);">العصر الرقمي الجديد</h5>
+                                <p class="text-muted" style="font-size: 0.9rem;">إطلاق منصة الطلب والتصدير المتكاملة المعتمدة على أحدث التقنيات.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <!-- ========== BRANCHES PAGE TEMPLATE ========== -->
+    <template id="branches_page_template" name="Anabtawi Sweets Branches" track="1">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure oe_empty">
+                <section class="anabtawi-page-banner">
+                    <div class="container py-3">
+                        <h1 class="mb-3" style="color: var(--anabtawi-primary); font-weight: 800; font-family: 'Cairo';">فروعنا</h1>
+                        <p class="lead text-muted col-md-8 mx-auto" style="font-size: 1.1rem;">نحن متواجدون بالقرب منك لخدمتك وتلبية طلباتك في الأردن وفلسطين.</p>
+                    </div>
+                </section>
+                <section class="py-5 bg-white">
+                    <div class="container">
+                        <h2 class="title text-center mb-5" style="font-family: 'Cairo';">فروع المملكة الأردنية الهاشمية</h2>
+                        <div class="row g-4 text-end">
+                            <div class="col-md-6 col-lg-4">
+                                <div class="branch-list-card h-100">
+                                    <h4 class="mb-3" style="color: var(--anabtawi-primary); font-weight: bold;"><i class="fa fa-map-marker me-2"/> فرع شارع المدينة المنورة</h4>
+                                    <p class="mb-2 text-muted"><i class="fa fa-map me-2"/> عمان، شارع المدينة المنورة</p>
+                                    <p class="mb-2 text-muted"><i class="fa fa-phone me-2"/> +962 6 5800001</p>
+                                    <p class="mb-4 text-muted"><i class="fa fa-clock-o me-2"/> 9:00 ص - 11:30 م</p>
+                                    <a href="https://maps.google.com" target="_blank" class="btn btn-more btn-sm w-100">عرض على الخريطة</a>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <div class="branch-list-card h-100">
+                                    <h4 class="mb-3" style="color: var(--anabtawi-primary); font-weight: bold;"><i class="fa fa-map-marker me-2"/> فرع الكرك</h4>
+                                    <p class="mb-2 text-muted"><i class="fa fa-map me-2"/> الكرك، الثنية، الشارع الرئيسي</p>
+                                    <p class="mb-2 text-muted"><i class="fa fa-phone me-2"/> +962 3 2341234</p>
+                                    <p class="mb-4 text-muted"><i class="fa fa-clock-o me-2"/> 9:00 ص - 11:00 م</p>
+                                    <a href="https://maps.google.com" target="_blank" class="btn btn-more btn-sm w-100">عرض على الخريطة</a>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <div class="branch-list-card h-100">
+                                    <h4 class="mb-3" style="color: var(--anabtawi-primary); font-weight: bold;"><i class="fa fa-map-marker me-2"/> فرع مطار الملكة علياء</h4>
+                                    <p class="mb-2 text-muted"><i class="fa fa-map me-2"/> مبنى المغادرين، الطابق الثاني</p>
+                                    <p class="mb-2 text-muted"><i class="fa fa-phone me-2"/> +962 6 4452000</p>
+                                    <p class="mb-4 text-muted"><i class="fa fa-clock-o me-2"/> 24 ساعة طيلة أيام الأسبوع</p>
+                                    <a href="https://maps.google.com" target="_blank" class="btn btn-more btn-sm w-100">عرض على الخريطة</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section class="py-5 bg-anabtawi-gray">
+                    <div class="container">
+                        <h2 class="title text-center mb-5" style="font-family: 'Cairo';">فروع فلسطين</h2>
+                        <div class="row g-4 text-end">
+                            <div class="col-md-6 col-lg-4">
+                                <div class="branch-list-card h-100">
+                                    <h4 class="mb-3" style="color: var(--anabtawi-primary); font-weight: bold;"><i class="fa fa-map-marker me-2"/> فرع طولكرم</h4>
+                                    <p class="mb-2 text-muted"><i class="fa fa-map me-2"/> طولكرم، شارع باريس، وسط المدينة</p>
+                                    <p class="mb-2 text-muted"><i class="fa fa-phone me-2"/> +970 9 2671234</p>
+                                    <p class="mb-4 text-muted"><i class="fa fa-clock-o me-2"/> 9:00 ص - 10:30 م</p>
+                                    <a href="https://maps.google.com" target="_blank" class="btn btn-more btn-sm w-100">عرض على الخريطة</a>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <div class="branch-list-card h-100">
+                                    <h4 class="mb-3" style="color: var(--anabtawi-primary); font-weight: bold;"><i class="fa fa-map-marker me-2"/> فرع عنبتا</h4>
+                                    <p class="mb-2 text-muted"><i class="fa fa-map me-2"/> عنبتا، الشارع الرئيسي</p>
+                                    <p class="mb-2 text-muted"><i class="fa fa-phone me-2"/> +970 9 2684321</p>
+                                    <p class="mb-4 text-muted"><i class="fa fa-clock-o me-2"/> 9:00 ص - 10:00 م</p>
+                                    <a href="https://maps.google.com" target="_blank" class="btn btn-more btn-sm w-100">عرض على الخريطة</a>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <div class="branch-list-card h-100">
+                                    <h4 class="mb-3" style="color: var(--anabtawi-primary); font-weight: bold;"><i class="fa fa-map-marker me-2"/> فرع قلقيلية</h4>
+                                    <p class="mb-2 text-muted"><i class="fa fa-map me-2"/> قلقيلية، الشارع الشرقي</p>
+                                    <p class="mb-2 text-muted"><i class="fa fa-phone me-2"/> +970 9 2940000</p>
+                                    <p class="mb-4 text-muted"><i class="fa fa-clock-o me-2"/> 9:00 ص - 11:00 م</p>
+                                    <a href="https://maps.google.com" target="_blank" class="btn btn-more btn-sm w-100">عرض على الخريطة</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <!-- ========== CATALOG PAGE TEMPLATE ========== -->
+    <template id="catalog_page_template" name="Anabtawi Sweets Catalog" track="1">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure oe_empty">
+                <section class="anabtawi-page-banner">
+                    <div class="container py-3">
+                        <h1 class="mb-3" style="color: var(--anabtawi-primary); font-weight: 800; font-family: 'Cairo';">كتالوج المنتجات</h1>
+                        <p class="lead text-muted col-md-8 mx-auto" style="font-size: 1.1rem;">قائمة منسقة بأشهى المأكولات والضيافة والحلويات المحضرة طازجة يومياً من أجلكم.</p>
+                    </div>
+                </section>
+                <section class="py-5 bg-white">
+                    <div class="container">
+                        <div class="d-flex justify-content-center flex-wrap gap-2 mb-5">
+                            <button class="btn btn-more btn-sm">عرض الكل</button>
+                            <button class="btn btn-anabtawi-primary btn-sm">حلويات شرقية</button>
+                            <button class="btn btn-anabtawi-primary btn-sm">كنافة ووربات</button>
+                            <button class="btn btn-anabtawi-primary btn-sm">شوكولاتة فاخرة</button>
+                            <button class="btn btn-anabtawi-primary btn-sm">كيك ومناسبات</button>
+                            <button class="btn btn-anabtawi-primary btn-sm">البن والقهوة</button>
+                        </div>
+                        <div class="row g-4 text-end">
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="كنافة خشنة بالجبنة البلدية" src="https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;"/>
+                                    <span class="badge-category mb-2">كنافة ووربات</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">كنافة خشنة بالجبنة البلدية</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">كنافة خشنة مغطاة بالفستق الحلبي الفاخر ومحشية بأجود أنواع الأجبان النابلسية.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="تشيز كيك بالفراولة" src="https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;"/>
+                                    <span class="badge-category mb-2">كيك ومناسبات</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">تشيز كيك بالفراولة والكراميل</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">قالب تشيز كيك كريمي مخبوز على الطريقة الأوروبية مع طبقة فراولة طازجة.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="بوكس شوكولاتة بلجيكية" src="https://images.unsplash.com/photo-1548907040-4d42b52115ca?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;"/>
+                                    <span class="badge-category mb-2">شوكولاتة فاخرة</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">بوكس شوكولاتة بلجيكية مشكلة</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">مجموعة حصرية من قطع الشوكولاتة المحشية بالكراميل والمكسرات واللوز المحمص.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="بن عنبتاوي أشقر" src="https://images.unsplash.com/photo-1507133750040-4a8f57021571?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;"/>
+                                    <span class="badge-category mb-2">البن والقهوة</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">بن عنبتاوي أشقر (خلطة عربية)</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">خلطة قهوة عربية بالهيل الطبيعي الفاخر، محمصة بعناية فائقة.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="صحن مشكل بقلاوة" src="https://images.unsplash.com/photo-1514517604298-cf80e0fb7f1e?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;"/>
+                                    <span class="badge-category mb-2">حلويات شرقية</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">صحن مشكل بقلاوة وفستقية</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">تشكيلة غنية ومقرمشة من البقلاوة وأصابع الفستق الحلبي.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-lg-4">
+                                <div class="product-card h-100 p-3">
+                                    <img alt="معمول فاخر بالتمر" src="https://images.unsplash.com/photo-1558961309-dbdf71799f5a?auto=format&amp;fit=crop&amp;w=500&amp;q=80" class="img-fluid rounded mb-3" style="height: 220px; width: 100%; object-fit: cover;"/>
+                                    <span class="badge-category mb-2">حلويات شرقية</span>
+                                    <h3 class="amazingcarousel-title mb-2" style="font-size: 1.25rem;">معمول فاخر بالتمر البلدي</h3>
+                                    <p class="text-muted" style="font-size: 0.9rem;">قطع المعمول التقليدي الهش المحشو بأجود أنواع التمور الطبيعية.</p>
+                                    <button class="btn btn-more btn-sm w-100 mt-3">اطلب الآن</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <!-- ========== CONTACT PAGE TEMPLATE ========== -->
+    <template id="contact_page_template" name="Anabtawi Sweets Contact" track="1">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure oe_empty">
+                <section class="anabtawi-page-banner">
+                    <div class="container py-3">
+                        <h1 class="mb-3" style="color: var(--anabtawi-primary); font-weight: 800; font-family: 'Cairo';">اتصل بنا</h1>
+                        <p class="lead text-muted col-md-8 mx-auto" style="font-size: 1.1rem;">يسعدنا سماع استفساراتك واقتراحاتك. تفضل بمراسلتنا أو الاتصال بنا مباشرة.</p>
+                    </div>
+                </section>
+                <section class="py-5 bg-white text-dark">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col-lg-5 mb-5 mb-lg-0 text-end">
+                                <h3 class="mb-4" style="color: var(--anabtawi-primary); font-weight: 700; font-family: 'Cairo';">معلومات التواصل</h3>
+                                <div class="d-flex align-items-center mb-4">
+                                    <div class="rounded-circle bg-light text-center d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; border: 1px solid #efebe9; margin-left: 15px;">
+                                        <i class="fa fa-phone" style="color: var(--anabtawi-gold); font-size: 1.25rem;"/>
+                                    </div>
+                                    <div>
+                                        <h5 class="mb-1" style="color: var(--anabtawi-primary); font-weight: 600;">رقم الهاتف</h5>
+                                        <p class="mb-0 text-muted">+962 7 97121121</p>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center mb-4">
+                                    <div class="rounded-circle bg-light text-center d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; border: 1px solid #efebe9; margin-left: 15px;">
+                                        <i class="fa fa-envelope" style="color: var(--anabtawi-gold); font-size: 1.25rem;"/>
+                                    </div>
+                                    <div>
+                                        <h5 class="mb-1" style="color: var(--anabtawi-primary); font-weight: 600;">البريد الإلكتروني</h5>
+                                        <p class="mb-0 text-muted">info@anabtawisweets.com</p>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center mb-4">
+                                    <div class="rounded-circle bg-light text-center d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; border: 1px solid #efebe9; margin-left: 15px;">
+                                        <i class="fa fa-map-marker" style="color: var(--anabtawi-gold); font-size: 1.25rem;"/>
+                                    </div>
+                                    <div>
+                                        <h5 class="mb-1" style="color: var(--anabtawi-primary); font-weight: 600;">المكتب الرئيسي</h5>
+                                        <p class="mb-0 text-muted">شارع المدينة المنورة، عمان، الأردن</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-7 text-end">
+                                <div class="p-4 rounded bg-light border" style="border-color: #efebe9 !important;">
+                                    <h3 class="mb-4" style="color: var(--anabtawi-primary); font-weight: 700; font-family: 'Cairo';">أرسل لنا رسالة</h3>
+                                    <form action="#" method="post" class="contact-form">
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label" style="color: var(--anabtawi-primary); font-weight: 600;">الاسم الكامل *</label>
+                                                <input type="text" class="form-control" placeholder="أدخل اسمك الكريم" required="required"/>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label" style="color: var(--anabtawi-primary); font-weight: 600;">البريد الإلكتروني *</label>
+                                                <input type="email" class="form-control" placeholder="example@domain.com" required="required"/>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" style="color: var(--anabtawi-primary); font-weight: 600;">رقم الهاتف *</label>
+                                            <input type="tel" class="form-control" placeholder="+962..." required="required"/>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" style="color: var(--anabtawi-primary); font-weight: 600;">الموضوع *</label>
+                                            <input type="text" class="form-control" placeholder="عنوان رسالتك" required="required"/>
+                                        </div>
+                                        <div class="mb-4">
+                                            <label class="form-label" style="color: var(--anabtawi-primary); font-weight: 600;">نص الرسالة *</label>
+                                            <textarea class="form-control" rows="5" placeholder="اكتب هنا تفاصيل استفسارك..." required="required"></textarea>
+                                        </div>
+                                        <button type="submit" class="btn btn-more w-100">إرسال الرسالة</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
+</odoo>

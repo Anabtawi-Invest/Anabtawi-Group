@@ -1,23 +1,23 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'Anabtawi Sweets Theme',
-    'description': 'A premium custom website module for Anabtawi Sweets with Arabic RTL support and cinematic scroll animation.',
+    'name': 'Anabtawi Sweets Corporate Website',
+    'version': '1.1',
+    'summary': 'Premium custom website for Anabtawi Sweets with Arabic RTL support and cinematic scroll animation',
+    'description': """
+        Anabtawi Sweets Corporate Website.
+        Features an authentic Arabic sweets brand theme with scroll-driven video scrubbing,
+        floating social sidebar, premium product catalog, and full Odoo website integration.
+    """,
+    'author': 'Antigravity Odoo Developer',
     'category': 'Website',
-    'version': '19.0.1.0.0',
-    'author': 'Antigravity / Anabtawi Sweets',
     'depends': ['website'],
     'data': [
-        'views/layout_templates.xml',
-        'views/homepage_templates.xml',
-        'views/about_templates.xml',
-        'views/branches_templates.xml',
-        'views/catalog_templates.xml',
-        'views/contact_templates.xml',
+        'views/website_templates.xml',
     ],
     'assets': {
         'web.assets_frontend': [
-            'theme_anabtawi_sweets/static/src/css/theme.css',
-            'theme_anabtawi_sweets/static/src/js/theme.js',
+            'theme_anabtawi_sweets/static/src/scss/website_style.scss',
+            'theme_anabtawi_sweets/static/src/js/website_animation.js',
         ],
     },
     'installable': True,
