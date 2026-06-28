@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Anabtawi Sweets Website Theme',
-    'version': '19.0.1.0.1',
-    'summary': 'Anabtawi Sweets corporate website theme for Odoo 19',
+    'version': '19.0.1.0.0',
+    'summary': 'Premium website theme for Anabtawi Sweets with Arabic RTL support',
     'description': """
-An Odoo 19 Website theme inspired by the public Anabtawi Sweets website.
-It provides editable home, about, branches, catalog, and contact pages,
-locally packaged brand imagery, custom snippets, and responsive styling.
+        Anabtawi Sweets corporate website theme for Odoo 19.
+        Features a custom homepage, product catalog, branches, about page,
+        and contact form integrated with the standard Odoo website builder.
     """,
     'author': 'Anabtawi Sweets',
-    'category': 'Website/Theme',
+    'category': 'Theme',
     'depends': ['website'],
     'data': [
         'views/layout.xml',
@@ -30,7 +30,6 @@ locally packaged brand imagery, custom snippets, and responsive styling.
         ],
     },
     'installable': True,
-    # Keep this visible in the Apps dashboard on Odoo.sh.
     'application': True,
     'license': 'LGPL-3',
 }

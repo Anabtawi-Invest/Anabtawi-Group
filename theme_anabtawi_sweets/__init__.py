@@ -1,1 +1,1 @@
-# This website theme does not require Python models or controllers.
+# -*- coding: utf-8 -*-
