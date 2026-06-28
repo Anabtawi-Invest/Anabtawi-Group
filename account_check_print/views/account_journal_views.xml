@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_account_journal_form_check_print" model="ir.ui.view">
+        <field name="name">account.journal.form.check.print</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="account.view_account_journal_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Business Check Printing" invisible="type != 'bank'" groups="account.group_account_manager">
+                    <group>
+                        <field name="enable_check_printing"/>
+                        <field name="check_layout_id" required="enable_check_printing" options="{'no_create': True}"/>
+                    </group>
+                    <group>
+                        <field name="next_check_number" required="enable_check_printing"/>
+                        <field name="print_language" required="enable_check_printing"/>
+                        <field name="stock_type" required="enable_check_printing"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+
