@@ -255,8 +255,8 @@ class AccountPayment(models.Model):
             f"font-size:{layout['font_size']}pt;overflow:hidden;"
         )
 
-    def check_amount_in_words(self):
-        """Spell the amount using Odoo's currency-aware language service."""
+    def get_check_print_amount_words(self):
+        """Spell the amount using the journal's configured print language."""
         self.ensure_one()
         lang = "ar_001" if self.journal_id.print_language == "ar" else "en_US"
         return self.currency_id.with_context(lang=lang).amount_to_text(self.amount)

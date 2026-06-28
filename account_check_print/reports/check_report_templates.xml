@@ -41,7 +41,7 @@
                         t-att-dir="'rtl' if o.journal_id.print_language == 'ar' else 'ltr'"
                         t-att-style="o.check_field_style('amount_words') + 'z-index:2;'"
                     >
-                        <span t-out="o.check_amount_in_words()"/>
+                        <span t-out="o.get_check_print_amount_words()"/>
                     </div>
                     <div
                         t-att-dir="'rtl' if o.journal_id.print_language == 'ar' else 'ltr'"
