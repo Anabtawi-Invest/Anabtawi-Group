@@ -1,0 +1,33 @@
+{
+    "name": "Account Check Print",
+    "summary": "Configurable multi-bank business check printing",
+    "version": "19.0.1.0.1",
+    "category": "Accounting/Accounting",
+    "author": "Anabtawi Group",
+    "license": "LGPL-3",
+    "depends": ["account", "web"],
+    "data": [
+        "security/account_check_print_security.xml",
+        "security/ir.model.access.csv",
+        "data/check_report_data.xml",
+        "views/check_layout_views.xml",
+        "views/account_journal_views.xml",
+        "views/account_payment_views.xml",
+        "views/check_history_views.xml",
+        "wizard/check_void_wizard_views.xml",
+        "wizard/check_reprint_wizard_views.xml",
+        "reports/check_report_templates.xml",
+        "reports/check_report.xml",
+        "views/check_print_menus.xml",
+    ],
+    "assets": {
+        "web.assets_backend": [
+            "account_check_print/static/src/js/check_layout_designer.js",
+            "account_check_print/static/src/xml/check_layout_designer.xml",
+            "account_check_print/static/src/scss/check_layout_designer.scss",
+        ],
+    },
+    "installable": True,
+    "application": False,
+    "auto_install": False,
+}

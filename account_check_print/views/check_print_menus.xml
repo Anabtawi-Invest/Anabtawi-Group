@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem
+        id="menu_account_check_print_root"
+        name="Check Printing"
+        parent="account.menu_finance_configuration"
+        sequence="75"
+        groups="account.group_account_user"
+    />
+    <menuitem
+        id="menu_account_check_layout"
+        name="Check Layouts"
+        parent="menu_account_check_print_root"
+        action="action_account_check_layout"
+        sequence="10"
+        groups="account.group_account_manager"
+    />
+    <menuitem
+        id="menu_account_check_history"
+        name="Check History"
+        parent="menu_account_check_print_root"
+        action="action_account_check_print_history"
+        sequence="20"
+        groups="account.group_account_user"
+    />
+</odoo>
+
