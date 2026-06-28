@@ -1,4 +1,4 @@
-# Account Check Print
+# Account Check Print 
 
 `account_check_print` is a configurable Odoo 19 Enterprise add-on for printing
 vendor and miscellaneous outgoing business checks from `account.payment`.
