@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Anabtawi Sweets Theme',
-    'description': 'A premium custom theme for Odoo 19 recreating the Anabtawi Sweets website experience.',
-    'category': 'Theme/Creative',
+    'description': 'A premium custom website module for Anabtawi Sweets with Arabic RTL support and cinematic scroll animation.',
+    'category': 'Website',
     'version': '19.0.1.0.0',
     'author': 'Antigravity / Anabtawi Sweets',
     'depends': ['website'],
