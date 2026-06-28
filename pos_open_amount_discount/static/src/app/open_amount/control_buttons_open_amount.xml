@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension" owl="1">
+        <xpath expr="//button[hasclass('more-btn')]" position="before">
+            <button
+                t-att-class="buttonClass"
+                t-if="isOpenAmountEnabled and !props.showRemainingButtons"
+                t-on-click="clickOpenAmount"
+                type="button">
+                <span>Open Amount</span>
+            </button>
+        </xpath>
+    </t>
+</templates>
