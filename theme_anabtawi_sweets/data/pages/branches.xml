@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="page_branches" model="website.page">
+        <field name="name">Anabtawi Branches</field>
+        <field name="is_published" eval="True"/>
+        <field name="key">theme_anabtawi_sweets.page_branches</field>
+        <field name="url">/branches</field>
+        <field name="website_id" ref="website.default_website"/>
+        <field name="type">qweb</field>
+        <field name="arch" type="xml">
+            <t t-name="theme_anabtawi_sweets.page_branches">
+                <t t-call="website.layout">
+                    <div id="wrap" class="oe_structure anabtawi-theme">
+                        <section class="anabtawi-page-hero py-5" data-name="Branches title" data-snippet="s_title">
+                            <div class="container py-4 text-center">
+                                <span class="anabtawi-eyebrow">Find Anabtawi</span>
+                                <h1 class="display-4 mt-2 mb-3">Our branches</h1>
+                                <p class="lead mx-auto mb-0">Serving customers through a growing network across Jordan and Palestine.</p>
+                            </div>
+                        </section>
+
+                        <section class="anabtawi-section py-5" data-name="Jordan branches" data-snippet="s_text_image">
+                            <div class="container py-4">
+                                <div class="row align-items-center g-5">
+                                    <div class="col-lg-5 text-center">
+                                        <img src="/theme_anabtawi_sweets/static/src/img/content/places-map.png" alt="Map of Anabtawi branches in Jordan" class="img-fluid anabtawi-branch-map" loading="lazy"/>
+                                    </div>
+                                    <div class="col-lg-7">
+                                        <span class="anabtawi-eyebrow">22 locations</span>
+                                        <h2 class="display-6 mt-2 mb-4">Jordan branches</h2>
+                                        <p class="lead">Visit Anabtawi Sweets in Amman and throughout the Kingdom, including airport service at Queen Alia International Airport.</p>
+                                        <div class="anabtawi-location-list mb-4">
+                                            <span>Amman</span><span>Al-Salt</span><span>Madaba</span><span>Irbid</span><span>Aqaba</span><span>Al-Karak</span><span>Queen Alia Airport</span>
+                                        </div>
+                                        <a href="https://maps.app.goo.gl/zDonDarr9R6AEv2w9" target="_blank" rel="noopener noreferrer" class="btn btn-primary">Open the main branch in Maps</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="anabtawi-section anabtawi-section--soft py-5" data-name="Palestine branches" data-snippet="s_image_text">
+                            <div class="container py-4">
+                                <div class="row align-items-center g-5">
+                                    <div class="col-lg-5 order-lg-2 text-center">
+                                        <img src="/theme_anabtawi_sweets/static/src/img/content/palestine-map.png" alt="Map of Anabtawi branches in Palestine" class="img-fluid anabtawi-branch-map" loading="lazy"/>
+                                    </div>
+                                    <div class="col-lg-7 order-lg-1">
+                                        <span class="anabtawi-eyebrow">6 locations</span>
+                                        <h2 class="display-6 mt-2 mb-4">Palestine branches</h2>
+                                        <p class="lead">Our Palestine network brings Anabtawi recipes and service to customers in key communities.</p>
+                                        <div class="anabtawi-location-list">
+                                            <span>Tulkarm</span><span>Ramallah</span><span>Jenin</span><span>Anabta</span><span>Attil</span><span>Qalqilya</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="anabtawi-partner py-5 text-center" data-name="Branch help" data-snippet="s_call_to_action">
+                            <div class="container py-4">
+                                <h2 class="display-6 mb-3">Need directions or opening hours?</h2>
+                                <p class="lead mx-auto mb-4">Contact our team and we will help you find the nearest Anabtawi branch.</p>
+                                <a href="/contactus" class="btn btn-primary">Contact us</a>
+                            </div>
+                        </section>
+                    </div>
+                </t>
+            </t>
+        </field>
+    </record>
+</odoo>

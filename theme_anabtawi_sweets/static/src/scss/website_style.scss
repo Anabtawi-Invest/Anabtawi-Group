@@ -1,0 +1,540 @@
+:root {
+    --anabtawi-primary: #5e3c32;
+    --anabtawi-primary-dark: #422820;
+    --anabtawi-gold: #c89211;
+    --anabtawi-gold-dark: #94690e;
+    --anabtawi-cream: #f6f2ec;
+    --anabtawi-ink: #2b211e;
+    --anabtawi-muted: #706864;
+    --anabtawi-white: #ffffff;
+}
+
+body {
+    overflow-x: hidden;
+}
+
+::selection {
+    color: var(--anabtawi-white);
+    background: var(--anabtawi-gold);
+}
+
+.anabtawi-topbar {
+    position: relative;
+    z-index: 1031;
+    color: var(--anabtawi-white);
+    background: var(--anabtawi-primary);
+    font-size: 0.82rem;
+
+    a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    a:hover,
+    a:focus-visible {
+        color: #ffe6a4;
+    }
+}
+
+header {
+    .navbar {
+        background-color: var(--anabtawi-white) !important;
+        border-bottom: 1px solid rgba(94, 60, 50, 0.12);
+        box-shadow: 0 0.3rem 1.25rem rgba(43, 33, 30, 0.06);
+    }
+
+    .navbar-brand,
+    .nav-link {
+        color: var(--anabtawi-ink) !important;
+    }
+
+    .nav-link {
+        font-weight: 650;
+    }
+
+    .nav-link:hover,
+    .nav-link:focus-visible,
+    .nav-link.active {
+        color: var(--anabtawi-gold-dark) !important;
+    }
+}
+
+.anabtawi-social-rail {
+    position: fixed;
+    inset-inline-start: 0;
+    top: 50%;
+    z-index: 1030;
+    flex-direction: column;
+    transform: translateY(-50%);
+    filter: drop-shadow(0 0.35rem 0.65rem rgba(0, 0, 0, 0.16));
+}
+
+.anabtawi-social-link {
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    color: var(--anabtawi-white) !important;
+    place-items: center;
+    text-decoration: none;
+    transition: width 180ms ease, filter 180ms ease;
+
+    &:first-child {
+        border-start-end-radius: 0.35rem;
+    }
+
+    &:last-child {
+        border-end-end-radius: 0.35rem;
+    }
+
+    &:hover,
+    &:focus-visible {
+        width: 3.25rem;
+        filter: brightness(1.1);
+    }
+}
+
+.anabtawi-social-link--whatsapp { background: #25d366; }
+.anabtawi-social-link--facebook { background: #3b5998; }
+.anabtawi-social-link--twitter { background: #111111; }
+.anabtawi-social-link--linkedin { background: #0077b5; }
+.anabtawi-social-link--youtube { background: #e62117; }
+.anabtawi-social-link--instagram { background: #c13584; }
+
+.anabtawi-theme {
+    color: var(--anabtawi-ink);
+    background: var(--anabtawi-white);
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        color: var(--anabtawi-primary);
+        font-weight: 750;
+        letter-spacing: -0.02em;
+    }
+
+    p {
+        color: var(--anabtawi-muted);
+        line-height: 1.8;
+    }
+
+    .lead {
+        line-height: 1.75;
+    }
+
+    .btn {
+        border-radius: 999px;
+        font-weight: 700;
+        padding-inline: 1.5rem;
+    }
+
+    .btn-primary {
+        color: var(--anabtawi-white);
+        background: var(--anabtawi-gold-dark);
+        border-color: var(--anabtawi-gold-dark);
+    }
+
+    .btn-primary:hover,
+    .btn-primary:focus-visible {
+        color: var(--anabtawi-white);
+        background: var(--anabtawi-primary);
+        border-color: var(--anabtawi-primary);
+    }
+
+    .btn-outline-secondary {
+        color: var(--anabtawi-primary);
+        border-color: var(--anabtawi-primary);
+    }
+
+    .btn-outline-secondary:hover,
+    .btn-outline-secondary:focus-visible {
+        color: var(--anabtawi-white);
+        background: var(--anabtawi-primary);
+        border-color: var(--anabtawi-primary);
+    }
+}
+
+.anabtawi-eyebrow {
+    display: inline-block;
+    color: var(--anabtawi-gold-dark);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.anabtawi-hero {
+    position: relative;
+    overflow: hidden;
+    min-height: 42rem;
+    display: flex;
+    align-items: center;
+    background:
+        radial-gradient(circle at 90% 10%, rgba(200, 146, 17, 0.2), transparent 32rem),
+        linear-gradient(135deg, #fff 0%, var(--anabtawi-cream) 100%);
+
+    &::before,
+    &::after {
+        position: absolute;
+        content: "";
+        width: 26rem;
+        aspect-ratio: 1;
+        background: url('/theme_anabtawi_sweets/static/src/img/content/art.png') center / contain no-repeat;
+        opacity: 0.045;
+        pointer-events: none;
+    }
+
+    &::before {
+        inset-inline-start: -10rem;
+        top: -10rem;
+    }
+
+    &::after {
+        inset-inline-end: -9rem;
+        bottom: -12rem;
+    }
+
+    .container {
+        position: relative;
+        z-index: 1;
+    }
+
+    h1 {
+        max-width: 14ch;
+    }
+
+    .lead {
+        max-width: 42rem;
+    }
+}
+
+.anabtawi-hero-visual {
+    position: relative;
+    max-width: 25rem;
+    margin-inline: auto;
+    padding: 1.25rem;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(94, 60, 50, 0.12);
+    border-radius: 50% 50% 12% 12%;
+    box-shadow: 0 2rem 4rem rgba(94, 60, 50, 0.18);
+
+    > img:first-child {
+        width: 100%;
+        max-height: 31rem;
+        object-fit: contain;
+    }
+}
+
+.anabtawi-hero-logo {
+    position: absolute;
+    inset-inline-start: 50%;
+    bottom: 1.5rem;
+    width: 6.75rem;
+    padding: 0.55rem;
+    background: rgba(255, 255, 255, 0.94);
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1.5rem rgba(43, 33, 30, 0.15);
+    transform: translateX(-50%);
+}
+
+[dir="rtl"] .anabtawi-hero-logo {
+    transform: translateX(50%);
+}
+
+.anabtawi-video-section {
+    color: var(--anabtawi-white);
+    background:
+        linear-gradient(rgba(43, 33, 30, 0.88), rgba(43, 33, 30, 0.88)),
+        url('/theme_anabtawi_sweets/static/src/img/content/art.png') center / 42rem;
+
+    h2,
+    p {
+        color: var(--anabtawi-white);
+    }
+
+    .anabtawi-eyebrow {
+        color: #f0c866;
+    }
+}
+
+.anabtawi-section {
+    background: var(--anabtawi-white);
+}
+
+.anabtawi-section--soft,
+.anabtawi-news {
+    background: var(--anabtawi-cream);
+}
+
+.anabtawi-page-hero {
+    position: relative;
+    overflow: hidden;
+    background: var(--anabtawi-cream);
+
+    &::after {
+        position: absolute;
+        inset-inline-end: -6rem;
+        top: -9rem;
+        width: 24rem;
+        aspect-ratio: 1;
+        content: "";
+        background: url('/theme_anabtawi_sweets/static/src/img/content/art.png') center / contain no-repeat;
+        opacity: 0.06;
+        pointer-events: none;
+    }
+
+    .container {
+        position: relative;
+        z-index: 1;
+    }
+
+    .lead {
+        max-width: 48rem;
+    }
+}
+
+.anabtawi-category-card,
+.anabtawi-news-card,
+.anabtawi-catalog-card {
+    overflow: hidden;
+    color: var(--anabtawi-ink);
+    background: var(--anabtawi-white);
+    border: 1px solid rgba(94, 60, 50, 0.12);
+    border-radius: 0.8rem;
+    box-shadow: 0 0.45rem 1.5rem rgba(43, 33, 30, 0.05);
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+
+    &:hover,
+    &:focus-within {
+        border-color: rgba(200, 146, 17, 0.65);
+        box-shadow: 0 1rem 2.25rem rgba(94, 60, 50, 0.12);
+        transform: translateY(-0.25rem);
+    }
+}
+
+.anabtawi-category-card {
+    img {
+        display: block;
+        width: 100%;
+        height: 15rem;
+        padding: 1rem 1rem 0;
+        object-fit: contain;
+    }
+
+    h3 {
+        color: var(--anabtawi-primary);
+    }
+}
+
+.anabtawi-news-card,
+.anabtawi-catalog-card {
+    img {
+        display: block;
+        width: 100%;
+        height: 15rem;
+        object-fit: cover;
+    }
+}
+
+.anabtawi-catalog-card {
+    display: flex;
+    flex-direction: column;
+
+    > div {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .btn {
+        margin-top: auto;
+    }
+}
+
+.anabtawi-catalog-note,
+.anabtawi-form-card {
+    background: var(--anabtawi-cream);
+    border: 1px solid rgba(94, 60, 50, 0.12);
+    border-radius: 1rem;
+}
+
+.anabtawi-partner {
+    position: relative;
+    overflow: hidden;
+    color: var(--anabtawi-white);
+    background: var(--anabtawi-primary);
+
+    &::before {
+        position: absolute;
+        inset: -12rem;
+        content: "";
+        background: url('/theme_anabtawi_sweets/static/src/img/content/art.png') center / 35rem repeat;
+        opacity: 0.035;
+        transform: rotate(-8deg);
+        pointer-events: none;
+    }
+
+    .container {
+        position: relative;
+        z-index: 1;
+    }
+
+    h2,
+    p {
+        color: var(--anabtawi-white);
+    }
+
+    p {
+        max-width: 46rem;
+    }
+}
+
+.anabtawi-partner-logo {
+    width: 7.5rem;
+    padding: 0.6rem;
+    background: var(--anabtawi-white);
+    border-radius: 0.5rem;
+}
+
+.anabtawi-branch-map {
+    max-height: 27rem;
+    filter: drop-shadow(0 1rem 1.5rem rgba(94, 60, 50, 0.14));
+}
+
+.anabtawi-location-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+
+    span {
+        padding: 0.5rem 0.85rem;
+        color: var(--anabtawi-primary);
+        background: var(--anabtawi-cream);
+        border: 1px solid rgba(94, 60, 50, 0.14);
+        border-radius: 999px;
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+}
+
+.anabtawi-contact-item {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+
+    > i {
+        display: grid;
+        flex: 0 0 2.75rem;
+        width: 2.75rem;
+        height: 2.75rem;
+        color: var(--anabtawi-gold-dark);
+        background: var(--anabtawi-cream);
+        border-radius: 50%;
+        place-items: center;
+    }
+}
+
+.anabtawi-form-card {
+    .form-control {
+        min-height: 3rem;
+        border-color: rgba(94, 60, 50, 0.2);
+    }
+
+    textarea.form-control {
+        min-height: 10rem;
+    }
+
+    .form-control:focus {
+        border-color: var(--anabtawi-gold);
+        box-shadow: 0 0 0 0.2rem rgba(200, 146, 17, 0.16);
+    }
+}
+
+.anabtawi-footer {
+    color: rgba(255, 255, 255, 0.82);
+    background: var(--anabtawi-primary-dark);
+
+    a {
+        color: var(--anabtawi-white);
+        text-decoration: none;
+    }
+
+    a:hover,
+    a:focus-visible {
+        color: #f0c866;
+    }
+}
+
+.anabtawi-footer-title {
+    color: #f0c866;
+}
+
+.anabtawi-footer-logo {
+    width: 7.5rem;
+    padding: 0.5rem;
+    background: var(--anabtawi-white);
+    border-radius: 0.4rem;
+}
+
+.anabtawi-certificates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+
+    img {
+        width: 4.5rem;
+        height: 4.5rem;
+        object-fit: contain;
+    }
+}
+
+.anabtawi-copyright {
+    color: rgba(255, 255, 255, 0.72);
+    background: rgba(0, 0, 0, 0.18);
+    font-size: 0.85rem;
+}
+
+.anabtawi-payment-image {
+    width: 10rem;
+    max-height: 2rem;
+    object-fit: contain;
+}
+
+@media (max-width: 991.98px) {
+    .anabtawi-hero {
+        min-height: auto;
+        text-align: center;
+
+        h1,
+        .lead {
+            margin-inline: auto;
+        }
+
+        .d-flex {
+            justify-content: center;
+        }
+    }
+}
+
+@media (max-width: 575.98px) {
+    .anabtawi-category-card img,
+    .anabtawi-news-card img,
+    .anabtawi-catalog-card img {
+        height: 11rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .anabtawi-social-link,
+    .anabtawi-category-card,
+    .anabtawi-news-card,
+    .anabtawi-catalog-card {
+        transition: none;
+    }
+}
