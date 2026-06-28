@@ -342,9 +342,9 @@
             </div>
         </xpath>
 
-        <!-- Completely eliminate Odoo's default footer copyright layout row to avoid duplication -->
-        <xpath expr="//div[hasclass('o_footer_copyright')]" position="replace">
-            <!-- Completely removed to prevent duplication -->
+        <!-- Hide Odoo's default copyright row (keep in arch for other module xpaths) -->
+        <xpath expr="//div[hasclass('o_footer_copyright')]" position="before">
+            <t t-set="no_copyright" t-value="True"/>
         </xpath>
     </template>
 
