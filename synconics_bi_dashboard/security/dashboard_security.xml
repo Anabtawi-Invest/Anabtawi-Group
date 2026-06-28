@@ -25,6 +25,10 @@
         <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
     </record>
 
+    <record id="base.group_user" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('group_dashboard_user'))]"/>
+    </record>
+
     <data noupdate="1">
         <record id="dashboard_chart_user_rule" model="ir.rule">
             <field name="name">Dashboard Chart</field>
