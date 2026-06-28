@@ -1,0 +1,120 @@
+// Anabtawi Sweets Custom Theme Styles
+$brand-gold: #c89211;
+$brand-blue: #122e44;
+$brand-red: #c9302c;
+
+.anabtawi-theme {
+    // Top header info bar
+    .top-bar {
+        background-color: #f8f9fa;
+        color: $brand-blue;
+        padding: 5px 0;
+        font-size: 14px;
+        
+        a {
+            color: $brand-blue;
+            text-decoration: none;
+            &:hover {
+                color: $brand-gold;
+            }
+        }
+        i {
+            color: $brand-gold;
+        }
+    }
+
+    // Navbar overrides
+    .navbar {
+        background-color: #ffffff;
+        border-bottom: 2px solid $brand-gold;
+        
+        .nav-link {
+            color: $brand-blue !important;
+            font-weight: 600;
+            text-transform: uppercase;
+            
+            &:hover, &.active {
+                color: $brand-gold !important;
+            }
+        }
+    }
+
+    // Hero Section
+    .anabtawi-hero-section {
+        background-image: url('/anabtawi_theme_final/static/src/img/hero-bg.jpg');
+        background-size: cover;
+        background-position: center;
+        min-height: 500px;
+        position: relative;
+        
+        .hero-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(18, 46, 68, 0.7); // $brand-blue overlay
+        }
+        
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            color: #ffffff;
+            
+            h1 {
+                font-family: 'Anton', sans-serif;
+                font-size: 3rem;
+                text-transform: uppercase;
+                color: $brand-gold;
+            }
+        }
+    }
+
+    // Buttons
+    .btn-gold {
+        background-color: $brand-gold;
+        color: #fff;
+        border-color: $brand-gold;
+        transition: 0.3s;
+        
+        &:hover {
+            background-color: transparent;
+            color: $brand-gold;
+            border-color: $brand-gold;
+        }
+    }
+
+    // Footer
+    .anabtawi-custom-footer {
+        background-color: $brand-blue;
+        color: #ffffff;
+        
+        h5 {
+            color: $brand-gold;
+            text-transform: uppercase;
+        }
+        
+        a {
+            color: #cccccc;
+            text-decoration: none;
+            
+            &:hover {
+                color: $brand-gold;
+            }
+        }
+        
+        .social-icons a {
+            color: #ffffff;
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            
+            &:hover {
+                background-color: $brand-gold;
+                color: #ffffff;
+            }
+        }
+    }
+}
