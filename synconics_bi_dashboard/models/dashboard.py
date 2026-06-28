@@ -771,7 +771,7 @@ class Dashboard(models.Model):
                 "active": rec.menu_active,
             }
             if not rec.created_menu_id:
-                menu = ir_ui_menu.create({**menu_data, "is_dashboard": True})
+                menu = ir_ui_menu.create(menu_data)
                 vals["created_menu_id"] = menu.id
             else:
                 rec.created_menu_id.write(menu_data)

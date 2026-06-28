@@ -2,7 +2,6 @@
 <odoo noupdate="1">
     <record id="my_dashboard_default" model="dashboard.dashboard">
         <field name="name">My Dashboard</field>
-        <field name="parent_menu_id" ref="parent_dashboard_menu"/>
     </record>
 
     <function name="create_update_menu" model="dashboard.dashboard">
