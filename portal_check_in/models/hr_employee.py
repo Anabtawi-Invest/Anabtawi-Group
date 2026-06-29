@@ -27,22 +27,6 @@ class HrEmployee(models.Model):
 
     def _acquire_portal_attendance_action_lock(self, lock_minutes=10):
         self.ensure_one()
-        disable_lock = (
-            self.env["ir.config_parameter"].sudo().get_param(
-                "portal_check_in.disable_attendance_action_lock", default="1"
-            ) or ""
-        ).strip().lower() in ("1", "true", "yes", "on")
-        if disable_lock:
-            # Temporary testing bypass: allow repeated check-in/check-out actions
-            # without waiting 10 minutes between submissions.
-            if self.portal_attendance_lock_until:
-                self.write({'portal_attendance_lock_until': False})
-            _logger.warning(
-                "portal_check_in lock bypassed by config: employee_id=%s param=portal_check_in.disable_attendance_action_lock",
-                self.id,
-            )
-            return
-
         _logger.info(
             "portal_check_in lock acquire requested: employee_id=%s lock_minutes=%s",
             self.id,
