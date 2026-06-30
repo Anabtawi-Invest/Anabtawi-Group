@@ -24,6 +24,14 @@ class RememberDeviceToken(models.Model):
     active = fields.Boolean(default=True, index=True)
 
     @api.model
+    def _is_concurrency_error(self, error):
+        msg = str(error or "").lower()
+        return (
+            "could not serialize access due to concurrent update" in msg
+            or "serializationfailure" in msg
+        )
+
+    @api.model
     def _cookie_name(self):
         return "anabtawi_remember_device"
 
@@ -77,7 +85,20 @@ class RememberDeviceToken(models.Model):
             ]
         )
         if existing:
-            existing.write(vals)
+            try:
+                with self.env.cr.savepoint():
+                    existing.write(vals)
+            except Exception as error:
+                if not self._is_concurrency_error(error):
+                    raise
+                # Keep login flow resilient: if another request updated the same
+                # trusted-device row concurrently, skip rotating it in this request.
+                _logger.info(
+                    "remember_device_login concurrent token refresh ignored: user_id=%s fingerprint=%s error=%s",
+                    user.id,
+                    device_fingerprint or "",
+                    error,
+                )
         else:
             self.sudo().create(vals)
         _logger.info(
@@ -104,7 +125,19 @@ class RememberDeviceToken(models.Model):
             if rec.device_fingerprint and rec.device_fingerprint != (device_fingerprint or ""):
                 continue
             if rec.token_hash and hmac.compare_digest(rec.token_hash, digest):
-                rec.write({"last_used_at": now})
+                try:
+                    with self.env.cr.savepoint():
+                        rec.write({"last_used_at": now})
+                except Exception as error:
+                    if not self._is_concurrency_error(error):
+                        raise
+                    # last_used_at is best-effort only; do not block authentication.
+                    _logger.info(
+                        "remember_device_login concurrent last_used_at update ignored: token_id=%s user_id=%s error=%s",
+                        rec.id,
+                        rec.user_id.id,
+                        error,
+                    )
                 return rec.user_id
         return self.env["res.users"]
 

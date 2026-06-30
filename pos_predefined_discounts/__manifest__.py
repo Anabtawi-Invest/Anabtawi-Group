@@ -4,7 +4,8 @@
     "name": "POS Predefined Discounts",
     "version": "1.0.0",
     "category": "Sales/Point of Sale",
-    "summary": "Select predefined discounts from POS instead of typing a number",
+    "summary": "Select predefined disc"
+               "ounts from POS instead of typing a number",
     "depends": ["point_of_sale", "pos_discount", "employee_request", "pos_advance_order", "portal", "portal_check_in"],
     "data": [
         "security/ir.model.access.csv",
