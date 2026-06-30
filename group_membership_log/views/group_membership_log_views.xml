@@ -48,14 +48,13 @@
                 <filter name="filter_add" string="Added" domain="[('action', '=', 'add')]"/>
                 <filter name="filter_remove" string="Removed" domain="[('action', '=', 'remove')]"/>
                 <separator/>
-                <filter name="filter_today" string="Today"
-                        domain="[('date', '&gt;=', (context_today()).strftime('%Y-%m-%d 00:00:00'))]"/>
-                <group expand="0" string="Group By">
-                    <filter name="group_by_user" string="User" context="{'group_by': 'user_id'}"/>
-                    <filter name="group_by_group" string="Group" context="{'group_by': 'group_id'}"/>
-                    <filter name="group_by_performed_by" string="Performed By" context="{'group_by': 'performed_by_id'}"/>
-                    <filter name="group_by_action" string="Action" context="{'group_by': 'action'}"/>
-                    <filter name="group_by_date" string="Date" context="{'group_by': 'date:day'}"/>
+                <filter name="filter_today" string="Today" domain="[('date', '&gt;=', 'today')]"/>
+                <group>
+                    <filter name="group_by_user" string="User" domain="[]" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_by_group" string="Group" domain="[]" context="{'group_by': 'group_id'}"/>
+                    <filter name="group_by_performed_by" string="Performed By" domain="[]" context="{'group_by': 'performed_by_id'}"/>
+                    <filter name="group_by_action" string="Action" domain="[]" context="{'group_by': 'action'}"/>
+                    <filter name="group_by_date" string="Date" domain="[]" context="{'group_by': 'date:day'}"/>
                 </group>
             </search>
         </field>

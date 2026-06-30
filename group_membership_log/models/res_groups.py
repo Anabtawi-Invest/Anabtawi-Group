@@ -8,6 +8,7 @@ class ResGroups(models.Model):
 
     membership_log_enabled = fields.Boolean(
         string='Track Membership Changes',
+        default=True,
         help='When enabled, adding or removing users from this group is logged.',
     )
 
