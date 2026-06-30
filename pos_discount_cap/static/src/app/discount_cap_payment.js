@@ -5,29 +5,16 @@ import { patch } from "@web/core/utils/patch";
 import { ask } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import {
+    applyCapDiscountUpdates,
+    buildCapConfirmationBody,
+    computeCapDiscountUpdates,
+    toNumber,
+} from "@pos_discount_cap/app/discount_cap_utils";
 
 const PAYMENT_RELOAD_KEY = "pos_discount_cap_reload_product_once";
 const FEE_PERCENTAGE = 0.04;
 const FEE_MAX = 1;
-
-function toNumber(value) {
-    const number = Number(value);
-    return Number.isFinite(number) ? number : 0;
-}
-
-function toPercentFromPrices(basePrice, discountedPrice) {
-    const base = toNumber(basePrice);
-    const discounted = toNumber(discountedPrice);
-    if (base <= 0) {
-        return 0;
-    }
-    const percent = ((base - discounted) / base) * 100;
-    return Math.max(0, Math.min(100, percent));
-}
-
-function roundPercent(value) {
-    return Math.round(toNumber(value) * 100) / 100;
-}
 
 patch(PosStore.prototype, {
     async setup() {
@@ -57,8 +44,12 @@ patch(PosStore.prototype, {
         return super.pay(...arguments);
     },
 
-    _reapplyCapLines(order, capLines) {
-        const byLineUuid = new Map((capLines || []).map((line) => [line.line_uuid, line]));
+    _reapplyCapLines(order, capPayload) {
+        const lineData = Array.isArray(capPayload) ? capPayload : capPayload?.lines || [];
+        const promotionalAmount = Array.isArray(capPayload)
+            ? 0
+            : toNumber(capPayload?.promotional_discount_amount);
+        const byLineUuid = new Map(lineData.map((line) => [line.line_uuid, line]));
         let hasChanges = false;
 
         for (const line of order.getOrderlines()) {
@@ -68,6 +59,7 @@ patch(PosStore.prototype, {
             }
             const targetUnitPrice = toNumber(data.price_unit);
             const targetDiscount = toNumber(data.discount);
+            const capDiscountApplied = Boolean(data.cap_discount_applied);
 
             if (Math.abs(toNumber(line.price_unit) - targetUnitPrice) > 1e-6) {
                 line.setUnitPrice(targetUnitPrice);
@@ -77,6 +69,15 @@ patch(PosStore.prototype, {
                 line.setDiscount(targetDiscount);
                 hasChanges = true;
             }
+            if (Boolean(line.cap_discount_applied) !== capDiscountApplied) {
+                line.update({ cap_discount_applied: capDiscountApplied });
+                hasChanges = true;
+            }
+        }
+
+        if (toNumber(order.promotional_discount_amount) !== promotionalAmount) {
+            order.update({ promotional_discount_amount: promotionalAmount });
+            hasChanges = true;
         }
 
         if (hasChanges) {
@@ -90,13 +91,17 @@ patch(PosStore.prototype, {
             return false;
         }
 
-        const capLines = order.getOrderlines().map((line) => ({
-            line_uuid: line.uuid,
-            product_id: line.product_id?.id,
-            price_unit: toNumber(line.price_unit),
-            discount: toNumber(line.getDiscount()),
-            qty: line.getQuantity(),
-        }));
+        const capLines = {
+            promotional_discount_amount: toNumber(order.promotional_discount_amount),
+            lines: order.getOrderlines().map((line) => ({
+                line_uuid: line.uuid,
+                product_id: line.product_id?.id,
+                price_unit: toNumber(line.price_unit),
+                discount: toNumber(line.getDiscount()),
+                qty: line.getQuantity(),
+                cap_discount_applied: Boolean(line.cap_discount_applied),
+            })),
+        };
 
         order._markDirty?.();
 
@@ -108,7 +113,7 @@ patch(PosStore.prototype, {
                     orderUuid: order.uuid,
                     at: Date.now(),
                     state: "reloaded",
-                    lines: capLines,
+                    capLines,
                 })
             );
             const url = new URL(window.location.href);
@@ -153,12 +158,13 @@ patch(PosStore.prototype, {
         if (!order) {
             console.warn("[pos_discount_cap] Order not found after reload", {
                 orderUuid: payload.orderUuid,
-                lines: payload.lines,
+                capLines: payload.capLines,
             });
             return;
         }
 
-        this._reapplyCapLines(order, payload.lines);
+        const capPayload = payload.capLines;
+        this._reapplyCapLines(order, capPayload);
         this.setOrder(order);
     },
 
@@ -206,33 +212,17 @@ patch(PosStore.prototype, {
 
         let evaluations;
         try {
-            console.info("[pos_discount_cap] Evaluating discount cap", {
-                pricelistId: pricelist.id,
-                capAmount,
-                capEnabled: pricelist.cap_enabled,
-                lineCount: lines.length,
-                lines,
-            });
             evaluations = await this.data.call("product.pricelist", "get_pos_cap_evaluations", [
                 pricelist.id,
                 lines,
             ]);
-            console.info("[pos_discount_cap] Discount cap evaluation succeeded", {
-                pricelistId: pricelist.id,
-                evaluations,
-            });
         } catch (error) {
             console.error("[pos_discount_cap] Discount cap evaluation failed", {
                 pricelistId: pricelist.id,
                 capAmount,
-                capEnabled: pricelist.cap_enabled,
                 lineCount: lines.length,
                 lines,
                 error,
-                message: error?.message,
-                name: error?.name,
-                data: error?.data,
-                cause: error?.cause,
             });
             this.dialog.add(AlertDialog, {
                 title: _t("Discount Cap Error"),
@@ -241,67 +231,17 @@ patch(PosStore.prototype, {
             return false;
         }
 
-        const byLineUuid = new Map((evaluations || []).map((item) => [item.line_uuid, item]));
-        let remainingCap = capAmount;
-        let consumedAmount = 0;
-        let eligibleLines = 0;
-        let excludedLines = 0;
-        let hasChanges = false;
-
-        for (const line of order.getOrderlines()) {
-            const data = byLineUuid.get(line.uuid);
-            if (!data?.cap_eligible || !data.can_apply_cap) {
-                continue;
-            }
-
-            eligibleLines += 1;
-            const lineBaseAmount = Math.max(0, toNumber(data.line_base_amount));
-            const targetBaseUnitPrice = toNumber(data.base_unit_price);
-            const targetDiscountedUnitPrice = toNumber(data.discounted_unit_price);
-            let targetDiscountPercent = 0;
-
-            if (lineBaseAmount > remainingCap + 1e-6) {
-                excludedLines += 1;
-                targetDiscountPercent = 0;
-            } else {
-                consumedAmount += lineBaseAmount;
-                remainingCap = Math.max(0, remainingCap - lineBaseAmount);
-                targetDiscountPercent = toPercentFromPrices(
-                    targetBaseUnitPrice,
-                    targetDiscountedUnitPrice
-                );
-            }
-            targetDiscountPercent = roundPercent(targetDiscountPercent);
-
-            if (Math.abs(toNumber(line.price_unit) - targetBaseUnitPrice) > 1e-6) {
-                line.setUnitPrice(targetBaseUnitPrice);
-                hasChanges = true;
-            }
-            if (Math.abs(toNumber(line.getDiscount()) - targetDiscountPercent) > 1e-6) {
-                line.setDiscount(targetDiscountPercent);
-                hasChanges = true;
-            }
-        }
-
-        if (hasChanges) {
-            order._markDirty?.();
-        }
-
-        const body = [
-            _t("Cap Amount: %s", this.env.utils.formatCurrency(capAmount)),
-            _t("Consumed Amount: %s", this.env.utils.formatCurrency(consumedAmount)),
-            _t("Remaining Cap: %s", this.env.utils.formatCurrency(remainingCap)),
-            _t("Eligible Lines: %s", eligibleLines),
-            _t("Excluded Lines: %s", excludedLines),
-        ].join("\n");
+        const computation = computeCapDiscountUpdates(order, evaluations, capAmount);
+        applyCapDiscountUpdates(order, computation);
 
         return ask(this.env.services.dialog, {
             title: _t("Discount Cap Applied"),
-            body,
+            body: buildCapConfirmationBody(this.env.utils, computation),
             confirmLabel: _t("Continue"),
             cancelLabel: _t("Cancel"),
         });
     },
+
     async _applyFeesForCurrentOrder() {
         const order = this.getOrder();
         const pricelist = order?.pricelist_id;
@@ -337,8 +277,6 @@ patch(PosStore.prototype, {
         const currentLines = order.getOrderlines();
         const existingFeeLine = currentLines.find((l) => l.product_id?.id === feeProduct.id) || null;
         const linesWithoutFee = currentLines.filter((l) => l.product_id?.id !== feeProduct.id);
-        // Compute from each line before discount and before tax.
-        // Example: (13.8 + 16.1) * 4% = 1.196 -> capped to 1.
         const preDiscountPreTaxTotal = linesWithoutFee.reduce(
             (sum, line) => sum + Math.max(0, toNumber(line.priceExclNoDiscount)),
             0
