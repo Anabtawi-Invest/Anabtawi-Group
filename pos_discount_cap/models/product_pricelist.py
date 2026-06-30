@@ -258,6 +258,9 @@ class PosOrder(models.Model):
     @api.model
     def _load_pos_data_fields(self, config):
         fields_to_load = super()._load_pos_data_fields(config)
+        # Core pos.order returns [] meaning "load all fields".
+        if not fields_to_load:
+            return fields_to_load
         if "promotional_discount_amount" not in fields_to_load:
             fields_to_load.append("promotional_discount_amount")
         return fields_to_load

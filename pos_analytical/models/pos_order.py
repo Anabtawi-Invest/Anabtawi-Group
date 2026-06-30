@@ -12,6 +12,15 @@ class PosOrderInherit (models.Model):
         'account.analytic.account', string="Analytic Account")
 
     @api.model
+    def _load_pos_data_fields(self, config):
+        fields_to_load = super()._load_pos_data_fields(config)
+        if not fields_to_load:
+            return fields_to_load
+        if 'sh_pos_order_analytic_account' not in fields_to_load:
+            fields_to_load.append('sh_pos_order_analytic_account')
+        return fields_to_load
+
+    @api.model
     def _order_fields(self, ui_order):
         """
         Overrides the base method to include the analytic account from the UI order.
@@ -55,3 +64,12 @@ class PosOrderlineInherit(models.Model):
     sh_pos_order_analytic_account = fields.Many2one(
         'account.analytic.account',
         related='order_id.sh_pos_order_analytic_account', string="Analytic Account", readonly=False)
+
+    @api.model
+    def _load_pos_data_fields(self, config):
+        fields_to_load = super()._load_pos_data_fields(config)
+        if not fields_to_load:
+            return fields_to_load
+        if 'sh_pos_order_analytic_account' not in fields_to_load:
+            fields_to_load.append('sh_pos_order_analytic_account')
+        return fields_to_load
