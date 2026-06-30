@@ -1,7 +1,7 @@
 {
     "name": "POS Pricelist Discount Cap",
     "summary": "Apply pricelist discounts with a payment-time cap in POS.",
-    "version": "19.0.5.2.0",
+    "version": "19.0.5.3.0",
     "category": "Point of Sale",
     "author": "Custom",
     "license": "LGPL-3",

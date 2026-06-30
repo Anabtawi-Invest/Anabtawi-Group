@@ -22,9 +22,6 @@ patch(PosStore.prototype, {
     },
 
     async pay() {
-        if (this._consumeReloadTokenForCurrentOrder()) {
-            return super.pay(...arguments);
-        }
         const feesOk = await this._applyFeesForCurrentOrder();
         if (!feesOk) {
             return;
@@ -32,13 +29,6 @@ patch(PosStore.prototype, {
         const canContinue = await this._applyDiscountCapAndConfirm();
         if (!canContinue) {
             return;
-        }
-        const order = this.getOrder();
-        const pricelist = order?.pricelist_id;
-        if (order && pricelist?.cap_enabled) {
-            if (await this._reloadBeforePaymentPage(order)) {
-                return;
-            }
         }
         return super.pay(...arguments);
     },
@@ -168,9 +158,27 @@ patch(PosStore.prototype, {
         return true;
     },
 
+    async _resolveCapPricelistSettings(pricelist) {
+        if (!pricelist?.id) {
+            return null;
+        }
+        if (pricelist.cap_enabled !== undefined) {
+            return pricelist;
+        }
+        try {
+            const rows = await this.data.call("product.pricelist", "read", [
+                [pricelist.id],
+                ["cap_enabled", "cap_amount", "has_fees"],
+            ]);
+            return rows?.[0] ? { ...pricelist, ...rows[0] } : pricelist;
+        } catch {
+            return pricelist;
+        }
+    },
+
     async _applyDiscountCapAndConfirm() {
         const order = this.getOrder();
-        const pricelist = order?.pricelist_id;
+        const pricelist = await this._resolveCapPricelistSettings(order?.pricelist_id);
         if (!order || !pricelist?.cap_enabled) {
             order.promotional_discount_amount = 0;
             return true;
@@ -183,6 +191,7 @@ patch(PosStore.prototype, {
             product_id: line.product_id?.id,
             qty: line.getQuantity(),
             price_type: line.price_type,
+            price_unit: toNumber(line.price_unit),
         }));
 
         let evaluations;

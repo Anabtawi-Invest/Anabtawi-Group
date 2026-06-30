@@ -41,7 +41,7 @@ export function computeSequentialCapDiscounts({ order, evaluations, capAmount })
 
         eligibleLines += 1;
         const qty = Math.abs(line.getQuantity());
-        const baseUnitPrice = toNumber(data.base_unit_price);
+        const baseUnitPrice = toNumber(data.base_unit_price) || toNumber(line.price_unit);
         const lineAmount = order.currency.round(qty * baseUnitPrice);
         const fullDiscountPercent = roundPercent(
             toNumber(data.pricelist_discount_percent) ||

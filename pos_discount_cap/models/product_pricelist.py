@@ -16,6 +16,8 @@ class ProductPricelist(models.Model):
     @api.model
     def _load_pos_data_fields(self, config):
         fields_to_load = super()._load_pos_data_fields(config)
+        if not fields_to_load:
+            return fields_to_load
         if "cap_enabled" not in fields_to_load:
             fields_to_load.append("cap_enabled")
         if "cap_amount" not in fields_to_load:
@@ -23,6 +25,16 @@ class ProductPricelist(models.Model):
         if "has_fees" not in fields_to_load:
             fields_to_load.append("has_fees")
         return fields_to_load
+
+    @staticmethod
+    def _get_rule_discount_percent(rule):
+        if not rule:
+            return 0.0
+        if rule.compute_price == "percentage":
+            return rule.percent_price or 0.0
+        if rule.compute_price == "formula" and rule.base != "standard_price":
+            return rule.price_discount or 0.0
+        return 0.0
 
     @api.model
     def get_pos_cap_evaluations(self, pricelist_id, lines):
@@ -53,8 +65,10 @@ class ProductPricelist(models.Model):
                     product = Product.browse(product_id).exists()
                     qty = abs(float(line.get("qty") or 0.0))
                     price_type = line.get("price_type", "original")
-                    is_original_price = price_type == "original"
-                    can_apply_cap = bool(product and qty > 0 and is_original_price)
+                    line_price_unit = abs(float(line.get("price_unit") or 0.0))
+                    can_apply_cap = bool(
+                        product and qty > 0 and price_type != "manual"
+                    )
 
                     discounted_unit_price = 0.0
                     base_unit_price = 0.0
@@ -81,9 +95,25 @@ class ProductPricelist(models.Model):
                                 "date": date,
                                 "currency": pricelist.currency_id,
                             }
-                            discounted_unit_price = rule._compute_price(**price_kwargs)
-                            base_unit_price = rule._compute_price_before_discount(**price_kwargs)
                             cap_eligible = bool(rule.cap_eligible)
+                            rule_discount_percent = self._get_rule_discount_percent(rule)
+                            if can_apply_cap and line_price_unit > 0:
+                                base_unit_price = line_price_unit
+                            else:
+                                base_unit_price = rule._compute_price_before_discount(
+                                    **price_kwargs
+                                )
+                            if rule_discount_percent and base_unit_price > 0:
+                                unit_discount = base_unit_price * (
+                                    rule_discount_percent / 100.0
+                                )
+                                discounted_unit_price = base_unit_price - unit_discount
+                            else:
+                                discounted_unit_price = rule._compute_price(**price_kwargs)
+                                if not base_unit_price:
+                                    base_unit_price = rule._compute_price_before_discount(
+                                        **price_kwargs
+                                    )
                         else:
                             discounted_unit_price, _rule_id = pricelist._get_product_price_rule(
                                 product,
@@ -115,10 +145,14 @@ class ProductPricelist(models.Model):
                     line_amount = qty * base_unit_price if cap_eligible and can_apply_cap else 0.0
                     unit_discount = max(0.0, base_unit_price - discounted_unit_price)
                     pricelist_discount_percent = (
-                        (unit_discount / base_unit_price) * 100.0
-                        if base_unit_price > 0 and cap_eligible
+                        self._get_rule_discount_percent(
+                            self.env["product.pricelist.item"].browse(rule_id)
+                        )
+                        if cap_eligible and rule_id
                         else 0.0
                     )
+                    if not pricelist_discount_percent and base_unit_price > 0 and cap_eligible:
+                        pricelist_discount_percent = (unit_discount / base_unit_price) * 100.0
                     line_full_discount_amount = (
                         qty * unit_discount if cap_eligible and can_apply_cap else 0.0
                     )
