@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_group_membership_log_list" model="ir.ui.view">
+        <field name="name">group.membership.log.list</field>
+        <field name="model">group.membership.log</field>
+        <field name="arch" type="xml">
+            <list string="Group Membership Log" create="false" edit="false" delete="false">
+                <field name="date"/>
+                <field name="user_id"/>
+                <field name="group_id"/>
+                <field name="action"/>
+                <field name="performed_by_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_group_membership_log_form" model="ir.ui.view">
+        <field name="name">group.membership.log.form</field>
+        <field name="model">group.membership.log</field>
+        <field name="arch" type="xml">
+            <form string="Group Membership Log" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="date"/>
+                            <field name="action"/>
+                        </group>
+                        <group>
+                            <field name="user_id"/>
+                            <field name="group_id"/>
+                            <field name="performed_by_id"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_group_membership_log_search" model="ir.ui.view">
+        <field name="name">group.membership.log.search</field>
+        <field name="model">group.membership.log</field>
+        <field name="arch" type="xml">
+            <search string="Group Membership Log">
+                <field name="user_id"/>
+                <field name="group_id"/>
+                <field name="performed_by_id"/>
+                <filter name="filter_add" string="Added" domain="[('action', '=', 'add')]"/>
+                <filter name="filter_remove" string="Removed" domain="[('action', '=', 'remove')]"/>
+                <separator/>
+                <filter name="filter_today" string="Today"
+                        domain="[('date', '&gt;=', (context_today()).strftime('%Y-%m-%d 00:00:00'))]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_by_user" string="User" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_by_group" string="Group" context="{'group_by': 'group_id'}"/>
+                    <filter name="group_by_performed_by" string="Performed By" context="{'group_by': 'performed_by_id'}"/>
+                    <filter name="group_by_action" string="Action" context="{'group_by': 'action'}"/>
+                    <filter name="group_by_date" string="Date" context="{'group_by': 'date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_group_membership_log" model="ir.actions.act_window">
+        <field name="name">Group Membership Log</field>
+        <field name="res_model">group.membership.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_group_membership_log_search"/>
+        <field name="context">{'create': False, 'edit': False, 'delete': False}</field>
+    </record>
+
+    <menuitem id="menu_group_membership_log"
+              name="Group Membership Log"
+              parent="base.menu_users"
+              action="action_group_membership_log"
+              groups="base.group_system"
+              sequence="25"/>
+
+</odoo>
