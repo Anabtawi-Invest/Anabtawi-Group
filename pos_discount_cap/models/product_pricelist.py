@@ -244,6 +244,25 @@ class ProductPricelistItem(models.Model):
                 )
 
 
+class PosOrder(models.Model):
+    _inherit = "pos.order"
+
+    promotional_discount_amount = fields.Monetary(
+        string="Promotional Discount Amount",
+        currency_field="currency_id",
+        readonly=True,
+        copy=False,
+        help="Total promotional discount applied through the POS discount cap.",
+    )
+
+    @api.model
+    def _load_pos_data_fields(self, config):
+        fields_to_load = super()._load_pos_data_fields(config)
+        if "promotional_discount_amount" not in fields_to_load:
+            fields_to_load.append("promotional_discount_amount")
+        return fields_to_load
+
+
 class PosConfig(models.Model):
     _inherit = "pos.config"
 
