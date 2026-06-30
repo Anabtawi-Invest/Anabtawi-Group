@@ -26,6 +26,7 @@ export function roundPercent(value) {
 export function computeSequentialCapDiscounts({ order, evaluations, capAmount }) {
     const byLineUuid = new Map((evaluations || []).map((item) => [item.line_uuid, item]));
     const lineUpdates = new Map();
+    const skippedLines = [];
     let accumulatedDiscount = 0;
     let capReached = false;
     let consumedAmount = 0;
@@ -35,7 +36,26 @@ export function computeSequentialCapDiscounts({ order, evaluations, capAmount })
 
     for (const line of order.getOrderlines()) {
         const data = byLineUuid.get(line.uuid);
+        if (!data) {
+            skippedLines.push({
+                line_uuid: line.uuid,
+                product: line.getProduct?.()?.display_name || line.product_id?.display_name,
+                reason: "missing_evaluation",
+            });
+            continue;
+        }
         if (!data?.cap_eligible || !data.can_apply_cap) {
+            skippedLines.push({
+                line_uuid: line.uuid,
+                product_id: data.product_id,
+                product: line.getProduct?.()?.display_name || line.product_id?.display_name,
+                reason: data.skip_reason || (!data.cap_eligible ? "not_cap_eligible" : "cannot_apply_cap"),
+                cap_eligible: data.cap_eligible,
+                can_apply_cap: data.can_apply_cap,
+                price_type: data.price_type,
+                rule_id: data.rule_id,
+                debug: data.debug,
+            });
             continue;
         }
 
@@ -86,6 +106,7 @@ export function computeSequentialCapDiscounts({ order, evaluations, capAmount })
         eligibleLines,
         adjustedLines,
         excludedAfterCapLines,
+        skippedLines,
     };
 }
 

@@ -195,17 +195,31 @@ patch(PosStore.prototype, {
             price_unit: toNumber(line.price_unit),
         }));
 
+        console.info("[pos_discount_cap] Payment cap check started", {
+            orderUuid: order.uuid,
+            pricelistId,
+            pricelistName: pricelist.name || pricelist.display_name,
+            capEnabled: pricelist.cap_enabled,
+            capAmount,
+            orderPricelistId: order.pricelist_id?.id,
+            orderPricelistName: order.pricelist_id?.name || order.pricelist_id?.display_name,
+            lineCount: lines.length,
+            lines,
+        });
+
         let evaluations;
         try {
             evaluations = await this.data.call("product.pricelist", "get_pos_cap_evaluations", [
                 pricelistId,
                 lines,
             ]);
+            console.info("[pos_discount_cap] Server evaluations", evaluations);
         } catch (error) {
             console.error("[pos_discount_cap] Discount cap evaluation failed", {
-                pricelistId: pricelist.id,
+                pricelistId,
                 capAmount,
                 lineCount: lines.length,
+                lines,
                 error,
             });
             this.dialog.add(AlertDialog, {
@@ -220,17 +234,31 @@ patch(PosStore.prototype, {
             evaluations,
             capAmount,
         });
+        console.info("[pos_discount_cap] Cap computation result", capResult);
+        if (capResult.skippedLines?.length) {
+            console.warn("[pos_discount_cap] Skipped lines", capResult.skippedLines);
+        }
         applyCapLineUpdates(order, capResult.lineUpdates);
         order.promotional_discount_amount = capResult.consumedAmount;
 
-        const body = [
+        const bodyLines = [
             _t("Cap Amount: %s", this.env.utils.formatCurrency(capAmount)),
             _t("Applied Discount: %s", this.env.utils.formatCurrency(capResult.consumedAmount)),
             _t("Remaining Cap: %s", this.env.utils.formatCurrency(capResult.remainingCap)),
             _t("Eligible Lines: %s", capResult.eligibleLines),
             _t("Adjusted Lines: %s", capResult.adjustedLines),
             _t("Lines After Cap: %s", capResult.excludedAfterCapLines),
-        ].join("\n");
+        ];
+        if (capResult.eligibleLines === 0 && capResult.skippedLines?.length) {
+            bodyLines.push("");
+            bodyLines.push(_t("Debug - skipped lines:"));
+            for (const skipped of capResult.skippedLines) {
+                bodyLines.push(
+                    `- ${skipped.product || skipped.line_uuid}: ${skipped.reason}`
+                );
+            }
+        }
+        const body = bodyLines.join("\n");
 
         return ask(this.env.services.dialog, {
             title: _t("Discount Cap Applied"),

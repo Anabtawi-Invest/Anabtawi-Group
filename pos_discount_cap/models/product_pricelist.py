@@ -50,21 +50,55 @@ class ProductPricelist(models.Model):
             ("date_end", ">=", date),
         ]
 
-    def _get_pos_cap_rule(self, product, quantity, date=False):
+    def _get_pos_cap_rule(self, product, quantity, date=False, debug=None):
         """Return the cap-eligible pricelist rule for a POS line."""
         self.ensure_one()
+        if debug is not None:
+            debug.setdefault("steps", [])
+
+        def _step(message, **extra):
+            if debug is not None:
+                entry = {"message": message}
+                entry.update(extra)
+                debug["steps"].append(entry)
+            _logger.info(
+                "[pos_discount_cap] pricelist=%s product=%s qty=%s | %s | %s",
+                self.id,
+                product.id if product else None,
+                quantity,
+                message,
+                extra,
+            )
+
         if not product:
+            _step("no_product")
             return self.env["product.pricelist.item"]
         product.ensure_one()
         date = date or fields.Datetime.now()
         qty = abs(float(quantity or 0.0))
         if qty <= 0:
+            _step("invalid_qty", qty=qty)
             return self.env["product.pricelist.item"]
 
         Item = self.env["product.pricelist.item"]
+        applicable_rules = self._get_applicable_rules(product, date)
+        _step(
+            "applicable_rules_loaded",
+            rule_count=len(applicable_rules),
+            rule_ids=applicable_rules.ids,
+        )
 
-        for rule in self._get_applicable_rules(product, date):
-            if rule.cap_eligible and rule._is_applicable_for(product, qty):
+        for rule in applicable_rules:
+            is_applicable = rule._is_applicable_for(product, qty)
+            _step(
+                "check_applicable_rule",
+                rule_id=rule.id,
+                cap_eligible=rule.cap_eligible,
+                applied_on=rule.applied_on,
+                is_applicable=is_applicable,
+            )
+            if rule.cap_eligible and is_applicable:
+                _step("matched_applicable_cap_rule", rule_id=rule.id)
                 return rule
 
         rule_id = self._get_product_rule(
@@ -73,24 +107,60 @@ class ProductPricelist(models.Model):
             uom=product.uom_id,
             date=date,
         )
+        _step("product_rule_lookup", rule_id=rule_id)
         if rule_id:
             rule = Item.browse(rule_id)
             if rule.exists() and rule.cap_eligible:
+                _step("matched_product_cap_rule", rule_id=rule.id)
                 return rule
+            _step(
+                "product_rule_not_cap_eligible",
+                rule_id=rule_id,
+                cap_eligible=bool(rule.cap_eligible) if rule.exists() else False,
+            )
 
         cap_rules = Item.search(
             self._get_cap_eligible_rules_domain(date),
             order="applied_on, min_quantity desc, categ_id desc, id desc",
         )
+        _step(
+            "cap_rules_search",
+            rule_count=len(cap_rules),
+            rule_ids=cap_rules.ids,
+        )
         for rule in cap_rules:
-            if rule._is_applicable_for(product, qty):
+            is_applicable = rule._is_applicable_for(product, qty)
+            _step(
+                "check_cap_rule",
+                rule_id=rule.id,
+                applied_on=rule.applied_on,
+                is_applicable=is_applicable,
+            )
+            if is_applicable:
+                _step("matched_cap_rule_search", rule_id=rule.id)
                 return rule
 
         global_cap_rules = cap_rules.filtered(lambda r: r.applied_on == "3_global")
         if global_cap_rules:
+            _step("matched_global_cap_rule", rule_id=global_cap_rules[0].id)
             return global_cap_rules[0]
 
+        _step("no_cap_rule_found")
         return Item
+
+    @staticmethod
+    def _line_skip_reason(product, qty, price_type, can_apply_cap, cap_eligible, rule_id):
+        if not product:
+            return "missing_product"
+        if qty <= 0:
+            return "invalid_qty"
+        if price_type == "manual":
+            return "manual_price_type"
+        if not cap_eligible:
+            return "no_cap_eligible_rule" if not rule_id else "rule_not_cap_eligible"
+        if not can_apply_cap:
+            return "cannot_apply_cap"
+        return None
 
     @api.model
     def get_pos_cap_evaluations(self, pricelist_id, lines):
@@ -109,9 +179,38 @@ class ProductPricelist(models.Model):
                 )
                 return []
             pricelist.ensure_one()
+            date = fields.Datetime.now()
+
+            cap_rules_on_pricelist = self.env["product.pricelist.item"].search(
+                pricelist._get_cap_eligible_rules_domain(date)
+            )
+            _logger.info(
+                "[pos_discount_cap] pricelist context: id=%s name=%s cap_enabled=%s "
+                "cap_amount=%s cap_rule_count=%s cap_rule_ids=%s cap_rules=%s",
+                pricelist.id,
+                pricelist.display_name,
+                pricelist.cap_enabled,
+                pricelist.cap_amount,
+                len(cap_rules_on_pricelist),
+                cap_rules_on_pricelist.ids,
+                [
+                    {
+                        "id": rule.id,
+                        "applied_on": rule.applied_on,
+                        "compute_price": rule.compute_price,
+                        "price_discount": rule.price_discount,
+                        "percent_price": rule.percent_price,
+                        "cap_eligible": rule.cap_eligible,
+                        "base": rule.base,
+                        "base_pricelist_id": rule.base_pricelist_id.id
+                        if rule.base_pricelist_id
+                        else False,
+                    }
+                    for rule in cap_rules_on_pricelist
+                ],
+            )
 
             Product = self.env["product.product"]
-            date = fields.Datetime.now()
             result = []
 
             for line in lines or []:
@@ -132,19 +231,24 @@ class ProductPricelist(models.Model):
                     base_unit_price = 0.0
                     cap_eligible = False
                     rule_id = False
+                    line_debug = {}
 
                     if product and qty > 0:
-                        rule = pricelist._get_pos_cap_rule(product, qty, date=date)
+                        rule = pricelist._get_pos_cap_rule(
+                            product, qty, date=date, debug=line_debug
+                        )
                         if rule:
                             rule_id = rule.id
-                            _logger.debug(
-                                "POS discount cap line %s: product_id=%s, rule_id=%s, "
-                                "compute_price=%s, cap_eligible=%s",
+                            _logger.info(
+                                "[pos_discount_cap] line %s product=%s (%s) matched rule=%s "
+                                "cap_eligible=%s compute_price=%s discount=%s",
                                 line_uuid,
                                 product_id,
+                                product.display_name,
                                 rule_id,
-                                rule.compute_price,
                                 rule.cap_eligible,
+                                rule.compute_price,
+                                self._get_rule_discount_percent(rule),
                             )
                             price_kwargs = {
                                 "product": product,
@@ -206,23 +310,41 @@ class ProductPricelist(models.Model):
                                     discounted_unit_price = discounted_unit_price
                             else:
                                 base_unit_price = discounted_unit_price
-                            _logger.debug(
-                                "POS discount cap line %s: product_id=%s, no preferred rule, "
-                                "fallback rule_id=%s, price=%s",
+                            _logger.info(
+                                "[pos_discount_cap] line %s product=%s fallback rule_id=%s "
+                                "cap_eligible=%s price=%s",
                                 line_uuid,
                                 product_id,
                                 rule_id,
+                                cap_eligible,
                                 discounted_unit_price,
                             )
                     else:
-                        _logger.debug(
-                            "POS discount cap line %s skipped: product_id=%s, product_exists=%s, "
-                            "qty=%s, price_type=%s",
+                        _logger.info(
+                            "[pos_discount_cap] line %s skipped before rule lookup: "
+                            "product_id=%s product_exists=%s qty=%s price_type=%s "
+                            "price_unit=%s",
                             line_uuid,
                             product_id,
                             bool(product),
                             qty,
                             price_type,
+                            line_price_unit,
+                        )
+
+                    skip_reason = self._line_skip_reason(
+                        product, qty, price_type, can_apply_cap, cap_eligible, rule_id
+                    )
+                    if skip_reason:
+                        _logger.info(
+                            "[pos_discount_cap] line %s NOT eligible: reason=%s "
+                            "can_apply_cap=%s cap_eligible=%s rule_id=%s debug=%s",
+                            line_uuid,
+                            skip_reason,
+                            can_apply_cap,
+                            cap_eligible,
+                            rule_id,
+                            line_debug,
                         )
 
                     line_amount = qty * base_unit_price if cap_eligible and can_apply_cap else 0.0
@@ -244,12 +366,16 @@ class ProductPricelist(models.Model):
                             "line_uuid": line_uuid,
                             "cap_eligible": cap_eligible,
                             "can_apply_cap": can_apply_cap,
+                            "skip_reason": skip_reason,
+                            "debug": line_debug,
                             "line_base_amount": line_amount,
                             "line_full_discount_amount": line_full_discount_amount,
                             "pricelist_discount_percent": pricelist_discount_percent,
                             "discounted_unit_price": discounted_unit_price,
                             "base_unit_price": base_unit_price,
                             "rule_id": rule_id,
+                            "product_id": product_id,
+                            "price_type": price_type,
                         }
                     )
                 except Exception:
@@ -262,9 +388,15 @@ class ProductPricelist(models.Model):
                     )
                     raise
 
+            eligible_count = sum(
+                1 for item in result if item.get("cap_eligible") and item.get("can_apply_cap")
+            )
             _logger.info(
-                "POS discount cap evaluation completed: pricelist_id=%s, result=%s",
+                "[pos_discount_cap] evaluation summary pricelist_id=%s lines=%s eligible=%s "
+                "result=%s",
                 pricelist_id,
+                len(result),
+                eligible_count,
                 result,
             )
             return result
