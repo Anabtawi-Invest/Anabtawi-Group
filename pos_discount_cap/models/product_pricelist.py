@@ -115,19 +115,6 @@ class ProductPricelist(models.Model):
                     line_base_amount = (
                         qty * base_unit_price if cap_eligible and can_apply_cap else 0.0
                     )
-                    pricelist_discount_percent = 0.0
-                    full_line_discount_amount = 0.0
-                    if cap_eligible and can_apply_cap and base_unit_price > 0:
-                        pricelist_discount_percent = max(
-                            0.0,
-                            min(
-                                100.0,
-                                (1.0 - (discounted_unit_price / base_unit_price)) * 100.0,
-                            ),
-                        )
-                        full_line_discount_amount = max(
-                            0.0, qty * max(0.0, base_unit_price - discounted_unit_price)
-                        )
                     result.append(
                         {
                             "line_uuid": line_uuid,
@@ -136,8 +123,6 @@ class ProductPricelist(models.Model):
                             "line_base_amount": line_base_amount,
                             "discounted_unit_price": discounted_unit_price,
                             "base_unit_price": base_unit_price,
-                            "pricelist_discount_percent": pricelist_discount_percent,
-                            "full_line_discount_amount": full_line_discount_amount,
                             "rule_id": rule_id,
                         }
                     )
