@@ -149,17 +149,15 @@ class ProductPricelist(models.Model):
         return Item
 
     @staticmethod
-    def _line_skip_reason(product, qty, price_type, can_apply_cap, cap_eligible, rule_id):
+    def _line_skip_reason(product, qty, cap_eligible, rule_id, exclude_from_cap):
+        if exclude_from_cap:
+            return "excluded_line"
         if not product:
             return "missing_product"
         if qty <= 0:
             return "invalid_qty"
-        if price_type == "manual":
-            return "manual_price_type"
         if not cap_eligible:
             return "no_cap_eligible_rule" if not rule_id else "rule_not_cap_eligible"
-        if not can_apply_cap:
-            return "cannot_apply_cap"
         return None
 
     @api.model
@@ -223,15 +221,14 @@ class ProductPricelist(models.Model):
                     qty = abs(float(line.get("qty") or 0.0))
                     price_type = line.get("price_type", "original")
                     line_price_unit = abs(float(line.get("price_unit") or 0.0))
-                    can_apply_cap = bool(
-                        product and qty > 0 and price_type != "manual"
-                    )
+                    exclude_from_cap = bool(line.get("exclude_from_cap"))
 
                     discounted_unit_price = 0.0
                     base_unit_price = 0.0
                     cap_eligible = False
                     rule_id = False
                     line_debug = {}
+                    rule_discount_percent = 0.0
 
                     if product and qty > 0:
                         rule = pricelist._get_pos_cap_rule(
@@ -259,7 +256,8 @@ class ProductPricelist(models.Model):
                             }
                             cap_eligible = bool(rule.cap_eligible)
                             rule_discount_percent = self._get_rule_discount_percent(rule)
-                            if can_apply_cap and line_price_unit > 0:
+                            use_line_price = line_price_unit > 0
+                            if use_line_price:
                                 base_unit_price = line_price_unit
                             else:
                                 base_unit_price = rule._compute_price_before_discount(
@@ -291,7 +289,8 @@ class ProductPricelist(models.Model):
                                 rule = fallback_rule
                                 cap_eligible = True
                                 rule_discount_percent = self._get_rule_discount_percent(rule)
-                                if can_apply_cap and line_price_unit > 0:
+                                use_line_price = line_price_unit > 0
+                                if use_line_price:
                                     base_unit_price = line_price_unit
                                 else:
                                     base_unit_price = rule._compute_price_before_discount(
@@ -332,8 +331,12 @@ class ProductPricelist(models.Model):
                             line_price_unit,
                         )
 
+                    can_apply_cap = bool(
+                        product and qty > 0 and cap_eligible and not exclude_from_cap
+                    )
+
                     skip_reason = self._line_skip_reason(
-                        product, qty, price_type, can_apply_cap, cap_eligible, rule_id
+                        product, qty, cap_eligible, rule_id, exclude_from_cap
                     )
                     if skip_reason:
                         _logger.info(

@@ -186,14 +186,19 @@ patch(PosStore.prototype, {
 
         const capAmount = Math.max(0, toNumber(pricelist.cap_amount));
         const pricelistId = pricelist.id || order.pricelist_id?.id;
-        const lines = order.getOrderlines().map((line, sequence) => ({
-            line_uuid: line.uuid,
-            sequence,
-            product_id: line.product_id?.id || line.getProduct?.()?.id,
-            qty: line.getQuantity(),
-            price_type: line.price_type || "original",
-            price_unit: toNumber(line.price_unit),
-        }));
+        const feeProductId = this.config?.fee_product_id?.id;
+        const lines = order.getOrderlines().map((line, sequence) => {
+            const productId = line.product_id?.id || line.getProduct?.()?.id;
+            return {
+                line_uuid: line.uuid,
+                sequence,
+                product_id: productId,
+                qty: line.getQuantity(),
+                price_type: line.price_type || "original",
+                price_unit: toNumber(line.price_unit),
+                exclude_from_cap: Boolean(feeProductId && productId === feeProductId),
+            };
+        });
 
         console.info("[pos_discount_cap] Payment cap check started", {
             orderUuid: order.uuid,
