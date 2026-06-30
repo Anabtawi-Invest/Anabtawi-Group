@@ -185,19 +185,20 @@ patch(PosStore.prototype, {
         }
 
         const capAmount = Math.max(0, toNumber(pricelist.cap_amount));
+        const pricelistId = pricelist.id || order.pricelist_id?.id;
         const lines = order.getOrderlines().map((line, sequence) => ({
             line_uuid: line.uuid,
             sequence,
-            product_id: line.product_id?.id,
+            product_id: line.product_id?.id || line.getProduct?.()?.id,
             qty: line.getQuantity(),
-            price_type: line.price_type,
+            price_type: line.price_type || "original",
             price_unit: toNumber(line.price_unit),
         }));
 
         let evaluations;
         try {
             evaluations = await this.data.call("product.pricelist", "get_pos_cap_evaluations", [
-                pricelist.id,
+                pricelistId,
                 lines,
             ]);
         } catch (error) {

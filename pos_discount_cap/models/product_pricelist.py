@@ -36,6 +36,62 @@ class ProductPricelist(models.Model):
             return rule.price_discount or 0.0
         return 0.0
 
+    def _get_cap_eligible_rules_domain(self, date=False):
+        self.ensure_one()
+        date = date or fields.Datetime.now()
+        return [
+            ("pricelist_id", "=", self.id),
+            ("cap_eligible", "=", True),
+            "|",
+            ("date_start", "=", False),
+            ("date_start", "<=", date),
+            "|",
+            ("date_end", "=", False),
+            ("date_end", ">=", date),
+        ]
+
+    def _get_pos_cap_rule(self, product, quantity, date=False):
+        """Return the cap-eligible pricelist rule for a POS line."""
+        self.ensure_one()
+        if not product:
+            return self.env["product.pricelist.item"]
+        product.ensure_one()
+        date = date or fields.Datetime.now()
+        qty = abs(float(quantity or 0.0))
+        if qty <= 0:
+            return self.env["product.pricelist.item"]
+
+        Item = self.env["product.pricelist.item"]
+
+        for rule in self._get_applicable_rules(product, date):
+            if rule.cap_eligible and rule._is_applicable_for(product, qty):
+                return rule
+
+        rule_id = self._get_product_rule(
+            product,
+            quantity=qty,
+            uom=product.uom_id,
+            date=date,
+        )
+        if rule_id:
+            rule = Item.browse(rule_id)
+            if rule.exists() and rule.cap_eligible:
+                return rule
+
+        cap_rules = Item.search(
+            self._get_cap_eligible_rules_domain(date),
+            order="applied_on, min_quantity desc, categ_id desc, id desc",
+        )
+        for rule in cap_rules:
+            if rule._is_applicable_for(product, qty):
+                return rule
+
+        global_cap_rules = cap_rules.filtered(lambda r: r.applied_on == "3_global")
+        if global_cap_rules:
+            return global_cap_rules[0]
+
+        return Item
+
     @api.model
     def get_pos_cap_evaluations(self, pricelist_id, lines):
         _logger.info(
@@ -61,6 +117,8 @@ class ProductPricelist(models.Model):
             for line in lines or []:
                 line_uuid = line.get("line_uuid")
                 product_id = line.get("product_id")
+                if isinstance(product_id, (list, tuple)):
+                    product_id = product_id[0] if product_id else False
                 try:
                     product = Product.browse(product_id).exists()
                     qty = abs(float(line.get("qty") or 0.0))
@@ -76,7 +134,7 @@ class ProductPricelist(models.Model):
                     rule_id = False
 
                     if product and qty > 0:
-                        rule = pricelist._get_pos_preferred_rule(product, qty, date=date)
+                        rule = pricelist._get_pos_cap_rule(product, qty, date=date)
                         if rule:
                             rule_id = rule.id
                             _logger.debug(
@@ -122,7 +180,32 @@ class ProductPricelist(models.Model):
                                 date=date,
                             )
                             rule_id = _rule_id
-                            base_unit_price = discounted_unit_price
+                            fallback_rule = self.env["product.pricelist.item"].browse(
+                                rule_id
+                            ).exists()
+                            if fallback_rule and fallback_rule.cap_eligible:
+                                rule = fallback_rule
+                                cap_eligible = True
+                                rule_discount_percent = self._get_rule_discount_percent(rule)
+                                if can_apply_cap and line_price_unit > 0:
+                                    base_unit_price = line_price_unit
+                                else:
+                                    base_unit_price = rule._compute_price_before_discount(
+                                        product=product,
+                                        quantity=qty,
+                                        uom=product.uom_id,
+                                        date=date,
+                                        currency=pricelist.currency_id,
+                                    )
+                                if rule_discount_percent and base_unit_price > 0:
+                                    unit_discount = base_unit_price * (
+                                        rule_discount_percent / 100.0
+                                    )
+                                    discounted_unit_price = base_unit_price - unit_discount
+                                else:
+                                    discounted_unit_price = discounted_unit_price
+                            else:
+                                base_unit_price = discounted_unit_price
                             _logger.debug(
                                 "POS discount cap line %s: product_id=%s, no preferred rule, "
                                 "fallback rule_id=%s, price=%s",
@@ -194,20 +277,8 @@ class ProductPricelist(models.Model):
             raise
 
     def _get_pos_preferred_rule(self, product, quantity, date=False):
-        self.ensure_one()
-        product.ensure_one()
-        date = date or fields.Datetime.now()
-        qty = abs(float(quantity or 0.0))
-        if qty <= 0:
-            return self.env["product.pricelist.item"]
-
-        # Keep Odoo default order, but prefer cap-eligible when multiple rules match.
-        rules = self._get_applicable_rules(product, date)
-        applicable_rules = rules.filtered(lambda r: r._is_applicable_for(product, qty))
-        cap_rules = applicable_rules.filtered("cap_eligible")
-        return (cap_rules[:1] or applicable_rules[:1]) if applicable_rules else self.env[
-            "product.pricelist.item"
-        ]
+        """Backward-compatible alias."""
+        return self._get_pos_cap_rule(product, quantity, date=date)
 
 
 class ProductPricelistItem(models.Model):
