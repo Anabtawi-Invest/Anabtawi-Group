@@ -229,8 +229,8 @@
                                             <span style="color: #666; font-size: 0.9em;"> (x<t t-esc="pline.qty"/>)</span>
                                         </t>
                                     </td>
-                                    <td class="text-end" style="padding: 3px 0;">
-                                        $ <t t-esc="pline.amount.toFixed(2)"/>
+                                    <td class="text-end font-monospace" style="padding: 3px 0;">
+                                        <t t-out="formatCurrency(pline.amount)"/>
                                     </td>
                                 </tr>
                             </t>
@@ -240,9 +240,9 @@
                                 <td style="padding-top: 8px;">
                                     <strong>إجمالي الرهن / Total Pledge:</strong>
                                 </td>
-                                <td class="text-end" style="padding-top: 8px;">
+                                <td class="text-end font-monospace" style="padding-top: 8px;">
                                     <strong style="font-size: 1.1em;">
-                                        $ <t t-esc="totalPledge.toFixed(2)"/>
+                                        <t t-out="formatCurrency(totalPledge)"/>
                                     </strong>
                                 </td>
                             </tr>
