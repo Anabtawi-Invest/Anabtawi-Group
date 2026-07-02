@@ -6,60 +6,101 @@ from datetime import timedelta
 class PlanningSlotTemplate(models.Model):
     _inherit = 'planning.slot.template'
 
-    start_time_12 = fields.Float('Start Hour (12h)', default=8.0)
-    start_am_pm = fields.Selection([('AM', 'AM'), ('PM', 'PM')], string='Start AM/PM', default='AM')
-    end_time_12 = fields.Float('End Hour (12h)', default=5.0)
-    end_am_pm = fields.Selection([('AM', 'AM'), ('PM', 'PM')], string='End AM/PM', default='PM')
+    start_time_12 = fields.Float('Start Hour (12h)', compute='_compute_start_time_12', inverse='_inverse_start_time_12', store=True)
+    start_am_pm = fields.Selection([('AM', 'AM'), ('PM', 'PM')], string='Start AM/PM', compute='_compute_start_am_pm', inverse='_inverse_start_time_12', store=True)
 
-    start_time = fields.Float(compute='_compute_times_24', inverse='_inverse_times_24', store=True)
-    end_time = fields.Float(compute='_compute_times_24', inverse='_inverse_times_24', store=True)
+    end_time_12 = fields.Float('End Hour (12h)', compute='_compute_end_time_12', inverse='_inverse_end_time_12', store=True)
+    end_am_pm = fields.Selection([('AM', 'AM'), ('PM', 'PM')], string='End AM/PM', compute='_compute_end_am_pm', inverse='_inverse_end_time_12', store=True)
 
-    @api.depends('start_time_12', 'start_am_pm', 'end_time_12', 'end_am_pm')
-    def _compute_times_24(self):
+    @api.depends('start_time')
+    def _compute_start_time_12(self):
         for rec in self:
-            # start_time
-            start_val = rec.start_time_12 or 0.0
-            if start_val > 12.0:
-                start_val = 12.0
-            elif start_val < 0.0:
-                start_val = 0.0
-            
-            if rec.start_am_pm == 'PM':
-                rec.start_time = (start_val % 12.0) + 12.0 if (start_val % 12.0) != 0.0 else 12.0
-            else:
-                rec.start_time = start_val % 12.0
-                
-            # end_time
-            end_val = rec.end_time_12 or 0.0
-            if end_val > 12.0:
-                end_val = 12.0
-            elif end_val < 0.0:
-                end_val = 0.0
-                
-            if rec.end_am_pm == 'PM':
-                rec.end_time = (end_val % 12.0) + 12.0 if (end_val % 12.0) != 0.0 else 12.0
-            else:
-                rec.end_time = end_val % 12.0
-
-    def _inverse_times_24(self):
-        for rec in self:
-            # start
-            h_start = rec.start_time
+            h_start = rec.start_time or 0.0
             if h_start >= 12.0:
-                rec.start_am_pm = 'PM'
                 rec.start_time_12 = 12.0 if h_start == 12.0 else h_start - 12.0
             else:
-                rec.start_am_pm = 'AM'
                 rec.start_time_12 = 12.0 if h_start == 0.0 else h_start
 
-            # end
-            h_end = rec.end_time
+    @api.depends('start_time')
+    def _compute_start_am_pm(self):
+        for rec in self:
+            if rec.start_time >= 12.0:
+                rec.start_am_pm = 'PM'
+            else:
+                rec.start_am_pm = 'AM'
+
+    def _inverse_start_time_12(self):
+        for rec in self:
+            val = rec.start_time_12 or 0.0
+            if val > 12.0:
+                val = 12.0
+            elif val < 0.0:
+                val = 0.0
+                
+            if rec.start_am_pm == 'PM':
+                rec.start_time = (val % 12.0) + 12.0 if (val % 12.0) != 0.0 else 12.0
+            else:
+                rec.start_time = val % 12.0
+
+    @api.depends('end_time')
+    def _compute_end_time_12(self):
+        for rec in self:
+            h_end = rec.end_time or 0.0
             if h_end >= 12.0:
-                rec.end_am_pm = 'PM'
                 rec.end_time_12 = 12.0 if h_end == 12.0 else h_end - 12.0
             else:
-                rec.end_am_pm = 'AM'
                 rec.end_time_12 = 12.0 if h_end == 0.0 else h_end
+
+    @api.depends('end_time')
+    def _compute_end_am_pm(self):
+        for rec in self:
+            if rec.end_time >= 12.0:
+                rec.end_am_pm = 'PM'
+            else:
+                rec.end_am_pm = 'AM'
+
+    def _inverse_end_time_12(self):
+        for rec in self:
+            val = rec.end_time_12 or 0.0
+            if val > 12.0:
+                val = 12.0
+            elif val < 0.0:
+                val = 0.0
+                
+            if rec.end_am_pm == 'PM':
+                rec.end_time = (val % 12.0) + 12.0 if (val % 12.0) != 0.0 else 12.0
+            else:
+                rec.end_time = val % 12.0
+
+    @api.onchange('start_time_12', 'start_am_pm')
+    def _onchange_start_time_12(self):
+        val = self.start_time_12 or 0.0
+        if val > 12.0:
+            self.start_time_12 = 12.0
+            val = 12.0
+        elif val < 0.0:
+            self.start_time_12 = 0.0
+            val = 0.0
+            
+        if self.start_am_pm == 'PM':
+            self.start_time = (val % 12.0) + 12.0 if (val % 12.0) != 0.0 else 12.0
+        else:
+            self.start_time = val % 12.0
+
+    @api.onchange('end_time_12', 'end_am_pm')
+    def _onchange_end_time_12(self):
+        val = self.end_time_12 or 0.0
+        if val > 12.0:
+            self.end_time_12 = 12.0
+            val = 12.0
+        elif val < 0.0:
+            self.end_time_12 = 0.0
+            val = 0.0
+            
+        if self.end_am_pm == 'PM':
+            self.end_time = (val % 12.0) + 12.0 if (val % 12.0) != 0.0 else 12.0
+        else:
+            self.end_time = val % 12.0
 
     def _check_start_and_end_times(self):
         # Override the base constraint check to bypass/disable the ValidationError

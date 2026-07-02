@@ -15,14 +15,14 @@
 
             <!-- Insert our custom AM/PM fields -->
             <xpath expr="//label[@for='start_time']" position="before">
-                <label for="start_time_12" string="Start Hour"/>
+                <label for="start_time" string="Start Hour"/>
                 <div class="d-flex align-items-center mb-2">
-                    <field name="start_time_12" widget="float_time" class="oe_inline me-2" style="max-width: 90px;"/>
+                    <field name="start_time" widget="float_time" class="oe_inline me-2" style="max-width: 90px;"/>
                     <field name="start_am_pm" class="oe_inline" style="max-width: 80px;"/>
                 </div>
-                <label for="end_time_12" string="End Hour"/>
+                <label for="end_time" string="End Hour"/>
                 <div class="d-flex align-items-center mb-2">
-                    <field name="end_time_12" widget="float_time" class="oe_inline me-2" style="max-width: 90px;"/>
+                    <field name="end_time" widget="float_time" class="oe_inline me-2" style="max-width: 90px;"/>
                     <field name="end_am_pm" class="oe_inline" style="max-width: 80px;"/>
                 </div>
             </xpath>
