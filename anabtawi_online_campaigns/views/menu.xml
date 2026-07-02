@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Standalone app launcher root: no parent, no restrictive groups -->
+    <menuitem id="menu_online_campaign_root"
+              name="Online Campaigns"
+              sequence="45"
+              web_icon="anabtawi_online_campaigns,static/description/icon.png"/>
+
+    <menuitem id="menu_online_campaign_dashboard" name="Dashboard"
+              parent="menu_online_campaign_root" action="action_online_campaign_dashboard" sequence="5"/>
+    <menuitem id="menu_online_campaign_calendar" name="Calendar"
+              parent="menu_online_campaign_root" action="action_online_discount_campaign_calendar" sequence="10"/>
+    <menuitem id="menu_online_campaigns" name="Campaigns"
+              parent="menu_online_campaign_root" action="action_online_discount_campaigns" sequence="20"/>
+    <menuitem id="menu_online_campaign_settlements" name="Aggregator Settlements"
+              parent="menu_online_campaign_root" action="action_online_campaign_settlements" sequence="30"
+              groups="point_of_sale.group_pos_manager,anabtawi_online_campaigns.group_online_campaign_finance_manager"/>
+
+    <menuitem id="menu_online_campaign_reporting" name="Reporting"
+              parent="menu_online_campaign_root" sequence="80"
+              groups="point_of_sale.group_pos_manager,anabtawi_online_campaigns.group_online_campaign_finance_manager"/>
+    <menuitem id="menu_online_campaign_results" name="Campaign Results"
+              parent="menu_online_campaign_reporting" action="action_online_campaign_discount_report" sequence="10"/>
+    <menuitem id="menu_online_campaign_profitability" name="Campaign Profitability"
+              parent="menu_online_campaign_reporting" action="action_online_campaign_profitability" sequence="20"/>
+    <menuitem id="menu_online_campaign_settlement_analysis" name="Settlement Analysis"
+              parent="menu_online_campaign_reporting" action="action_online_campaign_settlement_analysis" sequence="30"/>
+
+    <menuitem id="menu_online_campaign_configuration" name="Configuration"
+              parent="menu_online_campaign_root" sequence="90"/>
+    <menuitem id="menu_online_campaign_aggregators" name="Aggregators"
+              parent="menu_online_campaign_configuration" action="action_online_campaign_aggregators" sequence="10"/>
+</odoo>

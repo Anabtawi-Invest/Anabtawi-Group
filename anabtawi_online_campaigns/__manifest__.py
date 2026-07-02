@@ -1,0 +1,35 @@
+{
+    "name": "Anabtawi Online Campaigns",
+    "version": "19.0.2.0.2",
+    "category": "Sales/Point of Sale",
+    "summary": "Anabtawi online aggregator campaigns, POS discounts, accounting, settlement, and reporting",
+    "author": "Anabtawi Sweets",
+    "license": "LGPL-3",
+    "depends": [
+        "point_of_sale",
+        "account",
+        "mail",
+        "anabtawi_jo_pos_refund_buyer",
+    ],
+    "data": [
+        "security/security.xml",
+        "security/ir.model.access.csv",
+        "data/online_aggregators.xml",
+        "views/online_campaign_views.xml",
+        "views/pos_order_views.xml",
+        "views/online_campaign_reporting_views.xml",
+        "views/online_campaign_settlement_views.xml",
+        "views/menu.xml",
+    ],
+    "assets": {
+        "point_of_sale._assets_pos": [
+            "anabtawi_online_campaigns/static/src/js/online_campaign_loader.js",
+            "anabtawi_online_campaigns/static/src/js/online_discount_logic.js",
+            "anabtawi_online_campaigns/static/src/js/receipt_extension.js",
+            "anabtawi_online_campaigns/static/src/xml/receipt_extension.xml",
+            "anabtawi_online_campaigns/static/src/scss/online_campaign_receipt.scss",
+        ],
+    },
+    "installable": True,
+    "application": True,
+}

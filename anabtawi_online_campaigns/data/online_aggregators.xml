@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="aggregator_talabat" model="online.campaign.aggregator">
+        <field name="name">Talabat</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="default_commission_percent">0.0</field>
+        <field name="color">1</field>
+        <field name="note">Set the current contracted default commission and accounting accounts before approval.</field>
+    </record>
+    <record id="aggregator_careem" model="online.campaign.aggregator">
+        <field name="name">Careem</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="default_commission_percent">0.0</field>
+        <field name="color">2</field>
+        <field name="note">Set the current contracted default commission and accounting accounts before approval.</field>
+    </record>
+    <record id="aggregator_mythings" model="online.campaign.aggregator">
+        <field name="name">MyThings</field>
+        <field name="company_id" ref="base.main_company"/>
+        <field name="default_commission_percent">0.0</field>
+        <field name="color">3</field>
+        <field name="note">Set the current contracted default commission and accounting accounts before approval.</field>
+    </record>
+</odoo>
+
