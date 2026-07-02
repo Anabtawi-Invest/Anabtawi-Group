@@ -1,6 +1,6 @@
 {
     "name": "Anabtawi Mobile API",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.2.0",
     "summary": "Secure mobile API for Anabtawi HR attendance, leave, and overtime",
     "category": "Human Resources",
     "author": "Anabtawi Group",
@@ -15,4 +15,3 @@
     "installable": True,
     "application": False,
 }
-

@@ -91,6 +91,11 @@ class AnabtawiMobileAPI(http.Controller):
         if error:
             return error
         work_location = employee.work_location_id
+        otp_number = ""
+        for field_name in ("employee_password", "otp_number", "employee_otp", "otp", "pin"):
+            if field_name in employee._fields and employee[field_name]:
+                otp_number = str(employee[field_name])
+                break
         return _json({
             "status": "ok",
             "uid": user.id,
@@ -101,6 +106,7 @@ class AnabtawiMobileAPI(http.Controller):
             "department_name": employee.department_id.name if employee.department_id else "",
             "work_location": work_location.name if work_location else "",
             "mobile_phone": employee.mobile_phone or "",
+            "otp_number": otp_number,
             "company_name": employee.company_id.name,
             "geo_required": employee._is_portal_geo_tracking_required(),
             "allow_remote": bool(employee.allow_remote_attendance),
@@ -295,6 +301,28 @@ class AnabtawiMobileAPI(http.Controller):
             "request_date_to": date_to,
             "name": reason,
         }
+        if bool(data.get("request_unit_hours")):
+            hour_from = _as_float(data.get("request_hour_from"))
+            hour_to = _as_float(data.get("request_hour_to"))
+            if leave_type.request_unit != "hour":
+                return _error(
+                    "hourly_leave_type_required",
+                    _("This time off type must use the Hours request unit."),
+                    422,
+                )
+            if date_from != date_to:
+                return _error("invalid_hourly_leave", _("An hourly request must use one date."), 422)
+            if hour_from is None or hour_to is None or hour_from < 0 or hour_to > 24 or hour_to <= hour_from:
+                return _error(
+                    "invalid_leave_time",
+                    _("Enter a valid start and end time; the end must be after the start."),
+                    422,
+                )
+            vals.update({
+                "request_unit_hours": True,
+                "request_hour_from": hour_from,
+                "request_hour_to": hour_to,
+            })
         if bool(data.get("request_unit_half")):
             if date_from != date_to:
                 return _error("invalid_half_day", _("A half-day request must use one date."), 422)
@@ -329,6 +357,8 @@ class AnabtawiMobileAPI(http.Controller):
             "type": leave.holiday_status_id.name,
             "date_from": fields.Date.to_string(leave.request_date_from) if leave.request_date_from else None,
             "date_to": fields.Date.to_string(leave.request_date_to) if leave.request_date_to else None,
+            "hour_from": round(leave.request_hour_from, 4) if leave.request_unit_hours else None,
+            "hour_to": round(leave.request_hour_to, 4) if leave.request_unit_hours else None,
             "days": round(leave.number_of_days or 0.0, 2),
             "state": leave.state,
         } for leave in leaves]})
@@ -429,4 +459,3 @@ class AnabtawiMobileAPI(http.Controller):
             "hours": approval.quantity,
             "state": approval.request_status,
         } for approval in approvals]})
-

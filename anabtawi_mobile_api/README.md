@@ -1,5 +1,7 @@
 # Anabtawi Mobile API
 
+The employee Profile endpoint exposes the authenticated employee's rotating OTP from the `employee_request` module (`hr.employee.employee_password`) when that field is installed.
+
 Odoo 19 integration addon for the Anabtawi HR Android/iOS application.
 
 ## Required existing addons
@@ -34,4 +36,3 @@ For upgrades, use `-u anabtawi_mobile_api` instead of `-i`.
 ```
 
 Never run module tests against the production database.
-
