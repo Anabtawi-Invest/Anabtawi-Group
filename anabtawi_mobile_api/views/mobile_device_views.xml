@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_anabtawi_mobile_device_tree" model="ir.ui.view">
+        <field name="name">anabtawi.mobile.device.tree</field>
+        <field name="model">anabtawi.mobile.device</field>
+        <field name="arch" type="xml">
+            <list string="Employee App Devices">
+                <field name="user_id"/>
+                <field name="employee_id"/>
+                <field name="device_name"/>
+                <field name="device_uid"/>
+                <field name="registered_ip"/>
+                <field name="last_ip"/>
+                <field name="active"/>
+                <field name="registered_at"/>
+                <field name="last_login"/>
+                <field name="token_expires_at"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_anabtawi_mobile_device_form" model="ir.ui.view">
+        <field name="name">anabtawi.mobile.device.form</field>
+        <field name="model">anabtawi.mobile.device</field>
+        <field name="arch" type="xml">
+            <form string="Employee App Device">
+                <header>
+                    <button name="action_reset_device" type="object" string="Reset Employee App Device" class="btn-primary"
+                            confirm="This clears the registered Employee App device and token. The employee must log in again from the Employee App."/>
+                </header>
+                <sheet>
+                    <group string="Employee App Device">
+                        <field name="user_id"/>
+                        <field name="employee_id" readonly="1"/>
+                        <field name="device_name"/>
+                        <field name="device_uid"/>
+                        <field name="registered_ip" readonly="1"/>
+                        <field name="last_ip" readonly="1"/>
+                        <field name="active"/>
+                        <field name="registered_at" readonly="1"/>
+                        <field name="last_login" readonly="1"/>
+                        <field name="token_expires_at" readonly="1"/>
+                    </group>
+                    <group string="Technical" groups="base.group_system">
+                        <field name="token_index" readonly="1"/>
+                        <field name="token_hash" password="True"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_employee_form_employee_app_device" model="ir.ui.view">
+        <field name="name">hr.employee.form.employee.app.device</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='settings']" position="inside">
+                <group string="Employee App Device" groups="hr.group_hr_user">
+                    <group>
+                        <field name="employee_app_active_device_id" readonly="1"/>
+                        <field name="employee_app_device_name" readonly="1"/>
+                        <field name="employee_app_device_uid" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="employee_app_registered_ip" readonly="1"/>
+                        <field name="employee_app_last_ip" readonly="1"/>
+                        <field name="employee_app_registered_at" readonly="1"/>
+                        <field name="employee_app_last_login" readonly="1"/>
+                        <button name="action_reset_employee_app_device" type="object" string="Reset Employee App Device" class="btn-primary"
+                                confirm="This will allow the employee to register the Employee App on a different device."/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_anabtawi_mobile_device" model="ir.actions.act_window">
+        <field name="name">Employee App Devices</field>
+        <field name="res_model">anabtawi.mobile.device</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem
+        id="menu_anabtawi_mobile_device"
+        name="Employee App Devices"
+        parent="base.menu_users"
+        action="action_anabtawi_mobile_device"
+        sequence="95"
+        groups="hr.group_hr_manager"
+    />
+</odoo>
