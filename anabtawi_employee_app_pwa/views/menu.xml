@@ -1,0 +1,14 @@
+<odoo>
+    <record id="action_employee_app_pwa" model="ir.actions.act_url">
+        <field name="name">Employee App</field>
+        <field name="url">/employee-portal</field>
+        <field name="target">self</field>
+    </record>
+
+    <menuitem
+        id="menu_employee_app_pwa_root"
+        name="Employee App"
+        sequence="5"
+        action="action_employee_app_pwa"
+        groups="base.group_user"/>
+</odoo>
