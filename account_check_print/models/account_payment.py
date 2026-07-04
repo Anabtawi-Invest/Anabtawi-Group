@@ -1,4 +1,5 @@
 import base64
+import logging
 import os
 from functools import lru_cache
 
@@ -7,16 +8,42 @@ from markupsafe import Markup
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 
+_logger = logging.getLogger(__name__)
+
 
 @lru_cache(maxsize=1)
 def _check_print_font_path():
     """Return the bundled font path from the installed module directory."""
     try:
         from odoo.addons.account_check_print import __path__ as module_path
-    except ImportError:
+    except ImportError as error:
+        _logger.warning(
+            "account_check_print: could not import module path for bundled font: %s",
+            error,
+        )
         return ""
-    font_path = os.path.join(module_path[0], "static", "src", "fonts", "DejaVuSans.ttf")
-    return font_path if os.path.isfile(font_path) else ""
+    module_root = module_path[0]
+    font_path = os.path.join(module_root, "static", "src", "fonts", "DejaVuSans.ttf")
+    if os.path.isfile(font_path):
+        _logger.info(
+            "account_check_print: bundled font found at %s (size=%s bytes)",
+            font_path,
+            os.path.getsize(font_path),
+        )
+        return font_path
+    fonts_dir = os.path.join(module_root, "static", "src", "fonts")
+    fonts_dir_listing = []
+    if os.path.isdir(fonts_dir):
+        fonts_dir_listing = os.listdir(fonts_dir)
+    _logger.error(
+        "account_check_print: bundled font missing. module_root=%s font_path=%s "
+        "fonts_dir_exists=%s fonts_dir_listing=%s",
+        module_root,
+        font_path,
+        os.path.isdir(fonts_dir),
+        fonts_dir_listing,
+    )
+    return ""
 
 
 @lru_cache(maxsize=1)
@@ -24,9 +51,39 @@ def _check_print_font_base64():
     """Load the bundled DejaVu font once for embedded PDF rendering."""
     font_path = _check_print_font_path()
     if not font_path:
+        _logger.error("account_check_print: no bundled font path, skipping base64 embed")
         return ""
     with open(font_path, "rb") as font_file:
-        return base64.b64encode(font_file.read()).decode("ascii")
+        encoded = base64.b64encode(font_file.read()).decode("ascii")
+    _logger.info(
+        "account_check_print: bundled font encoded for PDF embed (base64_len=%s)",
+        len(encoded),
+    )
+    return encoded
+
+
+def get_check_print_font_diagnostics():
+    """Return font-loading details for tests and support troubleshooting."""
+    try:
+        from odoo.addons.account_check_print import __path__ as module_path
+        module_root = module_path[0]
+        import_error = ""
+    except ImportError as error:
+        module_root = ""
+        import_error = str(error)
+    font_path = _check_print_font_path()
+    font_base64 = _check_print_font_base64()
+    fonts_dir = os.path.join(module_root, "static", "src", "fonts") if module_root else ""
+    return {
+        "module_root": module_root,
+        "fonts_dir": fonts_dir,
+        "font_path": font_path,
+        "font_exists": bool(font_path),
+        "font_base64_length": len(font_base64),
+        "fonts_dir_exists": os.path.isdir(fonts_dir) if fonts_dir else False,
+        "fonts_dir_listing": os.listdir(fonts_dir) if fonts_dir and os.path.isdir(fonts_dir) else [],
+        "import_error": import_error,
+    }
 
 
 class AccountPayment(models.Model):
@@ -272,7 +329,15 @@ class AccountPayment(models.Model):
         """Embed the bundled font so wkhtmltopdf can render Arabic on Odoo.sh."""
         font_base64 = _check_print_font_base64()
         if not font_base64:
+            _logger.warning(
+                "account_check_print: rendering check without embedded font styles. diagnostics=%s",
+                get_check_print_font_diagnostics(),
+            )
             return Markup("")
+        _logger.info(
+            "account_check_print: embedding bundled font in check report HTML (base64_len=%s)",
+            len(font_base64),
+        )
         return Markup(
             "<style>"
             "@font-face {"
