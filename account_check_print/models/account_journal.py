@@ -19,13 +19,22 @@ class AccountJournal(models.Model):
     )
     next_check_number = fields.Integer(default=1, copy=False)
     print_language = fields.Selection(
-        [("en", "English"), ("ar", "Arabic")], required=True, default="en"
+        [("en", "English"), ("ar", "Arabic")],
+        required=True,
+        default=lambda self: self._default_check_print_language(),
+        help="Controls the language of amount-in-words and RTL layout on printed checks.",
     )
     stock_type = fields.Selection(
         [("blank", "Blank Stock"), ("preprinted", "Pre-printed Stock")],
         required=True,
         default="preprinted",
     )
+
+    @api.model
+    def _default_check_print_language(self):
+        """Default check language from the active user or company locale."""
+        lang = self.env.user.lang or self.env.company.partner_id.lang or "en_US"
+        return "ar" if lang.startswith("ar") else "en"
 
     @api.onchange("enable_check_printing")
     def _onchange_enable_check_printing(self):

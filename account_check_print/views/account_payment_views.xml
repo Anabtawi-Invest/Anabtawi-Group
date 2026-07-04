@@ -41,13 +41,14 @@
                 </button>
             </xpath>
             <xpath expr="//sheet" position="inside">
-                <group string="Business Check" invisible="not check_number">
-                    <group>
-                        <field name="check_number"/>
-                        <field name="printed"/>
-                        <field name="voided"/>
+                <group string="Business Check" invisible="not can_preview_check and not check_number">
+                    <group invisible="not can_preview_check and not check_number">
+                        <field name="check_print_language" readonly="1" invisible="not can_preview_check"/>
+                        <field name="check_number" invisible="not check_number"/>
+                        <field name="printed" invisible="not check_number"/>
+                        <field name="voided" invisible="not check_number"/>
                     </group>
-                    <group>
+                    <group invisible="not check_number">
                         <field name="printed_date"/>
                         <field name="printed_by"/>
                         <field name="reprinted_count"/>

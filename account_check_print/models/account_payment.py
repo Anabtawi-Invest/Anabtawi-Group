@@ -111,6 +111,10 @@ class AccountPayment(models.Model):
     check_history_count = fields.Integer(compute="_compute_check_history_count")
     can_print_check = fields.Boolean(compute="_compute_check_permissions")
     can_preview_check = fields.Boolean(compute="_compute_check_permissions")
+    check_print_language = fields.Selection(
+        related="journal_id.print_language",
+        string="Check Print Language",
+    )
 
     _journal_check_number_unique = models.Constraint(
         "UNIQUE(journal_id, check_number)",
@@ -484,6 +488,27 @@ class AccountPayment(models.Model):
             f"font-size:{layout['font_size']}pt;overflow:hidden;"
         )
 
+    def _check_arabic_currency_labels(self):
+        """Return Arabic currency labels even when currency translations are missing."""
+        currency = self.currency_id.with_context(lang="ar_001")
+        unit = currency.currency_unit_label or currency.name or ""
+        subunit = currency.currency_subunit_label or ""
+        if not _contains_arabic(unit) or (subunit and not _contains_arabic(subunit)):
+            fallback = {
+                "JOD": ("دينار", "قرش"),
+                "USD": ("دولار أمريكي", "سنت"),
+                "EUR": ("يورو", "سنت"),
+                "SAR": ("ريال سعودي", "هللة"),
+                "AED": ("درهم", "فلس"),
+                "KWD": ("دينار كويتي", "فلس"),
+            }
+            unit_fallback, subunit_fallback = fallback.get(currency.name, (unit, subunit))
+            if not _contains_arabic(unit):
+                unit = unit_fallback
+            if subunit and not _contains_arabic(subunit):
+                subunit = subunit_fallback
+        return unit, subunit
+
     def _check_amount_words_ar(self):
         """Spell the amount in Arabic without English title-casing side effects."""
         self.ensure_one()
@@ -504,17 +529,33 @@ class AccountPayment(models.Model):
         amount = self.amount
         integral, _, fractional = f"{amount:.{currency.decimal_places}f}".partition(".")
         integer_value = int(integral)
-        unit = currency.currency_unit_label or currency.name
+        unit, subunit = self._check_arabic_currency_labels()
         if currency.is_zero(amount - integer_value):
-            return f"{_words(integer_value)} {unit}"
-        subunit = currency.currency_subunit_label or ""
-        return f"{_words(integer_value)} {unit} و {_words(int(fractional or 0))} {subunit}".strip()
+            return f"{_words(integer_value)} {unit}".strip()
+        if subunit:
+            return f"{_words(integer_value)} {unit} و {_words(int(fractional or 0))} {subunit}".strip()
+        return f"{_words(integer_value)} {unit}".strip()
 
     def get_check_print_amount_words(self):
         """Spell the amount using the journal's configured print language."""
         self.ensure_one()
+        print_language = self.journal_id.print_language
+        _logger.info(
+            "account_check_print: amount words for payment %s journal=%s print_language=%s",
+            self.id,
+            self.journal_id.display_name,
+            print_language,
+        )
         if self.is_check_print_arabic():
             words = self._check_amount_words_ar()
+            if not _contains_arabic(words):
+                check_words = getattr(self, "check_amount_in_words", None) or ""
+                if _contains_arabic(check_words):
+                    _logger.warning(
+                        "account_check_print: falling back to payment check_amount_in_words=%r",
+                        check_words,
+                    )
+                    return check_words
             _logger.info("account_check_print: Arabic amount words=%r", words)
             return words
         return self.currency_id.with_context(lang="en_US").amount_to_text(self.amount)
