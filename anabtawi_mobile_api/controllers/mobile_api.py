@@ -66,18 +66,28 @@ class AnabtawiMobileAPI(http.Controller):
             return False
 
     def _eligible_mobile_user(self, user):
-    if not user or not user.active:
-        return False
+        """Return True only when the Odoo user is linked to an active employee.
 
-    employee = request.env["hr.employee"].sudo().search([
-        ("user_id", "=", user.id),
-        ("active", "=", True),
-    ], limit=1)
+        IMPORTANT:
+        This method is used only by the Employee App / mobile API login.
+        It must NOT restrict normal Odoo backend login (/odoo or /web/login).
 
-    if not employee:
-        return False
+        Rules:
+        - allow portal users, internal users, and even admin users IF they are linked
+          to an active hr.employee record;
+        - block public/unlinked/inactive users;
+        - do not use group restrictions such as base.group_system because some
+          employees may also be Odoo administrators or internal users.
+        """
+        if not user or not user.active:
+            return False
 
-    return True
+        employee = request.env["hr.employee"].sudo().search([
+            ("user_id", "=", user.id),
+            ("active", "=", True),
+        ], limit=1)
+
+        return bool(employee)
 
     @http.route(
         "/anabtawi/mobile/auth/login",
