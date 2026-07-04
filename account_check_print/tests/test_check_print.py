@@ -7,6 +7,7 @@ from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 from odoo.addons.account_check_print.models.account_payment import (
     _check_print_font_base64,
     _contains_arabic,
+    _shape_arabic_text_for_ltr_renderer,
     get_check_print_font_diagnostics,
 )
 
@@ -211,3 +212,10 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
         self.assertIn(b'direction:rtl', html)
         self.assertIn(b'dir="rtl"', html)
         self.assertIn(b"data:image/png;base64,", html)
+
+    def test_arabic_display_text_is_ordered_for_png(self):
+        text = "مائة دينار"
+        shaped = _shape_arabic_text_for_ltr_renderer(text)
+        self.assertNotEqual(shaped, text[::-1])
+        self.assertIn("د", shaped)
+        self.assertNotIn("ر ا ن", shaped)
