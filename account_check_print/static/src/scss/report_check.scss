@@ -1,0 +1,11 @@
+@font-face {
+    font-family: 'Check Print DejaVu';
+    src: url('/account_check_print/static/src/fonts/DejaVuSans.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+.o_check_print_page,
+.o_check_print_page * {
+    font-family: 'Check Print DejaVu', sans-serif;
+}
