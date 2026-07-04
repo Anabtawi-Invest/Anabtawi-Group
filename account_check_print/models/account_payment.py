@@ -1,14 +1,21 @@
 import base64
+import io
 import logging
 import os
+import unicodedata
 from functools import lru_cache
 
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.tools.arabic_reshaper import reshape
 
 _logger = logging.getLogger(__name__)
+
+
+def _contains_arabic(text):
+    return bool(text) and any("\u0600" <= char <= "\u06ff" for char in text)
 
 
 @lru_cache(maxsize=1)
@@ -362,9 +369,77 @@ class AccountPayment(models.Model):
         self.ensure_one()
         if self.journal_id.print_language == "ar":
             return "rtl"
-        if text and any("\u0600" <= char <= "\u06ff" for char in text):
+        if _contains_arabic(text):
             return "rtl"
         return "ltr"
+
+    def _check_arabic_display_text(self, text):
+        """Shape and order Arabic text for deterministic PDF rendering."""
+        if not text:
+            return ""
+        maybe_rtl_letter = text.lstrip()[:1] or " "
+        maybe_ltr_tail = text[1:]
+        first_letter_is_rtl = unicodedata.bidirectional(maybe_rtl_letter) in ("AL", "R")
+        no_letter_is_ltr = not any(
+            unicodedata.bidirectional(letter) == "L" for letter in maybe_ltr_tail
+        )
+        if first_letter_is_rtl and no_letter_is_ltr:
+            return reshape(text)[::-1]
+        return text
+
+    def _check_arabic_text_png_data_uri(self, text, field_name):
+        """Render Arabic text as PNG because wkhtmltopdf garbles UTF-8 HTML text."""
+        self.ensure_one()
+        font_path = _check_print_font_path()
+        if not font_path:
+            return ""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+        except ImportError:
+            _logger.warning(
+                "account_check_print: Pillow is unavailable, cannot render %s as PNG",
+                field_name,
+            )
+            return ""
+
+        layout = self.check_layout_values()
+        font_size_px = max(int(layout["font_size"] * 96 / 72), 8)
+        display_text = self._check_arabic_display_text(text)
+        font = ImageFont.truetype(font_path, font_size_px)
+        bbox = font.getbbox(display_text) or (0, 0, 0, 0)
+        width = max(bbox[2] - bbox[0], 1) + 4
+        height = max(bbox[3] - bbox[1], 1) + 4
+        image = Image.new("RGBA", (width, height), (255, 255, 255, 0))
+        draw = ImageDraw.Draw(image)
+        draw.text((2 - bbox[0], 2 - bbox[1]), display_text, font=font, fill=(0, 0, 0, 255))
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+
+    def check_field_text_markup(self, text, field_name):
+        """Return PNG markup for Arabic fields and plain text markup otherwise."""
+        self.ensure_one()
+        if not text:
+            return Markup("")
+        if not _contains_arabic(text):
+            return Markup(escape(text))
+        data_uri = self._check_arabic_text_png_data_uri(text, field_name)
+        if not data_uri:
+            _logger.warning(
+                "account_check_print: Arabic PNG fallback failed for %s, using plain text",
+                field_name,
+            )
+            return Markup(escape(text))
+        align = "right" if self.check_field_direction(text) == "rtl" else "left"
+        _logger.info(
+            "account_check_print: rendered %s as PNG for wkhtmltopdf (text_len=%s)",
+            field_name,
+            len(text),
+        )
+        return Markup(
+            '<img alt="" src="%s" '
+            'style="width:100%%;height:100%%;object-fit:contain;object-position:%s center;"/>'
+        ) % (data_uri, align)
 
     def check_field_style(self, field_name):
         """Build absolute CSS from layout data using millimetres only."""

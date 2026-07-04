@@ -3,7 +3,6 @@
     <template id="report_check_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
-                <t t-out="o.get_check_report_styles()"/>
                 <t t-set="layout" t-value="o.journal_id.check_layout_id"/>
                 <t t-set="geometry" t-value="o.check_layout_values()"/>
                 <t t-set="payee_name" t-value="o.check_payee_name()"/>
@@ -15,6 +14,7 @@
                     t-att-data-oe-id="o.id"
                     t-att-style="'position:relative;margin:0;padding:0;overflow:hidden;width:%smm;height:%smm;font-family:%s;' % (geometry['paper_width'], geometry['paper_height'], o.check_font_family())"
                 >
+                    <t t-out="o.get_check_report_styles()"/>
                     <img
                         t-if="o.journal_id.stock_type == 'blank' and layout.background_image"
                         t-att-src="image_data_uri(layout.background_image)"
@@ -36,7 +36,7 @@
                         t-att-dir="o.check_field_direction(payee_name)"
                         t-att-style="o.check_field_style('payee') + 'z-index:2;font-weight:bold;'"
                     >
-                        <span t-out="payee_name"/>
+                        <span t-out="o.check_field_text_markup(payee_name, 'payee')"/>
                     </div>
                     <div t-att-style="o.check_field_style('amount') + 'z-index:2;text-align:right;font-weight:bold;'">
                         <span t-out="o.check_formatted_amount()"/>
@@ -45,13 +45,13 @@
                         t-att-dir="o.check_field_direction(amount_words)"
                         t-att-style="o.check_field_style('amount_words') + 'z-index:2;'"
                     >
-                        <span t-out="amount_words"/>
+                        <span t-out="o.check_field_text_markup(amount_words, 'amount_words')"/>
                     </div>
                     <div
                         t-att-dir="o.check_field_direction(memo_text)"
                         t-att-style="o.check_field_style('memo') + 'z-index:2;'"
                     >
-                        <span t-out="memo_text"/>
+                        <span t-out="o.check_field_text_markup(memo_text, 'memo')"/>
                     </div>
                     <div t-att-style="o.check_field_style('logo') + 'z-index:2;'">
                         <img

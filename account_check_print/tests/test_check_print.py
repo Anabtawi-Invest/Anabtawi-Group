@@ -173,8 +173,15 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
             f"Arabic payee name missing from report HTML. diagnostics={get_check_print_font_diagnostics()}",
         )
         self.assertIn(
+            b"data:image/png;base64,",
+            html,
+            "Arabic payee should be rendered as PNG for wkhtmltopdf.",
+        )
+        self.assertIn(
             b"Check Print DejaVu",
             html,
             f"Check font marker missing from Arabic report HTML. diagnostics={get_check_print_font_diagnostics()}",
         )
         self.assertEqual(payment.check_field_direction(arabic_name), "rtl")
+        payee_markup = payment.check_field_text_markup(arabic_name, "payee")
+        self.assertIn("data:image/png;base64,", str(payee_markup))
