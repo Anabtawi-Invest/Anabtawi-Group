@@ -1,24 +1,31 @@
 import base64
+import os
 from functools import lru_cache
 
 from markupsafe import Markup
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
-from odoo.tools import file_path
+
+
+@lru_cache(maxsize=1)
+def _check_print_font_path():
+    """Return the bundled font path from the installed module directory."""
+    try:
+        from odoo.addons.account_check_print import __path__ as module_path
+    except ImportError:
+        return ""
+    font_path = os.path.join(module_path[0], "static", "src", "fonts", "DejaVuSans.ttf")
+    return font_path if os.path.isfile(font_path) else ""
 
 
 @lru_cache(maxsize=1)
 def _check_print_font_base64():
     """Load the bundled DejaVu font once for embedded PDF rendering."""
-    try:
-        path = file_path(
-            "account_check_print/static/src/fonts/DejaVuSans.ttf",
-            filter_ext=(".ttf",),
-        )
-    except (FileNotFoundError, ValueError):
+    font_path = _check_print_font_path()
+    if not font_path:
         return ""
-    with open(path, "rb") as font_file:
+    with open(font_path, "rb") as font_file:
         return base64.b64encode(font_file.read()).decode("ascii")
 
 

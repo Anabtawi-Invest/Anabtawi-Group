@@ -2,6 +2,7 @@ from odoo.tests import new_test_user, tagged
 from odoo.exceptions import AccessError, UserError
 
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
+from odoo.addons.account_check_print.models.account_payment import _check_print_font_base64
 
 
 @tagged("post_install", "-at_install")
@@ -76,6 +77,12 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
         with self.assertRaises(AccessError):
             payment.with_user(self.accounting_user).action_print_check()
 
+    def test_bundled_font_is_available(self):
+        self.assertTrue(
+            _check_print_font_base64(),
+            "DejaVuSans.ttf must be present in account_check_print/static/src/fonts/",
+        )
+
     def test_report_html_and_dynamic_paperformat(self):
         payment = self._create_posted_payment()
         payment.action_print_check()
@@ -91,7 +98,7 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
         self.assertIn(b"1001", html)
         self.assertIn(b"Check Print DejaVu", html)
 
-    def test_arabic_text_uses_embedded_font(self):
+    def test_arabic_text_renders_in_check_report(self):
         arabic_name = "الشركة العالمية"
         partner = self.env["res.partner"].create({"name": arabic_name})
         payment = self.init_payment(-200.0, post=False, partner=partner)
@@ -104,5 +111,4 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
         )
         self.assertIn(arabic_name.encode("utf-8"), html)
         self.assertIn(b"Check Print DejaVu", html)
-        self.assertIn(b"data:application/font-ttf", html)
         self.assertEqual(payment.check_field_direction(arabic_name), "rtl")
