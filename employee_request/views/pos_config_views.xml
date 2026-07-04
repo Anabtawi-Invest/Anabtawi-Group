@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pos_config_view_form_inherit_employee_pricelist" model="ir.ui.view">
+        <field name="name">pos.config.form.employee_request.employee_pricelist</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//setting[@id='other_devices']" position="after">
+                <setting string="Employee Pricelist"
+                    help="Select a pricelist to be used for employee-related pricing in this PoS.">
+                    <field name="employee_pricelist_id" options="{'no_create': True}"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+
