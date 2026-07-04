@@ -1,7 +1,7 @@
 {
     "name": "Anabtawi Employee App API",
-    "version": "19.0.1.3.1",
-    "summary": "Secure Employee App API for attendance, leave, overtime, and single-device restriction",
+    "version": "19.0.1.3.0",
+    "summary": "Secure Employee App API for attendance, leave, overtime, OTP, and devices",
     "category": "Human Resources",
     "author": "Anabtawi Group",
     "license": "LGPL-3",
@@ -9,6 +9,7 @@
         "base",
         "hr",
         "web",
+        "employee_request",
         "portal_check_in",
         "portal_leaves",
         "hr_attendance_overtime_approval_bridge",

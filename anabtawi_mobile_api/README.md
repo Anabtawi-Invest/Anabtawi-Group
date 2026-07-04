@@ -1,30 +1,28 @@
 # Anabtawi Employee App API
 
-Odoo 19 integration addon for the Anabtawi Employee App.
+Self-contained Odoo 19 API for the Employee App. It provides authentication, rotating access/refresh tokens, one-device enforcement, device metadata, employee OTP, attendance, leave, and overtime endpoints.
 
-## Main features
+## Dependencies
 
-- Employee App login endpoint with bearer token.
-- Attendance, leave, overtime, and employee profile APIs.
-- Single-device restriction for the Employee App only.
-- Registered device, registered IP, last IP, registered date, and last login shown under the employee Settings tab.
-- HR Manager can reset the Employee App device so the employee can register a different phone.
-- Normal Odoo web login is not restricted and can still be used from multiple devices.
-
-## Required existing addons
-
+- `employee_request`
 - `portal_check_in`
 - `portal_leaves`
 - `hr_attendance_overtime_approval_bridge`
 
-## Installation / Upgrade
+It does **not** depend on `anabtawi_mobile_single_device` and does not restrict ordinary `/odoo` browser sessions.
 
-1. Replace the existing `anabtawi_mobile_api` folder in custom addons.
-2. Push to Odoo.sh.
-3. Upgrade **Anabtawi Employee App API** on staging.
+## Deployment
 
-Command-line example:
+1. Back up and test on the Odoo.sh staging branch.
+2. Remove the legacy `anabtawi_mobile_single_device` code/module using an approved Odoo migration procedure.
+3. Install or upgrade `anabtawi_mobile_api`.
+4. The `19.0.1.3.0` migration revokes legacy tokens; employees register their current phone on the next login.
+5. HR managers can reset a device from **Employees → Employee App → Devices**.
 
-```bash
-./odoo-bin -d ANABTAWI_DATABASE -u anabtawi_mobile_api --stop-after-init
-```
+Token lifetimes are configurable with:
+
+- `anabtawi_mobile.access_token_ttl_minutes` (default 60)
+- `anabtawi_mobile.refresh_token_ttl_days` (default 30)
+- `anabtawi_mobile.token_pepper` (created automatically)
+
+Never run module tests against production.
