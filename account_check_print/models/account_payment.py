@@ -240,6 +240,12 @@ class AccountPayment(models.Model):
             return self.check_layout_snapshot
         return self._layout_snapshot_values()
 
+    def check_font_family(self):
+        """Return a PDF-safe font stack that renders Arabic and Latin text."""
+        return (
+            'Lato, "Odoo Unicode Support Noto", "DejaVu Sans", Tahoma, sans-serif'
+        )
+
     def check_field_style(self, field_name):
         """Build absolute CSS from layout data using millimetres only."""
         self.ensure_one()
@@ -252,6 +258,7 @@ class AccountPayment(models.Model):
             f"top:{layout[f'{field_name}_y']}mm;"
             f"width:{layout[f'{field_name}_width']}mm;"
             f"height:{layout[f'{field_name}_height']}mm;"
+            f"font-family:{self.check_font_family()};"
             f"font-size:{layout['font_size']}pt;overflow:hidden;"
         )
 

@@ -9,7 +9,7 @@
                     class="o_check_print_page"
                     t-att-data-oe-model="o._name"
                     t-att-data-oe-id="o.id"
-                    t-att-style="'position:relative;margin:0;padding:0;overflow:hidden;width:%smm;height:%smm;font-family:Arial, sans-serif;' % (geometry['paper_width'], geometry['paper_height'])"
+                    t-att-style="'position:relative;margin:0;padding:0;overflow:hidden;width:%smm;height:%smm;font-family:%s;' % (geometry['paper_width'], geometry['paper_height'], o.check_font_family())"
                 >
                     <img
                         t-if="o.journal_id.stock_type == 'blank' and layout.background_image"

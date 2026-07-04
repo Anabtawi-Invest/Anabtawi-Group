@@ -89,3 +89,18 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
         )
         self.assertIn(self.partner_a.name.encode(), html)
         self.assertIn(b"1001", html)
+        self.assertIn(b"Odoo Unicode Support Noto", html)
+
+    def test_arabic_text_uses_unicode_font_stack(self):
+        arabic_name = "الشركة العالمية"
+        partner = self.env["res.partner"].create({"name": arabic_name})
+        payment = self.init_payment(-200.0, post=False, partner=partner)
+        payment.journal_id = self.journal
+        payment.payment_method_line_id = self.outbound_payment_method_line
+        payment.action_post()
+        report = self.env.ref("account_check_print.action_report_check")
+        html, _report_type = report._render_qweb_html(
+            report.report_name, payment.ids, data={}
+        )
+        self.assertIn(arabic_name.encode("utf-8"), html)
+        self.assertNotIn("Ø§Ù".encode(), html)
