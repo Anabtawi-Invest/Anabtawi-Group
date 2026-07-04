@@ -1,26 +1,10 @@
-# Anabtawi Employee App PWA for Odoo 19
+# Anabtawi Employee App PWA
 
-This module serves the Anabtawi Employee App as an installable PWA from `/employee-portal`.
+Serves the installable Employee App from `/employee-portal` on Odoo 19/Odoo.sh.
 
-## Requirements
+Two release archives are produced from the same source:
 
-Install `anabtawi_mobile_api` and its dependencies first.
+- staging defaults to `https://anabtawi-group-stagingisstaging-34241811.dev.odoo.com`
+- production defaults to `https://anabtawi-group.odoo.com`
 
-## Usage
-
-1. Copy `anabtawi_employee_app_pwa` to your Odoo.sh custom addons repository.
-2. Commit and push.
-3. Update Apps List.
-4. Install **Anabtawi Employee App PWA**.
-5. Open `https://anabtawi-group-stagingisstaging-34241811.dev.odoo.com/employee-portal` for staging testing.
-
-The app name and PWA labels are **Employee App**, not HR App.
-
-
-## Staging default
-
-The Employee App login screen defaults to:
-
-`https://anabtawi-group-stagingisstaging-34241811.dev.odoo.com`
-
-Employees can still change the server URL if needed.
+Deploy only the archive matching the target Odoo.sh branch, update the Apps list, then install or upgrade the module.

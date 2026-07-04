@@ -3,7 +3,7 @@
   "short_name": "Employee App",
   "description": "Secure attendance, leave, overtime, and employee self-service for Anabtawi Group.",
   "start_url": "/employee-portal",
-  "scope": "/employee-portal",
+  "scope": "/employee-portal/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#090B18",
