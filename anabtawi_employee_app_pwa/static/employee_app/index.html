@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>Employee App</title>
+    <title>Anabtawi Employee App</title>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
       /* These styles make the body full-height */
@@ -39,6 +39,16 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/anabtawi_employee_app_pwa/static/employee_app/_expo/static/js/web/AppEntry-671e9f26e4e329586045ad8a84bd85a1.js" defer></script>
+  <script src="/anabtawi_employee_app_pwa/static/employee_app/_expo/static/js/web/AppEntry-e73b266969d7706cc7b0cc72c8fb8695.js" defer></script>
+
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("/employee-portal/sw.js", { scope: "/employee-portal" }).catch(function (err) {
+            console.warn("Employee App service worker registration failed", err);
+          });
+        });
+      }
+    </script>
 </body>
 </html>
