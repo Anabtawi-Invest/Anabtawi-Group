@@ -371,7 +371,10 @@ class AccountPayment(models.Model):
     def is_check_print_arabic(self):
         """Return whether this check should render in Arabic."""
         self.ensure_one()
-        return self.journal_id.print_language == "ar"
+        if self.journal_id.print_language == "ar":
+            return True
+        check_words = getattr(self, "check_amount_in_words", None) or ""
+        return _contains_arabic(check_words)
 
     def check_print_lang(self):
         """Return the Odoo lang code used for check wording."""
@@ -537,25 +540,21 @@ class AccountPayment(models.Model):
         return f"{_words(integer_value)} {unit}".strip()
 
     def get_check_print_amount_words(self):
-        """Spell the amount using the journal's configured print language."""
+        """Return the same amount-in-words text shown on the payment form."""
         self.ensure_one()
+        check_words = getattr(self, "check_amount_in_words", None)
         print_language = self.journal_id.print_language
         _logger.info(
-            "account_check_print: amount words for payment %s journal=%s print_language=%s",
+            "account_check_print: amount words payment=%s journal=%s print_language=%s form_words=%r",
             self.id,
             self.journal_id.display_name,
             print_language,
+            check_words,
         )
-        if self.is_check_print_arabic():
+        if check_words:
+            return check_words
+        if self.journal_id.print_language == "ar":
             words = self._check_amount_words_ar()
-            if not _contains_arabic(words):
-                check_words = getattr(self, "check_amount_in_words", None) or ""
-                if _contains_arabic(check_words):
-                    _logger.warning(
-                        "account_check_print: falling back to payment check_amount_in_words=%r",
-                        check_words,
-                    )
-                    return check_words
             _logger.info("account_check_print: Arabic amount words=%r", words)
             return words
         return self.currency_id.with_context(lang="en_US").amount_to_text(self.amount)
