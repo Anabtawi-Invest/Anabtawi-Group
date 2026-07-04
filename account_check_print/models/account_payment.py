@@ -364,10 +364,25 @@ class AccountPayment(models.Model):
         """Return the embedded font used by the check PDF report."""
         return "'Check Print DejaVu', sans-serif"
 
+    def is_check_print_arabic(self):
+        """Return whether this check should render in Arabic."""
+        self.ensure_one()
+        return self.journal_id.print_language == "ar"
+
+    def check_print_lang(self):
+        """Return the Odoo lang code used for check wording."""
+        self.ensure_one()
+        return "ar_001" if self.is_check_print_arabic() else "en_US"
+
+    def check_page_direction(self):
+        """Return the page direction for the check report."""
+        self.ensure_one()
+        return "rtl" if self.is_check_print_arabic() else "ltr"
+
     def check_field_direction(self, text):
         """Use RTL when the journal or field content requires Arabic layout."""
         self.ensure_one()
-        if self.journal_id.print_language == "ar":
+        if self.is_check_print_arabic():
             return "rtl"
         if _contains_arabic(text):
             return "rtl"
@@ -421,7 +436,8 @@ class AccountPayment(models.Model):
         self.ensure_one()
         if not text:
             return Markup("")
-        if not _contains_arabic(text):
+        use_png = self.is_check_print_arabic() or _contains_arabic(text)
+        if not use_png:
             return Markup(escape(text))
         data_uri = self._check_arabic_text_png_data_uri(text, field_name)
         if not data_uri:
@@ -441,27 +457,67 @@ class AccountPayment(models.Model):
             'style="width:100%%;height:100%%;object-fit:contain;object-position:%s center;"/>'
         ) % (data_uri, align)
 
-    def check_field_style(self, field_name):
+    def check_field_style(self, field_name, text=None):
         """Build absolute CSS from layout data using millimetres only."""
         self.ensure_one()
         layout = self.check_layout_values()
         allowed = self.journal_id.check_layout_id._designer_field_names()
         if field_name not in allowed:
             raise ValidationError(_("Unknown check field: %s", field_name))
+        if field_name in ("amount", "check_number"):
+            align = "text-align:right;"
+        elif field_name == "date":
+            align = "text-align:center;"
+        elif self.is_check_print_arabic() and field_name in ("payee", "amount_words", "memo"):
+            align = "text-align:right;direction:rtl;"
+        elif text and _contains_arabic(text) and field_name in ("payee", "amount_words", "memo"):
+            align = "text-align:right;direction:rtl;"
+        else:
+            align = ""
         return (
             f"position:absolute;left:{layout[f'{field_name}_x']}mm;"
             f"top:{layout[f'{field_name}_y']}mm;"
             f"width:{layout[f'{field_name}_width']}mm;"
             f"height:{layout[f'{field_name}_height']}mm;"
+            f"{align}"
             f"font-family:{self.check_font_family()};"
             f"font-size:{layout['font_size']}pt;overflow:hidden;"
         )
 
+    def _check_amount_words_ar(self):
+        """Spell the amount in Arabic without English title-casing side effects."""
+        self.ensure_one()
+        try:
+            from num2words import num2words
+        except ImportError:
+            _logger.warning("account_check_print: num2words unavailable for Arabic amount words")
+            return self.currency_id.with_context(lang="ar_001").amount_to_text(self.amount)
+
+        currency = self.currency_id.with_context(lang="ar_001")
+
+        def _words(number):
+            try:
+                return num2words(number, lang="ar")
+            except NotImplementedError:
+                return num2words(number, lang="en")
+
+        amount = self.amount
+        integral, _, fractional = f"{amount:.{currency.decimal_places}f}".partition(".")
+        integer_value = int(integral)
+        unit = currency.currency_unit_label or currency.name
+        if currency.is_zero(amount - integer_value):
+            return f"{_words(integer_value)} {unit}"
+        subunit = currency.currency_subunit_label or ""
+        return f"{_words(integer_value)} {unit} و {_words(int(fractional or 0))} {subunit}".strip()
+
     def get_check_print_amount_words(self):
         """Spell the amount using the journal's configured print language."""
         self.ensure_one()
-        lang = "ar_001" if self.journal_id.print_language == "ar" else "en_US"
-        return self.currency_id.with_context(lang=lang).amount_to_text(self.amount)
+        if self.is_check_print_arabic():
+            words = self._check_amount_words_ar()
+            _logger.info("account_check_print: Arabic amount words=%r", words)
+            return words
+        return self.currency_id.with_context(lang="en_US").amount_to_text(self.amount)
 
     def check_formatted_amount(self):
         """Format the numeric check amount without an external dependency."""
@@ -472,4 +528,6 @@ class AccountPayment(models.Model):
     def check_payee_name(self):
         """Return the payment partner or a translated bearer label."""
         self.ensure_one()
-        return self.partner_id.name or _("Bearer")
+        if self.partner_id.name:
+            return self.partner_id.name
+        return self.with_context(lang=self.check_print_lang()).env._("Bearer")

@@ -12,7 +12,8 @@
                     class="o_check_print_page"
                     t-att-data-oe-model="o._name"
                     t-att-data-oe-id="o.id"
-                    t-att-style="'position:relative;margin:0;padding:0;overflow:hidden;width:%smm;height:%smm;font-family:%s;' % (geometry['paper_width'], geometry['paper_height'], o.check_font_family())"
+                    t-att-dir="o.check_page_direction()"
+                    t-att-style="'position:relative;margin:0;padding:0;overflow:hidden;width:%smm;height:%smm;font-family:%s;direction:%s;' % (geometry['paper_width'], geometry['paper_height'], o.check_font_family(), o.check_page_direction())"
                 >
                     <t t-out="o.get_check_report_styles()"/>
                     <img
@@ -26,30 +27,30 @@
                         style="position:absolute;left:15%;top:35%;width:70%;text-align:center;transform:rotate(-20deg);font-size:32pt;font-weight:bold;color:rgba(180,0,0,.22);z-index:5;"
                     >PREVIEW</div>
 
-                    <div t-att-style="o.check_field_style('check_number') + 'z-index:2;text-align:right;font-weight:bold;'">
+                    <div t-att-style="o.check_field_style('check_number') + 'z-index:2;font-weight:bold;'">
                         <span t-out="o.check_number or 'PREVIEW'"/>
                     </div>
-                    <div t-att-style="o.check_field_style('date') + 'z-index:2;text-align:center;'">
+                    <div t-att-style="o.check_field_style('date') + 'z-index:2;'">
                         <span t-out="o.date.strftime('%d/%m/%Y') if o.date else ''"/>
                     </div>
                     <div
                         t-att-dir="o.check_field_direction(payee_name)"
-                        t-att-style="o.check_field_style('payee') + 'z-index:2;font-weight:bold;'"
+                        t-att-style="o.check_field_style('payee', payee_name) + 'z-index:2;font-weight:bold;'"
                     >
                         <span t-out="o.check_field_text_markup(payee_name, 'payee')"/>
                     </div>
-                    <div t-att-style="o.check_field_style('amount') + 'z-index:2;text-align:right;font-weight:bold;'">
+                    <div t-att-style="o.check_field_style('amount') + 'z-index:2;font-weight:bold;'">
                         <span t-out="o.check_formatted_amount()"/>
                     </div>
                     <div
                         t-att-dir="o.check_field_direction(amount_words)"
-                        t-att-style="o.check_field_style('amount_words') + 'z-index:2;'"
+                        t-att-style="o.check_field_style('amount_words', amount_words) + 'z-index:2;'"
                     >
                         <span t-out="o.check_field_text_markup(amount_words, 'amount_words')"/>
                     </div>
                     <div
                         t-att-dir="o.check_field_direction(memo_text)"
-                        t-att-style="o.check_field_style('memo') + 'z-index:2;'"
+                        t-att-style="o.check_field_style('memo', memo_text) + 'z-index:2;'"
                     >
                         <span t-out="o.check_field_text_markup(memo_text, 'memo')"/>
                     </div>

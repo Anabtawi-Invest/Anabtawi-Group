@@ -6,6 +6,7 @@ from odoo.exceptions import AccessError, UserError
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 from odoo.addons.account_check_print.models.account_payment import (
     _check_print_font_base64,
+    _contains_arabic,
     get_check_print_font_diagnostics,
 )
 
@@ -185,3 +186,28 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
         self.assertEqual(payment.check_field_direction(arabic_name), "rtl")
         payee_markup = payment.check_field_text_markup(arabic_name, "payee")
         self.assertIn("data:image/png;base64,", str(payee_markup))
+
+    def test_arabic_print_language_uses_rtl_and_amount_words(self):
+        self.journal.print_language = "ar"
+        payment = self._create_posted_payment(amount=100.0)
+        self.assertEqual(payment.check_page_direction(), "rtl")
+        amount_words = payment.get_check_print_amount_words()
+        _logger.info(
+            "account_check_print test [test_arabic_print_language]: amount_words=%r",
+            amount_words,
+        )
+        self.assertFalse(
+            amount_words.lower().startswith("one hundred"),
+            f"Expected Arabic amount words, got: {amount_words!r}",
+        )
+        self.assertTrue(
+            _contains_arabic(amount_words),
+            f"Expected Arabic script in amount words, got: {amount_words!r}",
+        )
+        report = self.env.ref("account_check_print.action_report_check")
+        html, _report_type = report._render_qweb_html(
+            report.report_name, payment.ids, data={}
+        )
+        self.assertIn(b'direction:rtl', html)
+        self.assertIn(b'dir="rtl"', html)
+        self.assertIn(b"data:image/png;base64,", html)
