@@ -66,16 +66,18 @@ class AnabtawiMobileAPI(http.Controller):
             return False
 
     def _eligible_mobile_user(self, user):
-        if not user or not user.active:
-            return False
-        if self._safe_has_group(user, "base.group_system"):
-            return False
-        is_public = self._safe_has_group(user, "base.group_public")
-        is_portal = self._safe_has_group(user, "base.group_portal")
-        is_internal = self._safe_has_group(user, "base.group_user")
-        if is_public and not is_portal and not is_internal:
-            return False
-        return is_portal or is_internal
+    if not user or not user.active:
+        return False
+
+    employee = request.env["hr.employee"].sudo().search([
+        ("user_id", "=", user.id),
+        ("active", "=", True),
+    ], limit=1)
+
+    if not employee:
+        return False
+
+    return True
 
     @http.route(
         "/anabtawi/mobile/auth/login",
