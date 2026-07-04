@@ -3,8 +3,12 @@
     <template id="report_check_document">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
+                <t t-out="o.get_check_report_styles()"/>
                 <t t-set="layout" t-value="o.journal_id.check_layout_id"/>
                 <t t-set="geometry" t-value="o.check_layout_values()"/>
+                <t t-set="payee_name" t-value="o.check_payee_name()"/>
+                <t t-set="amount_words" t-value="o.get_check_print_amount_words()"/>
+                <t t-set="memo_text" t-value="o.memo or o.payment_reference or ''"/>
                 <article
                     class="o_check_print_page"
                     t-att-data-oe-model="o._name"
@@ -29,25 +33,25 @@
                         <span t-out="o.date.strftime('%d/%m/%Y') if o.date else ''"/>
                     </div>
                     <div
-                        t-att-dir="'rtl' if o.journal_id.print_language == 'ar' else 'ltr'"
+                        t-att-dir="o.check_field_direction(payee_name)"
                         t-att-style="o.check_field_style('payee') + 'z-index:2;font-weight:bold;'"
                     >
-                        <span t-out="o.check_payee_name()"/>
+                        <span t-out="payee_name"/>
                     </div>
                     <div t-att-style="o.check_field_style('amount') + 'z-index:2;text-align:right;font-weight:bold;'">
                         <span t-out="o.check_formatted_amount()"/>
                     </div>
                     <div
-                        t-att-dir="'rtl' if o.journal_id.print_language == 'ar' else 'ltr'"
+                        t-att-dir="o.check_field_direction(amount_words)"
                         t-att-style="o.check_field_style('amount_words') + 'z-index:2;'"
                     >
-                        <span t-out="o.get_check_print_amount_words()"/>
+                        <span t-out="amount_words"/>
                     </div>
                     <div
-                        t-att-dir="'rtl' if o.journal_id.print_language == 'ar' else 'ltr'"
+                        t-att-dir="o.check_field_direction(memo_text)"
                         t-att-style="o.check_field_style('memo') + 'z-index:2;'"
                     >
-                        <span t-out="o.memo or o.payment_reference or ''"/>
+                        <span t-out="memo_text"/>
                     </div>
                     <div t-att-style="o.check_field_style('logo') + 'z-index:2;'">
                         <img

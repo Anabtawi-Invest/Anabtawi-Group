@@ -1,5 +1,25 @@
+import base64
+from functools import lru_cache
+
+from markupsafe import Markup
+
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.tools import file_path
+
+
+@lru_cache(maxsize=1)
+def _check_print_font_base64():
+    """Load the bundled DejaVu font once for embedded PDF rendering."""
+    try:
+        path = file_path(
+            "account_check_print/static/src/fonts/DejaVuSans.ttf",
+            filter_ext=(".ttf",),
+        )
+    except (FileNotFoundError, ValueError):
+        return ""
+    with open(path, "rb") as font_file:
+        return base64.b64encode(font_file.read()).decode("ascii")
 
 
 class AccountPayment(models.Model):
@@ -240,11 +260,39 @@ class AccountPayment(models.Model):
             return self.check_layout_snapshot
         return self._layout_snapshot_values()
 
+    @api.model
+    def get_check_report_styles(self):
+        """Embed the bundled font so wkhtmltopdf can render Arabic on Odoo.sh."""
+        font_base64 = _check_print_font_base64()
+        if not font_base64:
+            return Markup("")
+        return Markup(
+            "<style>"
+            "@font-face {"
+            "font-family: 'Check Print DejaVu';"
+            "src: url('data:application/font-ttf;charset=utf-8;base64,%s') "
+            "format('truetype');"
+            "font-weight: normal;"
+            "font-style: normal;"
+            "}"
+            ".o_check_print_page, .o_check_print_page * {"
+            "font-family: 'Check Print DejaVu', sans-serif;"
+            "}"
+            "</style>"
+        ) % font_base64
+
     def check_font_family(self):
-        """Return a PDF-safe font stack that renders Arabic and Latin text."""
-        return (
-            'Lato, "Odoo Unicode Support Noto", "DejaVu Sans", Tahoma, sans-serif'
-        )
+        """Return the embedded font used by the check PDF report."""
+        return "'Check Print DejaVu', sans-serif"
+
+    def check_field_direction(self, text):
+        """Use RTL when the journal or field content requires Arabic layout."""
+        self.ensure_one()
+        if self.journal_id.print_language == "ar":
+            return "rtl"
+        if text and any("\u0600" <= char <= "\u06ff" for char in text):
+            return "rtl"
+        return "ltr"
 
     def check_field_style(self, field_name):
         """Build absolute CSS from layout data using millimetres only."""
