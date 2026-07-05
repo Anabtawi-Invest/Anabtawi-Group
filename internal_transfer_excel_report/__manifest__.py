@@ -1,6 +1,6 @@
 {
     'name': 'Internal Transfer Excel Report-Anabtawi',
-    'version': '1.3',
+    'version': '1.4',
     "author": "Anabtawi",
     'depends': ['stock', 'factory_plan_category'],
     'data': [
