@@ -162,6 +162,7 @@ class InternalTransferReportWizard(models.TransientModel):
         for move in moves:
             picking = move.picking_id
             rows.append({
+                'transfer_reference': picking.name or '',
                 'product_name': move.product_id.display_name,
                 'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
                 'created_by': picking.create_uid.display_name or self.env._('Undefined'),
@@ -171,43 +172,55 @@ class InternalTransferReportWizard(models.TransientModel):
             })
         return rows
 
+    def _get_sheet2_products(self):
+        product_ids = self._get_factory_plan_category_product_ids()
+        if product_ids is None:
+            return self.env['product.product'].search([], order='display_name')
+        return self.env['product.product'].browse(product_ids).sorted('display_name')
+
     def _get_sheet2_data(self):
         self.ensure_one()
+
+        state_labels = self._get_picking_state_labels()
+        aggregated = {}
 
         picking_domain = self._get_base_picking_domain()
         picking_domain.append(('state', 'not in', ('done', 'cancel')))
         picking_ids = self.env['stock.picking'].search(picking_domain).ids
-        if not picking_ids:
-            return []
 
-        move_domain = [
-            ('picking_id.picking_type_code', '=', 'internal'),
-            ('picking_id', 'in', picking_ids),
-            ('picking_id.state', 'not in', ('done', 'cancel')),
-            ('move_dest_ids', '=', False),
-        ]
-        move_domain = self._append_factory_plan_category_domain(move_domain)
+        if picking_ids:
+            move_domain = [
+                ('picking_id.picking_type_code', '=', 'internal'),
+                ('picking_id', 'in', picking_ids),
+                ('picking_id.state', 'not in', ('done', 'cancel')),
+                ('move_dest_ids', '=', False),
+            ]
+            move_domain = self._append_factory_plan_category_domain(move_domain)
+            moves = self.env['stock.move'].search(move_domain)
 
-        moves = self.env['stock.move'].search(move_domain)
-        aggregated = {}
-        state_labels = self._get_picking_state_labels()
+            for move in moves:
+                picking = move.picking_id
+                key = (move.product_id.id, picking.state)
+                row = aggregated.setdefault(key, {
+                    'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
+                    'product_name': move.product_id.display_name,
+                    'status': state_labels.get(picking.state, picking.state),
+                    'total_demand': 0.0,
+                    'total_quantity': 0.0,
+                })
+                row['total_demand'] += move.product_uom_qty
+                row['total_quantity'] += move.quantity
 
-        for move in moves:
-            picking = move.picking_id
-            key = (
-                self._get_factory_plan_category_display(move.product_id),
-                move.product_id.display_name,
-                picking.state,
-            )
-            row = aggregated.setdefault(key, {
-                'factory_plan_category': key[0],
-                'product_name': key[1],
-                'status': state_labels.get(picking.state, picking.state),
-                'total_demand': 0.0,
-                'total_quantity': 0.0,
-            })
-            row['total_demand'] += move.product_uom_qty
-            row['total_quantity'] += move.quantity
+        products_with_rows = {key[0] for key in aggregated}
+        for product in self._get_sheet2_products():
+            if product.id not in products_with_rows:
+                aggregated[(product.id, '')] = {
+                    'factory_plan_category': self._get_factory_plan_category_display(product),
+                    'product_name': product.display_name,
+                    'status': '',
+                    'total_demand': 0.0,
+                    'total_quantity': 0.0,
+                }
 
         return sorted(
             aggregated.values(),
@@ -240,6 +253,7 @@ class InternalTransferReportWizard(models.TransientModel):
         sheet1.freeze_panes(1, 0)
 
         sheet1_headers = [
+            self.env._('Reference'),
             self.env._('Product'),
             self.env._('Factory Plan Category'),
             self.env._('Created By'),
@@ -250,11 +264,12 @@ class InternalTransferReportWizard(models.TransientModel):
         for col, header in enumerate(sheet1_headers):
             sheet1.write(0, col, header, header_style)
 
-        sheet1.set_column(0, 0, 45)
-        sheet1.set_column(1, 1, 25)
-        sheet1.set_column(2, 2, 30)
-        sheet1.set_column(3, 3, 22)
-        sheet1.set_column(4, 5, 18)
+        sheet1.set_column(0, 0, 22)
+        sheet1.set_column(1, 1, 45)
+        sheet1.set_column(2, 2, 25)
+        sheet1.set_column(3, 3, 30)
+        sheet1.set_column(4, 4, 22)
+        sheet1.set_column(5, 6, 18)
 
         row = 1
         sheet1_rows = self._get_sheet1_data()
@@ -262,15 +277,16 @@ class InternalTransferReportWizard(models.TransientModel):
             sheet1.write(row, 0, self.env._('No data for selected filters.'), text_style)
         else:
             for data in sheet1_rows:
-                sheet1.write(row, 0, data['product_name'], text_style)
-                sheet1.write(row, 1, data['factory_plan_category'], text_style)
-                sheet1.write(row, 2, data['created_by'], text_style)
+                sheet1.write(row, 0, data['transfer_reference'], text_style)
+                sheet1.write(row, 1, data['product_name'], text_style)
+                sheet1.write(row, 2, data['factory_plan_category'], text_style)
+                sheet1.write(row, 3, data['created_by'], text_style)
                 if data['creating_date']:
-                    sheet1.write_datetime(row, 3, data['creating_date'], datetime_style)
+                    sheet1.write_datetime(row, 4, data['creating_date'], datetime_style)
                 else:
-                    sheet1.write(row, 3, '', text_style)
-                sheet1.write_number(row, 4, data['demand'], number_style)
-                sheet1.write_number(row, 5, data['quantity'], number_style)
+                    sheet1.write(row, 4, '', text_style)
+                sheet1.write_number(row, 5, data['demand'], number_style)
+                sheet1.write_number(row, 6, data['quantity'], number_style)
                 row += 1
 
         sheet2 = workbook.add_worksheet(self.env._('Summary'))

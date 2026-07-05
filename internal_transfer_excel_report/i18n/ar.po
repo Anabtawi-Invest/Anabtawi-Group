@@ -106,6 +106,11 @@ msgstr "التفاصيل"
 
 #. module: internal_transfer_excel_report
 #: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Reference"
+msgstr "المرجع"
+
+#. module: internal_transfer_excel_report
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
 msgid "Product"
 msgstr "المنتج"
 
