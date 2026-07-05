@@ -16,6 +16,10 @@ class AccountPayment(models.Model):
     
     _inherit = 'account.payment'
 
+    def _get_cheque_memo(self):
+        """Return memo/reference text for cheque printing (Odoo 19: memo, not ref)."""
+        return self.memo or self.payment_reference or ''
+
     def action_print_check(self):
         """
         Open the Print Check wizard for the current payment.
@@ -33,7 +37,7 @@ class AccountPayment(models.Model):
             'cheque_amount': self.amount,
             'cheque_date': self._format_cheque_date(self.date or date.today()),
             'currency_code': self.currency_id.name or 'JOD',
-            'cheque_memo': self.ref or '',
+            'cheque_memo': self._get_cheque_memo(),
         })
         
         return {
@@ -103,7 +107,7 @@ class PrintCheck(models.TransientModel):
                     'cheque_amount': payment.amount,
                     'cheque_date': self._format_date(payment.date),
                     'currency_code': payment.currency_id.name or 'JOD',
-                    'cheque_memo': payment.ref or '',
+                    'cheque_memo': payment._get_cheque_memo(),
                 })
         
         # Handle PDC wizard context (already passes default_ prefixed values)
