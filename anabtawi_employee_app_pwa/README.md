@@ -1,6 +1,6 @@
 Employee App PWA 19.0.1.1.5
 
-Fixes included:
+Fixes included: 
 - Mobile URL stability fix for Arabic/RTL.
 - Prevents horizontal shaking/movement on mobile browsers.
 - Viewport corrected for mobile PWA use.
