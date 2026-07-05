@@ -1,7 +1,7 @@
 {
     "name": "Account Check Print",
     "summary": "Configurable multi-bank business check printing",
-    "version": "19.0.1.0.11",
+    "version": "19.0.1.0.12",
     "category": "Accounting/Accounting",
     "author": "Anabtawi Group",
     "license": "LGPL-3",
