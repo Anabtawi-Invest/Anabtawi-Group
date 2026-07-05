@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 
+    Print Check Form View
+    =====================
+    
+    CRITICAL RTL FIX: This form uses multiple layers of RTL protection:
+    1. dir="ltr" attribute on the main container div
+    2. style="direction:ltr" inline style as backup
+    3. CSS class .pc-ltr-isolated for scoped LTR rules
+    4. JavaScript enforcement via MutationObserver
+    
+    The combination ensures the layout stays LTR even when Odoo
+    applies the .o_rtl class to the body in Arabic mode.
+    -->
+    
+    <record id="view_print_check_form" model="ir.ui.view">
+        <field name="name">print.check.form</field>
+        <field name="model">print.check</field>
+        <field name="arch" type="xml">
+            <form string="Print Bank Cheque / طباعة شيك">
+                <sheet>
+                    <!-- Hidden Odoo Fields (for ORM/linking) -->
+                    <field name="partner_id" invisible="1"/>
+                    <field name="payment_id" invisible="1"/>
+                    <field name="cheque_memo" invisible="1"/>
+                    
+                    <!-- 
+                    Data Bridge: Odoo Fields to JavaScript
+                    These fields are rendered in a special div that JavaScript can read.
+                    We use a div with specific IDs for each field value.
+                    -->
+                    <div id="odooDataBridge" class="pc-data-bridge">
+                        <span id="pcDataPartnerName"><field name="partner_name" readonly="1" nolabel="1"/></span>
+                        <span id="pcDataChequeDate"><field name="cheque_date" readonly="1" nolabel="1"/></span>
+                        <span id="pcDataAmount"><field name="cheque_amount" readonly="1" nolabel="1"/></span>
+                        <span id="pcDataCurrency"><field name="currency_code" readonly="1" nolabel="1"/></span>
+                    </div>
+                    
+                    <!-- 
+                    ========================================
+                    MAIN PRINT CHECK CONTAINER
+                    ========================================
+                    
+                    This is the RTL-isolated container. THREE layers of protection:
+                    1. dir="ltr" - HTML5 attribute for text/layout direction
+                    2. style="direction:ltr;text-align:left" - Inline CSS backup
+                    3. class="pc-ltr-isolated" - For scoped CSS rules
+                    -->
+                    <div class="print-check-container pc-ltr-isolated" 
+                         id="printCheckContainer"
+                         dir="ltr"
+                         style="direction:ltr !important; text-align:left;">
+                        
+                        <!-- ===== LEFT PANEL: CONTROLS ===== -->
+                        <div class="print-check-controls" id="printCheckControls" dir="ltr">
+                            
+                            <!-- Tabs Navigation -->
+                            <div class="pc-tabs-nav">
+                                <button type="button" class="pc-tab-btn active" data-tab="payeeSection">
+                                    <span>👤 Payee / المستفيد</span>
+                                </button>
+                                <button type="button" class="pc-tab-btn" data-tab="dateSection">
+                                    <span>📅 Date / التاريخ</span>
+                                </button>
+                                <button type="button" class="pc-tab-btn" data-tab="amountSection">
+                                    <span>💰 Amount / المبلغ</span>
+                                </button>
+                                <button type="button" class="pc-tab-btn" data-tab="tafqeetSection">
+                                    <span>✍️ Words / تفقيط</span>
+                                </button>
+                                <button type="button" class="pc-tab-btn" data-tab="crossingSection">
+                                    <span>✖️ Crossing</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Tab Content Container -->
+                            <div class="pc-tabs-content">
+                            
+                                <!-- ==================== PAYEE SECTION ==================== -->
+                                <div class="pc-tab-pane active" id="payeeSection">
+                                    <div class="pc-section-header">Payee Name / اسم المستفيد</div>
+                                    
+                                    <textarea id="pcPayeeName" class="pc-input pc-textarea" 
+                                              dir="auto"
+                                              placeholder="Enter payee name / أدخل اسم المستفيد..."></textarea>
+                                    
+                                    <!-- Arabic Honorific Shortcuts -->
+                                    <div class="pc-honorifics">
+                                        <span class="pc-label-text">Quick Insert / إضافة سريعة:</span>
+                                        <div class="pc-btn-group pc-honorific-group">
+                                            <button type="button" class="pc-btn pc-btn-honorific" data-text="السيد ">السيد</button>
+                                            <button type="button" class="pc-btn pc-btn-honorific" data-text="السيدة ">السيدة</button>
+                                            <button type="button" class="pc-btn pc-btn-honorific" data-text="السادة ">السادة</button>
+                                            <button type="button" class="pc-btn pc-btn-honorific" data-text="المحترم">المحترم</button>
+                                            <button type="button" class="pc-btn pc-btn-honorific" data-text="المحترمون">المحترمون</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Payee Controls Grid -->
+                                    <div class="pc-controls-grid">
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Font Size</span>
+                                            <input type="range" id="pcPayeeFontSize" min="10" max="24" value="16" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcPayeeFontSizeValue">16px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Font Weight</span>
+                                            <input type="range" id="pcPayeeFontWeight" min="300" max="700" value="400" step="100" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcPayeeFontWeightValue">400</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Text Align</span>
+                                            <div class="pc-btn-group">
+                                                <button type="button" class="pc-btn pc-btn-align" data-align="left" title="Left">◀</button>
+                                                <button type="button" class="pc-btn pc-btn-align" data-align="center" title="Center">●</button>
+                                                <button type="button" class="pc-btn pc-btn-align active" data-align="right" title="Right">▶</button>
+                                            </div>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↕ Vertical</span>
+                                            <input type="range" id="pcPayeeVertPos" min="-15" max="15" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcPayeeVertPosValue">0px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↔ Horizontal</span>
+                                            <input type="range" id="pcPayeeHorzPos" min="-15" max="15" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcPayeeHorzPosValue">0px</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- ==================== DATE SECTION ==================== -->
+                                <div class="pc-tab-pane" id="dateSection">
+                                    <div class="pc-section-header">Cheque Date / تاريخ الشيك</div>
+                                    
+                                    <input type="text" id="pcDate" class="pc-input" 
+                                           dir="ltr"
+                                           placeholder="DD/MM/YYYY"/>
+                                    
+                                    <div class="pc-controls-grid">
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Font Size</span>
+                                            <input type="range" id="pcDateFontSize" min="10" max="24" value="14" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcDateFontSizeValue">14px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Font Weight</span>
+                                            <input type="range" id="pcDateFontWeight" min="300" max="700" value="400" step="100" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcDateFontWeightValue">400</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↕ Vertical</span>
+                                            <input type="range" id="pcDateVertPos" min="-15" max="15" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcDateVertPosValue">0px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↔ Horizontal</span>
+                                            <input type="range" id="pcDateHorzPos" min="-15" max="15" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcDateHorzPosValue">0px</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- ==================== AMOUNT SECTION ==================== -->
+                                <div class="pc-tab-pane" id="amountSection">
+                                    <div class="pc-section-header">Amount / المبلغ</div>
+                                    
+                                    <input type="number" id="pcAmount" class="pc-input" 
+                                           dir="ltr"
+                                           placeholder="0.000" step="0.001"/>
+                                    
+                                    <div class="pc-controls-grid">
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Font Size</span>
+                                            <input type="range" id="pcAmountFontSize" min="10" max="24" value="16" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcAmountFontSizeValue">16px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Font Weight</span>
+                                            <input type="range" id="pcAmountFontWeight" min="300" max="700" value="400" step="100" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcAmountFontWeightValue">400</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Surround</span>
+                                            <div class="pc-btn-group">
+                                                <button type="button" class="pc-btn pc-btn-surround active" data-surround="none" title="None">—</button>
+                                                <button type="button" class="pc-btn pc-btn-surround" data-surround="hash" title="Hash">#</button>
+                                                <button type="button" class="pc-btn pc-btn-surround" data-surround="slash" title="Slash">//</button>
+                                            </div>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Thousands</span>
+                                            <div class="pc-btn-group">
+                                                <button type="button" class="pc-btn pc-btn-separator" data-separator="off">Off</button>
+                                                <button type="button" class="pc-btn pc-btn-separator active" data-separator="on">On</button>
+                                            </div>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Numerals</span>
+                                            <div class="pc-btn-group">
+                                                <button type="button" class="pc-btn pc-btn-numerals active" data-numerals="english">123</button>
+                                                <button type="button" class="pc-btn pc-btn-numerals" data-numerals="arabic">١٢٣</button>
+                                            </div>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↕ Vertical</span>
+                                            <input type="range" id="pcAmountVertPos" min="-15" max="15" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcAmountVertPosValue">0px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↔ Horizontal</span>
+                                            <input type="range" id="pcAmountHorzPos" min="-15" max="15" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcAmountHorzPosValue">0px</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- ==================== TAFQEET SECTION ==================== -->
+                                <div class="pc-tab-pane" id="tafqeetSection">
+                                    <div class="pc-section-header">Amount in Words / المبلغ كتابة (تفقيط)</div>
+                                    
+                                    <textarea id="pcTafqeetText" class="pc-input pc-textarea" 
+                                              dir="rtl"
+                                              placeholder="سيظهر المبلغ كتابة هنا..."></textarea>
+                                    
+                                    <div class="pc-controls-grid">
+                                        <div class="pc-control pc-control-full">
+                                            <span class="pc-label-text">Currency / العملة</span>
+                                            <select id="pcCurrency" class="pc-select" dir="rtl">
+                                                <option value="JOD" data-cur="دينار" data-cur2="ديناراً" data-div="فلس" data-fr="1000">🇯🇴 دينار أردني (JOD)</option>
+                                                <option value="SAR" data-cur="ريال" data-cur2="ريالاً" data-div="هللة" data-fr="100">🇸🇦 ريال سعودي (SAR)</option>
+                                                <option value="AED" data-cur="درهم" data-cur2="درهماً" data-div="فلس" data-fr="100">🇦🇪 درهم إماراتي (AED)</option>
+                                                <option value="EGP" data-cur="جنيه" data-cur2="جنيهاً" data-div="قرش" data-fr="100">🇪🇬 جنيه مصري (EGP)</option>
+                                                <option value="KWD" data-cur="دينار" data-cur2="ديناراً" data-div="فلس" data-fr="1000">🇰🇼 دينار كويتي (KWD)</option>
+                                                <option value="BHD" data-cur="دينار" data-cur2="ديناراً" data-div="فلس" data-fr="1000">🇧🇭 دينار بحريني (BHD)</option>
+                                                <option value="QAR" data-cur="ريال" data-cur2="ريالاً" data-div="درهم" data-fr="100">🇶🇦 ريال قطري (QAR)</option>
+                                                <option value="OMR" data-cur="ريال" data-cur2="ريالاً" data-div="بيسة" data-fr="1000">🇴🇲 ريال عماني (OMR)</option>
+                                                <option value="IQD" data-cur="دينار" data-cur2="ديناراً" data-div="فلس" data-fr="1000">🇮🇶 دينار عراقي (IQD)</option>
+                                                <option value="SYP" data-cur="ليرة" data-cur2="ليرة" data-div="قرش" data-fr="100">🇸🇾 ليرة سورية (SYP)</option>
+                                                <option value="LBP" data-cur="ليرة" data-cur2="ليرة" data-div="قرش" data-fr="100">🇱🇧 ليرة لبنانية (LBP)</option>
+                                                <option value="LYD" data-cur="دينار" data-cur2="ديناراً" data-div="درهم" data-fr="1000">🇱🇾 دينار ليبي (LYD)</option>
+                                                <option value="SDG" data-cur="جنيه" data-cur2="جنيهاً" data-div="قرش" data-fr="100">🇸🇩 جنيه سوداني (SDG)</option>
+                                                <option value="YER" data-cur="ريال" data-cur2="ريالاً" data-div="فلس" data-fr="100">🇾🇪 ريال يمني (YER)</option>
+                                                <option value="MAD" data-cur="درهم" data-cur2="درهماً" data-div="سنتيم" data-fr="100">🇲🇦 درهم مغربي (MAD)</option>
+                                                <option value="DZD" data-cur="دينار" data-cur2="ديناراً" data-div="سنتيم" data-fr="100">🇩🇿 دينار جزائري (DZD)</option>
+                                                <option value="TND" data-cur="دينار" data-cur2="ديناراً" data-div="مليم" data-fr="1000">🇹🇳 دينار تونسي (TND)</option>
+                                                <option value="ILS" data-cur="شيكل" data-cur2="شيكل" data-div="أغورة" data-fr="100">🇮🇱 شيكل (ILS)</option>
+                                                <option value="USD" data-cur="دولار" data-cur2="دولاراً" data-div="سنت" data-fr="100">🇺🇸 دولار أمريكي (USD)</option>
+                                                <option value="EUR" data-cur="يورو" data-cur2="يورو" data-div="سنت" data-fr="100">🇪🇺 يورو (EUR)</option>
+                                                <option value="GBP" data-cur="جنيه" data-cur2="جنيهاً" data-div="بنس" data-fr="100">🇬🇧 جنيه إسترليني (GBP)</option>
+                                            </select>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Font Size</span>
+                                            <input type="range" id="pcTafqeetFontSize" min="10" max="20" value="14" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcTafqeetFontSizeValue">14px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Font Weight</span>
+                                            <input type="range" id="pcTafqeetFontWeight" min="300" max="700" value="400" step="100" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcTafqeetFontWeightValue">400</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Fraction</span>
+                                            <div class="pc-btn-group">
+                                                <button type="button" class="pc-btn pc-btn-fraction active" data-fraction="normal">Numbers</button>
+                                                <button type="button" class="pc-btn pc-btn-fraction" data-fraction="words">Words</button>
+                                            </div>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Surround</span>
+                                            <div class="pc-btn-group">
+                                                <button type="button" class="pc-btn pc-btn-taf-surround active" data-surround="none">—</button>
+                                                <button type="button" class="pc-btn pc-btn-taf-surround" data-surround="faqat">فقط...لا غير</button>
+                                            </div>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Text Align</span>
+                                            <div class="pc-btn-group">
+                                                <button type="button" class="pc-btn pc-btn-taf-align" data-align="left">◀</button>
+                                                <button type="button" class="pc-btn pc-btn-taf-align" data-align="center">●</button>
+                                                <button type="button" class="pc-btn pc-btn-taf-align active" data-align="right">▶</button>
+                                            </div>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↕ Vertical</span>
+                                            <input type="range" id="pcTafqeetVertPos" min="-15" max="15" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcTafqeetVertPosValue">0px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↔ Horizontal</span>
+                                            <input type="range" id="pcTafqeetHorzPos" min="-15" max="15" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcTafqeetHorzPosValue">0px</span>
+                                        </div>
+
+                                        <!-- Free Text (2nd Line) -->
+                                        <div class="pc-control pc-control-full">
+                                            <span class="pc-label-text">2nd Line (Free Text) / سطر إضافي</span>
+                                            <input type="text" id="pcFreeText" class="pc-input" 
+                                                   dir="auto"
+                                                   placeholder="Add text here... / أضف نص هنا..."/>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Font Size</span>
+                                            <input type="range" id="pcFreeTextFontSize" min="8" max="20" value="11" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcFreeTextFontSizeValue">11px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Font Weight</span>
+                                            <input type="range" id="pcFreeTextFontWeight" min="300" max="700" value="400" step="100" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcFreeTextFontWeightValue">400</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↕ Vertical (2nd Line)</span>
+                                            <input type="range" id="pcFreeTextVertPos" min="-20" max="20" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcFreeTextVertPosValue">0px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↔ Horizontal (2nd Line)</span>
+                                            <input type="range" id="pcFreeTextHorzPos" min="-20" max="20" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcFreeTextHorzPosValue">0px</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+
+                                
+                                <!-- ==================== CROSSING SECTION ==================== -->
+                                <div class="pc-tab-pane" id="crossingSection">
+                                    <div class="pc-section-header">Crossing / التسطير</div>
+                                    
+                                    <input type="text" id="pcCrossing" class="pc-input" 
+                                           dir="auto"
+                                           list="crossingOptions"
+                                           value="يصرف للمستفيد الأول"
+                                           placeholder="Crossing text / نص التسطير..."/>
+                                    <datalist id="crossingOptions">
+                                        <option value="Account Payee Only"/>
+                                        <option value="يصرف للمستفيد الأول"/>
+                                        <option value="غير قابل للتداول"/>
+                                        <option value="Not Negotiable"/>
+                                    </datalist>
+                                    
+                                    <div class="pc-controls-grid">
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">Font Size</span>
+                                            <input type="range" id="pcCrossingFontSize" min="8" max="20" value="12" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcCrossingFontSizeValue">12px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↕ Vertical</span>
+                                            <input type="range" id="pcCrossingVertPos" min="-20" max="20" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcCrossingVertPosValue">0px</span>
+                                        </div>
+                                        <div class="pc-control">
+                                            <span class="pc-label-text">↔ Horizontal</span>
+                                            <input type="range" id="pcCrossingHorzPos" min="-20" max="20" value="0" class="pc-range"/>
+                                            <span class="pc-slider-value" id="pcCrossingHorzPosValue">0px</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                            </div>
+                            <!-- End Tab Content -->
+                            
+                        </div>
+                        <!-- End Controls Panel -->
+                        
+                        <!-- ===== RIGHT PANEL: PREVIEW ===== -->
+                        <div class="print-check-preview" id="printCheckPreview" dir="ltr">
+                            <div class="pc-preview-container" id="pcPreviewContainer">
+                                <div class="pc-cheque" id="pcCheque" style="position:relative; direction:ltr !important; transform:none !important;">
+                                    <!-- Cheque Background Image -->
+                                    <img src="/print_check/static/src/cheque/jor-all.jpg" 
+                                         class="pc-cheque-bg" id="pcChequeBg" alt="Cheque Background"/>
+                                     
+                                     <!-- Crossing Label -->
+                                     <div class="pc-label pc-label-crossing pc-crossing-horizontal" id="pcLabelCrossing" 
+                                          style="position:absolute !important; top:28px !important; left:200px !important; right:auto !important; width:180px; font-size:12px; text-align:center; font-weight:bold;"></div>
+                                    
+                                    <!-- Date Label - standard position: font-size:16px, font-weight:600, vertical:+6px, horizontal:+10px -->
+                                    <div class="pc-label pc-label-date" id="pcLabelDate" 
+                                         style="position:absolute !important; top:48px !important; left:52px !important; right:auto !important; font-size:16px; font-weight:600;"></div>
+                                    
+                                    <!-- Payee Name Label - horizontal +23px from 140 = 163px -->
+                                    <div class="pc-label pc-label-payee" id="pcLabelPayee" 
+                                         style="position:absolute !important; top:95px !important; left:163px !important; right:auto !important; width:400px; font-size:14px; text-align:right; direction:rtl;"></div>
+                                    
+                                    <!-- Amount (Integer/JOD) Label -->
+                                    <div class="pc-label pc-label-amount" id="pcLabelAmount" 
+                                         style="position:absolute !important; top:152px !important; right:96px !important; left:auto !important; width:90px; font-size:14px; text-align:center;"></div>
+                                    
+                                    <!-- Amount (Fraction/Fils) Label -->
+                                    <div class="pc-label pc-label-fraction" id="pcLabelFraction" 
+                                         style="position:absolute !important; top:152px !important; right:20px !important; left:auto !important; width:60px; font-size:12px; text-align:center;"></div>
+                                    
+                                    <!-- Tafqeet (Amount in Words) Label - On Sum Of line -->
+                                    <div class="pc-label pc-label-tafqeet" id="pcLabelTafqeet" 
+                                         style="position:absolute !important; top:130px !important; left:60px !important; right:auto !important; width:330px; font-size:11px; text-align:right; direction:rtl; white-space:normal; line-height:1.2;"></div>
+                                     
+                                    <!-- Free Text (2nd Line) Label - Positioned below Tafqeet -->
+                                    <div class="pc-label pc-label-free-text" id="pcLabelFreeText" 
+                                         style="position:absolute !important; top:155px !important; left:60px !important; right:auto !important; width:330px; font-size:11px; text-align:right; direction:rtl; white-space:normal;"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Print Button -->
+                            <div class="pc-print-actions">
+                                <button type="button" class="pc-btn pc-btn-print" id="pcPrintBtn">
+                                    🖨️ طباعة الشيك / Print Cheque
+                                </button>
+                            </div>
+                        </div>
+                        <!-- End Preview Panel -->
+                        
+                    </div>
+                    <!-- End Main Container -->
+                    
+                </sheet>
+            </form>
+        </field>
+    </record>
+    
+    <!-- Action to open Print Check wizard directly -->
+    <record id="action_print_check" model="ir.actions.act_window">
+        <field name="name">Print Check / طباعة شيك</field>
+        <field name="res_model">print.check</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+    </record>
+</odoo>
