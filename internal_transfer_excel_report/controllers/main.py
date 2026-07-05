@@ -1,4 +1,4 @@
-from odoo import _, http
+from odoo import http
 from odoo.http import content_disposition, request
 from odoo.tools import osutil
 
@@ -14,8 +14,11 @@ class InternalTransferXlsxController(http.Controller):
         if not wizard.exists():
             return request.not_found()
 
-        xlsx_data = wizard._generate_xlsx_content()
-        filename = osutil.clean_filename(_("Internal Transfer Report") + '.xlsx')
+        request.env['factory.plan.category.option'].sync_from_products()
+        report_lang = wizard._get_report_lang()
+        wizard = wizard.with_context(lang=report_lang)
+        xlsx_data = wizard._generate_xlsx_content_localized()
+        filename = osutil.clean_filename(wizard.env._('Internal Transfer Report') + '.xlsx')
         headers = [
             ('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
             ('Content-Disposition', content_disposition(filename)),

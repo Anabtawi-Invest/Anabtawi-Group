@@ -9,12 +9,15 @@
                 <group>
                     <field name="filter_type"/>
 
-                    <field name="date_from" invisible="filter_type != 'custom'"
-                    />
+                    <field name="date_from" invisible="filter_type != 'custom'"/>
 
                     <field name="date_to" invisible="filter_type != 'custom'"/>
 
-                    <field name="category_id"/>
+                    <field name="all_factory_plan_categories"/>
+                    <field name="factory_plan_category_ids"
+                           widget="many2many_tags"
+                           invisible="all_factory_plan_categories"
+                           options="{'no_create': True, 'no_create_edit': True}"/>
                 </group>
 
                 <footer>
@@ -41,7 +44,5 @@
               name="Internal Transfer Report"
               parent="stock.menu_stock_warehouse_mgmt"
               action="action_internal_transfer_wizard"/>
-
-
 
 </odoo>
