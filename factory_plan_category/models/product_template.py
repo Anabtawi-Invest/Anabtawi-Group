@@ -16,6 +16,6 @@ class ProductProduct(models.Model):
     factory_plan_category = fields.Char(
         related="product_tmpl_id.factory_plan_category",
         store=True,
-        readonly=True,
+        readonly=False,
         index=True,
     )
