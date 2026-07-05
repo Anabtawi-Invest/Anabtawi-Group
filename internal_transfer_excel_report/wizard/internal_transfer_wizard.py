@@ -85,11 +85,6 @@ class InternalTransferReportWizard(models.TransientModel):
         category = product.product_tmpl_id.factory_plan_category
         return category if category else self.env._('Non')
 
-    def _get_picking_state_labels(self):
-        return dict(
-            self.env['stock.picking'].fields_get(['state'])['state']['selection']
-        )
-
     def _get_factory_plan_category_product_ids(self):
         """Return matching product ids, empty list if none, None if no filter."""
         self.ensure_one()
@@ -181,7 +176,6 @@ class InternalTransferReportWizard(models.TransientModel):
     def _get_sheet2_data(self):
         self.ensure_one()
 
-        state_labels = self._get_picking_state_labels()
         aggregated = {}
 
         picking_domain = self._get_base_picking_domain()
@@ -199,32 +193,28 @@ class InternalTransferReportWizard(models.TransientModel):
             moves = self.env['stock.move'].search(move_domain)
 
             for move in moves:
-                picking = move.picking_id
-                key = (move.product_id.id, picking.state)
+                key = move.product_id.id
                 row = aggregated.setdefault(key, {
                     'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
                     'product_name': move.product_id.display_name,
-                    'status': state_labels.get(picking.state, picking.state),
                     'total_demand': 0.0,
                     'total_quantity': 0.0,
                 })
                 row['total_demand'] += move.product_uom_qty
                 row['total_quantity'] += move.quantity
 
-        products_with_rows = {key[0] for key in aggregated}
         for product in self._get_sheet2_products():
-            if product.id not in products_with_rows:
-                aggregated[(product.id, '')] = {
+            if product.id not in aggregated:
+                aggregated[product.id] = {
                     'factory_plan_category': self._get_factory_plan_category_display(product),
                     'product_name': product.display_name,
-                    'status': '',
                     'total_demand': 0.0,
                     'total_quantity': 0.0,
                 }
 
         return sorted(
             aggregated.values(),
-            key=lambda item: (item['factory_plan_category'], item['product_name'], item['status']),
+            key=lambda item: (item['factory_plan_category'], item['product_name']),
         )
 
     def _generate_xlsx_content(self):
@@ -298,7 +288,6 @@ class InternalTransferReportWizard(models.TransientModel):
             self.env._('Product'),
             self.env._('Total Demand'),
             self.env._('Total Quantity'),
-            self.env._('Status'),
         ]
         for col, header in enumerate(sheet2_headers):
             sheet2.write(0, col, header, header_style)
@@ -306,7 +295,6 @@ class InternalTransferReportWizard(models.TransientModel):
         sheet2.set_column(0, 0, 25)
         sheet2.set_column(1, 1, 45)
         sheet2.set_column(2, 3, 18)
-        sheet2.set_column(4, 4, 18)
 
         row = 1
         sheet2_rows = self._get_sheet2_data()
@@ -318,7 +306,6 @@ class InternalTransferReportWizard(models.TransientModel):
                 sheet2.write(row, 1, data['product_name'], text_style)
                 sheet2.write_number(row, 2, data['total_demand'], number_style)
                 sheet2.write_number(row, 3, data['total_quantity'], number_style)
-                sheet2.write(row, 4, data['status'], text_style)
                 row += 1
 
         workbook.close()
