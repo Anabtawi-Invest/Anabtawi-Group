@@ -1,8 +1,9 @@
 from datetime import datetime, time, timedelta
 import io
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+
 
 class InternalTransferReportWizard(models.TransientModel):
     _name = 'internal.transfer.report.wizard'
@@ -12,16 +13,40 @@ class InternalTransferReportWizard(models.TransientModel):
         ('week', 'This Week'),
         ('last_month', 'Last Month'),
         ('custom', 'Custom'),
-        ('today','Today'),
+        ('today', 'Today'),
     ], default='week', required=True)
 
     date_from = fields.Datetime()
     date_to = fields.Datetime()
 
-    category_id = fields.Many2one(
-        'product.category',
-        string='Product Category'
+    all_factory_plan_categories = fields.Boolean(
+        string='All Factory Plan Categories',
+        default=True,
     )
+    factory_plan_category_ids = fields.Many2many(
+        'factory.plan.category.option',
+        string='Factory Plan Categories',
+    )
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        self.env['factory.plan.category.option'].sync_from_products()
+        return res
+
+    @api.onchange('all_factory_plan_categories')
+    def _onchange_all_factory_plan_categories(self):
+        if self.all_factory_plan_categories:
+            self.factory_plan_category_ids = [(5, 0, 0)]
+
+    def _get_report_lang(self):
+        self.ensure_one()
+        return (
+            self.env.context.get('lang')
+            or self.env.user.lang
+            or self.env.company.partner_id.lang
+            or 'en_US'
+        )
 
     def _compute_dates(self):
         self.ensure_one()
@@ -41,6 +66,10 @@ class InternalTransferReportWizard(models.TransientModel):
             start = datetime.combine(start_d, time.min)
             end = datetime.combine(end_d, time.max)
 
+        elif self.filter_type == 'today':
+            start = datetime.combine(today, time.min)
+            end = datetime.combine(today, time.max)
+
         else:
             if not self.date_from or not self.date_to:
                 raise UserError(_("Please set both start and end date/time for custom filter."))
@@ -49,16 +78,64 @@ class InternalTransferReportWizard(models.TransientModel):
 
         return fields.Datetime.to_string(start), fields.Datetime.to_string(end)
 
-    def _get_report_groups(self):
-        self.ensure_one()
+    def _get_factory_plan_category_display(self, product):
+        category = product.product_tmpl_id.factory_plan_category
+        return category if category else self.env._('Non')
 
+    def _get_picking_state_labels(self):
+        return dict(
+            self.env['stock.picking'].fields_get(['state'])['state']['selection']
+        )
+
+    def _append_factory_plan_category_domain(self, move_domain):
+        self.ensure_one()
+        if self.all_factory_plan_categories:
+            return move_domain
+
+        if not self.factory_plan_category_ids:
+            return move_domain
+
+        named_categories = self.factory_plan_category_ids.filtered(
+            lambda option: not option.is_uncategorized
+        )
+        include_uncategorized = bool(
+            self.factory_plan_category_ids.filtered('is_uncategorized')
+        )
+
+        if named_categories and include_uncategorized:
+            move_domain.extend([
+                '|',
+                ('product_id.product_tmpl_id.factory_plan_category', 'in', named_categories.mapped('name')),
+                '|',
+                ('product_id.product_tmpl_id.factory_plan_category', '=', False),
+                ('product_id.product_tmpl_id.factory_plan_category', '=', ''),
+            ])
+        elif named_categories:
+            move_domain.append(
+                ('product_id.product_tmpl_id.factory_plan_category', 'in', named_categories.mapped('name'))
+            )
+        elif include_uncategorized:
+            move_domain.extend([
+                '|',
+                ('product_id.product_tmpl_id.factory_plan_category', '=', False),
+                ('product_id.product_tmpl_id.factory_plan_category', '=', ''),
+            ])
+
+        return move_domain
+
+    def _get_base_picking_domain(self):
         date_from_dt, date_to_dt = self._compute_dates()
-        picking_domain = [
+        return [
             ('picking_type_code', '=', 'internal'),
             ('scheduled_date', '>=', date_from_dt),
             ('scheduled_date', '<=', date_to_dt),
-            ('state', '!=', 'cancel'),
         ]
+
+    def _get_sheet1_data(self):
+        self.ensure_one()
+
+        picking_domain = self._get_base_picking_domain()
+        picking_domain.append(('state', '!=', 'cancel'))
         picking_ids = self.env['stock.picking'].search(picking_domain).ids
         if not picking_ids:
             return []
@@ -67,60 +144,78 @@ class InternalTransferReportWizard(models.TransientModel):
             ('picking_id.picking_type_code', '=', 'internal'),
             ('picking_id', 'in', picking_ids),
             ('state', '!=', 'cancel'),
-            # Keep only terminal moves to avoid double counting in transit chains.
             ('move_dest_ids', '=', False),
         ]
-        if self.category_id:
-            move_domain.append(('product_id.categ_id', 'child_of', self.category_id.id))
+        move_domain = self._append_factory_plan_category_domain(move_domain)
 
-        moves = self.env['stock.move'].search(move_domain, order='product_id, picking_id')
-        result = {}
+        moves = self.env['stock.move'].search(
+            move_domain,
+            order='picking_id, product_id',
+        )
+        rows = []
         for move in moves:
-            product = move.product_id
-            planned_qty = move.product_uom_qty
-            actual_qty = move.quantity
-            delivered_qty = move.quantity if move.state == 'done' else 0.0
-            group = result.setdefault(product.id, {
-                'product_name': product.display_name,
-                'uom_name': move.product_uom.display_name or product.uom_id.display_name,
-                'rows': {},
-                'total_qty': 0.0,
-                'total_actual_qty': 0.0,
-                'total_delivered_qty': 0.0,
+            picking = move.picking_id
+            rows.append({
+                'product_name': move.product_id.display_name,
+                'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
+                'created_by': picking.create_uid.display_name or self.env._('Undefined'),
+                'creating_date': picking.create_date,
+                'demand': move.product_uom_qty,
+                'quantity': move.quantity,
             })
+        return rows
 
-            requested_by = move.picking_id.create_uid.display_name or _('Undefined')
-            row_data = group['rows'].setdefault(requested_by, {
-                'requested_by': requested_by,
-                'product_name': product.display_name,
-                'quantity': 0.0,
-                'actual_quantity': 0.0,
-                'delivered_quantity': 0.0,
+    def _get_sheet2_data(self):
+        self.ensure_one()
+
+        picking_domain = self._get_base_picking_domain()
+        picking_domain.append(('state', 'in', ('done', 'cancel')))
+        picking_ids = self.env['stock.picking'].search(picking_domain).ids
+        if not picking_ids:
+            return []
+
+        move_domain = [
+            ('picking_id.picking_type_code', '=', 'internal'),
+            ('picking_id', 'in', picking_ids),
+            ('picking_id.state', 'in', ('done', 'cancel')),
+            ('move_dest_ids', '=', False),
+        ]
+        move_domain = self._append_factory_plan_category_domain(move_domain)
+
+        moves = self.env['stock.move'].search(move_domain)
+        aggregated = {}
+        state_labels = self._get_picking_state_labels()
+
+        for move in moves:
+            picking = move.picking_id
+            key = (
+                self._get_factory_plan_category_display(move.product_id),
+                move.product_id.display_name,
+                picking.state,
+            )
+            row = aggregated.setdefault(key, {
+                'factory_plan_category': key[0],
+                'product_name': key[1],
+                'status': state_labels.get(picking.state, picking.state),
+                'total_demand': 0.0,
             })
+            row['total_demand'] += move.product_uom_qty
 
-            row_data['quantity'] += planned_qty
-            row_data['actual_quantity'] += actual_qty
-            row_data['delivered_quantity'] += delivered_qty
-
-            group['total_qty'] += planned_qty
-            group['total_actual_qty'] += actual_qty
-            group['total_delivered_qty'] += delivered_qty
-
-        grouped_data = []
-        for group in sorted(result.values(), key=lambda item: item['product_name']):
-            group['rows'] = [group['rows'][key] for key in sorted(group['rows'])]
-            grouped_data.append(group)
-        return grouped_data
+        return sorted(
+            aggregated.values(),
+            key=lambda item: (item['factory_plan_category'], item['product_name'], item['status']),
+        )
 
     def _generate_xlsx_content(self):
+        self.ensure_one()
+        return self.with_context(lang=self._get_report_lang())._generate_xlsx_content_localized()
+
+    def _generate_xlsx_content_localized(self):
         self.ensure_one()
         import xlsxwriter  # pylint: disable=import-outside-toplevel
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-        sheet = workbook.add_worksheet('Internal Transfers')
-        sheet.right_to_left()
-        sheet.freeze_panes(1, 0)
 
         header_style = workbook.add_format({
             'bold': True,
@@ -130,52 +225,75 @@ class InternalTransferReportWizard(models.TransientModel):
         })
         text_style = workbook.add_format({'border': 1})
         number_style = workbook.add_format({'border': 1, 'num_format': '#,##0.00'})
-        group_text_style = workbook.add_format({'bold': True, 'bg_color': '#E9ECEF', 'border': 1})
-        group_number_style = workbook.add_format({
-            'bold': True,
-            'bg_color': '#E9ECEF',
-            'border': 1,
-            'num_format': '#,##0.00',
-        })
+        datetime_style = workbook.add_format({'border': 1, 'num_format': 'yyyy-mm-dd hh:mm:ss'})
 
-        headers = [
-            _('Requested by'),
-            _('Products'),
-            _('Quantity'),
-            _('Actual Quantity'),
-            _('Delivered Quantity'),
-            _('Unit of Measure'),
+        sheet1 = workbook.add_worksheet(self.env._('Details'))
+        sheet1.right_to_left()
+        sheet1.freeze_panes(1, 0)
+
+        sheet1_headers = [
+            self.env._('Product'),
+            self.env._('Factory Plan Category'),
+            self.env._('Created By'),
+            self.env._('Creating Date'),
+            self.env._('Demand'),
+            self.env._('Quantity'),
         ]
-        for col, header in enumerate(headers):
-            sheet.write(0, col, header, header_style)
+        for col, header in enumerate(sheet1_headers):
+            sheet1.write(0, col, header, header_style)
 
-        sheet.set_column(0, 0, 30)
-        sheet.set_column(1, 1, 45)
-        sheet.set_column(2, 4, 18)
-        sheet.set_column(5, 5, 16)
+        sheet1.set_column(0, 0, 45)
+        sheet1.set_column(1, 1, 25)
+        sheet1.set_column(2, 2, 30)
+        sheet1.set_column(3, 3, 22)
+        sheet1.set_column(4, 5, 18)
 
         row = 1
-        groups = self._get_report_groups()
-        if not groups:
-            sheet.write(row, 0, _('No data for selected filters.'), text_style)
+        sheet1_rows = self._get_sheet1_data()
+        if not sheet1_rows:
+            sheet1.write(row, 0, self.env._('No data for selected filters.'), text_style)
         else:
-            for group in groups:
-                sheet.write(row, 0, _('Total'), group_text_style)
-                sheet.write(row, 1, group['product_name'], group_text_style)
-                sheet.write_number(row, 2, group['total_qty'], group_number_style)
-                sheet.write_number(row, 3, group['total_actual_qty'], group_number_style)
-                sheet.write_number(row, 4, group['total_delivered_qty'], group_number_style)
-                sheet.write(row, 5, group['uom_name'], group_text_style)
+            for data in sheet1_rows:
+                sheet1.write(row, 0, data['product_name'], text_style)
+                sheet1.write(row, 1, data['factory_plan_category'], text_style)
+                sheet1.write(row, 2, data['created_by'], text_style)
+                if data['creating_date']:
+                    sheet1.write_datetime(row, 3, data['creating_date'], datetime_style)
+                else:
+                    sheet1.write(row, 3, '', text_style)
+                sheet1.write_number(row, 4, data['demand'], number_style)
+                sheet1.write_number(row, 5, data['quantity'], number_style)
                 row += 1
 
-                for detail in group['rows']:
-                    sheet.write(row, 0, detail['requested_by'], text_style)
-                    sheet.write(row, 1, detail['product_name'], text_style)
-                    sheet.write_number(row, 2, detail['quantity'], number_style)
-                    sheet.write_number(row, 3, detail['actual_quantity'], number_style)
-                    sheet.write_number(row, 4, detail['delivered_quantity'], number_style)
-                    sheet.write(row, 5, group['uom_name'], text_style)
-                    row += 1
+        sheet2 = workbook.add_worksheet(self.env._('Summary'))
+        sheet2.right_to_left()
+        sheet2.freeze_panes(1, 0)
+
+        sheet2_headers = [
+            self.env._('Factory Plan Category'),
+            self.env._('Product'),
+            self.env._('Total Demand'),
+            self.env._('Status'),
+        ]
+        for col, header in enumerate(sheet2_headers):
+            sheet2.write(0, col, header, header_style)
+
+        sheet2.set_column(0, 0, 25)
+        sheet2.set_column(1, 1, 45)
+        sheet2.set_column(2, 2, 18)
+        sheet2.set_column(3, 3, 18)
+
+        row = 1
+        sheet2_rows = self._get_sheet2_data()
+        if not sheet2_rows:
+            sheet2.write(row, 0, self.env._('No data for selected filters.'), text_style)
+        else:
+            for data in sheet2_rows:
+                sheet2.write(row, 0, data['factory_plan_category'], text_style)
+                sheet2.write(row, 1, data['product_name'], text_style)
+                sheet2.write_number(row, 2, data['total_demand'], number_style)
+                sheet2.write(row, 3, data['status'], text_style)
+                row += 1
 
         workbook.close()
         return output.getvalue()
