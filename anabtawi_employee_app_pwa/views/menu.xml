@@ -1,7 +1,0 @@
-<odoo>
-    <record id="action_employee_app_pwa" model="ir.actions.act_url">
-        <field name="name">Employee App</field>
-        <field name="url">/employee-portal</field>
-        <field name="target">self</field>
-    </record>
-</odoo>
