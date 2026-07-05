@@ -1,0 +1,15 @@
+<odoo>
+    <!-- Hidden intentionally: Employee App must be opened by URL only: /employee-portal -->
+    <record id="action_employee_app_pwa" model="ir.actions.act_url">
+        <field name="name">Employee App</field>
+        <field name="url">/employee-portal</field>
+        <field name="target">self</field>
+    </record>
+
+    <record id="menu_employee_app_pwa_root" model="ir.ui.menu">
+        <field name="name">Employee App</field>
+        <field name="sequence">9999</field>
+        <field name="action" eval="False"/>
+        <field name="groups_id" eval="[(6, 0, [ref('base.group_no_one')])]"/>
+    </record>
+</odoo>
