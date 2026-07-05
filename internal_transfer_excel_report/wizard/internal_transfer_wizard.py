@@ -172,7 +172,7 @@ class InternalTransferReportWizard(models.TransientModel):
         self.ensure_one()
 
         picking_domain = self._get_base_picking_domain()
-        picking_domain.append(('state', 'in', ('done', 'cancel')))
+        picking_domain.append(('state', 'not in', ('done', 'cancel')))
         picking_ids = self.env['stock.picking'].search(picking_domain).ids
         if not picking_ids:
             return []
@@ -180,7 +180,7 @@ class InternalTransferReportWizard(models.TransientModel):
         move_domain = [
             ('picking_id.picking_type_code', '=', 'internal'),
             ('picking_id', 'in', picking_ids),
-            ('picking_id.state', 'in', ('done', 'cancel')),
+            ('picking_id.state', 'not in', ('done', 'cancel')),
             ('move_dest_ids', '=', False),
         ]
         move_domain = self._append_factory_plan_category_domain(move_domain)
@@ -201,8 +201,10 @@ class InternalTransferReportWizard(models.TransientModel):
                 'product_name': key[1],
                 'status': state_labels.get(picking.state, picking.state),
                 'total_demand': 0.0,
+                'total_quantity': 0.0,
             })
             row['total_demand'] += move.product_uom_qty
+            row['total_quantity'] += move.quantity
 
         return sorted(
             aggregated.values(),
@@ -276,6 +278,7 @@ class InternalTransferReportWizard(models.TransientModel):
             self.env._('Factory Plan Category'),
             self.env._('Product'),
             self.env._('Total Demand'),
+            self.env._('Total Quantity'),
             self.env._('Status'),
         ]
         for col, header in enumerate(sheet2_headers):
@@ -283,8 +286,8 @@ class InternalTransferReportWizard(models.TransientModel):
 
         sheet2.set_column(0, 0, 25)
         sheet2.set_column(1, 1, 45)
-        sheet2.set_column(2, 2, 18)
-        sheet2.set_column(3, 3, 18)
+        sheet2.set_column(2, 3, 18)
+        sheet2.set_column(4, 4, 18)
 
         row = 1
         sheet2_rows = self._get_sheet2_data()
@@ -295,7 +298,8 @@ class InternalTransferReportWizard(models.TransientModel):
                 sheet2.write(row, 0, data['factory_plan_category'], text_style)
                 sheet2.write(row, 1, data['product_name'], text_style)
                 sheet2.write_number(row, 2, data['total_demand'], number_style)
-                sheet2.write(row, 3, data['status'], text_style)
+                sheet2.write_number(row, 3, data['total_quantity'], number_style)
+                sheet2.write(row, 4, data['status'], text_style)
                 row += 1
 
         workbook.close()

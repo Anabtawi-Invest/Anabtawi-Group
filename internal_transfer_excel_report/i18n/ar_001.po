@@ -151,6 +151,11 @@ msgstr "إجمالي الطلب"
 
 #. module: internal_transfer_excel_report
 #: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Total Quantity"
+msgstr "إجمالي الكمية"
+
+#. module: internal_transfer_excel_report
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
 msgid "Status"
 msgstr "الحالة"
 
