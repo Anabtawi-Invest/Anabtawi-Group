@@ -25,6 +25,9 @@ class InternalTransferReportWizard(models.TransientModel):
     )
     factory_plan_category_ids = fields.Many2many(
         'factory.plan.category.option',
+        'int_transfer_wiz_fpc_option_rel',
+        'wizard_id',
+        'option_id',
         string='Factory Plan Categories',
     )
 
