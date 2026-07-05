@@ -238,7 +238,7 @@ class PortalCheckInController(http.Controller):
             'txt_attendance_updated': _('Attendance updated successfully.'),
             'txt_no_employee': _('Your user is not linked to an employee profile.'),
             'txt_location_default': _('You cannot check in from this location.'),
-            'txt_weekly_threshold': _('You reached the weekly worked hours threshold.'),
+            'txt_weekly_threshold': _('You exceeded the weekly worked hours limit.'),
             'txt_checkin_locked_ot': _('Check-in is locked until one overtime request is approved.'),
             'txt_ot_auth_session': _('An approved overtime authorization is available for one session.'),
             'txt_max_auth_hours': _('Maximum authorized hours:'),

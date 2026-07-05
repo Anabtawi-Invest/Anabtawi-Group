@@ -221,7 +221,7 @@ class HrEmployee(models.Model):
 
         raise UserError(
             _(
-                "You reached the weekly worked hours limit. You must obtain an approved overtime request before checking in again."
+                "You exceeded the weekly worked hours limit. You must obtain an approved overtime request before checking in again."
             )
         )
 

@@ -51,13 +51,18 @@ class HrEmployee(models.Model):
         return float(value or 0.0)
 
     def _is_weekly_hours_threshold_reached(self):
+        """Return True when weekly worked hours exceed the configured limit.
+
+        Used by portal check-in gating: employees at exactly the required weekly
+        hours may still check in without a preapproved overtime request.
+        """
         self.ensure_one()
         required_weekly_hours = self._get_required_weekly_hours()
         if required_weekly_hours <= 0:
             return False
         return float_compare(
             self.weekly_worked_hours, required_weekly_hours, precision_digits=2
-        ) >= 0
+        ) > 0
 
     def _get_overtime_eligibility_map(self):
         required_weekly_hours = self._get_required_weekly_hours()
