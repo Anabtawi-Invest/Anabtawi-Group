@@ -175,8 +175,8 @@ class InternalTransferReportWizard(models.TransientModel):
     def _get_sheet2_products(self):
         product_ids = self._get_factory_plan_category_product_ids()
         if product_ids is None:
-            return self.env['product.product'].search([], order='display_name')
-        return self.env['product.product'].browse(product_ids).sorted('display_name')
+            return self.env['product.product'].search([], order='name')
+        return self.env['product.product'].browse(product_ids).sorted('name')
 
     def _get_sheet2_data(self):
         self.ensure_one()
