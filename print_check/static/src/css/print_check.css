@@ -821,9 +821,9 @@
         display: none !important;
     }
 
-    /* Page setup */
+    /* Page setup - match physical cheque dimensions */
     @page {
-        size: landscape;
+        size: 16.6cm 8.2cm;
         margin: 0;
     }
 
@@ -838,10 +838,12 @@
         display: block !important;
         background: none !important;
         padding: 0 !important;
+        margin: 0 !important;
     }
 
     .print-check-preview {
         padding: 0 !important;
+        margin: 0 !important;
     }
 
     .pc-preview-container {
@@ -849,16 +851,19 @@
         box-shadow: none !important;
         border: none !important;
         padding: 0 !important;
+        margin: 0 !important;
     }
 
-    /* Cheque positioning for print */
+    /* Anchor cheque at top-left of the print page */
     .pc-cheque {
-        position: fixed !important;
-        top: 50% !important;
-        right: 0 !important;
-        left: auto !important;
-        transform: translateY(-50%) !important;
-        border: 1px dashed #999 !important;
+        position: relative !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: auto !important;
+        transform: none !important;
+        width: 16.6cm !important;
+        height: 8.2cm !important;
+        border: none !important;
         box-shadow: none !important;
     }
 

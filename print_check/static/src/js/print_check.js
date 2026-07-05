@@ -1239,71 +1239,94 @@
                 return;
             }
 
-            // Clone the cheque element
             const clone = cheque.cloneNode(true);
 
-            // Hide background image for printing (printing on real cheque paper)
+            // Hide background image for printing on pre-printed cheque paper
             const bgImg = clone.querySelector('.pc-cheque-bg');
             if (bgImg) {
                 bgImg.style.display = 'none';
             }
 
-            // CRITICAL: Copy ALL computed styles including positions
+            // Copy computed styles so print matches the preview
             this.copyAllStylesToClone(cheque, clone);
 
-            // Build print content with styles
-            const printStyles = `
-                <style>
-                    @page { 
-                        size: 16.6cm 8.2cm; 
-                        margin: 0; 
-                    }
-                    * { 
-                        box-sizing: border-box; 
-                        margin: 0; 
-                        padding: 0; 
-                    }
-                    html, body { 
-                        width: 16.6cm;
-                        height: 8.2cm;
-                        margin: 0;
-                        padding: 0;
-                        direction: ltr !important;
-                        background: white;
-                    }
-                    .pc-cheque {
-                        width: 16.6cm;
-                        height: 8.2cm;
-                        position: relative;
-                        border: none !important;
-                    }
-                    .pc-label {
-                        position: absolute;
-                        color: #000;
-                        font-family: Arial, sans-serif;
-                        white-space: pre-wrap;
-                    }
-                </style>
-            `;
+            // Print via isolated iframe to avoid Odoo @media print CSS conflicts
+            const printHtml = `<!DOCTYPE html>
+<html dir="ltr">
+<head>
+<meta charset="utf-8">
+<title>Print Cheque</title>
+<style>
+    @page {
+        size: 16.6cm 8.2cm;
+        margin: 0;
+    }
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+    html, body {
+        width: 16.6cm;
+        height: 8.2cm;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        direction: ltr !important;
+        background: white;
+    }
+    .pc-cheque {
+        width: 16.6cm !important;
+        height: 8.2cm !important;
+        position: relative !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: auto !important;
+        transform: none !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    .pc-cheque-bg {
+        display: none !important;
+    }
+    .pc-label {
+        position: absolute !important;
+        color: #000 !important;
+        font-family: Arial, sans-serif;
+        white-space: pre-wrap;
+    }
+</style>
+</head>
+<body>${clone.outerHTML}</body>
+</html>`;
 
-            const printContent = printStyles + clone.outerHTML;
+            const iframe = document.createElement('iframe');
+            iframe.setAttribute('aria-hidden', 'true');
+            iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+            document.body.appendChild(iframe);
 
-            // Store original body content
-            const originalContent = document.body.innerHTML;
+            const iframeWindow = iframe.contentWindow;
+            const iframeDoc = iframeWindow.document;
+            iframeDoc.open();
+            iframeDoc.write(printHtml);
+            iframeDoc.close();
 
-            // Replace body with print content
-            document.body.innerHTML = printContent;
+            const triggerPrint = () => {
+                try {
+                    iframeWindow.focus();
+                    iframeWindow.print();
+                } catch (e) {
+                    console.error('[PrintCheck] Print error:', e);
+                    alert('خطأ في الطباعة / Print error');
+                } finally {
+                    setTimeout(() => iframe.remove(), 1000);
+                }
+            };
 
-            // Print
-            window.print();
+            // Allow iframe layout to settle before opening the print dialog
+            setTimeout(triggerPrint, 300);
 
-            // Restore original content and reload to re-initialize
-            document.body.innerHTML = originalContent;
-
-            // Reload page to reinitialize the component
-            setTimeout(() => window.location.reload(), 100);
-
-            console.log('[PrintCheck] Print completed');
+            console.log('[PrintCheck] Print dialog opened');
         }
 
         /**
