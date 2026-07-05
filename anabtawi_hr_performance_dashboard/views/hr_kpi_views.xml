@@ -1,0 +1,181 @@
+<odoo>
+    <record id="view_anabtawi_hr_kpi_period_tree" model="ir.ui.view">
+        <field name="name">anabtawi.hr.kpi.period.tree</field>
+        <field name="model">anabtawi.hr.kpi.period</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="company_id"/>
+                <field name="state"/>
+                <field name="snapshot_count"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_anabtawi_hr_kpi_period_form" model="ir.ui.view">
+        <field name="name">anabtawi.hr.kpi.period.form</field>
+        <field name="model">anabtawi.hr.kpi.period</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_compute" type="object" string="Compute KPIs" class="btn-primary"/>
+                    <button name="action_approve" type="object" string="Approve" invisible="state != 'computed'"/>
+                    <button name="action_reset_draft" type="object" string="Reset to Draft" invisible="state == 'draft'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,computed,approved"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="company_id"/>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                    </group>
+                    <notebook>
+                        <page string="KPI Results">
+                            <field name="snapshot_ids">
+                                <tree editable="bottom">
+                                    <field name="category_id"/>
+                                    <field name="definition_id"/>
+                                    <field name="value"/>
+                                    <field name="target_value"/>
+                                    <field name="display_value"/>
+                                    <field name="score"/>
+                                    <field name="manual_note"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_anabtawi_hr_kpi_snapshot_tree" model="ir.ui.view">
+        <field name="name">anabtawi.hr.kpi.snapshot.tree</field>
+        <field name="model">anabtawi.hr.kpi.snapshot</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="period_id"/>
+                <field name="category_id"/>
+                <field name="definition_id"/>
+                <field name="value"/>
+                <field name="target_value"/>
+                <field name="display_value"/>
+                <field name="score"/>
+                <field name="company_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_anabtawi_hr_kpi_snapshot_kanban" model="ir.ui.view">
+        <field name="name">anabtawi.hr.kpi.snapshot.kanban</field>
+        <field name="model">anabtawi.hr.kpi.snapshot</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="category_id">
+                <field name="definition_id"/>
+                <field name="display_value"/>
+                <field name="target_value"/>
+                <field name="score"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_card">
+                            <strong><field name="definition_id"/></strong>
+                            <div class="display-6"><field name="display_value"/></div>
+                            <div>Target: <field name="target_value"/></div>
+                            <div>Status: <field name="score"/></div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_anabtawi_hr_kpi_snapshot_pivot" model="ir.ui.view">
+        <field name="name">anabtawi.hr.kpi.snapshot.pivot</field>
+        <field name="model">anabtawi.hr.kpi.snapshot</field>
+        <field name="arch" type="xml">
+            <pivot>
+                <field name="period_id" type="row"/>
+                <field name="category_id" type="row"/>
+                <field name="definition_id" type="col"/>
+                <field name="value" type="measure"/>
+                <field name="target_value" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_anabtawi_hr_kpi_snapshot_graph" model="ir.ui.view">
+        <field name="name">anabtawi.hr.kpi.snapshot.graph</field>
+        <field name="model">anabtawi.hr.kpi.snapshot</field>
+        <field name="arch" type="xml">
+            <graph string="HR KPI Trend" type="bar">
+                <field name="period_id"/>
+                <field name="definition_id"/>
+                <field name="value" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_anabtawi_hr_kpi_definition_tree" model="ir.ui.view">
+        <field name="name">anabtawi.hr.kpi.definition.tree</field>
+        <field name="model">anabtawi.hr.kpi.definition</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="category_id"/>
+                <field name="unit"/>
+                <field name="direction"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_anabtawi_hr_kpi_definition_form" model="ir.ui.view">
+        <field name="name">anabtawi.hr.kpi.definition.form</field>
+        <field name="model">anabtawi.hr.kpi.definition</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="category_id"/>
+                        <field name="sequence"/>
+                        <field name="unit"/>
+                        <field name="direction"/>
+                        <field name="active"/>
+                    </group>
+                    <group>
+                        <field name="formula"/>
+                        <field name="source_note"/>
+                        <field name="iso_area"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_anabtawi_hr_kpi_period" model="ir.actions.act_window">
+        <field name="name">KPI Reporting Periods</field>
+        <field name="res_model">anabtawi.hr.kpi.period</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="action_anabtawi_hr_kpi_dashboard" model="ir.actions.act_window">
+        <field name="name">HR Performance Dashboard</field>
+        <field name="res_model">anabtawi.hr.kpi.snapshot</field>
+        <field name="view_mode">kanban,graph,pivot,tree</field>
+        <field name="context">{'search_default_group_category': 1}</field>
+    </record>
+
+    <record id="action_anabtawi_hr_kpi_definition" model="ir.actions.act_window">
+        <field name="name">KPI Definitions</field>
+        <field name="res_model">anabtawi.hr.kpi.definition</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+</odoo>
