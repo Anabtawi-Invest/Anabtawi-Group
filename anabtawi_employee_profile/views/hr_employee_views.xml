@@ -9,6 +9,9 @@
                 <button name="action_print_employee_profile_pdf" type="object" string="Employee Profile PDF"
                         class="btn-secondary" groups="hr.group_hr_user" invisible="not id"/>
             </xpath>
+            <xpath expr="//h1" position="attributes">
+                <attribute name="class">d-flex flex-column</attribute>
+            </xpath>
             <xpath expr="//field[@name='name']" position="after">
                 <field name="name_arabic" placeholder="الاسم بالعربية" class="w-100"/>
             </xpath>
