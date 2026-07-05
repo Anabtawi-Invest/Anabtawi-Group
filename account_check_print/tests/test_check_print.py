@@ -217,5 +217,5 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
         text = "مائة دينار"
         shaped = _shape_arabic_text_for_ltr_renderer(text)
         self.assertNotEqual(shaped, text[::-1])
-        self.assertIn("د", shaped)
+        self.assertLess(shaped.find("م"), shaped.find("د"))
         self.assertNotIn("ر ا ن", shaped)

@@ -21,12 +21,20 @@ def _shape_arabic_text_for_ltr_renderer(text):
     """Join Arabic letters and order them for left-to-right PNG renderers."""
     if not text or not _contains_arabic(text):
         return text
+    shaped = reshape(text)
     try:
         from bidi.algorithm import get_display
     except ImportError:
-        shaped_words = [reshape(word) for word in text.split()]
-        return " ".join(reversed(shaped_words))
-    return get_display(reshape(text))
+        return shaped
+    return get_display(shaped)
+
+
+def _has_python_bidi():
+    try:
+        from bidi.algorithm import get_display  # noqa: F401
+    except ImportError:
+        return False
+    return True
 
 
 @lru_cache(maxsize=1)
@@ -436,12 +444,23 @@ class AccountPayment(models.Model):
         field_height_px = max(int(layout[f"{field_name}_height"] * 96 / 25.4), text_height + 4)
         image = Image.new("RGBA", (field_width_px, field_height_px), (255, 255, 255, 0))
         draw = ImageDraw.Draw(image)
-        if self.check_field_direction(text) == "rtl":
-            x = field_width_px - text_width - 2 - bbox[0]
-        else:
-            x = 2 - bbox[0]
         y = max(2 - bbox[1], 0)
-        draw.text((x, y), display_text, font=font, fill=(0, 0, 0, 255))
+        rtl = self.check_field_direction(text) == "rtl"
+        if rtl and _has_python_bidi():
+            draw.text(
+                (field_width_px - 2, y),
+                display_text,
+                font=font,
+                fill=(0, 0, 0, 255),
+                anchor="ra",
+            )
+        else:
+            draw.text(
+                (2 - bbox[0], y),
+                display_text,
+                font=font,
+                fill=(0, 0, 0, 255),
+            )
         buffer = io.BytesIO()
         image.save(buffer, format="PNG")
         return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
