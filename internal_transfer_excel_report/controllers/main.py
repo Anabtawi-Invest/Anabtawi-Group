@@ -14,6 +14,7 @@ class InternalTransferXlsxController(http.Controller):
         if not wizard.exists():
             return request.not_found()
 
+        request.env['factory.plan.category.option'].sync_from_products()
         report_lang = wizard._get_report_lang()
         wizard = wizard.with_context(lang=report_lang)
         xlsx_data = wizard._generate_xlsx_content_localized()

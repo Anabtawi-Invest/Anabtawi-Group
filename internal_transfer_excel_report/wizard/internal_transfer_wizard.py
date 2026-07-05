@@ -90,48 +90,51 @@ class InternalTransferReportWizard(models.TransientModel):
             self.env['stock.picking'].fields_get(['state'])['state']['selection']
         )
 
-    def _append_factory_plan_category_domain(self, move_domain):
+    def _get_factory_plan_category_product_ids(self):
+        """Return matching product ids, empty list if none, None if no filter."""
         self.ensure_one()
-        if self.all_factory_plan_categories:
-            return move_domain
-
-        if not self.factory_plan_category_ids:
-            return move_domain
+        if self.all_factory_plan_categories or not self.factory_plan_category_ids:
+            return None
 
         named_categories = self.factory_plan_category_ids.filtered(
             lambda option: not option.is_uncategorized
-        )
+        ).mapped('name')
         include_uncategorized = bool(
             self.factory_plan_category_ids.filtered('is_uncategorized')
         )
 
         if named_categories and include_uncategorized:
-            move_domain.extend([
+            product_domain = [
                 '|',
-                ('product_id.product_tmpl_id.factory_plan_category', 'in', named_categories.mapped('name')),
+                ('factory_plan_category', 'in', named_categories),
                 '|',
-                ('product_id.product_tmpl_id.factory_plan_category', '=', False),
-                ('product_id.product_tmpl_id.factory_plan_category', '=', ''),
-            ])
+                ('factory_plan_category', '=', False),
+                ('factory_plan_category', '=', ''),
+            ]
         elif named_categories:
-            move_domain.append(
-                ('product_id.product_tmpl_id.factory_plan_category', 'in', named_categories.mapped('name'))
-            )
-        elif include_uncategorized:
-            move_domain.extend([
+            product_domain = [('factory_plan_category', 'in', named_categories)]
+        else:
+            product_domain = [
                 '|',
-                ('product_id.product_tmpl_id.factory_plan_category', '=', False),
-                ('product_id.product_tmpl_id.factory_plan_category', '=', ''),
-            ])
+                ('factory_plan_category', '=', False),
+                ('factory_plan_category', '=', ''),
+            ]
 
+        return self.env['product.product'].search(product_domain).ids
+
+    def _append_factory_plan_category_domain(self, move_domain):
+        product_ids = self._get_factory_plan_category_product_ids()
+        if product_ids is None:
+            return move_domain
+        move_domain.append(('product_id', 'in', product_ids or [0]))
         return move_domain
 
     def _get_base_picking_domain(self):
         date_from_dt, date_to_dt = self._compute_dates()
         return [
             ('picking_type_code', '=', 'internal'),
-            ('scheduled_date', '>=', date_from_dt),
-            ('scheduled_date', '<=', date_to_dt),
+            ('create_date', '>=', date_from_dt),
+            ('create_date', '<=', date_to_dt),
         ]
 
     def _get_sheet1_data(self):
@@ -307,6 +310,7 @@ class InternalTransferReportWizard(models.TransientModel):
 
     def action_print_excel(self):
         self.ensure_one()
+        self.env['factory.plan.category.option'].sync_from_products()
         return {
             'type': 'ir.actions.act_url',
             'url': f'/internal_transfer_excel_report/xlsx/{self.id}',

@@ -1,6 +1,6 @@
 {
     "name": "Factory Plan Category",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "summary": "Adds Factory Plan Category to Product.",
     "author": "Anabtawi Sweets",
     "category": "Inventory",

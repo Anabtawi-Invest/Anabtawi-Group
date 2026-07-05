@@ -23,7 +23,7 @@ class FactoryPlanCategoryOption(models.Model):
         if not Option.search([('is_uncategorized', '=', True)], limit=1):
             Option.create({'name': 'Non', 'is_uncategorized': True})
 
-        categories = self.env['product.template'].search([
+        categories = self.env['product.product'].search([
             ('factory_plan_category', '!=', False),
             ('factory_plan_category', '!=', ''),
         ]).mapped('factory_plan_category')
