@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="point_of_sale.menu_point_root" model="ir.ui.menu">
-        <field name="group_ids" eval="[Command.link(ref('online_campaigns_discount.group_online_campaign_ecommerce_manager')), Command.link(ref('online_campaigns_discount.group_online_campaign_finance_manager'))]"/>
-    </record>
     <menuitem id="menu_online_campaign_root" name="Online Campaigns"
-              parent="point_of_sale.menu_point_root" sequence="45"
+              sequence="45"
               groups="point_of_sale.group_pos_manager,online_campaigns_discount.group_online_campaign_ecommerce_manager,online_campaigns_discount.group_online_campaign_finance_manager"/>
     <menuitem id="menu_online_campaign_dashboard" name="Dashboard"
               parent="menu_online_campaign_root" action="action_online_campaign_dashboard" sequence="5"/>
