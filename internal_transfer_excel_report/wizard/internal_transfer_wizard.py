@@ -167,50 +167,37 @@ class InternalTransferReportWizard(models.TransientModel):
             })
         return rows
 
-    def _get_sheet2_products(self):
-        product_ids = self._get_factory_plan_category_product_ids()
-        if product_ids is None:
-            return self.env['product.product'].search([], order='name')
-        return self.env['product.product'].browse(product_ids).sorted('name')
-
     def _get_sheet2_data(self):
         self.ensure_one()
-
-        aggregated = {}
 
         picking_domain = self._get_base_picking_domain()
         picking_domain.append(('state', 'not in', ('done', 'cancel')))
         picking_ids = self.env['stock.picking'].search(picking_domain).ids
+        if not picking_ids:
+            return []
 
-        if picking_ids:
-            move_domain = [
-                ('picking_id.picking_type_code', '=', 'internal'),
-                ('picking_id', 'in', picking_ids),
-                ('picking_id.state', 'not in', ('done', 'cancel')),
-                ('move_dest_ids', '=', False),
-            ]
-            move_domain = self._append_factory_plan_category_domain(move_domain)
-            moves = self.env['stock.move'].search(move_domain)
+        move_domain = [
+            ('picking_id.picking_type_code', '=', 'internal'),
+            ('picking_id', 'in', picking_ids),
+            ('picking_id.state', 'not in', ('done', 'cancel')),
+            ('move_dest_ids', '=', False),
+        ]
+        move_domain = self._append_factory_plan_category_domain(move_domain)
+        moves = self.env['stock.move'].search(move_domain)
+        if not moves:
+            return []
 
-            for move in moves:
-                key = move.product_id.id
-                row = aggregated.setdefault(key, {
-                    'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
-                    'product_name': move.product_id.display_name,
-                    'total_demand': 0.0,
-                    'total_quantity': 0.0,
-                })
-                row['total_demand'] += move.product_uom_qty
-                row['total_quantity'] += move.quantity
-
-        for product in self._get_sheet2_products():
-            if product.id not in aggregated:
-                aggregated[product.id] = {
-                    'factory_plan_category': self._get_factory_plan_category_display(product),
-                    'product_name': product.display_name,
-                    'total_demand': 0.0,
-                    'total_quantity': 0.0,
-                }
+        aggregated = {}
+        for move in moves:
+            key = move.product_id.id
+            row = aggregated.setdefault(key, {
+                'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
+                'product_name': move.product_id.display_name,
+                'total_demand': 0.0,
+                'total_quantity': 0.0,
+            })
+            row['total_demand'] += move.product_uom_qty
+            row['total_quantity'] += move.quantity
 
         return sorted(
             aggregated.values(),
