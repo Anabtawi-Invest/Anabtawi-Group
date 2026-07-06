@@ -33,6 +33,17 @@ msgid "Factory Plan Category Option"
 msgstr "خيار فئة خطة المصنع"
 
 #. module: internal_transfer_excel_report
+#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__picking_type_id
+msgid "Operation Type"
+msgstr "نوع العملية"
+
+#. module: internal_transfer_excel_report
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+#, python-format
+msgid "Please select an operation type."
+msgstr "يرجى اختيار نوع العملية."
+
+#. module: internal_transfer_excel_report
 #: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__filter_type
 msgid "Filter Type"
 msgstr "نوع التصفية"

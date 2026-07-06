@@ -30,11 +30,24 @@ class InternalTransferReportWizard(models.TransientModel):
         'option_id',
         string='Factory Plan Categories',
     )
+    picking_type_id = fields.Many2one(
+        'stock.picking.type',
+        string='Operation Type',
+        required=True,
+        domain="[('code', '=', 'internal')]",
+    )
 
     @api.model
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
         self.env['factory.plan.category.option'].sync_from_products()
+        if 'picking_type_id' in fields_list and not res.get('picking_type_id'):
+            picking_type = self.env['stock.picking.type'].search([
+                ('code', '=', 'internal'),
+                ('company_id', 'in', [self.env.company.id, False]),
+            ], limit=1)
+            if picking_type:
+                res['picking_type_id'] = picking_type.id
         return res
 
     @api.onchange('all_factory_plan_categories')
@@ -125,9 +138,12 @@ class InternalTransferReportWizard(models.TransientModel):
         return move_domain
 
     def _get_base_picking_domain(self):
+        self.ensure_one()
+        if not self.picking_type_id:
+            raise UserError(_("Please select an operation type."))
         date_from_dt, date_to_dt = self._compute_dates()
         return [
-            ('picking_type_code', '=', 'internal'),
+            ('picking_type_id', '=', self.picking_type_id.id),
             ('create_date', '>=', date_from_dt),
             ('create_date', '<=', date_to_dt),
         ]
@@ -142,7 +158,7 @@ class InternalTransferReportWizard(models.TransientModel):
             return []
 
         move_domain = [
-            ('picking_id.picking_type_code', '=', 'internal'),
+            ('picking_id.picking_type_id', '=', self.picking_type_id.id),
             ('picking_id', 'in', picking_ids),
             ('state', '!=', 'cancel'),
             ('move_dest_ids', '=', False),
@@ -177,7 +193,7 @@ class InternalTransferReportWizard(models.TransientModel):
             return []
 
         move_domain = [
-            ('picking_id.picking_type_code', '=', 'internal'),
+            ('picking_id.picking_type_id', '=', self.picking_type_id.id),
             ('picking_id', 'in', picking_ids),
             ('picking_id.state', 'not in', ('done', 'cancel')),
             ('move_dest_ids', '=', False),
