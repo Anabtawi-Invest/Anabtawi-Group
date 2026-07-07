@@ -1,0 +1,15 @@
+<odoo>
+    <menuitem id="menu_anabtawi_ordering_root" name="Anabtawi Ordering" sequence="45" groups="group_ordering_user" action="action_anabtawi_direct_order" web_icon="anabtawi_direct_ordering_platform,static/description/icon.png"/>
+    <menuitem id="menu_anabtawi_ordering_orders" name="Orders" parent="menu_anabtawi_ordering_root" action="action_anabtawi_direct_order" sequence="10"/>
+    <menuitem id="menu_anabtawi_ordering_kds" name="KDS Screen" parent="menu_anabtawi_ordering_root" action="action_anabtawi_direct_order_kds" sequence="20"/>
+    <menuitem id="menu_anabtawi_order_notification" name="Staff Notifications" parent="menu_anabtawi_ordering_root" action="action_anabtawi_order_notification" sequence="35"/>
+    <menuitem id="menu_anabtawi_ordering_dispatch" name="Delivery Dispatch" parent="menu_anabtawi_ordering_root" action="action_anabtawi_direct_order_dispatch" sequence="30"/>
+    <menuitem id="menu_anabtawi_ordering_config" name="Configuration" parent="menu_anabtawi_ordering_root" sequence="90" groups="group_ordering_manager"/>
+    <menuitem id="menu_anabtawi_ordering_branch" name="Branches" parent="menu_anabtawi_ordering_config" action="action_anabtawi_ordering_branch" sequence="10"/>
+    <menuitem id="menu_anabtawi_delivery_zone" name="Delivery Zones" parent="menu_anabtawi_ordering_config" action="action_anabtawi_delivery_zone" sequence="20"/>
+    <menuitem id="menu_anabtawi_talabat_root" name="Talabat Integration" parent="menu_anabtawi_ordering_root" sequence="60" groups="group_ordering_manager"/>
+    <menuitem id="menu_anabtawi_talabat_config" name="API Configuration" parent="menu_anabtawi_talabat_root" action="action_anabtawi_talabat_config" sequence="10"/>
+    <menuitem id="menu_anabtawi_talabat_branch_map" name="Branch Mapping" parent="menu_anabtawi_talabat_root" action="action_anabtawi_talabat_branch_map" sequence="20"/>
+    <menuitem id="menu_anabtawi_talabat_product_map" name="Product Mapping" parent="menu_anabtawi_talabat_root" action="action_anabtawi_talabat_product_map" sequence="30"/>
+    <menuitem id="menu_anabtawi_talabat_api_log" name="API Logs" parent="menu_anabtawi_talabat_root" action="action_anabtawi_talabat_api_log" sequence="90"/>
+</odoo>
