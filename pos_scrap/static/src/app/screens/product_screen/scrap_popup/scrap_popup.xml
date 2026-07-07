@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="pos_scrap.ScrapPopup" owl="1">
-        <Dialog size="'md'" title="'Scrap'">
+        <Dialog size="'md'" title="'S crap'">
             <div class="pos-scrap-popup">
                 <div class="form-group mb-3">
                     <label>
