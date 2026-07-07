@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_online_campaign_line_pivot" model="ir.ui.view">
+        <field name="name">pos.order.line.online.campaign.pivot</field>
+        <field name="model">pos.order.line</field>
+        <field name="arch" type="xml">
+            <pivot string="Online Campaign Analysis">
+                <field name="online_aggregator_id" type="row"/>
+                <field name="online_campaign_id" type="row"/>
+                <field name="online_order_date" interval="month" type="col"/>
+                <field name="online_gross_amount" type="measure"/>
+                <field name="online_discount_amount" type="measure"/>
+                <field name="aggregator_contribution_amount" type="measure"/>
+                <field name="company_contribution_amount" type="measure"/>
+                <field name="aggregator_commission_amount" type="measure"/>
+                <field name="online_customer_paid_amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_online_campaign_line_graph" model="ir.ui.view">
+        <field name="name">pos.order.line.online.campaign.graph</field>
+        <field name="model">pos.order.line</field>
+        <field name="arch" type="xml">
+            <graph string="Campaign Sales and Costs" type="bar" stacked="1">
+                <field name="online_aggregator_id"/>
+                <field name="online_discount_amount" type="measure"/>
+                <field name="company_contribution_amount" type="measure"/>
+                <field name="aggregator_commission_amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="action_online_campaign_discount_report" model="ir.actions.act_window">
+        <field name="view_mode">list,pivot,graph</field>
+    </record>
+
+    <record id="view_online_campaign_performance_list" model="ir.ui.view">
+        <field name="name">online.campaign.performance.report.list</field>
+        <field name="model">online.campaign.performance.report</field>
+        <field name="arch" type="xml">
+            <list string="Campaign Profitability" create="0" edit="0" delete="0">
+                <field name="date"/>
+                <field name="aggregator_id"/>
+                <field name="campaign_id"/>
+                <field name="session_id" optional="hide"/>
+                <field name="order_count" sum="Orders"/>
+                <field name="line_count" optional="hide" sum="Lines"/>
+                <field name="gross_amount" widget="monetary" sum="Gross"/>
+                <field name="discount_amount" widget="monetary" sum="Discount"/>
+                <field name="aggregator_contribution" widget="monetary" sum="Aggregator Contribution"/>
+                <field name="company_contribution" widget="monetary" sum="Company Contribution"/>
+                <field name="estimated_commission" widget="monetary" sum="Commission"/>
+                <field name="customer_collections" widget="monetary" sum="Customer Collections"/>
+                <field name="estimated_net_proceeds" widget="monetary" sum="Net Proceeds"/>
+                <field name="estimated_campaign_cost" widget="monetary" sum="Campaign Cost"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_online_campaign_performance_pivot" model="ir.ui.view">
+        <field name="name">online.campaign.performance.report.pivot</field>
+        <field name="model">online.campaign.performance.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Campaign Profitability">
+                <field name="aggregator_id" type="row"/>
+                <field name="campaign_id" type="row"/>
+                <field name="date" interval="month" type="col"/>
+                <field name="gross_amount" type="measure"/>
+                <field name="company_contribution" type="measure"/>
+                <field name="estimated_commission" type="measure"/>
+                <field name="estimated_net_proceeds" type="measure"/>
+                <field name="estimated_campaign_cost" type="measure"/>
+                <field name="order_count" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_online_campaign_performance_graph" model="ir.ui.view">
+        <field name="name">online.campaign.performance.report.graph</field>
+        <field name="model">online.campaign.performance.report</field>
+        <field name="arch" type="xml">
+            <graph string="Campaign Profitability Dashboard" type="bar" stacked="0">
+                <field name="aggregator_id"/>
+                <field name="gross_amount" type="measure"/>
+                <field name="estimated_net_proceeds" type="measure"/>
+                <field name="estimated_campaign_cost" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_online_campaign_performance_search" model="ir.ui.view">
+        <field name="name">online.campaign.performance.report.search</field>
+        <field name="model">online.campaign.performance.report</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="aggregator_id"/>
+                <field name="campaign_id"/>
+                <field name="date"/>
+                <field name="session_id"/>
+                <filter name="group_aggregator" string="Aggregator" context="{'group_by': 'aggregator_id'}"/>
+                <filter name="group_campaign" string="Campaign" context="{'group_by': 'campaign_id'}"/>
+                <filter name="group_month" string="Month" context="{'group_by': 'date:month'}"/>
+                <filter name="group_session" string="POS Session" context="{'group_by': 'session_id'}"/>
+                <filter name="group_company" string="Company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_online_campaign_profitability" model="ir.actions.act_window">
+        <field name="name">Campaign Profitability</field>
+        <field name="res_model">online.campaign.performance.report</field>
+        <field name="view_mode">list,pivot,graph</field>
+        <field name="search_view_id" ref="view_online_campaign_performance_search"/>
+    </record>
+
+    <record id="action_online_campaign_dashboard" model="ir.actions.act_window">
+        <field name="name">Campaign Dashboard</field>
+        <field name="res_model">online.campaign.performance.report</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="view_id" ref="view_online_campaign_performance_graph"/>
+        <field name="search_view_id" ref="view_online_campaign_performance_search"/>
+        <field name="context">{'graph_mode': 'bar', 'group_by': ['aggregator_id']}</field>
+    </record>
+</odoo>
