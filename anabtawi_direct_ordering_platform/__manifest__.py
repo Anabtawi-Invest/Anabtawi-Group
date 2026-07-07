@@ -1,0 +1,23 @@
+{
+    'name': 'Anabtawi Direct Ordering Platform',
+    'version': '19.0.1.3.0',
+    'category': 'Sales/Point of Sale',
+    'summary': 'Direct ordering, KDS, delivery dispatch, customer portal APIs, and Talabat-ready aggregator integration with Odoo-side settlement accounting for Anabtawi.',
+    'author': 'Anabtawi / ChatGPT',
+    'license': 'LGPL-3',
+    'depends': ['base', 'mail', 'product', 'stock', 'sale_management', 'point_of_sale', 'account'],
+    'data': [
+        'security/security.xml',
+        'security/ir.model.access.csv',
+        'data/sequences.xml',
+        'views/direct_order_views.xml',
+        'views/notification_views.xml',
+        'views/branch_config_views.xml',
+        'views/delivery_views.xml',
+        'views/product_views.xml',
+        'views/talabat_views.xml',
+        'views/menu.xml',
+    ],
+    'installable': True,
+    'application': True,
+}

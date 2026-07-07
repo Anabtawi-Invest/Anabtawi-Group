@@ -1,0 +1,184 @@
+<odoo>
+    <record id="view_anabtawi_direct_order_list" model="ir.ui.view">
+        <field name="name">anabtawi.direct.order.list</field>
+        <field name="model">anabtawi.direct.order</field>
+        <field name="arch" type="xml">
+            <list decoration-danger="state == 'cancelled'" decoration-success="state == 'done'" decoration-warning="state in ('received','accepted','preparing')">
+                <field name="name"/>
+                <field name="channel"/>
+                <field name="branch_id"/>
+                <field name="customer_name"/>
+                <field name="customer_phone"/>
+                <field name="order_type"/>
+                <field name="payment_method"/>
+                <field name="amount_total"/>
+                <field name="driver_id"/>
+                <field name="kitchen_print_required"/>
+                <field name="timer_status" widget="badge"/>
+                <field name="state" widget="badge"/>
+                <field name="create_date"/>
+            </list>
+        </field>
+    </record>
+    <record id="view_anabtawi_direct_order_form" model="ir.ui.view">
+        <field name="name">anabtawi.direct.order.form</field>
+        <field name="model">anabtawi.direct.order</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_accept" string="Accept" type="object" class="btn-primary" invisible="state not in ('received','draft')"/>
+                    <button name="action_prepare" string="Preparing" type="object" invisible="state != 'accepted'"/>
+                    <button name="action_ready" string="Ready" type="object" invisible="state != 'preparing'"/>
+                    <button name="action_out_for_delivery" string="Out For Delivery" type="object" invisible="state != 'ready' or order_type != 'delivery'"/>
+                    <button name="action_done" string="Complete" type="object" class="btn-success" invisible="state not in ('ready','out_for_delivery')"/>
+                    <button name="action_create_sale_order" string="Create Sale Order" type="object" invisible="sale_order_id"/>
+                    <button name="action_push_talabat_status" string="Push Talabat Status" type="object" invisible="channel != 'talabat'"/>
+                    <button name="action_create_aggregator_accounting_entry" string="Post Aggregator Accounting" type="object" invisible="channel not in ('talabat','careem') or aggregator_account_move_id"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ('done','cancelled')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="received,accepted,preparing,ready,out_for_delivery,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object" name="action_create_sale_order" icon="fa-shopping-cart" invisible="sale_order_id">
+                            <div class="o_stat_info"><span class="o_stat_text">Create SO</span></div>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_view_notifications" icon="fa-bell">
+                            <field name="notification_count" widget="statinfo" string="Notifications"/>
+                        </button>
+                    </div>
+                    <h1><field name="name"/></h1>
+                    <group>
+                        <group>
+                            <field name="channel"/>
+                            <field name="external_order_ref"/>
+                            <field name="branch_id"/>
+                            <field name="order_type"/>
+                            <field name="payment_method"/>
+                        </group>
+                        <group>
+                            <field name="customer_name"/>
+                            <field name="customer_phone"/>
+                            <field name="partner_id"/>
+                            <field name="zone_id"/>
+                            <field name="customer_address"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Order Lines">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="product_id"/>
+                                    <field name="name"/>
+                                    <field name="quantity"/>
+                                    <field name="price_unit"/>
+                                    <field name="discount_percent"/>
+                                    <field name="tax_ids" widget="many2many_tags"/>
+                                    <field name="price_subtotal"/>
+                                    <field name="price_tax"/>
+                                    <field name="price_total"/>
+                                    <field name="notes"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer">
+                                <field name="amount_untaxed"/>
+                                <field name="amount_tax"/>
+                                <field name="amount_discount"/>
+                                <field name="amount_delivery"/>
+                                <field name="amount_total" class="oe_subtotal_footer_separator"/>
+                            </group>
+                        </page>
+                        <page string="Kitchen / Delivery">
+                            <group>
+                                <field name="driver_id"/>
+                                <field name="requested_datetime"/>
+                                <field name="promised_datetime"/>
+                                <field name="accepted_by_id"/>
+                                <field name="accepted_datetime"/>
+                                <field name="ready_datetime"/>
+                                <field name="delivered_datetime"/>
+                                <field name="prep_deadline"/>
+                                <field name="kitchen_print_required"/>
+                                <field name="timer_status"/>
+                                <field name="kitchen_notes"/>
+                                <field name="notes"/>
+                                <field name="cancellation_reason"/>
+                            </group>
+                        </page>
+                        <page string="Aggregator Accounting">
+                            <group>
+                                <group string="Amounts">
+                                    <field name="talabat_commission_amount"/>
+                                    <field name="talabat_commission_percent"/>
+                                    <field name="aggregator_discount_amount"/>
+                                    <field name="company_discount_amount"/>
+                                </group>
+                                <group string="Odoo Accounting Calculation">
+                                    <field name="commission_base_amount" readonly="1"/>
+                                    <field name="commission_tax_amount" readonly="1"/>
+                                    <field name="net_aggregator_receivable" readonly="1"/>
+                                    <field name="aggregator_account_move_id" readonly="1"/>
+                                </group>
+                            </group>
+                            <p class="text-muted">Commission base and contribution posting are calculated only on the Odoo side. Talabat API documentation/endpoints are not modified.</p>
+                        </page>
+                        <page string="Odoo Documents">
+                            <group>
+                                <field name="sale_order_id"/>
+                                <field name="pos_order_id"/>
+                                <field name="invoice_id"/>
+                            </group>
+                        </page>
+                        <page string="Raw Payload">
+                            <field name="talabat_config_id" invisible="channel != 'talabat'"/>
+                            <field name="talabat_vendor_id" invisible="channel != 'talabat'"/>
+                            <field name="talabat_status" invisible="channel != 'talabat'"/>
+                            <field name="talabat_last_sync" invisible="channel != 'talabat'"/>
+                            <field name="talabat_sync_message" invisible="channel != 'talabat'"/>
+                            <field name="raw_payload"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+    <record id="view_anabtawi_direct_order_kanban" model="ir.ui.view">
+        <field name="name">anabtawi.direct.order.kanban</field>
+        <field name="model">anabtawi.direct.order</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state">
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_card">
+                            <strong><field name="name"/></strong>
+                            <div><field name="branch_id"/> - <field name="channel"/></div>
+                            <div><field name="customer_name"/> / <field name="customer_phone"/></div>
+                            <div>Total: <field name="amount_total"/></div>
+                            <div><field name="order_type"/> - <field name="driver_id"/></div>
+                            <div>Timer: <field name="timer_status"/> | Print: <field name="kitchen_print_required"/></div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+    <record id="action_anabtawi_direct_order" model="ir.actions.act_window">
+        <field name="name">Direct Orders</field>
+        <field name="res_model">anabtawi.direct.order</field>
+        <field name="view_mode">list,kanban,form</field>
+    </record>
+    <record id="action_anabtawi_direct_order_kds" model="ir.actions.act_window">
+        <field name="name">Kitchen Display Screen</field>
+        <field name="res_model">anabtawi.direct.order</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('state','in',('accepted','preparing'))]</field>
+        <field name="context">{'search_default_group_by_state': 1}</field>
+    </record>
+    <record id="action_anabtawi_direct_order_dispatch" model="ir.actions.act_window">
+        <field name="name">Delivery Dispatch</field>
+        <field name="res_model">anabtawi.direct.order</field>
+        <field name="view_mode">list,kanban,form</field>
+        <field name="domain">[('order_type','=','delivery'),('state','in',('ready','out_for_delivery'))]</field>
+    </record>
+</odoo>
