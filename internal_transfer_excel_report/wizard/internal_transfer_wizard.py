@@ -98,6 +98,9 @@ class InternalTransferReportWizard(models.TransientModel):
         category = product.product_tmpl_id.factory_plan_category
         return category if category else self.env._('Non')
 
+    def _get_move_uom_name(self, move):
+        return move.product_uom.display_name or move.product_id.uom_id.display_name or ''
+
     def _get_factory_plan_category_product_ids(self):
         """Return matching product ids, empty list if none, None if no filter."""
         self.ensure_one()
@@ -180,6 +183,7 @@ class InternalTransferReportWizard(models.TransientModel):
                 'creating_date': picking.create_date,
                 'demand': move.product_uom_qty,
                 'quantity': move.quantity,
+                'product_uom': self._get_move_uom_name(move),
             })
         return rows
 
@@ -209,6 +213,7 @@ class InternalTransferReportWizard(models.TransientModel):
             row = aggregated.setdefault(key, {
                 'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
                 'product_name': move.product_id.display_name,
+                'product_uom': self._get_move_uom_name(move),
                 'total_demand': 0.0,
                 'total_quantity': 0.0,
             })
@@ -253,6 +258,7 @@ class InternalTransferReportWizard(models.TransientModel):
             self.env._('Creating Date'),
             self.env._('Demand'),
             self.env._('Quantity'),
+            self.env._('Unit of Measure'),
         ]
         for col, header in enumerate(sheet1_headers):
             sheet1.write(0, col, header, header_style)
@@ -263,6 +269,7 @@ class InternalTransferReportWizard(models.TransientModel):
         sheet1.set_column(3, 3, 30)
         sheet1.set_column(4, 4, 22)
         sheet1.set_column(5, 6, 18)
+        sheet1.set_column(7, 7, 16)
 
         row = 1
         sheet1_rows = self._get_sheet1_data()
@@ -280,6 +287,7 @@ class InternalTransferReportWizard(models.TransientModel):
                     sheet1.write(row, 4, '', text_style)
                 sheet1.write_number(row, 5, data['demand'], number_style)
                 sheet1.write_number(row, 6, data['quantity'], number_style)
+                sheet1.write(row, 7, data['product_uom'], text_style)
                 row += 1
 
         sheet2 = workbook.add_worksheet(self.env._('Summary'))
@@ -291,6 +299,7 @@ class InternalTransferReportWizard(models.TransientModel):
             self.env._('Product'),
             self.env._('Total Demand'),
             self.env._('Total Quantity'),
+            self.env._('Unit of Measure'),
         ]
         for col, header in enumerate(sheet2_headers):
             sheet2.write(0, col, header, header_style)
@@ -298,6 +307,7 @@ class InternalTransferReportWizard(models.TransientModel):
         sheet2.set_column(0, 0, 25)
         sheet2.set_column(1, 1, 45)
         sheet2.set_column(2, 3, 18)
+        sheet2.set_column(4, 4, 16)
 
         row = 1
         sheet2_rows = self._get_sheet2_data()
@@ -309,6 +319,7 @@ class InternalTransferReportWizard(models.TransientModel):
                 sheet2.write(row, 1, data['product_name'], text_style)
                 sheet2.write_number(row, 2, data['total_demand'], number_style)
                 sheet2.write_number(row, 3, data['total_quantity'], number_style)
+                sheet2.write(row, 4, data['product_uom'], text_style)
                 row += 1
 
         workbook.close()
