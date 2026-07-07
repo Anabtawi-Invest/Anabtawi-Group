@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_employee_view_form_overtime_second_manager" model="ir.ui.view">
+        <field name="name">hr.employee.form.overtime.second.manager</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr_attendance.view_employee_form_inherit_hr_attendance"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='managers']//field[@name='attendance_manager_id']" position="after">
+                <field name="second_manager_id" widget="many2one_avatar_user" groups="hr_attendance.group_hr_attendance_user"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -15,6 +15,7 @@
         "data/ir_cron.xml",
         "views/approval_request_views.xml",
         "views/hr_attendance_views.xml",
+        "views/hr_employee_views.xml",
         "views/portal_templates.xml",
     ],
     "installable": True,

@@ -556,30 +556,42 @@ class ApprovalRequest(models.Model):
 
     def _ensure_overtime_manager_approver(self):
         for request in self.filtered(lambda req: req.is_overtime_category and req.overtime_employee_id):
-            manager_user = request.overtime_employee_id.attendance_manager_id
-            if not manager_user:
+            employee = request.overtime_employee_id
+            if not employee.attendance_manager_id:
                 raise UserError(
                     _("The overtime employee must have an Attendance Manager before submitting this request.")
                 )
 
-            manager_approver = request.approver_ids.filtered(lambda approver: approver.user_id == manager_user)
-            if manager_approver:
-                manager_approver.write({"required": True})
-                continue
+            overtime_approvers = [
+                (employee.attendance_manager_id, 1),
+            ]
+            if (
+                employee.second_manager_id
+                and employee.second_manager_id != employee.attendance_manager_id
+            ):
+                overtime_approvers.append((employee.second_manager_id, 2))
 
-            request.write(
-                {
-                    "approver_ids": [
-                        Command.create(
-                            {
-                                "user_id": manager_user.id,
-                                "required": True,
-                                "sequence": 1,
-                            }
-                        )
-                    ]
-                }
-            )
+            for manager_user, sequence in overtime_approvers:
+                manager_approver = request.approver_ids.filtered(
+                    lambda approver, user=manager_user: approver.user_id == user
+                )
+                if manager_approver:
+                    manager_approver.write({"required": True, "sequence": sequence})
+                    continue
+
+                request.write(
+                    {
+                        "approver_ids": [
+                            Command.create(
+                                {
+                                    "user_id": manager_user.id,
+                                    "required": True,
+                                    "sequence": sequence,
+                                }
+                            )
+                        ]
+                    }
+                )
 
     def action_confirm(self):
         overtime_requests = self.filtered("is_overtime_category")
