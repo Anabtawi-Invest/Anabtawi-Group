@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="s_anabtawi_hero" name="Anabtawi Hero">
+        <section class="s_anabtawi_hero anabtawi-hero py-5" data-name="Anabtawi Hero" data-snippet="s_anabtawi_hero">
+            <div class="container py-4 py-lg-5">
+                <div class="row align-items-center g-5">
+                    <div class="col-lg-7">
+                        <span class="anabtawi-eyebrow">Anabtawi Sweets · Since 1983</span>
+                        <h1 class="display-3 mt-3 mb-4">Authentic taste, made for memorable moments</h1>
+                        <p class="lead mb-4">
+                            Fine Arabic and international sweets prepared with craftsmanship, trusted ingredients, and four decades of experience.
+                        </p>
+                        <div class="d-flex flex-wrap gap-3">
+                            <a href="/our-catalog" class="btn btn-primary btn-lg">Explore our catalog</a>
+                            <a href="/branches" class="btn btn-outline-secondary btn-lg">Find a branch</a>
+                        </div>
+                    </div>
+                    <div class="col-lg-5 text-center">
+                        <div class="anabtawi-hero-visual">
+                            <img src="/anabtawi_sweets_website/static/src/img/content/category-kunafeh.png" alt="Anabtawi kunafeh and warbat" class="img-fluid" loading="eager"/>
+                            <img src="/anabtawi_sweets_website/static/src/img/content/logo.png" alt="Anabtawi Sweets" class="anabtawi-hero-logo"/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template id="s_anabtawi_categories" name="Anabtawi Product Categories">
+        <section class="s_anabtawi_categories anabtawi-section py-5" data-name="Anabtawi Product Categories" data-snippet="s_anabtawi_categories">
+            <div class="container py-4">
+                <div class="text-center mb-5">
+                    <span class="anabtawi-eyebrow">Our specialties</span>
+                    <h2 class="display-5 mt-2">A world of Anabtawi flavors</h2>
+                </div>
+                <div class="row g-4">
+                    <t t-foreach="[
+                        ('category-kunafeh.png', 'Kunafeh and Warbat'),
+                        ('category-assorted.png', 'Assorted Sweets'),
+                        ('category-cakes.png', 'Cakes and Western Sweets'),
+                        ('category-mediterranean.png', 'Mediterranean Sweets'),
+                        ('category-chocolate.png', 'Chocolates and Gifts'),
+                        ('category-coffee.png', 'Coffee'),
+                        ('category-honey.png', 'Tryaq Honey'),
+                        ('category-maamoul.png', 'Maamoul and Cookies')
+                    ]" t-as="category">
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="/our-catalog" class="anabtawi-category-card d-block h-100 text-decoration-none">
+                                <img t-att-src="'/anabtawi_sweets_website/static/src/img/content/%s' % category[0]" t-att-alt="category[1]" class="img-fluid" loading="lazy"/>
+                                <h3 class="h6 mb-0 p-3 text-center" t-out="category[1]"/>
+                            </a>
+                        </div>
+                    </t>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <template id="snippets" inherit_id="website.snippets" name="Anabtawi Sweets - Snippets">
+        <xpath expr="//snippets[@id='snippet_groups']/*[1]" position="before">
+            <t snippet-group="anabtawi" t-snippet="website.s_snippet_group" string="Anabtawi Sweets" t-thumbnail="/anabtawi_sweets_website/static/src/img/content/logo.png"/>
+        </xpath>
+        <xpath expr="//snippets[@id='snippet_structure']/*[1]" position="before">
+            <t t-snippet="anabtawi_sweets_website.s_anabtawi_hero" string="Anabtawi Hero" group="anabtawi" t-thumbnail="/anabtawi_sweets_website/static/src/img/content/category-kunafeh.png">
+                <keywords>Hero Anabtawi sweets intro banner</keywords>
+            </t>
+            <t t-snippet="anabtawi_sweets_website.s_anabtawi_categories" string="Anabtawi Categories" group="anabtawi" t-thumbnail="/anabtawi_sweets_website/static/src/img/content/category-assorted.png">
+                <keywords>Products sweets categories catalog</keywords>
+            </t>
+        </xpath>
+    </template>
+</odoo>
