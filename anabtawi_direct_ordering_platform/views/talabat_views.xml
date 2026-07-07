@@ -1,0 +1,155 @@
+<odoo>
+    <record id="view_anabtawi_talabat_config_tree" model="ir.ui.view">
+        <field name="name">anabtawi.talabat.config.tree</field>
+        <field name="model">anabtawi.talabat.config</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="environment"/>
+                <field name="api_base_url"/>
+                <field name="chain_id"/>
+                <field name="last_connection_status"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_anabtawi_talabat_config_form" model="ir.ui.view">
+        <field name="name">anabtawi.talabat.config.form</field>
+        <field name="model">anabtawi.talabat.config</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_test_connection" type="object" string="Test Connection" class="btn-primary"/>
+                    <button name="action_pull_orders" type="object" string="Pull Orders"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="active"/>
+                            <field name="environment"/>
+                            <field name="company_id"/>
+                            <field name="api_base_url"/>
+                            <field name="auth_url"/>
+                            <field name="chain_id"/>
+                        </group>
+                        <group>
+                            <field name="client_id" password="True"/>
+                            <field name="client_secret" password="True"/>
+                            <field name="webhook_secret" password="True"/>
+                            <field name="default_branch_id"/>
+                            <field name="default_payment_method"/>
+                            <field name="auto_accept_orders"/>
+                            <field name="create_sale_order_on_import"/>
+                        </group>
+                    </group>
+                    <group string="Connection Status">
+                        <field name="last_connection_status" readonly="1"/>
+                        <field name="last_connection_message" readonly="1"/>
+                        <field name="token_expiry" readonly="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Notes">
+                            <p>Webhook URL: /anabtawi/talabat/webhook/&lt;config_id&gt;?secret=&lt;webhook_secret&gt;</p>
+                            <p>This connector is install-safe before live Talabat credentials are issued. Add the official endpoint paths from Talabat when credentials are activated.</p>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_anabtawi_talabat_config" model="ir.actions.act_window">
+        <field name="name">Talabat Configuration</field>
+        <field name="res_model">anabtawi.talabat.config</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_anabtawi_talabat_branch_map_tree" model="ir.ui.view">
+        <field name="name">anabtawi.talabat.branch.map.tree</field>
+        <field name="model">anabtawi.talabat.branch.map</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="config_id"/>
+                <field name="talabat_vendor_id"/>
+                <field name="talabat_vendor_name"/>
+                <field name="branch_id"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_anabtawi_talabat_branch_map" model="ir.actions.act_window">
+        <field name="name">Talabat Branch Mapping</field>
+        <field name="res_model">anabtawi.talabat.branch.map</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_anabtawi_talabat_product_map_tree" model="ir.ui.view">
+        <field name="name">anabtawi.talabat.product.map.tree</field>
+        <field name="model">anabtawi.talabat.product.map</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="config_id"/>
+                <field name="talabat_item_id"/>
+                <field name="talabat_sku"/>
+                <field name="talabat_item_name"/>
+                <field name="product_id"/>
+                <field name="sync_availability"/>
+                <field name="active"/>
+                <button name="action_push_availability" type="object" string="Push Availability"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_anabtawi_talabat_product_map" model="ir.actions.act_window">
+        <field name="name">Talabat Product Mapping</field>
+        <field name="res_model">anabtawi.talabat.product.map</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_anabtawi_talabat_api_log_tree" model="ir.ui.view">
+        <field name="name">anabtawi.talabat.api.log.tree</field>
+        <field name="model">anabtawi.talabat.api.log</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0">
+                <field name="create_date"/>
+                <field name="config_id"/>
+                <field name="method"/>
+                <field name="endpoint"/>
+                <field name="status_code"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_anabtawi_talabat_api_log_form" model="ir.ui.view">
+        <field name="name">anabtawi.talabat.api.log.form</field>
+        <field name="model">anabtawi.talabat.api.log</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0">
+                <sheet>
+                    <group>
+                        <field name="config_id"/>
+                        <field name="method"/>
+                        <field name="endpoint"/>
+                        <field name="status_code"/>
+                        <field name="state"/>
+                    </group>
+                    <group>
+                        <field name="request_payload" widget="text"/>
+                        <field name="response_payload" widget="text"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_anabtawi_talabat_api_log" model="ir.actions.act_window">
+        <field name="name">Talabat API Logs</field>
+        <field name="res_model">anabtawi.talabat.api.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
