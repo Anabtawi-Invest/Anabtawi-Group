@@ -152,6 +152,11 @@ msgstr "الكمية"
 
 #. module: internal_transfer_excel_report
 #: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Unit of Measure"
+msgstr "وحدة القياس"
+
+#. module: internal_transfer_excel_report
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
 msgid "No data for selected filters."
 msgstr "لا توجد بيانات للفلاتر المحددة."
 
