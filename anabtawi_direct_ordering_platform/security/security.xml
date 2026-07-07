@@ -1,0 +1,11 @@
+<odoo>
+    <record id="group_ordering_user" model="res.groups">
+        <field name="name">Direct Ordering User</field>
+        <field name="category_id" ref="base.module_category_sales_sales"/>
+    </record>
+    <record id="group_ordering_manager" model="res.groups">
+        <field name="name">Direct Ordering Manager</field>
+        <field name="category_id" ref="base.module_category_sales_sales"/>
+        <field name="implied_ids" eval="[(4, ref('group_ordering_user'))]"/>
+    </record>
+</odoo>

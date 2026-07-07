@@ -1,0 +1,16 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ordering_branch_user,ordering.branch.user,model_anabtawi_ordering_branch,group_ordering_user,1,0,0,0
+access_ordering_branch_manager,ordering.branch.manager,model_anabtawi_ordering_branch,group_ordering_manager,1,1,1,1
+access_delivery_zone_user,delivery.zone.user,model_anabtawi_delivery_zone,group_ordering_user,1,0,0,0
+access_delivery_zone_manager,delivery.zone.manager,model_anabtawi_delivery_zone,group_ordering_manager,1,1,1,1
+access_direct_order_user,direct.order.user,model_anabtawi_direct_order,group_ordering_user,1,1,1,0
+access_direct_order_manager,direct.order.manager,model_anabtawi_direct_order,group_ordering_manager,1,1,1,1
+access_direct_order_line_user,direct.order.line.user,model_anabtawi_direct_order_line,group_ordering_user,1,1,1,0
+access_direct_order_line_manager,direct.order.line.manager,model_anabtawi_direct_order_line,group_ordering_manager,1,1,1,1
+access_talabat_config_manager,talabat.config.manager,model_anabtawi_talabat_config,group_ordering_manager,1,1,1,1
+access_talabat_branch_map_manager,talabat.branch.map.manager,model_anabtawi_talabat_branch_map,group_ordering_manager,1,1,1,1
+access_talabat_product_map_manager,talabat.product.map.manager,model_anabtawi_talabat_product_map,group_ordering_manager,1,1,1,1
+access_talabat_api_log_manager,talabat.api.log.manager,model_anabtawi_talabat_api_log,group_ordering_manager,1,0,0,0
+
+access_order_notification_user,order.notification.user,model_anabtawi_order_notification,group_ordering_user,1,1,1,0
+access_order_notification_manager,order.notification.manager,model_anabtawi_order_notification,group_ordering_manager,1,1,1,1
