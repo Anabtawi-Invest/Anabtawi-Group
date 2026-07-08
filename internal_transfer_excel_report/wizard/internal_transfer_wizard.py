@@ -155,7 +155,7 @@ class InternalTransferReportWizard(models.TransientModel):
         self.ensure_one()
 
         picking_domain = self._get_base_picking_domain()
-        picking_domain.append(('state', '!=', 'cancel'))
+        picking_domain.append(('state', 'not in', ('done', 'cancel')))
         picking_ids = self.env['stock.picking'].search(picking_domain).ids
         if not picking_ids:
             return []
@@ -163,7 +163,8 @@ class InternalTransferReportWizard(models.TransientModel):
         move_domain = [
             ('picking_id.picking_type_id', '=', self.picking_type_id.id),
             ('picking_id', 'in', picking_ids),
-            ('state', '!=', 'cancel'),
+            ('picking_id.state', 'not in', ('done', 'cancel')),
+            ('state', 'not in', ('done', 'cancel')),
             ('move_dest_ids', '=', False),
         ]
         move_domain = self._append_factory_plan_category_domain(move_domain)
@@ -200,6 +201,7 @@ class InternalTransferReportWizard(models.TransientModel):
             ('picking_id.picking_type_id', '=', self.picking_type_id.id),
             ('picking_id', 'in', picking_ids),
             ('picking_id.state', 'not in', ('done', 'cancel')),
+            ('state', 'not in', ('done', 'cancel')),
             ('move_dest_ids', '=', False),
         ]
         move_domain = self._append_factory_plan_category_domain(move_domain)
