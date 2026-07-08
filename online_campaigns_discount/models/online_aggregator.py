@@ -10,7 +10,11 @@ class OnlineCampaignAggregator(models.Model):
 
     name = fields.Char(required=True, index=True)
     active = fields.Boolean(default=True)
-    partner_id = fields.Many2one("res.partner", string="Related Contact", check_company=True)
+    partner_id = fields.Many2one(
+        "res.partner",
+        string="Related Contact",
+        check_company=True,
+    )
 
     default_commission_percent = fields.Float(
         string="Default Commission %",
@@ -46,25 +50,22 @@ class OnlineCampaignAggregator(models.Model):
     receivable_account_id = fields.Many2one(
         "account.account",
         string="Aggregator Receivable Account",
-        domain="[('account_type', '=', 'asset_receivable'), ('company_ids', '=', company_id)]",
         check_company=True,
-        help="Used to reconcile customer payments, campaign contributions, commission deductions, and settlement amounts from this aggregator.",
+        help="Account used to reconcile customer payments, campaign contributions and settlements.",
     )
 
     discount_expense_account_id = fields.Many2one(
         "account.account",
         string="Company Discount Expense Account",
-        domain="[('account_type', 'in', ('expense', 'expense_direct_cost')), ('company_ids', '=', company_id)]",
         check_company=True,
-        help="Used to record the company-funded share of online campaign discounts.",
+        help="Account used to record the company-funded share of online campaign discounts.",
     )
 
     commission_expense_account_id = fields.Many2one(
         "account.account",
         string="Commission Expense Account",
-        domain="[('account_type', 'in', ('expense', 'expense_direct_cost')), ('company_ids', '=', company_id)]",
         check_company=True,
-        help="Used to record the aggregator commission expense.",
+        help="Account used to record aggregator commissions.",
     )
 
     color = fields.Integer()
@@ -81,15 +82,12 @@ class OnlineCampaignAggregator(models.Model):
             if not 0 <= aggregator.default_commission_percent <= 100:
                 raise ValidationError(_("Default commission must be between 0 and 100%."))
 
-    @api.constrains("receivable_account_id")
-    def _check_receivable(self):
-        for aggregator in self:
-            if aggregator.receivable_account_id and not aggregator.receivable_account_id.reconcile:
-                raise ValidationError(_("The aggregator receivable account must allow reconciliation."))
-
     @api.model
     def _load_pos_data_domain(self, data, config):
-        return [("active", "=", True), ("company_id", "=", config.company_id.id)]
+        return [
+            ("active", "=", True),
+            ("company_id", "=", config.company_id.id),
+        ]
 
     @api.model
     def _load_pos_data_fields(self, config):
