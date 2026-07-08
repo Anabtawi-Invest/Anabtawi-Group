@@ -5,7 +5,7 @@ class StockMoveLine(models.Model):
     _inherit = "stock.move.line"
 
     demand_qty = fields.Float(
-        string="الكية المطلوبة من المصنع",
+        string="show the demand qty",
         digits="Product Unit",
         copy=False,
         help="Planned quantity to move for this operation line.",
