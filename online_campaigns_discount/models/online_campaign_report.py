@@ -108,7 +108,7 @@ class OnlineCampaignPerformanceReport(models.Model):
                            WHERE campaign_line.order_id = po.id
                              AND campaign_line.online_campaign_id IS NOT NULL
                       )
-                )                ),
+                ),
                 all_rows AS (
                     SELECT * FROM campaign_rows
                     UNION ALL
