@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import logging
-import math
 from datetime import timedelta
 
 from odoo import _, fields, models
@@ -90,58 +89,47 @@ class HrEmployee(models.Model):
         except (TypeError, ValueError):
             return None
 
-    @staticmethod
-    def _haversine_distance_m(lat1, lon1, lat2, lon2):
-        # Distance between two points on earth in meters.
-        radius_earth_m = 6371000.0
-        phi1 = math.radians(lat1)
-        phi2 = math.radians(lat2)
-        delta_phi = math.radians(lat2 - lat1)
-        delta_lambda = math.radians(lon2 - lon1)
-        a = math.sin(delta_phi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
-        c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
-        return radius_earth_m * c
-
-    def _get_portal_geofence_work_location(self):
+    def _get_portal_geofence_company(self):
         self.ensure_one()
-        work_location = self.work_location_id
-        if not work_location or self.allow_remote_attendance:
-            return self.env["hr.work.location"]
-        return work_location if work_location.attendance_geo_enforce else self.env["hr.work.location"]
+        company = self.company_id
+        if not company or self.allow_remote_attendance or not company.attendance_geo_enforce:
+            return self.env['res.company']
+        return company
 
     def _is_portal_geo_tracking_required(self):
         self.ensure_one()
-        return bool(self._get_portal_geofence_work_location())
+        company = self._get_portal_geofence_company()
+        return bool(company and company._get_valid_attendance_geofence_locations())
 
     def _check_portal_geo_restriction(self, geo_information=None):
         self.ensure_one()
         # Restrict only check-in; check-out remains unchanged.
-        work_location = self._get_portal_geofence_work_location()
-        if work_location:
-            location_lat = self._safe_float(work_location.attendance_geo_latitude)
-            location_lon = self._safe_float(work_location.attendance_geo_longitude)
-            radius_m = self._safe_float(work_location.attendance_geo_radius_m) or 0.0
-            if location_lat is None or location_lon is None:
-                raise UserError(_(
-                    "تم تفعيل نطاق موقع الدوام، لكن إحداثيات موقع الدوام (خط العرض/خط الطول) غير مضبوطة."
-                ))
+        company = self._get_portal_geofence_company()
+        if not company:
+            return
 
-            payload = geo_information or {}
-            employee_lat = self._safe_float(payload.get('latitude'))
-            employee_lon = self._safe_float(payload.get('longitude'))
-            if employee_lat is None or employee_lon is None:
-                raise UserError(_(
-                    "تعذر التحقق من موقعك. يرجى تفعيل إذن الموقع ثم المحاولة مرة أخرى."
-                ))
+        locations = company._get_valid_attendance_geofence_locations()
+        if not locations:
+            raise UserError(_(
+                "تم تفعيل نطاق موقع الشركة، لكن لا توجد مواقع شركة مضبوطة بإحداثيات ونطاق صالح."
+            ))
 
-            distance_m = self._haversine_distance_m(
-                employee_lat, employee_lon, location_lat, location_lon
-            )
-            if distance_m > radius_m:
-                raise UserError(_(
-                    "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لموقع الدوام. "
-                    "المسافة الحالية %.0f متر، والنطاق المسموح %.0f متر."
-                ) % (distance_m, radius_m))
+        payload = geo_information or {}
+        employee_lat = self._safe_float(payload.get('latitude'))
+        employee_lon = self._safe_float(payload.get('longitude'))
+        if employee_lat is None or employee_lon is None:
+            raise UserError(_(
+                "تعذر التحقق من موقعك. يرجى تفعيل إذن الموقع ثم المحاولة مرة أخرى."
+            ))
+
+        is_within, distance_m, radius_m = company._is_within_attendance_geofence(
+            employee_lat, employee_lon
+        )
+        if not is_within:
+            raise UserError(_(
+                "تم رفض تسجيل الحضور: أنت خارج جميع مواقع الشركة المسموحة. "
+                "أقرب موقع على بعد %.0f متر، والنطاق المسموح %.0f متر."
+            ) % (distance_m, radius_m))
 
     def _get_available_overtime_authorization_request(self):
         self.ensure_one()

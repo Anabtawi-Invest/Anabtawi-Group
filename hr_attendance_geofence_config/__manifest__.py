@@ -7,9 +7,10 @@ Provides company geofence fields and attendance settings UI.
     """,
     'category': 'Human Resources/Attendances',
     'author':"Anabtawi",
-    'version': '1.1',
+    'version': '1.2',
     'depends': ['base', 'hr_attendance'],
     'data': [
+        'security/ir.model.access.csv',
         'views/hr_attendance_geofence_views.xml',
     ],
     'license': "Other proprietary",

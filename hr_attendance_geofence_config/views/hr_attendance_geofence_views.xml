@@ -9,20 +9,18 @@
             <xpath expr="//setting[field[@name='attendance_device_tracking']]" position="after">
                 <setting string="Restrict Attendance by Company Location"
                     company_dependent="1"
-                    help="Allow check-in only when employees are inside the configured company radius.">
+                    help="Allow check-in only when employees are inside at least one configured company location.">
                     <field name="attendance_geo_enforce"/>
                     <div class="mt-2" invisible="not attendance_geo_enforce">
-                        <div class="o_row mb-2">
-                            <span class="me-2">Company Coordinates</span>
-                            <field name="attendance_geo_latitude" class="oe_inline"/>
-                            <span class="mx-1">,</span>
-                            <field name="attendance_geo_longitude" class="oe_inline"/>
-                        </div>
-                        <div class="o_row">
-                            <span class="me-2">Allowed Radius</span>
-                            <field name="attendance_geo_radius_m" class="oe_inline" style="width: 8rem;"/>
-                            <span class="ms-2">meters</span>
-                        </div>
+                        <field name="attendance_geo_location_ids" nolabel="1">
+                            <list editable="bottom">
+                                <field name="sequence" widget="handle"/>
+                                <field name="name"/>
+                                <field name="latitude"/>
+                                <field name="longitude"/>
+                                <field name="radius_m"/>
+                            </list>
+                        </field>
                     </div>
                 </setting>
             </xpath>
@@ -38,9 +36,15 @@
             <field name="parent_id" position="after">
                 <group string="Attendance Geofence" groups="hr_attendance.group_hr_attendance_manager">
                     <field name="attendance_geo_enforce"/>
-                    <field name="attendance_geo_latitude" invisible="not attendance_geo_enforce"/>
-                    <field name="attendance_geo_longitude" invisible="not attendance_geo_enforce"/>
-                    <field name="attendance_geo_radius_m" invisible="not attendance_geo_enforce"/>
+                    <field name="attendance_geo_location_ids" invisible="not attendance_geo_enforce" nolabel="1" colspan="2">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="name"/>
+                            <field name="latitude"/>
+                            <field name="longitude"/>
+                            <field name="radius_m"/>
+                        </list>
+                    </field>
                 </group>
             </field>
         </field>
