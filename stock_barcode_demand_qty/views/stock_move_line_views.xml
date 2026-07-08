@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="stock_move_line_product_selector" model="ir.ui.view">
+        <field name="name">stock.product.selector.demand.qty</field>
+        <field name="model">stock.move.line</field>
+        <field name="inherit_id" ref="stock_barcode.stock_move_line_product_selector"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='quantity']" position="before">
+                <div name="demand_quantity" class="row my-2">
+                    <div class="col">
+                        <div class="text-black-50 mb-1 fs-5">
+                            <label for="demand_qty" string="Demand Quantity" class="p-0"/>
+                        </div>
+                        <field name="demand_qty" class="text-end"
+                            options="{'type': 'number'}" placeholder="Demand Quantity"/>
+                    </div>
+                </div>
+            </xpath>
+            <xpath expr="//div[@name='quantity']/div[@class='col']/field[@name='qty_done']" position="before">
+                <div class="text-black-50 mb-1 fs-5">
+                    <label for="qty_done" string="Quantity Done" class="p-0"/>
+                </div>
+            </xpath>
+            <xpath expr="//widget[@name='digipad']" position="attributes">
+                <attribute name="fulfilled_at">demand_qty</attribute>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
