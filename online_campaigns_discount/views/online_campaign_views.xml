@@ -41,7 +41,6 @@
                             <field name="receivable_account_id" options="{'no_create': True}"/>
                             <field name="discount_expense_account_id" options="{'no_create': True}"/>
                             <field name="commission_expense_account_id" options="{'no_create': True}"/>
-                            <field name="discount_clearing_account_id" options="{'no_create': True}"/>
                         </group>
                     </group>
                     <group string="Internal Notes">
@@ -202,6 +201,7 @@
         <field name="view_mode">list,calendar,form</field>
         <field name="search_view_id" ref="view_online_discount_campaign_search"/>
     </record>
+
     <record id="action_online_discount_campaign_calendar" model="ir.actions.act_window">
         <field name="name">Campaign Calendar</field>
         <field name="res_model">online.discount.campaign</field>
