@@ -18,6 +18,11 @@ class PosSession(models.Model):
     def _create_non_reconciliable_move_lines(self, data):
         data = super()._create_non_reconciliable_move_lines(data)
         self.ensure_one()
+
+        pos_receivable_account = self.config_id.journal_id.default_account_id
+        if not pos_receivable_account:
+            raise UserError(_("Configure a default account on the POS journal before closing the session."))
+
         lines = self._get_closed_orders().filtered(lambda order: not order.account_move).lines.filtered(
             lambda line: line.online_campaign_id and (
                 not float_is_zero(line.online_discount_amount, precision_rounding=self.currency_id.rounding)
@@ -31,17 +36,12 @@ class PosSession(models.Model):
         aggregator_receivables_credit = defaultdict(float)
         company_expenses = defaultdict(float)
         commission_expenses = defaultdict(float)
-        clearing_credits = defaultdict(float)
+        receivable_reduction_credits = defaultdict(float)
 
         for line in lines:
             aggregator = line.online_aggregator_id
             direction = -1.0 if line.price_unit * line.qty < 0 else 1.0
 
-            if not aggregator.discount_clearing_account_id:
-                raise UserError(_(
-                    "Configure campaign discount clearing account on aggregator %s before closing the session.",
-                    aggregator.display_name,
-                ))
             if not aggregator.discount_expense_account_id:
                 raise UserError(_(
                     "Configure company discount expense account on aggregator %s before closing the session.",
@@ -49,16 +49,20 @@ class PosSession(models.Model):
                 ))
 
             has_aggregator_contribution = not float_is_zero(
-                line.aggregator_contribution_amount, precision_rounding=self.currency_id.rounding
+                line.aggregator_contribution_amount,
+                precision_rounding=self.currency_id.rounding,
             )
             has_commission = not float_is_zero(
-                line.aggregator_commission_amount, precision_rounding=self.currency_id.rounding
+                line.aggregator_commission_amount,
+                precision_rounding=self.currency_id.rounding,
             )
+
             if (has_aggregator_contribution or has_commission) and not aggregator.receivable_account_id:
                 raise UserError(_(
                     "Configure receivable account on aggregator %s before closing the session.",
                     aggregator.display_name,
                 ))
+
             if has_commission and not aggregator.commission_expense_account_id:
                 raise UserError(_(
                     "Configure commission expense account on aggregator %s before closing the session.",
@@ -69,14 +73,17 @@ class PosSession(models.Model):
                 aggregator_receivables_debit[aggregator.receivable_account_id] += (
                     direction * line.aggregator_contribution_amount
                 )
+
             if not float_is_zero(line.company_contribution_amount, precision_rounding=self.currency_id.rounding):
                 company_expenses[aggregator.discount_expense_account_id] += (
                     direction * line.company_contribution_amount
                 )
+
             if not float_is_zero(line.online_discount_amount, precision_rounding=self.currency_id.rounding):
-                clearing_credits[aggregator.discount_clearing_account_id] += (
+                receivable_reduction_credits[pos_receivable_account] += (
                     direction * line.online_discount_amount
                 )
+
             if has_commission:
                 commission_expenses[aggregator.commission_expense_account_id] += (
                     direction * line.aggregator_commission_amount
@@ -101,9 +108,10 @@ class PosSession(models.Model):
             for account, amount in commission_expenses.items()
             if not float_is_zero(amount, precision_rounding=self.currency_id.rounding)
         ]
+
         credit_specs = [
-            (account, amount, _("Online campaign discount clearing"), "product")
-            for account, amount in clearing_credits.items()
+            (account, amount, _("Online campaign discount receivable reduction"), "payment_term")
+            for account, amount in receivable_reduction_credits.items()
             if not float_is_zero(amount, precision_rounding=self.currency_id.rounding)
         ] + [
             (account, amount, _("Aggregator commission deduction"), "payment_term")
@@ -114,16 +122,22 @@ class PosSession(models.Model):
         for account, amount, label, display_type in debit_specs:
             converted = self._amount_converter(amount, date, True)
             values.append(self._debit_amounts({
-                "name": label, "account_id": account.id, "move_id": self.move_id.id,
+                "name": label,
+                "account_id": account.id,
+                "move_id": self.move_id.id,
                 "display_type": display_type,
             }, amount, converted))
+
         for account, amount, label, display_type in credit_specs:
             converted = self._amount_converter(amount, date, True)
             values.append(self._credit_amounts({
-                "name": label, "account_id": account.id, "move_id": self.move_id.id,
+                "name": label,
+                "account_id": account.id,
+                "move_id": self.move_id.id,
                 "display_type": display_type,
             }, amount, converted))
 
         if values:
             data["MoveLine"].create(values)
+
         return data
