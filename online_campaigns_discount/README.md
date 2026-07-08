@@ -1,4 +1,4 @@
-# Online Campaigns Discount — Odoo 19 Enterprise 
+# Online Campaigns Discount — Odoo 19 Enterprise
 
 Portable campaign engine for POS orders received through Talabat, Careem,
 MyThings, or any future aggregator. It provides calendar scheduling, dual
