@@ -1,8 +1,8 @@
 {
     "name": "Branch Product Whitelist for Internal Transfers-Ameen-Anabtawi",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "category": "Inventory",
-    "depends": ["stock", "product", "stock_picking_catalog"],
+    "depends": ["stock", "product", "stock_picking_catalog", "stock_barcode"],
     "author":"Anabtawi",
     "data": [
         "security/security.xml",
