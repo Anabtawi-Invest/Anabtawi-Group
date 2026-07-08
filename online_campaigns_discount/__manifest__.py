@@ -1,6 +1,6 @@
 {
     "name": "Online Campaigns Discount",
-    "version": "19.0.3.0.3",
+    "version": "19.0.4.0.3",
     "category": "Sales/Point of Sale",
     "summary": "Approved aggregator campaigns with POS, calendar, accounting, and reporting",
     "author": "Anabtawi Sweets",
