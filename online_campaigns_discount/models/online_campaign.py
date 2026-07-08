@@ -230,7 +230,7 @@ class OnlineDiscountCampaign(models.Model):
         missing_accounts = self.filtered(
             lambda campaign: (campaign.aggregator_contribution_percent > 0 and not campaign.aggregator_id.receivable_account_id)
             or not campaign.aggregator_id.discount_expense_account_id
-            or not campaign.aggregator_id.discount_clearing_account_id
+            or not campaign.aggregator_id.receivable_account_id
             or not campaign.aggregator_id.commission_expense_account_id
         )
         if missing_accounts:
