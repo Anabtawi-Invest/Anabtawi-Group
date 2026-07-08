@@ -5,14 +5,20 @@ class StockMoveLine(models.Model):
     _inherit = "stock.move.line"
 
     demand_qty = fields.Float(
-        string="Demand Quantity",
+        string="الكية المطلوبة من المصنع",
         digits="Product Unit",
         copy=False,
         help="Planned quantity to move for this operation line.",
     )
+    show_barcode_demand_qty = fields.Boolean(
+        related="picking_type_id.barcode_show_demand_qty",
+    )
 
     def _sync_demand_qty_to_move(self):
-        for line in self.filtered("move_id"):
+        lines = self.filtered(
+            lambda line: line.move_id and line.picking_type_id.barcode_show_demand_qty
+        )
+        for line in lines:
             line_uom = line.product_uom_id or line.move_id.product_uom
             line.move_id.product_uom_qty = line_uom._compute_quantity(
                 line.demand_qty,
@@ -41,4 +47,7 @@ class StockMoveLine(models.Model):
         return data
 
     def _get_fields_stock_barcode(self):
-        return super()._get_fields_stock_barcode() + ["demand_qty"]
+        return super()._get_fields_stock_barcode() + [
+            "demand_qty",
+            "show_barcode_demand_qty",
+        ]
