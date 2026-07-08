@@ -554,32 +554,62 @@ class ApprovalRequest(models.Model):
                     _("Each overtime line can only have one open approval request at a time.")
                 )
 
-    def _ensure_overtime_manager_approver(self):
+    def _get_overtime_manager_users(self, employee):
+        employee = employee.sudo()
+        if not employee.attendance_manager_id:
+            return []
+
+        managers = [(employee.attendance_manager_id, 1)]
+        if (
+            employee.second_manager_id
+            and employee.second_manager_id != employee.attendance_manager_id
+        ):
+            managers.append((employee.second_manager_id, 2))
+        return managers
+
+    def _apply_overtime_manager_approvers(self):
         for request in self.filtered(lambda req: req.is_overtime_category and req.overtime_employee_id):
-            manager_user = request.overtime_employee_id.attendance_manager_id
-            if not manager_user:
+            employee = request.overtime_employee_id
+            commands = []
+            for manager_user, sequence in request._get_overtime_manager_users(employee):
+                approver = request.approver_ids.filtered(
+                    lambda approver, user=manager_user: approver.user_id == user
+                )
+                if approver:
+                    commands.append(
+                        Command.update(
+                            approver.id,
+                            {"required": True, "sequence": sequence},
+                        )
+                    )
+                    continue
+                commands.append(
+                    Command.create(
+                        {
+                            "user_id": manager_user.id,
+                            "required": True,
+                            "sequence": sequence,
+                        }
+                    )
+                )
+            if commands:
+                request.update({"approver_ids": commands})
+
+    @api.depends("category_id", "request_owner_id", "overtime_employee_id")
+    def _compute_approver_ids(self):
+        super()._compute_approver_ids()
+        self._apply_overtime_manager_approvers()
+
+    def _ensure_overtime_manager_approver(self):
+        overtime_requests = self.filtered(
+            lambda req: req.is_overtime_category and req.overtime_employee_id
+        )
+        for request in overtime_requests:
+            if not request.overtime_employee_id.sudo().attendance_manager_id:
                 raise UserError(
                     _("The overtime employee must have an Attendance Manager before submitting this request.")
                 )
-
-            manager_approver = request.approver_ids.filtered(lambda approver: approver.user_id == manager_user)
-            if manager_approver:
-                manager_approver.write({"required": True})
-                continue
-
-            request.write(
-                {
-                    "approver_ids": [
-                        Command.create(
-                            {
-                                "user_id": manager_user.id,
-                                "required": True,
-                                "sequence": 1,
-                            }
-                        )
-                    ]
-                }
-            )
+        overtime_requests._apply_overtime_manager_approvers()
 
     def action_confirm(self):
         overtime_requests = self.filtered("is_overtime_category")

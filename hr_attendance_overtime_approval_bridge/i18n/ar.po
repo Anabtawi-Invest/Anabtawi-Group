@@ -212,3 +212,13 @@ msgstr "تم حفظ طلبك. أرسله عندما تكون جاهزاً."
 #: code:addons/hr_attendance_overtime_approval_bridge/controllers/portal_overtime.py:0
 msgid "Your request was sent to your attendance manager for approval."
 msgstr "أُرسل طلبك إلى مسؤول الحضور للاعتماد."
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model:ir.model.fields,field_description:hr_attendance_overtime_approval_bridge.field_hr_employee__second_manager_id
+msgid "Second Manager"
+msgstr "المدير الثاني"
+
+#. module: hr_attendance_overtime_approval_bridge
+#: model:ir.model.fields,help:hr_attendance_overtime_approval_bridge.field_hr_employee__second_manager_id
+msgid "If set, this user is added as the second approver on overtime approval requests for this employee."
+msgstr "إذا تم تعيينه، يُضاف هذا المستخدم كموافق ثانٍ في طلبات اعتماد العمل الإضافي لهذا الموظف."
