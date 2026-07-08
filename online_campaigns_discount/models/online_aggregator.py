@@ -11,52 +11,68 @@ class OnlineCampaignAggregator(models.Model):
     name = fields.Char(required=True, index=True)
     active = fields.Boolean(default=True)
     partner_id = fields.Many2one("res.partner", string="Related Contact", check_company=True)
+
     default_commission_percent = fields.Float(
-        string="Default Commission %", required=True, default=0.0, digits=(16, 4)
+        string="Default Commission %",
+        required=True,
+        default=0.0,
+        digits=(16, 4),
     )
+
     commission_base = fields.Selection(
-        [("before_tax", "Sales Amount Before Tax"), ("after_tax", "Sales Amount After Tax")],
+        [
+            ("before_tax", "Sales Amount Before Tax"),
+            ("after_tax", "Sales Amount After Tax"),
+        ],
         string="Commission Base",
         default="after_tax",
         required=True,
         help="Choose whether the aggregator commission is calculated before or after sales tax.",
     )
+
     company_id = fields.Many2one(
-        "res.company", required=True, default=lambda self: self.env.company, index=True
+        "res.company",
+        required=True,
+        default=lambda self: self.env.company,
+        index=True,
     )
-    currency_id = fields.Many2one(related="company_id.currency_id", store=True, readonly=True)
+
+    currency_id = fields.Many2one(
+        related="company_id.currency_id",
+        store=True,
+        readonly=True,
+    )
+
     receivable_account_id = fields.Many2one(
         "account.account",
         string="Aggregator Receivable Account",
         domain="[('account_type', '=', 'asset_receivable'), ('company_ids', '=', company_id)]",
         check_company=True,
-        help="Reconcile campaign contributions received from this aggregator here.",
+        help="Used to reconcile customer payments, campaign contributions, commission deductions, and settlement amounts from this aggregator.",
     )
+
     discount_expense_account_id = fields.Many2one(
         "account.account",
         string="Company Discount Expense Account",
         domain="[('account_type', 'in', ('expense', 'expense_direct_cost')), ('company_ids', '=', company_id)]",
         check_company=True,
+        help="Used to record the company-funded share of online campaign discounts.",
     )
+
     commission_expense_account_id = fields.Many2one(
         "account.account",
         string="Commission Expense Account",
         domain="[('account_type', 'in', ('expense', 'expense_direct_cost')), ('company_ids', '=', company_id)]",
         check_company=True,
-        help="Used for settlement/vendor-bill reconciliation; campaign orders store the estimated commission.",
+        help="Used to record the aggregator commission expense.",
     )
-    discount_clearing_account_id = fields.Many2one(
-        "account.account",
-        string="Campaign Discount Clearing Account",
-        domain="[('company_ids', '=', company_id)]",
-        check_company=True,
-        help="Credited with the tax-exclusive campaign discount split so sales and output tax are not duplicated.",
-    )
+
     color = fields.Integer()
     note = fields.Text()
 
     _unique_name_company = models.UniqueIndex(
-        "(name, company_id)", "An aggregator with this name already exists for the company."
+        "(name, company_id)",
+        "An aggregator with this name already exists for the company.",
     )
 
     @api.constrains("default_commission_percent")
@@ -77,5 +93,11 @@ class OnlineCampaignAggregator(models.Model):
 
     @api.model
     def _load_pos_data_fields(self, config):
-        return ["name", "default_commission_percent", "commission_base", "company_id", "color", "write_date"]
-
+        return [
+            "name",
+            "default_commission_percent",
+            "commission_base",
+            "company_id",
+            "color",
+            "write_date",
+        ]
