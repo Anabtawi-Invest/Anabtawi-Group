@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="stock_move_line_product_selector_branch" model="ir.ui.view">
+        <field name="name">stock.move.line.barcode.product.branch.whitelist</field>
+        <field name="model">stock.move.line</field>
+        <field name="inherit_id" ref="stock_barcode.stock_move_line_product_selector"/>
+        <field name="groups_id" eval="[(4, ref('branch_product_whitelist.group_branch_restricted_product_selection'))]"/>
+        <field name="arch" type="xml">
+            <field name="product_id" position="attributes">
+                <attribute name="domain">[
+                    ('type', '=', 'consu'),
+                    ('product_tmpl_id.branch_allowed', '=', True),
+                    '|', ('company_id', '=', False), ('company_id', 'parent_of', company_id)
+                ]</attribute>
+            </field>
+        </field>
+    </record>
+
+</odoo>
