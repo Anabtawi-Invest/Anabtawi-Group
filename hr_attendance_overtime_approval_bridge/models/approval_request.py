@@ -230,8 +230,13 @@ class ApprovalRequest(models.Model):
             if len(request.overtime_line_ids.employee_id) > 1:
                 raise ValidationError(_("All overtime lines in one request must belong to the same employee."))
 
-    @api.constrains("overtime_line_ids", "request_owner_id")
+    @api.constrains("overtime_line_ids", "request_owner_id", "overtime_employee_id")
     def _check_overtime_request_owner(self):
+        # Portal employees must submit overtime requests for themselves only.
+        # Internal/backend users may create requests on behalf of employees.
+        if not self.env.user.share:
+            return
+
         for request in self.filtered("overtime_line_ids"):
             employee = request.overtime_employee_id
             if not employee or not employee.user_id:
