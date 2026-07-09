@@ -1,4 +1,4 @@
-# Online Campaigns Discount — Odoo 19 Enterprise Stable
+# Online Campaigns Discount — Odoo 19 Enterprise Stable 
 
 Enterprise POS aggregator management for Anabtawi Group and reusable Odoo 19 deployments.
 The module manages aggregator campaigns, capped discounts, contribution splits,
