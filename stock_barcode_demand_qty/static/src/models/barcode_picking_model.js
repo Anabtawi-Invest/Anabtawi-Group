@@ -6,6 +6,9 @@ patch(BarcodePickingModel.prototype, {
         const smlData = super._getMoveLineData(...arguments);
         if (this.config.barcode_show_demand_qty && smlData.demand_qty) {
             smlData.reserved_uom_qty = smlData.demand_qty;
+            if (!smlData.picked) {
+                smlData.qty_done = 0;
+            }
         }
         return smlData;
     },
@@ -19,8 +22,9 @@ patch(BarcodePickingModel.prototype, {
 
     _getNewLineDefaultContext() {
         const context = super._getNewLineDefaultContext(...arguments);
-        if (this.config.barcode_show_demand_qty && this.selectedLine?.demand_qty) {
-            context.force_fullfil_quantity = this.selectedLine.demand_qty;
+        if (this.config.barcode_show_demand_qty) {
+            context.default_qty_done = 0;
+            delete context.force_fullfil_quantity;
         }
         return context;
     },
