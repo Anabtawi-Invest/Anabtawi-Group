@@ -147,6 +147,7 @@ class InternalTransferReportWizard(models.TransientModel):
         date_from_dt, date_to_dt = self._compute_dates()
         return [
             ('picking_type_id', '=', self.picking_type_id.id),
+            ('return_id', '=', False),
             ('create_date', '>=', date_from_dt),
             ('create_date', '<=', date_to_dt),
         ]
