@@ -26,23 +26,16 @@ class StockMoveLine(models.Model):
                 rounding_method="HALF-UP",
             )
 
-    def _sync_demand_to_qty_done(self):
-        for line in self.filtered(lambda l: l.show_barcode_demand_qty and l.demand_qty):
-            line.qty_done = line.demand_qty
-
     @api.model_create_multi
     def create(self, vals_list):
         lines = super().create(vals_list)
-        demand_lines = lines.filtered(lambda line: line.demand_qty)
-        demand_lines._sync_demand_qty_to_move()
-        demand_lines._sync_demand_to_qty_done()
+        lines.filtered(lambda line: line.demand_qty)._sync_demand_qty_to_move()
         return lines
 
     def write(self, vals):
         res = super().write(vals)
         if "demand_qty" in vals:
             self._sync_demand_qty_to_move()
-            self._sync_demand_to_qty_done()
         return res
 
     def read(self, fields=None, load="_classic_read"):
