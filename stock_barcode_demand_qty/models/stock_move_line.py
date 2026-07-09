@@ -5,7 +5,7 @@ class StockMoveLine(models.Model):
     _inherit = "stock.move.line"
 
     demand_qty = fields.Float(
-        string="show the demand qty",
+        string="الكمية المطلوبة من المصنع",
         digits="Product Unit",
         copy=False,
         help="Planned quantity to move for this operation line.",
@@ -26,8 +26,33 @@ class StockMoveLine(models.Model):
                 rounding_method="HALF-UP",
             )
 
+    def _prepare_demand_mode_vals(self, vals):
+        picking = (
+            self.env["stock.picking"].browse(vals["picking_id"])
+            if vals.get("picking_id")
+            else self.env["stock.picking"]
+        )
+        move = (
+            self.env["stock.move"].browse(vals["move_id"])
+            if vals.get("move_id")
+            else self.env["stock.move"]
+        )
+        picking_type = (
+            picking.picking_type_id
+            if picking
+            else move.picking_type_id
+            if move
+            else self.env["stock.picking.type"]
+        )
+        if picking_type.barcode_show_demand_qty and vals.get("demand_qty"):
+            vals.pop("qty_done", None)
+            vals["quantity"] = 0
+            vals["picked"] = False
+
     @api.model_create_multi
     def create(self, vals_list):
+        for vals in vals_list:
+            self._prepare_demand_mode_vals(vals)
         lines = super().create(vals_list)
         lines.filtered(lambda line: line.demand_qty)._sync_demand_qty_to_move()
         return lines
@@ -36,6 +61,16 @@ class StockMoveLine(models.Model):
         res = super().write(vals)
         if "demand_qty" in vals:
             self._sync_demand_qty_to_move()
+            stray_done = self.filtered(
+                lambda line: line.show_barcode_demand_qty
+                and line.demand_qty
+                and not line.picked
+                and line.quantity
+            )
+            if stray_done:
+                stray_done.with_context(preserve_state=True).write(
+                    {"quantity": 0, "picked": False}
+                )
         return res
 
     def read(self, fields=None, load="_classic_read"):

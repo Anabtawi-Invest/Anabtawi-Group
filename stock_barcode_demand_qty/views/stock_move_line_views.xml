@@ -19,17 +19,20 @@
                             options="{'type': 'number'}" placeholder="الكمية المطلوبة من المصنع"/>
                     </div>
                 </div>
+                <div name="demand_digipad" class="row" invisible="not show_barcode_demand_qty or (tracking == 'serial' and (not hide_lot_name or not hide_lot))">
+                    <widget name="digipad" field_to_edit="demand_qty"/>
+                </div>
+            </xpath>
+            <xpath expr="//div[@name='quantity']" position="attributes">
+                <attribute name="invisible">show_barcode_demand_qty</attribute>
             </xpath>
             <xpath expr="//div[@name='quantity']/div[@class='col']/field[@name='qty_done']" position="before">
                 <div class="text-black-50 mb-1 fs-5">
                     <label for="qty_done" string="Quantity Done" class="p-0"/>
                 </div>
             </xpath>
-            <xpath expr="//widget[@name='digipad']" position="replace">
-                <widget name="digipad" field_to_edit="qty_done" fulfilled_at="demand_qty"
-                    invisible="not show_barcode_demand_qty or (tracking == 'serial' and (not hide_lot_name or not hide_lot))"/>
-                <widget name="digipad" field_to_edit="qty_done" fulfilled_at="quantity"
-                    invisible="show_barcode_demand_qty or (tracking == 'serial' and (not hide_lot_name or not hide_lot))"/>
+            <xpath expr="//widget[@name='digipad']" position="attributes">
+                <attribute name="invisible">show_barcode_demand_qty or (tracking == 'serial' and (not hide_lot_name or not hide_lot))</attribute>
             </xpath>
             <xpath expr="//div[@name='quantity']/div[hasclass('col-3')]" position="attributes">
                 <attribute name="invisible">1</attribute>

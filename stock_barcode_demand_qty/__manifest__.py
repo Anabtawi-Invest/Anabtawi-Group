@@ -1,6 +1,6 @@
 {
     "name": "Stock Barcode Demand Quantity",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.2.2",
     "category": "Inventory/Inventory",
     "summary": "Add a demand quantity field to the barcode transfer product form",
     "author": "Anabtawi",
