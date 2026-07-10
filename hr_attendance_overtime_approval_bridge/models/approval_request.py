@@ -129,13 +129,13 @@ class ApprovalRequest(models.Model):
                 )
             if not request.overtime_date_from:
                 request.overtime_date_from = (
-                    (request.date_start and fields.Datetime.to_date(request.date_start))
-                    or (request.date and fields.Datetime.to_date(request.date))
+                    (request.date_start and fields.Date.to_date(request.date_start))
+                    or (request.date and fields.Date.to_date(request.date))
                 )
             if not request.overtime_date_to:
                 request.overtime_date_to = (
-                    (request.date_end and fields.Datetime.to_date(request.date_end))
-                    or (request.date and fields.Datetime.to_date(request.date))
+                    (request.date_end and fields.Date.to_date(request.date_end))
+                    or (request.date and fields.Date.to_date(request.date))
                 )
 
     @api.depends("overtime_employee_id", "overtime_date_from", "overtime_date_to", "is_overtime_category")
@@ -417,7 +417,7 @@ class ApprovalRequest(models.Model):
                 continue
 
             approved_hours = min(attendance.worked_hours or 0.0, request.quantity or 0.0)
-            attendance_date = fields.Datetime.to_date(attendance.check_in) or fields.Date.context_today(request)
+            attendance_date = fields.Date.to_date(attendance.check_in) or fields.Date.context_today(request)
             pending_week_start, pending_week_end = request._get_week_date_bounds(attendance_date)
             overtime_lines = attendance.linked_overtime_ids.sorted(
                 lambda line: (line.time_start or attendance.check_in, line.id)
