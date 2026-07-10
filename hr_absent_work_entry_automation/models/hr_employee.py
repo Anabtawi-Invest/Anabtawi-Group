@@ -53,10 +53,12 @@ class HrEmployee(models.Model):
         expected_hours = self._get_expected_hours_on_day(target_date)
         if expected_hours <= 0:
             _logger.info(
-                "Absent automation: skip employee=%s(%s) date=%s reason=no expected work hours",
+                "Absent automation: skip employee=%s(%s) date=%s reason=no expected work hours "
+                "work_entry_source=%s",
                 self.name,
                 self.id,
                 target_date,
+                self._get_work_entry_source_on_day(target_date) or "none",
             )
             return
         if self._has_checkin_on_day(target_date):
@@ -159,10 +161,24 @@ class HrEmployee(models.Model):
         self.ensure_one()
         return self._get_expected_hours_on_day(target_date) > 0
 
-    def _get_expected_hours_on_day(self, target_date):
+    def _get_work_entry_source_on_day(self, target_date):
         self.ensure_one()
-        # Planning-only absence logic: ignore calendar working schedules.
-        return self._get_planning_hours_on_day(target_date)
+        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
+        if not version:
+            return False
+        return (version.work_entry_source or "").strip()
+
+    def _get_expected_hours_on_day(self, target_date):
+        """Return expected work hours based on the contract work entry source.
+
+        - planning: use planning slots for that day
+        - attendance / calendar / other: use the working schedule (resource calendar)
+        """
+        self.ensure_one()
+        source = self._get_work_entry_source_on_day(target_date)
+        if source == "planning":
+            return self._get_planning_hours_on_day(target_date)
+        return self._get_calendar_hours_on_day(target_date)
 
     def _get_day_utc_bounds(self, target_date):
         self.ensure_one()
