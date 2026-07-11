@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_anabtawi_api_token_system,anabtawi.api.token.system,model_anabtawi_api_token,base.group_system,1,1,1,1
