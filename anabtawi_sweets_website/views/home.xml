@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="homepage" inherit_id="website.homepage" name="Anabtawi Sweets - Homepage" active="True" priority="50">
+    <template id="homepage" inherit_id="website.homepage" name="Anabtawi Sweets - Homepage" active="True" priority="50" website_id="1">
         <xpath expr="//div[@id='wrap']" position="replace">
             <div id="wrap" class="oe_structure anabtawi-theme">
                 <t t-call="anabtawi_sweets_website.s_anabtawi_hero"/>
