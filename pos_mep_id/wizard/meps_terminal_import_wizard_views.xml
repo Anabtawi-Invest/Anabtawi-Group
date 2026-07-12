@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_meps_terminal_import_wizard_form" model="ir.ui.view">
+        <field name="name">meps.terminal.import.wizard.form</field>
+        <field name="model">meps.terminal.import.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <p>
+                    Upload the MEPS/ApexECR terminal list provided by the acquirer for this
+                    customer (columns: TID, MID, Merchant Name, Branch, Secure Key). Existing
+                    terminals are matched by Tid and updated in place; new rows create a new
+                    payment method.
+                </p>
+                <group>
+                    <field name="file" filename="filename"/>
+                    <field name="filename" invisible="1"/>
+                    <field name="auto_link_pos_config"/>
+                </group>
+                <field name="result_message" invisible="not result_message" readonly="1"/>
+                <footer>
+                    <button name="action_import" type="object" string="Import" class="btn-primary"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_meps_terminal_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import MEPS Terminals</field>
+        <field name="res_model">meps.terminal.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+        id="menu_meps_terminal_import"
+        name="Import MEPS Terminals"
+        parent="point_of_sale.menu_point_of_sale_configuration"
+        action="action_meps_terminal_import_wizard"
+        sequence="49"
+        groups="point_of_sale.group_pos_manager"
+    />
+</odoo>

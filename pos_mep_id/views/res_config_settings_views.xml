@@ -1,22 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="res_config_settings_view_form_inherit_pos_mep_id" model="ir.ui.view">
-        <field name="name">res.config.settings.view.form.inherit.pos.mep.id</field>
+    <record id="res_config_settings_view_form_meps" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.meps</field>
         <field name="model">res.config.settings</field>
         <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='pos_payment_method_ids']/ancestor::setting[1]" position="after">
                 <setting
-                    id="pos_mep_payment_methods_setting"
-                    string="Visa Payment Methods"
-                    help="Payment methods that require entering a Visa ID in POS."
+                    id="meps_connection_setting"
+                    string="MEPS Connection"
+                    help="Gateway URL and timeout for the MEPS/ApexECR terminal integration. Per-branch Tid/Mid/SecureKey are set on each Payment Method (or via Import MEPS Terminals)."
                 >
-                    <field
-                        name="pos_mep_payment_method_ids"
-                        widget="many2many_tags"
-                        options="{'no_create': True}"
-                        domain="[('id', 'in', pos_payment_method_ids)]"
-                    />
+                    <field name="meps_endpoint_url" placeholder="https://gprs.mepspay.com/v100/ecrcomInterface.svc"/>
+                    <field name="meps_timeout" placeholder="90"/>
                 </setting>
             </xpath>
         </field>

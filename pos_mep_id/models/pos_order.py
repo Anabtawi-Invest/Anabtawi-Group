@@ -5,7 +5,10 @@ from odoo import api, fields, models
 class PosOrder(models.Model):
     _inherit = "pos.order"
 
-    mep_id = fields.Char(string="Visa ID")
+    mep_id = fields.Char(
+        string="MEPS RRN",
+        help="Retrieval Reference Number returned by MEPS for this order's card payment(s).",
+    )
 
     @api.model
     def _load_pos_data_fields(self, config):
