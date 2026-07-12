@@ -1,0 +1,71 @@
+<section class="oe_container">
+    <div class="row">
+        <div class="col-md-12 text-center">
+            <h2 class="oe_slogan">MEPS / ApexECR Payment Terminal for Point of Sale</h2>
+            <h4 class="oe_slogan text-muted">
+                Real card payments from Odoo POS - no manual entry, no re-keying amounts.
+            </h4>
+        </div>
+    </div>
+</section>
+
+<section class="oe_container oe_dark">
+    <div class="row">
+        <div class="col-md-4">
+            <h3>Automatic Sale</h3>
+            <p>
+                Selecting a MEPS payment method in POS sends the amount straight to the
+                physical EFTPOS terminal over the official SOAP web service and waits for
+                the customer to tap/insert/swipe. No typing amounts twice.
+            </p>
+        </div>
+        <div class="col-md-4">
+            <h3>Void &amp; Settlement</h3>
+            <p>
+                Void a completed sale and run end-of-day terminal settlement directly from
+                the Payment Method form in the backend.
+            </p>
+        </div>
+        <div class="col-md-4">
+            <h3>Multi-branch, Multi-terminal</h3>
+            <p>
+                Every branch/terminal has its own Terminal ID, Merchant ID and Secure Key,
+                configured per Payment Method - one company, any number of terminals.
+            </p>
+        </div>
+    </div>
+</section>
+
+<section class="oe_container">
+    <div class="row">
+        <div class="col-md-6">
+            <h3>Set up in minutes</h3>
+            <ol>
+                <li>Install the module.</li>
+                <li>
+                    Settings &gt; Point of Sale &gt; <strong>MEPS Connection</strong> - confirm
+                    the gateway URL and timeout (production values pre-filled).
+                </li>
+                <li>
+                    Point of Sale &gt; Configuration &gt; <strong>Import MEPS Terminals</strong> -
+                    upload the Tid/Mid/SecureKey Excel sheet your acquirer gave you, or fill
+                    one Payment Method by hand.
+                </li>
+                <li>Assign the resulting "MEPS - ..." payment method(s) to your POS config(s).</li>
+                <li>Open a POS session and take a card payment.</li>
+            </ol>
+        </div>
+        <div class="col-md-6">
+            <h3>Nothing hardcoded</h3>
+            <p>
+                This module ships with zero customer-specific data. Every terminal, key and
+                endpoint is configured after install through the UI or a one-click Excel
+                import, so the same module works for any MEPS merchant.
+            </p>
+            <p class="text-muted">
+                Requires a MEPS/ApexECR merchant account and Terminal IDs activated for
+                WEB-ECR by your acquirer.
+            </p>
+        </div>
+    </div>
+</section>
