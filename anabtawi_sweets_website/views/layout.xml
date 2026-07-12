@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <template id="layout_top_bar" inherit_id="website.layout" name="Anabtawi Sweets - Top Bar">
+    <template id="layout_top_bar" inherit_id="website.layout" name="Anabtawi Sweets - Top Bar" website_id="1">
         <xpath expr="//header" position="before">
             <div class="anabtawi-topbar d-none d-lg-block" data-name="Anabtawi contact bar">
                 <div class="container-fluid px-4 px-xl-5">
@@ -49,7 +49,8 @@
         </xpath>
     </template>
 
-    <template id="layout_footer" inherit_id="website.layout" name="Anabtawi Sweets - Footer" priority="50">
+    <!-- تم إضافة website_id="1" للفوتر لربطه بموقع الحلويات فقط -->
+    <template id="layout_footer" inherit_id="website.layout" name="Anabtawi Sweets - Footer" priority="50" website_id="1">
         <xpath expr="//div[@id='footer']" position="replace">
             <div id="footer" class="oe_structure oe_structure_solo text-break" t-ignore="true" t-if="not no_footer">
                 <footer class="anabtawi-footer" data-name="Anabtawi footer">
