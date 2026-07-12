@@ -35,7 +35,7 @@
     <menuitem
         id="menu_meps_terminal_import"
         name="Import MEPS Terminals"
-        parent="point_of_sale.menu_point_of_sale_configuration"
+        parent="point_of_sale.menu_point_config_product"
         action="action_meps_terminal_import_wizard"
         sequence="49"
         groups="point_of_sale.group_pos_manager"
