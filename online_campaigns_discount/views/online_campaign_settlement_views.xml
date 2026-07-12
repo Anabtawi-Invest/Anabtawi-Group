@@ -124,11 +124,11 @@
                         </group>
                     </group>
                     <group string="Reconciliation Variance">
-                        <field name="variance_amount" widget="monetary"/>
-                        <field name="variance_percent"/>
-                        <field name="variance_reason" readonly="state == 'reconciled'"
-                               placeholder="Required when the actual statement differs from POS expectations."/>
-                    </group>
+                           <field name="variance_amount" widget="monetary"/>
+                           <field name="variance_percent" widget="percentage"/>
+                           <field name="variance_reason" readonly="state == 'reconciled'"
+                             placeholder="Required when the actual statement differs from POS expectations."/>
+                        </group>
                     <chatter/>
                 </sheet>
             </form>
