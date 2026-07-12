@@ -187,7 +187,7 @@ class OnlineCampaignSettlement(models.Model):
                 settlement.actual_net_received - settlement.expected_net_settlement
             )
             settlement.variance_percent = (
-                settlement.variance_amount / settlement.expected_net_settlement * 100.0
+                settlement.variance_amount / settlement.expected_net_settlement
                 if settlement.expected_net_settlement else 0.0
             )
             currency = settlement.currency_id
