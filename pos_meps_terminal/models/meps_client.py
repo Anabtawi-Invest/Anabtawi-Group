@@ -136,8 +136,15 @@ def call_meps(env, operation, request_element):
 
     `env` supplies the (customer-configurable) endpoint URL and timeout from
     Settings > Point of Sale > MEPS Connection, falling back to DEFAULT_MEPS_URL/TIMEOUT.
+
+    If the gateway URL points at this module's built-in mock path, the response is
+    generated in-process (no HTTP). That is the recommended way to test on Odoo.sh.
     """
     url, timeout = _get_connection_settings(env)
+
+    # In-process mock: avoids Odoo.sh worker self-HTTP deadlocks and needs no tunnel.
+    if "/pos_meps_terminal/mock" in (url or ""):
+        return _call_meps_mock_inprocess(env, url, operation, request_element, timeout)
 
     envelope = etree.Element(f"{{{NS_SOAP}}}Envelope", nsmap={"soapenv": NS_SOAP, "tem": NS_TEM})
     etree.SubElement(envelope, f"{{{NS_SOAP}}}Header")
@@ -164,3 +171,36 @@ def call_meps(env, operation, request_element):
         raise UserError(_("MEPS gateway returned HTTP %s.") % response.status_code)
 
     return _parse_result(response.content, operation)
+
+
+def _call_meps_mock_inprocess(env, url, operation, request_element, timeout):
+    from urllib.parse import parse_qs, urlparse
+
+    from odoo.addons.pos_meps_terminal.meps_mock_payload import (
+        ICP_ENABLE_MOCK,
+        amount_from_body,
+        build_mock_response,
+        normalize_scenario,
+    )
+
+    ICP = env["ir.config_parameter"].sudo()
+    if ICP.get_param(ICP_ENABLE_MOCK) != "True":
+        raise UserError(_(
+            "Built-in MEPS mock URL is configured, but the mock gateway is disabled. "
+            "Enable it in Settings → Point of Sale → MEPS Connection."
+        ))
+
+    scenario = normalize_scenario((parse_qs(urlparse(url).query).get("scenario") or ["success"])[0])
+    amount = amount_from_body(etree.tostring(request_element))
+    _logger.info("MEPS in-process mock: op=%s scenario=%s amount=%s", operation, scenario, amount)
+
+    status, _ctype, payload, sleep_s = build_mock_response(
+        scenario, operation, amount, timeout_sleep=min(timeout + 2, 15)
+    )
+    if sleep_s:
+        import time
+        time.sleep(sleep_s)
+        raise UserError(_("Timed out waiting for the MEPS terminal to respond."))
+    if status != 200:
+        raise UserError(_("MEPS gateway returned HTTP %s.") % status)
+    return _parse_result(payload, operation)

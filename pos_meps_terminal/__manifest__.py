@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "MEPS / ApexECR Payment Terminal for Point of Sale",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "summary": "Accept MEPS card payments in POS with real terminal integration (Sale/Void/Settlement)",
     "description": """
 MEPS / ApexECR Payment Terminal for Point of Sale

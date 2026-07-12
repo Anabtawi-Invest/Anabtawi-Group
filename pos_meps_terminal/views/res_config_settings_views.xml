@@ -11,8 +11,35 @@
                     string="MEPS Connection"
                     help="Gateway URL and timeout for the MEPS/ApexECR terminal integration. Per-branch Tid/Mid/SecureKey are set on each Payment Method (or via Import MEPS Terminals)."
                 >
-                    <field name="meps_endpoint_url" placeholder="https://gprs.mepspay.com/v100/ecrcomInterface.svc"/>
-                    <field name="meps_timeout" placeholder="90"/>
+                    <div class="content-group">
+                        <div class="row mt16">
+                            <label for="meps_endpoint_url" class="col-lg-3 o_light_label" string="Gateway URL"/>
+                            <field name="meps_endpoint_url" class="col-lg-9" placeholder="https://gprs.mepspay.com/v100/ecrcomInterface.svc"/>
+                        </div>
+                        <div class="row">
+                            <label for="meps_timeout" class="col-lg-3 o_light_label" string="Timeout (seconds)"/>
+                            <field name="meps_timeout" class="col-lg-3" placeholder="90"/>
+                        </div>
+                        <div class="row mt8">
+                            <label for="meps_enable_mock" class="col-lg-3 o_light_label" string="Built-in mock"/>
+                            <field name="meps_enable_mock" class="col-lg-9"/>
+                        </div>
+                        <div class="mt8">
+                            <button
+                                name="action_meps_use_mock_url"
+                                type="object"
+                                string="Use mock (approve)"
+                                class="btn-secondary"
+                                help="Enable mock and set Gateway URL to this database's /pos_meps_terminal/mock"
+                            />
+                            <button
+                                name="action_meps_use_mock_decline_url"
+                                type="object"
+                                string="Use mock (decline)"
+                                class="btn-link"
+                            />
+                        </div>
+                    </div>
                 </setting>
             </xpath>
         </field>
