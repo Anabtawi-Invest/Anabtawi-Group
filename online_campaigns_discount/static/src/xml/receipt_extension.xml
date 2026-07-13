@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t
+        t-name="online_campaigns_discount.ReceiptHeaderAggregatorOrderRef"
+        t-inherit="point_of_sale.ReceiptHeader"
+        t-inherit-mode="extension"
+    >
+        <xpath expr="//div[contains(@class, 'pos-receipt-customer')]" position="after">
+            <div t-if="order.online_aggregator_order_ref" class="pos-receipt-customer mt-1">
+                <t t-if="order.online_aggregator_id?.name">
+                    <t t-esc="order.online_aggregator_id.name"/> Order ID:
+                </t>
+                <t t-else="">Order ID:</t>
+                <t t-esc="order.online_aggregator_order_ref"/>
+            </div>
+        </xpath>
+    </t>
+</templates>
