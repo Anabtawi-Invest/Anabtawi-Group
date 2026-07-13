@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="report_pos_order_view_list_cost" model="ir.ui.view">
+        <field name="name">report.pos.order.view.list.cost</field>
+        <field name="model">pos.order.report</field>
+        <field name="inherit_id" ref="point_of_sale.report_pos_order_view_tree"/>
+        <field name="arch" type="xml">
+            <field name="product_id" position="after">
+                <field name="standard_price" optional="show"/>
+            </field>
+        </field>
+    </record>
+</odoo>
