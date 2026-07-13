@@ -1,3 +1,6 @@
+## 19.0.5.6.0
+- Aggregator order ID now prints on the customer receipt: extends point_of_sale.ReceiptHeader with a line showing "<Aggregator> Order ID: <ref>" when online_aggregator_order_ref is set. Wired the previously-unused receipt_extension.xml into the manifest assets.
+
 ## 19.0.5.5.3
 - Fixed view load crash: `pos_order_views.xml`'s Aggregator Sales Results list used `<field name="order_id.online_aggregator_order_ref">`, a dotted path, which Odoo's view validator rejects ("Field does not exist in model pos.order.line"). Added a proper related field `online_aggregator_order_ref` on pos.order.line (mirrors the existing online_order_date/online_session_id pattern) and pointed the view at that instead.
 
