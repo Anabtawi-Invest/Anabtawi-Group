@@ -19,6 +19,7 @@
             "pos_pricelist_id/static/src/pos/id_number_validation.js",
             "pos_pricelist_id/static/src/pos/receipt_header.xml",
             "pos_pricelist_id/static/src/pos/aggregator_order_ref_popup.js",
+             "pos_pricelist_id/static/src/pos/order_receipt.xml",
         ],
     },
     'installable': True,
