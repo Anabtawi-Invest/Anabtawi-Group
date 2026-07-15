@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================ -->
+    <!-- "Branch Quality Control" tab under the standard Quality app  -->
+    <!-- ============================================================ -->
+    <menuitem id="menu_qc_branch_root"
+              name="Branch Quality Control"
+              parent="quality.menu_quality_root"
+              sequence="80"
+              groups="group_qc_management_viewer,group_qc_inspector"/>
+
+    <menuitem id="menu_qc_inspections"
+              name="Inspections"
+              parent="menu_qc_branch_root"
+              action="action_qc_inspection"
+              sequence="10"/>
+
+    <menuitem id="menu_qc_corrective_actions"
+              name="Corrective Actions"
+              parent="menu_qc_branch_root"
+              action="action_qc_corrective_action"
+              sequence="20"/>
+
+    <!-- Reporting -->
+    <menuitem id="menu_qc_reporting"
+              name="Reporting"
+              parent="menu_qc_branch_root"
+              sequence="30"/>
+
+    <menuitem id="menu_qc_dashboard"
+              name="Dashboard"
+              parent="menu_qc_reporting"
+              action="action_qc_dashboard"
+              sequence="10"/>
+
+    <menuitem id="menu_qc_branch_ranking"
+              name="Branch Ranking"
+              parent="menu_qc_reporting"
+              action="action_qc_branch_ranking"
+              sequence="20"/>
+
+    <menuitem id="menu_qc_priority_branches"
+              name="Priority Branches"
+              parent="menu_qc_reporting"
+              action="action_qc_priority_branches"
+              sequence="30"/>
+
+    <menuitem id="menu_qc_factor_performance"
+              name="Factor Performance"
+              parent="menu_qc_reporting"
+              action="action_qc_factor_performance"
+              sequence="40"/>
+
+    <menuitem id="menu_qc_historical_trends"
+              name="Historical Trends"
+              parent="menu_qc_reporting"
+              action="action_qc_historical_trends"
+              sequence="50"/>
+
+    <!-- Configuration -->
+    <menuitem id="menu_qc_configuration"
+              name="Configuration"
+              parent="menu_qc_branch_root"
+              sequence="90"
+              groups="group_qc_quality_manager"/>
+
+    <menuitem id="menu_qc_branches"
+              name="Branches"
+              parent="menu_qc_configuration"
+              action="action_qc_branch"
+              sequence="10"/>
+
+    <menuitem id="menu_qc_checklists"
+              name="Checklists"
+              parent="menu_qc_configuration"
+              action="action_qc_checklist_template"
+              sequence="20"/>
+
+    <menuitem id="menu_qc_grades"
+              name="Grades"
+              parent="menu_qc_configuration"
+              action="action_qc_grade"
+              sequence="30"/>
+
+    <!-- Historical data import -->
+    <menuitem id="menu_qc_historical"
+              name="Historical Data"
+              parent="menu_qc_configuration"
+              sequence="35"/>
+
+    <menuitem id="menu_qc_historical_scores"
+              name="Historical Scores"
+              parent="menu_qc_historical"
+              action="action_qc_historical_score"
+              sequence="10"/>
+
+    <menuitem id="menu_qc_historical_factor_averages"
+              name="Factor Averages"
+              parent="menu_qc_historical"
+              action="action_qc_historical_factor_average"
+              sequence="20"/>
+
+    <menuitem id="menu_qc_settings"
+              name="Settings"
+              parent="menu_qc_configuration"
+              action="action_qc_config_settings"
+              sequence="40"
+              groups="group_qc_admin"/>
+
+</odoo>
