@@ -1,0 +1,6 @@
+<odoo>
+    <menuitem id="menu_anabtawi_hr_performance_root" name="HR Performance" parent="hr.menu_hr_root" sequence="90"/>
+    <menuitem id="menu_anabtawi_hr_kpi_dashboard" name="HR Dashboard" parent="board.menu_board_my_dash" action="action_anabtawi_hr_kpi_dashboard" sequence="10"/>
+    <menuitem id="menu_anabtawi_hr_kpi_period" name="Reporting Periods" parent="menu_anabtawi_hr_performance_root" action="action_anabtawi_hr_kpi_period" sequence="20"/>
+    <menuitem id="menu_anabtawi_hr_kpi_definition" name="KPI Definitions" parent="menu_anabtawi_hr_performance_root" action="action_anabtawi_hr_kpi_definition" sequence="30"/>
+</odoo>
