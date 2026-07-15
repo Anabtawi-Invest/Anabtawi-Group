@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_anabtawi_hr_kpi_category_user,anabtawi.hr.kpi.category user,model_anabtawi_hr_kpi_category,hr.group_hr_user,1,1,1,1
+access_anabtawi_hr_kpi_definition_user,anabtawi.hr.kpi.definition user,model_anabtawi_hr_kpi_definition,hr.group_hr_user,1,1,1,1
+access_anabtawi_hr_kpi_period_user,anabtawi.hr.kpi.period user,model_anabtawi_hr_kpi_period,hr.group_hr_user,1,1,1,1
+access_anabtawi_hr_kpi_snapshot_user,anabtawi.hr.kpi.snapshot user,model_anabtawi_hr_kpi_snapshot,hr.group_hr_user,1,1,1,1
