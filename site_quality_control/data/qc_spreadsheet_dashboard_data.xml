@@ -10,7 +10,7 @@
     <record id="spreadsheet_dashboard_quality_combined" model="spreadsheet.dashboard">
         <field name="name">Quality &amp; Audit Performance</field>
         <field name="dashboard_group_id" ref="spreadsheet_dashboard_group_quality"/>
-        <field name="spreadsheet_data" type="base64" file="site_quality_control/data/dashboards/quality_combined_dashboard.json"/>
+        <field name="spreadsheet_binary_data" type="base64" file="site_quality_control/data/dashboards/quality_combined_dashboard.json"/>
         <field name="sequence">10</field>
     </record>
 </odoo>
