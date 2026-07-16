@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_reporting_request_tree" model="ir.ui.view">
+        <field name="name">ai.reporting.request.list</field>
+        <field name="model">ai.reporting.request</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="user_id"/>
+                <field name="company_id"/>
+                <field name="state"/>
+                <field name="current_revision"/>
+                <field name="confirmed_revision"/>
+                <field name="record_count"/>
+                <field name="execution_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_reporting_request_form" model="ir.ui.view">
+        <field name="name">ai.reporting.request.form</field>
+        <field name="model">ai.reporting.request</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_generate_draft" type="object" string="Generate Draft" class="btn-primary" invisible="state not in ('draft', 'failed', 'validation_failed')"/>
+                    <button name="action_preview" type="object" string="Preview" invisible="state not in ('awaiting_confirmation', 'preview_ready')"/>
+                    <button name="action_confirm" type="object" string="Confirm" class="btn-primary" invisible="state != 'preview_ready'"/>
+                    <button name="action_save_report" type="object" string="Save Report" class="btn-primary" invisible="state != 'confirmed'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="user_id"/>
+                            <field name="company_id"/>
+                            <field name="language_code"/>
+                            <field name="current_revision"/>
+                        </group>
+                        <group>
+                            <field name="confirmed_by" readonly="1"/>
+                            <field name="confirmation_date" readonly="1"/>
+                            <field name="confirmed_revision" readonly="1"/>
+                            <field name="saved_report_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Question">
+                            <field name="question"/>
+                            <field name="normalized_question" readonly="1"/>
+                        </page>
+                        <page string="Draft Definition">
+                            <field name="draft_report_definition_json" widget="json"/>
+                            <field name="draft_parameter_schema_json" widget="json"/>
+                        </page>
+                        <page string="Preview">
+                            <field name="result_summary" readonly="1"/>
+                            <field name="preview_result_metadata_json" widget="json" readonly="1"/>
+                            <field name="validation_result_json" widget="json" readonly="1"/>
+                        </page>
+                        <page string="Audit">
+                            <field name="odoo_ai_request_id" readonly="1"/>
+                            <field name="model_name" readonly="1"/>
+                            <field name="token_usage" readonly="1"/>
+                            <field name="estimated_cost" readonly="1"/>
+                            <field name="error_message" readonly="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ai_reporting_request" model="ir.actions.act_window">
+        <field name="name">Advanced Report Requests</field>
+        <field name="res_model">ai.reporting.request</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
+

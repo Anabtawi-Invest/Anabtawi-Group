@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="rule_ai_reporting_memory_user" model="ir.rule">
+        <field name="name">AI Reporting memories visible to allowed users</field>
+        <field name="model_id" ref="model_ai_reporting_memory"/>
+        <field name="groups" eval="[(4, ref('group_ai_reporting_user'))]"/>
+        <field name="domain_force">['|','|','|',('owner_id','=',user.id),('visibility','in',('company','global')),('shared_user_ids','in',[user.id]),('shared_group_ids','in',user.group_ids.ids)]</field>
+    </record>
+
+    <record id="rule_ai_reporting_memory_manager" model="ir.rule">
+        <field name="name">AI Reporting managers can see memories</field>
+        <field name="model_id" ref="model_ai_reporting_memory"/>
+        <field name="groups" eval="[(4, ref('group_ai_reporting_manager'))]"/>
+        <field name="domain_force">[(1,'=',1)]</field>
+    </record>
+
+    <record id="rule_ai_reporting_request_user" model="ir.rule">
+        <field name="name">AI Reporting requests owned by user</field>
+        <field name="model_id" ref="model_ai_reporting_request"/>
+        <field name="groups" eval="[(4, ref('group_ai_reporting_user'))]"/>
+        <field name="domain_force">[('user_id','=',user.id)]</field>
+    </record>
+
+    <record id="rule_ai_reporting_request_manager" model="ir.rule">
+        <field name="name">AI Reporting managers can see requests</field>
+        <field name="model_id" ref="model_ai_reporting_request"/>
+        <field name="groups" eval="[(4, ref('group_ai_reporting_manager'))]"/>
+        <field name="domain_force">[(1,'=',1)]</field>
+    </record>
+
+    <record id="rule_ai_reporting_saved_report_user" model="ir.rule">
+        <field name="name">AI Reporting reports visible to allowed users</field>
+        <field name="model_id" ref="model_ai_reporting_saved_report"/>
+        <field name="groups" eval="[(4, ref('group_ai_reporting_user'))]"/>
+        <field name="domain_force">['|','|','|',('owner_id','=',user.id),('visibility','in',('company','global')),('shared_user_ids','in',[user.id]),('share_ids.user_id','=',user.id)]</field>
+    </record>
+
+    <record id="rule_ai_reporting_saved_report_manager" model="ir.rule">
+        <field name="name">AI Reporting managers can see reports</field>
+        <field name="model_id" ref="model_ai_reporting_saved_report"/>
+        <field name="groups" eval="[(4, ref('group_ai_reporting_manager'))]"/>
+        <field name="domain_force">[(1,'=',1)]</field>
+    </record>
+
+    <record id="rule_ai_reporting_memory_multi_company" model="ir.rule">
+        <field name="name">AI Reporting memory multi-company isolation</field>
+        <field name="model_id" ref="model_ai_reporting_memory"/>
+        <field name="domain_force">['|','|',('company_id','=',False),('company_id','in',company_ids),('allowed_company_ids','in',company_ids)]</field>
+    </record>
+
+    <record id="rule_ai_reporting_request_multi_company" model="ir.rule">
+        <field name="name">AI Reporting request multi-company isolation</field>
+        <field name="model_id" ref="model_ai_reporting_request"/>
+        <field name="domain_force">['|','|',('company_id','=',False),('company_id','in',company_ids),('allowed_company_ids','in',company_ids)]</field>
+    </record>
+
+    <record id="rule_ai_reporting_saved_report_multi_company" model="ir.rule">
+        <field name="name">AI Reporting saved report multi-company isolation</field>
+        <field name="model_id" ref="model_ai_reporting_saved_report"/>
+        <field name="domain_force">['|','|',('company_id','=',False),('company_id','in',company_ids),('allowed_company_ids','in',company_ids)]</field>
+    </record>
+
+    <record id="rule_ai_reporting_saved_report_share_owner" model="ir.rule">
+        <field name="name">AI Reporting only the report owner (or a manager) manages sharing</field>
+        <field name="model_id" ref="model_ai_reporting_saved_report_share"/>
+        <field name="groups" eval="[(4, ref('group_ai_reporting_user'))]"/>
+        <field name="domain_force">[('report_id.owner_id','=',user.id)]</field>
+    </record>
+
+    <record id="rule_ai_reporting_saved_report_share_manager" model="ir.rule">
+        <field name="name">AI Reporting managers can manage all sharing</field>
+        <field name="model_id" ref="model_ai_reporting_saved_report_share"/>
+        <field name="groups" eval="[(4, ref('group_ai_reporting_manager'))]"/>
+        <field name="domain_force">[(1,'=',1)]</field>
+    </record>
+</odoo>
+

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="param_enable_native_ask_ai_lma" model="ir.config_parameter">
+        <field name="key">ai_reporting.enable_native_ask_ai_lma</field>
+        <field name="value">True</field>
+    </record>
+    <record id="param_enable_advanced_report_chatbot" model="ir.config_parameter">
+        <field name="key">ai_reporting.enable_advanced_report_chatbot</field>
+        <field name="value">True</field>
+    </record>
+    <record id="param_maximum_synchronous_records" model="ir.config_parameter">
+        <field name="key">ai_reporting.maximum_synchronous_records</field>
+        <field name="value">5000</field>
+    </record>
+    <record id="param_maximum_report_records" model="ir.config_parameter">
+        <field name="key">ai_reporting.maximum_report_records</field>
+        <field name="value">50000</field>
+    </record>
+    <record id="param_native_ai_status" model="ir.config_parameter">
+        <field name="key">ai_reporting.native_ai_status</field>
+        <field name="value">unavailable</field>
+    </record>
+    <record id="param_third_party_provider" model="ir.config_parameter">
+        <field name="key">ai_reporting.third_party_provider</field>
+        <field name="value">none</field>
+    </record>
+    <record id="param_openai_api_key_env" model="ir.config_parameter">
+        <field name="key">ai_reporting.openai_api_key_env</field>
+        <field name="value">OPENAI_API_KEY</field>
+    </record>
+    <record id="param_openai_model" model="ir.config_parameter">
+        <field name="key">ai_reporting.openai_model</field>
+        <field name="value"></field>
+    </record>
+    <record id="param_anthropic_api_key_env" model="ir.config_parameter">
+        <field name="key">ai_reporting.anthropic_api_key_env</field>
+        <field name="value">ANTHROPIC_API_KEY</field>
+    </record>
+    <record id="param_anthropic_model" model="ir.config_parameter">
+        <field name="key">ai_reporting.anthropic_model</field>
+        <field name="value">claude-sonnet-5</field>
+    </record>
+</odoo>
