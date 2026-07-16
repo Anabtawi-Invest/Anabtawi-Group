@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_ai_reporting" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.ai.reporting</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="AI Reporting" string="AI Reporting" name="ai_reporting">
+                    <block title="Ask AI and Local Memory">
+                        <setting string="Native Ask AI Local Memory">
+                            <field name="enable_native_ask_ai_lma"/>
+                        </setting>
+                        <setting string="Advanced Report Chatbot">
+                            <field name="enable_advanced_report_chatbot"/>
+                        </setting>
+                        <setting string="Native AI Status">
+                            <field name="native_ai_status"/>
+                        </setting>
+                        <setting string="Exact and Semantic Cache">
+                            <field name="enable_exact_cache"/>
+                            <field name="enable_semantic_cache"/>
+                        </setting>
+                    </block>
+                    <block title="Execution Limits">
+                        <setting string="Maximum Synchronous Records">
+                            <field name="maximum_synchronous_records"/>
+                        </setting>
+                        <setting string="Maximum Report Records">
+                            <field name="maximum_report_records"/>
+                        </setting>
+                        <setting string="Maximum Date Range">
+                            <field name="maximum_date_range"/>
+                        </setting>
+                    </block>
+                    <block title="Languages and Approval">
+                        <setting string="English and Arabic">
+                            <field name="enable_english"/>
+                            <field name="enable_arabic"/>
+                        </setting>
+                        <setting string="Require Confirmation">
+                            <field name="require_report_confirmation"/>
+                        </setting>
+                        <setting string="Usage Tracking">
+                            <field name="enable_usage_tracking"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+

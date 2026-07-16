@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="ai_reporting.ReportBuilder">
+        <div class="o_ai_reporting_builder">
+            <div class="o_ai_reporting_builder__pane">
+                <div class="o_ai_reporting_builder__header">
+                    <h1>Advanced Report Builder</h1>
+                    <span t-esc="state.status"/>
+                </div>
+                <textarea class="form-control" rows="5" t-model="state.question" placeholder="Describe the advanced report"/>
+                <div class="o_ai_reporting_builder__actions">
+                    <button class="btn btn-primary" t-on-click="createDraft" t-att-disabled="state.busy">Generate Preview</button>
+                    <button class="btn btn-secondary" t-on-click="confirmDraft" t-att-disabled="state.busy || !state.preview">Confirm and Save</button>
+                </div>
+                <t t-if="state.preview">
+                    <div class="o_ai_reporting_builder__preview">
+                        <h2>Preview</h2>
+                        <p t-esc="state.preview.summary"/>
+                        <div class="o_ai_reporting_builder__stats">
+                            <span>Rows</span>
+                            <strong t-esc="state.preview.record_count"/>
+                        </div>
+                        <textarea class="form-control" rows="3" t-model="state.adjustment" placeholder="Request an adjustment"/>
+                        <button class="btn btn-outline-primary" t-on-click="adjustDraft" t-att-disabled="state.busy || !state.adjustment">Apply Adjustment</button>
+                        <pre t-esc="JSON.stringify(state.preview.sample_rows || [], null, 2)"/>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>
+
