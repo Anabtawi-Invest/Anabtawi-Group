@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- ============================================================ -->
+    <!-- Standard checklist template: 10 factors x 10 points = 100    -->
+    <!-- NOTE: Arabic wording is provisional and must be approved by  -->
+    <!-- the Quality Assurance team before use as final data.         -->
+    <!-- ============================================================ -->
+    <record id="template_branch_qa" model="qc.checklist.template">
+        <field name="name">Branch Quality Assurance Assessment / تقييم ضمان جودة الفرع</field>
+    </record>
+
+    <!-- 1. Equipment & tools safety -->
+    <record id="factor_equipment_safety" model="qc.factor.template">
+        <field name="name">سلامة المعدات والأدوات</field>
+        <field name="template_id" ref="template_branch_qa"/>
+        <field name="sequence">10</field>
+        <field name="max_score">10.0</field>
+        <field name="is_critical_factor" eval="True"/>
+    </record>
+    <record id="q_equip_1" model="qc.question.template">
+        <field name="name">المعدات تعمل بشكل سليم وآمن</field>
+        <field name="factor_id" ref="factor_equipment_safety"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">score_10</field>
+    </record>
+    <record id="q_equip_2" model="qc.question.template">
+        <field name="name">لا توجد معدات غير آمنة قيد الاستخدام</field>
+        <field name="factor_id" ref="factor_equipment_safety"/>
+        <field name="sequence">20</field>
+        <field name="answer_type">pass_fail</field>
+        <field name="is_critical" eval="True"/>
+    </record>
+    <record id="q_equip_3" model="qc.question.template">
+        <field name="name">أدوات القياس والحرارة معايرة وصالحة</field>
+        <field name="factor_id" ref="factor_equipment_safety"/>
+        <field name="sequence">30</field>
+        <field name="answer_type">score_5</field>
+    </record>
+
+    <!-- 2. Personal hygiene & dress -->
+    <record id="factor_personal_hygiene" model="qc.factor.template">
+        <field name="name">النظافة الشخصية واللباس</field>
+        <field name="template_id" ref="template_branch_qa"/>
+        <field name="sequence">20</field>
+        <field name="max_score">10.0</field>
+    </record>
+    <record id="q_pers_1" model="qc.question.template">
+        <field name="name">الزي النظيف والكامل لجميع الموظفين</field>
+        <field name="factor_id" ref="factor_personal_hygiene"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">score_10</field>
+    </record>
+    <record id="q_pers_2" model="qc.question.template">
+        <field name="name">استخدام القفازات وأغطية الرأس عند الحاجة</field>
+        <field name="factor_id" ref="factor_personal_hygiene"/>
+        <field name="sequence">20</field>
+        <field name="answer_type">pass_fail</field>
+    </record>
+
+    <!-- 3. General cleanliness -->
+    <record id="factor_general_cleanliness" model="qc.factor.template">
+        <field name="name">النظافة العامة</field>
+        <field name="template_id" ref="template_branch_qa"/>
+        <field name="sequence">30</field>
+        <field name="max_score">10.0</field>
+    </record>
+    <record id="q_gen_1" model="qc.question.template">
+        <field name="name">نظافة الأرضيات والجدران والأسقف</field>
+        <field name="factor_id" ref="factor_general_cleanliness"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">score_10</field>
+    </record>
+    <record id="q_gen_2" model="qc.question.template">
+        <field name="name">نظافة أسطح العمل والمعدات</field>
+        <field name="factor_id" ref="factor_general_cleanliness"/>
+        <field name="sequence">20</field>
+        <field name="answer_type">score_10</field>
+    </record>
+
+    <!-- 4. Storage & arrangement -->
+    <record id="factor_storage" model="qc.factor.template">
+        <field name="name">التخزين وترتيب المواد</field>
+        <field name="template_id" ref="template_branch_qa"/>
+        <field name="sequence">40</field>
+        <field name="max_score">10.0</field>
+    </record>
+    <record id="q_stor_1" model="qc.question.template">
+        <field name="name">تخزين المواد وفق درجات الحرارة الصحيحة</field>
+        <field name="factor_id" ref="factor_storage"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">pass_fail</field>
+        <field name="is_critical" eval="True"/>
+    </record>
+    <record id="q_stor_2" model="qc.question.template">
+        <field name="name">ترتيب المواد وفق مبدأ الصادر أولاً منتهي أولاً (FEFO)</field>
+        <field name="factor_id" ref="factor_storage"/>
+        <field name="sequence">20</field>
+        <field name="answer_type">score_10</field>
+    </record>
+
+    <!-- 5. External cleanliness & facade -->
+    <record id="factor_exterior" model="qc.factor.template">
+        <field name="name">النظافة الخارجية والواجهة</field>
+        <field name="template_id" ref="template_branch_qa"/>
+        <field name="sequence">50</field>
+        <field name="max_score">10.0</field>
+    </record>
+    <record id="q_ext_1" model="qc.question.template">
+        <field name="name">نظافة الواجهة واللافتات</field>
+        <field name="factor_id" ref="factor_exterior"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">score_10</field>
+    </record>
+
+    <!-- 6. Returns ratio -->
+    <record id="factor_returns" model="qc.factor.template">
+        <field name="name">نسبة المرتجعات</field>
+        <field name="template_id" ref="template_branch_qa"/>
+        <field name="sequence">60</field>
+        <field name="max_score">10.0</field>
+    </record>
+    <record id="q_ret_1" model="qc.question.template">
+        <field name="name">نسبة المرتجعات ضمن الحدود المقبولة</field>
+        <field name="factor_id" ref="factor_returns"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">score_10</field>
+    </record>
+
+    <!-- 7. Kunafa evaluation -->
+    <record id="factor_kunafa" model="qc.factor.template">
+        <field name="name">تقييم الكنافة</field>
+        <field name="template_id" ref="template_branch_qa"/>
+        <field name="sequence">70</field>
+        <field name="max_score">10.0</field>
+    </record>
+    <record id="q_kun_1" model="qc.question.template">
+        <field name="name">مطابقة الطعم والقوام للمواصفات</field>
+        <field name="factor_id" ref="factor_kunafa"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">score_10</field>
+    </record>
+    <record id="q_kun_2" model="qc.question.template">
+        <field name="name">مطابقة المظهر والتقديم</field>
+        <field name="factor_id" ref="factor_kunafa"/>
+        <field name="sequence">20</field>
+        <field name="answer_type">score_5</field>
+    </record>
+
+    <!-- 8. Expiry, dates & inventory management (critical) -->
+    <record id="factor_expiry_inventory" model="qc.factor.template">
+        <field name="name">الصلاحيات والتواريخ وإدارة المخزون</field>
+        <field name="template_id" ref="template_branch_qa"/>
+        <field name="sequence">80</field>
+        <field name="max_score">10.0</field>
+        <field name="is_critical_factor" eval="True"/>
+    </record>
+    <record id="q_exp_1" model="qc.question.template">
+        <field name="name">لا توجد منتجات منتهية الصلاحية معروضة للبيع</field>
+        <field name="factor_id" ref="factor_expiry_inventory"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">pass_fail</field>
+        <field name="is_critical" eval="True"/>
+    </record>
+    <record id="q_exp_2" model="qc.question.template">
+        <field name="name">توفر سجلات التتبع وتواريخ الصلاحية</field>
+        <field name="factor_id" ref="factor_expiry_inventory"/>
+        <field name="sequence">20</field>
+        <field name="answer_type">pass_fail</field>
+        <field name="is_critical" eval="True"/>
+    </record>
+    <record id="q_exp_3" model="qc.question.template">
+        <field name="name">دقة أرصدة المخزون مقابل النظام</field>
+        <field name="factor_id" ref="factor_expiry_inventory"/>
+        <field name="sequence">30</field>
+        <field name="answer_type">score_10</field>
+    </record>
+
+    <!-- 9. Product handling -->
+    <record id="factor_product_handling" model="qc.factor.template">
+        <field name="name">التعامل مع المنتج</field>
+        <field name="template_id" ref="template_branch_qa"/>
+        <field name="sequence">90</field>
+        <field name="max_score">10.0</field>
+    </record>
+    <record id="q_prod_1" model="qc.question.template">
+        <field name="name">التعامل مع المنتج وفق الاشتراطات الصحية</field>
+        <field name="factor_id" ref="factor_product_handling"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">score_10</field>
+    </record>
+
+    <!-- 10. Pest control (critical) -->
+    <record id="factor_pest_control" model="qc.factor.template">
+        <field name="name">مكافحة الحشرات</field>
+        <field name="template_id" ref="template_branch_qa"/>
+        <field name="sequence">100</field>
+        <field name="max_score">10.0</field>
+        <field name="is_critical_factor" eval="True"/>
+    </record>
+    <record id="q_pest_1" model="qc.question.template">
+        <field name="name">لا توجد حشرات أو آفات ظاهرة</field>
+        <field name="factor_id" ref="factor_pest_control"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">pass_fail</field>
+        <field name="is_critical" eval="True"/>
+    </record>
+    <record id="q_pest_2" model="qc.question.template">
+        <field name="name">توثيق زيارات مكافحة الحشرات</field>
+        <field name="factor_id" ref="factor_pest_control"/>
+        <field name="sequence">20</field>
+        <field name="answer_type">pass_fail</field>
+    </record>
+    <record id="q_pest_3" model="qc.question.template">
+        <field name="name">أجهزة مكافحة الحشرات تعمل بكفاءة</field>
+        <field name="factor_id" ref="factor_pest_control"/>
+        <field name="sequence">30</field>
+        <field name="answer_type">score_5</field>
+    </record>
+    <record id="q_pest_4" model="qc.question.template">
+        <field name="name">لا توجد فتحات تسمح بدخول الآفات</field>
+        <field name="factor_id" ref="factor_pest_control"/>
+        <field name="sequence">40</field>
+        <field name="answer_type">score_5</field>
+    </record>
+    <record id="q_pest_5" model="qc.question.template">
+        <field name="name">إنجاز الإجراءات التصحيحية من الزيارة السابقة</field>
+        <field name="factor_id" ref="factor_pest_control"/>
+        <field name="sequence">50</field>
+        <field name="answer_type">pass_fail</field>
+    </record>
+
+</odoo>
