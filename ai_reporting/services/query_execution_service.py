@@ -24,10 +24,10 @@ class AiReportingQueryExecutionService(models.AbstractModel):
         groupby = plan.get("groupby") or []
         measures = plan.get("measures") or []
         if measures:
-            result = self._read_group(model, domain, groupby, measures, limit, self._order(plan))
+            result = self._read_group(model, domain, groupby, measures, limit, self._plan_order(plan))
         else:
             result = {
-                "rows": model.search_read(domain, fields_to_read, limit=limit, order=self._order(plan)),
+                "rows": model.search_read(domain, fields_to_read, limit=limit, order=self._plan_order(plan)),
                 "grouped": False,
             }
         result.update({
@@ -44,7 +44,7 @@ class AiReportingQueryExecutionService(models.AbstractModel):
             fields_to_read.add(measure if isinstance(measure, str) else measure.get("field"))
         return [field for field in fields_to_read if field]
 
-    def _order(self, plan):
+    def _plan_order(self, plan):
         order = plan.get("order") or []
         if isinstance(order, str):
             return order
