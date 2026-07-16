@@ -185,6 +185,26 @@ class TestAiReporting(TransactionCase):
         self.assertIn("request_id", draft)
         self.assertIn("state", draft)
 
+    def test_format_local_memory_chat_reply_renders_markdown_table(self):
+        bridge = self.env["ai.reporting.odoo_ai_bridge"]
+        result = {
+            "rows": [
+                {"id": 1, "display_name": "Downtown Branch"},
+                {"id": 2, "display_name": "Uptown Branch"},
+            ],
+            "record_count": 2,
+        }
+        message = bridge.format_local_memory_chat_reply("sales for Downtown Branch", result)
+        self.assertIn("Local Memory", message)
+        self.assertIn("Downtown Branch", message)
+        self.assertIn("Uptown Branch", message)
+        self.assertNotIn("| id |", message, "The internal id column should not be shown in the chat reply.")
+
+    def test_format_local_memory_chat_reply_handles_empty_rows(self):
+        bridge = self.env["ai.reporting.odoo_ai_bridge"]
+        message = bridge.format_local_memory_chat_reply("sales for Nowhere", {"rows": [], "record_count": 0})
+        self.assertIn("0 result", message)
+
     def test_multi_company_isolation_hides_other_company_reports(self):
         other_company = self.env["res.company"].create({"name": "AI Reporting Other Co"})
         report = self.env["ai.reporting.saved.report"].create({

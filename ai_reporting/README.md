@@ -135,6 +135,38 @@ Settings > Technical > AI > Agents, open the default agent, and confirm "AI Repo
 Reports" appears under its Topics — then anyone chatting with that agent can ask it to list, run, or
 draft your Advanced Reports.
 
+## Local Memory interception for ordinary Ask AI questions (`ai_reporting_ai_bridge`)
+
+The tool-registration above only covers Advanced Reports. Ordinary business questions typed into
+native Ask AI (e.g. "sales for Downtown Branch from June to July") were still going straight to
+Odoo's own LLM connection with no Local Memory check at all — that gap is what a second addon,
+`ai_reporting_ai_bridge`, closes.
+
+This had to be a **separate addon**, not code inside `ai_reporting` itself, because it needs
+`_inherit = "ai.agent"`, and `ai.agent` only exists on databases where the real Enterprise `ai` app
+is installed. Putting that class directly in `ai_reporting` would crash installation on any database
+without that app. `ai_reporting_ai_bridge` instead declares `"depends": ["ai_reporting", "ai"]` and
+`"auto_install": True` — the standard Odoo pattern for optional glue modules (same pattern as core's
+own `sale_stock`) — so it only ever installs itself once both are present, and never loads (so never
+references `ai.agent`) otherwise.
+
+It overrides `ai.agent._generate_response_for_channel(mail_message, channel)`, which I verified is
+the real per-chat-message entry point in `/home/odoo/src/enterprise/ai/models/ai_agent.py` on your
+own Odoo.sh instance: it parses the user's prompt, calls `_generate_response()` (which is what
+actually calls the configured LLM provider and is what was demanding an API key), then posts each
+returned string back to the channel via `_post_ai_response()`. The override checks AI Reporting's
+Local Memory for the parsed prompt *before* calling `super()`; on a confirmed match it formats the
+result as a small markdown table and posts it directly, skipping the LLM call (and any API key
+requirement) entirely for that question. On any non-match or internal error it falls straight through
+to `super()._generate_response_for_channel(...)`, so native Ask AI behaves exactly as it did before
+this addon existed. Gated by the existing `enable_native_ask_ai_lma` setting (Settings > AI
+Reporting), default on.
+
+`services/odoo_ai_bridge.format_local_memory_chat_reply(question, result)` builds the markdown reply
+and lives in `ai_reporting` (not the glue addon) specifically so it can be unit tested
+(`test_format_local_memory_chat_reply_renders_markdown_table` /
+`..._handles_empty_rows` in `tests/test_ai_reporting.py`) without the real `ai` app installed.
+
 ## What is intentionally out of scope for this pass
 - **OCA `ai_oca_bridge`**: inspected for architectural reference only, per instruction, and not used
   or copied — `odoo_ai_bridge.py` and `third_party_ai_provider.py` are this module's own code.

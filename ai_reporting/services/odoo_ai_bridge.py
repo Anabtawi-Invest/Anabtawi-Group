@@ -206,6 +206,37 @@ class AiReportingOdooAiBridge(models.AbstractModel):
     def route_ask_ai_question(self, question, parameters=None):
         return self.env["ai.reporting.memory_service"].answer_question(question, parameters or {})
 
+    def format_local_memory_chat_reply(self, question, result):
+        """Turn a query_execution_service result (rows/record_count/...) into
+        a short markdown chat message, used by the ai_reporting_ai_bridge
+        glue addon to answer native Ask AI questions straight from Local
+        Memory instead of calling the LLM. Kept here (not in the glue addon)
+        so it can be unit tested without the real Enterprise "ai" app
+        installed."""
+        rows = result.get("rows") or []
+        record_count = result.get("record_count", len(rows))
+        lines = [
+            _("Answered from AI Reporting Local Memory (no AI call needed) -- %(count)s result(s) for \"%(question)s\".")
+            % {"count": record_count, "question": question}
+        ]
+        if rows:
+            columns = [key for key in rows[0].keys() if key != "id"][:6] or list(rows[0].keys())[:6]
+            lines.append("")
+            lines.append("| " + " | ".join(columns) + " |")
+            lines.append("| " + " | ".join(["---"] * len(columns)) + " |")
+            for row in rows[:20]:
+                cells = []
+                for column in columns:
+                    value = row.get(column)
+                    if isinstance(value, (list, tuple)) and len(value) == 2:
+                        value = value[1]
+                    cells.append("" if value in (False, None) else str(value))
+                lines.append("| " + " | ".join(cells) + " |")
+            if len(rows) > 20:
+                lines.append("")
+                lines.append(_("... and %s more row(s). Open AI Reporting > Local Memory or Advanced Reports for the full result.") % (len(rows) - 20))
+        return "\n".join(lines)
+
     def ask_native_provider(self, question, parameters=None):
         status = self.detect_native_ai()
         if status["third_party"].get("configured"):
