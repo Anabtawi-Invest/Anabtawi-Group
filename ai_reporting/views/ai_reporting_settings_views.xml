@@ -63,4 +63,11 @@
         </field>
     </record>
 
-    <re
+    <record id="action_ai_reporting_config_settings" model="ir.actions.act_window">
+        <field name="name">AI Reporting Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'ai_reporting'}</field>
+    </record>
+</odoo>
