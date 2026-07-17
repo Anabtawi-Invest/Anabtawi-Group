@@ -83,7 +83,7 @@
                 No overtime approval type is configured. Ask your administrator to enable an approval category as "Overtime Category".
             </div>
             <div t-if="categories" class="alert alert-info" role="status">
-                Once approved by your manager, this request unlocks one overtime check-in session. The requested hours become the maximum allowed duration for that overtime session.
+                You can submit this request before or after you work the extra hours. Once your manager approves it, matched overtime lines are validated as extra hours (immediately if you already worked, or automatically after check-out if you apply first).
             </div>
             <form t-if="categories" action="/my/overtime_approvals/new" method="post" class="o_portal_wrap">
                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>

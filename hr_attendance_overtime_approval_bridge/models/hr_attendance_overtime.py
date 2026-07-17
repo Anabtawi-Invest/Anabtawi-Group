@@ -60,6 +60,8 @@ class HrAttendanceOvertimeLine(models.Model):
     def create(self, vals_list):
         records = super().create(vals_list)
         records._queue_linked_attendance_recompute()
+        # Pre-work approvals: validate new extra-hours lines once attendance creates them.
+        self.env["approval.request"]._apply_approved_requests_to_new_overtime_lines(records)
         return records
 
     def action_approve(self):
@@ -71,7 +73,8 @@ class HrAttendanceOvertimeLine(models.Model):
         return super().action_approve()
 
     def write(self, vals):
-        if any(key in vals for key in ["status", "manual_duration", "time_start"]):
+        result = super().write(vals)
+        if any(key in vals for key in ["status", "manual_duration", "time_start", "date", "employee_id"]):
             self._queue_linked_attendance_recompute()
-        return super().write(vals)
+        return result
 

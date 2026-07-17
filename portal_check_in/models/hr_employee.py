@@ -209,21 +209,13 @@ class HrEmployee(models.Model):
         return attendance
 
     def _check_overtime_gate_before_check_in(self):
+        """Check-in is always allowed (before or after overtime approval).
+
+        Extra hours are validated when the manager approves an overtime request,
+        whether the employee applied before or after working that day.
+        """
         self.ensure_one()
-        if not hasattr(type(self), "_is_weekly_hours_threshold_reached"):
-            return False
-        if not self._is_weekly_hours_threshold_reached():
-            return False
-
-        approval_request = self._get_available_overtime_authorization_request()
-        if approval_request:
-            return approval_request
-
-        raise UserError(
-            _(
-                "You exceeded the weekly worked hours limit. You must obtain an approved overtime request before checking in again."
-            )
-        )
+        return False
 
     def _apply_authorized_check_out(self, attendance, action_date, geo_information):
         self.ensure_one()
