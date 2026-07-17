@@ -39,6 +39,55 @@ class AiReportingQueryExecutionService(models.AbstractModel):
         })
         return result
 
+    def execute_comparison(self, plan, parameters=None):
+        """Run a two-period comparison plan: same model/measures, two
+        separate domains (domain_a/domain_b), executed and validated exactly
+        like any other plan (each side goes through the normal execute_plan
+        safety checks), then summed per measure so callers get a clean
+        current-vs-previous total plus the delta."""
+        parameters = parameters or {}
+        shared_keys = {"model", "fields", "groupby", "measures", "order", "limit"}
+        base_plan = {key: value for key, value in plan.items() if key in shared_keys}
+        plan_a = dict(base_plan, domain=plan.get("domain_a") or [])
+        plan_b = dict(base_plan, domain=plan.get("domain_b") or [])
+        result_a = self.execute_plan(plan_a, parameters, preview=False)
+        result_b = self.execute_plan(plan_b, parameters, preview=False)
+        return {
+            "comparison": True,
+            "label_a": plan.get("label_a") or _("Period A"),
+            "label_b": plan.get("label_b") or _("Period B"),
+            "result_a": result_a,
+            "result_b": result_b,
+            "totals": self._compare_totals(result_a, result_b, plan.get("measures") or []),
+            "model": plan.get("model"),
+            "record_count": result_a.get("record_count", 0) + result_b.get("record_count", 0),
+        }
+
+    def _compare_totals(self, result_a, result_b, measures):
+        totals = []
+        for measure in measures:
+            if isinstance(measure, str):
+                field, alias = measure, measure
+            else:
+                field = measure.get("field")
+                alias = measure.get("alias") or field
+            total_a = self._sum_alias(result_a.get("rows", []), alias)
+            total_b = self._sum_alias(result_b.get("rows", []), alias)
+            delta = total_a - total_b
+            delta_percent = round((delta / total_b) * 100.0, 2) if total_b else (100.0 if total_a else 0.0)
+            totals.append({
+                "field": field,
+                "alias": alias,
+                "total_a": total_a,
+                "total_b": total_b,
+                "delta": delta,
+                "delta_percent": delta_percent,
+            })
+        return totals
+
+    def _sum_alias(self, rows, alias):
+        return sum((row.get(alias) or 0) for row in rows) if rows else 0
+
     def _check_date_range(self, domain):
         """Enforce the configured maximum date-range span once placeholders
         such as $date_from/$date_to are resolved to concrete values. Only

@@ -237,6 +237,56 @@ class AiReportingOdooAiBridge(models.AbstractModel):
                 lines.append(_("... and %s more row(s). Open AI Reporting > Local Memory or Advanced Reports for the full result.") % (len(rows) - 20))
         return "\n".join(lines)
 
+    def format_local_memory_comparison_reply(self, question, result):
+        """Format a query_execution_service.execute_comparison() result
+        (label_a/label_b/totals with delta + delta_percent per measure) as a
+        short markdown chat message for a period-over-period question such as
+        "compare sales this month vs last month"."""
+        label_a = result.get("label_a") or _("Period A")
+        label_b = result.get("label_b") or _("Period B")
+        lines = [
+            _("Answered from AI Reporting Local Memory (no AI call needed) -- comparing %(label_a)s vs %(label_b)s for \"%(question)s\".")
+            % {"label_a": label_a, "label_b": label_b, "question": question}
+        ]
+        totals = result.get("totals") or []
+        if totals:
+            lines.append("")
+            lines.append("| %s | %s | %s | %s |" % (_("Measure"), label_a, label_b, _("Change")))
+            lines.append("| --- | --- | --- | --- |")
+            for entry in totals:
+                arrow = "+" if entry.get("delta", 0) >= 0 else ""
+                lines.append(
+                    "| %s | %s | %s | %s%s (%s%s%%) |"
+                    % (
+                        entry.get("alias") or entry.get("field") or "",
+                        self._format_number(entry.get("total_a")),
+                        self._format_number(entry.get("total_b")),
+                        arrow,
+                        self._format_number(entry.get("delta")),
+                        arrow,
+                        entry.get("delta_percent", 0.0),
+                    )
+                )
+        else:
+            lines.append(_("%(count_a)s record(s) in %(label_a)s vs %(count_b)s record(s) in %(label_b)s.") % {
+                "count_a": result.get("result_a", {}).get("record_count", 0),
+                "label_a": label_a,
+                "count_b": result.get("result_b", {}).get("record_count", 0),
+                "label_b": label_b,
+            })
+        return "\n".join(lines)
+
+    def _format_number(self, value):
+        if value is None:
+            return "0"
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return str(value)
+        if number == int(number):
+            return "{:,}".format(int(number))
+        return "{:,.2f}".format(number)
+
     def ask_native_provider(self, question, parameters=None):
         status = self.detect_native_ai()
         if status["third_party"].get("configured"):

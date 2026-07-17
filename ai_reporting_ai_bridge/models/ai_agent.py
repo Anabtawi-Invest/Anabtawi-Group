@@ -63,12 +63,17 @@ class AiAgentLocalMemoryBridge(models.Model):
         except Exception:
             _logger.exception("AI Reporting: Local Memory answer execution failed; falling back to native AI.")
             return False
-        if not isinstance(result, dict) or "rows" not in result:
+        if not isinstance(result, dict):
+            return False
+        bridge = self.env["ai.reporting.odoo_ai_bridge"]
+        if result.get("comparison"):
+            return bridge.format_local_memory_comparison_reply(prompt, result)
+        if "rows" not in result:
             # answer_question() falls through to ask_native_provider() when there
             # is no real memory match; that shape has no "rows" key, so treat it
             # as "no local answer" and let native Ask AI handle it normally.
             return False
-        return self.env["ai.reporting.odoo_ai_bridge"].format_local_memory_chat_reply(prompt, result)
+        return bridge.format_local_memory_chat_reply(prompt, result)
 
     def _ai_reporting_lma_enabled(self):
         value = self.env["ir.config_parameter"].sudo().get_param("ai_reporting.enable_native_ask_ai_lma", "True")

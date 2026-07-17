@@ -40,7 +40,12 @@ class AiReportingMemoryService(models.AbstractModel):
         if memory:
             execution_parameters = dict(parameters or {})
             execution_parameters.update(resolved.get("parameters") or {})
-            result = self.env["ai.reporting.query_execution_service"].execute_plan(memory.plan_json, execution_parameters)
+            plan = memory.plan_json or {}
+            executor = self.env["ai.reporting.query_execution_service"]
+            if plan.get("plan_type") == "comparison":
+                result = executor.execute_comparison(plan, execution_parameters)
+            else:
+                result = executor.execute_plan(plan, execution_parameters)
             memory.record_execution(
                 question,
                 resolution_type=resolved.get("resolution_type"),

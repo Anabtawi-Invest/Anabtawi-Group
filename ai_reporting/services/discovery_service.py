@@ -144,10 +144,133 @@ class AiReportingDiscoveryService(models.AbstractModel):
             field_name = measure if isinstance(measure, str) else measure.get("field")
             if field_name and field_name not in available_fields:
                 return False
-        for item in plan.get("domain", []) or []:
-            if isinstance(item, (list, tuple)) and len(item) == 3 and item[0] not in available_fields:
-                return False
+        domain_keys = ("domain_a", "domain_b") if plan.get("plan_type") == "comparison" else ("domain",)
+        for domain_key in domain_keys:
+            for item in plan.get(domain_key, []) or []:
+                if isinstance(item, (list, tuple)) and len(item) == 3 and item[0] not in available_fields:
+                    return False
         return True
+
+    def _relative_periods(self):
+        """Named relative date ranges, all resolved server-side at run time by
+        parameter_resolver.py ($month_start(report_date) and friends) -- so
+        phrases like "sales last quarter" need no free-text date parameters
+        and stay correct however long the memory template is reused."""
+        return [
+            {"code": "today", "phrase": "today", "start": "$today", "end": "$today"},
+            {"code": "yesterday", "phrase": "yesterday", "start": "$yesterday", "end": "$yesterday"},
+            {"code": "this_week", "phrase": "this week", "start": "$week_start(report_date)", "end": "$week_end(report_date)"},
+            {"code": "last_week", "phrase": "last week", "start": "$previous_week_start(report_date)", "end": "$previous_week_end(report_date)"},
+            {"code": "this_month", "phrase": "this month", "start": "$month_start(report_date)", "end": "$month_end(report_date)"},
+            {"code": "last_month", "phrase": "last month", "start": "$previous_month_start(report_date)", "end": "$previous_month_end(report_date)"},
+            {"code": "this_quarter", "phrase": "this quarter", "start": "$quarter_start(report_date)", "end": "$quarter_end(report_date)"},
+            {"code": "last_quarter", "phrase": "last quarter", "start": "$previous_quarter_start(report_date)", "end": "$previous_quarter_end(report_date)"},
+            {"code": "this_year", "phrase": "this year", "start": "$year_start(report_date)", "end": "$year_end(report_date)"},
+            {"code": "last_year", "phrase": "last year", "start": "$previous_year_start(report_date)", "end": "$previous_year_end(report_date)"},
+        ]
+
+    def _period_pair(self, periods, code_a, code_b):
+        by_code = {period["code"]: period for period in periods}
+        return by_code.get(code_a), by_code.get(code_b)
+
+    def _period_total_template(self, model_name, model_label, date_field, measure_field, period, intent_prefix, addon_context=None, extra_domain=None):
+        addon_context = addon_context or {}
+        domain = list(extra_domain or []) + [[date_field, ">=", period["start"]], [date_field, "<=", period["end"]]]
+        return {
+            "name": "%s total %s" % (model_label.title(), period["phrase"]),
+            "intent_code": "%s_total_%s" % (intent_prefix, period["code"]),
+            "phrases": [
+                "%s %s" % (model_label, period["phrase"]),
+                "how much %s %s" % (model_label, period["phrase"]),
+                "total %s %s" % (model_label, period["phrase"]),
+                "what is the total %s %s" % (model_label, period["phrase"]),
+            ],
+            "plan": {
+                "model": model_name,
+                "addon_names": addon_context.get("addons", []),
+                "domain": domain,
+                "fields": [],
+                "groupby": [],
+                "measures": [{"field": measure_field, "aggregation": "sum", "alias": "total_%s" % measure_field}],
+                "limit": 5,
+            },
+            "parameter_schema": {},
+        }
+
+    def _period_by_relation_template(self, model_name, model_label, date_field, relation_field, measure_field, label, period, intent_prefix, addon_context=None, extra_domain=None):
+        addon_context = addon_context or {}
+        domain = list(extra_domain or []) + [[date_field, ">=", period["start"]], [date_field, "<=", period["end"]]]
+        return {
+            "name": "%s by %s %s" % (model_label.title(), label, period["phrase"]),
+            "intent_code": "%s_by_%s_%s" % (intent_prefix, label, period["code"]),
+            "phrases": [
+                "%s by %s %s" % (model_label, label, period["phrase"]),
+                "%s per %s %s" % (model_label, label, period["phrase"]),
+                "how much %s per %s %s" % (model_label, label, period["phrase"]),
+                "what is the %s per %s %s" % (model_label, label, period["phrase"]),
+            ],
+            "plan": {
+                "model": model_name,
+                "addon_names": addon_context.get("addons", []),
+                "domain": domain,
+                "fields": [relation_field],
+                "groupby": [relation_field],
+                "measures": [{"field": measure_field, "aggregation": "sum", "alias": "total_%s" % measure_field}],
+                "order": "total_%s desc" % measure_field,
+                "limit": 20,
+            },
+            "parameter_schema": {},
+        }
+
+    def _comparison_template(self, model_name, model_label, date_field, measure_field, period_a, period_b, intent_prefix, addon_context=None, extra_domain=None):
+        addon_context = addon_context or {}
+        base_domain = list(extra_domain or [])
+        domain_a = base_domain + [[date_field, ">=", period_a["start"]], [date_field, "<=", period_a["end"]]]
+        domain_b = base_domain + [[date_field, ">=", period_b["start"]], [date_field, "<=", period_b["end"]]]
+        return {
+            "name": "Compare %s: %s vs %s" % (model_label.title(), period_a["phrase"], period_b["phrase"]),
+            "intent_code": "%s_compare_%s_vs_%s" % (intent_prefix, period_a["code"], period_b["code"]),
+            "phrases": [
+                "compare %s between %s and %s" % (model_label, period_a["phrase"], period_b["phrase"]),
+                "%s comparison %s vs %s" % (model_label, period_a["phrase"], period_b["phrase"]),
+                "how do %s %s compare to %s" % (model_label, period_a["phrase"], period_b["phrase"]),
+                "%s %s vs %s" % (model_label, period_a["phrase"], period_b["phrase"]),
+            ],
+            "plan": {
+                "plan_type": "comparison",
+                "model": model_name,
+                "addon_names": addon_context.get("addons", []),
+                "domain_a": domain_a,
+                "domain_b": domain_b,
+                "label_a": period_a["phrase"].title(),
+                "label_b": period_b["phrase"].title(),
+                "measures": [{"field": measure_field, "aggregation": "sum", "alias": "total_%s" % measure_field}],
+            },
+            "parameter_schema": {},
+        }
+
+    def _period_and_comparison_templates(self, model_name, model_label, date_field, measure_field, intent_prefix, branch_field=None, extra_domain=None):
+        """Shared expansion used by sales/purchase/accounting: one total
+        template per relative period (today/this week/.../last year),
+        one by-branch breakdown per period if a branch field exists, and
+        month/quarter/year-over-year comparisons."""
+        templates = []
+        periods = self._relative_periods()
+        for period in periods:
+            templates.append(self._period_total_template(
+                model_name, model_label, date_field, measure_field, period, intent_prefix, extra_domain=extra_domain,
+            ))
+            if branch_field:
+                templates.append(self._period_by_relation_template(
+                    model_name, model_label, date_field, branch_field, measure_field, "branch", period, intent_prefix, extra_domain=extra_domain,
+                ))
+        for code_a, code_b in (("this_month", "last_month"), ("this_quarter", "last_quarter"), ("this_year", "last_year")):
+            period_a, period_b = self._period_pair(periods, code_a, code_b)
+            if period_a and period_b:
+                templates.append(self._comparison_template(
+                    model_name, model_label, date_field, measure_field, period_a, period_b, intent_prefix, extra_domain=extra_domain,
+                ))
+        return templates
 
     def _business_templates(self):
         templates = []
@@ -254,6 +377,10 @@ class AiReportingDiscoveryService(models.AbstractModel):
                     }
                 },
             })
+        templates += self._period_and_comparison_templates(
+            "account.move", "vendor bills", "invoice_date", "amount_total", "account_vendor_bills",
+            branch_field=branch_field, extra_domain=[["move_type", "=", "in_invoice"]],
+        )
         return templates
 
     def _purchase_templates(self):
@@ -376,6 +503,9 @@ class AiReportingDiscoveryService(models.AbstractModel):
                     }
                 },
             })
+        templates += self._period_and_comparison_templates(
+            "purchase.order.line", "purchases", "date_order", "price_subtotal", "purchase", branch_field=branch_field,
+        )
         return templates
 
     def _sales_templates(self):
@@ -427,6 +557,9 @@ class AiReportingDiscoveryService(models.AbstractModel):
                     }
                 },
             })
+        templates += self._period_and_comparison_templates(
+            "sale.order", "sales", "date_order", "amount_total", "sales", branch_field=branch_field,
+        )
         return templates
 
     def _inventory_templates(self):
@@ -542,6 +675,34 @@ class AiReportingDiscoveryService(models.AbstractModel):
                     "partner",
                     addon_context,
                 ))
+            if date_field and numeric_fields:
+                templates += self._generic_relative_period_templates(
+                    model_name, model_label, date_field, numeric_fields[0], branch_field, addon_context,
+                )
+        return templates
+
+    def _generic_relative_period_templates(self, model_name, model_label, date_field, measure_field, branch_field, addon_context=None):
+        """A deliberately small subset of _period_and_comparison_templates
+        (this month / last month, plus one comparison) applied to every
+        installed model that has a date field and a numeric field, so
+        "how much <anything> this month" works everywhere without generating
+        an unbounded number of Local Memory records per model. Sales,
+        purchases, and vendor bills get the full period set separately in
+        _sales_templates/_purchase_templates/_accounting_templates."""
+        intent_prefix = "generic_%s" % self._code(model_name)
+        periods = self._relative_periods()
+        this_month, last_month = self._period_pair(periods, "this_month", "last_month")
+        templates = [
+            self._period_total_template(model_name, model_label, date_field, measure_field, this_month, intent_prefix, addon_context=addon_context),
+            self._period_total_template(model_name, model_label, date_field, measure_field, last_month, intent_prefix, addon_context=addon_context),
+        ]
+        if branch_field:
+            templates.append(self._period_by_relation_template(
+                model_name, model_label, date_field, branch_field, measure_field, "branch", this_month, intent_prefix, addon_context=addon_context,
+            ))
+        templates.append(self._comparison_template(
+            model_name, model_label, date_field, measure_field, this_month, last_month, intent_prefix, addon_context=addon_context,
+        ))
         return templates
 
     def _is_generic_model_supported(self, model_name):

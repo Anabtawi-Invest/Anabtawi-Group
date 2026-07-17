@@ -167,6 +167,36 @@ and lives in `ai_reporting` (not the glue addon) specifically so it can be unit 
 (`test_format_local_memory_chat_reply_renders_markdown_table` /
 `..._handles_empty_rows` in `tests/test_ai_reporting.py`) without the real `ai` app installed.
 
+## Discovery: relative periods, by-branch breakdowns, and comparisons
+
+The Discovery wizard (`services/discovery_service.py`) generates a much broader set of ready-to-use
+Local Memory questions, not just fixed-date-range templates. `_relative_periods()` defines ten named
+ranges (today, yesterday, this/last week, this/last month, this/last quarter, this/last year), each
+resolved server-side at run time by `services/parameter_resolver.py` (`$month_start(report_date)` and
+friends), so a saved phrase like "sales last quarter" never goes stale — it recomputes the real
+quarter boundaries every time it runs, not the boundaries from whenever it was generated.
+
+For sales, purchases, and vendor bills, `_period_and_comparison_templates()` builds, per period: a
+total (e.g. "how much sales this month"), a by-branch breakdown if the model has a branch/warehouse/
+company field (e.g. "sales by branch this month"), and month-over-month / quarter-over-quarter /
+year-over-year comparisons (e.g. "compare sales between this month and last month"). Comparisons use
+a new `plan_type: "comparison"` plan shape (`domain_a`/`domain_b`/`label_a`/`label_b`) that reuses the
+existing single-domain validator and executor twice — once per side — so a comparison plan never
+bypasses the same SQL/eval/sudo/unbounded-limit checks a normal plan goes through
+(`query_execution_service.execute_comparison`).
+
+Every other installed model that has a date field and a numeric field also gets a smaller, bounded set
+(this month / last month / one comparison, plus a by-branch breakdown if applicable) via
+`_generic_relative_period_templates()`, so "how much `<anything>` this month" works across the whole
+database without generating an unbounded number of Local Memory records per model.
+
+Example phrases now answerable straight from Local Memory (no AI/API key needed) once Discovery has
+run: "sales this month", "sales by branch last quarter", "compare sales between this month and last
+month", "purchases last year", "vendor bills by branch this week", "compare purchases between this
+quarter and last quarter". Native Ask AI questions matching a comparison template are formatted by
+the new `odoo_ai_bridge.format_local_memory_comparison_reply()` as a small markdown table with
+per-measure totals and percentage change.
+
 ## What is intentionally out of scope for this pass
 - **OCA `ai_oca_bridge`**: inspected for architectural reference only, per instruction, and not used
   or copied — `odoo_ai_bridge.py` and `third_party_ai_provider.py` are this module's own code.

@@ -205,6 +205,57 @@ class TestAiReporting(TransactionCase):
         message = bridge.format_local_memory_chat_reply("sales for Nowhere", {"rows": [], "record_count": 0})
         self.assertIn("0 result", message)
 
+    def test_execute_comparison_returns_totals_and_record_counts(self):
+        self.env["res.partner"].create({"name": "Comparison Partner A"})
+        executor = self.env["ai.reporting.query_execution_service"]
+        plan = {
+            "model": "res.partner",
+            "domain_a": [["name", "=", "Comparison Partner A"]],
+            "domain_b": [["name", "=", "Nonexistent Partner XYZ"]],
+            "label_a": "With Match",
+            "label_b": "No Match",
+            "fields": ["display_name"],
+        }
+        result = executor.execute_comparison(plan)
+        self.assertTrue(result["comparison"])
+        self.assertEqual(result["result_a"]["record_count"], 1)
+        self.assertEqual(result["result_b"]["record_count"], 0)
+
+    def test_format_local_memory_comparison_reply_shows_both_periods(self):
+        bridge = self.env["ai.reporting.odoo_ai_bridge"]
+        result = {
+            "comparison": True,
+            "label_a": "This Month",
+            "label_b": "Last Month",
+            "totals": [{
+                "field": "amount_total",
+                "alias": "total_amount_total",
+                "total_a": 150.0,
+                "total_b": 100.0,
+                "delta": 50.0,
+                "delta_percent": 50.0,
+            }],
+            "result_a": {"record_count": 3},
+            "result_b": {"record_count": 2},
+        }
+        message = bridge.format_local_memory_comparison_reply("compare sales this month vs last month", result)
+        self.assertIn("This Month", message)
+        self.assertIn("Last Month", message)
+        self.assertIn("150", message)
+        self.assertIn("100", message)
+
+    def test_discovery_build_query_templates_runs_end_to_end(self):
+        # Exercises the full template-generation pipeline added this pass
+        # (relative periods, by-branch breakdowns, comparisons, and the
+        # generic-model expansion) against whatever models are actually
+        # installed in this test database -- models that don't exist here
+        # (sale.order, purchase.order.line, account.move) are simply skipped
+        # by _template_supported(), so this must complete without error.
+        result = self.env["ai.reporting.discovery.service"].build_query_templates()
+        self.assertIn("created", result)
+        self.assertIn("skipped", result)
+        self.assertGreater(result["created"], 0)
+
     def test_multi_company_isolation_hides_other_company_reports(self):
         other_company = self.env["res.company"].create({"name": "AI Reporting Other Co"})
         report = self.env["ai.reporting.saved.report"].create({
