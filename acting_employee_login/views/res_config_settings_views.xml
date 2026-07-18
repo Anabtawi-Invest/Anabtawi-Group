@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_acting_employee" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.acting.employee</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@id='invite_users']" position="after">
+                <div id="acting_employee_login_settings">
+                    <block title="Acting Employee Login" name="acting_employee_login_container">
+                        <setting id="acting_employee_modules_setting"
+                                 string="Chatter modules"
+                                 help="Show the acting employee name beside the username in chatter for documents belonging to these modules.">
+                            <field name="acting_employee_module_ids"
+                                     widget="many2many_tags"
+                                     options="{'no_create': True}"/>
+                        </setting>
+                    </block>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>
