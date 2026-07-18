@@ -84,6 +84,16 @@ class HrEmployee(models.Model):
 
     def _apply_absence_for_day(self, target_date, absent_type):
         self.ensure_one()
+        work_entry_source = self._get_work_entry_source_on_day(target_date)
+        # Working Schedule (calendar): keep standard work entries, do not mark as absent.
+        if work_entry_source == "calendar":
+            _logger.info(
+                "Absent automation: skip employee=%s(%s) date=%s reason=work entry source is Working Schedule",
+                self.name,
+                self.id,
+                target_date,
+            )
+            return
         expected_hours = self._get_expected_hours_on_day(target_date)
         if expected_hours <= 0:
             _logger.info(
@@ -92,7 +102,7 @@ class HrEmployee(models.Model):
                 self.name,
                 self.id,
                 target_date,
-                self._get_work_entry_source_on_day(target_date) or "none",
+                work_entry_source or "none",
             )
             return
         if self._has_checkin_on_day(target_date):
