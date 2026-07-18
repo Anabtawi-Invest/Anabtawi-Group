@@ -24,6 +24,15 @@ class HrEmployee(models.Model):
         help="If enabled, this employee can check in from any location and geofence "
              "restrictions are skipped.",
     )
+    attendance_work_location_ids = fields.Many2many(
+        "hr.work.location",
+        "hr_employee_attendance_work_location_rel",
+        "employee_id",
+        "work_location_id",
+        string="Allowed Attendance Work Locations",
+        help="Portal check-in is allowed when the employee is inside the geofence "
+             "of any of these work locations (each location uses its own lat/lon/radius).",
+    )
 
     def _acquire_portal_attendance_action_lock(self, lock_minutes=10):
         self.ensure_one()
@@ -102,46 +111,82 @@ class HrEmployee(models.Model):
         c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
         return radius_earth_m * c
 
-    def _get_portal_geofence_work_location(self):
+    def _get_portal_geofence_work_locations(self):
+        """Return work locations used to validate portal check-in geofence."""
         self.ensure_one()
-        work_location = self.work_location_id
-        if not work_location or self.allow_remote_attendance:
+        if self.allow_remote_attendance:
             return self.env["hr.work.location"]
-        return work_location if work_location.attendance_geo_enforce else self.env["hr.work.location"]
+
+        def _has_coordinates(location):
+            return (
+                self._safe_float(location.attendance_geo_latitude) is not None
+                and self._safe_float(location.attendance_geo_longitude) is not None
+            )
+
+        # Preferred: locations explicitly allowed on the employee profile.
+        if self.attendance_work_location_ids:
+            return self.attendance_work_location_ids.filtered(_has_coordinates)
+
+        # Backward compatibility: fall back to the single work location.
+        if self.work_location_id and self.work_location_id.attendance_geo_enforce:
+            return self.work_location_id.filtered(_has_coordinates)
+
+        return self.env["hr.work.location"]
+
+    def _get_portal_geofence_work_location(self):
+        """Deprecated single-location helper; kept for compatibility."""
+        return self._get_portal_geofence_work_locations()[:1]
 
     def _is_portal_geo_tracking_required(self):
         self.ensure_one()
-        return bool(self._get_portal_geofence_work_location())
+        if self.allow_remote_attendance:
+            return False
+        if self.attendance_work_location_ids:
+            return True
+        return bool(self._get_portal_geofence_work_locations())
 
     def _check_portal_geo_restriction(self, geo_information=None):
         self.ensure_one()
         # Restrict only check-in; check-out remains unchanged.
-        work_location = self._get_portal_geofence_work_location()
-        if work_location:
+        if self.allow_remote_attendance:
+            return
+
+        if self.attendance_work_location_ids and not self._get_portal_geofence_work_locations():
+            raise UserError(_(
+                "تم تحديد مواقع دوام للموظف، لكن إحداثياتها (خط العرض/خط الطول) غير مضبوطة."
+            ))
+
+        work_locations = self._get_portal_geofence_work_locations()
+        if not work_locations:
+            return
+
+        payload = geo_information or {}
+        employee_lat = self._safe_float(payload.get('latitude'))
+        employee_lon = self._safe_float(payload.get('longitude'))
+        if employee_lat is None or employee_lon is None:
+            raise UserError(_(
+                "تعذر التحقق من موقعك. يرجى تفعيل إذن الموقع ثم المحاولة مرة أخرى."
+            ))
+
+        nearest_distance_m = None
+        nearest_radius_m = None
+        for work_location in work_locations:
             location_lat = self._safe_float(work_location.attendance_geo_latitude)
             location_lon = self._safe_float(work_location.attendance_geo_longitude)
             radius_m = self._safe_float(work_location.attendance_geo_radius_m) or 0.0
-            if location_lat is None or location_lon is None:
-                raise UserError(_(
-                    "تم تفعيل نطاق موقع الدوام، لكن إحداثيات موقع الدوام (خط العرض/خط الطول) غير مضبوطة."
-                ))
-
-            payload = geo_information or {}
-            employee_lat = self._safe_float(payload.get('latitude'))
-            employee_lon = self._safe_float(payload.get('longitude'))
-            if employee_lat is None or employee_lon is None:
-                raise UserError(_(
-                    "تعذر التحقق من موقعك. يرجى تفعيل إذن الموقع ثم المحاولة مرة أخرى."
-                ))
-
             distance_m = self._haversine_distance_m(
                 employee_lat, employee_lon, location_lat, location_lon
             )
-            if distance_m > radius_m:
-                raise UserError(_(
-                    "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لموقع الدوام. "
-                    "المسافة الحالية %.0f متر، والنطاق المسموح %.0f متر."
-                ) % (distance_m, radius_m))
+            if distance_m <= radius_m:
+                return
+            if nearest_distance_m is None or distance_m < nearest_distance_m:
+                nearest_distance_m = distance_m
+                nearest_radius_m = radius_m
+
+        raise UserError(_(
+            "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لمواقع الدوام المحددة. "
+            "أقرب مسافة %.0f متر، وأقرب نطاق مسموح %.0f متر."
+        ) % (nearest_distance_m or 0.0, nearest_radius_m or 0.0))
 
     def _get_available_overtime_authorization_request(self):
         self.ensure_one()
