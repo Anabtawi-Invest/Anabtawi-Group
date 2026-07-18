@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_qc_ccp_list" model="ir.ui.view">
+        <field name="name">qc.ccp.list</field>
+        <field name="model">qc.ccp</field>
+        <field name="arch" type="xml">
+            <list string="Critical Control Points">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="process_step"/>
+                <field name="hazard_type"/>
+                <field name="critical_limit"/>
+                <field name="monitoring_frequency"/>
+                <field name="company_id" groups="base.group_multi_company"
+                       optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_qc_ccp_form" model="ir.ui.view">
+        <field name="name">qc.ccp.form</field>
+        <field name="model">qc.ccp</field>
+        <field name="arch" type="xml">
+            <form string="Critical Control Point">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1>
+                            <field name="code" placeholder="CCP-01"
+                                   class="oe_inline"/> -
+                            <field name="name" placeholder="Name"
+                                   class="oe_inline"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="process_step"/>
+                            <field name="hazard_type"/>
+                            <field name="critical_limit"/>
+                            <field name="monitoring_frequency"/>
+                        </group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="company_id"
+                                   groups="base.group_multi_company"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Hazard Analysis" name="hazard">
+                            <group>
+                                <field name="hazard_description"/>
+                                <field name="corrective_guidance"/>
+                            </group>
+                        </page>
+                        <page string="Linked Questions" name="questions">
+                            <field name="question_ids" readonly="1">
+                                <list>
+                                    <field name="template_id"/>
+                                    <field name="name"/>
+                                    <field name="answer_type"/>
+                                    <field name="is_critical"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_qc_ccp" model="ir.actions.act_window">
+        <field name="name">CCP Register</field>
+        <field name="res_model">qc.ccp</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Document your CCPs</p>
+            <p>Record each Critical Control Point with its hazard, critical
+               limit and monitoring frequency, then link checklist questions
+               to it (HACCP).</p>
+        </field>
+    </record>
+
+</odoo>
