@@ -12,6 +12,11 @@
                 <field name="answer_type"/>
                 <field name="weight"/>
                 <field name="is_critical"/>
+                <field name="ccp_id" optional="show"/>
+                <field name="target_value" optional="hide"/>
+                <field name="tolerance_min" optional="hide"/>
+                <field name="tolerance_max" optional="hide"/>
+                <field name="uom_name" optional="hide"/>
                 <field name="allow_na" optional="hide"/>
                 <field name="allow_photo" optional="hide"/>
             </list>
@@ -48,6 +53,11 @@
                                     <field name="answer_type"/>
                                     <field name="weight"/>
                                     <field name="is_critical"/>
+                                    <field name="ccp_id" optional="show"/>
+                                    <field name="target_value" optional="hide"/>
+                                    <field name="tolerance_min" optional="hide"/>
+                                    <field name="tolerance_max" optional="hide"/>
+                                    <field name="uom_name" optional="hide"/>
                                 </list>
                             </field>
                         </page>
@@ -87,7 +97,11 @@
                     </div>
                     <group>
                         <group>
-                            <field name="total_score"/>
+                            <field name="checklist_type" widget="radio"/>
+                            <field name="daily_rounds"
+                                   invisible="checklist_type != 'daily'"/>
+                            <field name="total_score"
+                                   invisible="checklist_type != 'audit'"/>
                             <field name="factor_count"/>
                         </group>
                         <group>
@@ -122,6 +136,7 @@
         <field name="arch" type="xml">
             <list string="Checklist Templates">
                 <field name="name"/>
+                <field name="checklist_type"/>
                 <field name="factor_count"/>
                 <field name="total_score"/>
                 <field name="company_id" groups="base.group_multi_company"/>

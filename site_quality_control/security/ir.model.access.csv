@@ -38,3 +38,24 @@ access_qc_historical_score_manager,qc.historical.score quality manager,model_qc_
 access_qc_historical_factor_average_viewer,qc.historical.factor.average viewer,model_qc_historical_factor_average,group_qc_management_viewer,1,0,0,0
 access_qc_historical_factor_average_inspector,qc.historical.factor.average inspector,model_qc_historical_factor_average,group_qc_inspector,1,0,0,0
 access_qc_historical_factor_average_manager,qc.historical.factor.average quality manager,model_qc_historical_factor_average,group_qc_quality_manager,1,1,1,1
+access_qc_daily_checklist_viewer,qc.daily.checklist viewer,model_qc_daily_checklist,group_qc_management_viewer,1,0,0,0
+access_qc_daily_checklist_line_viewer,qc.daily.checklist.line viewer,model_qc_daily_checklist_line,group_qc_management_viewer,1,0,0,0
+access_qc_daily_checklist_inspector,qc.daily.checklist inspector,model_qc_daily_checklist,group_qc_inspector,1,1,1,0
+access_qc_daily_checklist_line_inspector,qc.daily.checklist.line inspector,model_qc_daily_checklist_line,group_qc_inspector,1,1,1,1
+access_qc_daily_checklist_manager,qc.daily.checklist quality manager,model_qc_daily_checklist,group_qc_quality_manager,1,1,1,1
+access_qc_daily_checklist_line_manager,qc.daily.checklist.line quality manager,model_qc_daily_checklist_line,group_qc_quality_manager,1,1,1,1
+access_qc_instrument_viewer,qc.instrument viewer,model_qc_instrument,group_qc_management_viewer,1,0,0,0
+access_qc_instrument_inspector,qc.instrument inspector,model_qc_instrument,group_qc_inspector,1,1,0,0
+access_qc_instrument_manager,qc.instrument quality manager,model_qc_instrument,group_qc_quality_manager,1,1,1,1
+access_qc_instrument_calibration_viewer,qc.instrument.calibration viewer,model_qc_instrument_calibration,group_qc_management_viewer,1,0,0,0
+access_qc_instrument_calibration_inspector,qc.instrument.calibration inspector,model_qc_instrument_calibration,group_qc_inspector,1,1,1,0
+access_qc_instrument_calibration_manager,qc.instrument.calibration quality manager,model_qc_instrument_calibration,group_qc_quality_manager,1,1,1,1
+access_qc_ccp_viewer,qc.ccp viewer,model_qc_ccp,group_qc_management_viewer,1,0,0,0
+access_qc_ccp_inspector,qc.ccp inspector,model_qc_ccp,group_qc_inspector,1,0,0,0
+access_qc_ccp_manager,qc.ccp quality manager,model_qc_ccp,group_qc_quality_manager,1,1,1,1
+access_qc_receiving_viewer,qc.receiving.inspection viewer,model_qc_receiving_inspection,group_qc_management_viewer,1,0,0,0
+access_qc_receiving_inspector,qc.receiving.inspection inspector,model_qc_receiving_inspection,group_qc_inspector,1,1,1,0
+access_qc_receiving_manager,qc.receiving.inspection quality manager,model_qc_receiving_inspection,group_qc_quality_manager,1,1,1,1
+access_qc_receiving_line_viewer,qc.receiving.line viewer,model_qc_receiving_line,group_qc_management_viewer,1,0,0,0
+access_qc_receiving_line_inspector,qc.receiving.line inspector,model_qc_receiving_line,group_qc_inspector,1,1,1,1
+access_qc_receiving_line_manager,qc.receiving.line quality manager,model_qc_receiving_line,group_qc_quality_manager,1,1,1,1

@@ -15,6 +15,18 @@
               action="action_qc_inspection"
               sequence="10"/>
 
+    <menuitem id="menu_qc_daily_checklists"
+              name="Daily Checklists"
+              parent="menu_qc_branch_root"
+              action="action_qc_daily_checklist"
+              sequence="15"/>
+
+    <menuitem id="menu_qc_receiving"
+              name="Receiving Inspections"
+              parent="menu_qc_branch_root"
+              action="action_qc_receiving"
+              sequence="17"/>
+
     <menuitem id="menu_qc_corrective_actions"
               name="Corrective Actions"
               parent="menu_qc_branch_root"
@@ -75,6 +87,18 @@
               parent="menu_qc_configuration"
               action="action_qc_checklist_template"
               sequence="20"/>
+
+    <menuitem id="menu_qc_instruments"
+              name="Instruments"
+              parent="menu_qc_configuration"
+              action="action_qc_instrument"
+              sequence="25"/>
+
+    <menuitem id="menu_qc_ccp"
+              name="CCP Register"
+              parent="menu_qc_configuration"
+              action="action_qc_ccp"
+              sequence="27"/>
 
     <menuitem id="menu_qc_grades"
               name="Grades"

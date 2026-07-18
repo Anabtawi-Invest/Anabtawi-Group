@@ -6,6 +6,8 @@ ANSWER_TYPES = [
     ("pass_fail", "Pass / Fail"),
     ("score_5", "Score 0-5"),
     ("score_10", "Score 0-10"),
+    ("check", "Done Check"),
+    ("measure", "Measure (value)"),
     ("comment", "Comment only"),
 ]
 
@@ -40,3 +42,26 @@ class QcQuestionTemplate(models.Model):
     allow_na = fields.Boolean(string="Allow Not Applicable", default=True)
     allow_photo = fields.Boolean(string="Allow Photo", default=True)
     help_text = fields.Text(string="Guidance")
+
+    # Measure questions (e.g. fridge temperature): the entered value must fall
+    # within [tolerance_min, tolerance_max] to pass.
+    target_value = fields.Float(
+        string="Target Value",
+        help="Expected value for measure questions (e.g. 4 for a fridge in °C).",
+    )
+    tolerance_min = fields.Float(
+        string="Min Tolerance",
+        help="Lowest acceptable measured value.",
+    )
+    tolerance_max = fields.Float(
+        string="Max Tolerance",
+        help="Highest acceptable measured value.",
+    )
+    uom_name = fields.Char(
+        string="Unit", help="Display unit for the measured value (e.g. °C).",
+    )
+    ccp_id = fields.Many2one(
+        "qc.ccp", string="CCP",
+        help="Critical Control Point from the HACCP register this question "
+             "monitors. Failures are traced back to the hazard analysis.",
+    )

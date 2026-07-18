@@ -11,6 +11,26 @@
         <field name="active" eval="True"/>
     </record>
 
+    <record id="cron_generate_daily_checklists" model="ir.cron">
+        <field name="name">Branch QC: Generate Daily Checklists</field>
+        <field name="model_id" ref="model_qc_daily_checklist"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_generate_daily_checklists()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="cron_calibration_reminders" model="ir.cron">
+        <field name="name">Branch QC: Instrument Calibration Reminders</field>
+        <field name="model_id" ref="model_qc_instrument"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_calibration_reminders()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
+    </record>
+
     <record id="cron_send_due_reminders" model="ir.cron">
         <field name="name">Branch QC: Inspection Reminders</field>
         <field name="model_id" ref="model_qc_inspection"/>

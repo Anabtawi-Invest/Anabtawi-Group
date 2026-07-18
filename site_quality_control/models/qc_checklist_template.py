@@ -9,6 +9,25 @@ class QcChecklistTemplate(models.Model):
     _order = "name"
 
     name = fields.Char(string="Template Name", required=True, translate=True)
+    checklist_type = fields.Selection(
+        [
+            ("audit", "Graded Audit"),
+            ("daily", "Daily Checklist (no grading)"),
+            ("receiving", "Receiving Inspection"),
+        ],
+        string="Checklist Type", default="audit", required=True,
+        help="Graded audits produce a score and a grade. Daily checklists are "
+             "simple done/measure lists filled by the site with no scoring. "
+             "Receiving templates are used to inspect incoming deliveries.",
+    )
+    daily_rounds = fields.Selection(
+        [("1", "Once a day"), ("2", "Twice a day (morning/evening)"),
+         ("3", "Three times a day")],
+        string="Rounds per Day", default="1",
+        help="How many checklists are generated per day for daily templates. "
+             "Use several rounds for CCP monitoring such as fridge "
+             "temperatures.",
+    )
     active = fields.Boolean(default=True)
     company_id = fields.Many2one(
         "res.company", string="Company",

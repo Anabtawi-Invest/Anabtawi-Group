@@ -177,6 +177,11 @@ class QcInspection(models.Model):
                         "answer_type": q_tmpl.answer_type,
                         "weight": q_tmpl.weight,
                         "is_critical": q_tmpl.is_critical,
+                        "target_value": q_tmpl.target_value,
+                        "tolerance_min": q_tmpl.tolerance_min,
+                        "tolerance_max": q_tmpl.tolerance_max,
+                        "uom_name": q_tmpl.uom_name,
+                        "ccp_id": q_tmpl.ccp_id.id,
                     })
         return True
 
@@ -287,6 +292,15 @@ class QcInspection(models.Model):
             raise UserError(_(
                 "%d question(s) still need an answer before submitting.")
                 % len(pending))
+        # Measures taken with an uncalibrated/overdue instrument are invalid.
+        bad_instruments = self.answer_ids.filtered(
+            lambda a: a.answer_type == "measure" and a.instrument_id
+            and not a.instrument_id._is_usable()).mapped("instrument_id")
+        if bad_instruments:
+            raise UserError(_(
+                "The following instruments are overdue for calibration and "
+                "cannot be used: %s")
+                % ", ".join(bad_instruments.mapped("name")))
 
     def _handle_critical_failures(self):
         """Create mandatory corrective actions and optional Quality Alerts."""
@@ -407,6 +421,7 @@ class QcInspection(models.Model):
                     (today - last.inspection_date).days < interval:
                 continue
             template = self.env["qc.checklist.template"].search([
+                ("checklist_type", "=", "audit"),
                 "|", ("company_id", "=", branch.company_id.id),
                 ("company_id", "=", False),
             ], limit=1)

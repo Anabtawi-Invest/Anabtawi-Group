@@ -28,6 +28,16 @@
                             <field name="answer_type" readonly="1" optional="show"/>
                             <field name="val_pass"/>
                             <field name="val_score"/>
+                            <field name="val_check"/>
+                            <field name="val_measure"/>
+                            <field name="uom_name" readonly="1" optional="show"/>
+                            <field name="target_value" readonly="1" optional="hide"/>
+                            <field name="tolerance_min" readonly="1" optional="hide"/>
+                            <field name="tolerance_max" readonly="1" optional="hide"/>
+                            <field name="instrument_id" optional="show"/>
+                            <field name="ccp_id" readonly="1" optional="show"/>
+                            <field name="out_of_range" readonly="1"
+                                   decoration-danger="out_of_range" optional="show"/>
                             <field name="not_applicable"/>
                             <field name="comment" optional="show"/>
                             <field name="photo" widget="image" optional="hide"/>
