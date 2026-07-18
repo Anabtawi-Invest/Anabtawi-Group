@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- ============================================================ -->
+    <!-- Daily site checklist template (no grading).                  -->
+    <!-- Arabic wording is provisional — QA team to approve.          -->
+    <!-- ============================================================ -->
+    <record id="template_daily_site" model="qc.checklist.template">
+        <field name="name">القائمة اليومية للفرع / Daily Site Checklist</field>
+        <field name="checklist_type">daily</field>
+    </record>
+
+    <!-- Section 1: Opening & cleaning tasks -->
+    <record id="daily_factor_opening" model="qc.factor.template">
+        <field name="name">مهام الافتتاح والنظافة</field>
+        <field name="template_id" ref="template_daily_site"/>
+        <field name="sequence">10</field>
+    </record>
+    <record id="daily_q_open_1" model="qc.question.template">
+        <field name="name">تنظيف أسطح العمل والمعدات</field>
+        <field name="factor_id" ref="daily_factor_opening"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">check</field>
+    </record>
+    <record id="daily_q_open_2" model="qc.question.template">
+        <field name="name">تنظيف الأرضيات ومنطقة البيع</field>
+        <field name="factor_id" ref="daily_factor_opening"/>
+        <field name="sequence">20</field>
+        <field name="answer_type">check</field>
+    </record>
+    <record id="daily_q_open_3" model="qc.question.template">
+        <field name="name">التأكد من نظافة الزي والمظهر الشخصي</field>
+        <field name="factor_id" ref="daily_factor_opening"/>
+        <field name="sequence">30</field>
+        <field name="answer_type">check</field>
+    </record>
+    <record id="daily_q_open_4" model="qc.question.template">
+        <field name="name">فحص تواريخ الصلاحية للمنتجات المعروضة</field>
+        <field name="factor_id" ref="daily_factor_opening"/>
+        <field name="sequence">40</field>
+        <field name="answer_type">check</field>
+        <field name="is_critical" eval="True"/>
+    </record>
+
+    <!-- Section 2: Temperatures (measures) -->
+    <record id="daily_factor_temps" model="qc.factor.template">
+        <field name="name">درجات حرارة التبريد والتجميد</field>
+        <field name="template_id" ref="template_daily_site"/>
+        <field name="sequence">20</field>
+    </record>
+    <record id="daily_q_temp_fridge1" model="qc.question.template">
+        <field name="name">درجة حرارة البراد الرئيسي</field>
+        <field name="factor_id" ref="daily_factor_temps"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">measure</field>
+        <field name="is_critical" eval="True"/>
+        <field name="target_value">4.0</field>
+        <field name="tolerance_min">0.0</field>
+        <field name="tolerance_max">5.0</field>
+        <field name="uom_name">°C</field>
+    </record>
+    <record id="daily_q_temp_fridge2" model="qc.question.template">
+        <field name="name">درجة حرارة براد العرض</field>
+        <field name="factor_id" ref="daily_factor_temps"/>
+        <field name="sequence">20</field>
+        <field name="answer_type">measure</field>
+        <field name="is_critical" eval="True"/>
+        <field name="target_value">4.0</field>
+        <field name="tolerance_min">0.0</field>
+        <field name="tolerance_max">5.0</field>
+        <field name="uom_name">°C</field>
+    </record>
+    <record id="daily_q_temp_freezer" model="qc.question.template">
+        <field name="name">درجة حرارة الفريزر</field>
+        <field name="factor_id" ref="daily_factor_temps"/>
+        <field name="sequence">30</field>
+        <field name="answer_type">measure</field>
+        <field name="is_critical" eval="True"/>
+        <field name="target_value">-18.0</field>
+        <field name="tolerance_min">-25.0</field>
+        <field name="tolerance_max">-15.0</field>
+        <field name="uom_name">°C</field>
+    </record>
+
+    <!-- Section 3: Closing tasks -->
+    <record id="daily_factor_closing" model="qc.factor.template">
+        <field name="name">مهام الإغلاق</field>
+        <field name="template_id" ref="template_daily_site"/>
+        <field name="sequence">30</field>
+    </record>
+    <record id="daily_q_close_1" model="qc.question.template">
+        <field name="name">تخزين المنتجات المتبقية بشكل صحيح</field>
+        <field name="factor_id" ref="daily_factor_closing"/>
+        <field name="sequence">10</field>
+        <field name="answer_type">check</field>
+    </record>
+    <record id="daily_q_close_2" model="qc.question.template">
+        <field name="name">إغلاق وتنظيف المعدات</field>
+        <field name="factor_id" ref="daily_factor_closing"/>
+        <field name="sequence">20</field>
+        <field name="answer_type">check</field>
+    </record>
+    <record id="daily_q_close_3" model="qc.question.template">
+        <field name="name">ملاحظات نهاية اليوم</field>
+        <field name="factor_id" ref="daily_factor_closing"/>
+        <field name="sequence">30</field>
+        <field name="answer_type">comment</field>
+    </record>
+
+</odoo>
