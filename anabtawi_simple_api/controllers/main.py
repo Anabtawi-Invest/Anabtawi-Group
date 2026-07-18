@@ -113,7 +113,6 @@ class AnabtawiSimpleAPI(http.Controller):
                 "name": partner.name or "",
                 "email": partner.email or "",
                 "phone": partner.phone or "",
-                "mobile": partner.mobile or "",
                 "vat": partner.vat or "",
                 "street": partner.street or "",
                 "city": partner.city or "",
