@@ -128,7 +128,7 @@
                 <filter name="todo" string="To Do"
                         domain="[('state', '=', 'todo')]"/>
                 <filter name="with_issues" string="Out of Range"
-                        domain="[('out_of_range_count', '&gt;', 0)]"/>
+                        domain="[('line_ids.out_of_range', '=', True)]"/>
                 <group>
                     <filter name="group_branch" string="Site"
                             context="{'group_by': 'branch_id'}"/>
