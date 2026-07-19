@@ -34,16 +34,16 @@ class HrEmployee(models.Model):
     def _inverse_acting_login_password(self):
         for employee in self:
             password = employee.acting_login_password or ''
+            # Same pattern as res.users._set_new_password: the web client
+            # submits False/'' for empty fields, and this field always
+            # displays empty after save. Never clear the hash on empty.
+            if not password:
+                continue
             employee._set_acting_login_password(password)
 
     def _set_acting_login_password(self, password):
         self.ensure_one()
         if not password:
-            self.sudo().write({'acting_login_password_hash': False})
-            _logger.warning(
-                "acting_employee_login: cleared acting password for employee_id=%s",
-                self.id,
-            )
             return
         hashed = self.env['res.users']._crypt_context().hash(password)
         self.sudo().write({'acting_login_password_hash': hashed})
