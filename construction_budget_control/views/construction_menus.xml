@@ -1,0 +1,7 @@
+<odoo>
+    <menuitem id="menu_construction_root" name="Construction Budget Control" sequence="60"/>
+    <menuitem id="menu_construction_projects" name="Projects" parent="menu_construction_root" action="action_construction_project" sequence="10"/>
+    <menuitem id="menu_construction_pos" name="Purchase Orders" parent="menu_construction_root" action="action_construction_po" sequence="20"/>
+    <menuitem id="menu_construction_config" name="Configuration" parent="menu_construction_root" sequence="90" groups="group_construction_manager"/>
+    <menuitem id="menu_construction_config_settings" name="Settings" parent="menu_construction_config" action="action_construction_config_settings" sequence="10"/>
+</odoo>
