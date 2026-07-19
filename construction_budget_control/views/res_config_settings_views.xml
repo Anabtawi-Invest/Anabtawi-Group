@@ -1,16 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="res_config_settings_view_form_construction" model="ir.ui.view">
         <field name="name">res.config.settings.view.form.inherit.construction</field>
         <field name="model">res.config.settings</field>
-        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
                 <app string="Construction Budget Control" name="construction_budget_control">
                     <block title="Approval Thresholds" name="approval_thresholds_settings">
-                        <setting string="General Manager Approval Threshold" help="Purchase Orders at or above this amount require General Manager approval">
+                        <field name="company_currency_id" invisible="1"/>
+                        <setting string="General Manager Approval Threshold"
+                                 help="Purchase Orders at or above this amount require General Manager approval">
                             <field name="construction_gm_threshold"/>
                         </setting>
-                        <setting string="Chairman Approval Threshold" help="Purchase Orders at or above this amount require Chairman approval (after the General Manager)">
+                        <setting string="Chairman Approval Threshold"
+                                 help="Purchase Orders at or above this amount require Chairman approval (after the General Manager)">
                             <field name="construction_chairman_threshold"/>
                         </setting>
                     </block>
