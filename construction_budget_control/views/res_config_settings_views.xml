@@ -1,0 +1,29 @@
+<odoo>
+    <record id="res_config_settings_view_form_construction" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.construction</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app string="Construction Budget Control" name="construction_budget_control">
+                    <block title="Approval Thresholds" name="approval_thresholds_settings">
+                        <setting string="General Manager Approval Threshold" help="Purchase Orders at or above this amount require General Manager approval">
+                            <field name="construction_gm_threshold"/>
+                        </setting>
+                        <setting string="Chairman Approval Threshold" help="Purchase Orders at or above this amount require Chairman approval (after the General Manager)">
+                            <field name="construction_chairman_threshold"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_construction_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'construction_budget_control'}</field>
+    </record>
+</odoo>
