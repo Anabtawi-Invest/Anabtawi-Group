@@ -14,11 +14,11 @@ class IrHttp(models.AbstractModel):
     @classmethod
     def _pre_dispatch(cls, rule, args):
         super()._pre_dispatch(rule, args)
-        cls._log_login_request()
+        cls._log_login_request(rule)
         cls._inject_acting_employee_context()
 
     @classmethod
-    def _log_login_request(cls):
+    def _log_login_request(cls, rule=None):
         if not request or not getattr(request, 'httprequest', None):
             return
         path = (request.httprequest.path or '').rstrip('/')
@@ -32,6 +32,9 @@ class IrHttp(models.AbstractModel):
         except Exception:  # noqa: BLE001
             pass
         cookie_sid = request.httprequest.cookies.get('session_id') or ''
+        endpoint = None
+        if rule is not None:
+            endpoint = getattr(rule, 'endpoint', None)
         _logger.warning(
             "acting_employee_login request: method=%s path=%s session_uid=%s "
             "sid_prefix=%s cookie_sid_prefix=%s endpoint=%s",
@@ -40,7 +43,7 @@ class IrHttp(models.AbstractModel):
             uid,
             sid[:42],
             cookie_sid[:42],
-            getattr(rule, 'endpoint', None),
+            endpoint,
         )
 
     @classmethod
