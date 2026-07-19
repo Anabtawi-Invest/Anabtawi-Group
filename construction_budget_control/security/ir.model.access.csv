@@ -1,7 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_construction_project_user,construction.project.user,model_construction_project,group_construction_user,1,1,1,0
-access_construction_project_manager,construction.project.manager,model_construction_project,group_construction_manager,1,1,1,1
-access_construction_po_user,construction.budget.po.user,model_construction_budget_po,group_construction_user,1,1,1,0
-access_construction_po_manager,construction.budget.po.manager,model_construction_budget_po,group_construction_manager,1,1,1,1
-access_construction_po_line_user,construction.budget.po.line.user,model_construction_budget_po_line,group_construction_user,1,1,1,1
-access_construction_po_line_manager,construction.budget.po.line.manager,model_construction_budget_po_line,group_construction_manager,1,1,1,1
