@@ -10,13 +10,12 @@ selected in Settings.
     """,
     'category': 'Hidden',
     'author': 'enbtawi',
-    'version': '1.3',
+    'version': '1.4',
     'depends': [
         'base_setup',
         'hr',
         'mail',
         'web',
-        'website',
     ],
     'data': [
         'views/hr_employee_views.xml',
@@ -25,9 +24,6 @@ selected in Settings.
     ],
     'assets': {
         'web.assets_backend': [
-            'acting_employee_login/static/src/core/common/**/*',
-        ],
-        'mail.assets_public': [
             'acting_employee_login/static/src/core/common/**/*',
         ],
     },
