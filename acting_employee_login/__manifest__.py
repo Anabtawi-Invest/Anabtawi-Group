@@ -10,12 +10,13 @@ selected in Settings.
     """,
     'category': 'Hidden',
     'author': 'enbtawi',
-    'version': '1.0',
+    'version': '1.1',
     'depends': [
         'base_setup',
         'hr',
         'mail',
         'web',
+        'website',
     ],
     'data': [
         'views/hr_employee_views.xml',
