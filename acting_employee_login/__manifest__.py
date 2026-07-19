@@ -10,7 +10,7 @@ selected in Settings.
     """,
     'category': 'Hidden',
     'author': 'enbtawi',
-    'version': '1.4',
+    'version': '1.5',
     'depends': [
         'base_setup',
         'hr',
