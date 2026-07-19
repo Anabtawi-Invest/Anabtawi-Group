@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 
+import logging
+
 from odoo import api, fields, models
 from odoo.exceptions import AccessDenied
+
+_logger = logging.getLogger(__name__)
 
 
 class HrEmployee(models.Model):
@@ -36,9 +40,18 @@ class HrEmployee(models.Model):
         self.ensure_one()
         if not password:
             self.sudo().write({'acting_login_password_hash': False})
+            _logger.warning(
+                "acting_employee_login: cleared acting password for employee_id=%s",
+                self.id,
+            )
             return
         hashed = self.env['res.users']._crypt_context().hash(password)
         self.sudo().write({'acting_login_password_hash': hashed})
+        _logger.warning(
+            "acting_employee_login: set acting password hash for employee_id=%s name=%r",
+            self.id,
+            self.name,
+        )
 
     def _check_acting_login_password(self, password):
         self.ensure_one()
@@ -54,13 +67,29 @@ class HrEmployee(models.Model):
         name = (name or '').strip()
         password = password or ''
         if not name or not password:
+            _logger.warning(
+                "acting_employee_login: missing name or password "
+                "name_empty=%s password_empty=%s",
+                not bool(name),
+                not bool(password),
+            )
             raise AccessDenied(
                 self.env._('Employee name and employee password are required.')
             )
 
         employees = self.sudo().search([('name', '=ilike', name)])
+        with_hash = employees.filtered(lambda emp: bool(emp.acting_login_password_hash))
         matches = employees.filtered(
             lambda emp: emp._check_acting_login_password(password)
+        )
+        _logger.warning(
+            "acting_employee_login: name lookup name=%r found=%s with_hash=%s "
+            "matches=%s ids=%s",
+            name,
+            len(employees),
+            len(with_hash),
+            len(matches),
+            employees.ids,
         )
         if len(matches) != 1:
             raise AccessDenied(
