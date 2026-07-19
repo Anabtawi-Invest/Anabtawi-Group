@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+
+    <!-- ============================================================ -->
+    <!-- Security groups (chained via implied_ids)                    -->
+    <!-- ============================================================ -->
+    <record id="group_qc_management_viewer" model="res.groups">
+        <field name="name">Quality: Top Management Viewer</field>
+        <field name="implied_ids" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="comment">Read-only access to inspections, ranking, reports and dashboard.</field>
+    </record>
+
+    <record id="group_qc_inspector" model="res.groups">
+        <field name="name">Quality: QC Inspector</field>
+        <field name="implied_ids" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="comment">Performs inspections for assigned sites.</field>
+    </record>
+
+    <record id="group_qc_branch_manager" model="res.groups">
+        <field name="name">Quality: Site/Dept Manager</field>
+        <field name="implied_ids" eval="[Command.link(ref('group_qc_inspector'))]"/>
+        <field name="comment">Follows up corrective actions for their site.</field>
+    </record>
+
+    <record id="group_qc_quality_manager" model="res.groups">
+        <field name="name">Quality: Quality Manager</field>
+        <field name="implied_ids" eval="[Command.link(ref('group_qc_branch_manager')), Command.link(ref('group_qc_management_viewer'))]"/>
+        <field name="comment">Reviews, approves and returns inspections; manages templates.</field>
+    </record>
+
+    <record id="group_qc_admin" model="res.groups">
+        <field name="name">Quality: Administrator</field>
+        <field name="implied_ids" eval="[Command.link(ref('group_qc_quality_manager'))]"/>
+        <field name="comment">Full configuration access.</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Record rules                                                 -->
+    <!-- ============================================================ -->
+
+    <!-- Multi-company isolation -->
+    <record id="rule_qc_branch_company" model="ir.rule">
+        <field name="name">QC Site: multi-company</field>
+        <field name="model_id" ref="model_qc_branch"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_inspection_company" model="ir.rule">
+        <field name="name">QC Inspection: multi-company</field>
+        <field name="model_id" ref="model_qc_inspection"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_corrective_company" model="ir.rule">
+        <field name="name">QC Corrective Action: multi-company</field>
+        <field name="model_id" ref="model_qc_corrective_action"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_ranking_company" model="ir.rule">
+        <field name="name">QC Site Ranking: multi-company</field>
+        <field name="model_id" ref="model_qc_branch_ranking"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_historical_score_company" model="ir.rule">
+        <field name="name">QC Historical Score: multi-company</field>
+        <field name="model_id" ref="model_qc_historical_score"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_historical_factor_average_company" model="ir.rule">
+        <field name="name">QC Historical Factor Average: multi-company</field>
+        <field name="model_id" ref="model_qc_historical_factor_average"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <!-- Site scoping: inspectors and site managers see only inspections
+         for sites where they are the assigned inspector or manager.
+         Quality managers and above see everything (their own rule below). -->
+    <record id="rule_qc_inspection_own_branch" model="ir.rule">
+        <field name="name">QC Inspection: own sites only</field>
+        <field name="model_id" ref="model_qc_inspection"/>
+        <field name="groups" eval="[Command.link(ref('group_qc_inspector'))]"/>
+        <field name="domain_force">
+            ['|', '|', '|',
+                ('inspector_id', '=', user.id),
+                ('reviewer_id', '=', user.id),
+                ('branch_id.inspector_id', '=', user.id),
+                ('branch_id.manager_id', '=', user.id)]
+        </field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_qc_inspection_manager_all" model="ir.rule">
+        <field name="name">QC Inspection: quality managers see all</field>
+        <field name="model_id" ref="model_qc_inspection"/>
+        <field name="groups" eval="[Command.link(ref('group_qc_quality_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <record id="rule_qc_corrective_own_branch" model="ir.rule">
+        <field name="name">QC Corrective Action: own sites only</field>
+        <field name="model_id" ref="model_qc_corrective_action"/>
+        <field name="groups" eval="[Command.link(ref('group_qc_inspector'))]"/>
+        <field name="domain_force">
+            ['|', '|', '|',
+                ('responsible_id', '=', user.id),
+                ('inspection_id.inspector_id', '=', user.id),
+                ('branch_id.inspector_id', '=', user.id),
+                ('branch_id.manager_id', '=', user.id)]
+        </field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_qc_corrective_manager_all" model="ir.rule">
+        <field name="name">QC Corrective Action: quality managers see all</field>
+        <field name="model_id" ref="model_qc_corrective_action"/>
+        <field name="groups" eval="[Command.link(ref('group_qc_quality_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <!-- Daily checklists -->
+    <record id="rule_qc_daily_checklist_company" model="ir.rule">
+        <field name="name">QC Daily Checklist: multi-company</field>
+        <field name="model_id" ref="model_qc_daily_checklist"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_daily_checklist_own_branch" model="ir.rule">
+        <field name="name">QC Daily Checklist: own sites only</field>
+        <field name="model_id" ref="model_qc_daily_checklist"/>
+        <field name="groups" eval="[Command.link(ref('group_qc_inspector'))]"/>
+        <field name="domain_force">
+            ['|', '|',
+                ('user_id', '=', user.id),
+                ('branch_id.inspector_id', '=', user.id),
+                ('branch_id.manager_id', '=', user.id)]
+        </field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_qc_daily_checklist_manager_all" model="ir.rule">
+        <field name="name">QC Daily Checklist: quality managers see all</field>
+        <field name="model_id" ref="model_qc_daily_checklist"/>
+        <field name="groups" eval="[Command.link(ref('group_qc_quality_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <!-- Instruments -->
+    <record id="rule_qc_instrument_company" model="ir.rule">
+        <field name="name">QC Instrument: multi-company</field>
+        <field name="model_id" ref="model_qc_instrument"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_ccp_company" model="ir.rule">
+        <field name="name">QC CCP: multi-company</field>
+        <field name="model_id" ref="model_qc_ccp"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_receiving_company" model="ir.rule">
+        <field name="name">QC Receiving: multi-company</field>
+        <field name="model_id" ref="model_qc_receiving_inspection"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_receiving_own_branch" model="ir.rule">
+        <field name="name">QC Receiving: own sites only</field>
+        <field name="model_id" ref="model_qc_receiving_inspection"/>
+        <field name="groups" eval="[Command.link(ref('group_qc_inspector'))]"/>
+        <field name="domain_force">
+            ['|', '|',
+                ('user_id', '=', user.id),
+                ('branch_id.inspector_id', '=', user.id),
+                ('branch_id.manager_id', '=', user.id)]
+        </field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_qc_receiving_manager_all" model="ir.rule">
+        <field name="name">QC Receiving: quality managers see all</field>
+        <field name="model_id" ref="model_qc_receiving_inspection"/>
+        <field name="groups" eval="[Command.link(ref('group_qc_quality_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <!-- V4 compliance models: company isolation -->
+    <record id="rule_qc_document_company" model="ir.rule">
+        <field name="name">QC Document: multi-company</field>
+        <field name="model_id" ref="model_qc_document"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_training_company" model="ir.rule">
+        <field name="name">QC Training: multi-company</field>
+        <field name="model_id" ref="model_qc_training_record"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_mgmt_review_company" model="ir.rule">
+        <field name="name">QC Management Review: multi-company</field>
+        <field name="model_id" ref="model_qc_management_review"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_approved_supplier_company" model="ir.rule">
+        <field name="name">QC Approved Supplier: multi-company</field>
+        <field name="model_id" ref="model_qc_approved_supplier"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+    <record id="rule_qc_recall_company" model="ir.rule">
+        <field name="name">QC Recall: multi-company</field>
+        <field name="model_id" ref="model_qc_recall"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="global" eval="True"/>
+    </record>
+
+</odoo>

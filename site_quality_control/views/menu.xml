@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================ -->
+    <!-- "Site Quality Control" tab under the standard Quality app  -->
+    <!-- ============================================================ -->
+    <menuitem id="menu_qc_branch_root"
+              name="Site Quality Control"
+              parent="quality_control.menu_quality_root"
+              sequence="80"/>
+
+    <menuitem id="menu_qc_inspections"
+              name="Inspections"
+              parent="menu_qc_branch_root"
+              action="action_qc_inspection"
+              sequence="10"/>
+
+    <menuitem id="menu_qc_daily_checklists"
+              name="Daily Checklists"
+              parent="menu_qc_branch_root"
+              action="action_qc_daily_checklist"
+              sequence="15"/>
+
+    <menuitem id="menu_qc_receiving"
+              name="Receiving Inspections"
+              parent="menu_qc_branch_root"
+              action="action_qc_receiving"
+              sequence="17"/>
+
+    <menuitem id="menu_qc_recalls"
+              name="Recalls"
+              parent="menu_qc_branch_root"
+              action="action_qc_recall"
+              sequence="18"
+              groups="group_qc_quality_manager"/>
+
+    <menuitem id="menu_qc_management_reviews"
+              name="Management Reviews"
+              parent="menu_qc_branch_root"
+              action="action_qc_management_review"
+              sequence="19"
+              groups="group_qc_quality_manager"/>
+
+    <menuitem id="menu_qc_corrective_actions"
+              name="Corrective Actions"
+              parent="menu_qc_branch_root"
+              action="action_qc_corrective_action"
+              sequence="20"/>
+
+    <!-- Reporting -->
+    <menuitem id="menu_qc_reporting"
+              name="Reporting"
+              parent="menu_qc_branch_root"
+              sequence="30"/>
+
+    <menuitem id="menu_qc_dashboard"
+              name="Dashboard"
+              parent="menu_qc_reporting"
+              action="action_qc_dashboard"
+              sequence="10"/>
+
+    <menuitem id="menu_qc_branch_ranking"
+              name="Site Ranking"
+              parent="menu_qc_reporting"
+              action="action_qc_branch_ranking"
+              sequence="20"/>
+
+    <menuitem id="menu_qc_priority_branches"
+              name="Priority Sites"
+              parent="menu_qc_reporting"
+              action="action_qc_priority_branches"
+              sequence="30"/>
+
+    <menuitem id="menu_qc_factor_performance"
+              name="Site Performance"
+              parent="menu_qc_reporting"
+              action="action_qc_factor_performance"
+              sequence="40"/>
+
+    <menuitem id="menu_qc_historical_trends"
+              name="Historical Trends"
+              parent="menu_qc_reporting"
+              action="action_qc_historical_trends"
+              sequence="50"/>
+
+    <!-- Configuration -->
+    <menuitem id="menu_qc_configuration"
+              name="Configuration"
+              parent="menu_qc_branch_root"
+              sequence="90"
+              groups="group_qc_quality_manager"/>
+
+    <menuitem id="menu_qc_branches"
+              name="Sites"
+              parent="menu_qc_configuration"
+              action="action_qc_branch"
+              sequence="10"/>
+
+    <menuitem id="menu_qc_checklists"
+              name="Checklists"
+              parent="menu_qc_configuration"
+              action="action_qc_checklist_template"
+              sequence="20"/>
+
+    <menuitem id="menu_qc_documents"
+              name="SOP Documents"
+              parent="menu_qc_configuration"
+              action="action_qc_document"
+              sequence="22"/>
+
+    <menuitem id="menu_qc_training"
+              name="Training Records"
+              parent="menu_qc_configuration"
+              action="action_qc_training"
+              sequence="23"/>
+
+    <menuitem id="menu_qc_allergens"
+              name="Allergens"
+              parent="menu_qc_configuration"
+              action="action_qc_allergen"
+              sequence="24"/>
+
+    <menuitem id="menu_qc_approved_suppliers"
+              name="Approved Suppliers"
+              parent="menu_qc_configuration"
+              action="action_qc_approved_supplier"
+              sequence="26"/>
+
+    <menuitem id="menu_qc_instruments"
+              name="Instruments"
+              parent="menu_qc_configuration"
+              action="action_qc_instrument"
+              sequence="25"/>
+
+    <menuitem id="menu_qc_ccp"
+              name="CCP Register"
+              parent="menu_qc_configuration"
+              action="action_qc_ccp"
+              sequence="27"/>
+
+    <menuitem id="menu_qc_grades"
+              name="Grades"
+              parent="menu_qc_configuration"
+              action="action_qc_grade"
+              sequence="30"/>
+
+    <!-- Historical data import -->
+    <menuitem id="menu_qc_historical"
+              name="Historical Data"
+              parent="menu_qc_configuration"
+              sequence="35"/>
+
+    <menuitem id="menu_qc_historical_scores"
+              name="Historical Scores"
+              parent="menu_qc_historical"
+              action="action_qc_historical_score"
+              sequence="10"/>
+
+    <menuitem id="menu_qc_historical_factor_averages"
+              name="Factor Averages"
+              parent="menu_qc_historical"
+              action="action_qc_historical_factor_average"
+              sequence="20"/>
+
+    <menuitem id="menu_qc_settings"
+              name="Settings"
+              parent="menu_qc_configuration"
+              action="action_qc_config_settings"
+              sequence="40"
+              groups="group_qc_admin"/>
+
+</odoo>
