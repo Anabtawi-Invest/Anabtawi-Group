@@ -1,0 +1,9 @@
+<odoo>
+    <record id="seq_construction_budget_po" model="ir.sequence">
+        <field name="name">Construction PO Control Reference</field>
+        <field name="code">construction.budget.po</field>
+        <field name="prefix">CPO/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>
