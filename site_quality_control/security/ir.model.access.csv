@@ -1,0 +1,46 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_qc_branch_viewer,qc.branch viewer,model_qc_branch,group_qc_management_viewer,1,0,0,0
+access_qc_grade_viewer,qc.grade viewer,model_qc_grade,group_qc_management_viewer,1,0,0,0
+access_qc_checklist_template_viewer,qc.checklist.template viewer,model_qc_checklist_template,group_qc_management_viewer,1,0,0,0
+access_qc_factor_template_viewer,qc.factor.template viewer,model_qc_factor_template,group_qc_management_viewer,1,0,0,0
+access_qc_question_template_viewer,qc.question.template viewer,model_qc_question_template,group_qc_management_viewer,1,0,0,0
+access_qc_inspection_viewer,qc.inspection viewer,model_qc_inspection,group_qc_management_viewer,1,0,0,0
+access_qc_inspection_factor_viewer,qc.inspection.factor viewer,model_qc_inspection_factor,group_qc_management_viewer,1,0,0,0
+access_qc_inspection_answer_viewer,qc.inspection.answer viewer,model_qc_inspection_answer,group_qc_management_viewer,1,0,0,0
+access_qc_corrective_action_viewer,qc.corrective.action viewer,model_qc_corrective_action,group_qc_management_viewer,1,0,0,0
+access_qc_branch_ranking_viewer,qc.branch.ranking viewer,model_qc_branch_ranking,group_qc_management_viewer,1,0,0,0
+access_qc_branch_inspector,qc.branch inspector,model_qc_branch,group_qc_inspector,1,0,0,0
+access_qc_grade_inspector,qc.grade inspector,model_qc_grade,group_qc_inspector,1,0,0,0
+access_qc_checklist_template_inspector,qc.checklist.template inspector,model_qc_checklist_template,group_qc_inspector,1,0,0,0
+access_qc_factor_template_inspector,qc.factor.template inspector,model_qc_factor_template,group_qc_inspector,1,0,0,0
+access_qc_question_template_inspector,qc.question.template inspector,model_qc_question_template,group_qc_inspector,1,0,0,0
+access_qc_inspection_inspector,qc.inspection inspector,model_qc_inspection,group_qc_inspector,1,1,1,0
+access_qc_inspection_factor_inspector,qc.inspection.factor inspector,model_qc_inspection_factor,group_qc_inspector,1,1,1,1
+access_qc_inspection_answer_inspector,qc.inspection.answer inspector,model_qc_inspection_answer,group_qc_inspector,1,1,1,1
+access_qc_corrective_action_inspector,qc.corrective.action inspector,model_qc_corrective_action,group_qc_inspector,1,1,1,0
+access_qc_branch_ranking_inspector,qc.branch.ranking inspector,model_qc_branch_ranking,group_qc_inspector,1,0,0,0
+access_qc_branch_manager,qc.branch branch manager,model_qc_branch,group_qc_branch_manager,1,1,0,0
+access_qc_corrective_action_manager,qc.corrective.action branch manager,model_qc_corrective_action,group_qc_branch_manager,1,1,1,1
+access_qc_branch_quality_manager,qc.branch quality manager,model_qc_branch,group_qc_quality_manager,1,1,1,1
+access_qc_grade_quality_manager,qc.grade quality manager,model_qc_grade,group_qc_quality_manager,1,1,1,0
+access_qc_checklist_template_quality_manager,qc.checklist.template quality manager,model_qc_checklist_template,group_qc_quality_manager,1,1,1,1
+access_qc_factor_template_quality_manager,qc.factor.template quality manager,model_qc_factor_template,group_qc_quality_manager,1,1,1,1
+access_qc_question_template_quality_manager,qc.question.template quality manager,model_qc_question_template,group_qc_quality_manager,1,1,1,1
+access_qc_inspection_quality_manager,qc.inspection quality manager,model_qc_inspection,group_qc_quality_manager,1,1,1,1
+access_qc_inspection_factor_quality_manager,qc.inspection.factor quality manager,model_qc_inspection_factor,group_qc_quality_manager,1,1,1,1
+access_qc_inspection_answer_quality_manager,qc.inspection.answer quality manager,model_qc_inspection_answer,group_qc_quality_manager,1,1,1,1
+access_qc_corrective_action_quality_manager,qc.corrective.action quality manager,model_qc_corrective_action,group_qc_quality_manager,1,1,1,1
+access_qc_grade_admin,qc.grade admin,model_qc_grade,group_qc_admin,1,1,1,1
+access_qc_branch_admin,qc.branch admin,model_qc_branch,group_qc_admin,1,1,1,1
+access_qc_historical_score_viewer,qc.historical.score viewer,model_qc_historical_score,group_qc_management_viewer,1,0,0,0
+access_qc_historical_score_inspector,qc.historical.score inspector,model_qc_historical_score,group_qc_inspector,1,0,0,0
+access_qc_historical_score_manager,qc.historical.score quality manager,model_qc_historical_score,group_qc_quality_manager,1,1,1,1
+access_qc_historical_factor_average_viewer,qc.historical.factor.average viewer,model_qc_historical_factor_average,group_qc_management_viewer,1,0,0,0
+access_qc_historical_factor_average_inspector,qc.historical.factor.average inspector,model_qc_historical_factor_average,group_qc_inspector,1,0,0,0
+access_qc_historical_factor_average_manager,qc.historical.factor.average quality manager,model_qc_historical_factor_average,group_qc_quality_manager,1,1,1,1
+access_qc_daily_checklist_viewer,qc.daily.checklist viewer,model_qc_daily_checklist,group_qc_management_viewer,1,0,0,0
+access_qc_daily_checklist_line_viewer,qc.daily.checklist.line viewer,model_qc_daily_checklist_line,group_qc_management_viewer,1,0,0,0
+access_qc_daily_checklist_inspector,qc.daily.checklist inspector,model_qc_daily_checklist,group_qc_inspector,1,1,1,0
+access_qc_daily_checklist_line_inspector,qc.daily.checklist.line inspector,model_qc_daily_checklist_line,group_qc_inspector,1,1,1,1
+access_qc_daily_checklist_manager,qc.daily.checklist quality manager,model_qc_daily_checklist,group_qc_quality_manager,1,1,1,1
+access_qc_daily_checklist_line_manager,qc.daily.checklist.line quality manager,model_qc_daily_checklist_line,group_qc_quality_manager,1,1,1,1
