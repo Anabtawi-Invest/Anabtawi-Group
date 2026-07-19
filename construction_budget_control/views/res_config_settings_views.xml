@@ -1,0 +1,38 @@
+<odoo>
+    <record id="res_config_settings_view_form_construction" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.construction</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('settings')]" position="inside">
+                <div class="app_settings_block" data-string="Construction Budget Control" string="Construction Budget Control" data-key="construction_budget_control">
+                    <h2>Approval Thresholds</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="construction_gm_threshold"/>
+                                <div class="text-muted">POs at or above this amount require General Manager approval</div>
+                                <field name="construction_gm_threshold"/>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="construction_chairman_threshold"/>
+                                <div class="text-muted">POs at or above this amount require Chairman approval (after the General Manager)</div>
+                                <field name="construction_chairman_threshold"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_construction_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'construction_budget_control'}</field>
+    </record>
+</odoo>

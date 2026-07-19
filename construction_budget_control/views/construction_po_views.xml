@@ -1,0 +1,144 @@
+<odoo>
+    <record id="view_construction_po_list" model="ir.ui.view">
+        <field name="name">construction.budget.po.list</field>
+        <field name="model">construction.budget.po</field>
+        <field name="arch" type="xml">
+            <list string="Purchase Orders" decoration-danger="state == 'rejected'" decoration-success="state == 'approved'" decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="project_id"/>
+                <field name="vendor_id"/>
+                <field name="po_number"/>
+                <field name="po_date"/>
+                <field name="amount" sum="Total"/>
+                <field name="requested_by"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_construction_po_form" model="ir.ui.view">
+        <field name="name">construction.budget.po.form</field>
+        <field name="model">construction.budget.po</field>
+        <field name="arch" type="xml">
+            <form string="Construction Purchase Order">
+                <header>
+                    <button name="action_submit" type="object" string="Submit for Approval" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_accounting_approve" type="object" string="Approve (Accounting)" class="btn-primary" invisible="state != 'accounting_review'" groups="construction_budget_control.group_construction_accounting_approver"/>
+                    <button name="action_gm_approve" type="object" string="Approve (General Manager)" class="btn-primary" invisible="state != 'gm_review'" groups="construction_budget_control.group_construction_gm_approver"/>
+                    <button name="action_chairman_approve" type="object" string="Approve (Chairman)" class="btn-primary" invisible="state != 'chairman_review'" groups="construction_budget_control.group_construction_chairman_approver"/>
+                    <button name="action_reject" type="object" string="Reject" class="btn-danger" invisible="state not in ('accounting_review', 'gm_review', 'chairman_review')"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state != 'rejected'"/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,accounting_review,gm_review,chairman_review,approved"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Rejected" bg_color="text-bg-danger" invisible="state != 'rejected'"/>
+                    <widget name="web_ribbon" title="Approved" bg_color="text-bg-success" invisible="state != 'approved'"/>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="not bom_mismatch">
+                        The BOM lines total does not match the PO Amount. Please review before submitting.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="project_id"/>
+                            <field name="vendor_id"/>
+                            <field name="po_number"/>
+                            <field name="po_date"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="amount"/>
+                            <field name="lines_total"/>
+                            <field name="project_remaining_budget"/>
+                            <field name="requested_by"/>
+                        </group>
+                    </group>
+                    <field name="description" placeholder="Scope of work / description..."/>
+                    <notebook>
+                        <page string="Bill of Materials">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="description"/>
+                                    <field name="uom"/>
+                                    <field name="quantity"/>
+                                    <field name="unit_price"/>
+                                    <field name="subtotal" sum="Total"/>
+                                </list>
+                            </field>
+                            <button name="action_export_bom_excel" type="object" string="Export BOM to Excel" class="btn-secondary mt-2" icon="fa-file-excel-o"/>
+                        </page>
+                        <page string="Document">
+                            <field name="po_document" filename="po_document_filename"/>
+                            <field name="po_document_filename" invisible="1"/>
+                        </page>
+                        <page string="Approval Trail">
+                            <group>
+                                <group string="Accounting">
+                                    <field name="accounting_user_id" readonly="1"/>
+                                    <field name="accounting_date" readonly="1"/>
+                                </group>
+                                <group string="General Manager">
+                                    <field name="gm_required" readonly="1"/>
+                                    <field name="gm_user_id" readonly="1"/>
+                                    <field name="gm_date" readonly="1"/>
+                                </group>
+                                <group string="Chairman">
+                                    <field name="chairman_required" readonly="1"/>
+                                    <field name="chairman_user_id" readonly="1"/>
+                                    <field name="chairman_date" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Rejection" invisible="state != 'rejected'">
+                            <group>
+                                <field name="rejected_by" readonly="1"/>
+                                <field name="rejected_stage" readonly="1"/>
+                            </group>
+                            <field name="reject_reason"/>
+                        </page>
+                    </notebook>
+                    <field name="reject_reason" invisible="state not in ('accounting_review', 'gm_review', 'chairman_review')" placeholder="Fill in before rejecting..."/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_construction_po_search" model="ir.ui.view">
+        <field name="name">construction.budget.po.search</field>
+        <field name="model">construction.budget.po</field>
+        <field name="arch" type="xml">
+            <search string="Purchase Orders">
+                <field name="name"/>
+                <field name="project_id"/>
+                <field name="vendor_id"/>
+                <field name="po_number"/>
+                <filter string="Pending Accounting" name="pending_accounting" domain="[('state', '=', 'accounting_review')]"/>
+                <filter string="Pending GM" name="pending_gm" domain="[('state', '=', 'gm_review')]"/>
+                <filter string="Pending Chairman" name="pending_chairman" domain="[('state', '=', 'chairman_review')]"/>
+                <filter string="Approved" name="approved" domain="[('state', '=', 'approved')]"/>
+                <filter string="Rejected" name="rejected" domain="[('state', '=', 'rejected')]"/>
+                <filter string="My Requests" name="my_requests" domain="[('requested_by', '=', uid)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Project" name="group_project" context="{'group_by': 'project_id'}"/>
+                    <filter string="Vendor" name="group_vendor" context="{'group_by': 'vendor_id'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_construction_po" model="ir.actions.act_window">
+        <field name="name">Purchase Orders</field>
+        <field name="res_model">construction.budget.po</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_construction_po_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create your first Purchase Order</p>
+            <p>Upload the PO document, add its Bill of Materials, and submit it for approval.</p>
+        </field>
+    </record>
+</odoo>
