@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================ -->
+    <!-- Site ranking (read-only SQL view)                            -->
+    <!-- ============================================================ -->
+    <record id="view_qc_branch_ranking_list" model="ir.ui.view">
+        <field name="name">qc.branch.ranking.list</field>
+        <field name="model">qc.branch.ranking</field>
+        <field name="arch" type="xml">
+            <list string="Site Ranking" default_order="current_score desc"
+                  create="false" delete="false"
+                  decoration-danger="current_score &lt; 60"
+                  decoration-warning="current_score &gt;= 60 and current_score &lt; 70"
+                  decoration-success="current_score &gt;= 90">
+                <field name="rank"/>
+                <field name="branch_id"/>
+                <field name="current_score"/>
+                <field name="grade_id"/>
+                <field name="previous_score"/>
+                <field name="score_diff"
+                       decoration-success="score_diff &gt; 0"
+                       decoration-danger="score_diff &lt; 0"/>
+                <field name="critical_count"/>
+                <field name="open_corrective"/>
+                <field name="overdue_corrective"
+                       decoration-danger="overdue_corrective &gt; 0"/>
+                <field name="priority_band"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_qc_branch_ranking_graph" model="ir.ui.view">
+        <field name="name">qc.branch.ranking.graph</field>
+        <field name="model">qc.branch.ranking</field>
+        <field name="arch" type="xml">
+            <graph string="Site Ranking" type="bar">
+                <field name="branch_id"/>
+                <field name="current_score" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_qc_branch_ranking_search" model="ir.ui.view">
+        <field name="name">qc.branch.ranking.search</field>
+        <field name="model">qc.branch.ranking</field>
+        <field name="arch" type="xml">
+            <search string="Site Ranking">
+                <field name="branch_id"/>
+                <field name="template_id"/>
+                <field name="grade_id"/>
+                <filter name="urgent" string="Urgent (&lt; 60)"
+                        domain="[('priority_band', '=', 'urgent')]"/>
+                <filter name="high" string="High Priority (60-70)"
+                        domain="[('priority_band', '=', 'high')]"/>
+                <filter name="has_critical" string="With Critical Failure"
+                        domain="[('has_critical', '=', True)]"/>
+                <group>
+                    <filter name="group_grade" string="Grade"
+                            context="{'group_by': 'grade_id'}"/>
+                    <filter name="group_template" string="Checklist"
+                            context="{'group_by': 'template_id'}"/>
+                    <filter name="group_band" string="Priority Band"
+                            context="{'group_by': 'priority_band'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_qc_branch_ranking" model="ir.actions.act_window">
+        <field name="name">Site Ranking</field>
+        <field name="res_model">qc.branch.ranking</field>
+        <field name="view_mode">list,graph</field>
+        <field name="search_view_id" ref="view_qc_branch_ranking_search"/>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Priority sites (same model, pre-filtered)                    -->
+    <!-- ============================================================ -->
+    <record id="action_qc_priority_branches" model="ir.actions.act_window">
+        <field name="name">Priority Sites</field>
+        <field name="res_model">qc.branch.ranking</field>
+        <field name="view_mode">list,graph</field>
+        <field name="search_view_id" ref="view_qc_branch_ranking_search"/>
+        <field name="domain">[('priority_band', 'in', ('urgent', 'high'))]</field>
+        <field name="context">{'search_default_urgent': 1, 'search_default_high': 1}</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Factor performance (pivot/graph on inspection factors)       -->
+    <!-- ============================================================ -->
+    <record id="view_qc_inspection_factor_pivot" model="ir.ui.view">
+        <field name="name">qc.inspection.factor.pivot</field>
+        <field name="model">qc.inspection.factor</field>
+        <field name="arch" type="xml">
+            <pivot string="Site Performance">
+                <field name="name" type="row"/>
+                <field name="branch_id" type="col"/>
+                <field name="percentage" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_qc_inspection_factor_graph" model="ir.ui.view">
+        <field name="name">qc.inspection.factor.graph</field>
+        <field name="model">qc.inspection.factor</field>
+        <field name="arch" type="xml">
+            <graph string="Site Performance" type="bar">
+                <field name="name"/>
+                <field name="percentage" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_qc_inspection_factor_search" model="ir.ui.view">
+        <field name="name">qc.inspection.factor.search</field>
+        <field name="model">qc.inspection.factor</field>
+        <field name="arch" type="xml">
+            <search string="Site Performance">
+                <field name="name"/>
+                <field name="branch_id"/>
+                <filter name="critical" string="Critical Failures"
+                        domain="[('has_critical_failure', '=', True)]"/>
+                <group>
+                    <filter name="group_factor" string="Factor"
+                            context="{'group_by': 'name'}"/>
+                    <filter name="group_branch" string="Site"
+                            context="{'group_by': 'branch_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_qc_factor_performance" model="ir.actions.act_window">
+        <field name="name">Site Performance</field>
+        <field name="res_model">qc.inspection.factor</field>
+        <field name="view_mode">pivot,graph</field>
+        <field name="search_view_id" ref="view_qc_inspection_factor_search"/>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Historical trends (inspection over time)                     -->
+    <!-- ============================================================ -->
+    <record id="view_qc_inspection_trend_graph" model="ir.ui.view">
+        <field name="name">qc.inspection.trend.graph</field>
+        <field name="model">qc.inspection</field>
+        <field name="arch" type="xml">
+            <graph string="Historical Trends" type="line">
+                <field name="inspection_date" interval="month"/>
+                <field name="percentage" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="action_qc_historical_trends" model="ir.actions.act_window">
+        <field name="name">Historical Trends</field>
+        <field name="res_model">qc.inspection</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="domain">[('state', 'in', ('reviewed', 'approved', 'closed'))]</field>
+        <field name="context">{'graph_view_ref': 'anabtawi_branch_qc.view_qc_inspection_trend_graph'}</field>
+    </record>
+
+</odoo>

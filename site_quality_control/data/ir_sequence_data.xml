@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <record id="seq_qc_inspection" model="ir.sequence">
+        <field name="name">Branch Quality Inspection</field>
+        <field name="code">qc.inspection</field>
+        <field name="prefix">QC/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_qc_daily_checklist" model="ir.sequence">
+        <field name="name">Daily Site Checklist</field>
+        <field name="code">qc.daily.checklist</field>
+        <field name="prefix">DC/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_qc_receiving_inspection" model="ir.sequence">
+        <field name="name">Receiving Inspection</field>
+        <field name="code">qc.receiving.inspection</field>
+        <field name="prefix">RI/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_qc_management_review" model="ir.sequence">
+        <field name="name">Quality Management Review</field>
+        <field name="code">qc.management.review</field>
+        <field name="prefix">MR/%(year)s/</field>
+        <field name="padding">3</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_qc_recall" model="ir.sequence">
+        <field name="name">Product Recall</field>
+        <field name="code">qc.recall</field>
+        <field name="prefix">RC/%(year)s/</field>
+        <field name="padding">3</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_qc_corrective_action" model="ir.sequence">
+        <field name="name">Quality Corrective Action</field>
+        <field name="code">qc.corrective.action</field>
+        <field name="prefix">CA/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+</odoo>
