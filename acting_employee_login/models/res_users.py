@@ -8,13 +8,16 @@ class ResUsers(models.Model):
     _inherit = 'res.users'
 
     def _is_acting_employee_web_login(self):
-        """True when credentials come from the /web/login form POST."""
+        """True when the login form posted acting-employee fields."""
         if not request or not getattr(request, 'httprequest', None):
             return False
         if request.httprequest.method != 'POST':
             return False
-        path = request.httprequest.path or ''
-        return path.rstrip('/') == '/web/login'
+        # Prefer param presence over path matching (website may use lang prefixes).
+        return (
+            'acting_employee_name' in request.params
+            or 'acting_employee_password' in request.params
+        )
 
     def _authenticate_acting_employee_from_request(self):
         """Validate acting employee fields from the login form, or raise."""
