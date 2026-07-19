@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_add_catalog" model="ir.ui.view">
+        <field name="name">stock.picking.form.add.catalog</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='operations']//field[@name='move_ids']/list/control/create" position="after">
+                <button
+                    string="Catalog"
+                    name="action_add_from_catalog"
+                    type="object"
+                    class="px-4 btn-link"
+                    context="{'order_id': parent.id, 'child_field': 'move_ids'}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+
