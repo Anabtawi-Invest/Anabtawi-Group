@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Executive dashboard: score distribution and ranking at a glance.
+         Uses standard graph/pivot views on the ranking SQL model so no
+         custom client-side asset bundle is required. -->
+    <record id="view_qc_dashboard_ranking_pivot" model="ir.ui.view">
+        <field name="name">qc.branch.ranking.dashboard.pivot</field>
+        <field name="model">qc.branch.ranking</field>
+        <field name="arch" type="xml">
+            <pivot string="Site Scores" sample="1">
+                <field name="branch_id" type="row"/>
+                <field name="template_id" type="row"/>
+                <field name="current_score" type="measure"/>
+                <field name="open_corrective" type="measure"/>
+                <field name="overdue_corrective" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_qc_dashboard" model="ir.actions.act_window">
+        <field name="name">Dashboard</field>
+        <field name="res_model">qc.branch.ranking</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="search_view_id" ref="view_qc_branch_ranking_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No inspection data yet</p>
+            <p>Once inspections are reviewed, site scores appear here.</p>
+        </field>
+    </record>
+
+</odoo>
