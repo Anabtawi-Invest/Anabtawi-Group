@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="res_config_settings_view_form_qc" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.qc</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Site Quality Control"
+                     string="Site Quality Control" name="site_quality_control"
+                     logo="/base/static/img/icons/quality_control.png">
+                    <block title="Site Quality Control" name="qc_settings_block">
+                        <setting string="Create Quality Alert on Critical Failure"
+                                 help="When enabled, a standard Quality Alert is created automatically whenever an inspection has a critical failure.">
+                            <field name="qc_create_quality_alert"/>
+                        </setting>
+                        <setting string="Default Minimum Passing Score"
+                                 help="Default passing score (out of 100) applied to new sites.">
+                            <field name="qc_default_passing_score"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_qc_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="context">{'module': 'site_quality_control'}</field>
+    </record>
+
+</odoo>

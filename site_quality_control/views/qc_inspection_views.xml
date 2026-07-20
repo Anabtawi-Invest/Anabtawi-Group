@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Inline factor form (opened from the inspection notebook) -->
+    <record id="view_qc_inspection_factor_form" model="ir.ui.view">
+        <field name="name">qc.inspection.factor.form</field>
+        <field name="model">qc.inspection.factor</field>
+        <field name="arch" type="xml">
+            <form string="Factor">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="score" readonly="1"/>
+                            <field name="max_score" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="percentage" widget="percentage" readonly="1"/>
+                            <field name="has_critical_failure" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="answer_ids">
+                        <list editable="bottom" default_order="sequence">
+                            <field name="sequence" widget="handle"/>
+                            <field name="name" readonly="1"/>
+                            <field name="answer_type" readonly="1" optional="show"/>
+                            <field name="val_pass"/>
+                            <field name="val_score"/>
+                            <field name="val_check"/>
+                            <field name="val_measure"/>
+                            <field name="uom_name" readonly="1" optional="show"/>
+                            <field name="target_value" readonly="1" optional="hide"/>
+                            <field name="tolerance_min" readonly="1" optional="hide"/>
+                            <field name="tolerance_max" readonly="1" optional="hide"/>
+                            <field name="instrument_id" optional="show"/>
+                            <field name="ccp_id" readonly="1" optional="show"/>
+                            <field name="out_of_range" readonly="1"
+                                   decoration-danger="out_of_range" optional="show"/>
+                            <field name="not_applicable"/>
+                            <field name="comment" optional="show"/>
+                            <field name="photo_ids" widget="many2many_binary" optional="show"/>
+                            <field name="is_critical" readonly="1" optional="show"/>
+                            <field name="corrective_required" optional="hide"/>
+                            <field name="critical_failed" readonly="1"
+                                   decoration-danger="critical_failed"
+                                   optional="show"/>
+                            <field name="answered" column_invisible="1"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_qc_inspection_form" model="ir.ui.view">
+        <field name="name">qc.inspection.form</field>
+        <field name="model">qc.inspection</field>
+        <field name="arch" type="xml">
+            <form string="Inspection">
+                <header>
+                    <button name="action_start" string="Start" type="object"
+                            class="oe_highlight" invisible="state != 'scheduled'"/>
+                    <button name="action_load_checklist" string="Load Checklist"
+                            type="object"
+                            invisible="state not in ('scheduled', 'in_progress')"/>
+                    <button name="action_submit" string="Submit" type="object"
+                            class="oe_highlight"
+                            invisible="state not in ('in_progress', 'returned')"/>
+                    <button name="action_review" string="Mark Reviewed" type="object"
+                            class="oe_highlight" invisible="state != 'submitted'"
+                            groups="site_quality_control.group_qc_quality_manager"/>
+                    <button name="action_return" string="Return" type="object"
+                            invisible="state not in ('submitted', 'reviewed')"
+                            groups="site_quality_control.group_qc_quality_manager"/>
+                    <button name="action_approve" string="Approve" type="object"
+                            class="oe_highlight" invisible="state != 'reviewed'"
+                            groups="site_quality_control.group_qc_quality_manager"/>
+                    <button name="action_close" string="Close" type="object"
+                            invisible="state != 'approved'"/>
+                    <button name="%(action_report_qc_inspection)d" string="Print"
+                            type="action"
+                            invisible="state in ('scheduled', 'in_progress')"/>
+                    <button name="action_reset_to_scheduled" string="Reset"
+                            type="object" invisible="state in ('scheduled', 'closed')"
+                            groups="site_quality_control.group_qc_quality_manager"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="scheduled,in_progress,submitted,reviewed,approved,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_corrective_actions" type="object"
+                                class="oe_stat_button" icon="fa-wrench">
+                            <field name="corrective_action_count" widget="statinfo"
+                                   string="Corrective Actions"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Failed" bg_color="text-bg-danger"
+                            invisible="result != 'fail'"/>
+                    <widget name="web_ribbon" title="Passed" bg_color="text-bg-success"
+                            invisible="result != 'pass'"/>
+                    <group groups="site_quality_control.group_qc_quality_manager"
+                           invisible="state not in ('approved', 'closed')">
+                        <field name="reset_reason"
+                               placeholder="Reason required to reset an approved/closed inspection..."/>
+                    </group>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="branch_id"
+                                   readonly="state not in ('scheduled', 'in_progress')"/>
+                            <field name="template_id"
+                                   readonly="state not in ('scheduled', 'in_progress')"/>
+                            <field name="inspection_date"/>
+                            <field name="followup_date"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="inspector_id"/>
+                            <field name="reviewer_id"/>
+                            <field name="total_score" readonly="1"/>
+                            <field name="max_score" readonly="1"/>
+                            <field name="percentage" widget="percentage" readonly="1"/>
+                            <field name="grade_id" readonly="1"/>
+                            <field name="result" readonly="1"/>
+                            <field name="has_critical" readonly="1"
+                                   decoration-danger="has_critical"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Checklist" name="checklist">
+                            <field name="factor_ids" readonly="state in ('approved', 'closed')">
+                                <list default_order="sequence"
+                                      decoration-danger="has_critical_failure">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="score"/>
+                                    <field name="max_score"/>
+                                    <field name="percentage" widget="percentage"/>
+                                    <field name="has_critical_failure"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Corrective Actions" name="corrective">
+                            <field name="corrective_action_ids">
+                                <list decoration-danger="is_overdue">
+                                    <field name="name"/>
+                                    <field name="factor_id"/>
+                                    <field name="responsible_id"/>
+                                    <field name="due_date"/>
+                                    <field name="priority" widget="priority"/>
+                                    <field name="state"/>
+                                    <field name="is_overdue" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="General Comments" name="comments">
+                            <field name="note" placeholder="General comments..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_qc_inspection_list" model="ir.ui.view">
+        <field name="name">qc.inspection.list</field>
+        <field name="model">qc.inspection</field>
+        <field name="arch" type="xml">
+            <list string="Inspections"
+                  decoration-danger="result == 'fail'"
+                  decoration-success="result == 'pass'">
+                <field name="name"/>
+                <field name="branch_id"/>
+                <field name="inspection_date"/>
+                <field name="inspector_id"/>
+                <field name="percentage" widget="percentage"/>
+                <field name="grade_id"/>
+                <field name="has_critical" optional="show"/>
+                <field name="result"/>
+                <field name="state" widget="badge"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_qc_inspection_search" model="ir.ui.view">
+        <field name="name">qc.inspection.search</field>
+        <field name="model">qc.inspection</field>
+        <field name="arch" type="xml">
+            <search string="Inspections">
+                <field name="name"/>
+                <field name="branch_id"/>
+                <field name="inspector_id"/>
+                <field name="grade_id"/>
+                <filter name="my_inspections" string="My Inspections"
+                        domain="[('inspector_id', '=', uid)]"/>
+                <filter name="critical" string="Critical Failures"
+                        domain="[('has_critical', '=', True)]"/>
+                <filter name="failed" string="Failed"
+                        domain="[('result', '=', 'fail')]"/>
+                <separator/>
+                <filter name="open" string="Open"
+                        domain="[('state', 'not in', ('closed',))]"/>
+                <group>
+                    <filter name="group_branch" string="Site"
+                            context="{'group_by': 'branch_id'}"/>
+                    <filter name="group_state" string="Status"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_grade" string="Grade"
+                            context="{'group_by': 'grade_id'}"/>
+                    <filter name="group_date" string="Inspection Month"
+                            context="{'group_by': 'inspection_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_qc_inspection_graph" model="ir.ui.view">
+        <field name="name">qc.inspection.graph</field>
+        <field name="model">qc.inspection</field>
+        <field name="arch" type="xml">
+            <graph string="Inspection Scores" type="bar">
+                <field name="branch_id"/>
+                <field name="percentage" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_qc_inspection_pivot" model="ir.ui.view">
+        <field name="name">qc.inspection.pivot</field>
+        <field name="model">qc.inspection</field>
+        <field name="arch" type="xml">
+            <pivot string="Inspection Analysis">
+                <field name="branch_id" type="row"/>
+                <field name="inspection_date" interval="month" type="col"/>
+                <field name="percentage" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_qc_inspection" model="ir.actions.act_window">
+        <field name="name">Inspections</field>
+        <field name="res_model">qc.inspection</field>
+        <field name="view_mode">list,form,graph,pivot</field>
+        <field name="search_view_id" ref="view_qc_inspection_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Schedule your first inspection</p>
+            <p>Perform branch quality inspections and track their results.</p>
+        </field>
+    </record>
+
+</odoo>
