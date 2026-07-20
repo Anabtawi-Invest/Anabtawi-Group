@@ -336,13 +336,22 @@ class AnabtawiMobileAPI(http.Controller):
                 if field_name in employee._fields and employee[field_name]:
                     otp_number = str(employee[field_name])
                     break
+        job_title = (employee.job_title or "").strip()
+        emp_num = ""
+        for fn in ("employee_number", "registration_number", "barcode"):
+            if fn in employee._fields and employee[fn]:
+                emp_num = str(employee[fn]).strip()
+                break
+        full_job_title = f"{job_title} ({emp_num})" if (job_title and emp_num) else (job_title or (f"({emp_num})" if emp_num else ""))
+
         return _json({
             "status": "ok",
             "uid": user.id,
             "employee_id": employee.id,
             "login": user.login,
             "name": employee.name,
-            "job_title": employee.job_title or "",
+            "job_title": full_job_title,
+            "employee_number": emp_num,
             "department_name": employee.department_id.name if employee.department_id else "",
             "work_location": work_location.name if work_location else "",
             "mobile_phone": employee.mobile_phone or "",
