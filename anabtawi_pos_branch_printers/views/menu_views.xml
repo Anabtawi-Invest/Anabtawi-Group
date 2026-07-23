@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <!-- Menu in Point of Sale -> Configuration -->
-    <menuitem id="menu_pos_branch_printer"
-              name="Branch Thermal Printers"
-              parent="point_of_sale.menu_point_config_product"
-              action="action_pos_branch_printer"
-              sequence="30"/>
-</odoo>
