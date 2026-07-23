@@ -5,11 +5,10 @@
         <field name="model">pos.config</field>
         <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//setting[@id='other_devices']" position="inside">
-                <div class="content-group mt-2">
-                    <label for="branch_printer_id" string="Branch Thermal Printer"/>
+            <xpath expr="//sheet" position="inside">
+                <group string="Branch Thermal Printer" class="mt-4">
                     <field name="branch_printer_id" options="{'no_create': True}" placeholder="Select Branch Thermal Printer..."/>
-                </div>
+                </group>
             </xpath>
         </field>
     </record>
