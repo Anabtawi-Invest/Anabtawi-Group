@@ -50,12 +50,7 @@
                     </group>
                     <notebook>
                         <page string="Assigned POS Configurations" name="pos_configs">
-                            <field name="pos_config_ids" readonly="1">
-                                <list string="POS Configurations">
-                                    <field name="name"/>
-                                    <field name="company_id"/>
-                                </list>
-                            </field>
+                            <field name="pos_config_ids" widget="many2many_tags" placeholder="Select assigned POS Register(s)..."/>
                         </page>
                         <page string="Maintenance Notes" name="notes">
                             <field name="notes" placeholder="Enter any notes, maintenance logs, or printer serial numbers..."/>
