@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Tree / List View -->
+    <record id="view_pos_branch_printer_tree" model="ir.ui.view">
+        <field name="name">pos.branch.printer.tree</field>
+        <field name="model">pos.branch.printer</field>
+        <field name="arch" type="xml">
+            <list string="POS Branch Printers" multi_edit="1">
+                <field name="branch_code"/>
+                <field name="name"/>
+                <field name="connection_type" widget="badge" decoration-info="connection_type == 'lan'" decoration-success="connection_type == 'usb'"/>
+                <field name="ip_address" optional="show"/>
+                <field name="port" optional="show"/>
+                <field name="usb_device_name" optional="hide"/>
+                <field name="print_engine_client_id" optional="show"/>
+                <field name="printer_id" optional="show"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_pos_branch_printer_form" model="ir.ui.view">
+        <field name="name">pos.branch.printer.form</field>
+        <field name="model">pos.branch.printer</field>
+        <field name="arch" type="xml">
+            <form string="POS Branch Printer">
+                <header>
+                    <button name="action_test_connection" string="Test Connection / Print Test Page" type="object" class="btn-primary" icon="fa-print"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Branch 01 - Thermal Receipt Printer"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Branch &amp; Network Information">
+                            <field name="branch_code" placeholder="e.g. B01"/>
+                            <field name="connection_type" widget="radio" options="{'horizontal': true}"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group string="Connection Details">
+                            <field name="ip_address" invisible="connection_type != 'lan'" required="connection_type == 'lan'" placeholder="192.168.1.100"/>
+                            <field name="port" invisible="connection_type != 'lan'" required="connection_type == 'lan'"/>
+                            <field name="usb_device_name" invisible="connection_type != 'usb'" placeholder="e.g. EPSON TM-T20III"/>
+                            <field name="usb_vendor_id" invisible="connection_type != 'usb'" placeholder="0x04b8"/>
+                            <field name="usb_product_id" invisible="connection_type != 'usb'" placeholder="0x0e15"/>
+                        </group>
+                    </group>
+                    <group string="Direct Print Integration">
+                        <group>
+                            <field name="print_engine_client_id"/>
+                            <field name="printer_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Assigned POS Configurations" name="pos_configs">
+                            <field name="pos_config_ids" readonly="1">
+                                <list string="POS Configurations">
+                                    <field name="name"/>
+                                    <field name="company_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Maintenance Notes" name="notes">
+                            <field name="notes" placeholder="Enter any notes, maintenance logs, or printer serial numbers..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_pos_branch_printer_search" model="ir.ui.view">
+        <field name="name">pos.branch.printer.search</field>
+        <field name="model">pos.branch.printer</field>
+        <field name="arch" type="xml">
+            <search string="Search Branch Printers">
+                <field name="name"/>
+                <field name="branch_code"/>
+                <field name="ip_address"/>
+                <filter string="LAN Printers" name="lan_printers" domain="[('connection_type', '=', 'lan')]"/>
+                <filter string="USB Printers" name="usb_printers" domain="[('connection_type', '=', 'usb')]"/>
+                <separator/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Connection Type" name="group_connection_type" context="{'group_by': 'connection_type'}"/>
+                    <filter string="Print Engine" name="group_print_engine" context="{'group_by': 'print_engine_client_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_pos_branch_printer" model="ir.actions.act_window">
+        <field name="name">Branch Thermal Printers</field>
+        <field name="res_model">pos.branch.printer</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_pos_branch_printer_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first POS Branch Thermal Printer!
+            </p>
+            <p>
+                Configure LAN (IP Address) or USB thermal printers for your 23 branches and assign them to POS registers.
+            </p>
+        </field>
+    </record>
+</odoo>
