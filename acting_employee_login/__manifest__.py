@@ -15,7 +15,7 @@ in chatter for modules selected in Settings.
     """,
     'category': 'Hidden',
     'author': 'enbtawi',
-    'version': '1.6.1',
+    'version': '1.6.2',
     'depends': [
         'base_setup',
         'hr',

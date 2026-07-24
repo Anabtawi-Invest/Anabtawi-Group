@@ -54,10 +54,12 @@ class ResUsers(models.Model):
         if user and user.is_branch_user:
             _logger.warning(
                 "acting_employee_login auth: validating branch access login=%r "
-                "user_id=%s branch_name=%r",
+                "user_id=%s is_branch_user=%s branch_name=%r has_password=%s",
                 login,
                 user.id,
+                user.is_branch_user,
                 (name or '')[:80],
+                bool(password),
             )
             return self.env['acting.branch.access']._authenticate_branch_access(
                 user, name, password
@@ -65,8 +67,10 @@ class ResUsers(models.Model):
 
         _logger.warning(
             "acting_employee_login auth: validating acting employee login=%r "
-            "name=%r has_password=%s",
+            "user_id=%s is_branch_user=%s name=%r has_password=%s",
             login,
+            user.id if user else None,
+            user.is_branch_user if user else None,
             (name or '')[:80],
             bool(password),
         )
@@ -121,10 +125,11 @@ class ResUsers(models.Model):
 
         _logger.warning(
             "acting_employee_login auth: authenticate called login=%r "
-            "is_second_step=%s interactive=%s",
+            "is_second_step=%s interactive=%s params_keys=%s",
             login,
             is_second_step,
             (user_agent_env or {}).get('interactive'),
+            sorted(request.params.keys()) if request and getattr(request, 'params', None) else [],
         )
 
         if is_second_step:
@@ -137,5 +142,17 @@ class ResUsers(models.Model):
                 self._store_branch_access_session(second_step_identity)
             else:
                 self._store_acting_employee_session(second_step_identity)
+        elif is_second_step:
+            _logger.warning(
+                "acting_employee_login auth: second step requested but no identity stored "
+                "login=%r",
+                login,
+            )
 
+        from ..acting_log import _session_snapshot
+        _logger.warning(
+            "acting_employee_login auth: authenticate done uid=%s session=%s",
+            auth_info.get('uid'),
+            _session_snapshot(),
+        )
         return auth_info
