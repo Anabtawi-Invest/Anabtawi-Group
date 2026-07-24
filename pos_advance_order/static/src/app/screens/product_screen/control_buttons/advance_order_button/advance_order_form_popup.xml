@@ -51,7 +51,7 @@
                         class="form-control"
                         min="0"
                         step="0.01"
-                        t-att-value="state.advance_amount"
+                        t-model.number="state.advance_amount"
                         t-on-input="onAdvanceAmountInput"
                         t-att-disabled="state.loading ? 'disabled' : undefined"
                     />
@@ -66,8 +66,9 @@
                         class="form-control"
                         min="0"
                         step="0.01"
-                        t-att-value="state.amount_tendered"
+                        t-model.number="state.amount_tendered"
                         t-on-input="onAmountTenderedInput"
+                        t-on-blur="onAmountTenderedBlur"
                         t-att-disabled="state.loading ? 'disabled' : undefined"
                     />
                     <small class="form-text text-muted" t-esc="amountTenderedHint"/>

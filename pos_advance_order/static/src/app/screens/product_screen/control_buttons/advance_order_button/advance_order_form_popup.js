@@ -293,17 +293,31 @@ export class AdvanceOrderFormPopup extends Component {
 
     onAdvanceAmountInput(ev) {
         const value = Number(ev.target.value || 0);
-        this.state.advance_amount = Number.isFinite(value) ? value : 0;
-        if (this.state.amount_tendered < this.state.advance_amount) {
-            this.state.amount_tendered = this.state.advance_amount;
+        const oldAdvance = Number(this.state.advance_amount) || 0;
+        const newAdvance = Number.isFinite(value) ? value : 0;
+        this.state.advance_amount = newAdvance;
+        const tendered = Number(this.state.amount_tendered) || 0;
+        // Keep tendered in sync only when it still matches the previous advance (not manually raised).
+        if (tendered === 0 || tendered === oldAdvance) {
+            this.state.amount_tendered = newAdvance;
+        } else if (tendered < newAdvance) {
+            this.state.amount_tendered = newAdvance;
         }
     }
 
     onAmountTenderedInput(ev) {
-        const value = Number(ev.target.value || 0);
+        const raw = ev.target.value;
+        if (raw === "" || raw === "-") {
+            return;
+        }
+        const value = Number(raw);
         this.state.amount_tendered = Number.isFinite(value) ? value : 0;
+    }
+
+    onAmountTenderedBlur() {
         const advance = Number(this.state.advance_amount) || 0;
-        if (this.state.amount_tendered < advance) {
+        const tendered = Number(this.state.amount_tendered) || 0;
+        if (tendered < advance) {
             this.state.amount_tendered = advance;
         }
     }
