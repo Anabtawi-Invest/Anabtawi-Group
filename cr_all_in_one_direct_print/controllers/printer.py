@@ -24,9 +24,10 @@ class CrPrinterController(http.Controller):
             with registry.cursor() as cr:
                 env = api.Environment(cr, SUPERUSER_ID, {})
                 odoo_api_token = (
-                    env["ir.config_parameter"].sudo().get_param("cr_print_engine.key")
+                    env["ir.config_parameter"].sudo().get_param("cr_print_engine.key") or ""
                 )
-                if api_token in odoo_api_token:
+                keys_list = [k.strip() for k in odoo_api_token.split(",") if k.strip()]
+                if api_token and api_token in keys_list:
                     return True, "Token verified"
                 else:
                     return False, "Invalid token"
@@ -88,12 +89,13 @@ class CrPrinterController(http.Controller):
 
         api_token = request.httprequest.headers.get("Authorization")
         odoo_api_token = (
-            request.env["ir.config_parameter"].sudo().get_param("cr_print_engine.key")
+            request.env["ir.config_parameter"].sudo().get_param("cr_print_engine.key") or ""
         )
+        keys_list = [k.strip() for k in odoo_api_token.split(",") if k.strip()]
 
-        if not odoo_api_token or not api_token:
+        if not keys_list or not api_token:
             return []
-        if api_token not in odoo_api_token:
+        if api_token not in keys_list:
             return []
 
         PrintJob = request.env["print.job"].sudo()
@@ -129,9 +131,10 @@ class CrPrinterController(http.Controller):
         """
         api_token = request.httprequest.headers.get("Authorization")
         odoo_api_token = (
-            request.env["ir.config_parameter"].sudo().get_param("cr_print_engine.key")
+            request.env["ir.config_parameter"].sudo().get_param("cr_print_engine.key") or ""
         )
-        if api_token not in odoo_api_token:
+        keys_list = [k.strip() for k in odoo_api_token.split(",") if k.strip()]
+        if not api_token or api_token not in keys_list:
             return {"status": "error", "message": "Invalid API token"}
         try:
             jobs = request.httprequest.json.get("jobs", [])
@@ -183,10 +186,11 @@ class CrPrinterController(http.Controller):
         """
         api_token = request.httprequest.headers.get("Authorization")
         odoo_api_token = (
-            request.env["ir.config_parameter"].sudo().get_param("cr_print_engine.key")
+            request.env["ir.config_parameter"].sudo().get_param("cr_print_engine.key") or ""
         )
+        keys_list = [k.strip() for k in odoo_api_token.split(",") if k.strip()]
 
-        if api_token not in odoo_api_token:
+        if not api_token or api_token not in keys_list:
             return {"status": "error", "message": "Invalid API token"}
 
         try:
