@@ -41,6 +41,111 @@ export class AdvanceOrderFormPopup extends Component {
         companyId: { type: Number, optional: true },
     };
 
+    _isArabicContext() {
+        const urlLang = new URLSearchParams(window.location.search).get("lang") || "";
+        const htmlLang = document?.documentElement?.lang || "";
+        const bodyDir = document?.body ? window.getComputedStyle(document.body).direction : "";
+        return urlLang.startsWith("ar") || htmlLang.startsWith("ar") || bodyDir === "rtl";
+    }
+
+    _tr(msgid, fallbackArabic) {
+        const translated = _t(msgid);
+        if (translated === msgid && this._isArabicContext()) {
+            return fallbackArabic;
+        }
+        return translated;
+    }
+
+    get popupTitle() {
+        return this._tr("Advance Order Details", "تفاصيل طلب العربون");
+    }
+
+    get popupSubtitle() {
+        return this._tr("Deposit and picking configuration", "إعدادات العربون والاستلام");
+    }
+
+    get fromPosLabel() {
+        return this._tr("From POS", "من نقطة البيع");
+    }
+
+    get pickingPosLabel() {
+        return this._tr("Picking POS", "نقطة البيع للاستلام");
+    }
+
+    get selectPickingPosPlaceholder() {
+        return this._tr("-- Select Picking POS --", "-- اختر نقطة استلام --");
+    }
+
+    get pricelistLabel() {
+        return this._tr("Pricelist", "قائمة الأسعار");
+    }
+
+    get advanceAmountLabel() {
+        return this._tr("Advance Amount", "مبلغ العربون");
+    }
+
+    get amountTenderedLabel() {
+        return this._tr("Amount Tendered", "المبلغ المستلم");
+    }
+
+    get amountTenderedHint() {
+        return this._tr(
+            "Customer paid at register (can exceed advance). Drawer and accounting record the advance only; give the customer the rest as change.",
+            "المبلغ الذي دفعه العميل عند الصندوق (يمكن أن يكون أكبر من العربون). يُسجّل في الصندوق والمحاسبة مبلغ العربون فقط؛ أعد للعميل الباقي كفكة."
+        );
+    }
+
+    get returnToCustomerLabel() {
+        return this._tr("Return to customer:", "إرجاع للعميل:");
+    }
+
+    get paymentMethodLabel() {
+        return this._tr("Payment method", "طريقة الدفع");
+    }
+
+    get depositLabel() {
+        return this._tr("Deposit:", "العربون:");
+    }
+
+    get tenderedLabel() {
+        return this._tr("Tendered:", "المستلم:");
+    }
+
+    get depositTooltip() {
+        return this._tr(
+            "Recorded in cash / journal (advance deposit)",
+            "يُسجّل في الصندوق / القيد (عربون)"
+        );
+    }
+
+    get withEmployeeLabel() {
+        return this._tr("With Employee", "مع موظف");
+    }
+
+    get employeeLabel() {
+        return this._tr("Employee", "الموظف");
+    }
+
+    get selectEmployeePlaceholder() {
+        return this._tr("-- Select Employee --", "-- اختر موظفًا --");
+    }
+
+    get discountLabel() {
+        return this._tr("Discount (Optional)", "الخصم (اختياري)");
+    }
+
+    get noDiscountPlaceholder() {
+        return this._tr("-- No Discount --", "-- بدون خصم --");
+    }
+
+    get cancelButtonLabel() {
+        return this._tr("Cancel", "إلغاء");
+    }
+
+    get confirmButtonLabel() {
+        return this._tr("Confirm", "تأكيد");
+    }
+
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
@@ -165,7 +270,8 @@ export class AdvanceOrderFormPopup extends Component {
             this._syncPricelistName();
         } catch (error) {
             this.notification.add(
-                error?.message || _t("Failed to load popup data."),
+                error?.message ||
+                    this._tr("Failed to load popup data.", "فشل تحميل بيانات النافذة."),
                 { type: "danger" }
             );
         }
@@ -230,8 +336,9 @@ export class AdvanceOrderFormPopup extends Component {
     }
 
     get noEligiblePaymentMethodsText() {
-        return _t(
-            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration."
+        return this._tr(
+            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration.",
+            "لا توجد طرق دفع مناسبة في نقطة البيع هذه. أضف طرق دفع نقدية أو بنكية يدوية بدون تكامل طرفية أو QR في إعدادات نقطة البيع."
         );
     }
 
@@ -242,11 +349,17 @@ export class AdvanceOrderFormPopup extends Component {
         }
         const currentFromPosId = this.props.posConfigId || this.state.from_pos_config_id;
         if (!currentFromPosId) {
-            this.notification.add(_t("Please select From POS."), { type: "warning" });
+            this.notification.add(
+                this._tr("Please select From POS.", "يرجى اختيار نقطة البيع."),
+                { type: "warning" }
+            );
             return;
         }
         if (!this.state.picking_pos_config_id) {
-            this.notification.add(_t("Please select Picking POS."), { type: "warning" });
+            this.notification.add(
+                this._tr("Please select Picking POS.", "يرجى اختيار نقطة البيع للاستلام."),
+                { type: "warning" }
+            );
             return;
         }
         if (!this.state.selected_payment_method_id) {
@@ -263,7 +376,10 @@ export class AdvanceOrderFormPopup extends Component {
             return;
         }
         if (this.state.with_employee && !this.state.employee_id) {
-            this.notification.add(_t("Please select an employee."), { type: "warning" });
+            this.notification.add(
+                this._tr("Please select an employee.", "يرجى اختيار موظف."),
+                { type: "warning" }
+            );
             return;
         }
         const selectedPm = this.state.payment_methods.find(

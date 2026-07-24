@@ -223,6 +223,15 @@ patch(ClosePosPopup.prototype, {
         return _t("Advance deposits");
     },
 
+    advanceIncludedLabel() {
+        const urlLang = new URLSearchParams(window.location.search).get("lang") || "";
+        const htmlLang = document?.documentElement?.lang || "";
+        const bodyDir = document?.body ? window.getComputedStyle(document.body).direction : "";
+        const isArabic = urlLang.startsWith("ar") || htmlLang.startsWith("ar") || bodyDir === "rtl";
+        const translated = _t("Advance included:");
+        return translated === "Advance included:" && isArabic ? "يشمل العربون:" : translated;
+    },
+
     advanceBankLineLabel(pm) {
         const name = pm?.name || "";
         return name ? `${_t("Advance deposits")}: ${name}` : _t("Advance deposits");
