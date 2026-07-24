@@ -93,17 +93,6 @@ class MailMessage(models.Model):
 
     @api.model
     def _get_acting_identity_vals(self, model_name):
-        enabled, enabled_reason = self._is_acting_employee_enabled_for_model(model_name)
-        if not enabled:
-            log_chatter_debug(
-                'identity_skipped_module',
-                model=model_name,
-                reason=enabled_reason,
-                session=_session_snapshot(),
-                context=_context_snapshot(self.env),
-            )
-            return {}
-
         acting_employee_id = self.env.context.get('acting_employee_id')
         acting_employee_name = self.env.context.get('acting_employee_name')
         acting_branch_access_id = self.env.context.get('acting_branch_access_id')
@@ -149,6 +138,17 @@ class MailMessage(models.Model):
                 'identity_branch_access_missing',
                 model=model_name,
                 acting_branch_access_id=acting_branch_access_id,
+                session=_session_snapshot(),
+                context=_context_snapshot(self.env),
+            )
+            return {}
+
+        enabled, enabled_reason = self._is_acting_employee_enabled_for_model(model_name)
+        if not enabled:
+            log_chatter_debug(
+                'identity_skipped_module',
+                model=model_name,
+                reason=enabled_reason,
                 session=_session_snapshot(),
                 context=_context_snapshot(self.env),
             )

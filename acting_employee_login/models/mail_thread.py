@@ -14,6 +14,14 @@ PREcommit_IDENTITY_KEY = 'acting_employee_login.identity'
 class MailThread(models.AbstractModel):
     _inherit = 'mail.thread'
 
+    def _get_message_create_valid_field_names(self):
+        return super()._get_message_create_valid_field_names() | {
+            'acting_employee_id',
+            'acting_employee_name',
+            'acting_branch_access_id',
+            'acting_branch_name',
+        }
+
     def _acting_login_get_identity_vals(self):
         return self.env['mail.message']._get_acting_identity_vals(self._name)
 
