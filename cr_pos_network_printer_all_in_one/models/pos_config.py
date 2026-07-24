@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Part of Creyox Technologies
 
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class PosConfig(models.Model):
