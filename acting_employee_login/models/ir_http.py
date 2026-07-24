@@ -59,13 +59,6 @@ class IrHttp(models.AbstractModel):
             source = 'employee'
         if context:
             request.update_context(**context)
-            log_chatter_debug(
-                'context_injected',
-                source=source,
-                context=context,
-                path=getattr(request.httprequest, 'path', None),
-                method=getattr(request.httprequest, 'method', None),
-            )
 
     @classmethod
     def _log_session_identity_on_requests(cls):
