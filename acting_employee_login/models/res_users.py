@@ -2,7 +2,7 @@
 
 import logging
 
-from odoo import models
+from odoo import api, fields, models
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
@@ -11,64 +11,129 @@ _logger = logging.getLogger(__name__)
 class ResUsers(models.Model):
     _inherit = 'res.users'
 
-    def _is_acting_employee_web_login(self):
-        """True when the login form posted acting-employee fields."""
+    is_branch_user = fields.Boolean(
+        string='Is Branch User',
+        help='If enabled, the second login step validates a branch name and '
+             'password assigned to this user under Inventory > Branch Login Access.',
+    )
+
+    acting_branch_access_ids = fields.One2many(
+        'acting.branch.access',
+        'user_id',
+        string='Branch Login Access',
+    )
+
+    def _is_second_step_web_login(self):
+        """True when the login form posted the second-step fields."""
         if not request or not getattr(request, 'httprequest', None):
             return False
         if request.httprequest.method != 'POST':
             return False
-        # Prefer param presence over path matching (website may use lang prefixes).
         return (
             'acting_employee_name' in request.params
             or 'acting_employee_password' in request.params
         )
 
-    def _authenticate_acting_employee_from_request(self):
-        """Validate acting employee fields from the login form, or raise."""
+    @api.model
+    def _lookup_user_by_login(self, login):
+        login = (login or '').strip()
+        if not login:
+            return self.env['res.users']
+        return self.sudo().search(
+            self._get_login_domain(login),
+            order=self._get_login_order(),
+            limit=1,
+        )
+
+    def _authenticate_second_step_from_request(self, login):
+        """Validate employee or branch credentials before session auth."""
         name = request.params.get('acting_employee_name')
+        password = request.params.get('acting_employee_password')
+        user = self._lookup_user_by_login(login)
+
+        if user and user.is_branch_user:
+            _logger.warning(
+                "acting_employee_login auth: validating branch access login=%r "
+                "user_id=%s branch_name=%r",
+                login,
+                user.id,
+                (name or '')[:80],
+            )
+            return self.env['acting.branch.access']._authenticate_branch_access(
+                user, name, password
+            )
+
         _logger.warning(
-            "acting_employee_login auth: validating acting employee name=%r "
-            "has_password=%s session_uid=%s sid_prefix=%s",
+            "acting_employee_login auth: validating acting employee login=%r "
+            "name=%r has_password=%s",
+            login,
             (name or '')[:80],
-            bool(request.params.get('acting_employee_password')),
-            request.session.uid if request.session else None,
-            (request.session.sid or '')[:12] if request.session else None,
+            bool(password),
         )
         return self.env['hr.employee'].sudo()._authenticate_acting_employee(
-            name,
-            request.params.get('acting_employee_password'),
+            name, password
         )
+
+    @staticmethod
+    def _clear_acting_session():
+        if not request or not getattr(request, 'session', None):
+            return
+        for key in (
+            'acting_employee_id',
+            'acting_employee_name',
+            'acting_branch_access_id',
+            'acting_branch_name',
+        ):
+            request.session.pop(key, None)
 
     @staticmethod
     def _store_acting_employee_session(employee):
         if not request or not getattr(request, 'session', None):
             return
+        ResUsers._clear_acting_session()
         request.session['acting_employee_id'] = employee.id
         request.session['acting_employee_name'] = employee.name
         _logger.warning(
-            "acting_employee_login auth: stored acting employee in session "
-            "employee_id=%s name=%r",
+            "acting_employee_login auth: stored acting employee employee_id=%s name=%r",
             employee.id,
             employee.name,
         )
 
+    @staticmethod
+    def _store_branch_access_session(access):
+        if not request or not getattr(request, 'session', None):
+            return
+        ResUsers._clear_acting_session()
+        request.session['acting_branch_access_id'] = access.id
+        request.session['acting_branch_name'] = access.branch_name
+        _logger.warning(
+            "acting_employee_login auth: stored branch access access_id=%s branch_name=%r",
+            access.id,
+            access.branch_name,
+        )
+
     def authenticate(self, credential, user_agent_env):
-        # Validate acting employee BEFORE parent auth so a failed check never
-        # rotates/finalizes the session (that caused invalid CSRF on re-login).
-        employee = None
-        is_acting_login = self._is_acting_employee_web_login()
+        second_step_identity = None
+        is_second_step = self._is_second_step_web_login()
+        login = (credential or {}).get('login')
+
         _logger.warning(
             "acting_employee_login auth: authenticate called login=%r "
-            "is_acting_login=%s interactive=%s",
-            (credential or {}).get('login'),
-            is_acting_login,
+            "is_second_step=%s interactive=%s",
+            login,
+            is_second_step,
             (user_agent_env or {}).get('interactive'),
         )
-        if is_acting_login:
-            employee = self._authenticate_acting_employee_from_request()
+
+        if is_second_step:
+            second_step_identity = self._authenticate_second_step_from_request(login)
 
         auth_info = super().authenticate(credential, user_agent_env)
 
-        if employee:
-            self._store_acting_employee_session(employee)
+        if second_step_identity:
+            if second_step_identity._name == 'acting.branch.access':
+                self._store_branch_access_session(second_step_identity)
+            else:
+                self._store_acting_employee_session(second_step_identity)
+
         return auth_info

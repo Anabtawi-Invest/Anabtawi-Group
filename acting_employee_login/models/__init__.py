@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from . import acting_branch_access
 from . import hr_employee
 from . import ir_http
 from . import mail_message

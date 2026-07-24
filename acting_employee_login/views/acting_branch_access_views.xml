@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_acting_branch_access_tree" model="ir.ui.view">
+        <field name="name">acting.branch.access.list</field>
+        <field name="model">acting.branch.access</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="user_id"/>
+                <field name="branch_name"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_acting_branch_access_form" model="ir.ui.view">
+        <field name="name">acting.branch.access.form</field>
+        <field name="model">acting.branch.access</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="user_id"/>
+                        <field name="branch_name"/>
+                        <field name="branch_password" password="True"
+                               placeholder="Set branch password for this user"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_acting_branch_access_search" model="ir.ui.view">
+        <field name="name">acting.branch.access.search</field>
+        <field name="model">acting.branch.access</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="user_id"/>
+                <field name="branch_name"/>
+                <filter name="active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_acting_branch_access" model="ir.actions.act_window">
+        <field name="name">Branch Login Access</field>
+        <field name="res_model">acting.branch.access</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_acting_branch_access_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create branch login access for branch users.
+            </p>
+            <p>
+                Each row links a user to a branch name with its own password.
+                A user can have multiple branches, each with a different password.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_acting_branch_access"
+              name="Branch Login Access"
+              parent="stock.menu_stock_config_settings"
+              action="action_acting_branch_access"
+              sequence="50"
+              groups="stock.group_stock_manager"/>
+</odoo>

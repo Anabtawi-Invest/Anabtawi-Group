@@ -8,16 +8,19 @@ patch(Message.prototype, {
         super.setup(...arguments);
         /** @type {string|undefined} */
         this.acting_employee_name = fields.Attr();
+        /** @type {string|undefined} */
+        this.acting_branch_name = fields.Attr();
     },
 
     /**
-     * Show acting employee beside the username when present.
-     * Example: "Admin User (Ahmed Mohamed)"
+     * Show acting employee or branch beside the username when present.
+     * Example: "Admin User (Ahmed Mohamed)" or "Admin User (Branch A)"
      */
     get authorName() {
         const name = super.authorName;
-        if (this.acting_employee_name) {
-            return `${name} (${this.acting_employee_name})`;
+        const actingName = this.acting_branch_name || this.acting_employee_name;
+        if (actingName) {
+            return `${name} (${actingName})`;
         }
         return name;
     },

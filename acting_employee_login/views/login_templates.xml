@@ -3,9 +3,9 @@
     <template id="login_acting_employee" inherit_id="web.login">
         <xpath expr="//div[hasclass('o_caps_lock_warning')]" position="after">
             <div class="mb-3 field-acting-employee-name">
-                <label for="acting_employee_name" class="form-label">Employee Name</label>
+                <label for="acting_employee_name" class="form-label">Employee / Branch Name</label>
                 <input type="text"
-                       placeholder="Enter employee name"
+                       placeholder="Enter employee or branch name"
                        name="acting_employee_name"
                        t-att-value="acting_employee_name"
                        id="acting_employee_name"
@@ -14,9 +14,9 @@
                        autocomplete="off"/>
             </div>
             <div class="mb-3 field-acting-employee-password">
-                <label for="acting_employee_password" class="form-label">Employee Password</label>
+                <label for="acting_employee_password" class="form-label">Employee / Branch Password</label>
                 <input type="password"
-                       placeholder="Enter employee password"
+                       placeholder="Enter employee or branch password"
                        name="acting_employee_password"
                        id="acting_employee_password"
                        class="form-control"
