@@ -93,6 +93,7 @@ class ResUsers(models.Model):
         ResUsers._clear_acting_session()
         request.session['acting_employee_id'] = employee.id
         request.session['acting_employee_name'] = employee.name
+        request.session.touch()
         _logger.warning(
             "acting_employee_login auth: stored acting employee employee_id=%s name=%r",
             employee.id,
@@ -106,6 +107,7 @@ class ResUsers(models.Model):
         ResUsers._clear_acting_session()
         request.session['acting_branch_access_id'] = access.id
         request.session['acting_branch_name'] = access.branch_name
+        request.session.touch()
         _logger.warning(
             "acting_employee_login auth: stored branch access access_id=%s branch_name=%r",
             access.id,

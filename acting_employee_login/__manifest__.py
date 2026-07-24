@@ -15,7 +15,7 @@ in chatter for modules selected in Settings.
     """,
     'category': 'Hidden',
     'author': 'enbtawi',
-    'version': '1.6.0',
+    'version': '1.6.1',
     'depends': [
         'base_setup',
         'hr',
@@ -23,6 +23,7 @@ in chatter for modules selected in Settings.
         'web',
         'stock',
     ],
+    'post_init_hook': 'post_init_hook',
     'data': [
         'security/ir.model.access.csv',
         'views/acting_branch_access_views.xml',

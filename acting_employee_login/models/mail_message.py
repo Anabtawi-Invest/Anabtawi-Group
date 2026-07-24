@@ -36,7 +36,11 @@ class MailMessage(models.Model):
         param = self.env['ir.config_parameter'].sudo().get_param(
             'acting_employee_login.enabled_modules', ''
         )
-        return {name.strip() for name in param.split(',') if name.strip()}
+        enabled = {name.strip() for name in param.split(',') if name.strip()}
+        if not enabled:
+            # Sensible defaults when Settings were never configured.
+            return {'stock', 'hr'}
+        return enabled
 
     @api.model
     def _is_acting_employee_enabled_for_model(self, model_name):
