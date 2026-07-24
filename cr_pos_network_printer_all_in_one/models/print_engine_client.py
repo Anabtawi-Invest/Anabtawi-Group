@@ -15,7 +15,11 @@ class PrintEngineClient(models.Model):
 
     @api.model
     def _load_pos_data_domain(self, data, config):
-        return []
+        printer_ids = config.printer_ids.mapped('printer_id')
+        if config.printer_id:
+            printer_ids |= config.printer_id
+        client_ids = printer_ids.mapped('print_engine_client_id').ids
+        return [('id', 'in', client_ids)]
 
     @api.model
     def _load_pos_data_search_read(self, data, config):
