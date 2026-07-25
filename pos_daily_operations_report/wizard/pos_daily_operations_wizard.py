@@ -21,12 +21,16 @@ class PosDailyOperationsWizard(models.TransientModel):
         day_end = datetime.combine(self.business_date, time.max)
         return day_start, day_end
 
+    def _get_active_configs(self):
+        return self.env['pos.config'].search([('active', '=', True)], order='name')
+
     def _get_sessions_on_date(self):
         self.ensure_one()
         day_start, day_end = self._get_day_bounds()
         return self.env['pos.session'].search([
             ('start_at', '>=', fields.Datetime.to_string(day_start)),
             ('start_at', '<=', fields.Datetime.to_string(day_end)),
+            ('config_id.active', '=', True),
         ], order='start_at asc')
 
     def _empty_branch_values(self):
@@ -63,7 +67,7 @@ class PosDailyOperationsWizard(models.TransientModel):
                  ('order_id.create_date', '<=', fields.Datetime.to_string(day_end)),
         ]
 
-    def _collect_pledge_totals(self, branch_data):
+    def _collect_pledge_totals(self, branch_data, active_config_ids):
         self.ensure_one()
         day_start, day_end = self._get_day_bounds()
         base_domain = self._pledge_order_on_date_domain(day_start, day_end)
@@ -74,7 +78,7 @@ class PosDailyOperationsWizard(models.TransientModel):
             )
             for pledge in pledges:
                 config_id = self._get_pledge_config_id(pledge)
-                if not config_id:
+                if not config_id or config_id not in active_config_ids:
                     continue
                 branch_data[config_id][field_name] += pledge.pledge_subtotal or 0.0
 
@@ -121,6 +125,23 @@ class PosDailyOperationsWizard(models.TransientModel):
                 for session in config_sessions
             )
 
+    def _get_other_payments(self, values):
+        return (
+            values['cash'] + values['hospitality'] + values['talabat']
+            + values['careem'] + values['mythings'] + values['kabseh']
+        )
+
+    def _compute_diff(self, values):
+        return (
+            values['open_bal'] + values['sales'] + values['rahen_in']
+            - values['rahen_out'] - values['delivery_amount'] - values['close_bal']
+            - self._get_other_payments(values)
+        )
+
+    def _enrich_row_with_diff(self, row):
+        row['diff'] = self._compute_diff(row)
+        return row
+
     def _get_report_rows(self):
         self.ensure_one()
         sessions = self._get_sessions_on_date()
@@ -128,20 +149,21 @@ class PosDailyOperationsWizard(models.TransientModel):
         for session in sessions:
             sessions_by_config[session.config_id.id].append(session)
 
-        configs = self.env['pos.config'].search([], order='name')
+        configs = self._get_active_configs()
+        active_config_ids = set(configs.ids)
         branch_data = defaultdict(self._empty_branch_values)
 
         self._collect_session_balances(branch_data, sessions_by_config)
         self._collect_payment_totals(branch_data, sessions)
-        self._collect_pledge_totals(branch_data)
+        self._collect_pledge_totals(branch_data, active_config_ids)
 
         rows = []
         for config in configs:
             values = branch_data[config.id]
-            rows.append({
+            rows.append(self._enrich_row_with_diff({
                 'branch_name': config.name,
                 **values,
-            })
+            }))
         return rows
 
     def _get_total_row(self, rows):
@@ -150,7 +172,7 @@ class PosDailyOperationsWizard(models.TransientModel):
             'talabat', 'careem', 'mythings', 'kabseh', 'delivery_amount', 'close_bal',
         )
         totals = {field: sum(row[field] for row in rows) for field in numeric_fields}
-        return {'branch_name': _('Total'), **totals}
+        return self._enrich_row_with_diff({'branch_name': _('Total'), **totals})
 
     def action_export_excel(self):
         self.ensure_one()
@@ -204,6 +226,7 @@ class PosDailyOperationsWizard(models.TransientModel):
             _('Kabseh'),
             _('Delivery Amount'),
             _('Close Bal'),
+            _('Diff'),
         ]
         header_row = 4
         for col, header in enumerate(headers):
@@ -229,6 +252,7 @@ class PosDailyOperationsWizard(models.TransientModel):
             sheet.write_number(row_idx, 10, line['kabseh'], num_fmt)
             sheet.write_number(row_idx, 11, line['delivery_amount'], num_fmt)
             sheet.write_number(row_idx, 12, line['close_bal'], num_fmt)
+            sheet.write_number(row_idx, 13, line['diff'], num_fmt)
 
         row_idx = header_row + 1
         if not rows:
