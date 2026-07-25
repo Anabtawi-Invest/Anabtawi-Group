@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_direct" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.pos.windows.printer</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//app[@name='point_of_sale']" position="inside">
+                <block title="Direct Branch Receipt Printer" id="cr_pos_printer_res_block_final">
+                    <setting id="cr_pos_custom_printer_setting_final" string="Branch Thermal Printer" help="Select local network, USB, Windows Agent, or Bluetooth printer created for this branch">
+                        <field name="pos_direct_printer_id" placeholder="Select Branch Printer (e.g. عين الباشا)..."/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>
