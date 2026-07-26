@@ -1,4 +1,4 @@
-# AI Recruitment Scoring — Odoo 19 Module
+# AI Recruitment Scoring — Odoo 19
 
 ## Overview
 
