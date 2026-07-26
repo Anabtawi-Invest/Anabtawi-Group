@@ -6,8 +6,6 @@
     'summary': 'Daily operations summary report by POS branch',
     'depends': [
         'point_of_sale',
-        'pos_advance_order',
-        'pos_delivery_amount',
     ],
     'data': [
         'security/ir.model.access.csv',
