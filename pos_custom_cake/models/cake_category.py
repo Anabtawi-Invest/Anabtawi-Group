@@ -8,22 +8,10 @@ class CakeCategory(models.Model):
     _description = "Cake Category"
     _order = "sequence, id"
 
-    name_ar = fields.Char(string="Category Name (Arabic)", required=True)
-    name_en = fields.Char(string="Category Name (English)", required=True)
+    name = fields.Char(string="Category Name", required=True, translate=True)
     active = fields.Boolean(default=True)
     sequence = fields.Integer(default=10)
     line_ids = fields.One2many("cake.category.line", "category_id", string="Products")
-
-    def name_get(self):
-        result = []
-        for record in self:
-            lang = self.env.lang or "en_US"
-            if lang.startswith("ar"):
-                name = record.name_ar or record.name_en
-            else:
-                name = record.name_en or record.name_ar
-            result.append((record.id, name))
-        return result
 
 
 class CakeCategoryLine(models.Model):

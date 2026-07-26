@@ -323,10 +323,10 @@ class PosCakeOrder(models.Model):
     def get_pos_config_data(self):
         """Return configuration data for POS popup."""
         company = self.env.company
-        lang = self.env.lang or "en_US"
-        is_ar = lang.startswith("ar")
+        lang = self.env.user.lang or self.env.lang or "en_US"
+        Category = self.env["cake.category"].with_context(lang=lang)
 
-        categories = self.env["cake.category"].sudo().search([("active", "=", True)])
+        categories = Category.search([("active", "=", True)])
         category_data = []
         for category in categories:
             lines = []
@@ -335,7 +335,7 @@ class PosCakeOrder(models.Model):
                     {
                         "id": line.id,
                         "product_id": line.product_id.id,
-                        "product_name": line.product_id.display_name,
+                        "product_name": line.product_id.with_context(lang=lang).display_name,
                         "quantity": line.quantity,
                         "cost": line.cost,
                         "total_cost": line.total_cost,
@@ -344,21 +344,19 @@ class PosCakeOrder(models.Model):
             category_data.append(
                 {
                     "id": category.id,
-                    "name": category.name_ar if is_ar else category.name_en,
-                    "name_ar": category.name_ar,
-                    "name_en": category.name_en,
+                    "name": category.name,
                     "lines": lines,
                 }
             )
 
-        sizes = self.env["cake.size"].sudo().search([("active", "=", True)])
+        sizes = self.env["cake.size"].search([("active", "=", True)])
         size_data = [
             {
                 "id": size.id,
                 "pieces": size.pieces,
                 "name": size.name,
                 "product_id": size.product_id.id,
-                "product_name": size.product_id.display_name,
+                "product_name": size.product_id.with_context(lang=lang).display_name,
             }
             for size in sizes
         ]

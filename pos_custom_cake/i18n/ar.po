@@ -137,6 +137,10 @@ msgid "Enable Custom Cake"
 msgstr "تفعيل الكعك المخصص"
 
 #. module: pos_custom_cake
+msgid "Category Name"
+msgstr "اسم الفئة"
+
+#. module: pos_custom_cake
 msgid "Category Name (Arabic)"
 msgstr "اسم الفئة (عربي)"
 
