@@ -168,8 +168,8 @@ msgstr "لا يمكنك تسجيل الحضور من هذا الموقع."
 #. module: portal_check_in
 #. odoo-python
 #: code:addons/portal_check_in/controllers/portal.py:0
-msgid "You reached the weekly worked hours threshold."
-msgstr "لقد بلغت الحد الأسبوعي المسموح لساعات العمل."
+msgid "You exceeded the weekly worked hours limit."
+msgstr "لقد تجاوزت الحد الأسبوعي المسموح لساعات العمل."
 
 #. module: portal_check_in
 #. odoo-python

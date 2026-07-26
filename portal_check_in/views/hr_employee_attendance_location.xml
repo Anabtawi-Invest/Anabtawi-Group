@@ -9,6 +9,11 @@
             <xpath expr="//page[@name='hr_settings']" position="inside">
                 <group string="Attendance Location">
                     <field name="allow_remote_attendance"/>
+                    <field name="attendance_work_location_ids"
+                             widget="many2many_tags"
+                             options="{'no_create_edit': True}"
+                             invisible="allow_remote_attendance"
+                             placeholder="Select allowed work locations"/>
                 </group>
             </xpath>
         </field>

@@ -346,24 +346,13 @@
                                 <div t-if="show_location_restricted" class="alert alert-danger py-2 o_portal_location_restricted_alert" role="alert">
                                     <t t-esc="location_restricted_message or txt_location_default"/>
                                 </div>
-                                <div t-if="employee and weekly_gate_reached and state != 'checked_in' and not available_overtime_authorization" class="alert alert-warning py-2" role="alert">
-                                    <span><t t-esc="txt_weekly_threshold"/> </span>
-                                    (<t t-esc="'%0.2f' % (weekly_worked_hours or 0.0)"/> /
-                                    <t t-esc="'%0.2f' % (required_weekly_hours or 0.0)"/>).
-                                    <span> <t t-esc="txt_checkin_locked_ot"/></span>
-                                </div>
-                                <div t-if="employee and weekly_gate_reached and state != 'checked_in' and available_overtime_authorization" class="alert alert-success py-2" role="status">
-                                    <span><t t-esc="txt_ot_auth_session"/> </span>
-                                    <span><t t-esc="txt_max_auth_hours"/> </span>
-                                    <span><t t-esc="'%0.2f' % (available_overtime_authorization.quantity or 0.0)"/>.</span>
-                                </div>
                                 <t t-if="employee">
                                     <div class="pc-check-circle-wrap">
                                         <form id="checkin_form" t-att-action="toggle_url" method="post" class="o_portal_check_in_form" t-att-data-device-tracking-enabled="'1' if device_tracking_enabled else '0'">
                                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                             <input type="hidden" name="latitude" id="lat" class="o_portal_check_latitude"/>
                                             <input type="hidden" name="longitude" id="lon" class="o_portal_check_longitude"/>
-                                            <button type="button" class="pc-check-circle-btn" onclick="submitCheckIn()" t-att-disabled="'disabled' if (weekly_gate_reached and state != 'checked_in' and not available_overtime_authorization) else None">
+                                            <button type="button" class="pc-check-circle-btn" onclick="submitCheckIn()">
                                                 <i class="fa fa-hand-pointer-o"/>
                                                 <t t-if="state == 'checked_in'"><t t-esc="txt_check_out_btn"/></t>
                                                 <t t-else=""><t t-esc="txt_check_in_btn"/></t>
@@ -404,13 +393,6 @@
                                                 <t t-esc="'%0.2f' % (required_weekly_hours or 0.0)"/>
                                             </div>
                                             <div class="pc-check-stat-label"><t t-esc="txt_weekly_limit"/></div>
-                                        </div>
-                                        <div>
-                                            <div class="pc-check-stat-value">
-                                                <span t-if="available_overtime_authorization"><t t-esc="txt_approved"/></span>
-                                                <span t-else=""><t t-esc="txt_none"/></span>
-                                            </div>
-                                            <div class="pc-check-stat-label"><t t-esc="txt_ot_approval"/></div>
                                         </div>
                                     </div>
                                     <div class="table-responsive">
