@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_custom_cake" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.custom.cake</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@id='pos_interface_section']" position="after">
+                <block title="Custom Cake" id="pos_custom_cake_settings">
+                    <setting string="Sugar Paste Product"
+                             help="Product used for sugar paste in custom cakes (cost and manufacturing only).">
+                        <field name="cake_sugar_paste_product_id"/>
+                    </setting>
+                    <setting string="Sugar Paste Unit Cost">
+                        <field name="cake_sugar_paste_cost"/>
+                    </setting>
+                    <setting string="Sugar Paste Qty per Piece">
+                        <field name="cake_sugar_paste_qty"/>
+                    </setting>
+                    <setting string="Cost Divisor"
+                             help="Selling price before tax = total cost / divisor (default 0.63).">
+                        <field name="cake_cost_divisor"/>
+                    </setting>
+                    <setting string="Tax Rate (%)"
+                             help="Tax percentage on selling price before tax (default 16%).">
+                        <field name="cake_tax_rate"/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

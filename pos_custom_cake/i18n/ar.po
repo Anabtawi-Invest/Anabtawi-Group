@@ -1,0 +1,181 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* pos_custom_cake
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-07-27 00:00+0000\n"
+"PO-Revision-Date: 2026-07-27 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+
+#. module: pos_custom_cake
+msgid "Custom Cake"
+msgstr "كعكة مخصصة"
+
+#. module: pos_custom_cake
+msgid "Cake Categories"
+msgstr "فئات الكعك"
+
+#. module: pos_custom_cake
+msgid "Cake Sizes"
+msgstr "أحجام الكعك"
+
+#. module: pos_custom_cake
+msgid "Cake Orders"
+msgstr "طلبات الكعك"
+
+#. module: pos_custom_cake
+msgid "Settings"
+msgstr "الإعدادات"
+
+#. module: pos_custom_cake
+msgid "Customer"
+msgstr "العميل"
+
+#. module: pos_custom_cake
+msgid "Cake Pieces"
+msgstr "قطع الكعك"
+
+#. module: pos_custom_cake
+msgid "Contains Sugar Paste"
+msgstr "يحتوي على عجينة السكر"
+
+#. module: pos_custom_cake
+msgid "Yes"
+msgstr "نعم"
+
+#. module: pos_custom_cake
+msgid "No"
+msgstr "لا"
+
+#. module: pos_custom_cake
+msgid "Price Summary"
+msgstr "ملخص السعر"
+
+#. module: pos_custom_cake
+msgid "Total Components Cost"
+msgstr "إجمالي تكلفة المكونات"
+
+#. module: pos_custom_cake
+msgid "Selling Price Before Tax"
+msgstr "سعر البيع قبل الضريبة"
+
+#. module: pos_custom_cake
+msgid "Tax"
+msgstr "الضريبة"
+
+#. module: pos_custom_cake
+msgid "Final Selling Price"
+msgstr "سعر البيع النهائي"
+
+#. module: pos_custom_cake
+msgid "Confirm"
+msgstr "تأكيد"
+
+#. module: pos_custom_cake
+msgid "Pay Later"
+msgstr "الدفع لاحقاً"
+
+#. module: pos_custom_cake
+msgid "Cancel"
+msgstr "إلغاء"
+
+#. module: pos_custom_cake
+msgid "Waiting for Payment"
+msgstr "في انتظار الدفع"
+
+#. module: pos_custom_cake
+msgid "Paid"
+msgstr "مدفوع"
+
+#. module: pos_custom_cake
+msgid "Cancelled"
+msgstr "ملغى"
+
+#. module: pos_custom_cake
+msgid "Draft"
+msgstr "مسودة"
+
+#. module: pos_custom_cake
+msgid "Please select a customer."
+msgstr "يرجى اختيار عميل."
+
+#. module: pos_custom_cake
+msgid "Please select a cake size."
+msgstr "يرجى اختيار حجم الكعك."
+
+#. module: pos_custom_cake
+msgid "Please select at least one cake component."
+msgstr "يرجى اختيار مكون واحد على الأقل."
+
+#. module: pos_custom_cake
+msgid "Custom Cake Order"
+msgstr "طلب كعكة مخصصة"
+
+#. module: pos_custom_cake
+msgid "Order Number"
+msgstr "رقم الطلب"
+
+#. module: pos_custom_cake
+msgid "Please pay at the counter when ready."
+msgstr "يرجى الدفع عند الكاونتر عند الاستلام."
+
+#. module: pos_custom_cake
+msgid "Sugar Paste Product"
+msgstr "منتج عجينة السكر"
+
+#. module: pos_custom_cake
+msgid "Enable Custom Cake"
+msgstr "تفعيل الكعك المخصص"
+
+#. module: pos_custom_cake
+msgid "Category Name (Arabic)"
+msgstr "اسم الفئة (عربي)"
+
+#. module: pos_custom_cake
+msgid "Category Name (English)"
+msgstr "اسم الفئة (إنجليزي)"
+
+#. module: pos_custom_cake
+msgid "Manufacturing Order"
+msgstr "أمر التصنيع"
+
+#. module: pos_custom_cake
+msgid "Status"
+msgstr "الحالة"
+
+#. module: pos_custom_cake
+msgid "Date"
+msgstr "التاريخ"
+
+#. module: pos_custom_cake
+msgid "Final Price"
+msgstr "السعر النهائي"
+
+#. module: pos_custom_cake
+msgid "Search by customer name or order number..."
+msgstr "البحث باسم العميل أو رقم الطلب..."
+
+#. module: pos_custom_cake
+msgid "No cake orders waiting for payment."
+msgstr "لا توجد طلبات كعك في انتظار الدفع."
+
+#. module: pos_custom_cake
+msgid "Close"
+msgstr "إغلاق"
+
+#. module: pos_custom_cake
+msgid "Pieces"
+msgstr "قطعة"
+
+#. module: pos_custom_cake
+msgid "Total"
+msgstr "الإجمالي"

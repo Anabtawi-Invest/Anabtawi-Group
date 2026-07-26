@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_custom_cake.CustomCakeFormPopup" owl="1">
+        <Dialog size="'lg'" title="'🎂 Custom Cake'">
+            <div class="custom-cake-popup p-2">
+                <t t-if="state.loading">
+                    <div class="text-center py-4">
+                        <i class="fa fa-spinner fa-spin fa-2x"/>
+                        <p class="mt-2" t-esc="_t('Loading...')"/>
+                    </div>
+                </t>
+                <t t-else="">
+                    <!-- Customer -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <t t-esc="_t('Customer')"/> *
+                        </label>
+                        <div class="d-flex gap-2">
+                            <input type="text" class="form-control" readonly="readonly"
+                                   t-att-value="state.partner?.name || ''"
+                                   t-att-placeholder="_t('Select customer...')"/>
+                            <button class="btn btn-primary" t-on-click="onSelectPartner" type="button">
+                                <i class="fa fa-user"/>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Cake Size -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <t t-esc="_t('Cake Pieces')"/> *
+                        </label>
+                        <select class="form-select" t-on-change="onSizeChange">
+                            <option value="" t-esc="_t('Select size...')"/>
+                            <t t-foreach="sizes" t-as="size" t-key="size.id">
+                                <option t-att-value="size.id"
+                                        t-att-selected="state.cake_size_id === size.id ? 'selected' : undefined"
+                                        t-esc="size.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- Sugar Paste -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <t t-esc="_t('Contains Sugar Paste')"/>
+                        </label>
+                        <div class="d-flex gap-3">
+                            <label class="form-check">
+                                <input class="form-check-input" type="radio" name="sugar_paste"
+                                       value="yes" t-on-change="onSugarPasteChange"/>
+                                <span class="ms-1" t-esc="_t('Yes')"/>
+                            </label>
+                            <label class="form-check">
+                                <input class="form-check-input" type="radio" name="sugar_paste"
+                                       value="no" checked="checked" t-on-change="onSugarPasteChange"/>
+                                <span class="ms-1" t-esc="_t('No')"/>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Categories -->
+                    <t t-foreach="categories" t-as="category" t-key="category.id">
+                        <div class="mb-3 border rounded p-3" t-if="category.lines.length">
+                            <h5 class="fw-bold mb-2" t-esc="category.name"/>
+                            <t t-foreach="category.lines" t-as="line" t-key="line.id">
+                                <label class="form-check d-block mb-1">
+                                    <input class="form-check-input" type="radio"
+                                           t-att-name="'category_' + category.id"
+                                           t-att-checked="isComponentSelected(category.id, line.id) ? 'checked' : undefined"
+                                           t-on-change="() => this.onComponentSelect(category.id, line.id)"/>
+                                    <span class="ms-1" t-esc="line.product_name"/>
+                                </label>
+                            </t>
+                        </div>
+                    </t>
+
+                    <!-- Price Summary -->
+                    <div class="price-summary bg-light border rounded p-3 mt-3">
+                        <h5 class="fw-bold mb-3">💰 <t t-esc="_t('Price Summary')"/></h5>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span t-esc="_t('Total Components Cost')"/>
+                            <span t-esc="formatAmount(state.prices.total_components_cost)"/>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span t-esc="_t('Selling Price Before Tax')"/>
+                            <span t-esc="formatAmount(state.prices.price_before_tax)"/>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span><t t-esc="_t('Tax')"/> (<t t-esc="taxRate"/>%)</span>
+                            <span t-esc="formatAmount(state.prices.tax_amount)"/>
+                        </div>
+                        <div class="d-flex justify-content-between fw-bold fs-5 mt-2 pt-2 border-top">
+                            <span t-esc="_t('Final Selling Price')"/>
+                            <span class="text-primary" t-esc="formatAmount(state.prices.final_price)"/>
+                        </div>
+                    </div>
+                </t>
+            </div>
+
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary" t-on-click="cancel" type="button">
+                    <t t-esc="_t('Cancel')"/>
+                </button>
+                <button class="btn btn-warning" t-on-click="payLater" type="button"
+                        t-att-disabled="state.loading ? 'disabled' : undefined">
+                    ⏳ <t t-esc="_t('Pay Later')"/>
+                </button>
+                <button class="btn btn-primary" t-on-click="confirm" type="button"
+                        t-att-disabled="state.loading ? 'disabled' : undefined">
+                    ✅ <t t-esc="_t('Confirm')"/>
+                </button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

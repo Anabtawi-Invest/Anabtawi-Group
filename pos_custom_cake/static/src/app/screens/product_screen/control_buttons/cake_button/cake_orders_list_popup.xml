@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_custom_cake.CakeOrdersListPopup" owl="1">
+        <Dialog size="'lg'" title="'🎂 Cake Orders'">
+            <div class="cake-orders-popup p-2">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control"
+                           t-att-placeholder="_t('Search by customer name or order number...')"
+                           t-att-value="state.query"
+                           t-on-input="onSearchInput"
+                           t-on-keydown="onSearchKeydown"/>
+                    <button class="btn btn-primary" t-on-click="onSearch" type="button">
+                        <i class="fa fa-search"/>
+                    </button>
+                </div>
+
+                <t t-if="state.loading">
+                    <div class="text-center py-4">
+                        <i class="fa fa-spinner fa-spin fa-2x"/>
+                    </div>
+                </t>
+                <t t-elif="!state.orders.length">
+                    <div class="text-center text-muted py-4">
+                        <t t-esc="_t('No cake orders waiting for payment.')"/>
+                    </div>
+                </t>
+                <t t-else="">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm">
+                            <thead>
+                                <tr>
+                                    <th t-esc="_t('Order Number')"/>
+                                    <th t-esc="_t('Customer')"/>
+                                    <th t-esc="_t('Cake Pieces')"/>
+                                    <th t-esc="_t('Status')"/>
+                                    <th t-esc="_t('Date')"/>
+                                    <th t-esc="_t('Final Price')"/>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="state.orders" t-as="order" t-key="order.id">
+                                    <tr class="cursor-pointer" t-on-click="() => this.selectOrder(order)">
+                                        <td t-esc="order.name"/>
+                                        <td t-esc="order.partner_name"/>
+                                        <td t-esc="order.pieces"/>
+                                        <td>
+                                            <span class="badge bg-info" t-esc="getStateLabel(order.state)"/>
+                                        </td>
+                                        <td t-esc="formatDate(order.date_order)"/>
+                                        <td t-esc="formatAmount(order.final_price)"/>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </div>
+
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary" t-on-click="cancel" type="button">
+                    <t t-esc="_t('Close')"/>
+                </button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

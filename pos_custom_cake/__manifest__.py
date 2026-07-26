@@ -1,0 +1,42 @@
+# -*- coding: utf-8 -*-
+{
+    "name": "POS Custom Cake",
+    "author": "Anabtawi",
+    "version": "19.0.1.0.0",
+    "category": "Point of Sale",
+    "summary": "Custom cake ordering with POS, MRP and dynamic pricing",
+    "license": "LGPL-3",
+    "depends": [
+        "point_of_sale",
+        "mrp",
+        "product",
+        "stock",
+        "mail",
+    ],
+    "data": [
+        "security/ir.model.access.csv",
+        "data/sequence.xml",
+        "views/cake_category_views.xml",
+        "views/cake_size_views.xml",
+        "views/pos_cake_order_views.xml",
+        "views/pos_config_views.xml",
+        "views/res_config_settings_views.xml",
+        "views/menu.xml",
+    ],
+    "assets": {
+        "point_of_sale._assets_pos": [
+            "pos_custom_cake/static/src/app/models/pos_order_patch.js",
+            "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/cake_pay_later_receipt.js",
+            "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/cake_pay_later_receipt.xml",
+            "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup.js",
+            "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup.xml",
+            "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/cake_orders_list_popup.js",
+            "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/cake_orders_list_popup.xml",
+            "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/cake_button.js",
+            "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/cake_button.xml",
+        ],
+    },
+    "installable": True,
+    "application": True,
+    "auto_install": False,
+}

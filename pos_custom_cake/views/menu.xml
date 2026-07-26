@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_custom_cake_root"
+              name="Custom Cake"
+              sequence="45"/>
+
+    <menuitem id="menu_cake_category"
+              name="Cake Categories"
+              parent="menu_custom_cake_root"
+              action="action_cake_category"
+              sequence="10"/>
+
+    <menuitem id="menu_cake_size"
+              name="Cake Sizes"
+              parent="menu_custom_cake_root"
+              action="action_cake_size"
+              sequence="20"/>
+
+    <menuitem id="menu_pos_cake_order"
+              name="Cake Orders"
+              parent="menu_custom_cake_root"
+              action="action_pos_cake_order"
+              sequence="30"/>
+
+    <record id="action_custom_cake_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+    </record>
+
+    <menuitem id="menu_custom_cake_settings"
+              name="Settings"
+              parent="menu_custom_cake_root"
+              action="action_custom_cake_settings"
+              sequence="100"/>
+</odoo>
