@@ -50,7 +50,7 @@ class HrAttendance(models.Model):
             check_out_dt = current_attendance.check_out
 
         if "check_in" in normalized_vals and check_in_dt:
-            check_in_dt = self._normalize_check_in_time(employee, check_in_dt)
+            # Keep the real check-in time (no early-arrival snap to schedule/slot).
             normalized_vals["check_in"] = check_in_dt
 
         if "check_out" in normalized_vals and check_out_dt:
@@ -75,32 +75,8 @@ class HrAttendance(models.Model):
         return self._default_employee() or self.env.user.employee_id
 
     def _normalize_check_in_time(self, employee, check_in_dt):
-        tz = self._get_employee_timezone(employee)
-        check_in_local = self._convert_utc_naive_to_tz(check_in_dt, tz)
-
-        # For planning-based contracts, align early check-in to first published slot start.
-        first_slot_start_local = self._get_planning_first_published_slot_start_local(
-            employee=employee,
-            reference_local_dt=check_in_local,
-            tz=tz,
-        )
-        if first_slot_start_local:
-            if check_in_local >= first_slot_start_local:
-                return check_in_dt
-            return first_slot_start_local.astimezone(pytz.UTC).replace(tzinfo=None)
-
-        day_bounds = self._get_employee_schedule_day_bounds(
-            employee=employee,
-            reference_dt=check_in_dt,
-            check_in_dt=check_in_dt,
-        )
-        if not day_bounds:
-            return check_in_dt
-
-        day_start, _day_end = day_bounds
-        if check_in_local >= day_start:
-            return check_in_dt
-        return day_start.astimezone(pytz.UTC).replace(tzinfo=None)
+        # Kept for compatibility; early check-in is no longer adjusted.
+        return check_in_dt
 
     def _get_planning_first_published_slot_start_local(self, employee, reference_local_dt, tz):
         version = employee.version_id or employee.current_version_id

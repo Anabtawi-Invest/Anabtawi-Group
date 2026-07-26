@@ -13,25 +13,59 @@ _logger = logging.getLogger(__name__)
 class HrEmployee(models.Model):
     _inherit = "hr.employee"
 
+    def generate_work_entries(self, date_start, date_stop, force=False):
+        """After a force regenerate (Reset), re-apply ABSENT for the full range."""
+        result = super().generate_work_entries(date_start, date_stop, force=force)
+        if force:
+            employees = self if self else self.search([("active", "=", True)])
+            employees._create_absent_work_entries_for_period(date_start, date_stop)
+        return result
+
     @api.model
     def _cron_create_absent_work_entries(self):
         """Daily cron: evaluate yesterday and create/update absent work entries."""
         target_date = fields.Date.context_today(self) - timedelta(days=1)
-        self._create_absent_work_entries_for_day(target_date)
+        self.search([("active", "=", True)])._create_absent_work_entries_for_day(target_date)
 
-    @api.model
-    def _create_absent_work_entries_for_day(self, target_date):
-        target_date = fields.Date.to_date(target_date)
-        _logger.info(
-            "Absent automation: start processing date=%s",
-            target_date,
-        )
+    def _get_absent_work_entry_type(self):
         absent_type = self.env.ref(
             "hr_absent_work_entry_automation.work_entry_type_absent",
             raise_if_not_found=False,
         )
         if not absent_type:
             absent_type = self.env["hr.work.entry.type"].search([("code", "=", "ABSENT")], limit=1)
+        return absent_type
+
+    def _create_absent_work_entries_for_period(self, date_from, date_to):
+        """Re-apply absence for every completed day in [date_from, date_to]."""
+        if not self:
+            return
+        date_from = fields.Date.to_date(date_from)
+        date_to = fields.Date.to_date(date_to)
+        # Same rule as the cron: only mark completed days (up to yesterday).
+        yesterday = fields.Date.context_today(self) - timedelta(days=1)
+        date_to = min(date_to, yesterday)
+        if date_from > date_to:
+            return
+
+        _logger.info(
+            "Absent automation: re-applying for %s employees from %s to %s",
+            len(self),
+            date_from,
+            date_to,
+        )
+        current = date_from
+        while current <= date_to:
+            self._create_absent_work_entries_for_day(current)
+            current += timedelta(days=1)
+
+    def _create_absent_work_entries_for_day(self, target_date):
+        target_date = fields.Date.to_date(target_date)
+        _logger.info(
+            "Absent automation: start processing date=%s",
+            target_date,
+        )
+        absent_type = self._get_absent_work_entry_type()
         if not absent_type:
             _logger.warning(
                 "Absent automation: skipped date=%s because ABSENT work entry type was not found",
@@ -39,9 +73,9 @@ class HrEmployee(models.Model):
             )
             return
 
-        employees = self.search([("active", "=", True)])
+        employees = self if self else self.search([("active", "=", True)])
         _logger.info(
-            "Absent automation: evaluating %s active employees for date=%s",
+            "Absent automation: evaluating %s employees for date=%s",
             len(employees),
             target_date,
         )
@@ -50,13 +84,25 @@ class HrEmployee(models.Model):
 
     def _apply_absence_for_day(self, target_date, absent_type):
         self.ensure_one()
-        expected_hours = self._get_expected_hours_on_day(target_date)
-        if expected_hours <= 0:
+        work_entry_source = self._get_work_entry_source_on_day(target_date)
+        # Working Schedule (calendar): keep standard work entries, do not mark as absent.
+        if work_entry_source == "calendar":
             _logger.info(
-                "Absent automation: skip employee=%s(%s) date=%s reason=no expected work hours",
+                "Absent automation: skip employee=%s(%s) date=%s reason=work entry source is Working Schedule",
                 self.name,
                 self.id,
                 target_date,
+            )
+            return
+        expected_hours = self._get_expected_hours_on_day(target_date)
+        if expected_hours <= 0:
+            _logger.info(
+                "Absent automation: skip employee=%s(%s) date=%s reason=no expected work hours "
+                "work_entry_source=%s",
+                self.name,
+                self.id,
+                target_date,
+                work_entry_source or "none",
             )
             return
         if self._has_checkin_on_day(target_date):
@@ -159,10 +205,24 @@ class HrEmployee(models.Model):
         self.ensure_one()
         return self._get_expected_hours_on_day(target_date) > 0
 
-    def _get_expected_hours_on_day(self, target_date):
+    def _get_work_entry_source_on_day(self, target_date):
         self.ensure_one()
-        # Planning-only absence logic: ignore calendar working schedules.
-        return self._get_planning_hours_on_day(target_date)
+        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
+        if not version:
+            return False
+        return (version.work_entry_source or "").strip()
+
+    def _get_expected_hours_on_day(self, target_date):
+        """Return expected work hours based on the contract work entry source.
+
+        - planning: use planning slots for that day
+        - attendance / calendar / other: use the working schedule (resource calendar)
+        """
+        self.ensure_one()
+        source = self._get_work_entry_source_on_day(target_date)
+        if source == "planning":
+            return self._get_planning_hours_on_day(target_date)
+        return self._get_calendar_hours_on_day(target_date)
 
     def _get_day_utc_bounds(self, target_date):
         self.ensure_one()

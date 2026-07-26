@@ -24,7 +24,7 @@ class StockPicking(models.Model):
                 if not source or source.usage != "internal":
                     continue
 
-                if not source._blocks_negative_stock_for():
+                if not source.restrict_negative:
                     continue
 
                 product = move.product_id

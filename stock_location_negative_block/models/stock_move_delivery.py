@@ -10,7 +10,7 @@ class StockMove(models.Model):
 
         for move in self:
             location = move.location_id
-            if not location or not location._blocks_negative_stock_for():
+            if not location or not location.restrict_negative:
                 continue
 
             picking = move.picking_id

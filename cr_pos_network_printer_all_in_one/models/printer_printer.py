@@ -18,14 +18,11 @@ class Printer(models.Model):
 
     @api.model
     def _load_pos_data_fields(self, config):
-        return ['id', 'name', 'ip', 'port', 'printer_type', 'print_engine_key', 'print_engine_client_id']
+        return ['id', 'name', 'ip', 'port', 'printer_type', 'print_engine_key']
 
     @api.model
     def _load_pos_data_domain(self, data, config):
-        printer_ids = config.printer_ids.mapped('printer_id').ids
-        if config.printer_id:
-            printer_ids.append(config.printer_id.id)
-        return [('id', 'in', printer_ids)]
+        return []
 
     @api.model
     def _load_pos_data_search_read(self, data, config):

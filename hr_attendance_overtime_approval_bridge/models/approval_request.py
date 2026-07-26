@@ -129,13 +129,13 @@ class ApprovalRequest(models.Model):
                 )
             if not request.overtime_date_from:
                 request.overtime_date_from = (
-                    (request.date_start and fields.Datetime.to_date(request.date_start))
-                    or (request.date and fields.Datetime.to_date(request.date))
+                    (request.date_start and fields.Date.to_date(request.date_start))
+                    or (request.date and fields.Date.to_date(request.date))
                 )
             if not request.overtime_date_to:
                 request.overtime_date_to = (
-                    (request.date_end and fields.Datetime.to_date(request.date_end))
-                    or (request.date and fields.Datetime.to_date(request.date))
+                    (request.date_end and fields.Date.to_date(request.date_end))
+                    or (request.date and fields.Date.to_date(request.date))
                 )
 
     @api.depends("overtime_employee_id", "overtime_date_from", "overtime_date_to", "is_overtime_category")
@@ -308,8 +308,7 @@ class ApprovalRequest(models.Model):
         for request in self.filtered("is_overtime_category"):
             if request.quantity <= 0:
                 raise ValidationError(_("Requested Overtime Hours must be greater than zero."))
-            # Overtime requests in this customization are always preauthorized
-            # before check-in, so existing overtime lines must not limit creation.
+            # Quantity is capped against matched overtime lines on manager approval.
 
     def _check_weekly_worked_hours_eligibility(self):
         required_weekly_hours = self._get_required_weekly_hours()
@@ -417,7 +416,7 @@ class ApprovalRequest(models.Model):
                 continue
 
             approved_hours = min(attendance.worked_hours or 0.0, request.quantity or 0.0)
-            attendance_date = fields.Datetime.to_date(attendance.check_in) or fields.Date.context_today(request)
+            attendance_date = fields.Date.to_date(attendance.check_in) or fields.Date.context_today(request)
             pending_week_start, pending_week_end = request._get_week_date_bounds(attendance_date)
             overtime_lines = attendance.linked_overtime_ids.sorted(
                 lambda line: (line.time_start or attendance.check_in, line.id)
@@ -618,22 +617,39 @@ class ApprovalRequest(models.Model):
 
     def action_confirm(self):
         overtime_requests = self.filtered("is_overtime_category")
-        overtime_requests.write({"overtime_preauthorization": True})
+        overtime_requests._compute_overtime_line_ids()
+        # Before work: no overtime lines yet → keep as preauthorization for later matching.
+        # After work: lines already exist → approve those lines when the manager accepts.
+        for request in overtime_requests:
+            request.overtime_preauthorization = not bool(request.overtime_line_ids)
         self._ensure_overtime_manager_approver()
         return super().action_confirm()
 
     def _sync_overtime_lines_with_status(self):
-        overtime_requests = self.filtered(
-            lambda req: req.overtime_line_ids and not req.overtime_preauthorization
-        )
+        """Validate (or refuse) matched extra-hours lines from the approval decision.
+
+        Works for requests submitted before or after the employee worked:
+        - after work: lines exist at approval time
+        - before work: lines appear later and are matched when created/recomputed
+        """
+        overtime_requests = self.filtered("is_overtime_category")
+        overtime_requests._compute_overtime_line_ids()
+        overtime_requests = overtime_requests.filtered("overtime_line_ids")
         for request in overtime_requests:
             if request.request_status == "approved":
-                remaining = request.quantity
-                for overtime_line in request.overtime_line_ids.sorted(
-                    lambda line: (line.date, line.time_start or fields.Datetime.now())
-                ):
+                already_approved = request.overtime_line_ids.filtered(
+                    lambda line: line.status == "approved"
+                )
+                remaining = max(
+                    (request.quantity or 0.0) - sum(already_approved.mapped("manual_duration")),
+                    0.0,
+                )
+                pending_lines = request.overtime_line_ids.filtered(
+                    lambda line: line.status == "to_approve"
+                ).sorted(lambda line: (line.date, line.time_start or fields.Datetime.now()))
+                for overtime_line in pending_lines:
                     if remaining <= 0:
-                        continue
+                        break
                     approved_chunk = min(overtime_line.manual_duration, remaining)
                     original_duration = overtime_line.manual_duration
                     if approved_chunk < original_duration:
@@ -651,7 +667,29 @@ class ApprovalRequest(models.Model):
                     overtime_line.with_context(skip_overtime_approval_gate=True).action_approve()
                     remaining -= approved_chunk
             elif request.request_status == "refused":
-                request.overtime_line_ids.action_refuse()
+                request.overtime_line_ids.filtered(
+                    lambda line: line.status == "to_approve"
+                ).action_refuse()
+
+    def _apply_approved_requests_to_new_overtime_lines(self, overtime_lines):
+        """When overtime lines appear after a pre-work approval, validate them."""
+        if not overtime_lines:
+            return
+        employees = overtime_lines.mapped("employee_id")
+        dates = overtime_lines.mapped("date")
+        if not employees or not dates:
+            return
+        matching_requests = self.search(
+            [
+                ("is_overtime_category", "=", True),
+                ("request_status", "=", "approved"),
+                ("overtime_employee_id", "in", employees.ids),
+                ("overtime_date_from", "<=", max(dates)),
+                ("overtime_date_to", ">=", min(dates)),
+            ]
+        )
+        if matching_requests:
+            matching_requests._sync_overtime_lines_with_status()
 
     def _mark_auto_checkout_policy_on_approval(self):
         overtime_requests = self.filtered(

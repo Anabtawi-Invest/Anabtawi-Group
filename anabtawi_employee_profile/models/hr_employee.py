@@ -11,7 +11,16 @@ class HrEmployee(models.Model):
         groups='hr.group_hr_user',
         tracking=True,
     )
-    religion = fields.Char(groups='hr.group_hr_user', tracking=True)
+    religion = fields.Selection(
+        selection=[
+            ('muslim', 'Muslim'),
+            ('christian', 'Christian'),
+            ('other', 'Other'),
+        ],
+        string='Religion',
+        groups='hr.group_hr_user',
+        tracking=True,
+    )
     mother_name = fields.Char(string="Mother's Name", groups='hr.group_hr_user', tracking=True)
     medical_insurance_ref = fields.Char(
         string='Medical Insurance (override)',
@@ -147,3 +156,13 @@ class HrEmployee(models.Model):
         if callable(selection):
             selection = selection(self)
         return dict(selection).get(self.sex) or self.sex
+
+    def profile_religion_display(self):
+        self.ensure_one()
+        if not self.religion:
+            return ''
+        field = self._fields['religion']
+        selection = field.selection
+        if callable(selection):
+            selection = selection(self)
+        return dict(selection).get(self.religion) or self.religion

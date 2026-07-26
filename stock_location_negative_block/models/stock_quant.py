@@ -11,7 +11,8 @@ class StockQuant(models.Model):
         for quant in self:
             location = quant.location_id
 
-            if not location or not location._blocks_negative_stock_for():
+            # فقط إذا الموقع عليه التقييد
+            if not location or not location.restrict_negative:
                 continue
 
             # الكمية الحالية في النظام

@@ -1,8 +1,8 @@
 {
     "name": "Negative Stock-Anabtawi",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.0.0",
     "category": "Inventory",
-    "summary": "Block negative stock when source location is flagged, with allowed users",
+    "summary": "Block negative stock when source location is flagged",
     "depends": ["stock"],
     "data": [
         "security/ir.model.access.csv",

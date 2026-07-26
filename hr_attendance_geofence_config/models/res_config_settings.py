@@ -10,7 +10,15 @@ class ResConfigSettings(models.TransientModel):
         related='company_id.attendance_geo_enforce',
         readonly=False,
     )
-    attendance_geo_location_ids = fields.One2many(
-        related='company_id.attendance_geo_location_ids',
+    attendance_geo_latitude = fields.Float(
+        related='company_id.attendance_geo_latitude',
+        readonly=False,
+    )
+    attendance_geo_longitude = fields.Float(
+        related='company_id.attendance_geo_longitude',
+        readonly=False,
+    )
+    attendance_geo_radius_m = fields.Float(
+        related='company_id.attendance_geo_radius_m',
         readonly=False,
     )

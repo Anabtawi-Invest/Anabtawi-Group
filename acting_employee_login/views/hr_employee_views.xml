@@ -6,10 +6,9 @@
         <field name="inherit_id" ref="hr.view_employee_form"/>
         <field name="arch" type="xml">
             <xpath expr="//group[@name='identification_group']" position="inside">
-                <field name="acting_login_password_set" readonly="1"/>
                 <field name="acting_login_password"
                          password="True"
-                         placeholder="Type a new password, then Save"/>
+                         placeholder="Set password used at login"/>
             </xpath>
         </field>
     </record>

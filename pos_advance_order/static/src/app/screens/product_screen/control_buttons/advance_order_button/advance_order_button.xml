@@ -27,7 +27,7 @@
             <span>
                 <t t-esc="env.utils.formatCurrency(props.default_cash_details.amount)"/>
                 <small t-if="props.default_cash_details.advance_payment_amount" class="ms-2 text-muted fs-6">
-                    (<t t-esc="advanceIncludedLabel"/>:
+                    (Advance included:
                     <t t-esc="env.utils.formatCurrency(props.default_cash_details.advance_payment_amount)"/>)
                 </small>
             </span>
@@ -36,7 +36,7 @@
             <span>
                 <t t-esc="env.utils.formatCurrency(pm.amount)"/>
                 <small t-if="pm.advance_payment_amount" class="ms-2 text-muted fs-6">
-                    (<t t-esc="advanceIncludedLabel"/>:
+                    (Advance included:
                     <t t-esc="env.utils.formatCurrency(pm.advance_payment_amount)"/>)
                 </small>
             </span>

@@ -65,14 +65,22 @@ class RememberDeviceHome(Home):
     def web_login(self, redirect=None, **kw):
         # Attempt auto-login from remember cookie before rendering login page.
         if request.httprequest.method == "GET":
-            if self._try_cookie_autologin():
-                return request.redirect(redirect or "/odoo")
+            try:
+                if self._try_cookie_autologin():
+                    return request.redirect(redirect or "/odoo")
+            except Exception:
+                # Never block /web/login due to remember-device side effects.
+                _logger.exception("remember_device_login auto-login failed; fallback to standard login flow")
 
         response = super().web_login(redirect=redirect, **kw)
 
         # On successful credential login, create remember cookie.
         if request.params.get("login_success") and request.session.uid:
-            self._set_remember_cookie(response, request.env.user)
+            try:
+                self._set_remember_cookie(response, request.env.user)
+            except Exception:
+                # Successful login must not fail if trusted-device persistence fails.
+                _logger.exception("remember_device_login cookie issue failed; login kept successful")
         return response
 
     @http.route("/anabtawi/remember/bootstrap", type="http", auth="public", methods=["POST"], csrf=False)
