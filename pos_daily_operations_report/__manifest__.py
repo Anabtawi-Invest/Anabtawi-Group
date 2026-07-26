@@ -1,6 +1,6 @@
 {
     'name': 'POS Daily Operations Report',
-    'version': '1.0',
+    'version': '2.0',
     'author': 'Anabtawi',
     'category': 'Point of Sale',
     'summary': 'Daily operations summary report by POS branch',
