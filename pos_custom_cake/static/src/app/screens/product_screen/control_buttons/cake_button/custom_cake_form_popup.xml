@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="pos_custom_cake.CustomCakeFormPopup" owl="1">
-        <Dialog size="'lg'" t-att-title="dialogTitle">
+        <Dialog size="'lg'" title="dialogTitle">
             <div class="custom-cake-popup p-2">
                 <t t-if="state.loading">
                     <div class="text-center py-4">
