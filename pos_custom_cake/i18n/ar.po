@@ -137,8 +137,13 @@ msgid "Enable Custom Cake"
 msgstr "تفعيل الكعك المخصص"
 
 #. module: pos_custom_cake
-msgid "Category Name"
-msgstr "اسم الفئة"
+msgid "Search product..."
+msgstr "بحث عن منتج..."
+
+#. module: pos_custom_cake
+msgid "No products match your search."
+msgstr "لا توجد منتجات مطابقة للبحث."
+
 
 #. module: pos_custom_cake
 msgid "Category Name (Arabic)"

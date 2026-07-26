@@ -7,7 +7,7 @@ import { useService } from "@web/core/utils/hooks";
 import { formatCurrency } from "@web/core/currency";
 import { rpc } from "@web/core/network/rpc";
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
-import { PartnerList } from "@point_of_sale/app/screens/partner_list/partner_list";
+import { normalize } from "@web/core/l10n/utils";
 
 function roundCurrency(amount, currency) {
     const rounding = currency?.rounding || 0.01;
@@ -33,6 +33,7 @@ export class CustomCakeFormPopup extends Component {
             cake_size_id: null,
             sugar_paste: false,
             selectedLines: {},
+            categorySearch: {},
             prices: {
                 total_components_cost: 0,
                 price_before_tax: 0,
@@ -80,6 +81,8 @@ export class CustomCakeFormPopup extends Component {
             cancel: _t("Cancel"),
             payLater: _t("Pay Later"),
             confirm: _t("Confirm"),
+            searchProduct: _t("Search product..."),
+            noProductsFound: _t("No products match your search."),
         };
     }
 
@@ -158,6 +161,30 @@ export class CustomCakeFormPopup extends Component {
     onComponentSelect(categoryId, lineId) {
         this.state.selectedLines[categoryId] = lineId;
         this._computePricesLocal();
+    }
+
+    onCategorySearchInput(categoryId, ev) {
+        this.state.categorySearch = {
+            ...this.state.categorySearch,
+            [categoryId]: ev.target.value || "",
+        };
+    }
+
+    getCategorySearch(categoryId) {
+        return this.state.categorySearch[categoryId] || "";
+    }
+
+    getFilteredLines(category) {
+        const query = normalize((this.state.categorySearch[category.id] || "").trim());
+        if (!query) {
+            return category.lines;
+        }
+        const selectedId = this.state.selectedLines[category.id];
+        return category.lines.filter(
+            (line) =>
+                line.id === selectedId ||
+                normalize(line.product_name || "").includes(query)
+        );
     }
 
     isComponentSelected(categoryId, lineId) {
