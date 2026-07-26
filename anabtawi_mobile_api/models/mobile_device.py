@@ -9,6 +9,8 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
+LAST_LOGIN_TOUCH_MINUTES = 5
+
 
 class AnabtawiMobileDevice(models.Model):
     _name = "anabtawi.mobile.device"
@@ -100,6 +102,21 @@ class AnabtawiMobileDevice(models.Model):
             vals["last_ip"] = ip_address
         self.sudo().write(vals)
 
+    def _touch_last_login(self, ip_address=None):
+        """Update last login/IP without writing on every parallel API request."""
+        self.ensure_one()
+        now = fields.Datetime.now()
+        vals = {}
+        if (
+            not self.last_login
+            or self.last_login <= now - timedelta(minutes=LAST_LOGIN_TOUCH_MINUTES)
+        ):
+            vals["last_login"] = now
+        if ip_address and self.last_ip != ip_address:
+            vals["last_ip"] = ip_address
+        if vals:
+            self.sudo().write(vals)
+
     @api.model
     def register_or_refresh_login(self, user, device_uid_clean, device_name=None, ip_address=None, platform=None, manufacturer=None, model_name=None, app_version=None):
         """Register/refresh an Employee App login.
@@ -133,6 +150,17 @@ class AnabtawiMobileDevice(models.Model):
         active_same_device = active_devices.filtered(lambda d: d.device_uid == device_uid_clean)[:1]
 
         plain = self_sudo._issue_plain_token()
+        digest = self_sudo._hash_plain_token(plain)
+        token_vals = {
+            "token_hash": digest,
+            "token_index": digest[:8] if digest else False,
+            "last_login": fields.Datetime.now(),
+            "active": True,
+            "token_expires_at": fields.Datetime.now() + timedelta(days=self_sudo._token_ttl_days()),
+        }
+        if ip_address:
+            token_vals["last_ip"] = ip_address
+
         if active_same_device:
             vals = {"device_name": device_name or active_same_device.device_name}
             if platform:
@@ -143,10 +171,7 @@ class AnabtawiMobileDevice(models.Model):
                 vals["model_name"] = model_name
             if app_version:
                 vals["app_version"] = app_version
-            if ip_address:
-                vals["last_ip"] = ip_address
-            active_same_device.write(vals)
-            active_same_device._apply_new_tokens(plain, ip_address=ip_address)
+            active_same_device.write({**vals, **token_vals})
             return {"access_token": plain}
 
         inactive_device = self_sudo.search([
@@ -166,9 +191,7 @@ class AnabtawiMobileDevice(models.Model):
                 vals["registered_at"] = fields.Datetime.now()
             if ip_address:
                 vals["registered_ip"] = inactive_device.registered_ip or ip_address
-                vals["last_ip"] = ip_address
-            inactive_device.write(vals)
-            inactive_device._apply_new_tokens(plain, ip_address=ip_address)
+            inactive_device.write({**vals, **token_vals})
             return {"access_token": plain}
 
         digest = self_sudo._hash_plain_token(plain)
@@ -216,10 +239,7 @@ class AnabtawiMobileDevice(models.Model):
         if not device.user_id.active:
             device.action_revoke_token()
             return self.env["res.users"]
-        vals = {"last_login": fields.Datetime.now()}
-        if ip_address:
-            vals["last_ip"] = ip_address
-        device.sudo().write(vals)
+        device._touch_last_login(ip_address=ip_address)
         return device.user_id
 
     @api.model
