@@ -7,6 +7,7 @@ import { useService } from "@web/core/utils/hooks";
 import { formatCurrency } from "@web/core/currency";
 import { rpc } from "@web/core/network/rpc";
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
+import { PartnerList } from "@point_of_sale/app/screens/partner_list/partner_list";
 import { normalize } from "@web/core/l10n/utils";
 
 function roundCurrency(amount, currency) {
