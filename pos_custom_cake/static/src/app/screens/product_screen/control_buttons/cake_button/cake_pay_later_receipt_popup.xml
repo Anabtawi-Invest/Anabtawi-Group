@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_custom_cake.CakePayLaterReceiptPopup" owl="1">
+        <Dialog title="title" size="'md'">
+            <div class="p-3 bg-light border rounded">
+                <CakePayLaterReceipt receipt="props.receipt"/>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-primary" t-on-click="print">
+                    <i class="fa fa-print me-1"/>
+                    <t t-esc="labels.print"/>
+                </button>
+                <button class="btn btn-secondary" t-on-click="close">
+                    <t t-esc="labels.close"/>
+                </button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

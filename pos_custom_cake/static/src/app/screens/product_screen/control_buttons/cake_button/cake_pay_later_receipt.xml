@@ -5,47 +5,47 @@
             <div class="text-center">
                 <div class="fw-bolder" t-esc="props.receipt.companyName"/>
                 <div t-esc="props.receipt.posName"/>
-                <div class="pt-1">🎂 <t t-esc="labels.customCakeOrder"/></div>
+                <div class="pt-1">🎂 <t t-esc="props.receipt.title"/></div>
             </div>
 
             <div class="pt-3">
                 <div>
-                    <strong t-esc="labels.orderNumber"/>:
+                    <strong t-esc="props.receipt.orderNumberLabel"/>:
                     <span t-esc="props.receipt.reference"/>
                 </div>
                 <div>
-                    <strong t-esc="labels.date"/>:
+                    <strong t-esc="props.receipt.dateLabel"/>:
                     <span t-esc="props.receipt.date"/>
                 </div>
                 <div>
-                    <strong t-esc="labels.customer"/>:
+                    <strong t-esc="props.receipt.customerLabel"/>:
                     <span t-esc="props.receipt.customerName"/>
                 </div>
                 <div>
-                    <strong t-esc="labels.status"/>:
-                    <span t-esc="statusLabel"/>
+                    <strong t-esc="props.receipt.statusLabel"/>:
+                    <span t-esc="props.receipt.statusText"/>
                 </div>
             </div>
 
             <div class="pt-3 border-top mt-2">
                 <div class="d-flex fw-bolder">
                     <span class="w-75" t-esc="props.receipt.productName"/>
-                    <span class="w-25 text-end" t-esc="formatCurrency(props.receipt.finalPrice)"/>
+                    <span class="w-25 text-end" t-esc="props.receipt.finalPriceFormatted"/>
                 </div>
                 <div class="text-muted small">
-                    <t t-esc="props.receipt.pieces"/> <t t-esc="labels.pieces"/>
+                    <t t-esc="props.receipt.pieces"/> <t t-esc="props.receipt.piecesLabel"/>
                 </div>
             </div>
 
             <div class="pt-3 border-top mt-2">
                 <div class="d-flex fw-bolder fs-5">
-                    <span t-esc="labels.total"/>
-                    <span class="ms-auto" t-esc="formatCurrency(props.receipt.finalPrice)"/>
+                    <span t-esc="props.receipt.totalLabel"/>
+                    <span class="ms-auto" t-esc="props.receipt.finalPriceFormatted"/>
                 </div>
             </div>
 
             <div class="text-center pt-3">
-                <span t-esc="labels.payAtCounter"/>
+                <span t-esc="props.receipt.footerText"/>
             </div>
         </div>
     </t>

@@ -7,16 +7,16 @@ import { usePos } from "@point_of_sale/app/hooks/pos_hook";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { rpc } from "@web/core/network/rpc";
+import { formatCurrency } from "@web/core/currency";
 import { CustomCakeFormPopup } from "./custom_cake_form_popup";
 import { CakeOrdersListPopup } from "./cake_orders_list_popup";
-import { CakePayLaterReceipt } from "./cake_pay_later_receipt";
+import { CakePayLaterReceiptPopup } from "./cake_pay_later_receipt_popup";
 
 patch(ControlButtons.prototype, {
     setup() {
         super.setup();
         this.pos = usePos();
         this.orm = useService("orm");
-        this.printer = useService("printer");
     },
 
     customCakeButtonClass() {
@@ -108,6 +108,7 @@ patch(ControlButtons.prototype, {
     },
 
     _buildPayLaterReceiptData(result, partner) {
+        const finalPrice = result?.final_price || 0;
         return {
             companyName: this.pos.company?.name || "",
             posName: this.pos.config?.name || "",
@@ -116,9 +117,28 @@ patch(ControlButtons.prototype, {
             customerName: partner?.name || result?.partner_name || "",
             productName: result?.product_name || "",
             pieces: result?.pieces || 0,
-            finalPrice: result?.final_price || 0,
+            finalPrice,
             currencyId: this.pos.currency?.id,
+            title: _t("Custom Cake Order"),
+            orderNumberLabel: _t("Order Number"),
+            dateLabel: _t("Date"),
+            customerLabel: _t("Customer"),
+            statusLabel: _t("Status"),
+            statusText: _t("Waiting for Payment"),
+            piecesLabel: _t("Pieces"),
+            totalLabel: _t("Total"),
+            finalPriceFormatted: formatCurrency(finalPrice, this.pos.currency?.id),
+            footerText: _t("Please pay at the counter when ready."),
         };
+    },
+
+    _showPayLaterReceipt(result, partner) {
+        const receipt = this._buildPayLaterReceiptData(result, partner);
+        this.dialog.add(CakePayLaterReceiptPopup, {
+            receipt,
+            printOptions: this.pos.printOptions,
+            autoPrint: true,
+        });
     },
 
     async onClickCustomCake() {
@@ -138,25 +158,22 @@ patch(ControlButtons.prototype, {
             const result = await rpc("/pos/custom_cake/create_order", popupResult.payload);
 
             if (popupResult.action === "pay_later") {
+                const moLabel = result?.production_name
+                    ? _t("MO: %s", result.production_name)
+                    : "";
                 this.notification.add(
-                    _t("Cake order saved: %s", result?.name || ""),
+                    _t("Cake order saved: %s %s", result?.name || "", moLabel).trim(),
                     { type: "success" }
                 );
-                try {
-                    await this.printer.print(
-                        CakePayLaterReceipt,
-                        {
-                            receipt: this._buildPayLaterReceiptData(result, popupResult.partner),
-                        },
-                        this.pos.printOptions
+                if (!result?.production_id) {
+                    this.notification.add(
+                        _t(
+                            "No manufacturing order was linked. Upgrade the module and use Create Manufacturing Order on the cake order form."
+                        ),
+                        { type: "danger" }
                     );
-                } catch (printError) {
-                    const printMessage =
-                        printError?.body ||
-                        printError?.message ||
-                        _t("Order saved but receipt printing failed.");
-                    this.notification.add(printMessage, { type: "warning" });
                 }
+                this._showPayLaterReceipt(result, popupResult.partner);
                 return;
             }
 
@@ -165,8 +182,11 @@ patch(ControlButtons.prototype, {
                 partnerId: popupResult.partner?.id,
             });
             if (added) {
+                const moLabel = result?.production_name
+                    ? _t("MO: %s", result.production_name)
+                    : "";
                 this.notification.add(
-                    _t("Custom cake added: %s", result?.name || ""),
+                    _t("Custom cake added: %s %s", result?.name || "", moLabel).trim(),
                     { type: "success" }
                 );
             }

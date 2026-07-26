@@ -6,6 +6,10 @@
         <field name="arch" type="xml">
             <form string="Cake Order" create="0">
                 <header>
+                    <button name="action_create_manufacturing_order"
+                            string="Create Manufacturing Order"
+                            type="object"
+                            invisible="production_id or state == 'cancelled'"/>
                     <button name="action_cancel" string="Cancel" type="object"
                             invisible="state in ('paid', 'cancelled')"/>
                     <field name="state" widget="statusbar"

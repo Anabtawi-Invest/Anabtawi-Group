@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.fields import Command
 from odoo.tools import float_compare, float_is_zero, float_round
+
+_logger = logging.getLogger(__name__)
 
 
 class PosCakeOrder(models.Model):
@@ -176,6 +180,15 @@ class PosCakeOrder(models.Model):
         cake_size = self.env["cake.size"].sudo().browse(int(cake_size_id)).exists()
         if not cake_size:
             raise ValidationError(_("Invalid cake size."))
+        if not cake_size.product_id:
+            raise ValidationError(_("The selected cake size has no POS product configured."))
+        if cake_size.product_id.type != "consu":
+            raise ValidationError(
+                _(
+                    "The cake size product must be of type Goods (not Service) "
+                    "so a manufacturing order can be created."
+                )
+            )
 
         pos_config = self.env["pos.config"].sudo().browse(int(pos_config_id)).exists()
         if not pos_config:
@@ -221,37 +234,104 @@ class PosCakeOrder(models.Model):
             "component_line_ids": [Command.create(vals) for vals in component_vals],
         }
         cake_order = self.sudo().create(order_vals)
+        cake_order.flush_recordset(["product_id"])
         production = cake_order._create_manufacturing_order()
-        cake_order.production_id = production.id
+        cake_order.write({"production_id": production.id})
         return cake_order._prepare_pos_response()
+
+    def _get_manufacturing_picking_type(self):
+        self.ensure_one()
+        PickingType = self.env["stock.picking.type"].sudo()
+        picking_type = PickingType.search(
+            [
+                ("code", "=", "mrp_operation"),
+                ("company_id", "=", self.company_id.id),
+            ],
+            limit=1,
+        )
+        if not picking_type:
+            warehouse = self.env["stock.warehouse"].sudo().search(
+                [("company_id", "=", self.company_id.id)], limit=1
+            )
+            if warehouse and warehouse.manufacture_pull_id:
+                picking_type = warehouse.manufacture_pull_id.picking_type_id
+        if not picking_type:
+            raise UserError(
+                _(
+                    "No manufacturing operation type found for company %(company)s. "
+                    "Please configure Manufacturing for this company.",
+                )
+                % {"company": self.company_id.display_name}
+            )
+        return picking_type
 
     def _create_manufacturing_order(self):
         self.ensure_one()
-        if not self.env.user.has_group("mrp.group_mrp_user") and not self.env.su:
-            pass
+        if self.production_id:
+            return self.production_id
+
+        if not self.product_id:
+            raise UserError(_("The selected cake size has no product configured."))
+
+        picking_type = self._get_manufacturing_picking_type()
         move_raw_vals = []
         for comp in self.component_line_ids:
             qty = comp.configured_qty * self.pieces
+            if float_is_zero(qty, precision_rounding=comp.product_id.uom_id.rounding or 0.01):
+                continue
             move_raw_vals.append(
                 Command.create(
                     {
                         "product_id": comp.product_id.id,
                         "product_uom_qty": qty,
                         "product_uom": comp.product_id.uom_id.id,
+                        "company_id": self.company_id.id,
                     }
                 )
             )
+        if not move_raw_vals:
+            raise UserError(_("No manufacturing components found for this cake order."))
+
         mo_vals = {
+            "company_id": self.company_id.id,
             "product_id": self.product_id.id,
             "product_qty": 1.0,
             "product_uom_id": self.product_id.uom_id.id,
             "bom_id": False,
             "origin": self.name,
+            "picking_type_id": picking_type.id,
+            "location_src_id": picking_type.default_location_src_id.id,
+            "location_dest_id": picking_type.default_location_dest_id.id,
             "move_raw_ids": move_raw_vals,
         }
-        production = self.env["mrp.production"].sudo().create(mo_vals)
+        if not mo_vals["location_src_id"] or not mo_vals["location_dest_id"]:
+            raise UserError(
+                _(
+                    "Manufacturing locations are not configured on operation type %(operation)s.",
+                )
+                % {"operation": picking_type.display_name}
+            )
+        production = (
+            self.env["mrp.production"]
+            .sudo()
+            .with_company(self.company_id)
+            .create(mo_vals)
+        )
         production.action_confirm()
+        _logger.info(
+            "Manufacturing order %s created for cake order %s",
+            production.name,
+            self.name,
+        )
         return production
+
+    def action_create_manufacturing_order(self):
+        for order in self:
+            if order.production_id:
+                continue
+            production = order._create_manufacturing_order()
+            order.production_id = production.id
+        return True
 
     def _prepare_pos_response(self):
         self.ensure_one()
@@ -269,8 +349,8 @@ class PosCakeOrder(models.Model):
             "price_before_tax": self.price_before_tax,
             "tax_amount": self.tax_amount,
             "final_price": self.final_price,
-            "production_id": self.production_id.id,
-            "production_name": self.production_id.name,
+            "production_id": self.production_id.id or False,
+            "production_name": self.production_id.name or False,
             "date_order": fields.Datetime.to_string(self.date_order),
         }
 
