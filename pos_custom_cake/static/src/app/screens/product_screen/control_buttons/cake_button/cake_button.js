@@ -19,34 +19,27 @@ patch(ControlButtons.prototype, {
         this.printer = useService("printer");
     },
 
-    customCakeMainButtonClass() {
-        return this.ui.isSmall
-            ? "btn btn-primary btn-md py-2 flex-shrink-0"
-            : "btn btn-primary btn-lg lh-lg flex-shrink-0";
-    },
-
-    cakeOrdersMainButtonClass() {
-        return this.ui.isSmall
-            ? "btn btn-info text-white btn-md py-2 flex-shrink-0"
-            : "btn btn-info text-white btn-lg lh-lg flex-shrink-0";
-    },
-
     customCakeButtonClass() {
-        if (this.props.showRemainingButtons) {
-            return this.ui.isSmall
-                ? "btn btn-primary btn-md py-2 text-start"
-                : "btn btn-primary btn-lg py-5";
-        }
-        return "btn btn-primary btn-lg lh-lg";
+        return this.ui.isSmall
+            ? "btn btn-md py-3 text-start w-100"
+            : "btn btn-lg py-5 text-start w-100";
+    },
+
+    customCakeButtonStyle() {
+        return "background: linear-gradient(135deg, #ff9ed2 0%, #ff69b4 45%, #e91e8c 100%); color: #fff; border: none;";
+    },
+
+    customCakeIconStyle() {
+        return "font-size: 2.75rem; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));";
     },
 
     cakeOrdersButtonClass() {
         if (this.props.showRemainingButtons) {
             return this.ui.isSmall
-                ? "btn btn-info btn-md py-2 text-start"
-                : "btn btn-info btn-lg py-5";
+                ? "btn btn-secondary btn-md py-2 text-start"
+                : "btn btn-secondary btn-lg py-5 text-start";
         }
-        return "btn btn-info btn-lg lh-lg";
+        return "btn btn-secondary btn-lg lh-lg";
     },
 
     get customCakeButtonLabel() {

@@ -1,49 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension" owl="1">
-        <!-- Main control bar -->
-        <xpath expr="//button[hasclass('more-btn')]" position="before">
-            <button
-                t-if="isCustomCakeEnabled() and !props.showRemainingButtons"
-                t-att-class="customCakeMainButtonClass()"
-                t-on-click="onClickCustomCake"
-                type="button">
-                <span class="d-flex align-items-center gap-1">
-                    <span class="fs-5" aria-hidden="true">🎂</span>
-                    <span t-esc="customCakeButtonLabel"/>
-                </span>
-            </button>
-            <button
-                t-if="isCustomCakeEnabled() and !props.showRemainingButtons"
-                t-att-class="cakeOrdersMainButtonClass()"
-                t-on-click="onClickCakeOrders"
-                type="button">
-                <span class="d-flex align-items-center gap-1">
-                    <span class="fs-5" aria-hidden="true">📋</span>
-                    <span t-esc="cakeOrdersButtonLabel"/>
-                </span>
-            </button>
-        </xpath>
-
-        <!-- Actions popup -->
+        <!-- Custom Cake: top of Actions menu, pink & prominent -->
         <xpath expr="//t[@t-if='props.showRemainingButtons']/div/NoteButton" position="after">
             <button
                 t-if="isCustomCakeEnabled()"
                 t-att-class="customCakeButtonClass()"
+                t-att-style="customCakeButtonStyle()"
                 t-on-click="onClickCustomCake"
                 type="button">
-                <span class="d-flex align-items-center gap-2">
-                    <span class="fs-5" aria-hidden="true">🎂</span>
-                    <span t-esc="customCakeButtonLabel"/>
+                <span class="d-flex align-items-center gap-3">
+                    <span t-att-style="customCakeIconStyle()" aria-hidden="true">🎂</span>
+                    <span class="fw-bold" t-esc="customCakeButtonLabel"/>
                 </span>
             </button>
+        </xpath>
+
+        <!-- Cake Orders: lower in Actions menu, away from Custom Cake -->
+        <xpath expr="//t[@t-if='props.showRemainingButtons']/div/button[contains(@t-on-click, 'onCancelOrder')]" position="before">
             <button
                 t-if="isCustomCakeEnabled()"
                 t-att-class="cakeOrdersButtonClass()"
                 t-on-click="onClickCakeOrders"
                 type="button">
                 <span class="d-flex align-items-center gap-2">
-                    <span class="fs-5" aria-hidden="true">📋</span>
+                    <i class="fa fa-list-alt me-1" role="img" aria-hidden="true"/>
                     <span t-esc="cakeOrdersButtonLabel"/>
                 </span>
             </button>
