@@ -7,14 +7,43 @@ PROTECTED_PAYMENT_METHOD_IDS = {142, 143, 144, 145}
 class PosPaymentMethod(models.Model):
     _inherit = 'pos.payment.method'
 
-    is_cash = fields.Boolean(
-        string='Is Cash',
-        help='If enabled, payments using this method are counted in the Cash column of the Daily Operations report.',
+    daily_ops_report_type = fields.Selection(
+        selection=[
+            ('cash', 'Cash'),
+            ('visa', 'Visa'),
+            ('hospitality', 'Hospitality'),
+        ],
+        string='Daily Operations Report Type',
+        help=(
+            'Optional. Leave empty if this payment method should not appear in the '
+            'Cash, Visa, or Hospitality columns of the Daily Operations report.'
+        ),
     )
-    is_hospitality = fields.Boolean(
-        string='Is Hospitality',
-        help='If enabled, payments using this method are counted in the Hospitality column of the Daily Operations report.',
-    )
+
+    def init(self):
+        self.env.cr.execute(
+            """
+            SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'pos_payment_method'
+               AND column_name = 'is_cash'
+             LIMIT 1
+            """
+        )
+        if not self.env.cr.fetchone():
+            return
+        self.env.cr.execute(
+            """
+            UPDATE pos_payment_method
+               SET daily_ops_report_type = CASE
+                   WHEN is_cash THEN 'cash'
+                   WHEN is_visa THEN 'visa'
+                   WHEN is_hospitality THEN 'hospitality'
+                   ELSE daily_ops_report_type
+               END
+             WHERE daily_ops_report_type IS NULL
+               AND (is_cash OR is_visa OR is_hospitality)
+            """
+        )
 
     def unlink(self):
         protected = self.filtered(lambda method: method.id in PROTECTED_PAYMENT_METHOD_IDS)

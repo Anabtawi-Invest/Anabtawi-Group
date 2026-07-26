@@ -35,18 +35,17 @@ class PosDailyOperationsWizard(models.TransientModel):
 
     def _empty_branch_values(self):
         return {
-            'open_bal': 0.0,
             'sales': 0.0,
             'rahen_in': 0.0,
             'rahen_out': 0.0,
             'cash': 0.0,
+            'visa': 0.0,
             'hospitality': 0.0,
             'talabat': 0.0,
             'careem': 0.0,
             'mythings': 0.0,
             'kabseh': 0.0,
             'delivery_amount': 0.0,
-            'close_bal': 0.0,
         }
 
     def _get_pledge_config_id(self, pledge):
@@ -95,9 +94,11 @@ class PosDailyOperationsWizard(models.TransientModel):
             config_id = session.config_id.id
             amount = total_amount or 0.0
             branch_data[config_id]['sales'] += amount
-            if payment_method.is_cash:
+            if payment_method.daily_ops_report_type == 'cash':
                 branch_data[config_id]['cash'] += amount
-            if payment_method.is_hospitality:
+            elif payment_method.daily_ops_report_type == 'visa':
+                branch_data[config_id]['visa'] += amount
+            elif payment_method.daily_ops_report_type == 'hospitality':
                 branch_data[config_id]['hospitality'] += amount
             if payment_method.id == PAYMENT_METHOD_TALABAT:
                 branch_data[config_id]['talabat'] += amount
@@ -108,39 +109,14 @@ class PosDailyOperationsWizard(models.TransientModel):
             elif payment_method.id == PAYMENT_METHOD_KABSEH:
                 branch_data[config_id]['kabseh'] += amount
 
-    def _collect_session_balances(self, branch_data, sessions_by_config):
+    def _collect_session_delivery_amounts(self, branch_data, sessions_by_config):
         for config_id, config_sessions in sessions_by_config.items():
             if not config_sessions:
                 continue
-            branch_data[config_id]['open_bal'] = sum(
-                session.cash_register_balance_start or 0.0
-                for session in config_sessions
-            )
-            branch_data[config_id]['close_bal'] = sum(
-                session.cash_register_balance_end_real or 0.0
-                for session in config_sessions
-            )
             branch_data[config_id]['delivery_amount'] = sum(
                 session.delivery_amount or 0.0
                 for session in config_sessions
             )
-
-    def _get_other_payments(self, values):
-        return (
-            values['cash'] + values['hospitality'] + values['talabat']
-            + values['careem'] + values['mythings'] + values['kabseh']
-        )
-
-    def _compute_diff(self, values):
-        return (
-            values['open_bal'] + values['sales'] + values['rahen_in']
-            - values['rahen_out'] - values['delivery_amount'] - values['close_bal']
-            - self._get_other_payments(values)
-        )
-
-    def _enrich_row_with_diff(self, row):
-        row['diff'] = self._compute_diff(row)
-        return row
 
     def _get_report_rows(self):
         self.ensure_one()
@@ -153,26 +129,26 @@ class PosDailyOperationsWizard(models.TransientModel):
         active_config_ids = set(configs.ids)
         branch_data = defaultdict(self._empty_branch_values)
 
-        self._collect_session_balances(branch_data, sessions_by_config)
+        self._collect_session_delivery_amounts(branch_data, sessions_by_config)
         self._collect_payment_totals(branch_data, sessions)
         self._collect_pledge_totals(branch_data, active_config_ids)
 
         rows = []
         for config in configs:
             values = branch_data[config.id]
-            rows.append(self._enrich_row_with_diff({
+            rows.append({
                 'branch_name': config.name,
                 **values,
-            }))
+            })
         return rows
 
     def _get_total_row(self, rows):
         numeric_fields = (
-            'open_bal', 'sales', 'rahen_in', 'rahen_out', 'cash', 'hospitality',
-            'talabat', 'careem', 'mythings', 'kabseh', 'delivery_amount', 'close_bal',
+            'sales', 'rahen_in', 'rahen_out', 'cash', 'visa', 'hospitality',
+            'talabat', 'careem', 'mythings', 'kabseh', 'delivery_amount',
         )
         totals = {field: sum(row[field] for row in rows) for field in numeric_fields}
-        return self._enrich_row_with_diff({'branch_name': _('Total'), **totals})
+        return {'branch_name': _('Total'), **totals}
 
     def action_export_excel(self):
         self.ensure_one()
@@ -214,19 +190,17 @@ class PosDailyOperationsWizard(models.TransientModel):
 
         headers = [
             _('Branch Name'),
-            _('Open Bal.'),
             _('Sales'),
             _('Rahen In'),
             _('Rahen Out'),
             _('Cash'),
+            _('Visa'),
             _('Hospitality'),
             _('Talabat'),
             _('Careem'),
             _('Mythings'),
             _('Kabseh'),
             _('Delivery Amount'),
-            _('Close Bal'),
-            _('Diff'),
         ]
         header_row = 4
         for col, header in enumerate(headers):
@@ -240,19 +214,17 @@ class PosDailyOperationsWizard(models.TransientModel):
             text_fmt = total_text_style if is_total else text_style
             num_fmt = total_number_style if is_total else number_style
             sheet.write(row_idx, 0, line['branch_name'], text_fmt)
-            sheet.write_number(row_idx, 1, line['open_bal'], num_fmt)
-            sheet.write_number(row_idx, 2, line['sales'], num_fmt)
-            sheet.write_number(row_idx, 3, line['rahen_in'], num_fmt)
-            sheet.write_number(row_idx, 4, line['rahen_out'], num_fmt)
-            sheet.write_number(row_idx, 5, line['cash'], num_fmt)
+            sheet.write_number(row_idx, 1, line['sales'], num_fmt)
+            sheet.write_number(row_idx, 2, line['rahen_in'], num_fmt)
+            sheet.write_number(row_idx, 3, line['rahen_out'], num_fmt)
+            sheet.write_number(row_idx, 4, line['cash'], num_fmt)
+            sheet.write_number(row_idx, 5, line['visa'], num_fmt)
             sheet.write_number(row_idx, 6, line['hospitality'], num_fmt)
             sheet.write_number(row_idx, 7, line['talabat'], num_fmt)
             sheet.write_number(row_idx, 8, line['careem'], num_fmt)
             sheet.write_number(row_idx, 9, line['mythings'], num_fmt)
             sheet.write_number(row_idx, 10, line['kabseh'], num_fmt)
             sheet.write_number(row_idx, 11, line['delivery_amount'], num_fmt)
-            sheet.write_number(row_idx, 12, line['close_bal'], num_fmt)
-            sheet.write_number(row_idx, 13, line['diff'], num_fmt)
 
         row_idx = header_row + 1
         if not rows:
