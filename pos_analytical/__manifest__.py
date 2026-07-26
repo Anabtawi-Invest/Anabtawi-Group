@@ -9,11 +9,12 @@
     "category": "Point Of Sale",
     "summary": "Link Analytic Account Configure Analytic Account Set Analytic Tags Analytic Journal Items, Analytic Journal Entries Point Of Sale Analytic Account Point Of Sale Analytic Tags POS Analytic Tags POS Analytic Account Analytic Account in POS POS Accounting Analysis POS Journal Analytic POS Configuration Analytic Account Odoo",
     "description": """This module helps configure the 'Analytic Account' in POS orders. You can set the analytic account based on each POS configuration. It automatically applies the 'Analytic Account' to journal entries and journal items, allowing you to analyze POS orders using analytic reports.""",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "license": "OPL-1",
     "depends": ["point_of_sale", "analytic"],
     "application": True,
     "data": [
+        'data/assets_cleanup.xml',
         'views/pos_order_views.xml',
         'views/pos_payment_views.xml',
         'views/pos_session_views.xml',
@@ -27,6 +28,7 @@
     "images": ["static/description/background.png", ],
     "auto_install": False,
     "installable": True,
+    "post_init_hook": "post_init_hook",
     "price": 17,
     "currency": "EUR"
 }
