@@ -19,6 +19,14 @@ patch(ControlButtons.prototype, {
         this.printer = useService("printer");
     },
 
+    customCakeMainButtonClass() {
+        return "btn btn-primary";
+    },
+
+    cakeOrdersMainButtonClass() {
+        return "btn btn-info text-white";
+    },
+
     customCakeButtonClass() {
         if (this.props.showRemainingButtons) {
             return this.ui.isSmall
