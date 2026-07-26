@@ -136,8 +136,6 @@ patch(ControlButtons.prototype, {
         const receipt = this._buildPayLaterReceiptData(result, partner);
         this.dialog.add(CakePayLaterReceiptPopup, {
             receipt,
-            printOptions: this.pos.printOptions,
-            autoPrint: true,
         });
     },
 
