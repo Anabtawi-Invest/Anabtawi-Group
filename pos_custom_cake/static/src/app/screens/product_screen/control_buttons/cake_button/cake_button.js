@@ -20,11 +20,15 @@ patch(ControlButtons.prototype, {
     },
 
     customCakeMainButtonClass() {
-        return "btn btn-primary";
+        return this.ui.isSmall
+            ? "btn btn-primary btn-md py-2 flex-shrink-0"
+            : "btn btn-primary btn-lg lh-lg flex-shrink-0";
     },
 
     cakeOrdersMainButtonClass() {
-        return "btn btn-info text-white";
+        return this.ui.isSmall
+            ? "btn btn-info text-white btn-md py-2 flex-shrink-0"
+            : "btn btn-info text-white btn-lg lh-lg flex-shrink-0";
     },
 
     customCakeButtonClass() {
@@ -51,6 +55,15 @@ patch(ControlButtons.prototype, {
 
     get cakeOrdersButtonLabel() {
         return _t("Cake Orders");
+    },
+
+    isCustomCakeEnabled() {
+        const cfg = this.pos?.config;
+        if (!cfg) {
+            return false;
+        }
+        // Default to enabled when field is missing from POS data (undefined).
+        return cfg.enable_custom_cake !== false;
     },
 
     _getCurrentOrder() {
@@ -116,7 +129,7 @@ patch(ControlButtons.prototype, {
     },
 
     async onClickCustomCake() {
-        if (!this.pos.config.enable_custom_cake) {
+        if (!this.isCustomCakeEnabled()) {
             this.notification.add(_t("Custom Cake is not enabled on this POS."), { type: "warning" });
             return;
         }
@@ -172,7 +185,7 @@ patch(ControlButtons.prototype, {
     },
 
     async onClickCakeOrders() {
-        if (!this.pos.config.enable_custom_cake) {
+        if (!this.isCustomCakeEnabled()) {
             this.notification.add(_t("Custom Cake is not enabled on this POS."), { type: "warning" });
             return;
         }

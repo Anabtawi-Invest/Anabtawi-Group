@@ -2,7 +2,7 @@
 {
     "name": "POS Custom Cake",
     "author": "Anabtawi",
-    "version": "19.0.1.0.2",
+    "version": "19.0.1.0.3",
     "category": "Point of Sale",
     "summary": "Custom cake ordering with POS, MRP and dynamic pricing",
     "license": "LGPL-3",
@@ -36,6 +36,7 @@
             "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/cake_button.xml",
         ],
     },
+    "post_init_hook": "post_init_hook",
     "installable": True,
     "application": False,
     "auto_install": False,
