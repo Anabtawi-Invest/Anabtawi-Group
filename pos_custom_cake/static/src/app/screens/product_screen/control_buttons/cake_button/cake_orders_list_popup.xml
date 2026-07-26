@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="pos_custom_cake.CakeOrdersListPopup" owl="1">
-        <Dialog size="'lg'" title="'🎂 Cake Orders'">
+        <Dialog size="'lg'" t-att-title="dialogTitle">
             <div class="cake-orders-popup p-2">
                 <div class="input-group mb-3">
                     <input type="text" class="form-control"
-                           t-att-placeholder="_t('Search by customer name or order number...')"
+                           t-att-placeholder="labels.searchPlaceholder"
                            t-att-value="state.query"
                            t-on-input="onSearchInput"
                            t-on-keydown="onSearchKeydown"/>
@@ -21,7 +21,7 @@
                 </t>
                 <t t-elif="!state.orders.length">
                     <div class="text-center text-muted py-4">
-                        <t t-esc="_t('No cake orders waiting for payment.')"/>
+                        <t t-esc="labels.noOrders"/>
                     </div>
                 </t>
                 <t t-else="">
@@ -29,12 +29,12 @@
                         <table class="table table-hover table-sm">
                             <thead>
                                 <tr>
-                                    <th t-esc="_t('Order Number')"/>
-                                    <th t-esc="_t('Customer')"/>
-                                    <th t-esc="_t('Cake Pieces')"/>
-                                    <th t-esc="_t('Status')"/>
-                                    <th t-esc="_t('Date')"/>
-                                    <th t-esc="_t('Final Price')"/>
+                                    <th t-esc="labels.orderNumber"/>
+                                    <th t-esc="labels.customer"/>
+                                    <th t-esc="labels.cakePieces"/>
+                                    <th t-esc="labels.status"/>
+                                    <th t-esc="labels.date"/>
+                                    <th t-esc="labels.finalPrice"/>
                                 </tr>
                             </thead>
                             <tbody>
@@ -58,7 +58,7 @@
 
             <t t-set-slot="footer">
                 <button class="btn btn-secondary" t-on-click="cancel" type="button">
-                    <t t-esc="_t('Close')"/>
+                    <t t-esc="labels.close"/>
                 </button>
             </t>
         </Dialog>

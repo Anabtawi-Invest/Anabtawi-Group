@@ -29,6 +29,24 @@ export class CakeOrdersListPopup extends Component {
         });
     }
 
+    get dialogTitle() {
+        return `🎂 ${_t("Cake Orders")}`;
+    }
+
+    get labels() {
+        return {
+            searchPlaceholder: _t("Search by customer name or order number..."),
+            noOrders: _t("No cake orders waiting for payment."),
+            orderNumber: _t("Order Number"),
+            customer: _t("Customer"),
+            cakePieces: _t("Cake Pieces"),
+            status: _t("Status"),
+            date: _t("Date"),
+            finalPrice: _t("Final Price"),
+            close: _t("Close"),
+        };
+    }
+
     formatAmount(amount) {
         return formatCurrency(amount || 0, this.props.pos.currency?.id);
     }

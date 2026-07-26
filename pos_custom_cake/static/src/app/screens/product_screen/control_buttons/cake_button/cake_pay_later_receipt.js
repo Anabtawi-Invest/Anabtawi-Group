@@ -17,4 +17,17 @@ export class CakePayLaterReceipt extends Component {
     get statusLabel() {
         return _t("Waiting for Payment");
     }
+
+    get labels() {
+        return {
+            customCakeOrder: _t("Custom Cake Order"),
+            orderNumber: _t("Order Number"),
+            date: _t("Date"),
+            customer: _t("Customer"),
+            status: _t("Status"),
+            pieces: _t("Pieces"),
+            total: _t("Total"),
+            payAtCounter: _t("Please pay at the counter when ready."),
+        };
+    }
 }

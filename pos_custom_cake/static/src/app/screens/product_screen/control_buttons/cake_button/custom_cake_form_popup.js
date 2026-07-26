@@ -58,6 +58,31 @@ export class CustomCakeFormPopup extends Component {
         }
     }
 
+    get dialogTitle() {
+        return `🎂 ${_t("Custom Cake")}`;
+    }
+
+    get labels() {
+        return {
+            loading: _t("Loading..."),
+            customer: _t("Customer"),
+            selectCustomer: _t("Select customer..."),
+            cakePieces: _t("Cake Pieces"),
+            selectSize: _t("Select size..."),
+            sugarPaste: _t("Contains Sugar Paste"),
+            yes: _t("Yes"),
+            no: _t("No"),
+            priceSummary: _t("Price Summary"),
+            totalComponentsCost: _t("Total Components Cost"),
+            sellingPriceBeforeTax: _t("Selling Price Before Tax"),
+            tax: _t("Tax"),
+            finalSellingPrice: _t("Final Selling Price"),
+            cancel: _t("Cancel"),
+            payLater: _t("Pay Later"),
+            confirm: _t("Confirm"),
+        };
+    }
+
     formatAmount(amount) {
         return formatCurrency(amount || 0, this.props.pos.currency?.id);
     }

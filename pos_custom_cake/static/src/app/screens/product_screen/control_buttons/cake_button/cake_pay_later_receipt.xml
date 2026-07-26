@@ -5,24 +5,24 @@
             <div class="text-center">
                 <div class="fw-bolder" t-esc="props.receipt.companyName"/>
                 <div t-esc="props.receipt.posName"/>
-                <div class="pt-1">🎂 <t t-esc="_t('Custom Cake Order')"/></div>
+                <div class="pt-1">🎂 <t t-esc="labels.customCakeOrder"/></div>
             </div>
 
             <div class="pt-3">
                 <div>
-                    <strong t-esc="_t('Order Number')"/>:
+                    <strong t-esc="labels.orderNumber"/>:
                     <span t-esc="props.receipt.reference"/>
                 </div>
                 <div>
-                    <strong t-esc="_t('Date')"/>:
+                    <strong t-esc="labels.date"/>:
                     <span t-esc="props.receipt.date"/>
                 </div>
                 <div>
-                    <strong t-esc="_t('Customer')"/>:
+                    <strong t-esc="labels.customer"/>:
                     <span t-esc="props.receipt.customerName"/>
                 </div>
                 <div>
-                    <strong t-esc="_t('Status')"/>:
+                    <strong t-esc="labels.status"/>:
                     <span t-esc="statusLabel"/>
                 </div>
             </div>
@@ -33,19 +33,19 @@
                     <span class="w-25 text-end" t-esc="formatCurrency(props.receipt.finalPrice)"/>
                 </div>
                 <div class="text-muted small">
-                    <t t-esc="props.receipt.pieces"/> <t t-esc="_t('Pieces')"/>
+                    <t t-esc="props.receipt.pieces"/> <t t-esc="labels.pieces"/>
                 </div>
             </div>
 
             <div class="pt-3 border-top mt-2">
                 <div class="d-flex fw-bolder fs-5">
-                    <span t-esc="_t('Total')"/>
+                    <span t-esc="labels.total"/>
                     <span class="ms-auto" t-esc="formatCurrency(props.receipt.finalPrice)"/>
                 </div>
             </div>
 
             <div class="text-center pt-3">
-                <span t-esc="_t('Please pay at the counter when ready.')"/>
+                <span t-esc="labels.payAtCounter"/>
             </div>
         </div>
     </t>
