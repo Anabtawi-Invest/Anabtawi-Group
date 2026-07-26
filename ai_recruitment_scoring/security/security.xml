@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================ -->
+    <!-- Module Category                                              -->
+    <!-- ============================================================ -->
+    <record id="module_category_ai_recruitment" model="ir.module.category">
+        <field name="name">AI Recruitment</field>
+        <field name="description">AI-powered recruitment scoring and analysis.</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Security Groups                                              -->
+    <!-- ============================================================ -->
+
+    <!-- User: Can trigger AI analysis on applicants they have access to -->
+    <record id="group_ai_recruitment_user" model="res.groups">
+        <field name="name">AI Recruitment User</field>
+        <field name="category_id" ref="module_category_ai_recruitment"/>
+        <field name="implied_ids" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+        <field name="comment">
+            Can use AI analysis features: analyze CVs, generate interview questions,
+            and view AI scores/summaries on applicants.
+        </field>
+    </record>
+
+    <!-- Manager: Can configure AI settings and run bulk operations -->
+    <record id="group_ai_recruitment_manager" model="res.groups">
+        <field name="name">AI Recruitment Manager</field>
+        <field name="category_id" ref="module_category_ai_recruitment"/>
+        <field name="implied_ids" eval="[(4, ref('ai_recruitment_scoring.group_ai_recruitment_user'))]"/>
+        <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+        <field name="comment">
+            Full access to AI recruitment features including:
+            API key configuration, bulk scoring, and clearing AI data.
+        </field>
+    </record>
+
+</odoo>
