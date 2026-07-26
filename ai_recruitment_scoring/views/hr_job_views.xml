@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================ -->
+    <!-- ai.scoring.dimension Tree View                               -->
+    <!-- ============================================================ -->
+    <record id="ai_scoring_dimension_view_tree" model="ir.ui.view">
+        <field name="name">ai.scoring.dimension.tree</field>
+        <field name="model">ai.scoring.dimension</field>
+        <field name="arch" type="xml">
+            <tree string="Scoring Dimensions" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="icon"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="weight" widget="progressbar"
+                       options="{'max_value': 100}"/>
+                <field name="is_default"/>
+                <field name="color" widget="color"/>
+                <field name="active" column_invisible="1"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- ai.scoring.dimension Form View                               -->
+    <!-- ============================================================ -->
+    <record id="ai_scoring_dimension_view_form" model="ir.ui.view">
+        <field name="name">ai.scoring.dimension.form</field>
+        <field name="model">ai.scoring.dimension</field>
+        <field name="arch" type="xml">
+            <form string="Scoring Dimension">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1>
+                            <field name="icon" class="me-2" style="display:inline;"/>
+                            <field name="name" placeholder="e.g., Leadership Skills"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" placeholder="e.g., leadership"/>
+                            <field name="weight"/>
+                            <field name="color" widget="color"/>
+                        </group>
+                        <group>
+                            <field name="is_default"/>
+                            <field name="active"/>
+                            <field name="sequence"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1" colspan="2"
+                               widget="text"
+                               placeholder="Describe what this dimension evaluates. This text is sent to the AI to guide scoring.&#10;&#10;Example: Evaluate the candidate's ability to lead teams, delegate tasks, manage conflicts, and drive results through others."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- ai.scoring.dimension Action & Menu                           -->
+    <!-- ============================================================ -->
+    <record id="action_ai_scoring_dimensions" model="ir.actions.act_window">
+        <field name="name">Scoring Dimensions</field>
+        <field name="res_model">ai.scoring.dimension</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first scoring dimension!
+            </p>
+            <p>
+                Scoring dimensions define the criteria the AI uses to evaluate candidates.
+                Examples: Skills Match, Leadership, Cultural Fit, Problem Solving.
+                <br/>
+                Each dimension has a weight that determines its impact on the overall score.
+            </p>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- hr.job Form View — AI Scoring Tab with Dynamic Dimensions    -->
+    <!-- ============================================================ -->
+    <record id="hr_job_view_form_ai_criteria" model="ir.ui.view">
+        <field name="name">hr.job.form.inherit.ai.recruitment</field>
+        <field name="model">hr.job</field>
+        <field name="inherit_id" ref="hr_recruitment.hr_job_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="🤖 AI Scoring Criteria" name="ai_scoring_criteria">
+                    <group string="Required Competencies">
+                        <group>
+                            <field name="ai_required_skills"
+                                   placeholder="Python, JavaScript, SQL, Git..."
+                                   widget="text"/>
+                            <field name="ai_experience_years"/>
+                            <field name="ai_education_level"/>
+                        </group>
+                        <group>
+                            <field name="ai_preferred_skills"
+                                   placeholder="Docker, AWS, TypeScript..."
+                                   widget="text"/>
+                        </group>
+                    </group>
+
+                    <group string="Scoring Dimensions">
+                        <div class="mb-2" colspan="2">
+                            <button name="action_load_default_dimensions"
+                                    string="📥 Load Default Dimensions"
+                                    type="object"
+                                    class="btn-secondary btn-sm"
+                                    help="Add all default dimensions to this job position"/>
+                            <span class="ms-3 text-muted small">
+                                Total Weight:
+                                <field name="ai_total_weight" class="d-inline fw-bold"/>%
+                                (should be ~100%)
+                            </span>
+                        </div>
+                        <field name="ai_dimension_line_ids" nolabel="1" colspan="2">
+                            <tree editable="bottom">
+                                <field name="sequence" widget="handle"/>
+                                <field name="dimension_id"
+                                       options="{'no_quick_create': True}"/>
+                                <field name="dimension_icon" column_invisible="1"/>
+                                <field name="weight" widget="progressbar"
+                                       options="{'max_value': 100}"/>
+                                <field name="dimension_description" column_invisible="1"/>
+                            </tree>
+                        </field>
+                    </group>
+
+                    <group string="Custom AI Instructions">
+                        <field name="ai_scoring_criteria" nolabel="1"
+                               colspan="2" widget="text"
+                               placeholder="Additional criteria for AI to consider during scoring..."/>
+                    </group>
+                    <group string="Interview Question Focus">
+                        <field name="ai_question_focus" nolabel="1"
+                               colspan="2" widget="text"
+                               placeholder="Focus areas for AI-generated interview questions..."/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
