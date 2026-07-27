@@ -9,18 +9,33 @@ class PosPaymentMethod(models.Model):
 
     daily_ops_report_type = fields.Selection(
         selection=[
+            ('none', 'None'),
             ('cash', 'Cash'),
             ('visa', 'Visa'),
             ('hospitality', 'Hospitality'),
         ],
         string='Daily Operations Report Type',
         help=(
-            'Optional. Leave empty if this payment method should not appear in the '
+            'Choose None if this payment method should not appear in the '
             'Cash, Visa, or Hospitality columns of the Daily Operations report.'
         ),
     )
 
+    def _is_write_forbidden(self, fields):
+        whitelisted_fields = {'daily_ops_report_type'}
+        remaining_fields = set(fields) - whitelisted_fields
+        if not remaining_fields:
+            return False
+        return super()._is_write_forbidden(remaining_fields)
+
     def init(self):
+        self.env.cr.execute(
+            """
+            UPDATE pos_payment_method
+               SET daily_ops_report_type = 'none'
+             WHERE daily_ops_report_type IS NULL
+            """
+        )
         self.env.cr.execute(
             """
             SELECT 1 FROM information_schema.columns
