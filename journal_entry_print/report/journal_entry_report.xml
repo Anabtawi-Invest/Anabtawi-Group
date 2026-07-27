@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="paperformat_journal_entry" model="report.paperformat">
+        <field name="name">Journal Entry PDF - Landscape</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">50</field>
+        <field name="margin_bottom">18</field>
+        <field name="margin_left">7</field>
+        <field name="margin_right">7</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">40</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <template id="report_journal_entry">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <t t-set="layout_document_title">
+                        <span class="journal-entry-layout-title">Journal Entry PDF</span>
+                    </t>
+                    <div class="page journal-entry-page">
+                        <style>
+                            .journal-entry-layout-title {
+                                display: block;
+                                width: 100%;
+                                text-align: center;
+                            }
+                            .journal-entry-page {
+                                font-family: "DejaVu Sans", sans-serif;
+                                font-size: 9px;
+                                padding-top: 10mm;
+                            }
+                            .journal-entry-page .mixed-text {
+                                unicode-bidi: plaintext;
+                                overflow-wrap: anywhere;
+                                white-space: pre-wrap;
+                            }
+                            .journal-entry-page .entry-header {
+                                width: 100%;
+                                margin-bottom: 12px;
+                                border-collapse: collapse;
+                            }
+                            .journal-entry-page .entry-header td {
+                                width: 33.333%;
+                                padding: 3px 8px 3px 0;
+                                vertical-align: top;
+                            }
+                            .journal-entry-page .entry-header .label {
+                                color: #666;
+                                font-weight: bold;
+                                margin-right: 4px;
+                            }
+                            .journal-entry-page .journal-items {
+                                width: 100%;
+                                border-collapse: collapse;
+                                table-layout: fixed;
+                            }
+                            .journal-entry-page .journal-items th {
+                                background: #e9ecef;
+                                border: 1px solid #777;
+                                padding: 4px 3px;
+                                text-align: center;
+                                vertical-align: middle;
+                            }
+                            .journal-entry-page .journal-items td {
+                                border: 1px solid #999;
+                                padding: 4px 3px;
+                                vertical-align: top;
+                            }
+                            .journal-entry-page .journal-items .amount {
+                                text-align: right;
+                                white-space: nowrap;
+                            }
+                            .journal-entry-page .journal-items .center {
+                                text-align: center;
+                            }
+                            .journal-entry-page .totals td {
+                                background: #e9ecef;
+                                border-top: 2px solid #555;
+                                font-weight: bold;
+                                vertical-align: middle;
+                            }
+                        </style>
+
+                        <table class="entry-header">
+                            <tr>
+                                <td>
+                                    <span class="label">Journal Entry Number:</span>
+                                    <span t-field="o.name" class="mixed-text"/>
+                                </td>
+                                <td>
+                                    <span class="label">Accounting Date:</span>
+                                    <span t-field="o.date"/>
+                                </td>
+                                <td>
+                                    <span class="label">Journal:</span>
+                                    <span t-field="o.journal_id" class="mixed-text"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="label">Reference:</span>
+                                    <span t-if="o.ref" t-field="o.ref" class="mixed-text"/>
+                                    <span t-else="">—</span>
+                                </td>
+                                <td>
+                                    <span class="label">Company:</span>
+                                    <span t-field="o.company_id" class="mixed-text"/>
+                                </td>
+                                <td>
+                                    <span class="label">Status:</span>
+                                    <span t-field="o.state"/>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <h4>Journal Items</h4>
+                        <table class="journal-items">
+                            <colgroup>
+                                <col style="width: 3%"/>
+                                <col style="width: 13%"/>
+                                <col style="width: 17%"/>
+                                <col style="width: 14%"/>
+                                <col style="width: 15%"/>
+                                <col style="width: 10%"/>
+                                <col style="width: 9%"/>
+                                <col style="width: 9%"/>
+                                <col style="width: 10%"/>
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Account Code / Name</th>
+                                    <th>Label / Partner</th>
+                                    <th>Analytic Distribution</th>
+                                    <th>Taxes / Tax Grids</th>
+                                    <th>Currency / Amount in Currency</th>
+                                    <th>Debit</th>
+                                    <th>Credit</th>
+                                    <th>Due Date / Matching</th>
+                                </tr>
+                            </thead>
+                            <t t-foreach="lines_by_move[o.id]" t-as="line">
+                                <tbody class="journal-line">
+                                    <tr>
+                                        <td class="center">
+                                            <span t-out="line_index + 1"/>
+                                        </td>
+                                        <td>
+                                            <div class="mixed-text">
+                                                <strong t-out="line.account_id.code or ''"/>
+                                            </div>
+                                            <div class="mixed-text" t-out="line.account_id.name or ''"/>
+                                        </td>
+                                        <td>
+                                            <div class="mixed-text" t-out="line.name or ''"/>
+                                            <div t-if="line.partner_id" class="mixed-text text-muted">
+                                                <span t-out="line.partner_id.display_name"/>
+                                            </div>
+                                        </td>
+                                        <td class="mixed-text">
+                                            <span t-out="format_analytic_distribution(line.analytic_distribution) or '—'"/>
+                                        </td>
+                                        <td>
+                                            <div t-if="line.tax_ids" class="mixed-text">
+                                                <strong>Taxes:</strong>
+                                                <span t-out="', '.join(line.tax_ids.mapped('display_name'))"/>
+                                            </div>
+                                            <div t-if="line.tax_line_id" class="mixed-text">
+                                                <strong>Originator Tax:</strong>
+                                                <span t-out="line.tax_line_id.display_name"/>
+                                            </div>
+                                            <div t-if="line.tax_tag_ids" class="mixed-text">
+                                                <strong>Tax Grids:</strong>
+                                                <span t-out="', '.join(line.tax_tag_ids.mapped('display_name'))"/>
+                                            </div>
+                                            <span t-if="not line.tax_ids and not line.tax_line_id and not line.tax_tag_ids">—</span>
+                                        </td>
+                                        <td class="amount">
+                                            <div t-out="line.currency_id.name"/>
+                                            <div t-field="line.amount_currency"
+                                                 t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+                                        </td>
+                                        <td class="amount">
+                                            <span t-field="line.debit"
+                                                  t-options="{'widget': 'monetary', 'display_currency': o.company_currency_id}"/>
+                                        </td>
+                                        <td class="amount">
+                                            <span t-field="line.credit"
+                                                  t-options="{'widget': 'monetary', 'display_currency': o.company_currency_id}"/>
+                                        </td>
+                                        <td>
+                                            <div t-if="line.date_maturity">
+                                                <strong>Due:</strong>
+                                                <span t-field="line.date_maturity"/>
+                                            </div>
+                                            <div t-if="format_reconciliation(line)"
+                                                 class="mixed-text"
+                                                 t-out="format_reconciliation(line)"/>
+                                            <span t-if="not line.date_maturity and not format_reconciliation(line)">—</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </t>
+                            <tfoot>
+                                <tr class="totals">
+                                    <td colspan="6" class="amount">Totals</td>
+                                    <td class="amount">
+                                        <span t-out="totals_by_move[o.id]['debit']"
+                                              t-options="{'widget': 'monetary', 'display_currency': o.company_currency_id}"/>
+                                    </td>
+                                    <td class="amount">
+                                        <span t-out="totals_by_move[o.id]['credit']"
+                                              t-options="{'widget': 'monetary', 'display_currency': o.company_currency_id}"/>
+                                    </td>
+                                    <td/>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <record id="action_report_journal_entry" model="ir.actions.report">
+        <field name="name">Journal Entry PDF</field>
+        <field name="model">account.move</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">journal_entry_print.report_journal_entry</field>
+        <field name="report_file">journal_entry_print.report_journal_entry</field>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="journal_entry_print.paperformat_journal_entry"/>
+        <field name="print_report_name">'Journal Entry PDF - %s' % (object.name or '')</field>
+    </record>
+</odoo>
