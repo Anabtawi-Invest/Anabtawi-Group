@@ -374,31 +374,15 @@
         </t>
     </template>
 
-    <record id="action_report_journal_entry"
-            model="ir.actions.report">
-
-        <field name="name">Journal Entry PDF</field>
-        <field name="model">account.move</field>
-        <field name="report_type">qweb-pdf</field>
-
-        <field name="report_name">
-            journal_entry_print.report_journal_entry
-        </field>
-
-        <field name="report_file">
-            journal_entry_print.report_journal_entry
-        </field>
-
-        <field name="binding_model_id"
-               ref="account.model_account_move"/>
-
-        <field name="binding_type">report</field>
-
-        <field name="paperformat_id"
-               ref="journal_entry_print.paperformat_journal_entry"/>
-
-        <field name="print_report_name">
-            'Journal Entry PDF - %s' % (object.name or '')
-        </field>
-    </record>
+   <record id="action_report_journal_entry" model="ir.actions.report">
+    <field name="name">Journal Entry PDF</field>
+    <field name="model">account.move</field>
+    <field name="report_type">qweb-pdf</field>
+    <field name="report_name">journal_entry_print.report_journal_entry</field>
+    <field name="report_file">journal_entry_print.report_journal_entry</field>
+    <field name="binding_model_id" ref="account.model_account_move"/>
+    <field name="binding_type">report</field>
+    <field name="paperformat_id" ref="journal_entry_print.paperformat_journal_entry"/>
+    <field name="print_report_name">'Journal Entry PDF - %s' % (object.name or '')</field>
+</record>
 </odoo>
