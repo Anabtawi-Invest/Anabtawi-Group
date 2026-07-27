@@ -17,4 +17,4 @@ class PosPaymentMethod(models.Model):
 
     def _is_write_forbidden(self, fields):
         whitelisted_fields = {"sequence", "exclusive_payment_method"}
-        return bool(fields - whitelisted_fields and self.open_session_ids)
+        return super()._is_write_forbidden(fields - whitelisted_fields)

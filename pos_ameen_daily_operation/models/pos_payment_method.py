@@ -22,7 +22,10 @@ class PosPaymentMethod(models.Model):
 
     def _is_write_forbidden(self, fields):
         whitelisted_fields = {'daily_ops_report_type'}
-        return super()._is_write_forbidden(fields - whitelisted_fields)
+        remaining_fields = set(fields) - whitelisted_fields
+        if not remaining_fields:
+            return False
+        return super()._is_write_forbidden(remaining_fields)
 
     def init(self):
         self.env.cr.execute(

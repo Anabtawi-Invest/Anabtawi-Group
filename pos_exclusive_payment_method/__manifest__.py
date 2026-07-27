@@ -1,6 +1,6 @@
 {
     "name": "POS Exclusive Payment Method",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "category": "Point of Sale",
     "summary": "Prevent mixing exclusive payment methods in POS orders",
     "depends": ["point_of_sale"],
