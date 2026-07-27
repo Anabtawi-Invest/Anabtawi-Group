@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Contact Translatable Name',
-    'version': '19.0.1.0.1',
+    'version': '19.0.1.0.2',
     'category': 'Contacts',
     'summary': 'Make Contact/Partner name translatable in multiple languages (English, Arabic, etc.)',
     'description': """
@@ -21,6 +21,7 @@ enter names in multiple languages via the standard Odoo Translation Dialog.
     'data': [
         'views/res_partner_views.xml',
     ],
+    'pre_init_hook': 'pre_init_hook',
     'post_init_hook': 'post_init_hook',
     'installable': True,
     'application': False,
