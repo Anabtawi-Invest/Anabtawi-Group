@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="paperformat_journal_entry" model="report.paperformat">
-        <field name="name">Journal Entry PDF - Landscape</field>
+        <field name="name">Journal Entry PDF - Portrait</field>
         <field name="default" eval="False"/>
         <field name="format">A4</field>
-        <field name="orientation">Landscape</field>
+        <field name="orientation">Portrait</field>
         <field name="margin_top">50</field>
         <field name="margin_bottom">18</field>
-        <field name="margin_left">7</field>
-        <field name="margin_right">7</field>
+        <field name="margin_left">5</field>
+        <field name="margin_right">5</field>
         <field name="header_line" eval="False"/>
         <field name="header_spacing">40</field>
         <field name="dpi">90</field>
@@ -27,10 +27,12 @@
                                 display: block;
                                 width: 100%;
                                 text-align: center;
+                                font-size: 22px;
+                                line-height: 1.1;
                             }
                             .journal-entry-page {
                                 font-family: "DejaVu Sans", sans-serif;
-                                font-size: 9px;
+                                font-size: 8px;
                                 padding-top: 10mm;
                             }
                             .journal-entry-page .mixed-text {
@@ -40,12 +42,13 @@
                             }
                             .journal-entry-page .entry-header {
                                 width: 100%;
-                                margin-bottom: 12px;
+                                margin-bottom: 7px;
                                 border-collapse: collapse;
+                                font-size: 8px;
                             }
                             .journal-entry-page .entry-header td {
                                 width: 33.333%;
-                                padding: 3px 8px 3px 0;
+                                padding: 2px 4px 2px 0;
                                 vertical-align: top;
                             }
                             .journal-entry-page .entry-header .label {
@@ -57,18 +60,26 @@
                                 width: 100%;
                                 border-collapse: collapse;
                                 table-layout: fixed;
+                                font-size: 6.6px;
+                                line-height: 1.15;
+                                overflow-wrap: anywhere;
                             }
                             .journal-entry-page .journal-items th {
                                 background: #e9ecef;
-                                border: 1px solid #777;
-                                padding: 4px 3px;
+                                border: 0.5px solid #777;
+                                padding: 2px 1px;
                                 text-align: center;
                                 vertical-align: middle;
+                                font-size: 6.3px;
+                                line-height: 1.1;
                             }
                             .journal-entry-page .journal-items td {
-                                border: 1px solid #999;
-                                padding: 4px 3px;
+                                border: 0.5px solid #999;
+                                padding: 2px 1px;
                                 vertical-align: top;
+                            }
+                            .journal-entry-page .journal-items tbody {
+                                page-break-inside: avoid;
                             }
                             .journal-entry-page .journal-items .amount {
                                 text-align: right;
@@ -79,9 +90,14 @@
                             }
                             .journal-entry-page .totals td {
                                 background: #e9ecef;
-                                border-top: 2px solid #555;
+                                border-top: 1px solid #555;
                                 font-weight: bold;
                                 vertical-align: middle;
+                            }
+                            .journal-entry-page h4 {
+                                margin: 5px 0 5px;
+                                font-size: 14px;
+                                line-height: 1.1;
                             }
                         </style>
 
@@ -122,25 +138,25 @@
                             <colgroup>
                                 <col style="width: 3%"/>
                                 <col style="width: 13%"/>
-                                <col style="width: 17%"/>
-                                <col style="width: 14%"/>
                                 <col style="width: 15%"/>
+                                <col style="width: 13%"/>
+                                <col style="width: 13%"/>
+                                <col style="width: 12%"/>
                                 <col style="width: 10%"/>
-                                <col style="width: 9%"/>
-                                <col style="width: 9%"/>
                                 <col style="width: 10%"/>
+                                <col style="width: 11%"/>
                             </colgroup>
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Account Code / Name</th>
-                                    <th>Label / Partner</th>
-                                    <th>Analytic Distribution</th>
-                                    <th>Taxes / Tax Grids</th>
-                                    <th>Currency / Amount in Currency</th>
+                                    <th>Account Code<br/>Account Name</th>
+                                    <th>Label<br/>Partner</th>
+                                    <th>Analytic<br/>Distribution</th>
+                                    <th>Taxes<br/>Tax Grids</th>
+                                    <th>Currency<br/>Amount</th>
                                     <th>Debit</th>
                                     <th>Credit</th>
-                                    <th>Due Date / Matching</th>
+                                    <th>Due Date<br/>Matching</th>
                                 </tr>
                             </thead>
                             <t t-foreach="lines_by_move[o.id]" t-as="line">
