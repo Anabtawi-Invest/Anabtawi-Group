@@ -415,9 +415,13 @@ class PosCakeOrder(models.Model):
         ]
 
     @api.model
-    def get_pos_config_data(self):
+    def get_pos_config_data(self, pos_config_id=None):
         """Return configuration data for POS popup."""
         company = self.env.company
+        if pos_config_id:
+            pos_config = self.env["pos.config"].sudo().browse(int(pos_config_id)).exists()
+            if pos_config:
+                company = pos_config.company_id
         lang = self.env.user.lang or self.env.lang or "en_US"
         Category = self.env["cake.category"].with_context(lang=lang)
 

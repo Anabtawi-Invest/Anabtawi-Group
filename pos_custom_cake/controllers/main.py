@@ -7,8 +7,10 @@ from odoo.http import request
 class PosCustomCakeController(http.Controller):
 
     @http.route("/pos/custom_cake/get_config", type="jsonrpc", auth="user")
-    def get_config(self, **kwargs):
-        return request.env["pos.cake.order"].get_pos_config_data()
+    def get_config(self, data=None, **kwargs):
+        payload = data if isinstance(data, dict) else kwargs
+        pos_config_id = payload.get("pos_config_id")
+        return request.env["pos.cake.order"].get_pos_config_data(pos_config_id=pos_config_id)
 
     @http.route("/pos/custom_cake/compute_prices", type="jsonrpc", auth="user")
     def compute_prices(self, data=None, **kwargs):

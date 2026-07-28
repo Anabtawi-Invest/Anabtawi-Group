@@ -40,20 +40,10 @@
                         <label class="form-label fw-bold">
                             <t t-esc="labels.sugarPaste"/>
                         </label>
-                        <div class="d-flex gap-3">
-                            <label class="form-check">
-                                <input class="form-check-input" type="radio" name="sugar_paste"
-                                       t-att-checked="state.sugar_paste ? true : undefined"
-                                       t-on-click="() => this.setSugarPaste(true)"/>
-                                <span class="ms-1" t-esc="labels.yes"/>
-                            </label>
-                            <label class="form-check">
-                                <input class="form-check-input" type="radio" name="sugar_paste"
-                                       t-att-checked="!state.sugar_paste ? true : undefined"
-                                       t-on-click="() => this.setSugarPaste(false)"/>
-                                <span class="ms-1" t-esc="labels.no"/>
-                            </label>
-                        </div>
+                        <select class="form-select" t-model="state.sugar_paste_choice">
+                            <option value="no" t-esc="labels.no"/>
+                            <option value="yes" t-esc="labels.yes"/>
+                        </select>
                     </div>
 
                     <t t-foreach="categories" t-as="category" t-key="category.id">
@@ -90,6 +80,10 @@
                         <div class="d-flex justify-content-between mb-1">
                             <span t-esc="labels.totalComponentsCost"/>
                             <span t-esc="formatAmount(priceSummary.total_components_cost)"/>
+                        </div>
+                        <div t-if="hasSugarPaste" class="d-flex justify-content-between mb-1 text-muted">
+                            <span t-esc="labels.sugarPasteCost"/>
+                            <span t-esc="formatAmount(priceSummary.sugar_paste_cost)"/>
                         </div>
                         <div class="d-flex justify-content-between mb-1">
                             <span t-esc="labels.sellingPriceBeforeTax"/>

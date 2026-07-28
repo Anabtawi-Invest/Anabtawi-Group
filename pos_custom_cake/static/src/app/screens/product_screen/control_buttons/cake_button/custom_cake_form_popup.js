@@ -32,7 +32,7 @@ export class CustomCakeFormPopup extends Component {
             config: null,
             partner: null,
             cake_size_id: 0,
-            sugar_paste: false,
+            sugar_paste_choice: "no",
             selectedLines: {},
             categorySearch: {},
         });
@@ -44,7 +44,9 @@ export class CustomCakeFormPopup extends Component {
 
     async _loadConfig() {
         try {
-            const config = await rpc("/pos/custom_cake/get_config", {});
+            const config = await rpc("/pos/custom_cake/get_config", {
+                pos_config_id: this.props.pos.config.id,
+            });
             this.state.config = config;
         } catch (error) {
             this.notification.add(error?.message || _t("Failed to load cake configuration."), {
@@ -68,6 +70,7 @@ export class CustomCakeFormPopup extends Component {
             yes: _t("Yes"),
             no: _t("No"),
             priceSummary: _t("Price Summary"),
+            sugarPasteCost: _t("Sugar Paste Cost"),
             totalComponentsCost: _t("Total Components Cost"),
             sellingPriceBeforeTax: _t("Selling Price Before Tax"),
             tax: _t("Tax"),
@@ -109,11 +112,24 @@ export class CustomCakeFormPopup extends Component {
         return size?.pieces || 1;
     }
 
+    get hasSugarPaste() {
+        return this.state.sugar_paste_choice === "yes";
+    }
+
+    _getSugarPasteCost(config, pieces) {
+        if (!this.hasSugarPaste || !config) {
+            return 0;
+        }
+        const sugarQty = config.sugar_paste_qty || 1;
+        return (config.sugar_paste_cost || 0) * sugarQty * pieces;
+    }
+
     /** Recomputed on every render when size, sugar paste, or components change. */
     get priceSummary() {
         const config = this.state.config;
         const empty = {
             total_components_cost: 0,
+            sugar_paste_cost: 0,
             price_before_tax: 0,
             tax_amount: 0,
             final_price: 0,
@@ -123,7 +139,7 @@ export class CustomCakeFormPopup extends Component {
         }
 
         const pieces = this._getSelectedPieces();
-        let totalCost = 0;
+        let componentsCost = 0;
         for (const category of config.categories) {
             const selectedId = this.state.selectedLines[category.id];
             if (!selectedId) {
@@ -132,13 +148,11 @@ export class CustomCakeFormPopup extends Component {
             const line = category.lines.find((l) => l.id === selectedId);
             if (line) {
                 const lineCost = line.total_cost ?? line.cost * (line.quantity || 1);
-                totalCost += lineCost * pieces;
+                componentsCost += lineCost * pieces;
             }
         }
-        if (this.state.sugar_paste) {
-            const sugarQty = config.sugar_paste_qty || 1;
-            totalCost += (config.sugar_paste_cost || 0) * sugarQty * pieces;
-        }
+        const sugarPasteCost = this._getSugarPasteCost(config, pieces);
+        const totalCost = componentsCost + sugarPasteCost;
 
         const currency = this.props.pos.currency;
         const divisor = this.costDivisor || 0.63;
@@ -148,6 +162,7 @@ export class CustomCakeFormPopup extends Component {
         const finalPrice = roundCurrency(priceBeforeTax + taxAmount, currency);
         return {
             total_components_cost: totalCost,
+            sugar_paste_cost: sugarPasteCost,
             price_before_tax: priceBeforeTax,
             tax_amount: taxAmount,
             final_price: finalPrice,
@@ -161,10 +176,6 @@ export class CustomCakeFormPopup extends Component {
         if (partner) {
             this.state.partner = partner;
         }
-    }
-
-    setSugarPaste(value) {
-        this.state.sugar_paste = value;
     }
 
     onComponentSelect(categoryId, lineId) {
@@ -223,7 +234,7 @@ export class CustomCakeFormPopup extends Component {
             });
             return false;
         }
-        if (this.state.sugar_paste && !this.state.config?.sugar_paste_product_id) {
+        if (this.hasSugarPaste && !this.state.config?.sugar_paste_product_id) {
             this.notification.add(
                 _t("Sugar Paste Product is not configured in Custom Cake Settings."),
                 { type: "warning" }
@@ -244,7 +255,7 @@ export class CustomCakeFormPopup extends Component {
         return {
             partner_id: this.state.partner.id,
             cake_size_id: this.state.cake_size_id,
-            sugar_paste: this.state.sugar_paste,
+            sugar_paste: this.hasSugarPaste,
             selected_lines: selectedLines,
             pay_later: payLater,
             pos_config_id: this.props.pos.config.id,
