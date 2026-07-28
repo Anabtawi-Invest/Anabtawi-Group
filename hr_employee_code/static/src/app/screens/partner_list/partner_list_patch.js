@@ -14,13 +14,13 @@ function partnerSummary(partner) {
         name: partner.name,
         employee_number: partner.employee_number,
         phone: partner.phone,
-        searchString: partner.searchString,
     };
 }
 
 patch(PartnerList.prototype, {
     setup() {
         super.setup(...arguments);
+        this._resetPartnerSearchOffset = false;
         this.debouncedServerSearch = debounce(() => this._serverSearchIfNeeded(), 400);
         useEffect(
             () => {
@@ -32,23 +32,19 @@ patch(PartnerList.prototype, {
 
     _getSearchFields(query) {
         const stripped = (query || "").replace(/[+\s()\-./]/g, "");
-        let fields;
         if (/^\d+$/.test(stripped)) {
-            fields = ["employee_number", "phone_mobile_search", "barcode", "vat", "zip"];
-        } else {
-            fields = super._getSearchFields(query);
-            if (query && !fields.includes("employee_number")) {
-                fields.push("employee_number");
-            }
+            return ["employee_number", "phone_mobile_search", "barcode", "vat", "zip"];
         }
-        console.info(LOG_PREFIX, "_getSearchFields", { query, stripped, fields });
+        const fields = super._getSearchFields(query);
+        if (query && !fields.includes("employee_number")) {
+            fields.push("employee_number");
+        }
         return fields;
     },
 
     getPartners(partners) {
         const searchWord = normalize(this.state.query?.trim() ?? "");
         const stripped = searchWord.replace(/[+\s()\-./]/g, "");
-        let result;
         if (searchWord && /^\d+$/.test(stripped)) {
             const allPartners = [...this.state.initialPartners, ...this.state.loadedPartners];
             const exactEmployeePartners = allPartners.filter(
@@ -56,73 +52,51 @@ patch(PartnerList.prototype, {
                     partner.employee_number &&
                     normalize(partner.employee_number) === searchWord
             );
-            const hasExactEmployee = exactEmployeePartners.length > 0;
-            console.info(LOG_PREFIX, "getPartners numeric", {
-                searchWord,
-                poolSize: partners.length,
-                allPartnersCount: allPartners.length,
-                exactEmployeePartners: exactEmployeePartners.map(partnerSummary),
-                hasExactEmployee,
-            });
-            if (hasExactEmployee) {
-                result = partners.filter(
+            if (exactEmployeePartners.length) {
+                return partners.filter(
                     (partner) =>
                         partner.employee_number &&
                         normalize(partner.employee_number) === searchWord
                 );
-            } else {
-                result = super.getPartners(partners);
             }
-        } else {
-            result = super.getPartners(partners);
         }
-        console.info(LOG_PREFIX, "getPartners result", {
-            searchWord,
-            inputPool: partners.length,
-            resultCount: result.length,
-            results: result.slice(0, 10).map(partnerSummary),
-        });
-        return result;
+        return super.getPartners(partners);
     },
 
     async _serverSearchIfNeeded() {
         const query = this.state.query?.trim();
         if (!query || this.state.loading) {
-            console.info(LOG_PREFIX, "_serverSearchIfNeeded skipped", {
-                query,
-                loading: this.state.loading,
-            });
             return;
         }
         const stripped = query.replace(/[+\s()\-./]/g, "");
         const isNumeric = /^\d+$/.test(stripped);
-        const initialMatches = this.getPartners(this.state.initialPartners);
-        const loadedMatches = this.getPartners(this.state.loadedPartners);
-        const localMatches = initialMatches.length + loadedMatches.length;
+        const localMatches =
+            this.getPartners(this.state.initialPartners).length +
+            this.getPartners(this.state.loadedPartners).length;
 
         console.info(LOG_PREFIX, "_serverSearchIfNeeded", {
             query,
             isNumeric,
             localMatches,
             posCompanyId: this.pos?.company?.id,
-            posCompanyName: this.pos?.company?.name,
-            configId: this.pos?.config?.id,
         });
 
         if (localMatches === 0 || isNumeric) {
+            this._resetPartnerSearchOffset = true;
             await this.getNewPartners();
         }
     },
 
     async getNewPartners() {
         let domain = [];
-        const offset = this.globalState.offsetBySearch[this.state.query] || 0;
+        let offset = this.globalState.offsetBySearch[this.state.query] || 0;
+        if (this._resetPartnerSearchOffset) {
+            offset = 0;
+            this.globalState.offsetBySearch[this.state.query] = 0;
+            this._resetPartnerSearchOffset = false;
+        }
         if (offset > this.loadedPartnerIds.size) {
-            console.info(LOG_PREFIX, "getNewPartners skipped offset", {
-                query: this.state.query,
-                offset,
-                loadedPartnerIdsSize: this.loadedPartnerIds.size,
-            });
+            console.info(LOG_PREFIX, "getNewPartners skipped", { query: this.state.query, offset });
             return [];
         }
         if (this.state.query) {
@@ -151,6 +125,7 @@ patch(PartnerList.prototype, {
             const partners = result["res.partner"] || [];
             console.info(LOG_PREFIX, "getNewPartners response", {
                 query: this.state.query,
+                offset,
                 count: partners.length,
                 partners: partners.map((p) => ({
                     id: p.id,
@@ -159,8 +134,9 @@ patch(PartnerList.prototype, {
                 })),
             });
 
-            this.globalState.offsetBySearch[this.state.query] =
-                offset + (partners.length || 100);
+            if (partners.length) {
+                this.globalState.offsetBySearch[this.state.query] = offset + partners.length;
+            }
 
             for (const partner of partners) {
                 if (!this.loadedPartnerIds.has(partner.id)) {
@@ -179,12 +155,8 @@ patch(PartnerList.prototype, {
     },
 
     async searchPartner() {
-        console.info(LOG_PREFIX, "searchPartner Enter pressed", { query: this.state.query });
-        const partners = await this.getNewPartners();
-        console.info(LOG_PREFIX, "searchPartner done", {
-            query: this.state.query,
-            count: partners.length,
-        });
-        return partners;
+        this._resetPartnerSearchOffset = true;
+        console.info(LOG_PREFIX, "searchPartner Enter", { query: this.state.query });
+        return this.getNewPartners();
     },
 });

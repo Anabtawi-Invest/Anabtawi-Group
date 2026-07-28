@@ -29,19 +29,10 @@ class ResPartner(models.Model):
         return domain
 
     def _get_employee_for_partner(self, partner, company=None):
-        domain = self._employee_number_domain(partner, company=company)
-        employee = self.env["hr.employee"].sudo().search(domain, limit=1)
-        _logger.info(
-            "[hr_employee_code] _get_employee_for_partner partner=%s (%s) company=%s domain=%s "
-            "employee=%s employee_number=%s",
-            partner.id,
-            partner.display_name,
-            company.id if company else self.env.company.id if self.env.company else None,
-            domain,
-            employee.id if employee else None,
-            employee.employee_number if employee else None,
+        return self.env["hr.employee"].sudo().search(
+            self._employee_number_domain(partner, company=company),
+            limit=1,
         )
-        return employee
 
     @api.depends("employee_ids.employee_number", "employee_ids.company_id")
     def _compute_employee_number(self):
@@ -66,19 +57,25 @@ class ResPartner(models.Model):
             )
             return self.browse()
 
-        employees = self.env["hr.employee"].sudo().search(
-            [
-                ("employee_number", "ilike", term),
-                ("company_id", "=", company.id),
-            ],
-            limit=100,
-        )
+        stripped = term.strip()
+        employee_domain = [("company_id", "=", company.id)]
+        if stripped.isdigit():
+            employee_domain += [
+                "|",
+                ("employee_number", "=", stripped),
+                ("employee_number", "ilike", stripped),
+            ]
+        else:
+            employee_domain.append(("employee_number", "ilike", term))
+
+        employees = self.env["hr.employee"].sudo().search(employee_domain, limit=100)
         _logger.info(
             "[hr_employee_code] _search_partners_by_employee_number term=%r company=%s (%s) "
-            "employees_found=%s details=%s",
+            "domain=%s employees_found=%s details=%s",
             term,
             company.id,
             company.display_name,
+            employee_domain,
             len(employees),
             [
                 {
@@ -132,13 +129,18 @@ class ResPartner(models.Model):
             new_partners = self.search(domain)
             employee_partners = self.browse()
         else:
-            new_partners = self.search(domain, offset=offset, limit=100)
             employee_partners = self.browse()
-            if offset == 0 and search_term:
+            if search_term:
                 employee_partners = self._search_partners_by_employee_number(
                     search_term, company
                 )
-                new_partners = employee_partners | new_partners
+            if employee_partners:
+                new_partners = employee_partners
+                if offset == 0:
+                    domain_matches = self.search(domain, limit=100)
+                    new_partners = employee_partners | domain_matches
+            else:
+                new_partners = self.search(domain, offset=offset, limit=100)
 
         _logger.info(
             "[hr_employee_code] get_new_partner domain_results=%s employee_results=%s merged=%s",
@@ -180,19 +182,6 @@ class ResPartner(models.Model):
             if partner.id in by_id:
                 by_id[partner.id]["employee_number"] = employee.employee_number or False
 
-        _logger.info(
-            "[hr_employee_code] _load_pos_data_read company=%s (%s) records=%s",
-            company.id,
-            company.display_name,
-            [
-                {
-                    "id": row.get("id"),
-                    "name": row.get("name"),
-                    "employee_number": row.get("employee_number"),
-                }
-                for row in result
-            ],
-        )
         return result
 
     @api.model
