@@ -169,27 +169,26 @@
     <record id="hr_applicant_view_search_ai" model="ir.ui.view">
         <field name="name">hr.applicant.search.inherit.ai.recruitment</field>
         <field name="model">hr.applicant</field>
-        <field name="inherit_id" ref="hr_recruitment.hr_applicant_view_search"/>
+        <field name="inherit_id" ref="hr_recruitment.hr_applicant_view_search_bis"/>
         <field name="arch" type="xml">
-            <xpath expr="//search" position="inside">
+            <xpath expr="//filter[@name='refused']" position="after">
                 <separator/>
                 <filter string="AI Scored" name="ai_scored"
                         domain="[('ai_score', '>', 0)]"/>
-                <filter string="Excellent Match (≥85)" name="ai_excellent"
-                        domain="[('ai_score', '>=', 85)]"/>
-                <filter string="Strong Match (≥70)" name="ai_strong"
-                        domain="[('ai_score', '>=', 70)]"/>
-                <filter string="Moderate Match (≥50)" name="ai_moderate"
-                        domain="[('ai_score', '>=', 50)]"/>
+                <filter string="Excellent Match (&gt;=85)" name="ai_excellent"
+                        domain="[('ai_score', '&gt;=', 85)]"/>
+                <filter string="Strong Match (&gt;=70)" name="ai_strong"
+                        domain="[('ai_score', '&gt;=', 70)]"/>
+                <filter string="Moderate Match (&gt;=50)" name="ai_moderate"
+                        domain="[('ai_score', '&gt;=', 50)]"/>
                 <filter string="Weak Match (&lt;50)" name="ai_weak"
                         domain="[('ai_score', '>', 0), ('ai_score', '&lt;', 50)]"/>
                 <filter string="Not Scored" name="ai_not_scored"
                         domain="[('ai_score', '=', 0)]"/>
-                <separator/>
-                <group expand="0" string="Group By">
-                    <filter string="AI Score Label" name="group_ai_label"
-                            context="{'group_by': 'ai_score_label'}"/>
-                </group>
+            </xpath>
+            <xpath expr="//group/filter[@name='group_by_applicant_properties']" position="after">
+                <filter string="AI Score Label" name="group_ai_label"
+                        context="{'group_by': 'ai_score_label'}"/>
             </xpath>
         </field>
     </record>
