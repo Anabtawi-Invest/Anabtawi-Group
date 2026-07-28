@@ -1,6 +1,6 @@
 {
     'name': 'HR Employee Number Search',
-    'version': '19.0.1.0.1',
+    'version': '19.0.1.0.3',
     'summary': 'Make employee number searchable across HR views.',
     'category': 'Human Resources',
     'author': 'Rana Faris',
@@ -28,4 +28,5 @@
     },
     'installable': True,
     'application': False,
+    'post_init_hook': 'post_init_hook',
 }
