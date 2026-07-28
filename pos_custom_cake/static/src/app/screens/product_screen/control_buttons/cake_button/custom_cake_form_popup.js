@@ -31,20 +31,13 @@ export class CustomCakeFormPopup extends Component {
             loading: true,
             config: null,
             partner: null,
-            cake_size_id: null,
+            cake_size_id: 0,
             sugar_paste: false,
             selectedLines: {},
             categorySearch: {},
-            prices: {
-                total_components_cost: 0,
-                price_before_tax: 0,
-                tax_amount: 0,
-                final_price: 0,
-            },
         });
         onMounted(async () => {
             await this._loadConfig();
-            this._computePricesLocal();
             this.state.loading = false;
         });
     }
@@ -108,18 +101,27 @@ export class CustomCakeFormPopup extends Component {
     }
 
     _getSelectedPieces() {
-        if (!this.state.cake_size_id) {
+        const sizeId = Number(this.state.cake_size_id);
+        if (!sizeId) {
             return 1;
         }
-        const size = this.sizes.find((s) => s.id === this.state.cake_size_id);
+        const size = this.sizes.find((s) => Number(s.id) === sizeId);
         return size?.pieces || 1;
     }
 
-    _computePricesLocal() {
+    /** Recomputed on every render when size, sugar paste, or components change. */
+    get priceSummary() {
         const config = this.state.config;
+        const empty = {
+            total_components_cost: 0,
+            price_before_tax: 0,
+            tax_amount: 0,
+            final_price: 0,
+        };
         if (!config) {
-            return;
+            return empty;
         }
+
         const pieces = this._getSelectedPieces();
         let totalCost = 0;
         for (const category of config.categories) {
@@ -137,18 +139,19 @@ export class CustomCakeFormPopup extends Component {
             const sugarQty = config.sugar_paste_qty || 1;
             totalCost += (config.sugar_paste_cost || 0) * sugarQty * pieces;
         }
+
         const currency = this.props.pos.currency;
         const divisor = this.costDivisor || 0.63;
         const taxRate = this.taxRate / 100;
         const priceBeforeTax = roundCurrency(totalCost / divisor, currency);
         const taxAmount = roundCurrency(priceBeforeTax * taxRate, currency);
         const finalPrice = roundCurrency(priceBeforeTax + taxAmount, currency);
-        Object.assign(this.state.prices, {
+        return {
             total_components_cost: totalCost,
             price_before_tax: priceBeforeTax,
             tax_amount: taxAmount,
             final_price: finalPrice,
-        });
+        };
     }
 
     async onSelectPartner() {
@@ -160,19 +163,15 @@ export class CustomCakeFormPopup extends Component {
         }
     }
 
-    onSizeChange(ev) {
-        this.state.cake_size_id = ev.target.value ? parseInt(ev.target.value, 10) : null;
-        this._computePricesLocal();
-    }
-
-    onSugarPasteChange(ev) {
-        this.state.sugar_paste = ev.target.value === "yes";
-        this._computePricesLocal();
+    setSugarPaste(value) {
+        this.state.sugar_paste = value;
     }
 
     onComponentSelect(categoryId, lineId) {
-        this.state.selectedLines[categoryId] = lineId;
-        this._computePricesLocal();
+        this.state.selectedLines = {
+            ...this.state.selectedLines,
+            [categoryId]: lineId,
+        };
     }
 
     onCategorySearchInput(categoryId, ev) {
@@ -260,7 +259,7 @@ export class CustomCakeFormPopup extends Component {
         this.props.getPayload({
             action: "confirm",
             payload: this._buildPayload(false),
-            prices: { ...this.state.prices },
+            prices: { ...this.priceSummary },
             partner: this.state.partner,
         });
         this.props.close();
@@ -273,7 +272,7 @@ export class CustomCakeFormPopup extends Component {
         this.props.getPayload({
             action: "pay_later",
             payload: this._buildPayload(true),
-            prices: { ...this.state.prices },
+            prices: { ...this.priceSummary },
             partner: this.state.partner,
         });
         this.props.close();
