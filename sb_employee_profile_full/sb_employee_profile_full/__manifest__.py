@@ -5,7 +5,7 @@
     "summary": "Adds missing employee profile fields/tables and prints Employee Profile PDF from employee form.",
     "author": "Softobia",
     "license": "LGPL-3",
-    "depends": ["hr", "hr_contract"],
+    "depends": ["hr"],
     "data": [
         "security/ir.model.access.csv",
         "views/hr_employee_profile_views.xml",

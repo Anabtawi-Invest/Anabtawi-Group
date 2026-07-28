@@ -36,13 +36,13 @@ class HrEmployee(models.Model):
 
     def _sb_active_contract(self):
         self.ensure_one()
-        # hr_contract provides hr.contract
-        contract = self.env["hr.contract"].search(
+        if "hr.contract" not in self.env:
+            return False
+        return self.env["hr.contract"].search(
             [("employee_id", "=", self.id), ("state", "in", ("open", "draft"))],
             order="state asc, date_start desc, id desc",
             limit=1,
         )
-        return contract
 
     def sb_profile_payload(self):
         """Payload for Employee Profile PDF."""
@@ -55,7 +55,7 @@ class HrEmployee(models.Model):
             "number": self.sb_employee_number or self.barcode or self.pin or "",
             "name": self.name or "",
             "alt_name": self.sb_alternate_name or "",
-            "start_date": (contract.date_start if contract else False) or self.first_contract_date or False,
+            "start_date": (contract.date_start if contract else False) or getattr(self, "first_contract_date", False) or False,
             "job": self.job_title or (self.job_id.name if self.job_id else ""),
             "type": self.employee_type or "",
             "religion": "",
