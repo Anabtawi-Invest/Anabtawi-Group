@@ -9,7 +9,7 @@
                 <field name="can_print_check" invisible="1"/>
                 <field name="can_preview_check" invisible="1"/>
                 <button
-                    name="action_print_check" type="object" string="Print Check"
+                    name="action_print_business_check" type="object" string="Print Check"
                     class="oe_highlight" icon="fa-print"
                     groups="account.group_account_manager"
                     invisible="not can_print_check or printed or voided"

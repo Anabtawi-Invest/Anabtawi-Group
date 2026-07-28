@@ -234,7 +234,7 @@ class AccountPayment(models.Model):
             "reason": reason,
         })
 
-    def action_print_check(self):
+    def action_print_business_check(self):
         """Reserve a number, audit the first print, and return the PDF report."""
         self.ensure_one()
         self._check_print_access()

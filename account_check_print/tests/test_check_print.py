@@ -75,13 +75,13 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
     def test_numbering_and_duplicate_print_protection(self):
         self._log_font_diagnostics("test_numbering_and_duplicate_print_protection")
         payment = self._create_posted_payment()
-        payment.action_print_check()
+        payment.action_print_business_check()
         self.assertEqual(payment.check_number, "1001")
         self.assertEqual(self.journal.next_check_number, 1002)
         self.assertTrue(payment.printed)
         self.assertEqual(payment.check_history_ids.event_type, "print")
         with self.assertRaises(UserError):
-            payment.action_print_check()
+            payment.action_print_business_check()
 
     def test_preview_does_not_consume_number(self):
         self._log_font_diagnostics("test_preview_does_not_consume_number")
@@ -95,7 +95,7 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
     def test_reprint_and_void_are_audited(self):
         self._log_font_diagnostics("test_reprint_and_void_are_audited")
         payment = self._create_posted_payment()
-        payment.action_print_check()
+        payment.action_print_business_check()
         payment._reprint_check("Printer jam damaged the first copy")
         self.assertEqual(payment.reprinted_count, 1)
         payment._void_check("Vendor bank details changed")
@@ -112,7 +112,7 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
         self._log_font_diagnostics("test_accounting_user_cannot_print_or_void")
         payment = self._create_posted_payment()
         with self.assertRaises(AccessError):
-            payment.with_user(self.accounting_user).action_print_check()
+            payment.with_user(self.accounting_user).action_print_business_check()
 
     def test_bundled_font_is_available(self):
         diagnostics = get_check_print_font_diagnostics()
@@ -126,7 +126,7 @@ class TestAccountCheckPrint(AccountTestInvoicingCommon):
     def test_report_html_and_dynamic_paperformat(self):
         self._log_font_diagnostics("test_report_html_and_dynamic_paperformat")
         payment = self._create_posted_payment()
-        payment.action_print_check()
+        payment.action_print_business_check()
         report = self.env.ref("account_check_print.action_report_check")
         selected = report.with_context(
             active_id=payment.id, active_ids=payment.ids
