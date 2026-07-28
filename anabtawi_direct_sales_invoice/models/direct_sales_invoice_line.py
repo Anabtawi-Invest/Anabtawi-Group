@@ -29,7 +29,6 @@ class DirectSalesInvoiceLine(models.Model):
         "uom.uom",
         string="Unit of Measure",
         required=True,
-        domain="[('category_id', '=', product_id.uom_id.category_id)]",
     )
     quantity = fields.Float(
         string="Requested Quantity", default=1.0, required=True, digits="Product Unit"
