@@ -1,7 +1,10 @@
 from collections import defaultdict
 
+from babel.dates import format_date as babel_format_date
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools.misc import babel_locale_parse, format_date, get_lang
 
 
 class PosDeliveryAmountReport(models.Model):
@@ -11,6 +14,10 @@ class PosDeliveryAmountReport(models.Model):
 
     name = fields.Char(required=True, readonly=True, copy=False)
     creation_date = fields.Date(required=True, readonly=True, index=True)
+    creation_date_display = fields.Char(
+        string="Date",
+        compute="_compute_creation_date_display",
+    )
     line_ids = fields.One2many("pos.delivery.amount.report.line", "report_id", string="Lines")
     currency_id = fields.Many2one(
         "res.currency",
@@ -47,9 +54,25 @@ class PosDeliveryAmountReport(models.Model):
             report.total_real_arrived_amount = sum(report.line_ids.mapped("real_arrived_amount"))
             report.total_difference = sum(report.line_ids.mapped("difference"))
 
+    @api.depends("creation_date")
+    def _compute_creation_date_display(self):
+        for report in self:
+            report.creation_date_display = report._format_date_with_day_name(report.creation_date)
+
+    @api.model
+    def _format_date_with_day_name(self, date_value):
+        if not date_value:
+            return ""
+        lang = get_lang(self.env)
+        locale = babel_locale_parse(lang.code)
+        day_name = babel_format_date(date_value, format="EEEE", locale=locale)
+        date_label = format_date(self.env, date_value)
+        return _("%(date)s (%(day)s)", date=date_label, day=day_name)
+
     @api.model
     def _report_name_for_date(self, date_value):
-        return _("Delivery Amount for Session %(date)s", date=fields.Date.to_string(date_value))
+        date_label = self._format_date_with_day_name(date_value)
+        return _("Delivery Amount for Session %(date)s", date=date_label)
 
     @api.model
     def action_generate_reports(self):

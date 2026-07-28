@@ -1,7 +1,10 @@
 from collections import defaultdict
 from datetime import datetime, time
 
+from babel.dates import format_date as babel_format_date
+
 from odoo import _, fields, models
+from odoo.tools.misc import babel_locale_parse, format_date, get_lang
 
 PAYMENT_METHOD_TALABAT = 142
 PAYMENT_METHOD_CAREEM = 143
@@ -20,6 +23,15 @@ class PosDailyOperationsWizard(models.TransientModel):
         day_start = datetime.combine(self.business_date, time.min)
         day_end = datetime.combine(self.business_date, time.max)
         return day_start, day_end
+
+    def _format_date_with_day_name(self, date_value):
+        if not date_value:
+            return ""
+        lang = get_lang(self.env)
+        locale = babel_locale_parse(lang.code)
+        day_name = babel_format_date(date_value, format="EEEE", locale=locale)
+        date_label = format_date(self.env, date_value)
+        return _("%(date)s (%(day)s)", date=date_label, day=day_name)
 
     def _get_active_configs(self):
         return self.env['pos.config'].search([('active', '=', True)], order='name')
@@ -187,11 +199,10 @@ class PosDailyOperationsWizard(models.TransientModel):
         total_number_style = workbook.add_format({
             'border': 1, 'bold': True, 'num_format': '#,##0.000', 'font_size': 9,
         })
-        date_style = workbook.add_format({'num_format': 'm/d/yyyy', 'font_size': 9})
 
         sheet.write(0, 0, _('Daily Operations Summary'), title_style)
         sheet.write(2, 0, _('Business Date'), label_style)
-        sheet.write(2, 1, self.business_date, date_style)
+        sheet.write(2, 1, self._format_date_with_day_name(self.business_date), text_style)
 
         headers = [
             _('Branch Name'),

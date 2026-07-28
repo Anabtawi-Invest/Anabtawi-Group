@@ -6,7 +6,8 @@
         <field name="arch" type="xml">
             <list create="0" edit="0">
                 <field name="name"/>
-                <field name="creation_date"/>
+                <field name="creation_date" column_invisible="1"/>
+                <field name="creation_date_display" string="Date"/>
                 <field name="total_delivery_amount" widget="monetary"/>
                 <field name="total_real_arrived_amount" widget="monetary"/>
                 <field name="total_difference" widget="monetary"/>
@@ -28,7 +29,8 @@
                 <sheet>
                     <group>
                         <field name="name" readonly="1"/>
-                        <field name="creation_date" readonly="1"/>
+                        <field name="creation_date" invisible="1"/>
+                        <field name="creation_date_display" string="Date"/>
                         <field name="currency_id" invisible="1"/>
                     </group>
                     <group>

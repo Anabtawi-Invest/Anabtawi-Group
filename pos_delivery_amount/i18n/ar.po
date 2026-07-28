@@ -68,6 +68,10 @@ msgid "Delivery Amount for Session %(date)s"
 msgstr "مبلغ التوريد لجلسات %(date)s"
 
 #. module: pos_delivery_amount
+msgid "%(date)s (%(day)s)"
+msgstr "%(date)s (%(day)s)"
+
+#. module: pos_delivery_amount
 msgid "Session Number"
 msgstr "رقم الجلسة"
 
