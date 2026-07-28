@@ -26,3 +26,16 @@ class PosOrder(models.Model):
         if cake_order_id:
             vals["pos_cake_order_id"] = int(cake_order_id)
         return vals
+
+
+class PosOrderLine(models.Model):
+    _inherit = "pos.order.line"
+
+    def _compute_total_cost(self, stock_moves):
+        cake_lines = self.filtered(lambda line: line.order_id.pos_cake_order_id)
+        for line in cake_lines:
+            line.total_cost = (
+                line.order_id.pos_cake_order_id.total_components_cost * abs(line.qty)
+            )
+            line.is_total_cost_computed = True
+        return super(PosOrderLine, self - cake_lines)._compute_total_cost(stock_moves)
