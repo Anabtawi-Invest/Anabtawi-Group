@@ -1,4 +1,8 @@
+import logging
+
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class ResPartner(models.Model):
@@ -25,10 +29,19 @@ class ResPartner(models.Model):
         return domain
 
     def _get_employee_for_partner(self, partner, company=None):
-        return self.env["hr.employee"].sudo().search(
-            self._employee_number_domain(partner, company=company),
-            limit=1,
+        domain = self._employee_number_domain(partner, company=company)
+        employee = self.env["hr.employee"].sudo().search(domain, limit=1)
+        _logger.info(
+            "[hr_employee_code] _get_employee_for_partner partner=%s (%s) company=%s domain=%s "
+            "employee=%s employee_number=%s",
+            partner.id,
+            partner.display_name,
+            company.id if company else self.env.company.id if self.env.company else None,
+            domain,
+            employee.id if employee else None,
+            employee.employee_number if employee else None,
         )
+        return employee
 
     @api.depends("employee_ids.employee_number", "employee_ids.company_id")
     def _compute_employee_number(self):
@@ -46,7 +59,13 @@ class ResPartner(models.Model):
     @api.model
     def _search_partners_by_employee_number(self, term, company):
         if not term or not company:
+            _logger.info(
+                "[hr_employee_code] _search_partners_by_employee_number skipped term=%r company=%s",
+                term,
+                company,
+            )
             return self.browse()
+
         employees = self.env["hr.employee"].sudo().search(
             [
                 ("employee_number", "ilike", term),
@@ -54,13 +73,39 @@ class ResPartner(models.Model):
             ],
             limit=100,
         )
+        _logger.info(
+            "[hr_employee_code] _search_partners_by_employee_number term=%r company=%s (%s) "
+            "employees_found=%s details=%s",
+            term,
+            company.id,
+            company.display_name,
+            len(employees),
+            [
+                {
+                    "id": e.id,
+                    "name": e.name,
+                    "employee_number": e.employee_number,
+                    "work_contact_id": e.work_contact_id.id,
+                    "user_partner_id": e.user_partner_id.id,
+                }
+                for e in employees
+            ],
+        )
+
         partner_ids = set()
         for employee in employees:
             if employee.work_contact_id:
                 partner_ids.add(employee.work_contact_id.id)
             if employee.user_partner_id:
                 partner_ids.add(employee.user_partner_id.id)
-        return self.browse(list(partner_ids))
+
+        partners = self.browse(list(partner_ids))
+        _logger.info(
+            "[hr_employee_code] _search_partners_by_employee_number partner_ids=%s partners=%s",
+            list(partner_ids),
+            [(p.id, p.display_name) for p in partners],
+        )
+        return partners
 
     @api.model
     def get_new_partner(self, config_id, domain, offset):
@@ -68,23 +113,55 @@ class ResPartner(models.Model):
         company = config.company_id
         search_term = self._extract_pos_search_term(domain) if domain else None
 
+        _logger.info(
+            "[hr_employee_code] get_new_partner config=%s company=%s (%s) offset=%s "
+            "search_term=%r domain=%s",
+            config_id,
+            company.id,
+            company.display_name,
+            offset,
+            search_term,
+            domain,
+        )
+
         if len(domain) == 0:
             limited_partner_ids = {
                 partner[0] for partner in config.get_limited_partners_loading(offset)
             }
             domain += [("id", "in", list(limited_partner_ids))]
             new_partners = self.search(domain)
+            employee_partners = self.browse()
         else:
             new_partners = self.search(domain, offset=offset, limit=100)
+            employee_partners = self.browse()
             if offset == 0 and search_term:
                 employee_partners = self._search_partners_by_employee_number(
                     search_term, company
                 )
                 new_partners = employee_partners | new_partners
 
+        _logger.info(
+            "[hr_employee_code] get_new_partner domain_results=%s employee_results=%s merged=%s",
+            [(p.id, p.display_name, p.employee_number) for p in new_partners - employee_partners],
+            [(p.id, p.display_name, p.employee_number) for p in employee_partners],
+            [(p.id, p.display_name, p.employee_number) for p in new_partners],
+        )
+
         fiscal_positions = new_partners.fiscal_position_id
+        partner_data = self._load_pos_data_read(new_partners, config)
+        _logger.info(
+            "[hr_employee_code] get_new_partner loaded_data=%s",
+            [
+                {
+                    "id": row.get("id"),
+                    "name": row.get("name"),
+                    "employee_number": row.get("employee_number"),
+                }
+                for row in partner_data
+            ],
+        )
         return {
-            "res.partner": self._load_pos_data_read(new_partners, config),
+            "res.partner": partner_data,
             "account.fiscal.position": self.env["account.fiscal.position"]._load_pos_data_read(
                 fiscal_positions, config
             ),
@@ -102,6 +179,20 @@ class ResPartner(models.Model):
             employee = partner._get_employee_for_partner(partner, company=company)
             if partner.id in by_id:
                 by_id[partner.id]["employee_number"] = employee.employee_number or False
+
+        _logger.info(
+            "[hr_employee_code] _load_pos_data_read company=%s (%s) records=%s",
+            company.id,
+            company.display_name,
+            [
+                {
+                    "id": row.get("id"),
+                    "name": row.get("name"),
+                    "employee_number": row.get("employee_number"),
+                }
+                for row in result
+            ],
+        )
         return result
 
     @api.model
