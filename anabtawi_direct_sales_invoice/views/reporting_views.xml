@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_direct_sales_invoice_pivot" model="ir.ui.view">
+        <field name="name">direct.sales.invoice.pivot</field>
+        <field name="model">direct.sales.invoice</field>
+        <field name="arch" type="xml">
+            <pivot string="Direct Sales Analysis" sample="1">
+                <field name="warehouse_id" type="row"/>
+                <field name="requested_date" interval="month" type="col"/>
+                <field name="amount_untaxed" type="measure"/>
+                <field name="amount_tax" type="measure"/>
+                <field name="amount_total" type="measure"/>
+                <field name="amount_paid" type="measure"/>
+                <field name="amount_residual" type="measure"/>
+                <field name="requested_quantity" type="measure"/>
+                <field name="approved_quantity" type="measure"/>
+                <field name="released_quantity" type="measure"/>
+                <field name="document_count" type="measure"/>
+                <field name="price_override_count" type="measure"/>
+                <field name="partial_approval_count" type="measure"/>
+                <field name="rejection_count" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_direct_sales_invoice_graph" model="ir.ui.view">
+        <field name="name">direct.sales.invoice.graph</field>
+        <field name="model">direct.sales.invoice</field>
+        <field name="arch" type="xml">
+            <graph string="Direct Sales by Warehouse" type="bar" sample="1">
+                <field name="warehouse_id"/>
+                <field name="amount_total" type="measure"/>
+                <field name="amount_residual" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_direct_sales_invoice_line_reporting_list" model="ir.ui.view">
+        <field name="name">direct.sales.invoice.line.reporting.list</field>
+        <field name="model">direct.sales.invoice.line</field>
+        <field name="arch" type="xml">
+            <list string="Direct Sales Product Movement" create="0" edit="0" delete="0">
+                <field name="direct_invoice_id"/>
+                <field name="invoice_date"/>
+                <field name="partner_id"/>
+                <field name="warehouse_id"/>
+                <field name="product_id"/>
+                <field name="product_category_id"/>
+                <field name="quantity" sum="Requested"/>
+                <field name="approved_quantity" sum="Approved"/>
+                <field name="released_quantity" sum="Released"/>
+                <field name="product_uom_id"/>
+                <field name="price_subtotal" sum="Untaxed"/>
+                <field name="price_tax" sum="Tax"/>
+                <field name="price_total" sum="Total"/>
+                <field name="currency_id" column_invisible="True"/>
+                <field name="price_overridden"/>
+                <field name="warehouse_status" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_direct_sales_invoice_line_pivot" model="ir.ui.view">
+        <field name="name">direct.sales.invoice.line.pivot</field>
+        <field name="model">direct.sales.invoice.line</field>
+        <field name="arch" type="xml">
+            <pivot string="Direct Sales Product Analysis" sample="1">
+                <field name="product_id" type="row"/>
+                <field name="warehouse_id" type="row"/>
+                <field name="invoice_date" interval="month" type="col"/>
+                <field name="quantity" type="measure"/>
+                <field name="approved_quantity" type="measure"/>
+                <field name="released_quantity" type="measure"/>
+                <field name="price_subtotal" type="measure"/>
+                <field name="price_tax" type="measure"/>
+                <field name="price_total" type="measure"/>
+                <field name="document_count" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_direct_sales_invoice_line_graph" model="ir.ui.view">
+        <field name="name">direct.sales.invoice.line.graph</field>
+        <field name="model">direct.sales.invoice.line</field>
+        <field name="arch" type="xml">
+            <graph string="Product Movement by Direct Invoice" type="bar" sample="1">
+                <field name="product_id"/>
+                <field name="released_quantity" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_direct_sales_invoice_line_search" model="ir.ui.view">
+        <field name="name">direct.sales.invoice.line.reporting.search</field>
+        <field name="model">direct.sales.invoice.line</field>
+        <field name="arch" type="xml">
+            <search string="Search Direct Sales Product Movement">
+                <field name="direct_invoice_id"/>
+                <field name="partner_id"/>
+                <field name="warehouse_id"/>
+                <field name="product_id"/>
+                <field name="product_category_id"/>
+                <field name="user_id"/>
+                <field name="team_id"/>
+                <field name="pricelist_id"/>
+                <field name="payment_term_id"/>
+                <separator/>
+                <filter name="released" string="Released" domain="[('released_quantity', '&gt;', 0)]"/>
+                <filter name="partial" string="Partially Approved" domain="[('warehouse_status', '=', 'partial')]"/>
+                <filter name="overridden" string="Manual Price Override" domain="[('price_overridden', '=', True)]"/>
+                <filter name="cash" string="Cash Sales" domain="[('is_cash_sale', '=', True)]"/>
+                <filter name="credit" string="Credit Sales" domain="[('is_cash_sale', '=', False)]"/>
+                <filter name="invoice_date" string="Invoice Date" date="invoice_date"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_product" string="Product" context="{'group_by': 'product_id'}"/>
+                    <filter name="group_category" string="Product Category" context="{'group_by': 'product_category_id'}"/>
+                    <filter name="group_customer" string="Customer" context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_warehouse" string="Warehouse" context="{'group_by': 'warehouse_id'}"/>
+                    <filter name="group_salesperson" string="Salesperson" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_team" string="Sales Team" context="{'group_by': 'team_id'}"/>
+                    <filter name="group_pricelist" string="Pricelist" context="{'group_by': 'pricelist_id'}"/>
+                    <filter name="group_payment_term" string="Payment Terms" context="{'group_by': 'payment_term_id'}"/>
+                    <filter name="group_payment_state" string="Payment Status" context="{'group_by': 'payment_state'}"/>
+                    <filter name="group_month" string="Month" context="{'group_by': 'invoice_date:month'}"/>
+                    <filter name="group_company" string="Company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_direct_sales_reporting" model="ir.actions.act_window">
+        <field name="name">Direct Sales Analysis</field>
+        <field name="res_model">direct.sales.invoice</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="search_view_id" ref="view_direct_sales_invoice_search"/>
+        <field name="context">{'search_default_group_warehouse': 1}</field>
+    </record>
+
+    <record id="action_direct_sales_product_reporting" model="ir.actions.act_window">
+        <field name="name">Product Movement by Invoice</field>
+        <field name="res_model">direct.sales.invoice.line</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="search_view_id" ref="view_direct_sales_invoice_line_search"/>
+    </record>
+
+    <record id="action_direct_sales_outstanding" model="ir.actions.act_window">
+        <field name="name">Outstanding Direct Invoices</field>
+        <field name="res_model">direct.sales.invoice</field>
+        <field name="view_mode">list,pivot,graph,form</field>
+        <field name="domain">[('invoice_id', '!=', False), ('amount_residual', '&gt;', 0)]</field>
+        <field name="search_view_id" ref="view_direct_sales_invoice_search"/>
+    </record>
+
+    <record id="action_direct_sales_price_overrides" model="ir.actions.act_window">
+        <field name="name">Manual Price Overrides</field>
+        <field name="res_model">direct.sales.invoice.line</field>
+        <field name="view_mode">list,pivot,graph</field>
+        <field name="domain">[('price_overridden', '=', True)]</field>
+        <field name="search_view_id" ref="view_direct_sales_invoice_line_search"/>
+    </record>
+</odoo>

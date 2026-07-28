@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_direct_sales" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.direct.sales</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="stock.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//app[@name='stock']" position="inside">
+                <block title="Direct Sales Invoice" name="direct_sales_invoice_settings">
+                    <setting
+                        id="direct_sales_enabled_setting"
+                        string="Enable Direct Sales Invoice"
+                        help="Allow assigned users to create warehouse-approved direct customer invoices."
+                        company_dependent="1">
+                        <field name="direct_sales_enabled"/>
+                    </setting>
+                    <setting
+                        id="direct_sales_invoice_policy_setting"
+                        string="Invoice Creation Policy"
+                        help="Choose whether the standard customer invoice is created at warehouse approval or actual goods release."
+                        company_dependent="1"
+                        invisible="not direct_sales_enabled">
+                        <field name="direct_sales_invoice_creation_policy" widget="radio"/>
+                    </setting>
+                    <setting
+                        id="direct_sales_auto_post_setting"
+                        string="Automatically Post Customer Invoice"
+                        help="Post the invoice automatically after the goods are released."
+                        company_dependent="1"
+                        invisible="not direct_sales_enabled">
+                        <field name="direct_sales_auto_post_invoice"/>
+                    </setting>
+                    <setting
+                        id="direct_sales_stock_flow_setting"
+                        string="Default Stock Flow"
+                        help="Default new warehouse configuration to direct delivery or two-step dispatch."
+                        company_dependent="1"
+                        invisible="not direct_sales_enabled">
+                        <field name="direct_sales_stock_flow" widget="radio"/>
+                    </setting>
+                    <setting
+                        id="direct_sales_cash_release_setting"
+                        string="Cash Release Control"
+                        help="Optionally require a fully paid and reconciled invoice before cash-sale goods are released."
+                        company_dependent="1"
+                        invisible="not direct_sales_enabled">
+                        <field name="cash_customer_release_policy" widget="radio"/>
+                    </setting>
+                    <setting
+                        id="direct_sales_partial_setting"
+                        string="Allow Partial Warehouse Approval"
+                        company_dependent="1"
+                        invisible="not direct_sales_enabled">
+                        <field name="allow_partial_warehouse_approval"/>
+                    </setting>
+                    <setting
+                        id="direct_sales_multi_warehouse_setting"
+                        string="Allow Multi-Warehouse Fulfillment"
+                        help="Allow individual product quantities to be allocated across multiple enabled warehouses."
+                        company_dependent="1"
+                        invisible="not direct_sales_enabled">
+                        <field name="allow_multi_warehouse_fulfillment"/>
+                    </setting>
+                    <setting
+                        id="direct_sales_journal_setting"
+                        string="Default Direct Sales Journal"
+                        company_dependent="1"
+                        invisible="not direct_sales_enabled">
+                        <field name="direct_sales_journal_id"/>
+                    </setting>
+                    <setting
+                        id="direct_sales_default_dispatch_setting"
+                        string="Default Dispatch Location"
+                        help="Reuse this internal location when it belongs to a warehouse being enabled; otherwise that warehouse receives its own Sales Dispatch location."
+                        company_dependent="1"
+                        invisible="not direct_sales_enabled">
+                        <field name="direct_sales_default_dispatch_location_id"/>
+                    </setting>
+                    <setting
+                        id="direct_sales_payment_term_setting"
+                        string="Fallback Payment Term"
+                        help="Used only when the customer has no payment term."
+                        company_dependent="1"
+                        invisible="not direct_sales_enabled">
+                        <field name="direct_sales_default_payment_term_id"/>
+                    </setting>
+                    <setting
+                        id="direct_sales_show_price_setting"
+                        string="Show Prices on Preparation Sheet"
+                        company_dependent="1"
+                        invisible="not direct_sales_enabled">
+                        <field name="direct_sales_show_prices_on_preparation"/>
+                    </setting>
+                    <setting
+                        id="direct_sales_override_approval_setting"
+                        string="Require Price Override Approval"
+                        company_dependent="1"
+                        invisible="not direct_sales_enabled">
+                        <field name="direct_sales_price_override_approval"/>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+</odoo>

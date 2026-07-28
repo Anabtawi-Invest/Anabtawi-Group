@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_commercial_audit" model="ir.actions.report">
+        <field name="name">Internal Commercial Audit</field>
+        <field name="model">direct.sales.invoice</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">anabtawi_direct_sales_invoice.report_commercial_audit</field>
+        <field name="report_file">anabtawi_direct_sales_invoice.report_commercial_audit</field>
+        <field name="binding_model_id" ref="model_direct_sales_invoice"/>
+        <field name="binding_type">report</field>
+        <field name="print_report_name">'Commercial Audit - %s' % (object.name)</field>
+        <field name="groups_id" eval="[
+            Command.link(ref('anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager')),
+            Command.link(ref('account.group_account_manager'))
+        ]"/>
+    </record>
+</odoo>
