@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from odoo.exceptions import AccessError, ValidationError
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import TransactionCase, new_test_user, tagged
 
 
 @tagged("post_install", "-at_install")
@@ -11,18 +11,18 @@ class TestAiReporting(TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.group_ai_user = cls.env.ref("ai_reporting.group_ai_reporting_user")
-        cls.owner = cls.env["res.users"].create({
-            "name": "AI Reporting Owner",
-            "login": "ai_reporting_owner",
-            "email": "ai_reporting_owner@example.com",
-            "group_ids": [(4, cls.group_ai_user.id)],
-        })
-        cls.viewer = cls.env["res.users"].create({
-            "name": "AI Reporting Viewer",
-            "login": "ai_reporting_viewer",
-            "email": "ai_reporting_viewer@example.com",
-            "group_ids": [(4, cls.group_ai_user.id)],
-        })
+        cls.owner = new_test_user(
+            cls.env,
+            login="ai_reporting_owner",
+            groups="ai_reporting.group_ai_reporting_user",
+            company_id=cls.env.company.id,
+        )
+        cls.viewer = new_test_user(
+            cls.env,
+            login="ai_reporting_viewer",
+            groups="ai_reporting.group_ai_reporting_user",
+            company_id=cls.env.company.id,
+        )
 
     def test_memory_exact_match_avoids_provider(self):
         plan = {"model": "res.partner", "domain": [], "fields": ["display_name"], "limit": 1}
@@ -156,16 +156,20 @@ class TestAiReporting(TransactionCase):
         with self.assertRaises(ValidationError):
             self.env["ai.reporting.query_execution_service"].execute_plan(plan)
 
-    def test_native_ai_registration_is_a_safe_no_op_without_the_real_app(self):
-        # This sandbox has no Enterprise "ai" app installed, so ir.actions.server
-        # has none of use_in_ai/ai_tool_description/ai_tool_schema. Confirms the
-        # bridge detects that correctly and never raises trying to register tools
-        # against a schema that isn't there.
+    def test_native_ai_registration_never_raises(self):
+        # register_integration() must stay safe on every database shape: with or
+        # without the Enterprise "ai" app, and regardless of whether native tools
+        # can actually be registered on this build.
         bridge = self.env["ai.reporting.odoo_ai_bridge"]
-        self.assertFalse(bridge._native_ai_app_ready())
         status = bridge.register_integration()
-        self.assertFalse(status["native_available"])
-        self.assertEqual(status["native_tools_registered"], 0)
+        self.assertIn("native_available", status)
+        self.assertIn("native_tools_registered", status)
+        if bridge._native_ai_app_ready():
+            self.assertTrue(status["native_available"])
+            self.assertGreaterEqual(status["native_tools_registered"], 0)
+        else:
+            self.assertFalse(status["native_available"])
+            self.assertEqual(status["native_tools_registered"], 0)
 
     def test_native_ai_tool_methods_are_directly_callable(self):
         # The methods the native-AI "code" tools call (model.env[...]._ai_tool_*)
