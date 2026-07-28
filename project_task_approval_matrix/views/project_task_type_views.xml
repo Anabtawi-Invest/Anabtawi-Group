@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="project_task_type_form_approval_closing" model="ir.ui.view">
+        <field name="name">project.task.type.form.approval.closing</field>
+        <field name="model">project.task.type</field>
+        <field name="inherit_id" ref="project.task_type_edit"/>
+        <field name="arch" type="xml">
+            <field name="fold" position="after">
+                <field
+                    name="approval_closing_stage"
+                    groups="project_task_approval_matrix.group_project_approval_manager"
+                />
+            </field>
+        </field>
+    </record>
+
+    <record id="project_task_type_list_approval_closing" model="ir.ui.view">
+        <field name="name">project.task.type.list.approval.closing</field>
+        <field name="model">project.task.type</field>
+        <field name="inherit_id" ref="project.task_type_tree"/>
+        <field name="arch" type="xml">
+            <field name="fold" position="after">
+                <field
+                    name="approval_closing_stage"
+                    optional="show"
+                    groups="project_task_approval_matrix.group_project_approval_manager"
+                />
+            </field>
+        </field>
+    </record>
+</odoo>

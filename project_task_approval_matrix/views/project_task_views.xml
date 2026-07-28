@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="project_task_view_form_approval_matrix" model="ir.ui.view">
+        <field name="name">project.task.form.approval.matrix</field>
+        <field name="model">project.task</field>
+        <field name="inherit_id" ref="project.view_task_form2"/>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <xpath expr="//form/field[@name='company_id'][1]" position="after">
+                <field name="project_approval_enabled" invisible="1"/>
+                <field name="can_current_user_approve" invisible="1"/>
+                <field name="can_submit_approval" invisible="1"/>
+                <field name="can_reset_approval" invisible="1"/>
+                <field name="can_manager_override" invisible="1"/>
+            </xpath>
+
+            <xpath expr="//header" position="inside">
+                <button
+                    name="action_submit_for_approval"
+                    type="object"
+                    string="Submit for Approval"
+                    class="oe_highlight"
+                    invisible="not can_submit_approval"
+                    groups="project.group_project_user"
+                />
+                <button
+                    name="action_approve"
+                    type="object"
+                    string="Approve"
+                    class="oe_highlight"
+                    invisible="not can_current_user_approve"
+                    groups="project_task_approval_matrix.group_project_task_approver"
+                />
+                <button
+                    name="action_request_changes"
+                    type="object"
+                    string="Request Changes"
+                    invisible="not can_current_user_approve"
+                    groups="project_task_approval_matrix.group_project_task_approver"
+                />
+                <button
+                    name="action_reject"
+                    type="object"
+                    string="Reject"
+                    invisible="not can_current_user_approve"
+                    groups="project_task_approval_matrix.group_project_task_approver"
+                />
+                <button
+                    name="action_reset_approval"
+                    type="object"
+                    string="Reset Approval"
+                    invisible="not can_reset_approval"
+                    groups="project_task_approval_matrix.group_project_approval_manager"
+                />
+                <button
+                    name="action_manager_override_approve"
+                    type="object"
+                    string="Manager Override"
+                    invisible="not can_manager_override"
+                    groups="project_task_approval_matrix.group_project_approval_manager"
+                    confirm="This controlled action approves every remaining step. Continue?"
+                />
+            </xpath>
+
+            <xpath expr="//div[@name='button_box']/span[@id='end_button_box']" position="before">
+                <button
+                    name="%(project_task_approval_matrix.action_task_approval_lines)d"
+                    type="action"
+                    class="oe_stat_button"
+                    icon="fa-check-square-o"
+                    invisible="not project_approval_enabled or approval_count == 0"
+                    context="{'search_default_task_id': id}"
+                >
+                    <field name="approval_count" widget="statinfo" string="Approval Steps"/>
+                </button>
+            </xpath>
+
+            <xpath expr="//field[@name='allocated_hours'][1]" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//sheet/group[1]/group[2]" position="inside">
+                <label for="allocation_value" string="Allocated Time"/>
+                <div name="allocation_value_container" class="d-flex gap-2">
+                    <field name="allocation_value" class="oe_inline"/>
+                    <field name="allocation_unit" class="oe_inline"/>
+                    <field
+                        name="allocation_calendar_id"
+                        class="oe_inline"
+                        invisible="allocation_unit != 'days'"
+                        required="allocation_unit == 'days'"
+                        options="{'no_create': True}"
+                    />
+                </div>
+            </xpath>
+
+            <xpath expr="//notebook/page[@name='description_page']" position="after">
+                <page
+                    name="approvals"
+                    string="Approvals"
+                    invisible="not project_approval_enabled"
+                    groups="project.group_project_user"
+                >
+                    <group>
+                        <group string="Configuration">
+                            <field
+                                name="approval_required"
+                                groups="project_task_approval_matrix.group_project_approval_manager"
+                            />
+                            <field
+                                name="approval_required"
+                                readonly="1"
+                                groups="!project_task_approval_matrix.group_project_approval_manager"
+                            />
+                            <field
+                                name="approval_type"
+                                invisible="not approval_required"
+                                groups="project_task_approval_matrix.group_project_approval_manager"
+                            />
+                            <field
+                                name="approval_type"
+                                readonly="1"
+                                invisible="not approval_required"
+                                groups="!project_task_approval_matrix.group_project_approval_manager"
+                            />
+                            <field
+                                name="approval_manager_override_reason"
+                                invisible="not approval_required or approval_state == 'approved'"
+                                groups="project_task_approval_matrix.group_project_approval_manager"
+                                placeholder="Required before Manager Override"
+                            />
+                        </group>
+                        <group string="Status" invisible="not approval_required">
+                            <field name="approval_state" widget="badge"/>
+                            <field name="approval_progress" widget="progressbar"/>
+                            <field name="current_approver_ids" widget="many2many_avatar_user"/>
+                            <field name="submitted_by_id" widget="many2one_avatar_user"/>
+                            <field name="submitted_date"/>
+                            <field name="approved_date"/>
+                        </group>
+                    </group>
+                    <field
+                        name="approval_line_ids"
+                        invisible="not approval_required"
+                        context="{'default_task_id': id}"
+                    >
+                        <list editable="bottom" open_form_view="True">
+                            <field
+                                name="sequence"
+                                widget="handle"
+                                readonly="parent.approval_state not in ['draft', 'changes_requested', 'rejected']"
+                            />
+                            <field
+                                name="approver_id"
+                                widget="many2one_avatar_user"
+                                readonly="parent.approval_state not in ['draft', 'changes_requested', 'rejected']"
+                                options="{'no_create': True, 'no_open': True}"
+                            />
+                            <field
+                                name="approver_role"
+                                readonly="parent.approval_state not in ['draft', 'changes_requested', 'rejected']"
+                            />
+                            <field name="state" widget="badge" readonly="1"/>
+                            <field name="submitted_date" optional="hide" readonly="1"/>
+                            <field name="decision_date" readonly="1"/>
+                            <field name="decided_by_id" widget="many2one_avatar_user" readonly="1"/>
+                            <field name="can_take_action" column_invisible="True"/>
+                            <field name="comments" readonly="not can_take_action"/>
+                        </list>
+                    </field>
+                    <div class="alert alert-info mt16" role="alert" invisible="not approval_required">
+                        Enter comments on your pending row before choosing Request Changes or Reject.
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

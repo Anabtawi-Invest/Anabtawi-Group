@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="mail_template_task_approval_pending" model="mail.template">
+            <field name="name">Project: Task Approval Required</field>
+            <field name="model_id" ref="project.model_project_task"/>
+            <field name="subject">Approval required: {{ object.name }}</field>
+            <field name="email_from">{{ user.email_formatted or '' }}</field>
+            <field name="description">Sent when a task approval step becomes pending.</field>
+            <field name="body_html" type="html">
+<div>
+    <p>Hello,</p>
+    <p>Your approval is required for task <strong t-out="object.name or ''">Task</strong>
+       in project <strong t-out="object.project_id.name or ''">Project</strong>.</p>
+    <p>Open the task in Odoo to approve, request changes, or reject it.</p>
+</div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <record id="mail_template_task_approval_decision" model="mail.template">
+            <field name="name">Project: Task Approval Decision</field>
+            <field name="model_id" ref="project.model_project_task"/>
+            <field name="subject">Approval update: {{ object.name }}</field>
+            <field name="email_from">{{ user.email_formatted or '' }}</field>
+            <field name="description">Sent to assignees after rejection or a change request.</field>
+            <field name="body_html" type="html">
+<div>
+    <p>The approval status of task <strong t-out="object.name or ''">Task</strong>
+       is now <strong t-out="object.approval_state or ''">Status</strong>.</p>
+    <p>Open the task in Odoo to review the approver's comments.</p>
+</div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <record id="mail_template_task_approval_complete" model="mail.template">
+            <field name="name">Project: Task Approval Complete</field>
+            <field name="model_id" ref="project.model_project_task"/>
+            <field name="subject">Fully approved: {{ object.name }}</field>
+            <field name="email_from">{{ user.email_formatted or '' }}</field>
+            <field name="description">Sent to assignees after final approval.</field>
+            <field name="body_html" type="html">
+<div>
+    <p>All required approvals are complete for task
+       <strong t-out="object.name or ''">Task</strong>.</p>
+</div>
+            </field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="project_project_view_form_approval_matrix" model="ir.ui.view">
+        <field name="name">project.project.form.approval.matrix</field>
+        <field name="model">project.project</field>
+        <field name="inherit_id" ref="project.edit_project"/>
+        <field name="priority">50</field>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='group_tasks_managment']/div" position="inside">
+                <setting
+                    class="col-lg-12"
+                    id="task_approval_matrix_setting"
+                    string="Task Approval Matrix"
+                    help="Configure task and subtask approval routes for this project."
+                    groups="project_task_approval_matrix.group_project_approval_manager"
+                >
+                    <field name="approval_matrix_enabled"/>
+                    <div class="content-group mt16" invisible="not approval_matrix_enabled">
+                        <field name="prevent_task_completion_without_approval"/>
+                        <field name="prevent_self_approval"/>
+                        <field name="send_approval_email_notifications"/>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

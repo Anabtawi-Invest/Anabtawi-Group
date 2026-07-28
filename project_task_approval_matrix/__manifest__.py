@@ -1,0 +1,28 @@
+{
+    "name": "Project Task Approval Matrix",
+    "version": "19.0.1.0.0",
+    "category": "Services/Project",
+    "summary": "Multi-level task approvals with hours or days allocation",
+    "author": "Anabtawi Group",
+    "license": "LGPL-3",
+    "depends": [
+        "project",
+        "mail",
+        "hr",
+        "resource",
+    ],
+    "data": [
+        "security/approval_security.xml",
+        "security/ir.model.access.csv",
+        "data/mail_activity_type.xml",
+        "data/mail_templates.xml",
+        "views/project_project_views.xml",
+        "views/project_task_type_views.xml",
+        "views/approval_line_views.xml",
+        "views/project_task_views.xml",
+        "views/project_task_search_views.xml",
+    ],
+    "post_init_hook": "post_init_hook",
+    "installable": True,
+    "application": False,
+}

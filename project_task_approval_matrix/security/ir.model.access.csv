@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_task_approval_line_project_user,task.approval.line.project.user,model_project_task_approval_line,project.group_project_user,1,0,0,0
+access_task_approval_line_user,task.approval.line.user,model_project_task_approval_line,group_project_approval_user,1,0,0,0
+access_task_approval_line_approver,task.approval.line.approver,model_project_task_approval_line,group_project_task_approver,1,1,0,0
+access_task_approval_line_manager,task.approval.line.manager,model_project_task_approval_line,group_project_approval_manager,1,1,1,1
