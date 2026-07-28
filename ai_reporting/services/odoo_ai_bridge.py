@@ -54,7 +54,7 @@ class AiReportingOdooAiBridge(models.AbstractModel):
             "target_model": "ai.reporting.saved.report",
             "code": (
                 "ai['result'] = model.env['ai.reporting.saved.report']"
-                "._ai_tool_run_report(report_id, parameters)"
+                "._ai_tool_run_report(report_id)"
             ),
             "description": (
                 "Run one saved Advanced Report (custom AI Reporting module) by id and return its "
@@ -64,7 +64,6 @@ class AiReportingOdooAiBridge(models.AbstractModel):
             "schema": {
                 "properties": {
                     "report_id": {"type": "integer", "description": "The id of the saved report to run."},
-                    "parameters": {"type": "object", "description": "Optional runtime parameters for the report."},
                 },
                 "required": ["report_id"],
             },
