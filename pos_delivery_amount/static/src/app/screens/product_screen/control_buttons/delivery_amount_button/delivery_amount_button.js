@@ -25,7 +25,14 @@ patch(ControlButtons.prototype, {
 
     isDeliveryAmountEnabled() {
         const config = this.pos?.config;
-        return !!(config?.delivery_journal_id && config?.delivery_intermediate_account_id);
+        if (!config) {
+            return false;
+        }
+        const journal = config.delivery_journal_id;
+        const account = config.delivery_intermediate_account_id;
+        const journalId = Array.isArray(journal) ? journal[0] : journal?.id ?? journal;
+        const accountId = Array.isArray(account) ? account[0] : account?.id ?? account;
+        return !!(journalId && accountId);
     },
 
     async onClickDeliveryAmount() {
