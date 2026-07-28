@@ -58,6 +58,8 @@ class PosDailyOperationsWizard(models.TransientModel):
             'mythings': 0.0,
             'kabseh': 0.0,
             'delivery_amount': 0.0,
+            'cash_out': 0.0,
+            'delivery_cash': 0.0,
         }
 
     def _get_pledge_config_id(self, pledge):
@@ -132,6 +134,24 @@ class PosDailyOperationsWizard(models.TransientModel):
                 for session in config_sessions
             )
 
+    def _collect_session_cash_out(self, branch_data, sessions_by_config):
+        for config_id, config_sessions in sessions_by_config.items():
+            if not config_sessions:
+                continue
+            cash_out = 0.0
+            for session in config_sessions:
+                for line in session.statement_line_ids:
+                    amount = line.amount or 0.0
+                    if amount < 0:
+                        cash_out += abs(amount)
+            branch_data[config_id]['cash_out'] = cash_out
+
+    def _apply_delivery_cash_totals(self, branch_data):
+        for config_id in branch_data:
+            branch_data[config_id]['delivery_cash'] = (
+                branch_data[config_id]['cash_out'] + branch_data[config_id]['delivery_amount']
+            )
+
     def _get_report_rows(self):
         self.ensure_one()
         sessions = self._get_sessions_on_date()
@@ -144,6 +164,8 @@ class PosDailyOperationsWizard(models.TransientModel):
         branch_data = defaultdict(self._empty_branch_values)
 
         self._collect_session_delivery_amounts(branch_data, sessions_by_config)
+        self._collect_session_cash_out(branch_data, sessions_by_config)
+        self._apply_delivery_cash_totals(branch_data)
         self._collect_payment_totals(branch_data, sessions)
         self._collect_pledge_totals(branch_data, active_config_ids)
 
@@ -160,6 +182,7 @@ class PosDailyOperationsWizard(models.TransientModel):
         numeric_fields = (
             'sales', 'rahen_in', 'rahen_out', 'cash', 'visa', 'hospitality',
             'talabat', 'careem', 'mythings', 'kabseh', 'delivery_amount',
+            'cash_out', 'delivery_cash',
         )
         totals = {field: sum(row[field] for row in rows) for field in numeric_fields}
         return {'branch_name': _('Total'), **totals}
@@ -219,6 +242,7 @@ class PosDailyOperationsWizard(models.TransientModel):
             _('Mythings'),
             _('Kabseh'),
             _('Delivery Amount'),
+            _('Delivery Cash'),
         ]
         header_row = 4
         sheet.set_row(header_row, 28)
@@ -244,6 +268,7 @@ class PosDailyOperationsWizard(models.TransientModel):
             sheet.write_number(row_idx, 9, line['mythings'], num_fmt)
             sheet.write_number(row_idx, 10, line['kabseh'], num_fmt)
             sheet.write_number(row_idx, 11, line['delivery_amount'], num_fmt)
+            sheet.write_number(row_idx, 12, line['delivery_cash'], num_fmt)
 
         row_idx = header_row + 1
         if not rows:

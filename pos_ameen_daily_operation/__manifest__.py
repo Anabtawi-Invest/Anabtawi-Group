@@ -1,12 +1,13 @@
 {
     'name': 'Daily Pos Sales Report',
-    'version': '10.7',
+    'version': '10.8',
     'author': 'Ameen Arabiyat - Rana Faris',
     'category': 'Point of Sale',
     'summary': 'Daily operations summary report by POS branch',
     'depends': [
         'point_of_sale',
         'pos_exclusive_payment_method',
+        'pos_delivery_amount',
     ],
     'data': [
         'security/ir.model.access.csv',
