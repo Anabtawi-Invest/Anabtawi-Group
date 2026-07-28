@@ -67,6 +67,17 @@
         <field name="domain_force">[('report_id.owner_id','=',user.id)]</field>
     </record>
 
+    <record id="rule_ai_reporting_saved_report_share_recipient" model="ir.rule">
+        <field name="name">AI Reporting users can read their own share grants</field>
+        <field name="model_id" ref="model_ai_reporting_saved_report_share"/>
+        <field name="groups" eval="[(4, ref('group_ai_reporting_user'))]"/>
+        <field name="domain_force">[('user_id','=',user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
     <record id="rule_ai_reporting_saved_report_share_manager" model="ir.rule">
         <field name="name">AI Reporting managers can manage all sharing</field>
         <field name="model_id" ref="model_ai_reporting_saved_report_share"/>
