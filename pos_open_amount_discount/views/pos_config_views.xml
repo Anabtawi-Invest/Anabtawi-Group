@@ -1,4 +1,3 @@
-
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <record id="pos_config_view_form_open_amount" model="ir.ui.view">
