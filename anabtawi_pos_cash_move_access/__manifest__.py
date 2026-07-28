@@ -1,7 +1,7 @@
 {
     "name": "AAnabtawi POS Cash In/Out Access",
     "summary": "Allow selected POS cashiers to use Cash In/Out",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "category": "Point of Sale",
     "author": "Anabtawi Group",
     "license": "LGPL-3",
@@ -14,6 +14,7 @@
     ],
     "assets": {
         "point_of_sale._assets_pos": [
+            "anabtawi_pos_cash_move_access/static/src/app/pos_store.js",
             "anabtawi_pos_cash_move_access/static/src/app/chrome.js",
         ],
     },
