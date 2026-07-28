@@ -111,7 +111,7 @@
                 <filter name="cash" string="Cash Sales" domain="[('is_cash_sale', '=', True)]"/>
                 <filter name="credit" string="Credit Sales" domain="[('is_cash_sale', '=', False)]"/>
                 <filter name="invoice_date" string="Invoice Date" date="invoice_date"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_product" string="Product" context="{'group_by': 'product_id'}"/>
                     <filter name="group_category" string="Product Category" context="{'group_by': 'product_category_id'}"/>
                     <filter name="group_customer" string="Customer" context="{'group_by': 'partner_id'}"/>

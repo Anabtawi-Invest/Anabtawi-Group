@@ -104,7 +104,7 @@
                 <separator/>
                 <filter name="invoice_date" string="Invoice Date" date="invoice_date"/>
                 <filter name="requested_date" string="Requested Date" date="requested_date"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_customer" string="Customer" context="{'group_by': 'partner_id'}"/>
                     <filter name="group_warehouse" string="Warehouse" context="{'group_by': 'warehouse_id'}"/>
                     <filter name="group_salesperson" string="Salesperson" context="{'group_by': 'user_id'}"/>
