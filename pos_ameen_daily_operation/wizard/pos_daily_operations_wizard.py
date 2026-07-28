@@ -60,6 +60,7 @@ class PosDailyOperationsWizard(models.TransientModel):
             'delivery_amount': 0.0,
             'cash_out': 0.0,
             'delivery_cash': 0.0,
+            'differences': 0.0,
         }
 
     def _get_pledge_config_id(self, pledge):
@@ -152,6 +153,12 @@ class PosDailyOperationsWizard(models.TransientModel):
                 branch_data[config_id]['cash_out'] + branch_data[config_id]['delivery_amount']
             )
 
+    def _apply_differences_totals(self, branch_data):
+        for config_id in branch_data:
+            values = branch_data[config_id]
+            all_cash_in = values['cash'] + values['rahen_in']
+            branch_data[config_id]['differences'] = all_cash_in - values['delivery_cash']
+
     def _get_report_rows(self):
         self.ensure_one()
         sessions = self._get_sessions_on_date()
@@ -168,6 +175,7 @@ class PosDailyOperationsWizard(models.TransientModel):
         self._apply_delivery_cash_totals(branch_data)
         self._collect_payment_totals(branch_data, sessions)
         self._collect_pledge_totals(branch_data, active_config_ids)
+        self._apply_differences_totals(branch_data)
 
         rows = []
         for config in configs:
@@ -182,7 +190,7 @@ class PosDailyOperationsWizard(models.TransientModel):
         numeric_fields = (
             'sales', 'rahen_in', 'rahen_out', 'cash', 'visa', 'hospitality',
             'talabat', 'careem', 'mythings', 'kabseh', 'delivery_amount',
-            'cash_out', 'delivery_cash',
+            'cash_out', 'delivery_cash', 'differences',
         )
         totals = {field: sum(row[field] for row in rows) for field in numeric_fields}
         return {'branch_name': _('Total'), **totals}
@@ -243,6 +251,7 @@ class PosDailyOperationsWizard(models.TransientModel):
             _('Kabseh'),
             _('Delivery Amount'),
             _('Delivery Cash'),
+            _('Differences'),
         ]
         header_row = 4
         sheet.set_row(header_row, 28)
@@ -269,6 +278,7 @@ class PosDailyOperationsWizard(models.TransientModel):
             sheet.write_number(row_idx, 10, line['kabseh'], num_fmt)
             sheet.write_number(row_idx, 11, line['delivery_amount'], num_fmt)
             sheet.write_number(row_idx, 12, line['delivery_cash'], num_fmt)
+            sheet.write_number(row_idx, 13, line['differences'], num_fmt)
 
         row_idx = header_row + 1
         if not rows:
