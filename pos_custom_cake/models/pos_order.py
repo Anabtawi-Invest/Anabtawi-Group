@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class PosOrder(models.Model):
@@ -13,6 +17,29 @@ class PosOrder(models.Model):
     )
 
     def action_pos_order_paid(self):
+        for order in self:
+            if order.pos_cake_order_id:
+                _logger.info(
+                    "[POS_CAKE_COGS] Paid order %s linked to cake order %s, "
+                    "total_components_cost=%s, product=%s",
+                    order.name,
+                    order.pos_cake_order_id.name,
+                    order.pos_cake_order_id.total_components_cost,
+                    order.pos_cake_order_id.product_id.display_name,
+                )
+            else:
+                cake_lines = order.lines.filtered(
+                    lambda line: line.product_id.display_name
+                )
+                if cake_lines:
+                    _logger.warning(
+                        "[POS_CAKE_COGS] Paid order %s has no pos_cake_order_id. Lines: %s",
+                        order.name,
+                        [
+                            (line.product_id.display_name, line.price_unit, line.qty)
+                            for line in cake_lines
+                        ],
+                    )
         result = super().action_pos_order_paid()
         for order in self.filtered(lambda o: o.pos_cake_order_id):
             if order.state == "paid" and order.pos_cake_order_id.state != "paid":
