@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_partner_view_form_employee_number" model="ir.ui.view">
+        <field name="name">res.partner.form.employee.number</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="hr.res_partner_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='phone']" position="after">
+                <field name="employee_number" readonly="1" invisible="not employee"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
