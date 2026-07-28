@@ -10,9 +10,6 @@
     'maintainer': 'HSxTech',
     'website': "https://www.hsxtech.net",
     'depends': ['base_setup', 'hr_attendance'],
-    'external_dependencies': {
-        'python': ['zk'],
-    },
     'data': [
         'security/ir.model.access.csv',
         'data/cron.xml',
@@ -24,7 +21,7 @@
     ],
     'license': 'LGPL-3',
     'installable': True,
-    'auto_install': True,
+    'auto_install': False,
     'application': True,
     'sequence': 2,
     'images': [
