@@ -170,19 +170,24 @@ class PosDailyOperationsWizard(models.TransientModel):
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
         sheet = workbook.add_worksheet(_('Daily Operations'))
 
-        title_style = workbook.add_format({'bold': True, 'font_size': 14})
-        label_style = workbook.add_format({'bold': True})
+        title_style = workbook.add_format({'bold': True, 'font_size': 12})
+        label_style = workbook.add_format({'bold': True, 'font_size': 9})
         header_style = workbook.add_format({
             'bold': True,
             'bg_color': '#D9E1F2',
             'border': 1,
             'align': 'center',
+            'valign': 'vcenter',
+            'text_wrap': True,
+            'font_size': 9,
         })
-        text_style = workbook.add_format({'border': 1})
-        total_text_style = workbook.add_format({'border': 1, 'bold': True})
-        number_style = workbook.add_format({'border': 1, 'num_format': '#,##0.000'})
-        total_number_style = workbook.add_format({'border': 1, 'bold': True, 'num_format': '#,##0.000'})
-        date_style = workbook.add_format({'num_format': 'm/d/yyyy'})
+        text_style = workbook.add_format({'border': 1, 'font_size': 9})
+        total_text_style = workbook.add_format({'border': 1, 'bold': True, 'font_size': 9})
+        number_style = workbook.add_format({'border': 1, 'num_format': '#,##0.000', 'font_size': 9})
+        total_number_style = workbook.add_format({
+            'border': 1, 'bold': True, 'num_format': '#,##0.000', 'font_size': 9,
+        })
+        date_style = workbook.add_format({'num_format': 'm/d/yyyy', 'font_size': 9})
 
         sheet.write(0, 0, _('Daily Operations Summary'), title_style)
         sheet.write(2, 0, _('Business Date'), label_style)
@@ -203,12 +208,13 @@ class PosDailyOperationsWizard(models.TransientModel):
             _('Delivery Amount'),
         ]
         header_row = 4
+        sheet.set_row(header_row, 28)
         for col, header in enumerate(headers):
             sheet.write(header_row, col, header, header_style)
 
-        sheet.set_column(0, 0, 28)
+        sheet.set_column(0, 0, 14)
         for col in range(1, len(headers)):
-            sheet.set_column(col, col, 14)
+            sheet.set_column(col, col, 9)
 
         def write_data_row(row_idx, line, is_total=False):
             text_fmt = total_text_style if is_total else text_style
@@ -235,6 +241,16 @@ class PosDailyOperationsWizard(models.TransientModel):
             for line in rows:
                 write_data_row(row_idx, line)
                 row_idx += 1
+
+        last_col = len(headers) - 1
+        last_row = max(row_idx - 1, header_row)
+        sheet.set_landscape()
+        sheet.fit_to_pages(1, 0)
+        sheet.set_paper(9)
+        sheet.set_margins(0.25, 0.25, 0.35, 0.35)
+        sheet.center_horizontally()
+        sheet.repeat_rows(header_row, header_row)
+        sheet.print_area(0, 0, last_row, last_col)
 
         workbook.close()
         return output.getvalue()

@@ -43,6 +43,7 @@ class TestPosDeliveryAmount(TestPoSCommon):
         result = session.action_process_delivery_amount(150.0)
         self.assertTrue(result["successful"])
         self.assertEqual(session.delivery_amount, 150.0)
+        self.assertEqual(len(session.delivery_line_ids), 1)
         self.assertTrue(session.delivery_move_id)
         self.assertEqual(session.delivery_move_id.state, "posted")
         self.assertEqual(session.delivery_move_id.journal_id, self.delivery_journal)
@@ -58,15 +59,23 @@ class TestPosDeliveryAmount(TestPoSCommon):
         self.assertEqual(debit_line.debit, 150.0)
         self.assertEqual(credit_line.credit, 150.0)
 
+    def test_multiple_delivery_amounts_are_accumulated(self):
+        session = self.open_new_session(opening_cash=300.0)
+        session.action_process_delivery_amount(100.0)
+        session.action_process_delivery_amount(75.0)
+        self.assertEqual(session.delivery_amount, 175.0)
+        self.assertEqual(len(session.delivery_line_ids), 2)
+        self.assertTrue(session.delivery_report_line_id)
+        self.assertEqual(session.delivery_report_line_id.real_arrived_amount, 175.0)
+
     def test_action_process_delivery_amount_rejects_excess_amount(self):
         session = self.open_new_session(opening_cash=200.0)
-        session.post_closing_cash_details(100.0)
-        session.update_closing_control_state_session("Closing")
+        session.action_process_delivery_amount(120.0)
 
         with self.assertRaisesRegex(
-            ValidationError, "Delivery Amount cannot exceed counted cash balance."
+            ValidationError, "Delivery Amount cannot exceed available cash balance."
         ):
-            session.action_process_delivery_amount(120.0)
+            session.action_process_delivery_amount(100.0)
 
     def test_action_process_delivery_amount_zero_does_not_create_move(self):
         session = self.open_new_session(opening_cash=100.0)
@@ -76,6 +85,7 @@ class TestPosDeliveryAmount(TestPoSCommon):
         result = session.action_process_delivery_amount(0.0)
         self.assertTrue(result["successful"])
         self.assertEqual(session.delivery_amount, 0.0)
+        self.assertFalse(session.delivery_line_ids)
         self.assertFalse(session.delivery_move_id)
 
     def test_action_process_delivery_amount_requires_configuration(self):

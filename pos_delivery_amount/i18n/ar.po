@@ -102,3 +102,27 @@ msgstr "يرجى إعداد حساب الصندوق الرئيسي القابض�
 #. module: pos_delivery_amount
 msgid "Please configure the Differences between Delivery Amount and Real Amount account on the POS settings."
 msgstr "يرجى إعداد حساب أمانات فائض/عجز صناديق الفروع في إعدادات نقطة البيع."
+
+#. module: pos_delivery_amount
+msgid "Cash Delivery"
+msgstr "تسليم النقد"
+
+#. module: pos_delivery_amount
+msgid "Available Cash"
+msgstr "النقد المتاح"
+
+#. module: pos_delivery_amount
+msgid "Available Cash (already delivered: %s)"
+msgstr "النقد المتاح (تم تسليم: %s)"
+
+#. module: pos_delivery_amount
+msgid "Delivery Amount is not configured on this POS."
+msgstr "مبلغ التوريد غير مهيأ على نقطة البيع هذه."
+
+#. module: pos_delivery_amount
+msgid "Delivery Amount processed successfully."
+msgstr "تمت معالجة مبلغ التوريد بنجاح."
+
+#. module: pos_delivery_amount
+msgid "Delivery Amount cannot exceed available cash balance."
+msgstr "لا يمكن أن يتجاوز مبلغ التوريد الرصيد النقدي المتاح."

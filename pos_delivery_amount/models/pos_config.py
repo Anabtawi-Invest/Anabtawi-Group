@@ -43,3 +43,10 @@ class PosConfig(models.Model):
         ],
         check_company=True,
     )
+
+    def _load_pos_data_fields(self, config):
+        fields_list = super()._load_pos_data_fields(config)
+        for field_name in ("delivery_journal_id", "delivery_intermediate_account_id"):
+            if field_name not in fields_list:
+                fields_list.append(field_name)
+        return fields_list

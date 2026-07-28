@@ -1,6 +1,6 @@
 {
     'name': 'Daily Pos Sales Report',
-    'version': '10.4',
+    'version': '10.5',
     'author': 'Ameen Arabiyat - Rana Faris',
     'category': 'Point of Sale',
     'summary': 'Daily operations summary report by POS branch',

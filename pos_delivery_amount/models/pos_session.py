@@ -1,6 +1,6 @@
 import logging
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
@@ -9,8 +9,17 @@ _logger = logging.getLogger(__name__)
 class PosSession(models.Model):
     _inherit = "pos.session"
 
+    delivery_line_ids = fields.One2many(
+        "pos.session.delivery.line",
+        "session_id",
+        string="Delivery Lines",
+        readonly=True,
+        copy=False,
+    )
     delivery_amount = fields.Monetary(
         string="Delivery Amount",
+        compute="_compute_delivery_totals",
+        store=True,
         readonly=True,
         copy=False,
         tracking=True,
@@ -18,9 +27,12 @@ class PosSession(models.Model):
     delivery_move_id = fields.Many2one(
         "account.move",
         string="Delivery Journal Entry",
+        compute="_compute_delivery_totals",
+        store=True,
         readonly=True,
         copy=False,
         tracking=True,
+        help="Journal entry of the latest delivery amount line.",
     )
     delivery_report_line_id = fields.Many2one(
         "pos.delivery.amount.report.line",
@@ -28,6 +40,55 @@ class PosSession(models.Model):
         readonly=True,
         copy=False,
     )
+
+    @api.depends("delivery_line_ids.amount", "delivery_line_ids.move_id")
+    def _compute_delivery_totals(self):
+        for session in self:
+            session.delivery_amount = sum(session.delivery_line_ids.mapped("amount"))
+            last_line = session.delivery_line_ids[-1:] if session.delivery_line_ids else self.env["pos.session.delivery.line"]
+            session.delivery_move_id = last_line.move_id.id if last_line else False
+
+    def init(self):
+        self.env.cr.execute(
+            """
+            SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'pos_session'
+               AND column_name = 'delivery_move_id'
+             LIMIT 1
+            """
+        )
+        if not self.env.cr.fetchone():
+            return
+        self.env.cr.execute(
+            """
+            SELECT 1 FROM information_schema.tables
+             WHERE table_name = 'pos_session_delivery_line'
+             LIMIT 1
+            """
+        )
+        if not self.env.cr.fetchone():
+            return
+        self.env.cr.execute(
+            """
+            INSERT INTO pos_session_delivery_line (session_id, amount, move_id, user_id, create_uid, write_uid, create_date, write_date)
+            SELECT ps.id,
+                   COALESCE(ps.delivery_amount, 0),
+                   ps.delivery_move_id,
+                   ps.user_id,
+                   ps.user_id,
+                   ps.user_id,
+                   COALESCE(ps.stop_at, ps.write_date, NOW() AT TIME ZONE 'UTC'),
+                   COALESCE(ps.stop_at, ps.write_date, NOW() AT TIME ZONE 'UTC')
+              FROM pos_session ps
+             WHERE ((ps.delivery_amount IS NOT NULL AND ps.delivery_amount <> 0)
+                OR ps.delivery_move_id IS NOT NULL)
+               AND NOT EXISTS (
+                    SELECT 1
+                      FROM pos_session_delivery_line line
+                     WHERE line.session_id = ps.id
+               )
+            """
+        )
 
     def _get_delivery_closing_date(self):
         self.ensure_one()
@@ -38,6 +99,21 @@ class PosSession(models.Model):
         opening_date = fields.Date.to_string(fields.Date.to_date(self.start_at)) if self.start_at else ""
         return _("Deliver Amount From %(pos)s - %(opening)s", pos=self.config_id.name, opening=opening_date)
 
+    def _get_delivered_total(self):
+        self.ensure_one()
+        return sum(self.delivery_line_ids.mapped("amount"))
+
+    def _get_cash_balance_for_delivery(self):
+        self.ensure_one()
+        if self.state in ("closing_control", "closed"):
+            return self.cash_register_balance_end_real or 0.0
+        return self.cash_register_balance_end or 0.0
+
+    def _get_available_cash_for_delivery(self):
+        self.ensure_one()
+        available = self._get_cash_balance_for_delivery() - self._get_delivered_total()
+        return max(0.0, available)
+
     def _validate_delivery_amount(self, amount):
         self.ensure_one()
         if amount is None:
@@ -45,18 +121,19 @@ class PosSession(models.Model):
         if amount < 0:
             raise ValidationError(_("Delivery Amount must be positive or zero."))
 
-        counted_cash = self.cash_register_balance_end_real or 0.0
-        if self.currency_id.compare_amounts(amount, counted_cash) > 0:
+        available_cash = self._get_available_cash_for_delivery()
+        if self.currency_id.compare_amounts(amount, available_cash) > 0:
             _logger.warning(
-                "POS delivery amount validation failed on session %s: amount=%s counted_cash=%s user=%s",
+                "POS delivery amount validation failed on session %s: amount=%s available_cash=%s delivered_total=%s user=%s",
                 self.id,
                 amount,
-                counted_cash,
+                available_cash,
+                self._get_delivered_total(),
                 self.env.user.id,
             )
-            raise ValidationError(_("Delivery Amount cannot exceed counted cash balance."))
+            raise ValidationError(_("Delivery Amount cannot exceed available cash balance."))
 
-        return counted_cash
+        return available_cash
 
     def _get_delivery_accounts(self):
         self.ensure_one()
@@ -112,6 +189,49 @@ class PosSession(models.Model):
         move._post()
         return move
 
+    def _ensure_delivery_report_line(self):
+        self.ensure_one()
+        if not self.delivery_line_ids:
+            return
+
+        Report = self.env["pos.delivery.amount.report"]
+        Line = self.env["pos.delivery.amount.report.line"]
+        creation_date = fields.Date.to_date(self.start_at or fields.Datetime.now())
+        report = Report.search([("creation_date", "=", creation_date)], limit=1)
+        if not report:
+            report = Report.create(
+                {
+                    "creation_date": creation_date,
+                    "name": Report._report_name_for_date(creation_date),
+                }
+            )
+
+        if self.delivery_report_line_id:
+            line = self.delivery_report_line_id
+            if line.state == "draft":
+                line.real_arrived_amount = self.delivery_amount
+            return
+
+        Line.create(
+            {
+                "report_id": report.id,
+                "session_id": self.id,
+                "real_arrived_amount": self.delivery_amount,
+            }
+        )
+
+    def get_delivery_amount_popup_data(self):
+        self.ensure_one()
+        config = self.config_id
+        configured = bool(
+            config.delivery_journal_id and config.delivery_intermediate_account_id
+        )
+        return {
+            "configured": configured,
+            "max_amount": self._get_available_cash_for_delivery(),
+            "delivered_total": self._get_delivered_total(),
+        }
+
     def action_process_delivery_amount(self, amount):
         self.ensure_one()
         if not self.env.user.has_group("point_of_sale.group_pos_user"):
@@ -120,36 +240,33 @@ class PosSession(models.Model):
             raise UserError(_("This session is already closed."))
 
         amount = float(amount or 0.0)
+        if self.currency_id.compare_amounts(amount, 0.0) == 0:
+            return {"successful": True}
+
         self._validate_delivery_amount(amount)
-
-        if self.delivery_move_id:
-            if self.currency_id.compare_amounts(self.delivery_amount, amount) == 0:
-                return {"successful": True}
-            raise UserError(_("Delivery Amount has already been processed for this session."))
-
-        move = self.env["account.move"]
-        if self.currency_id.compare_amounts(amount, 0.0) > 0:
-            move = self._create_delivery_move(amount)
-
-        self.write(
+        move = self._create_delivery_move(amount)
+        self.env["pos.session.delivery.line"].sudo().create(
             {
-                "delivery_amount": amount,
-                "delivery_move_id": move.id if move else False,
+                "session_id": self.id,
+                "amount": amount,
+                "move_id": move.id,
             }
         )
+        self._ensure_delivery_report_line()
 
         timestamp = fields.Datetime.context_timestamp(self, fields.Datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
         amount_label = f"{self.currency_id.symbol or ''}{amount:.2f}"
-        move_label = move._get_html_link() if move else _("N/A")
         message = _(
             "Delivery Amount processed successfully.<br/>"
             "Delivery Amount: %(amount)s<br/>"
+            "Delivered Total: %(total)s<br/>"
             "User: %(user)s<br/>"
             "Journal Entry: %(move)s<br/>"
             "Date/Time: %(date)s",
             amount=amount_label,
+            total=f"{self.currency_id.symbol or ''}{self.delivery_amount:.2f}",
             user=self.env.user.name,
-            move=move_label,
+            move=move._get_html_link(),
             date=timestamp,
         )
         self.message_post(body=message)
