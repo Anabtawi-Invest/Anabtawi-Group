@@ -14,13 +14,13 @@ class TestAiReporting(TransactionCase):
         cls.owner = new_test_user(
             cls.env,
             login="ai_reporting_owner",
-            groups="ai_reporting.group_ai_reporting_user",
+            groups="base.group_user,ai_reporting.group_ai_reporting_user",
             company_id=cls.env.company.id,
         )
         cls.viewer = new_test_user(
             cls.env,
             login="ai_reporting_viewer",
-            groups="ai_reporting.group_ai_reporting_user",
+            groups="base.group_user,ai_reporting.group_ai_reporting_user",
             company_id=cls.env.company.id,
         )
 
