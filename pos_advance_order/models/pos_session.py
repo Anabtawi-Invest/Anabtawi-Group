@@ -52,6 +52,8 @@ class PosSession(models.Model):
         """Advance orders whose deposit entry was posted during this session window."""
         self.ensure_one()
         advance_orders = self.env["pos.advance.order"].sudo()
+        if not self.start_at:
+            return advance_orders.browse()
         end = self.stop_at or fields.Datetime.now()
         deposited = advance_orders.browse()
         domain = [
