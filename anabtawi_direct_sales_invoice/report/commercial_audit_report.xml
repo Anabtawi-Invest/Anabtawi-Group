@@ -9,9 +9,5 @@
         <field name="binding_model_id" ref="model_direct_sales_invoice"/>
         <field name="binding_type">report</field>
         <field name="print_report_name">'Commercial Audit - %s' % (object.name)</field>
-        <field name="groups_id" eval="[
-            Command.link(ref('anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager')),
-            Command.link(ref('account.group_account_manager'))
-        ]"/>
     </record>
 </odoo>
