@@ -38,9 +38,13 @@ class OnlineDiscountCampaign(models.Model):
         help="Zero means unlimited. All allowance values remain non-negative for JoFotara."
     )
     cap_application = fields.Selection(
-        [("per_order", "Per Order")],
+        [
+            ("per_unit", "Per Unit"),
+            ("per_line", "Per Line"),
+            ("per_order", "Per Order"),
+        ],
         required=True,
-        default="per_order",
+        default="per_line",
         tracking=True,
     )
     pricelist_ids = fields.Many2many(
