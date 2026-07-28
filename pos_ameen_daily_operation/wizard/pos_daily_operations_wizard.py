@@ -189,7 +189,7 @@ class PosDailyOperationsWizard(models.TransientModel):
     def _get_total_row(self, rows):
         numeric_fields = (
             'sales', 'rahen_in', 'rahen_out', 'cash', 'visa', 'hospitality',
-            'talabat', 'careem', 'mythings', 'kabseh', 'delivery_amount',
+            'talabat', 'careem', 'mythings', 'kabseh',
             'cash_out', 'delivery_cash', 'differences',
         )
         totals = {field: sum(row[field] for row in rows) for field in numeric_fields}
@@ -249,7 +249,6 @@ class PosDailyOperationsWizard(models.TransientModel):
             _('Careem'),
             _('Mythings'),
             _('Kabseh'),
-            _('Delivery Amount'),
             _('Delivery Cash'),
             _('Differences'),
         ]
@@ -276,9 +275,8 @@ class PosDailyOperationsWizard(models.TransientModel):
             sheet.write_number(row_idx, 8, line['careem'], num_fmt)
             sheet.write_number(row_idx, 9, line['mythings'], num_fmt)
             sheet.write_number(row_idx, 10, line['kabseh'], num_fmt)
-            sheet.write_number(row_idx, 11, line['delivery_amount'], num_fmt)
-            sheet.write_number(row_idx, 12, line['delivery_cash'], num_fmt)
-            sheet.write_number(row_idx, 13, line['differences'], num_fmt)
+            sheet.write_number(row_idx, 11, line['delivery_cash'], num_fmt)
+            sheet.write_number(row_idx, 12, line['differences'], num_fmt)
 
         row_idx = header_row + 1
         if not rows:
