@@ -105,12 +105,14 @@ class PosDailyOperationsWizard(models.TransientModel):
         for session, payment_method, total_amount in grouped_payments:
             config_id = session.config_id.id
             amount = total_amount or 0.0
-            branch_data[config_id]['sales'] += amount
-            if payment_method.daily_ops_report_type == 'cash':
+            report_type = payment_method.daily_ops_report_type
+            if report_type != 'hospitality':
+                branch_data[config_id]['sales'] += amount
+            if report_type == 'cash':
                 branch_data[config_id]['cash'] += amount
-            elif payment_method.daily_ops_report_type == 'visa':
+            elif report_type == 'visa':
                 branch_data[config_id]['visa'] += amount
-            elif payment_method.daily_ops_report_type == 'hospitality':
+            elif report_type == 'hospitality':
                 branch_data[config_id]['hospitality'] += amount
             if payment_method.id == PAYMENT_METHOD_TALABAT:
                 branch_data[config_id]['talabat'] += amount

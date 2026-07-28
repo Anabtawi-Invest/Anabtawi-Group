@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class PosConfig(models.Model):
@@ -44,8 +44,12 @@ class PosConfig(models.Model):
         check_company=True,
     )
 
+    @api.model
     def _load_pos_data_fields(self, config):
         fields_list = super()._load_pos_data_fields(config)
+        # Core POS uses [] to mean "load all fields"; keep that behavior.
+        if not fields_list:
+            return fields_list
         for field_name in ("delivery_journal_id", "delivery_intermediate_account_id"):
             if field_name not in fields_list:
                 fields_list.append(field_name)
