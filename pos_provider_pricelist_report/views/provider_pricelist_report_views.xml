@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_report_pos_provider_pricelist_list" model="ir.ui.view">
+        <field name="name">report.pos.provider.pricelist.list</field>
+        <field name="model">report.pos.provider.pricelist</field>
+        <field name="arch" type="xml">
+            <list string="Provider Pricelist Report">
+                <field name="date_order"/>
+                <field name="order_id"/>
+                <field name="talabat_id" optional="show"/>
+                <field name="pricelist_id" optional="show"/>
+                <field name="product_id"/>
+                <field name="qty" optional="show"/>
+                <field name="unit_price" optional="show"/>
+                <field name="applied_discount" optional="hide"/>
+                <field name="total_excluded" optional="show"/>
+                <field name="total_included" optional="show"/>
+                <field name="discount_amount" optional="hide"/>
+                <field name="provider_commission" optional="show"/>
+                <field name="talabat_contribution" optional="show"/>
+                <field name="anabtawi_contribution" optional="show"/>
+                <field name="provider_commission_amount" optional="show"/>
+                <field name="talabat_contribution_amount" optional="show"/>
+                <field name="anabtawi_contribution_amount" optional="show"/>
+                <field name="config_id" optional="hide"/>
+                <field name="session_id" optional="hide"/>
+                <field name="user_id" optional="hide"/>
+                <field name="company_id" optional="hide" groups="base.group_multi_company"/>
+                <field name="currency_id" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_report_pos_provider_pricelist_search" model="ir.ui.view">
+        <field name="name">report.pos.provider.pricelist.search</field>
+        <field name="model">report.pos.provider.pricelist</field>
+        <field name="arch" type="xml">
+            <search string="Provider Pricelist Report">
+                <field name="order_id"/>
+                <field name="talabat_id"/>
+                <field name="pricelist_id"/>
+                <field name="product_id"/>
+                <field name="config_id"/>
+                <field name="session_id"/>
+                <field name="user_id"/>
+                <separator/>
+                <filter name="filter_date_order" date="date_order"/>
+                <group>
+                    <filter string="Point of Sale" name="group_config" context="{'group_by': 'config_id'}"/>
+                    <filter string="Pricelist" name="group_pricelist" context="{'group_by': 'pricelist_id'}"/>
+                    <filter string="Product" name="group_product" context="{'group_by': 'product_id'}"/>
+                    <filter string="Cashier" name="group_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Order Date" name="group_date_order" context="{'group_by': 'date_order:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_report_pos_provider_pricelist" model="ir.actions.act_window">
+        <field name="name">Provider Pricelist Report</field>
+        <field name="res_model">report.pos.provider.pricelist</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_report_pos_provider_pricelist_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No provider pricelist orders yet.
+            </p>
+            <p>
+                This report lists POS order lines paid with a pricelist marked as a provider.
+            </p>
+        </field>
+    </record>
+
+    <menuitem
+        id="menu_report_pos_provider_pricelist"
+        name="Provider Pricelist"
+        action="action_report_pos_provider_pricelist"
+        parent="point_of_sale.menu_point_rep"
+        sequence="5"/>
+</odoo>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="product_pricelist_view_provider" model="ir.ui.view">
+        <field name="name">product.pricelist.form.provider</field>
+        <field name="model">product.pricelist</field>
+        <field name="inherit_id" ref="product.product_pricelist_view"/>
+        <field name="arch" type="xml">
+            <field name="country_group_ids" position="after">
+                <field name="is_provider"/>
+            </field>
+            <xpath expr="//field[@name='item_ids']//list" position="inside">
+                <field name="pricelist_is_provider" column_invisible="True"/>
+                <field name="provider_commission" optional="show" column_invisible="not parent.is_provider"/>
+                <field name="talabat_contribution" optional="show" column_invisible="not parent.is_provider"/>
+                <field name="anabtawi_contribution" optional="show" column_invisible="not parent.is_provider"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="product_pricelist_item_form_view_provider" model="ir.ui.view">
+        <field name="name">product.pricelist.item.form.provider</field>
+        <field name="model">product.pricelist.item</field>
+        <field name="inherit_id" ref="product.product_pricelist_item_form_view"/>
+        <field name="arch" type="xml">
+            <group name="pricelist_rule_limits" position="after">
+                <group string="Provider Contributions" invisible="not pricelist_is_provider">
+                    <field name="pricelist_is_provider" invisible="1"/>
+                    <field name="provider_commission"/>
+                    <field name="talabat_contribution"/>
+                    <field name="anabtawi_contribution"/>
+                </group>
+            </group>
+        </field>
+    </record>
+</odoo>
