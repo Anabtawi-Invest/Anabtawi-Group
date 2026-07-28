@@ -4,7 +4,8 @@
     'version': '19.0.1.0.0',
     'category': 'Human Resources',
     'summary': "Integrating Biometric Device With HR Attendance (Face + Thumb)",
-    'description': "Integrating Biometric Device With HR Attendance (Face + Thumb)",
+    'description': "Direct TCP integration with ZK devices via pyzk. "
+                   "Not usable on Odoo.sh; use hs_zk_attendance_bridge instead.",
     'author': 'HSxTech',
     'company': 'HSxTech',
     'maintainer': 'HSxTech',
@@ -20,7 +21,7 @@
         'views/hs_shfits.xml',
     ],
     'license': 'LGPL-3',
-    'installable': True,
+    'installable': False,
     'auto_install': False,
     'application': True,
     'sequence': 2,

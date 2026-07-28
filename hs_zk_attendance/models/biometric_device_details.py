@@ -15,7 +15,10 @@ try:
 except ImportError:
     ZK = None
     const = None
-    _logger.error("Please Install pyzk library.")
+    _logger.debug(
+        "pyzk is not installed; direct ZK device integration is unavailable. "
+        "Use hs_zk_attendance_bridge on Odoo.sh instead."
+    )
 
 
 class BiometricDeviceDetails(models.Model):
@@ -60,10 +63,13 @@ class BiometricDeviceDetails(models.Model):
 
     @api.model
     def cron_download_attendance(self):
-        """cron_download method: Perform a cron job to download attendance data for all machines.
-
-          This method iterates through all the machines in the 'zk.machine' model and
-          triggers the download_attendance method for each machine."""
+        """Download attendance from configured devices when pyzk is available."""
+        if ZK is None:
+            _logger.info(
+                "Skipping ZK attendance cron: pyzk is not installed. "
+                "Use hs_zk_attendance_bridge on Odoo.sh."
+            )
+            return True
         _logger.info("++++++++++++Cron Executed++++++++++++++++++++++")
         machines = self.env['biometric.device.details'].search([])
         for machine in machines:

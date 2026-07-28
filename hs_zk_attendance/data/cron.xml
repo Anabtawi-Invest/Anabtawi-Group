@@ -1,7 +1,7 @@
 <odoo>
 	<record forcecreate="True" id="cron_download_data" model="ir.cron">
 		<field name="name">Download Attendances</field>
-		<field eval="True" name="active"/>
+		<field eval="False" name="active"/>
 		<field name="user_id" ref="base.user_admin"/>
 		<field name="interval_number">30</field>
 		<field name="interval_type">minutes</field>
