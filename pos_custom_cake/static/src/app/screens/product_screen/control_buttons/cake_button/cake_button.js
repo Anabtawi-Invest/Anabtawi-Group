@@ -75,6 +75,26 @@ patch(ControlButtons.prototype, {
         return partner;
     },
 
+    _getCakeLinePriceUnit(product, order, result) {
+        const targetTotal = result?.final_price || 0;
+        const fiscalPosition = order?.fiscal_position_id || false;
+        for (const candidate of [result?.price_before_tax, targetTotal]) {
+            if (candidate == null) {
+                continue;
+            }
+            const taxDetails = product.getTaxDetails({
+                overridedValues: {
+                    price: candidate,
+                    fiscalPosition,
+                },
+            });
+            if (Math.abs(taxDetails.total_included - targetTotal) < 0.01) {
+                return candidate;
+            }
+        }
+        return targetTotal;
+    },
+
     async _addCakeProductToOrder({ result, partnerId }) {
         const order = this._getCurrentOrder();
         if (!order) {
@@ -97,7 +117,7 @@ patch(ControlButtons.prototype, {
             {
                 product_tmpl_id: product.product_tmpl_id,
                 qty: 1,
-                price_unit: result.price_before_tax,
+                price_unit: this._getCakeLinePriceUnit(product, order, result),
             },
             {},
             false
