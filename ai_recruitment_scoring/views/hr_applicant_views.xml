@@ -61,7 +61,7 @@
                     <!-- Dynamic Dimension Scores -->
                     <group string="AI Scoring Breakdown" invisible="not ai_score_ids">
                         <field name="ai_score_ids" nolabel="1" colspan="2" readonly="1">
-                            <tree decoration-success="score >= 70"
+                            <list decoration-success="score >= 70"
                                   decoration-warning="score >= 40 and score &lt; 70"
                                   decoration-danger="score &lt; 40"
                                   create="0" delete="0" edit="0">
@@ -71,7 +71,7 @@
                                        options="{'max_value': 100}"/>
                                 <field name="weight" string="Weight %"/>
                                 <field name="weighted_score" string="Weighted"/>
-                            </tree>
+                            </list>
                         </field>
                     </group>
 
