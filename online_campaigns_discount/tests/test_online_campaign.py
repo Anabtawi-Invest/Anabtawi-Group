@@ -53,7 +53,6 @@ class TestOnlineCampaign(CommonPosTest):
             "apply_scope": "all_products",
             "aggregator_commission_percent": 10.0,
             "aggregator_contribution_percent": 50.0,
-            "company_contribution_percent": 50.0,
             "pos_config_ids": [Command.set(self.pos_config_usd.ids)],
             "company_id": self.pos_config_usd.company_id.id,
         }
@@ -72,7 +71,7 @@ class TestOnlineCampaign(CommonPosTest):
         self.assertEqual(amount, 4.5)
         self.assertEqual(amount * campaign.aggregator_contribution_percent / 100, 2.25)
         with self.assertRaises(ValidationError):
-            campaign.company_contribution_percent = 40
+            campaign.write({"company_contribution_percent": 40})
 
     def test_03_all_product_scope(self):
         campaign = self._campaign()

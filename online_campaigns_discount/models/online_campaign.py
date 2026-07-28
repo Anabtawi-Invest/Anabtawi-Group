@@ -110,6 +110,7 @@ class OnlineDiscountCampaign(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for values in vals_list:
+            values.pop("company_contribution_percent", None)
             if values.get("aggregator_id"):
                 aggregator = self.env["online.campaign.aggregator"].browse(values["aggregator_id"])
                 values.setdefault(
@@ -120,6 +121,10 @@ class OnlineDiscountCampaign(models.Model):
         return super().create(vals_list)
 
     def write(self, values):
+        if "company_contribution_percent" in values:
+            raise ValidationError(_(
+                "Company contribution is computed from the aggregator contribution percentage."
+            ))
         protected = {
             "start_datetime", "end_datetime", "aggregator_id", "discount_percent",
             "discount_cap_amount", "cap_application", "pricelist_ids", "apply_scope",
