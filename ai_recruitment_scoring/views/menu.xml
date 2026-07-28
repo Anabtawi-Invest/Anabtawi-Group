@@ -10,7 +10,6 @@
         <field name="name">AI Recruitment Settings</field>
         <field name="res_model">res.config.settings</field>
         <field name="view_mode">form</field>
-        <field name="target">inline</field>
         <field name="context">{'module': 'ai_recruitment_scoring'}</field>
     </record>
 
