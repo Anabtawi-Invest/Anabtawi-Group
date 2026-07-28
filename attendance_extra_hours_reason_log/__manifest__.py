@@ -5,6 +5,7 @@
     "author": "Anabtawi",
     "license": "LGPL-3",
     "depends": [
+        "anabtawi_web_frontend_fix",
         "hr_attendance",
         "planning",
     ],

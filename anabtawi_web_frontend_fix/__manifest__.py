@@ -6,7 +6,6 @@
     "author": "Anabtawi Group",
     "license": "LGPL-3",
     "depends": ["web"],
-    "auto_install": ["planning"],
     "data": ["views/web_frontend_layout_fix.xml"],
     "installable": True,
     "application": False,

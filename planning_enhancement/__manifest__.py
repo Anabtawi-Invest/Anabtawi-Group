@@ -6,6 +6,7 @@
     "author":"Anabtawi",
     'license': 'LGPL-3',
     'depends': [
+        'anabtawi_web_frontend_fix',
         'hr_payroll',
         'hr_holidays',
         'hr_attendance',

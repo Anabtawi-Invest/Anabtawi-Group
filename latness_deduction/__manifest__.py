@@ -5,13 +5,14 @@
     'category': 'Human Resources/Payroll',
     'author': 'Rana Faris',
     'license': 'LGPL-3',
-    'depends': [
-        'lateness_company_settings1',
-        'hr_payroll',
-        'hr_holidays',
-        'hr_attendance',
-        'hr_holidays_attendance',
-        'planning',
+    "depends": [
+        "anabtawi_web_frontend_fix",
+        "lateness_company_settings1",
+        "hr_payroll",
+        "hr_holidays",
+        "hr_attendance",
+        "hr_holidays_attendance",
+        "planning",
     ],
     'data': [
         'security/ir.model.access.csv',
