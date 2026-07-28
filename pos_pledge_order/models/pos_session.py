@@ -29,6 +29,15 @@ class PosSession(models.Model):
         """
         self.ensure_one()
         cur = self.currency_id
+        if not self.start_at:
+            return {
+                "cash_in": 0.0,
+                "cash_out": 0.0,
+                "cash": 0.0,
+                "by_pm_in": {},
+                "by_pm_out": {},
+                "by_pm": {},
+            }
         end = self.stop_at or fields.Datetime.now()
         cash_in = 0.0
         cash_out = 0.0
