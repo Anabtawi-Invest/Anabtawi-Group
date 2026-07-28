@@ -5,7 +5,7 @@
         <field name="model">res.partner</field>
         <field name="inherit_id" ref="hr.res_partner_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//field[@name='phone']" position="after">
+            <xpath expr="//field[@name='function']" position="after">
                 <field name="employee_number" readonly="1" invisible="not employee"/>
             </xpath>
         </field>
