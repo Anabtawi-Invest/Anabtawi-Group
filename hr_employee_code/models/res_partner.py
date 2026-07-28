@@ -29,10 +29,20 @@ class ResPartner(models.Model):
         return domain
 
     def _get_employee_for_partner(self, partner, company=None):
-        return self.env["hr.employee"].sudo().search(
+        Employee = self.env["hr.employee"].sudo()
+        employee = Employee.search(
             self._employee_number_domain(partner, company=company),
             limit=1,
         )
+        if not employee and partner.employee_number and company:
+            employee = Employee.search(
+                [
+                    ("company_id", "=", company.id),
+                    ("employee_number", "=", partner.employee_number),
+                ],
+                limit=1,
+            )
+        return employee
 
     @api.depends("employee_ids.employee_number", "employee_ids.company_id")
     def _compute_employee_number(self):
@@ -50,21 +60,12 @@ class ResPartner(models.Model):
     @api.model
     def _search_partners_by_employee_number(self, term, company):
         if not term or not company:
-            _logger.info(
-                "[hr_employee_code] _search_partners_by_employee_number skipped term=%r company=%s",
-                term,
-                company,
-            )
             return self.browse()
 
         stripped = term.strip()
         employee_domain = [("company_id", "=", company.id)]
         if stripped.isdigit():
-            employee_domain += [
-                "|",
-                ("employee_number", "=", stripped),
-                ("employee_number", "ilike", stripped),
-            ]
+            employee_domain.append(("employee_number", "=", stripped))
         else:
             employee_domain.append(("employee_number", "ilike", term))
 
@@ -109,6 +110,7 @@ class ResPartner(models.Model):
         config = self.env["pos.config"].browse(config_id)
         company = config.company_id
         search_term = self._extract_pos_search_term(domain) if domain else None
+        stripped = search_term.strip() if search_term else ""
 
         _logger.info(
             "[hr_employee_code] get_new_partner config=%s company=%s (%s) offset=%s "
@@ -128,24 +130,16 @@ class ResPartner(models.Model):
             domain += [("id", "in", list(limited_partner_ids))]
             new_partners = self.search(domain)
             employee_partners = self.browse()
+        elif stripped.isdigit() and offset == 0:
+            employee_partners = self._search_partners_by_employee_number(stripped, company)
+            partner_exact = self.search([("employee_number", "=", stripped)], limit=100)
+            new_partners = employee_partners | partner_exact
         else:
             employee_partners = self.browse()
-            if search_term:
-                employee_partners = self._search_partners_by_employee_number(
-                    search_term, company
-                )
-            if employee_partners:
-                new_partners = employee_partners
-                if offset == 0:
-                    domain_matches = self.search(domain, limit=100)
-                    new_partners = employee_partners | domain_matches
-            else:
-                new_partners = self.search(domain, offset=offset, limit=100)
+            new_partners = self.search(domain, offset=offset, limit=100)
 
         _logger.info(
-            "[hr_employee_code] get_new_partner domain_results=%s employee_results=%s merged=%s",
-            [(p.id, p.display_name, p.employee_number) for p in new_partners - employee_partners],
-            [(p.id, p.display_name, p.employee_number) for p in employee_partners],
+            "[hr_employee_code] get_new_partner results=%s",
             [(p.id, p.display_name, p.employee_number) for p in new_partners],
         )
 
@@ -180,7 +174,11 @@ class ResPartner(models.Model):
         for partner in records:
             employee = partner._get_employee_for_partner(partner, company=company)
             if partner.id in by_id:
-                by_id[partner.id]["employee_number"] = employee.employee_number or False
+                by_id[partner.id]["employee_number"] = (
+                    employee.employee_number
+                    if employee
+                    else partner.employee_number or False
+                )
 
         return result
 
