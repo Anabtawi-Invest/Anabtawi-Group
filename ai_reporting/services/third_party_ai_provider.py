@@ -303,7 +303,7 @@ class AiReportingThirdPartyAiProvider(models.AbstractModel):
         }
 
     def _param(self, key, default=False):
-        return self.env["ir.config_parameter"].get_param(key, default)
+        return self.env["ir.config_parameter"].sudo().get_param(key, default)
 
     def _timeout(self):
         return int(self._param("ai_reporting.ai_provider_timeout", 60) or 60)

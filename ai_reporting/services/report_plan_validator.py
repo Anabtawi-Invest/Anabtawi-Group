@@ -32,7 +32,7 @@ class AiReportingReportPlanValidator(models.AbstractModel):
             if operation not in self._calculations:
                 raise ValidationError(_("Unsupported calculation operation: %s") % operation)
         limit = int(plan.get("limit") or 500)
-        max_sync = int(self.env["ir.config_parameter"].get_param("ai_reporting.maximum_synchronous_records", 5000))
+        max_sync = int(self.env["ir.config_parameter"].sudo().get_param("ai_reporting.maximum_synchronous_records", 5000))
         if limit < 1 or limit > max_sync:
             raise ValidationError(_("The report row limit must be between 1 and %s.") % max_sync)
         return {"valid": True, "mode": mode, "model": plan.get("model"), "limit": limit}

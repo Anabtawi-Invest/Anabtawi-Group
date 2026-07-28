@@ -108,7 +108,7 @@ class AiReportingQueryExecutionService(models.AbstractModel):
                 bounds.setdefault(field_name, {})["end"] = parsed
         if not bounds:
             return
-        max_days = int(self.env["ir.config_parameter"].get_param("ai_reporting.maximum_date_range", 366) or 366)
+        max_days = int(self.env["ir.config_parameter"].sudo().get_param("ai_reporting.maximum_date_range", 366) or 366)
         for field_name, span in bounds.items():
             start = span.get("start")
             end = span.get("end")
