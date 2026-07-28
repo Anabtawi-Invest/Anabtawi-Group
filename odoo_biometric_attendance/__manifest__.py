@@ -43,6 +43,7 @@ https://camsunit.com/application/biometric-web-api.html#api_cost.
     "images":[
         "static/description/banner.png",
         ],
+    "post_init_hook": "post_init_hook",
     "data": [
         "security/ir.model.access.csv",
         "views/res_config_settings_views.xml",

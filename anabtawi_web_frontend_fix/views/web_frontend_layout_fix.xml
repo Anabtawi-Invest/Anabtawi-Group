@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="web_frontend_brand_promotion_fix"
+              inherit_id="web.frontend_layout"
+              name="Ensure Brand Promotion Footer Slot">
+        <xpath expr="//div[hasclass('o_footer_copyright')]//div[contains(@class,'col-sm')][last()]" position="replace">
+            <div class="col-sm text-center text-sm-end">
+                <t t-call="web.brand_promotion"/>
+            </div>
+        </xpath>
+    </template>
+</odoo>
