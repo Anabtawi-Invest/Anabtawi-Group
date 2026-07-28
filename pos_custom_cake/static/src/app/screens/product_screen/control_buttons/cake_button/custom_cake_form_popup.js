@@ -107,11 +107,20 @@ export class CustomCakeFormPopup extends Component {
         return this.state.config?.cost_divisor || 0.63;
     }
 
+    _getSelectedPieces() {
+        if (!this.state.cake_size_id) {
+            return 1;
+        }
+        const size = this.sizes.find((s) => s.id === this.state.cake_size_id);
+        return size?.pieces || 1;
+    }
+
     _computePricesLocal() {
         const config = this.state.config;
         if (!config) {
             return;
         }
+        const pieces = this._getSelectedPieces();
         let totalCost = 0;
         for (const category of config.categories) {
             const selectedId = this.state.selectedLines[category.id];
@@ -120,11 +129,13 @@ export class CustomCakeFormPopup extends Component {
             }
             const line = category.lines.find((l) => l.id === selectedId);
             if (line) {
-                totalCost += line.cost;
+                const lineCost = line.total_cost ?? line.cost * (line.quantity || 1);
+                totalCost += lineCost * pieces;
             }
         }
         if (this.state.sugar_paste) {
-            totalCost += config.sugar_paste_cost || 0;
+            const sugarQty = config.sugar_paste_qty || 1;
+            totalCost += (config.sugar_paste_cost || 0) * sugarQty * pieces;
         }
         const currency = this.props.pos.currency;
         const divisor = this.costDivisor || 0.63;
@@ -132,12 +143,12 @@ export class CustomCakeFormPopup extends Component {
         const priceBeforeTax = roundCurrency(totalCost / divisor, currency);
         const taxAmount = roundCurrency(priceBeforeTax * taxRate, currency);
         const finalPrice = roundCurrency(priceBeforeTax + taxAmount, currency);
-        this.state.prices = {
+        Object.assign(this.state.prices, {
             total_components_cost: totalCost,
             price_before_tax: priceBeforeTax,
             tax_amount: taxAmount,
             final_price: finalPrice,
-        };
+        });
     }
 
     async onSelectPartner() {

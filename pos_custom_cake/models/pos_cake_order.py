@@ -118,16 +118,18 @@ class PosCakeOrder(models.Model):
         return total_cost, price_before_tax, tax_amount, final_price
 
     @api.model
-    def _prepare_component_lines(self, selected_lines):
+    def _prepare_component_lines(self, selected_lines, pieces=1):
         """selected_lines: list of dicts with category_line_id."""
         CategoryLine = self.env["cake.category.line"]
         component_vals = []
         total_cost = 0.0
+        pieces = pieces or 1
         for item in selected_lines:
             line_id = int(item.get("category_line_id") or 0)
             category_line = CategoryLine.browse(line_id).exists()
             if not category_line:
                 continue
+            line_total = category_line.total_cost * pieces
             component_vals.append(
                 {
                     "category_id": category_line.category_id.id,
@@ -135,11 +137,20 @@ class PosCakeOrder(models.Model):
                     "product_id": category_line.product_id.id,
                     "configured_qty": category_line.quantity,
                     "unit_cost": category_line.cost,
-                    "total_cost": category_line.cost,
+                    "total_cost": line_total,
                 }
             )
-            total_cost += category_line.cost
+            total_cost += line_total
         return component_vals, total_cost
+
+    @api.model
+    def _get_sugar_paste_total_cost(self, company, pieces, sugar_paste=False):
+        if not sugar_paste:
+            return 0.0, False, 0.0, 0.0
+        unit_cost, product = self._add_sugar_paste_cost(company, True)
+        qty_per_piece = company.cake_sugar_paste_qty or 1.0
+        total_cost = unit_cost * qty_per_piece * (pieces or 1)
+        return total_cost, product, qty_per_piece, unit_cost
 
     @api.model
     def _add_sugar_paste_cost(self, company, sugar_paste):
@@ -197,21 +208,25 @@ class PosCakeOrder(models.Model):
             raise UserError(_("Custom Cake is not enabled on this Point of Sale."))
 
         company = pos_config.company_id
-        component_vals, total_cost = self._prepare_component_lines(selected_lines)
+        component_vals, total_cost = self._prepare_component_lines(
+            selected_lines, cake_size.pieces
+        )
         if not component_vals:
             raise ValidationError(_("Please select at least one valid cake component."))
 
-        sugar_cost, sugar_product = self._add_sugar_paste_cost(company, sugar_paste)
+        sugar_total, sugar_product, sugar_qty, sugar_unit_cost = self._get_sugar_paste_total_cost(
+            company, cake_size.pieces, sugar_paste
+        )
         if sugar_paste:
-            total_cost += sugar_cost
+            total_cost += sugar_total
             component_vals.append(
                 {
                     "category_id": False,
                     "category_line_id": False,
                     "product_id": sugar_product.id,
-                    "configured_qty": company.cake_sugar_paste_qty or 1.0,
-                    "unit_cost": sugar_cost,
-                    "total_cost": sugar_cost,
+                    "configured_qty": sugar_qty,
+                    "unit_cost": sugar_unit_cost,
+                    "total_cost": sugar_total,
                     "is_sugar_paste": True,
                 }
             )
@@ -463,10 +478,17 @@ class PosCakeOrder(models.Model):
         company = self.env.company
         selected_lines = payload.get("selected_lines") or []
         sugar_paste = bool(payload.get("sugar_paste"))
-        _, total_cost = self._prepare_component_lines(selected_lines)
-        if sugar_paste:
-            sugar_cost, _product = self._add_sugar_paste_cost(company, True)
-            total_cost += sugar_cost
+        cake_size_id = payload.get("cake_size_id")
+        pieces = 1
+        if cake_size_id:
+            cake_size = self.env["cake.size"].sudo().browse(int(cake_size_id)).exists()
+            if cake_size:
+                pieces = cake_size.pieces
+        _, total_cost = self._prepare_component_lines(selected_lines, pieces)
+        sugar_total, _product, _qty, _unit_cost = self._get_sugar_paste_total_cost(
+            company, pieces, sugar_paste
+        )
+        total_cost += sugar_total
         _total, price_before_tax, tax_amount, final_price = self._compute_prices(total_cost, company)
         return {
             "total_components_cost": total_cost,

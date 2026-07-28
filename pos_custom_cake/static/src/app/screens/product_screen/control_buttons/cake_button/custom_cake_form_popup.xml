@@ -45,12 +45,16 @@
                         <div class="d-flex gap-3">
                             <label class="form-check">
                                 <input class="form-check-input" type="radio" name="sugar_paste"
-                                       value="yes" t-on-change="onSugarPasteChange"/>
+                                       value="yes"
+                                       t-att-checked="state.sugar_paste ? true : undefined"
+                                       t-on-change="onSugarPasteChange"/>
                                 <span class="ms-1" t-esc="labels.yes"/>
                             </label>
                             <label class="form-check">
                                 <input class="form-check-input" type="radio" name="sugar_paste"
-                                       value="no" checked="checked" t-on-change="onSugarPasteChange"/>
+                                       value="no"
+                                       t-att-checked="!state.sugar_paste ? true : undefined"
+                                       t-on-change="onSugarPasteChange"/>
                                 <span class="ms-1" t-esc="labels.no"/>
                             </label>
                         </div>
