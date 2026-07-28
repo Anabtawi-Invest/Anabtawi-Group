@@ -132,7 +132,10 @@
         <field name="model">hr.applicant</field>
         <field name="inherit_id" ref="hr_recruitment.hr_kanban_view_applicant"/>
         <field name="arch" type="xml">
-            <xpath expr="//templates//div[hasclass('oe_kanban_bottom_right')]" position="inside">
+            <xpath expr="//field[@name='application_status']" position="after">
+                <field name="ai_score"/>
+            </xpath>
+            <xpath expr="//footer//field[@name='user_id']" position="before">
                 <span t-if="record.ai_score.raw_value > 0"
                       t-attf-class="badge rounded-pill #{record.ai_score.raw_value >= 70 ? 'text-bg-success' : record.ai_score.raw_value >= 40 ? 'text-bg-warning' : 'text-bg-danger'}"
                       t-att-title="'AI Score'"
