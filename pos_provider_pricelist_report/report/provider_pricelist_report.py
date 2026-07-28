@@ -59,7 +59,7 @@ class ReportPosProviderPricelist(models.Model):
                     0.0 AS talabat_contribution_amount,
                     0.0 AS anabtawi_contribution_amount,
                     s.company_id AS company_id,
-                    s.currency_id AS currency_id,
+                    pc.currency_id AS currency_id,
                     ps.config_id AS config_id,
                     s.session_id AS session_id,
                     s.user_id AS user_id
@@ -69,6 +69,7 @@ class ReportPosProviderPricelist(models.Model):
                 LEFT JOIN product_product p ON p.id = l.product_id
                 LEFT JOIN product_template pt ON pt.id = p.product_tmpl_id
                 LEFT JOIN pos_session ps ON ps.id = s.session_id
+                LEFT JOIN pos_config pc ON pc.id = ps.config_id
                 WHERE pp.is_provider IS TRUE
             )
         """ % self._table)
