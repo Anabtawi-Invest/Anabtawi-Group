@@ -23,27 +23,7 @@ patch(ControlButtons.prototype, {
         return _t("Cash Delivery");
     },
 
-    isDeliveryAmountEnabled() {
-        const config = this.pos?.config;
-        if (!config) {
-            return false;
-        }
-        const journal = config.delivery_journal_id;
-        const account = config.delivery_intermediate_account_id;
-        const journalId = Array.isArray(journal) ? journal[0] : journal?.id ?? journal;
-        const accountId = Array.isArray(account) ? account[0] : account?.id ?? account;
-        return !!(journalId && accountId);
-    },
-
     async onClickDeliveryAmount() {
-        if (!this.isDeliveryAmountEnabled()) {
-            this.notification.add(
-                _t("Delivery Amount is not configured on this POS."),
-                { type: "warning" }
-            );
-            return;
-        }
-
         let popupData;
         try {
             popupData = await fetchDeliveryAmountPopupData(this.pos);
