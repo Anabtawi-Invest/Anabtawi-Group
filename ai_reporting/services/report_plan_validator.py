@@ -54,10 +54,14 @@ class AiReportingReportPlanValidator(models.AbstractModel):
             raise ValidationError(_("Unsafe plan content was rejected."))
 
     def _validate_model(self, model_name):
-        if not model_name or not self.env["ir.model"].search_count([("model", "=", model_name)]):
+        if not model_name:
             raise ValidationError(_("Unsupported or unavailable model: %s") % (model_name or ""))
         if model_name not in self.env:
             raise ValidationError(_("Model is not loaded in this registry: %s") % model_name)
+        # Metadata lookup only -- actual record access is enforced later by
+        # query_execution_service using the caller's own ACLs.
+        if not self.env["ir.model"].sudo().search_count([("model", "=", model_name)]):
+            raise ValidationError(_("Unsupported or unavailable model: %s") % model_name)
 
     def _validate_field(self, model_name, field_name):
         if not model_name or not field_name:
