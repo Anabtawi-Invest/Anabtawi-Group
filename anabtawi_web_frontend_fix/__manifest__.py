@@ -5,7 +5,7 @@
     "category": "Hidden",
     "author": "Anabtawi Group",
     "license": "LGPL-3",
-    "depends": ["web"],
+    "depends": ["web", "hr"],
     "auto_install": True,
     "data": ["views/web_frontend_layout_fix.xml"],
     "installable": True,
