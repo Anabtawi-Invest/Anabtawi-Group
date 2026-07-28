@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_cake_order_form" model="ir.ui.view">
+        <field name="name">pos.cake.order.form</field>
+        <field name="model">pos.cake.order</field>
+        <field name="arch" type="xml">
+            <form string="Cake Order" create="0">
+                <header>
+                    <button name="action_create_manufacturing_order"
+                            string="Create Manufacturing Order"
+                            type="object"
+                            invisible="production_id or state == 'cancelled'"/>
+                    <button name="action_cancel" string="Cancel" type="object"
+                            invisible="state in ('paid', 'cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,waiting_payment,paid,cancelled"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="cake_size_id"/>
+                            <field name="pieces"/>
+                            <field name="product_id"/>
+                            <field name="sugar_paste"/>
+                        </group>
+                        <group>
+                            <field name="date_order"/>
+                            <field name="user_id"/>
+                            <field name="pos_config_id"/>
+                            <field name="pos_session_id"/>
+                            <field name="pos_order_id"/>
+                            <field name="production_id"/>
+                        </group>
+                    </group>
+                    <group string="Pricing">
+                        <group>
+                            <field name="total_components_cost"/>
+                            <field name="price_before_tax"/>
+                        </group>
+                        <group>
+                            <field name="tax_amount"/>
+                            <field name="final_price"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Components" name="components">
+                            <field name="component_line_ids">
+                                <list create="0" edit="0" delete="0">
+                                    <field name="category_id"/>
+                                    <field name="product_id"/>
+                                    <field name="configured_qty"/>
+                                    <field name="unit_cost"/>
+                                    <field name="total_cost"/>
+                                    <field name="is_sugar_paste"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pos_cake_order_list" model="ir.ui.view">
+        <field name="name">pos.cake.order.list</field>
+        <field name="model">pos.cake.order</field>
+        <field name="arch" type="xml">
+            <list string="Cake Orders" create="0">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="pieces"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'waiting_payment'"
+                       decoration-success="state == 'paid'"
+                       decoration-muted="state == 'cancelled'"/>
+                <field name="date_order"/>
+                <field name="final_price"/>
+                <field name="user_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pos_cake_order_search" model="ir.ui.view">
+        <field name="name">pos.cake.order.search</field>
+        <field name="model">pos.cake.order</field>
+        <field name="arch" type="xml">
+            <search string="Cake Orders">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <filter string="Waiting for Payment" name="waiting_payment"
+                        domain="[('state', '=', 'waiting_payment')]"/>
+                <filter string="Paid" name="paid" domain="[('state', '=', 'paid')]"/>
+                <filter string="Cancelled" name="cancelled" domain="[('state', '=', 'cancelled')]"/>
+                <separator/>
+                <group>
+                    <filter string="Status" name="group_state" domain="[]" context="{'group_by': 'state'}"/>
+                    <filter string="Customer" name="group_partner" domain="[]" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Date" name="group_date" domain="[]" context="{'group_by': 'date_order'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_pos_cake_order" model="ir.actions.act_window">
+        <field name="name">Cake Orders</field>
+        <field name="res_model">pos.cake.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_pos_cake_order_search"/>
+    </record>
+</odoo>

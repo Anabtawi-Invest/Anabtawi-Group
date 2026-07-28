@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_custom_cake.CustomCakeFormPopup" owl="1">
+        <Dialog size="'lg'" title="dialogTitle">
+            <div class="custom-cake-popup p-2">
+                <t t-if="state.loading">
+                    <div class="text-center py-4">
+                        <i class="fa fa-spinner fa-spin fa-2x"/>
+                        <p class="mt-2" t-esc="labels.loading"/>
+                    </div>
+                </t>
+                <t t-else="">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <t t-esc="labels.customer"/> *
+                        </label>
+                        <div class="d-flex gap-2">
+                            <input type="text" class="form-control" readonly="readonly"
+                                   t-att-value="state.partner?.name || ''"
+                                   t-att-placeholder="labels.selectCustomer"/>
+                            <button class="btn btn-primary" t-on-click="onSelectPartner" type="button">
+                                <i class="fa fa-user"/>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <t t-esc="labels.cakePieces"/> *
+                        </label>
+                        <select class="form-select" t-model.number="state.cake_size_id">
+                            <option value="0" t-esc="labels.selectSize"/>
+                            <t t-foreach="sizes" t-as="size" t-key="size.id">
+                                <option t-att-value="size.id" t-esc="size.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <t t-esc="labels.sugarPaste"/>
+                        </label>
+                        <select class="form-select" t-model="state.sugar_paste_choice">
+                            <option value="no" t-esc="labels.no"/>
+                            <option value="yes" t-esc="labels.yes"/>
+                        </select>
+                    </div>
+
+                    <t t-foreach="categories" t-as="category" t-key="category.id">
+                        <div class="mb-3 border rounded p-3" t-if="category.lines.length">
+                            <h5 class="fw-bold mb-2" t-esc="category.name"/>
+                            <div class="input-group input-group-sm mb-2">
+                                <span class="input-group-text">
+                                    <i class="fa fa-search" aria-hidden="true"/>
+                                </span>
+                                <input type="text" class="form-control"
+                                       t-att-value="getCategorySearch(category.id)"
+                                       t-att-placeholder="labels.searchProduct"
+                                       t-on-input="(ev) => this.onCategorySearchInput(category.id, ev)"/>
+                            </div>
+                            <div class="category-products-list" style="max-height: 180px; overflow-y: auto;">
+                                <t t-foreach="getFilteredLines(category)" t-as="line" t-key="line.id">
+                                    <label class="form-check d-block mb-1">
+                                        <input class="form-check-input" type="radio"
+                                               t-att-name="'category_' + category.id"
+                                               t-att-checked="isComponentSelected(category.id, line.id) ? 'checked' : undefined"
+                                               t-on-change="() => this.onComponentSelect(category.id, line.id)"/>
+                                        <span class="ms-1" t-esc="line.product_name"/>
+                                    </label>
+                                </t>
+                                <t t-if="!getFilteredLines(category).length">
+                                    <div class="text-muted small py-2" t-esc="labels.noProductsFound"/>
+                                </t>
+                            </div>
+                        </div>
+                    </t>
+
+                    <div class="price-summary bg-light border rounded p-3 mt-3">
+                        <h5 class="fw-bold mb-3">💰 <t t-esc="labels.priceSummary"/></h5>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span t-esc="labels.totalComponentsCost"/>
+                            <span t-esc="formatAmount(priceSummary.total_components_cost)"/>
+                        </div>
+                        <div t-if="hasSugarPaste" class="d-flex justify-content-between mb-1 text-muted">
+                            <span t-esc="labels.sugarPasteCost"/>
+                            <span t-esc="formatAmount(priceSummary.sugar_paste_cost)"/>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span t-esc="labels.sellingPriceBeforeTax"/>
+                            <span t-esc="formatAmount(priceSummary.price_before_tax)"/>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span><t t-esc="labels.tax"/> (<t t-esc="taxRate"/>%)</span>
+                            <span t-esc="formatAmount(priceSummary.tax_amount)"/>
+                        </div>
+                        <div class="d-flex justify-content-between fw-bold fs-5 mt-2 pt-2 border-top">
+                            <span t-esc="labels.finalSellingPrice"/>
+                            <span class="text-primary" t-esc="formatAmount(priceSummary.final_price)"/>
+                        </div>
+                    </div>
+                </t>
+            </div>
+
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary" t-on-click="cancel" type="button">
+                    <t t-esc="labels.cancel"/>
+                </button>
+                <button class="btn btn-warning" t-on-click="payLater" type="button"
+                        t-att-disabled="state.loading ? 'disabled' : undefined">
+                    ⏳ <t t-esc="labels.payLater"/>
+                </button>
+                <button class="btn btn-primary" t-on-click="confirm" type="button"
+                        t-att-disabled="state.loading ? 'disabled' : undefined">
+                    ✅ <t t-esc="labels.confirm"/>
+                </button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

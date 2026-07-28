@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Custom Cake submenu inside Point of Sale -->
+    <menuitem id="menu_custom_cake"
+              name="Custom Cake"
+              parent="point_of_sale.menu_point_root"
+              sequence="85"
+              groups="point_of_sale.group_pos_user,point_of_sale.group_pos_manager"/>
+
+    <menuitem id="menu_cake_category"
+              name="Cake Categories"
+              parent="menu_custom_cake"
+              action="action_cake_category"
+              sequence="10"
+              groups="point_of_sale.group_pos_manager"/>
+
+    <menuitem id="menu_cake_size"
+              name="Cake Sizes"
+              parent="menu_custom_cake"
+              action="action_cake_size"
+              sequence="20"
+              groups="point_of_sale.group_pos_manager"/>
+
+    <menuitem id="menu_pos_cake_order"
+              name="Cake Orders"
+              parent="menu_custom_cake"
+              action="action_pos_cake_order"
+              sequence="30"
+              groups="point_of_sale.group_pos_user,point_of_sale.group_pos_manager"/>
+
+    <menuitem id="menu_custom_cake_settings"
+              name="Settings"
+              parent="menu_custom_cake"
+              action="point_of_sale.action_pos_configuration"
+              sequence="100"
+              groups="point_of_sale.group_pos_manager"/>
+</odoo>
