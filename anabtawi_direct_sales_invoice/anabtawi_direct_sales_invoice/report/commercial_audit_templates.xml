@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_commercial_audit_document">
+        <t t-call="web.external_layout">
+            <div class="page">
+                <h2>Internal Commercial Audit Report</h2>
+                <div class="alert alert-warning">
+                    Confidential internal document — not for customer distribution.
+                </div>
+                <table class="table table-sm table-borderless">
+                    <tr>
+                        <th>Direct Invoice</th>
+                        <td><span t-field="o.name"/></td>
+                        <th>Customer</th>
+                        <td><span t-field="o.partner_id"/></td>
+                    </tr>
+                    <tr>
+                        <th>Pricelist Used</th>
+                        <td><span t-field="o.pricelist_id"/></td>
+                        <th>Pickup Warehouse</th>
+                        <td><span t-field="o.warehouse_id"/></td>
+                    </tr>
+                    <tr>
+                        <th>Warehouse Approver</th>
+                        <td><span t-field="o.warehouse_approved_by"/></td>
+                        <th>Approval Date</th>
+                        <td><span t-field="o.warehouse_approved_at"/></td>
+                    </tr>
+                    <tr>
+                        <th>Invoice</th>
+                        <td><span t-field="o.invoice_id"/></td>
+                        <th>Payment Status</th>
+                        <td><span t-field="o.payment_state"/></td>
+                    </tr>
+                </table>
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-end">Requested</th>
+                            <th class="text-end">Released</th>
+                            <th class="text-end">Pricelist Price</th>
+                            <th class="text-end">Final Price</th>
+                            <th>Override</th>
+                            <th>Reason / Approval</th>
+                            <th class="text-end">Estimated Margin</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="o.line_ids" t-as="line">
+                            <td><span t-field="line.product_id"/></td>
+                            <td class="text-end"><span t-field="line.quantity"/></td>
+                            <td class="text-end"><span t-field="line.released_quantity"/></td>
+                            <td class="text-end">
+                                <span t-field="line.original_pricelist_price"
+                                      t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-field="line.price_unit"
+                                      t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                            </td>
+                            <td><span t-esc="'Yes' if line.price_overridden else 'No'"/></td>
+                            <td>
+                                <span t-field="line.price_override_reason"/>
+                                <br t-if="line.price_override_approved_by"/>
+                                <span t-if="line.price_override_approved_by">Approved by </span>
+                                <span t-field="line.price_override_approved_by"/>
+                            </td>
+                            <td class="text-end">
+                                <span t-esc="'%.2f %s' % (
+                                    line.price_subtotal - (
+                                        line.product_id.standard_price * line.quantity
+                                    ),
+                                    o.currency_id.name,
+                                )"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <h4 class="mt-4">Approval Audit</h4>
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Event</th>
+                            <th>User</th>
+                            <th>State Change</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="o.env['direct.sales.invoice.approval'].search([('direct_invoice_id', '=', o.id)], order='event_date')" t-as="approval">
+                            <td><span t-field="approval.event_date"/></td>
+                            <td><span t-field="approval.event"/></td>
+                            <td><span t-field="approval.user_id"/></td>
+                            <td>
+                                <span t-field="approval.state_from"/>
+                                <span> → </span>
+                                <span t-field="approval.state_to"/>
+                            </td>
+                            <td><span t-field="approval.note"/></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_commercial_audit">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="anabtawi_direct_sales_invoice.report_commercial_audit_document"/>
+            </t>
+        </t>
+    </template>
+</odoo>
