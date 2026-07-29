@@ -1,10 +1,13 @@
 from collections import defaultdict
 from datetime import datetime, time
+import logging
 
 from babel.dates import format_date as babel_format_date
 
 from odoo import _, fields, models
 from odoo.tools.misc import babel_locale_parse, format_date, get_lang
+
+_logger = logging.getLogger(__name__)
 
 PAYMENT_METHOD_TALABAT = 142
 PAYMENT_METHOD_CAREEM = 143
@@ -189,11 +192,65 @@ class PosDailyOperationsWizard(models.TransientModel):
     def _get_total_row(self, rows):
         numeric_fields = (
             'sales', 'rahen_in', 'rahen_out', 'cash', 'visa', 'hospitality',
-            'talabat', 'careem', 'mythings', 'kabseh',
+            'talabat', 'careem', 'mythings', 'kabseh', 'delivery_amount',
             'cash_out', 'delivery_cash', 'differences',
         )
         totals = {field: sum(row[field] for row in rows) for field in numeric_fields}
         return {'branch_name': _('Total'), **totals}
+
+    def _log_delivery_cash_and_differences_breakdown(self, rows, total_row):
+        self.ensure_one()
+        date_label = self._format_date_with_day_name(self.business_date)
+        _logger.info(
+            "Daily Operations Report — calculation breakdown | date=%s | wizard=%s",
+            date_label,
+            self.id,
+        )
+        if not rows:
+            _logger.info("  No branch data for selected date.")
+            return
+
+        for row in rows:
+            all_cash_in = (row['cash'] or 0.0) + (row['rahen_in'] or 0.0)
+            _logger.info(
+                "  Branch [%s]: Delivery Cash = cash_out(%s) + delivery_amount(%s) = %s",
+                row['branch_name'],
+                row['cash_out'],
+                row['delivery_amount'],
+                row['delivery_cash'],
+            )
+            _logger.info(
+                "  Branch [%s]: Differences = cash(%s) + rahen_in(%s) - delivery_cash(%s) = %s",
+                row['branch_name'],
+                row['cash'],
+                row['rahen_in'],
+                row['delivery_cash'],
+                row['differences'],
+            )
+            _logger.info(
+                "  Branch [%s]: all_cash_in=%s (cash + rahen_in, used in Differences)",
+                row['branch_name'],
+                all_cash_in,
+            )
+
+        total_all_cash_in = (total_row['cash'] or 0.0) + (total_row['rahen_in'] or 0.0)
+        _logger.info(
+            "  TOTAL: Delivery Cash = cash_out(%s) + delivery_amount(%s) = %s",
+            total_row['cash_out'],
+            total_row['delivery_amount'],
+            total_row['delivery_cash'],
+        )
+        _logger.info(
+            "  TOTAL: Differences = cash(%s) + rahen_in(%s) - delivery_cash(%s) = %s",
+            total_row['cash'],
+            total_row['rahen_in'],
+            total_row['delivery_cash'],
+            total_row['differences'],
+        )
+        _logger.info(
+            "  TOTAL: all_cash_in=%s (cash + rahen_in, used in Differences)",
+            total_all_cash_in,
+        )
 
     def action_export_excel(self):
         self.ensure_one()
@@ -210,6 +267,7 @@ class PosDailyOperationsWizard(models.TransientModel):
 
         rows = self._get_report_rows()
         total_row = self._get_total_row(rows)
+        self._log_delivery_cash_and_differences_breakdown(rows, total_row)
 
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
