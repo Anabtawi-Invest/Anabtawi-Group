@@ -11,6 +11,23 @@ import {
 } from "@pos_delivery_amount/app/utils/delivery_amount_flow";
 
 patch(ClosePosPopup.prototype, {
+    get deliveryMoveData() {
+        const moves = this.props.default_cash_details?.delivery_moves || [];
+        return {
+            total: this.props.default_cash_details?.delivery_total ?? 0,
+            moves: moves.map((move, index) => ({
+                id: move.id ?? index,
+                name: move.name,
+                amount: move.amount,
+            })),
+        };
+    },
+
+    shouldShowCashDeliveryLine() {
+        const total = this.props.default_cash_details?.delivery_total ?? 0;
+        return !!(this.pos.currency && !this.pos.currency.isZero(total));
+    },
+
     async closeSession() {
         this.pos._resetConnectedCashier();
         const syncSuccess = await this.pos.pushOrdersWithClosingPopup();

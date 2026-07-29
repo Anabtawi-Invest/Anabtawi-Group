@@ -232,6 +232,40 @@ class PosSession(models.Model):
             "delivered_total": self._get_delivered_total(),
         }
 
+    def _get_delivery_closing_moves(self):
+        self.ensure_one()
+        moves = []
+        for index, line in enumerate(self.delivery_line_ids.sorted("create_date"), start=1):
+            amount = line.amount or 0.0
+            if self.currency_id.is_zero(amount):
+                continue
+            moves.append(
+                {
+                    "id": line.id,
+                    "name": _("Cash Delivery %s", index),
+                    "amount": -abs(amount),
+                }
+            )
+        return moves
+
+    def get_closing_control_data(self):
+        data = super().get_closing_control_data()
+        self.ensure_one()
+        if not data.get("default_cash_details"):
+            return data
+
+        delivered_total = self._get_delivered_total()
+        delivery_moves = self._get_delivery_closing_moves()
+        delivery_total = -delivered_total if not self.currency_id.is_zero(delivered_total) else 0.0
+
+        dc = dict(data["default_cash_details"])
+        dc["delivery_total"] = self.currency_id.round(delivery_total)
+        dc["delivery_moves"] = delivery_moves
+        if not self.currency_id.is_zero(delivered_total):
+            dc["amount"] = self.currency_id.round(dc["amount"] - delivered_total)
+        data["default_cash_details"] = dc
+        return data
+
     def action_process_delivery_amount(self, amount):
         self.ensure_one()
         if not self.env.user.has_group("point_of_sale.group_pos_user"):

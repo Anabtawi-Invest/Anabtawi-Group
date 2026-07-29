@@ -1,7 +1,7 @@
 {
     "name": "POS Delivery Amount",
     "summary": "Capture and post POS delivery amount at closing",
-    "version": "19.0.3.0.4",
+    "version": "19.0.3.0.5",
     "category": "Point of Sale",
     "author": "Anabtawi Group",
     "license": "LGPL-3",
@@ -23,6 +23,7 @@
             "pos_delivery_amount/static/src/app/screens/product_screen/control_buttons/delivery_amount_button/delivery_amount_button.js",
             "pos_delivery_amount/static/src/app/screens/product_screen/control_buttons/delivery_amount_button/delivery_amount_button.xml",
             "pos_delivery_amount/static/src/app/patches/close_pos_popup_patch.js",
+            "pos_delivery_amount/static/src/app/patches/close_pos_popup_patch.xml",
         ],
     },
     "installable": True,
