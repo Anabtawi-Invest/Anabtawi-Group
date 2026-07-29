@@ -139,14 +139,7 @@
                         </group>
                         <group>
                             <field name="original_pricelist_price" readonly="True"/>
-                            <field
-                                name="price_unit"
-                                groups="anabtawi_direct_sales_invoice.group_direct_invoice_price_override"
-                                readonly="state != 'draft'"/>
-                            <field
-                                name="price_unit"
-                                groups="!anabtawi_direct_sales_invoice.group_direct_invoice_price_override"
-                                readonly="True"/>
+                            <field name="price_unit" readonly="state != 'draft'"/>
                             <field name="discount" readonly="state != 'draft'"/>
                             <field name="tax_ids" widget="many2many_tags" readonly="state != 'draft'"/>
                             <field name="price_override_reason" readonly="state != 'draft' or not price_overridden"/>
@@ -362,14 +355,7 @@
                             <field name="dispatch_location_id" readonly="state != 'draft' or stock_flow == 'direct_delivery'"/>
                         </group>
                         <group>
-                            <field
-                                name="pricelist_id"
-                                groups="anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager"
-                                readonly="state != 'draft'"/>
-                            <field
-                                name="pricelist_id"
-                                groups="!anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager"
-                                readonly="True"/>
+                            <field name="pricelist_id" readonly="state != 'draft'"/>
                             <field name="payment_term_id" readonly="state != 'draft'"/>
                             <field name="is_cash_sale" readonly="state != 'draft'"/>
                             <field name="invoice_date" readonly="state != 'draft'"/>
@@ -397,13 +383,7 @@
                                     <field name="forecast_quantity" readonly="True" optional="show"/>
                                     <field name="shortage_quantity" readonly="True" optional="show"/>
                                     <field name="availability_state" readonly="True" widget="badge"/>
-                                    <field
-                                        name="price_unit"
-                                        groups="anabtawi_direct_sales_invoice.group_direct_invoice_price_override"/>
-                                    <field
-                                        name="price_unit"
-                                        groups="!anabtawi_direct_sales_invoice.group_direct_invoice_price_override"
-                                        readonly="True"/>
+                                    <field name="price_unit"/>
                                     <field name="discount"/>
                                     <field name="tax_ids" widget="many2many_tags" optional="show"/>
                                     <field name="price_subtotal" readonly="True" sum="Untaxed"/>

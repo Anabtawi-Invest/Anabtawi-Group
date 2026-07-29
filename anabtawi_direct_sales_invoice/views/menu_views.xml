@@ -95,6 +95,6 @@
         id="menu_direct_sales_settings"
         name="Settings"
         parent="menu_direct_sales_configuration"
-        action="base.action_res_config_settings"
+        action="action_direct_sales_settings"
         sequence="20"/>
 </odoo>
