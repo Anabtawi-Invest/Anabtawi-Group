@@ -1,4 +1,4 @@
-# Anabtawi Direct Sales Invoice
+# Anabtawi Direct Sales Invoice #
 
 Production-oriented Odoo 19 Enterprise workflow for direct customer invoices that
 must be approved, reserved, prepared, and released by a warehouse while retaining
