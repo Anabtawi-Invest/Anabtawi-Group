@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_move_form_direct_sales" model="ir.ui.view">
+        <field name="name">account.move.form.direct.sales</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button
+                    name="action_view_direct_sales_document"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-shopping-basket"
+                    invisible="not direct_sales_invoice_id">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Direct Sales</span>
+                        <span class="o_stat_text">Document</span>
+                    </div>
+                </button>
+                <button
+                    name="action_view_direct_sales_pickings"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-truck"
+                    invisible="direct_sales_picking_count == 0">
+                    <field name="direct_sales_picking_count" widget="statinfo" string="Pickings"/>
+                </button>
+            </xpath>
+            <xpath expr="//group[@name='sale_info_group']" position="inside">
+                <field name="direct_sales_invoice_id" readonly="True" invisible="not direct_sales_invoice_id"/>
+                <field name="pickup_warehouse_id" readonly="True" invisible="not direct_sales_invoice_id"/>
+                <field name="pricelist_id" readonly="True" invisible="not direct_sales_invoice_id"/>
+                <field name="warehouse_approved_by" readonly="True" invisible="not direct_sales_invoice_id"/>
+                <field name="warehouse_approved_at" readonly="True" invisible="not direct_sales_invoice_id"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+
