@@ -35,6 +35,7 @@ export class CustomCakeFormPopup extends Component {
             sugar_paste_choice: "no",
             selectedLines: {},
             categorySearch: {},
+            note: "",
         });
         onMounted(async () => {
             await this._loadConfig();
@@ -80,6 +81,8 @@ export class CustomCakeFormPopup extends Component {
             confirm: _t("Confirm"),
             searchProduct: _t("Search product..."),
             noProductsFound: _t("No products match your search."),
+            note: _t("Note"),
+            notePlaceholder: _t("Add special instructions..."),
         };
     }
 
@@ -260,6 +263,7 @@ export class CustomCakeFormPopup extends Component {
             pay_later: payLater,
             pos_config_id: this.props.pos.config.id,
             pos_session_id: this.props.pos.session?.id || false,
+            note: (this.state.note || "").trim(),
         };
     }
 

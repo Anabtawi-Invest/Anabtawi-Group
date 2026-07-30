@@ -89,6 +89,7 @@ class PosCakeOrder(models.Model):
         copy=False,
     )
     pos_config_id = fields.Many2one("pos.config", string="POS Config", readonly=True)
+    note = fields.Text(string="Note", readonly=True)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -176,6 +177,7 @@ class PosCakeOrder(models.Model):
         pay_later = bool(payload.get("pay_later"))
         pos_config_id = payload.get("pos_config_id")
         pos_session_id = payload.get("pos_session_id")
+        note = (payload.get("note") or "").strip()
 
         if not partner_id:
             raise ValidationError(_("Customer is required."))
@@ -246,6 +248,7 @@ class PosCakeOrder(models.Model):
             "tax_amount": tax_amount,
             "final_price": final_price,
             "state": "waiting_payment" if pay_later else "waiting_payment",
+            "note": note or False,
             "component_line_ids": [Command.create(vals) for vals in component_vals],
         }
         cake_order = self.sudo().create(order_vals)
@@ -367,6 +370,7 @@ class PosCakeOrder(models.Model):
             "production_id": self.production_id.id or False,
             "production_name": self.production_id.name or False,
             "date_order": fields.Datetime.to_string(self.date_order),
+            "note": self.note or "",
         }
 
     def action_mark_paid(self, pos_order=None):
@@ -410,6 +414,7 @@ class PosCakeOrder(models.Model):
                 "date_order": fields.Datetime.to_string(order.date_order),
                 "final_price": order.final_price,
                 "product_name": order.product_id.display_name,
+                "note": order.note or "",
             }
             for order in orders
         ]

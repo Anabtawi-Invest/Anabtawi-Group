@@ -26,6 +26,7 @@
                             <field name="pieces"/>
                             <field name="product_id"/>
                             <field name="sugar_paste"/>
+                            <field name="note" placeholder="Special instructions from POS..."/>
                         </group>
                         <group>
                             <field name="date_order"/>
@@ -92,6 +93,7 @@
             <search string="Cake Orders">
                 <field name="name"/>
                 <field name="partner_id"/>
+                <field name="note"/>
                 <filter string="Waiting for Payment" name="waiting_payment"
                         domain="[('state', '=', 'waiting_payment')]"/>
                 <filter string="Paid" name="paid" domain="[('state', '=', 'paid')]"/>

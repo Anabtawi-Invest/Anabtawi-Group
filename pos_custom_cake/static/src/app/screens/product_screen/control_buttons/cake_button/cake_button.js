@@ -149,6 +149,8 @@ patch(ControlButtons.prototype, {
             totalLabel: _t("Total"),
             finalPriceFormatted: formatCurrency(finalPrice, this.pos.currency?.id),
             footerText: _t("Please pay at the counter when ready."),
+            note: result?.note || "",
+            noteLabel: _t("Note"),
         };
     },
 
