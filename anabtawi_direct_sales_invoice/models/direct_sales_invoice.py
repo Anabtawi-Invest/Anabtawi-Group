@@ -1573,7 +1573,10 @@ class DirectSalesInvoice(models.Model):
         for (warehouse_id, source_location_id), entries in grouped.items():
             warehouse = self.env["stock.warehouse"].browse(warehouse_id)
             source_location = self.env["stock.location"].browse(source_location_id)
-            if stage == "preparation":
+            if self.is_warehouse_request:
+                destination = warehouse.lot_stock_id
+                picking_type = warehouse.int_type_id or warehouse.direct_sales_operation_type_id
+            elif stage == "preparation":
                 destination = warehouse.direct_sales_dispatch_location_id
                 picking_type = warehouse.direct_sales_operation_type_id
                 if not destination or not picking_type:
