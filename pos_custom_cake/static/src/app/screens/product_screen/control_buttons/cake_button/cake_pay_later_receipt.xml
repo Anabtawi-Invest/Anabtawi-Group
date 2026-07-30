@@ -35,6 +35,10 @@
                 <div class="text-muted small">
                     <t t-esc="props.receipt.pieces"/> <t t-esc="props.receipt.piecesLabel"/>
                 </div>
+                <div t-if="props.receipt.note" class="text-muted small pt-1">
+                    <strong t-esc="props.receipt.noteLabel"/>:
+                    <span t-esc="props.receipt.note"/>
+                </div>
             </div>
 
             <div class="pt-3 border-top mt-2">

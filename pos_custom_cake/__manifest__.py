@@ -2,7 +2,7 @@
 {
     "name": "POS Custom Cake",
     "author": "Anabtawi",
-    "version": "19.0.1.0.16",
+    "version": "19.0.1.0.19",
     "category": "Point of Sale",
     "summary": "Custom cake ordering with POS, MRP and dynamic pricing",
     "license": "LGPL-3",
@@ -11,6 +11,7 @@
         "mrp",
         "product",
         "stock",
+        "stock_account",
         "mail",
     ],
     "data": [
