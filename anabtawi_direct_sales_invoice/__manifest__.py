@@ -1,7 +1,7 @@
 {
     "name": "Anabtawi Direct Sales Invoice",
-    "summary": "Warehouse-approved direct customer invoicing with stock traceability",
-    "version": "19.0.1.0.0",
+    "summary": "Role-isolated direct sales, van replenishment, and custodian cash accounting",
+    "version": "19.0.2.0.0",
     "category": "Sales/Inventory/Accounting",
     "author": "Anabtawi Sweets",
     "website": "https://www.anabtawisweets.com",
@@ -34,6 +34,8 @@
         "report/goods_release_report.xml",
         "report/commercial_audit_templates.xml",
         "report/commercial_audit_report.xml",
+        "views/res_users_views.xml",
+        "views/cash_handover_wizard_views.xml",
         "views/menu_views.xml",
     ],
     "assets": {},

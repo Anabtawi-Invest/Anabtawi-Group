@@ -46,6 +46,13 @@
         parent="menu_direct_sales_operations"
         action="action_direct_sales_released"
         sequence="50"/>
+    <menuitem
+        id="menu_direct_sales_cash_handover"
+        name="Cash Handover &amp; Wallet Reset"
+        parent="menu_direct_sales_operations"
+        action="action_cash_handover_wizard"
+        sequence="60"
+        groups="anabtawi_direct_sales_invoice.group_direct_invoice_user,anabtawi_direct_sales_invoice.group_direct_invoice_accounting_user"/>
 
     <menuitem
         id="menu_direct_sales_reporting"

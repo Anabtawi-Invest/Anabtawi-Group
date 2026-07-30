@@ -214,13 +214,6 @@
                         groups="anabtawi_direct_sales_invoice.group_direct_invoice_user"
                         invisible="state not in ('warehouse_approved', 'partially_approved')"/>
                     <button
-                        name="action_share_whatsapp"
-                        type="object"
-                        string="Share WhatsApp"
-                        class="btn-success"
-                        icon="fa-whatsapp"
-                        invisible="is_warehouse_request"/>
-                    <button
                         name="action_send_email"
                         type="object"
                         string="Send Email"

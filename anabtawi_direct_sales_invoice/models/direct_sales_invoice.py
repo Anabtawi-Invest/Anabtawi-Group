@@ -2047,6 +2047,19 @@ class DirectSalesInvoice(models.Model):
                     self._schedule_payment_collection(
                         summary=_("Collect cash-sale payment")
                     )
+                    if invoice.state == "posted" and self.user_id.salesperson_cash_journal_id:
+                        try:
+                            payment_register = self.env["account.payment.register"].sudo().with_context(
+                                active_model="account.move",
+                                active_ids=invoice.ids,
+                            ).create({
+                                "journal_id": self.user_id.salesperson_cash_journal_id.id,
+                                "amount": invoice.amount_residual,
+                                "payment_date": fields.Date.context_today(self),
+                            })
+                            payment_register.action_create_payments()
+                        except Exception:
+                            pass
                 return invoice
         except (UserError, ValidationError):
             raise
@@ -2362,32 +2375,6 @@ class DirectSalesInvoice(models.Model):
             record._log_approval_event("ready", note=_("Salesperson confirmed stock receiving."))
             record.message_post(body=_("Stock received and confirmed by %s.") % self.env.user.display_name)
         return True
-
-    def action_share_whatsapp(self):
-        """Generate a WhatsApp web share link with invoice details."""
-        self.ensure_one()
-        phone = self.partner_id.phone or self.partner_id.mobile or ""
-        clean_phone = "".join(filter(str.isdigit, phone))
-        lines_summary = "\n".join(
-            [f"• {line.product_id.display_name}: {line.quantity} {line.product_uom_id.name} @ {line.price_unit}"
-             for line in self.line_ids]
-        )
-        msg = (
-            f"Hello {self.partner_id.name},\n"
-            f"Here is your Direct Invoice *{self.name}*:\n"
-            f"Total Amount: *{self.amount_total} {self.currency_id.name}*\n"
-            f"Date: {self.invoice_date}\n\n"
-            f"Items:\n{lines_summary}\n\n"
-            f"Thank you for your business!"
-        )
-        import urllib.parse
-        encoded_msg = urllib.parse.quote(msg)
-        whatsapp_url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_msg}" if clean_phone else f"https://api.whatsapp.com/send?text={encoded_msg}"
-        return {
-            "type": "ir.actions.act_url",
-            "url": whatsapp_url,
-            "target": "new",
-        }
 
     def action_send_email(self):
         """Open mail composer wizard for this direct invoice."""

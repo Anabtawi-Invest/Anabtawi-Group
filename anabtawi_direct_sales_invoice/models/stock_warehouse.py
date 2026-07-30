@@ -177,3 +177,43 @@ class ResUsers(models.Model):
         string="Direct Sales Approval Warehouses",
         readonly=True,
     )
+    direct_sales_channel_type = fields.Selection(
+        [
+            ("salesperson", "Salesperson (Pre-Order / Pickup)"),
+            ("cash_van", "Cash Van Driver"),
+        ],
+        string="Direct Sales Channel Type",
+        default="salesperson",
+        required=True,
+        help="Determines the isolated workflow & screens visible for this user.",
+    )
+    salesperson_cash_journal_id = fields.Many2one(
+        "account.journal",
+        string="Salesperson Custodian Cash Journal",
+        domain="[('type', '=', 'cash'), ('company_id', 'in', company_ids)]",
+        help="Custodian cash journal representing the salesperson's physical cash wallet.",
+    )
+    cash_wallet_balance = fields.Float(
+        string="Cash Wallet Balance",
+        compute="_compute_cash_wallet_balance",
+        digits="Account",
+        help="Total cash collected from clients that is currently held by this salesperson.",
+    )
+
+    def _compute_cash_wallet_balance(self):
+        for user in self:
+            if not user.salesperson_cash_journal_id:
+                user.cash_wallet_balance = 0.0
+                continue
+            journal = user.salesperson_cash_journal_id
+            account = journal.default_account_id
+            if account:
+                domain = [
+                    ("account_id", "=", account.id),
+                    ("parent_state", "=", "posted"),
+                    ("company_id", "in", user.company_ids.ids),
+                ]
+                lines = self.env["account.move.line"].search(domain)
+                user.cash_wallet_balance = sum(lines.mapped("balance"))
+            else:
+                user.cash_wallet_balance = 0.0
