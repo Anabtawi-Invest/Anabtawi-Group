@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_goods_release_document">
+        <t t-call="web.external_layout">
+            <div class="page">
+                <h2>Goods Release Document</h2>
+                <table class="table table-sm table-borderless mb-3">
+                    <tr>
+                        <th>Direct Invoice</th>
+                        <td><span t-field="o.name"/></td>
+                        <th>Customer Invoice</th>
+                        <td><span t-field="o.invoice_id.name"/></td>
+                    </tr>
+                    <tr>
+                        <th>Customer</th>
+                        <td><span t-field="o.partner_id"/></td>
+                        <th>Pickup Warehouse</th>
+                        <td><span t-field="o.warehouse_id"/></td>
+                    </tr>
+                    <tr>
+                        <th>Release Date</th>
+                        <td><span t-field="o.released_at"/></td>
+                        <th>Released By</th>
+                        <td><span t-field="o.released_by"/></td>
+                    </tr>
+                    <tr>
+                        <th>Customer Receiver</th>
+                        <td><span t-field="o.customer_receiver_name"/></td>
+                        <th>Payment Status</th>
+                        <td><span t-field="o.payment_state"/></td>
+                    </tr>
+                </table>
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Description</th>
+                            <th class="text-end">Released Quantity</th>
+                            <th>UoM</th>
+                            <th>Lot / Serial</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="o.line_ids.filtered(lambda l: l.released_quantity)" t-as="line">
+                            <td><span t-field="line.product_id"/></td>
+                            <td><span t-field="line.name"/></td>
+                            <td class="text-end"><span t-field="line.released_quantity"/></td>
+                            <td><span t-field="line.product_uom_id"/></td>
+                            <td><span t-esc="', '.join(line.lot_ids.mapped('name'))"/></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="row mt-5" style="min-height: 130px;">
+                    <div class="col-6 pe-4">
+                        <div class="border rounded p-3 h-100">
+                            <strong>Customer Receiver Signature</strong>
+                            <div class="mt-5 border-top pt-2">
+                                Name: <span t-field="o.customer_receiver_name"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 ps-4">
+                        <div class="border rounded p-3 h-100">
+                            <strong>Warehouse Signature</strong>
+                            <div class="mt-5 border-top pt-2">
+                                Released by: <span t-field="o.released_by"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_goods_release">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="anabtawi_direct_sales_invoice.report_goods_release_document"/>
+            </t>
+        </t>
+    </template>
+</odoo>
+

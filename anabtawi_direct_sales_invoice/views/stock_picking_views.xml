@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_direct_sales" model="ir.ui.view">
+        <field name="name">stock.picking.form.direct.sales</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button
+                    name="action_view_direct_sales_document"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-shopping-basket"
+                    invisible="not direct_invoice_id">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Direct Sales</span>
+                        <span class="o_stat_text">Document</span>
+                    </div>
+                </button>
+                <button
+                    name="action_view_customer_invoice"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-file-text-o"
+                    invisible="not customer_invoice_id">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Customer</span>
+                        <span class="o_stat_text">Invoice</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//form//sheet//field[@name='origin']" position="after">
+                <field name="direct_invoice_id" readonly="True" invisible="not direct_invoice_id"/>
+                <field name="customer_invoice_id" readonly="True" invisible="not direct_invoice_id"/>
+                <field name="direct_sales_warehouse_id" readonly="True" invisible="not direct_invoice_id"/>
+                <field name="direct_sales_stage" readonly="True" invisible="not direct_invoice_id"/>
+                <field name="pickup_customer_id" readonly="True" invisible="not direct_invoice_id"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_picking_list_direct_sales" model="ir.ui.view">
+        <field name="name">stock.picking.list.direct.sales</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='origin']" position="after">
+                <field name="direct_invoice_id" optional="hide"/>
+                <field name="direct_sales_stage" widget="badge" optional="hide"/>
+                <field name="direct_sales_warehouse_id" optional="hide"/>
+                <field name="customer_invoice_id" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+

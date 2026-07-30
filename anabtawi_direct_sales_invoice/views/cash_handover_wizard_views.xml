@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cash_handover_wizard_form" model="ir.ui.view">
+        <field name="name">direct.sales.cash.handover.wizard.form</field>
+        <field name="model">direct.sales.cash.handover.wizard</field>
+        <field name="arch" type="xml">
+            <form string="End-of-Day Cash Collection &amp; Handover">
+                <sheet>
+                    <group>
+                        <group string="Salesperson Info">
+                            <field name="user_id" widget="many2one_avatar_user"/>
+                            <field name="salesperson_cash_journal_id"/>
+                            <field name="current_wallet_balance" widget="monetary"/>
+                        </group>
+                        <group string="Accounting Handover">
+                            <field name="destination_journal_id"/>
+                            <field name="amount_handed_over" widget="monetary"/>
+                            <field name="remaining_balance" widget="monetary" class="oe_subtotal_footer_separator"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="notes" placeholder="Notes or memo for accounting..."/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_handover" string="Confirm Cash Handover &amp; Reconcile" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_cash_handover_wizard" model="ir.actions.act_window">
+        <field name="name">Cash Collection Handover</field>
+        <field name="res_model">direct.sales.cash.handover.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

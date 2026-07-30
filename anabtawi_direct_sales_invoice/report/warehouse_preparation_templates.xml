@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_warehouse_preparation_document">
+        <t t-call="web.external_layout">
+            <div class="page">
+                <h2>Warehouse Preparation Sheet</h2>
+                <div class="row mb-3">
+                    <div class="col-8">
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <th>Direct Invoice</th>
+                                <td><span t-field="o.name"/></td>
+                                <th>Requested</th>
+                                <td><span t-field="o.requested_date"/></td>
+                            </tr>
+                            <tr>
+                                <th>Customer</th>
+                                <td><span t-field="o.partner_id"/></td>
+                                <th>Salesperson</th>
+                                <td><span t-field="o.user_id"/></td>
+                            </tr>
+                            <tr>
+                                <th>Pickup Warehouse</th>
+                                <td><span t-field="o.warehouse_id"/></td>
+                                <th>Source</th>
+                                <td><span t-field="o.source_location_id"/></td>
+                            </tr>
+                            <tr>
+                                <th>Dispatch Location</th>
+                                <td><span t-field="o.dispatch_location_id"/></td>
+                                <th>Stock Flow</th>
+                                <td><span t-field="o.stock_flow"/></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-4 text-end">
+                        <div t-field="o.name"
+                             t-options="{'widget': 'barcode', 'width': 500, 'height': 100, 'img_style': 'width:260px;height:52px'}"/>
+                    </div>
+                </div>
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Description</th>
+                            <th class="text-end">Requested</th>
+                            <th class="text-end">Approved</th>
+                            <th>UoM</th>
+                            <th>Source Location</th>
+                            <th>Lot / Serial</th>
+                            <th t-if="o.company_id.direct_sales_show_prices_on_preparation" class="text-end">Unit Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="o.line_ids" t-as="line">
+                            <td>
+                                <span t-field="line.product_id"/>
+                                <div t-if="line.product_id.barcode"
+                                     t-field="line.product_id.barcode"
+                                     t-options="{'widget': 'barcode', 'width': 300, 'height': 60, 'img_style': 'width:120px;height:24px'}"/>
+                            </td>
+                            <td><span t-field="line.name"/></td>
+                            <td class="text-end"><span t-field="line.quantity"/></td>
+                            <td class="text-end"><span t-field="line.approved_quantity"/></td>
+                            <td><span t-field="line.product_uom_id"/></td>
+                            <td>
+                                <span t-esc="', '.join(line.allocation_ids.mapped('source_location_id.display_name')) or o.source_location_id.display_name"/>
+                            </td>
+                            <td><span t-esc="', '.join(line.lot_ids.mapped('name'))"/></td>
+                            <td t-if="o.company_id.direct_sales_show_prices_on_preparation" class="text-end">
+                                <span t-field="line.price_unit"
+                                      t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <strong>Warehouse Comment</strong>
+                        <p t-field="o.warehouse_comment"/>
+                    </div>
+                </div>
+                <div class="row mt-5">
+                    <div class="col-6">
+                        <div class="border-top pt-2">Prepared By / Date</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border-top pt-2">Checked By / Date</div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_warehouse_preparation">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="anabtawi_direct_sales_invoice.report_warehouse_preparation_document"/>
+            </t>
+        </t>
+    </template>
+</odoo>
