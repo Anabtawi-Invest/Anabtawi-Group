@@ -43,10 +43,17 @@ class DirectSalesInvoice(models.Model):
         tracking=True,
         index=True,
     )
+    is_warehouse_request = fields.Boolean(
+        string="Is Warehouse / Van Request",
+        default=False,
+        copy=False,
+        index=True,
+        help="Set to True for internal Cash Van / Warehouse replenishment requests without customer invoicing.",
+    )
     partner_id = fields.Many2one(
         "res.partner",
         string="Customer",
-        required=True,
+        required=False,
         tracking=True,
         check_company=True,
         index=True,
@@ -395,11 +402,12 @@ class DirectSalesInvoice(models.Model):
                 vals.get("company_id")
             ) or self.env.company
             if vals.get("name", "New") == "New":
+                seq_code = "direct.sales.warehouse.request" if vals.get("is_warehouse_request") else "direct.sales.invoice"
                 vals["name"] = (
                     self.env["ir.sequence"]
                     .with_company(company)
-                    .next_by_code("direct.sales.invoice")
-                    or _("New")
+                    .next_by_code(seq_code)
+                    or (self.env["ir.sequence"].with_company(company).next_by_code("direct.sales.invoice") or _("New"))
                 )
             partner = self.env["res.partner"].browse(vals.get("partner_id"))
             if partner:

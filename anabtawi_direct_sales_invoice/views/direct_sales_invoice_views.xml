@@ -218,17 +218,20 @@
                         type="object"
                         string="Share WhatsApp"
                         class="btn-success"
-                        icon="fa-whatsapp"/>
+                        icon="fa-whatsapp"
+                        invisible="is_warehouse_request"/>
                     <button
                         name="action_send_email"
                         type="object"
                         string="Send Email"
-                        icon="fa-envelope"/>
+                        icon="fa-envelope"
+                        invisible="is_warehouse_request"/>
                     <button
                         name="action_print_pdf"
                         type="object"
                         string="Print PDF"
-                        icon="fa-print"/>
+                        icon="fa-print"
+                        invisible="is_warehouse_request"/>
                     <button
                         name="action_open_approval_wizard"
                         type="object"
@@ -314,6 +317,7 @@
                     <field name="allowed_warehouse_ids" invisible="True"/>
                     <field name="invoice_status" invisible="True"/>
                     <field name="manual_price_override" invisible="True"/>
+                    <field name="is_warehouse_request" invisible="True"/>
                     <div class="oe_button_box" name="button_box">
                         <button
                             name="action_view_invoice"
@@ -364,17 +368,24 @@
                         </button>
                     </div>
                     <div class="oe_title">
-                        <label for="name" string="Direct Invoice"/>
+                        <label for="name" string="Warehouse Replenishment Request" invisible="not is_warehouse_request"/>
+                        <label for="name" string="Direct Invoice" invisible="is_warehouse_request"/>
                         <h1><field name="name"/></h1>
                     </div>
                     <group>
-                        <group string="Customer &amp; Sales Info">
-                            <field name="partner_id" readonly="state != 'draft'"/>
+                        <group string="Warehouse Request Info" invisible="not is_warehouse_request">
+                            <field name="user_id" string="Requested By" widget="many2one_avatar_user" readonly="state != 'draft'"/>
+                            <field name="warehouse_id" string="Destination Warehouse / Van" readonly="state != 'draft'"/>
+                            <field name="source_location_id" string="Source Stock Location" readonly="state != 'draft'"/>
+                            <field name="requested_date"/>
+                        </group>
+                        <group string="Customer &amp; Sales Info" invisible="is_warehouse_request">
+                            <field name="partner_id" required="not is_warehouse_request" readonly="state != 'draft'"/>
                             <field name="commercial_partner_id" invisible="True"/>
                             <field name="user_id" widget="many2one_avatar_user" readonly="state != 'draft'"/>
                             <field name="warehouse_id" string="Pickup Warehouse / Van" readonly="state != 'draft'"/>
                         </group>
-                        <group string="Pricing &amp; Payment Terms">
+                        <group string="Pricing &amp; Payment Terms" invisible="is_warehouse_request">
                             <field name="pricelist_id" readonly="state != 'draft'"/>
                             <field name="payment_term_id" readonly="state != 'draft'"/>
                             <field name="invoice_date" readonly="state != 'draft'"/>
@@ -400,18 +411,18 @@
                                     <field name="forecast_quantity" readonly="True" optional="show"/>
                                     <field name="shortage_quantity" readonly="True" optional="show"/>
                                     <field name="availability_state" readonly="True" widget="badge"/>
-                                    <field name="price_unit"/>
-                                    <field name="discount"/>
-                                    <field name="tax_ids" widget="many2many_tags" optional="show"/>
-                                    <field name="price_subtotal" readonly="True" sum="Untaxed"/>
+                                    <field name="price_unit" column_invisible="parent.is_warehouse_request"/>
+                                    <field name="discount" column_invisible="parent.is_warehouse_request"/>
+                                    <field name="tax_ids" widget="many2many_tags" optional="show" column_invisible="parent.is_warehouse_request"/>
+                                    <field name="price_subtotal" readonly="True" sum="Untaxed" column_invisible="parent.is_warehouse_request"/>
                                     <field name="currency_id" column_invisible="True"/>
-                                    <field name="price_overridden" readonly="True" optional="show"/>
-                                    <field name="price_override_reason" optional="hide"/>
-                                    <field name="price_override_state" readonly="True" widget="badge" optional="show"/>
+                                    <field name="price_overridden" readonly="True" optional="show" column_invisible="parent.is_warehouse_request"/>
+                                    <field name="price_override_reason" optional="hide" column_invisible="parent.is_warehouse_request"/>
+                                    <field name="price_override_state" readonly="True" widget="badge" optional="show" column_invisible="parent.is_warehouse_request"/>
                                     <field name="warehouse_status" readonly="True" widget="badge"/>
                                 </list>
                             </field>
-                            <group class="oe_subtotal_footer oe_right">
+                            <group class="oe_subtotal_footer oe_right" invisible="is_warehouse_request">
                                 <field name="amount_untaxed" widget="monetary"/>
                                 <field name="amount_tax" widget="monetary"/>
                                 <field name="amount_total" widget="monetary" class="oe_subtotal_footer_separator"/>
@@ -566,8 +577,9 @@
         <field name="name">Direct Invoices</field>
         <field name="res_model">direct.sales.invoice</field>
         <field name="view_mode">list,form</field>
+        <field name="domain">[('is_warehouse_request', '=', False)]</field>
+        <field name="context">{'default_is_warehouse_request': False, 'search_default_requested_date': 1}</field>
         <field name="search_view_id" ref="view_direct_sales_invoice_search"/>
-        <field name="context">{'search_default_requested_date': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">Create a warehouse-approved direct invoice</p>
             <p>Select the customer, pickup warehouse, and products, then submit the request for approval.</p>
@@ -578,7 +590,8 @@
         <field name="name">My Direct Invoices</field>
         <field name="res_model">direct.sales.invoice</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('user_id', '=', uid)]</field>
+        <field name="domain">[('user_id', '=', uid), ('is_warehouse_request', '=', False)]</field>
+        <field name="context">{'default_is_warehouse_request': False}</field>
         <field name="search_view_id" ref="view_direct_sales_invoice_search"/>
     </record>
 
@@ -587,7 +600,8 @@
         <field name="res_model">direct.sales.invoice</field>
         <field name="view_mode">list,form</field>
         <field name="view_id" ref="view_direct_sales_invoice_warehouse_list"/>
-        <field name="domain">[('state', 'in', ('warehouse_pending', 'partially_approved', 'warehouse_approved'))]</field>
+        <field name="domain">[('is_warehouse_request', '=', True)]</field>
+        <field name="context">{'default_is_warehouse_request': True, 'search_default_warehouse_pending': 1}</field>
         <field name="search_view_id" ref="view_direct_sales_invoice_search"/>
     </record>
 

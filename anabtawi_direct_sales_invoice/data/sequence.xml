@@ -8,5 +8,13 @@
         <field name="number_increment">1</field>
         <field name="company_id" eval="False"/>
     </record>
+    <record id="sequence_direct_sales_warehouse_request" model="ir.sequence">
+        <field name="name">Direct Sales Warehouse Request</field>
+        <field name="code">direct.sales.warehouse.request</field>
+        <field name="prefix">WR/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="number_increment">1</field>
+        <field name="company_id" eval="False"/>
+    </record>
 </odoo>
 
