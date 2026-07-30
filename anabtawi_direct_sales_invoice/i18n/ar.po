@@ -1,0 +1,243 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* anabtawi_direct_sales_invoice
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-07-30 12:00+0000\n"
+"PO-Revision-Date: 2026-07-30 12:00+0000\n"
+"Last-Translator: Anabtawi Team\n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.ui.menu,name:anabtawi_direct_sales_invoice.menu_direct_sales_root
+msgid "Direct Sales"
+msgstr "المبيعات المباشرة"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.ui.menu,name:anabtawi_direct_sales_invoice.menu_direct_sales_operations
+msgid "Operations"
+msgstr "العمليات"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.ui.menu,name:anabtawi_direct_sales_invoice.menu_direct_sales_invoices
+msgid "Sales Invoices"
+msgstr "فواتير المبيعات"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.ui.menu,name:anabtawi_direct_sales_invoice.menu_cash_van_stock_requests
+msgid "Van Stock Requests"
+msgstr "طلبات بضاعة الفان"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.ui.menu,name:anabtawi_direct_sales_invoice.menu_cash_van_invoices
+msgid "Cash Van Sales Invoices"
+msgstr "فواتير مبيعات الفان"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.ui.menu,name:anabtawi_direct_sales_invoice.menu_direct_sales_cash_handover
+msgid "Cash Handover & Wallet Reset"
+msgstr "تسليم النقدية وتصفير المحفظة"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.ui.menu,name:anabtawi_direct_sales_invoice.menu_direct_sales_reporting
+msgid "Reporting"
+msgstr "التقارير"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.ui.menu,name:anabtawi_direct_sales_invoice.menu_direct_sales_analysis
+msgid "Sales Performance Analysis"
+msgstr "تحليل أداء المبيعات"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.ui.menu,name:anabtawi_direct_sales_invoice.menu_direct_sales_product_movement
+msgid "Product Movement Analysis"
+msgstr "تحليل حركة المنتجات"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.ui.menu,name:anabtawi_direct_sales_invoice.menu_direct_sales_outstanding
+msgid "Outstanding Invoices & Ledger"
+msgstr "الفواتير المعلقة وسجل الحسابات"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.ui.menu,name:anabtawi_direct_sales_invoice.menu_direct_sales_configuration
+msgid "Configuration"
+msgstr "الإعدادات"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice.field_direct_sales_invoice__partner_id
+msgid "Customer"
+msgstr "العميل"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice.field_direct_sales_invoice__user_id
+msgid "Salesperson"
+msgstr "مندوب المبيعات"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice.field_direct_sales_invoice__warehouse_id
+msgid "Pickup Warehouse / Van"
+msgstr "مستودع الاستلام / الفان"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice.field_direct_sales_invoice__source_location_id
+msgid "Source Stock Location"
+msgstr "موقع المخزن المصدر"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice.field_direct_sales_invoice__payment_term_id
+msgid "Payment Terms"
+msgstr "شروط الدفع"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice.field_direct_sales_invoice__invoice_date
+msgid "Invoice Date"
+msgstr "تاريخ الفاتورة"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice.field_direct_sales_invoice__line_ids
+msgid "Products"
+msgstr "المنتجات"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice_line__product_id
+msgid "Product"
+msgstr "المنتج"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice_line__quantity
+msgid "Requested Quantity"
+msgstr "الكمية المطلوبة"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice_line__approved_quantity
+msgid "Approved Quantity"
+msgstr "الكمية المعتمدة"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice_line__price_unit
+msgid "Unit Price"
+msgstr "سعر الوحدة"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice_line__discount
+msgid "Discount (%)"
+msgstr "الخصم (%)"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice_line__price_subtotal
+msgid "Subtotal"
+msgstr "الإجمالي الفرعي"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_invoice__amount_total
+msgid "Total"
+msgstr "الإجمالي"
+
+#. module: anabtawi_direct_sales_invoice
+#: selection:direct.sales.invoice,state:0
+msgid "Draft"
+msgstr "مسودة"
+
+#. module: anabtawi_direct_sales_invoice
+#: selection:direct.sales.invoice,state:0
+msgid "Pending Sales Manager Approval"
+msgstr "في انتظار موافقة مدير المبيعات"
+
+#. module: anabtawi_direct_sales_invoice
+#: selection:direct.sales.invoice,state:0
+msgid "Waiting Warehouse Approval"
+msgstr "في انتظار موافقة المستودع"
+
+#. module: anabtawi_direct_sales_invoice
+#: selection:direct.sales.invoice,state:0
+msgid "Partially Approved"
+msgstr "تمت الموافقة جزئياً"
+
+#. module: anabtawi_direct_sales_invoice
+#: selection:direct.sales.invoice,state:0
+msgid "Warehouse Approved"
+msgstr "تمت موافقة المستودع"
+
+#. module: anabtawi_direct_sales_invoice
+#: selection:direct.sales.invoice,state:0
+msgid "Ready for Pickup"
+msgstr "جاهز للتسليم"
+
+#. module: anabtawi_direct_sales_invoice
+#: selection:direct.sales.invoice,state:0
+msgid "Released"
+msgstr "تم التسليم"
+
+#. module: anabtawi_direct_sales_invoice
+#: selection:direct.sales.invoice,state:0
+msgid "Completed"
+msgstr "مكتمل"
+
+#. module: anabtawi_direct_sales_invoice
+#: selection:direct.sales.invoice,state:0
+msgid "Cancelled"
+msgstr "ملغى"
+
+#. module: anabtawi_direct_sales_invoice
+msgid "Submit to Warehouse"
+msgstr "إرسال للمستودع"
+
+#. module: anabtawi_direct_sales_invoice
+msgid "Approve Order"
+msgstr "موافقة على الطلب"
+
+#. module: anabtawi_direct_sales_invoice
+msgid "Reject Order"
+msgstr "رفض الطلب"
+
+#. module: anabtawi_direct_sales_invoice
+msgid "Confirm Receiving"
+msgstr "تأكيد الاستلام"
+
+#. module: anabtawi_direct_sales_invoice
+msgid "Send Email"
+msgstr "إرسال بالبريد"
+
+#. module: anabtawi_direct_sales_invoice
+msgid "Print PDF"
+msgstr "طباعة PDF"
+
+#. module: anabtawi_direct_sales_invoice
+msgid "Confirm Goods Release"
+msgstr "تأكيد تسليم البضائع"
+
+#. module: anabtawi_direct_sales_invoice
+msgid "End-of-Day Cash Collection & Handover"
+msgstr "تسليم النقدية وتصفير المحفظة بنهاية اليوم"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_cash_handover_wizard__amount_handed_over
+msgid "Physical Cash Handed Over"
+msgstr "النقدية المسلمة فعلياً"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_cash_handover_wizard__current_wallet_balance
+msgid "Total Cash Collected (Wallet Balance)"
+msgstr "إجمالي النقدية المحصلة (رصيد المحفظة)"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_cash_handover_wizard__destination_journal_id
+msgid "Destination Safe / Main Cash Journal"
+msgstr "الخزينة الرئيسية / دفتر النقدية"
+
+#. module: anabtawi_direct_sales_invoice
+#: model:ir.model.fields,field_description:anabtawi_direct_sales_cash_handover_wizard__remaining_balance
+msgid "Remaining Balance Owed by Salesperson"
+msgstr "المبلغ المتبقي بذمة المندوب"
+
+#. module: anabtawi_direct_sales_invoice
+msgid "Confirm Cash Handover & Reconcile"
+msgstr "تأكيد تسليم النقدية والتسوية"

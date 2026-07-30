@@ -207,6 +207,20 @@
                         groups="anabtawi_direct_sales_invoice.group_direct_invoice_user"
                         invisible="state != 'draft'"/>
                     <button
+                        name="action_approve_sales_manager"
+                        type="object"
+                        string="Approve Order"
+                        class="btn-success"
+                        groups="anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager"
+                        invisible="state != 'sales_manager_pending'"/>
+                    <button
+                        name="action_open_rejection_wizard"
+                        type="object"
+                        string="Reject Order"
+                        class="btn-danger"
+                        groups="anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager"
+                        invisible="state != 'sales_manager_pending'"/>
+                    <button
                         name="action_confirm_receiving"
                         type="object"
                         string="Confirm Receiving"
@@ -302,9 +316,12 @@
                     <field
                         name="state"
                         widget="statusbar"
-                        statusbar_visible="draft,warehouse_pending,warehouse_approved,ready,released,completed"/>
+                        statusbar_visible="draft,sales_manager_pending,warehouse_pending,ready,released,completed"/>
                 </header>
                 <sheet>
+                    <div class="alert alert-danger mb-3" role="alert" invisible="state != 'rejected'">
+                        <strong>Order Rejected:</strong> <field name="rejection_reason" readonly="1" class="d-inline"/>
+                    </div>
                     <field name="company_id" invisible="True"/>
                     <field name="currency_id" invisible="True"/>
                     <field name="allowed_warehouse_ids" invisible="True"/>
@@ -378,11 +395,11 @@
                             <field name="user_id" widget="many2one_avatar_user" readonly="state != 'draft'"/>
                             <field name="warehouse_id" string="Pickup Warehouse / Van" readonly="state != 'draft'"/>
                         </group>
-                        <group string="Pricing &amp; Payment Terms" invisible="is_warehouse_request">
-                            <field name="pricelist_id" readonly="state != 'draft'"/>
-                            <field name="payment_term_id" readonly="state != 'draft'"/>
+                        <group string="Payment &amp; Terms" invisible="is_warehouse_request">
+                            <field name="pricelist_id" invisible="True"/>
+                            <field name="is_cash_sale" invisible="True"/>
+                            <field name="payment_term_id" string="Payment Terms" readonly="state != 'draft'"/>
                             <field name="invoice_date" readonly="state != 'draft'"/>
-                            <field name="is_cash_sale" readonly="state != 'draft'"/>
                         </group>
                     </group>
                     <notebook>
@@ -404,7 +421,7 @@
                                     <field name="forecast_quantity" readonly="True" optional="show"/>
                                     <field name="shortage_quantity" readonly="True" optional="show"/>
                                     <field name="availability_state" readonly="True" widget="badge"/>
-                                    <field name="price_unit" column_invisible="parent.is_warehouse_request"/>
+                                    <field name="price_unit" readonly="True" column_invisible="parent.is_warehouse_request"/>
                                     <field name="discount" column_invisible="parent.is_warehouse_request"/>
                                     <field name="tax_ids" widget="many2many_tags" optional="show" column_invisible="parent.is_warehouse_request"/>
                                     <field name="price_subtotal" readonly="True" sum="Untaxed" column_invisible="parent.is_warehouse_request"/>
@@ -421,7 +438,7 @@
                                 <field name="amount_total" widget="monetary" class="oe_subtotal_footer_separator"/>
                             </group>
                         </page>
-                        <page string="Warehouse" name="warehouse">
+                        <page string="Warehouse" name="warehouse" groups="anabtawi_direct_sales_invoice.group_direct_invoice_admin">
                             <group>
                                 <group>
                                     <field name="warehouse_id" readonly="True"/>
@@ -452,7 +469,7 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Accounting" name="accounting">
+                        <page string="Accounting" name="accounting" groups="anabtawi_direct_sales_invoice.group_direct_invoice_admin">
                             <group>
                                 <group>
                                     <field name="invoice_id"/>
@@ -471,7 +488,7 @@
                                 </group>
                             </group>
                         </page>
-                        <page string="Traceability" name="traceability">
+                        <page string="Traceability" name="traceability" groups="anabtawi_direct_sales_invoice.group_direct_invoice_admin">
                             <group>
                                 <group>
                                     <field name="pricelist_id" readonly="True"/>
@@ -500,7 +517,7 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Warehouse &amp; Technical" name="technical_info">
+                        <page string="Warehouse &amp; Technical" name="technical" groups="anabtawi_direct_sales_invoice.group_direct_invoice_admin">
                             <group>
                                 <group string="Stock Details">
                                     <field name="source_location_id" readonly="state != 'draft'"/>
@@ -567,34 +584,39 @@
     </record>
 
     <record id="action_direct_sales_invoice" model="ir.actions.act_window">
-        <field name="name">Direct Invoices</field>
+        <field name="name">Sales Invoices</field>
         <field name="res_model">direct.sales.invoice</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('is_warehouse_request', '=', False)]</field>
-        <field name="context">{'default_is_warehouse_request': False, 'search_default_requested_date': 1}</field>
+        <field name="domain">[('is_warehouse_request', '=', False), ('is_cash_van', '=', False)]</field>
+        <field name="context">{'default_is_warehouse_request': False, 'default_is_cash_van': False, 'search_default_requested_date': 1}</field>
         <field name="search_view_id" ref="view_direct_sales_invoice_search"/>
-        <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Create a warehouse-approved direct invoice</p>
-            <p>Select the customer, pickup warehouse, and products, then submit the request for approval.</p>
-        </field>
     </record>
 
     <record id="action_my_direct_sales_invoice" model="ir.actions.act_window">
-        <field name="name">My Direct Invoices</field>
+        <field name="name">My Sales Invoices</field>
         <field name="res_model">direct.sales.invoice</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('user_id', '=', uid), ('is_warehouse_request', '=', False)]</field>
-        <field name="context">{'default_is_warehouse_request': False}</field>
+        <field name="domain">[('user_id', '=', uid), ('is_warehouse_request', '=', False), ('is_cash_van', '=', False)]</field>
+        <field name="context">{'default_is_warehouse_request': False, 'default_is_cash_van': False}</field>
+        <field name="search_view_id" ref="view_direct_sales_invoice_search"/>
+    </record>
+
+    <record id="action_direct_sales_cash_van_invoices" model="ir.actions.act_window">
+        <field name="name">Cash Van Sales Invoices</field>
+        <field name="res_model">direct.sales.invoice</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('is_cash_van', '=', True)]</field>
+        <field name="context">{'default_is_cash_van': True, 'default_is_warehouse_request': False}</field>
         <field name="search_view_id" ref="view_direct_sales_invoice_search"/>
     </record>
 
     <record id="action_direct_sales_warehouse_requests" model="ir.actions.act_window">
-        <field name="name">Warehouse Requests</field>
+        <field name="name">Van Stock Requests</field>
         <field name="res_model">direct.sales.invoice</field>
         <field name="view_mode">list,form</field>
         <field name="view_id" ref="view_direct_sales_invoice_warehouse_list"/>
         <field name="domain">[('is_warehouse_request', '=', True)]</field>
-        <field name="context">{'default_is_warehouse_request': True, 'search_default_warehouse_pending': 1}</field>
+        <field name="context">{'default_is_warehouse_request': True, 'default_is_cash_van': False, 'search_default_warehouse_pending': 1}</field>
         <field name="search_view_id" ref="view_direct_sales_invoice_search"/>
     </record>
 

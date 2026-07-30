@@ -7,6 +7,7 @@ from odoo.tools.float_utils import float_compare, float_is_zero
 
 DIRECT_SALES_STATES = [
     ("draft", "Draft"),
+    ("sales_manager_pending", "Pending Sales Manager Approval"),
     ("warehouse_pending", "Waiting Warehouse Approval"),
     ("partially_approved", "Partially Approved"),
     ("warehouse_approved", "Warehouse Approved"),
@@ -49,6 +50,13 @@ class DirectSalesInvoice(models.Model):
         copy=False,
         index=True,
         help="Set to True for internal Cash Van / Warehouse replenishment requests without customer invoicing.",
+    )
+    is_cash_van = fields.Boolean(
+        string="Is Cash Van Invoice",
+        default=False,
+        copy=False,
+        index=True,
+        help="Set to True for direct on-the-road Cash Van customer invoices.",
     )
     partner_id = fields.Many2one(
         "res.partner",
@@ -803,6 +811,18 @@ class DirectSalesInvoice(models.Model):
             if warning:
                 return {"warning": warning}
 
+    @api.onchange("payment_term_id")
+    def _onchange_payment_term_id(self):
+        for record in self:
+            if not record.payment_term_id:
+                record.is_cash_sale = False
+                continue
+            term_name = (record.payment_term_id.name or "").lower()
+            is_immediate = "immediate" in term_name or "cash" in term_name or "نقدي" in term_name or "فوري" in term_name
+            if not is_immediate and hasattr(record.payment_term_id, "line_ids") and record.payment_term_id.line_ids:
+                is_immediate = not any(getattr(line, "nb_days", 0) > 0 for line in record.payment_term_id.line_ids)
+            record.is_cash_sale = is_immediate
+
     @api.onchange("pricelist_id")
     def _onchange_pricelist_id(self):
         for record in self:
@@ -1142,9 +1162,11 @@ class DirectSalesInvoice(models.Model):
                 )
             approvers = approval_warehouses.direct_sales_approval_user_ids
             old_state = record.state
-            record.with_context(direct_sales_bypass_lock=True).write(
-                {"state": "warehouse_pending"}
-            )
+            # Cash Van invoice without discount bypasses Sales Manager approval
+            requires_manager_approval = not (record.is_cash_van and not any(line.discount > 0 for line in record.line_ids))
+            target_state = "sales_manager_pending" if requires_manager_approval else "warehouse_pending"
+            
+            record.with_context(direct_sales_bypass_lock=True).write({"state": target_state})
             record.line_ids.with_context(direct_sales_warehouse_write=True).write(
                 {
                     "approved_quantity": 0.0,
@@ -1154,21 +1176,23 @@ class DirectSalesInvoice(models.Model):
             record._log_approval_event(
                 "submitted",
                 state_from=old_state,
-                state_to="warehouse_pending",
+                state_to=target_state,
             )
-            record._schedule_activity_once(
-                "anabtawi_direct_sales_invoice.mail_activity_direct_warehouse_approval",
-                approvers,
-                _("Approve direct invoice %s", record.name),
-                _("Customer: %s", record.partner_id.display_name),
-            )
-            record._notify_users(
-                approvers,
-                _(
-                    "Direct invoice <b>%(reference)s</b> was submitted for warehouse approval.",
-                    reference=record.name,
-                ),
-            )
+            if not requires_manager_approval:
+                record._ensure_approval_pickings()
+
+    def action_approve_sales_manager(self):
+        for record in self:
+            if record.state != "sales_manager_pending":
+                raise UserError(_("Only documents pending Sales Manager approval can be approved."))
+            old_state = record.state
+            record.with_context(direct_sales_bypass_lock=True).write({"state": "warehouse_pending"})
+            record.line_ids.with_context(direct_sales_warehouse_write=True).write({
+                "approved_quantity": 0.0,
+                "warehouse_status": "pending",
+            })
+            record._log_approval_event("sales_manager_approved", state_from=old_state, state_to="warehouse_pending")
+            record._ensure_approval_pickings()
         return True
 
     def action_open_approval_wizard(self):

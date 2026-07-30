@@ -1,7 +1,7 @@
 {
     "name": "Anabtawi Direct Sales Invoice",
-    "summary": "Role-isolated direct sales, van replenishment, and custodian cash accounting",
-    "version": "19.0.2.0.0",
+    "summary": "5-Role Direct Sales & Cash Van workflows with Sales Manager Approval and Custodian Cash Accounting",
+    "version": "19.0.3.0.0",
     "category": "Sales/Inventory/Accounting",
     "author": "Anabtawi Sweets",
     "website": "https://www.anabtawisweets.com",

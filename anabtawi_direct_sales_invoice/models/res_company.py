@@ -76,3 +76,8 @@ class ResCompany(models.Model):
         string="Enable Price Override Approval",
         default=True,
     )
+    direct_sales_max_discount_percent = fields.Float(
+        string="Maximum Allowed Discount %",
+        default=15.0,
+        help="Maximum discount percentage allowed for salespeople and cash van drivers.",
+    )

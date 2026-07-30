@@ -5,54 +5,45 @@
         name="Direct Sales"
         sequence="35"
         web_icon="anabtawi_direct_sales_invoice,static/description/icon.png"
-        groups="anabtawi_direct_sales_invoice.group_direct_invoice_user,anabtawi_direct_sales_invoice.group_direct_invoice_warehouse_user,anabtawi_direct_sales_invoice.group_direct_invoice_accounting_user"/>
+        groups="anabtawi_direct_sales_invoice.group_direct_invoice_user,anabtawi_direct_sales_invoice.group_direct_invoice_cash_van,anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager,anabtawi_direct_sales_invoice.group_direct_invoice_accounting_user,anabtawi_direct_sales_invoice.group_direct_invoice_admin"/>
 
     <menuitem
         id="menu_direct_sales_operations"
         name="Operations"
         parent="menu_direct_sales_root"
         sequence="10"/>
+
     <menuitem
         id="menu_direct_sales_invoices"
-        name="Direct Invoices"
+        name="Sales Invoices"
         parent="menu_direct_sales_operations"
         action="action_direct_sales_invoice"
         sequence="10"
-        groups="anabtawi_direct_sales_invoice.group_direct_invoice_user,anabtawi_direct_sales_invoice.group_direct_invoice_accounting_user"/>
+        groups="anabtawi_direct_sales_invoice.group_direct_invoice_salesperson,anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager,anabtawi_direct_sales_invoice.group_direct_invoice_accounting_user,anabtawi_direct_sales_invoice.group_direct_invoice_admin"/>
+
     <menuitem
-        id="menu_my_direct_sales_invoices"
-        name="My Direct Invoices"
-        parent="menu_direct_sales_operations"
-        action="action_my_direct_sales_invoice"
-        sequence="20"
-        groups="anabtawi_direct_sales_invoice.group_direct_invoice_user"/>
-    <menuitem
-        id="menu_direct_sales_warehouse_requests"
-        name="Warehouse Requests"
+        id="menu_cash_van_stock_requests"
+        name="Van Stock Requests"
         parent="menu_direct_sales_operations"
         action="action_direct_sales_warehouse_requests"
+        sequence="20"
+        groups="anabtawi_direct_sales_invoice.group_direct_invoice_cash_van,anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager,anabtawi_direct_sales_invoice.group_direct_invoice_admin"/>
+
+    <menuitem
+        id="menu_cash_van_invoices"
+        name="Cash Van Sales Invoices"
+        parent="menu_direct_sales_operations"
+        action="action_direct_sales_cash_van_invoices"
         sequence="30"
-        groups="anabtawi_direct_sales_invoice.group_direct_invoice_warehouse_user"/>
-    <menuitem
-        id="menu_direct_sales_ready"
-        name="Ready for Pickup"
-        parent="menu_direct_sales_operations"
-        action="action_direct_sales_ready"
-        sequence="40"
-        groups="anabtawi_direct_sales_invoice.group_direct_invoice_user,anabtawi_direct_sales_invoice.group_direct_invoice_warehouse_user"/>
-    <menuitem
-        id="menu_direct_sales_released"
-        name="Released Orders"
-        parent="menu_direct_sales_operations"
-        action="action_direct_sales_released"
-        sequence="50"/>
+        groups="anabtawi_direct_sales_invoice.group_direct_invoice_cash_van,anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager,anabtawi_direct_sales_invoice.group_direct_invoice_accounting_user,anabtawi_direct_sales_invoice.group_direct_invoice_admin"/>
+
     <menuitem
         id="menu_direct_sales_cash_handover"
         name="Cash Handover &amp; Wallet Reset"
         parent="menu_direct_sales_operations"
         action="action_cash_handover_wizard"
-        sequence="60"
-        groups="anabtawi_direct_sales_invoice.group_direct_invoice_user,anabtawi_direct_sales_invoice.group_direct_invoice_accounting_user"/>
+        sequence="40"
+        groups="anabtawi_direct_sales_invoice.group_direct_invoice_user,anabtawi_direct_sales_invoice.group_direct_invoice_accounting_user,anabtawi_direct_sales_invoice.group_direct_invoice_admin"/>
 
     <menuitem
         id="menu_direct_sales_reporting"
@@ -60,31 +51,27 @@
         parent="menu_direct_sales_root"
         sequence="20"
         groups="anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager,anabtawi_direct_sales_invoice.group_direct_invoice_accounting_user,anabtawi_direct_sales_invoice.group_direct_invoice_admin"/>
+
     <menuitem
         id="menu_direct_sales_analysis"
-        name="Sales Analysis"
+        name="Sales Performance Analysis"
         parent="menu_direct_sales_reporting"
         action="action_direct_sales_reporting"
         sequence="10"/>
+
     <menuitem
         id="menu_direct_sales_product_movement"
-        name="Product Movement"
+        name="Product Movement Analysis"
         parent="menu_direct_sales_reporting"
         action="action_direct_sales_product_reporting"
         sequence="20"/>
+
     <menuitem
         id="menu_direct_sales_outstanding"
-        name="Outstanding Invoices"
+        name="Outstanding Invoices &amp; Ledger"
         parent="menu_direct_sales_reporting"
         action="action_direct_sales_outstanding"
         sequence="30"/>
-    <menuitem
-        id="menu_direct_sales_price_overrides"
-        name="Manual Price Overrides"
-        parent="menu_direct_sales_reporting"
-        action="action_direct_sales_price_overrides"
-        sequence="40"
-        groups="anabtawi_direct_sales_invoice.group_direct_invoice_sales_manager,anabtawi_direct_sales_invoice.group_direct_invoice_accounting_user"/>
 
     <menuitem
         id="menu_direct_sales_configuration"
@@ -92,12 +79,14 @@
         parent="menu_direct_sales_root"
         sequence="30"
         groups="anabtawi_direct_sales_invoice.group_direct_invoice_admin"/>
+
     <menuitem
         id="menu_direct_sales_warehouses"
         name="Warehouses"
         parent="menu_direct_sales_configuration"
         action="stock.action_warehouse_form"
         sequence="10"/>
+
     <menuitem
         id="menu_direct_sales_settings"
         name="Settings"

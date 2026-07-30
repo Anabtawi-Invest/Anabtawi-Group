@@ -177,6 +177,16 @@ class DirectSalesInvoiceLine(models.Model):
         copy=False,
         index=True,
     )
+    @api.constrains("discount")
+    def _check_max_discount(self):
+        for line in self:
+            max_disc = line.company_id.direct_sales_max_discount_percent or 100.0
+            if line.discount > max_disc:
+                raise ValidationError(
+                    _("Discount of %.2f%% exceeds maximum allowed discount of %.2f%%.")
+                    % (line.discount, max_disc)
+                )
+
     product_category_id = fields.Many2one(
         related="product_id.categ_id", store=True, index=True
     )
