@@ -5,6 +5,6 @@
         <field name="bundle">point_of_sale._assets_pos</field>
         <field name="directive">remove</field>
         <field name="path">sh_pos_analytic_tags/static/src/overrides/models.js</field>
-        <field name="sequence">1</field>
+        <field name="sequence">9999</field>
     </record>
 </odoo>

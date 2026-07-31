@@ -8,6 +8,6 @@
     "author": "Anabtawi Group",
     "license": "LGPL-3",
     "depends": ["point_of_sale"],
-    "installable": False,
+    "installable": True,
     "application": False,
 }
