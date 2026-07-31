@@ -1,7 +1,7 @@
 {
     "name": "Anabtawi Direct Sales Invoice",
     "summary": "5-Role Direct Sales & Cash Van workflows with Sales Manager Approval and Custodian Cash Accounting",
-    "version": "19.0.3.0.0",
+    "version": "19.0.3.0.1",
     "category": "Sales/Inventory/Accounting",
     "author": "Anabtawi Sweets",
     "website": "https://www.anabtawisweets.com",
