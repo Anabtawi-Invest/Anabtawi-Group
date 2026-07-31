@@ -52,6 +52,24 @@ class HrEmployee(models.Model):
     def _lat_float_is_zero(self, value, precision=1e-6):
         return abs(value) <= precision
 
+    @api.model
+    def _lat_truncate_to_minute(self, dt):
+        """Drop seconds so LAT matches clock times shown in the UI."""
+        if not dt:
+            return dt
+        return dt.replace(second=0, microsecond=0)
+
+    @api.model
+    def _lat_diff_whole_minutes(self, later, earlier):
+        """Whole minutes between datetimes; ignores sub-minute noise."""
+        if not later or not earlier:
+            return 0
+        later = self._lat_truncate_to_minute(later)
+        earlier = self._lat_truncate_to_minute(earlier)
+        if later <= earlier:
+            return 0
+        return int((later - earlier).total_seconds()) // 60
+
     def _lat_get_work_entry_type(self):
         self.ensure_one()
         work_entry_type = self.env["hr.work.entry.type"].sudo().search([("code", "=", "LAT")], limit=1)
@@ -285,15 +303,12 @@ class HrEmployee(models.Model):
                     if not attendance_end or overlap_end > attendance_end:
                         attendance_end = overlap_end
 
-            late_check_in_hours = 0.0
-            if planned_start and attendance_start and attendance_start > planned_start:
-                late_check_in_hours = (attendance_start - planned_start).total_seconds() / 3600.0
-
-            early_check_out_hours = 0.0
-            if planned_end and attendance_end and planned_end > attendance_end:
-                early_check_out_hours = (planned_end - attendance_end).total_seconds() / 3600.0
-
-            lateness_hours = max(late_check_in_hours + early_check_out_hours, 0.0)
+            late_check_in_minutes = self._lat_diff_whole_minutes(attendance_start, planned_start)
+            early_check_out_minutes = self._lat_diff_whole_minutes(planned_end, attendance_end)
+            lateness_minutes = late_check_in_minutes + early_check_out_minutes
+            lateness_hours = lateness_minutes / 60.0
+            late_check_in_hours = late_check_in_minutes / 60.0
+            early_check_out_hours = early_check_out_minutes / 60.0
             should_have_lat = (
                 bool(planned_start and planned_end and attendance_start and attendance_end)
                 and lateness_hours > grace_hours
@@ -365,7 +380,7 @@ class HrEmployee(models.Model):
             self._lat_remove_entries(existing_entries)
             return
 
-        duration = min(round(late_hours, 4), 24.0)
+        duration = min(late_hours, 24.0)
         if duration <= 0.0:
             _logger.info(
                 "[LAT] sync_action employee_id=%s employee=%s date=%s action=remove reason=non_positive_duration existing_entries=%s",
