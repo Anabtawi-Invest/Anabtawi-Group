@@ -70,6 +70,130 @@ class HrEmployee(models.Model):
             return 0
         return int((later - earlier).total_seconds()) // 60
 
+    def _lat_format_dt_local(self, dt):
+        """Format UTC-naive datetime in employee timezone for log readability."""
+        if not dt:
+            return "None"
+        employee_tz = self._lat_get_timezone()
+        local_dt = pytz.utc.localize(dt).astimezone(employee_tz)
+        return local_dt.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+    def _lat_raw_diff_seconds(self, later, earlier):
+        if not later or not earlier or later <= earlier:
+            return 0
+        return int((later - earlier).total_seconds())
+
+    def _lat_log_day_diagnosis(
+        self,
+        day,
+        planned_source,
+        planning_intervals,
+        day_attendances,
+        day_slots,
+        planned_start,
+        planned_end,
+        attendance_start,
+        attendance_end,
+        late_check_in_minutes,
+        early_check_out_minutes,
+        lateness_minutes,
+        grace_hours,
+        should_have_lat,
+        existing_entry_ids,
+    ):
+        """Detailed LAT breakdown — search logs for [LAT DIAG]."""
+        self.ensure_one()
+        tz_name = self._lat_get_timezone().zone
+
+        late_raw_sec = self._lat_raw_diff_seconds(attendance_start, planned_start)
+        early_raw_sec = self._lat_raw_diff_seconds(planned_end, attendance_end)
+
+        slot_lines = [
+            "slot_id=%s state=%s start_utc=%s end_utc=%s start_local=%s end_local=%s"
+            % (
+                slot.id,
+                slot.state,
+                slot.start_datetime,
+                slot.end_datetime,
+                self._lat_format_dt_local(slot.start_datetime),
+                self._lat_format_dt_local(slot.end_datetime),
+            )
+            for slot in day_slots
+        ]
+        attendance_lines = [
+            "attendance_id=%s check_in_utc=%s check_out_utc=%s check_in_local=%s check_out_local=%s"
+            % (
+                att.id,
+                att.check_in,
+                att.check_out,
+                self._lat_format_dt_local(att.check_in),
+                self._lat_format_dt_local(att.check_out),
+            )
+            for att in day_attendances
+        ]
+        interval_lines = [
+            "interval start_utc=%s end_utc=%s start_local=%s end_local=%s duration_min=%s"
+            % (
+                start,
+                end,
+                self._lat_format_dt_local(start),
+                self._lat_format_dt_local(end),
+                int((end - start).total_seconds()) // 60,
+            )
+            for start, end in planning_intervals
+        ]
+
+        _logger.warning(
+            "[LAT DIAG] employee=%s(%s) date=%s tz=%s source=%s\n"
+            "  PLANNED   start: utc=%s local=%s | end: utc=%s local=%s\n"
+            "  ATTENDANCE start: utc=%s local=%s | end: utc=%s local=%s\n"
+            "  TRUNCATED planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s\n"
+            "  LATE CHECK-IN  raw_sec=%s (%sm%ss) -> whole_min=%s\n"
+            "  EARLY CHECK-OUT raw_sec=%s (%sm%ss) -> whole_min=%s\n"
+            "  TOTAL lateness_min=%s (%sh%sm) stored_hours=%.6f grace_min=%s should_have_lat=%s existing_lat_ids=%s\n"
+            "  PLANNING INTERVALS (%s):\n    %s\n"
+            "  DAY SLOTS (%s):\n    %s\n"
+            "  DAY ATTENDANCES (%s):\n    %s",
+            self.display_name,
+            self.id,
+            day,
+            tz_name,
+            planned_source,
+            planned_start,
+            self._lat_format_dt_local(planned_start),
+            planned_end,
+            self._lat_format_dt_local(planned_end),
+            attendance_start,
+            self._lat_format_dt_local(attendance_start),
+            attendance_end,
+            self._lat_format_dt_local(attendance_end),
+            self._lat_truncate_to_minute(planned_start),
+            self._lat_truncate_to_minute(planned_end),
+            self._lat_truncate_to_minute(attendance_start),
+            self._lat_truncate_to_minute(attendance_end),
+            late_raw_sec,
+            late_raw_sec // 60,
+            late_raw_sec % 60,
+            late_check_in_minutes,
+            early_raw_sec,
+            early_raw_sec // 60,
+            early_raw_sec % 60,
+            early_check_out_minutes,
+            lateness_minutes,
+            lateness_minutes // 60,
+            lateness_minutes % 60,
+            lateness_minutes / 60.0,
+            int(grace_hours * 60),
+            should_have_lat,
+            existing_entry_ids,
+            len(planning_intervals),
+            "\n    ".join(interval_lines) or "(none)",
+            len(day_slots),
+            "\n    ".join(slot_lines) or "(none)",
+            len(day_attendances),
+            "\n    ".join(attendance_lines) or "(none)",
+        )
+
     def _lat_get_work_entry_type(self):
         self.ensure_one()
         work_entry_type = self.env["hr.work.entry.type"].sudo().search([("code", "=", "LAT")], limit=1)
@@ -263,11 +387,13 @@ class HrEmployee(models.Model):
             day_start, day_end = day_bounds[day]
             planning_intervals = []
             planned_source = "planning"
+            day_slots = self.env["planning.slot"]
             for slot in slots:
                 overlap_start = max(slot.start_datetime, day_start)
                 overlap_end = min(slot.end_datetime, day_end)
                 if overlap_end > overlap_start:
                     planning_intervals.append((overlap_start, overlap_end))
+                    day_slots |= slot
 
             if not planning_intervals:
                 calendar_intervals = self._lat_get_calendar_intervals_on_day(day, day_start, day_end)
@@ -289,6 +415,7 @@ class HrEmployee(models.Model):
 
             attendance_start = False
             attendance_end = False
+            day_attendances = self.env["hr.attendance"]
             for attendance in attendances:
                 if not attendance.check_in or not attendance.check_out:
                     continue
@@ -297,6 +424,7 @@ class HrEmployee(models.Model):
                 overlap_start = max(attendance.check_in, day_start)
                 overlap_end = min(attendance.check_out, day_end)
                 if overlap_end > overlap_start:
+                    day_attendances |= attendance
                     current_start = overlap_start
                     if not attendance_start or current_start < attendance_start:
                         attendance_start = current_start
@@ -313,6 +441,24 @@ class HrEmployee(models.Model):
                 bool(planned_start and planned_end and attendance_start and attendance_end)
                 and lateness_hours > grace_hours
             )
+            existing_entry_ids = entries_by_day.get(day, self.env["hr.work.entry"]).ids
+            self._lat_log_day_diagnosis(
+                day=day,
+                planned_source=planned_source,
+                planning_intervals=planning_intervals,
+                day_attendances=day_attendances,
+                day_slots=day_slots,
+                planned_start=planned_start,
+                planned_end=planned_end,
+                attendance_start=attendance_start,
+                attendance_end=attendance_end,
+                late_check_in_minutes=late_check_in_minutes,
+                early_check_out_minutes=early_check_out_minutes,
+                lateness_minutes=lateness_minutes,
+                grace_hours=grace_hours,
+                should_have_lat=should_have_lat,
+                existing_entry_ids=existing_entry_ids,
+            )
             _logger.info(
                 "[LAT] day_eval employee_id=%s employee=%s date=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s planned_hours=%.4f late_check_in=%.4f early_check_out=%.4f lateness=%.4f grace=%.4f should_have_lat=%s existing_entries=%s",
                 self.id,
@@ -328,22 +474,17 @@ class HrEmployee(models.Model):
                 lateness_hours,
                 grace_hours,
                 should_have_lat,
-                entries_by_day.get(day, self.env["hr.work.entry"]).ids,
+                existing_entry_ids,
             )
             _logger.warning(
-                "[LAT TRACE2] employee=%s(%s) date=%s source=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s late_in=%.4f early_out=%.4f total=%.4f grace=%.4f apply=%s",
+                "[LAT TRACE2] employee=%s(%s) date=%s source=%s late_in_min=%s early_out_min=%s total_min=%s apply=%s",
                 self.display_name,
                 self.id,
                 day,
                 planned_source,
-                planned_start,
-                planned_end,
-                attendance_start,
-                attendance_end,
-                late_check_in_hours,
-                early_check_out_hours,
-                lateness_hours,
-                grace_hours,
+                late_check_in_minutes,
+                early_check_out_minutes,
+                lateness_minutes,
                 should_have_lat,
             )
             _logger.info(
@@ -356,6 +497,7 @@ class HrEmployee(models.Model):
             self._lat_sync_work_entry_for_day(
                 target_date=day,
                 late_hours=lateness_hours,
+                lateness_minutes=lateness_minutes,
                 should_have_lat=should_have_lat,
                 lat_type=lat_type,
                 existing_entries=entries_by_day.get(day, self.env["hr.work.entry"]),
@@ -366,7 +508,9 @@ class HrEmployee(models.Model):
             self.display_name,
         )
 
-    def _lat_sync_work_entry_for_day(self, target_date, late_hours, should_have_lat, lat_type, existing_entries):
+    def _lat_sync_work_entry_for_day(
+        self, target_date, late_hours, should_have_lat, lat_type, existing_entries, lateness_minutes=0,
+    ):
         self.ensure_one()
         existing_entries = existing_entries.sorted("id")
         if not should_have_lat:
@@ -381,6 +525,20 @@ class HrEmployee(models.Model):
             return
 
         duration = min(late_hours, 24.0)
+        total_min = lateness_minutes or int(round(duration * 60))
+        display_h, display_m = divmod(total_min, 60)
+        _logger.warning(
+            "[LAT DIAG SYNC] employee=%s(%s) date=%s lateness_min=%s stored_hours=%.6f "
+            "ui_display=%sh%02sm existing_entries=%s",
+            self.display_name,
+            self.id,
+            target_date,
+            total_min,
+            duration,
+            display_h,
+            display_m,
+            existing_entries.ids,
+        )
         if duration <= 0.0:
             _logger.info(
                 "[LAT] sync_action employee_id=%s employee=%s date=%s action=remove reason=non_positive_duration existing_entries=%s",
