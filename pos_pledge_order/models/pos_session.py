@@ -53,7 +53,7 @@ class PosSession(models.Model):
                 if part[0] == "cash":
                     cash_in += part[1]
                 else:
-                    by_pm_in[part[2]] += part[1]
+                    by_pm_in[part[1]] += part[2]
 
         PledgeLine = self.env["pos.advance.order.pledge"].sudo()
         returned_here = PledgeLine.search([
@@ -77,7 +77,7 @@ class PosSession(models.Model):
                 if part[0] == "cash":
                     cash_out += part[1]
                 else:
-                    by_pm_out[part[2]] += part[1]
+                    by_pm_out[part[1]] += part[2]
 
         cash_net = cur.round(cash_in - cash_out)
         by_pm_net = defaultdict(float)
