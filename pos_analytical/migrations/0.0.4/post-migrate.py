@@ -8,6 +8,7 @@ def migrate(cr, version):
         """
         DELETE FROM ir_asset
          WHERE path LIKE 'sh_pos_analytic_tags/%'
+           AND directive != 'remove'
         """
     )
     cr.execute(

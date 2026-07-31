@@ -12,6 +12,7 @@ def _cleanup_legacy_analytic_module(env):
         """
         DELETE FROM ir_asset
          WHERE path LIKE 'sh_pos_analytic_tags/%'
+           AND directive != 'remove'
         """
     )
     ghost_module = env['ir.module.module'].sudo().search([
