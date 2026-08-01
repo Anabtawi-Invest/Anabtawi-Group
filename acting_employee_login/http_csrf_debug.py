@@ -75,9 +75,9 @@ def _logged_validate_csrf(self, csrf):
     try:
         form = self.httprequest.form
         form_keys = sorted(form.keys())
-        has_acting_name = 'acting_employee_name' in form
+        has_acting_number = 'acting_employee_number' in form
         has_acting_password = bool(form.get('acting_employee_password'))
-        acting_name = (form.get('acting_employee_name') or '')[:80]
+        acting_number = (form.get('acting_employee_number') or '')[:80]
         login_value = (form.get('login') or '')[:80]
     except Exception:  # noqa: BLE001
         pass
@@ -102,8 +102,8 @@ def _logged_validate_csrf(self, csrf):
         "acting_employee_login CSRF debug: path=%s method=%s valid=%s reason=%s "
         "has_csrf=%s csrf_prefix=%s max_ts=%s expired=%s now_ts=%s "
         "session_sid_prefix=%s cookie_sid_prefix=%s sid_matches_cookie=%s "
-        "session_uid=%s should_rotate=%s login=%r acting_name=%r "
-        "has_acting_name=%s has_acting_password=%s form_keys=%s",
+        "session_uid=%s should_rotate=%s login=%r acting_number=%r "
+        "has_acting_number=%s has_acting_password=%s form_keys=%s",
         path,
         method,
         valid,
@@ -119,8 +119,8 @@ def _logged_validate_csrf(self, csrf):
         uid,
         should_rotate,
         login_value,
-        acting_name,
-        has_acting_name,
+        acting_number,
+        has_acting_number,
         has_acting_password,
         form_keys,
     )

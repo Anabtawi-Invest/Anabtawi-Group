@@ -7,8 +7,8 @@
         <field name="arch" type="xml">
             <xpath expr="//group[@name='identification_group']" position="inside">
                 <field name="acting_login_password"
-                         password="True"
-                         placeholder="Set password used at login"/>
+                       password="True"
+                       placeholder="Set password used at login"/>
             </xpath>
         </field>
     </record>

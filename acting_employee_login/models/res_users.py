@@ -30,7 +30,7 @@ class ResUsers(models.Model):
         if request.httprequest.method != 'POST':
             return False
         return (
-            'acting_employee_name' in request.params
+            'acting_employee_number' in request.params
             or 'acting_employee_password' in request.params
         )
 
@@ -47,7 +47,7 @@ class ResUsers(models.Model):
 
     def _authenticate_second_step_from_request(self, login):
         """Validate employee or branch credentials before session auth."""
-        name = request.params.get('acting_employee_name')
+        second_step_id = request.params.get('acting_employee_number')
         password = request.params.get('acting_employee_password')
         user = self._lookup_user_by_login(login)
 
@@ -58,24 +58,24 @@ class ResUsers(models.Model):
                 login,
                 user.id,
                 user.is_branch_user,
-                (name or '')[:80],
+                (second_step_id or '')[:80],
                 bool(password),
             )
             return self.env['acting.branch.access']._authenticate_branch_access(
-                user, name, password
+                user, second_step_id, password
             )
 
         _logger.warning(
             "acting_employee_login auth: validating acting employee login=%r "
-            "user_id=%s is_branch_user=%s name=%r has_password=%s",
+            "user_id=%s is_branch_user=%s employee_number=%r has_password=%s",
             login,
             user.id if user else None,
             user.is_branch_user if user else None,
-            (name or '')[:80],
+            (second_step_id or '')[:80],
             bool(password),
         )
         return self.env['hr.employee'].sudo()._authenticate_acting_employee(
-            name, password
+            second_step_id, password, user=user
         )
 
     @staticmethod

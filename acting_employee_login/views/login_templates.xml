@@ -2,13 +2,13 @@
 <odoo>
     <template id="login_acting_employee" inherit_id="web.login">
         <xpath expr="//div[hasclass('o_caps_lock_warning')]" position="after">
-            <div class="mb-3 field-acting-employee-name">
-                <label for="acting_employee_name" class="form-label">Employee Name</label>
+            <div class="mb-3 field-acting-employee-number">
+                <label for="acting_employee_number" class="form-label">Employee Number</label>
                 <input type="text"
-                       placeholder="Enter employee name"
-                       name="acting_employee_name"
-                       t-att-value="acting_employee_name"
-                       id="acting_employee_name"
+                       placeholder="Enter employee number"
+                       name="acting_employee_number"
+                       t-att-value="acting_employee_number"
+                       id="acting_employee_number"
                        class="form-control"
                        required="required"
                        autocomplete="off"/>

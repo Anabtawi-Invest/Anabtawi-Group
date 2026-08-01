@@ -13,7 +13,7 @@ from odoo.exceptions import AccessDenied
 from odoo.http import request
 from odoo.tools.translate import _
 
-ACTING_LOGIN_PARAMS = {'acting_employee_name', 'acting_employee_password'}
+ACTING_LOGIN_PARAMS = {'acting_employee_number', 'acting_employee_password'}
 
 
 class ActingEmployeeHome(Home):
@@ -70,9 +70,11 @@ class ActingEmployeeHome(Home):
             auth_info = request.session.authenticate(request.env, credential)
             request.update_env(user=auth_info['uid'])
 
+            user = request.env['res.users'].browse(auth_info['uid'])
             employee = request.env['hr.employee']._authenticate_acting_employee(
-                request.params.get('acting_employee_name'),
+                request.params.get('acting_employee_number'),
                 request.params.get('acting_employee_password'),
+                user=user,
             )
             self._store_acting_employee_session(employee)
 

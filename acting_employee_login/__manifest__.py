@@ -3,17 +3,18 @@
     'name': 'Acting Employee Login',
     'summary': 'Identify the acting employee at login and show them in chatter',
     'description': """
-Require an employee name and employee password at login (in addition to the
-normal user credentials). The acting employee name is stored on mail messages
-and shown beside the username in chatter for models belonging to modules
-selected in Settings.
+Require an employee number and employee password at login (in addition to the
+normal user credentials). The employee must be linked to the signing-in user.
+The acting employee name is stored on mail messages and shown beside the
+username in chatter for models belonging to modules selected in Settings.
     """,
     'category': 'Hidden',
     'author': 'enbtawi',
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.2.0',
     'depends': [
         'base_setup',
         'hr',
+        'hr_employee_code',
         'mail',
         'stock',
         'web',
