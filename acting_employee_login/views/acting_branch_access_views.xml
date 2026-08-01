@@ -64,5 +64,5 @@
               parent="stock.menu_stock_config_settings"
               action="action_acting_branch_access"
               sequence="50"
-              groups="stock.group_stock_manager"/>
+              />
 </odoo>
