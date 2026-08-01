@@ -10,7 +10,7 @@ username in chatter for models belonging to modules selected in Settings.
     """,
     'category': 'Hidden',
     'author': 'enbtawi',
-    'version': '19.0.1.2.8',
+    'version': '19.0.1.2.9',
     'depends': [
         'base_setup',
         'employee_request',
