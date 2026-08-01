@@ -19,6 +19,7 @@ class ActingBranchAccess(models.Model):
         required=True,
         ondelete='cascade',
         index=True,
+        domain=[('share', '=', False), ('active', '=', True)],
     )
     branch_name = fields.Char(required=True, index=True)
     branch_password = fields.Char(
@@ -41,6 +42,18 @@ class ActingBranchAccess(models.Model):
         for record in self:
             if not (record.branch_name or '').strip():
                 raise ValidationError(self.env._('Branch name is required.'))
+
+    @api.constrains('user_id')
+    def _check_user_id_internal(self):
+        for record in self.filtered('user_id'):
+            if record.user_id.share:
+                raise ValidationError(self.env._(
+                    'Only internal users can be selected.'
+                ))
+            if not record.user_id.active:
+                raise ValidationError(self.env._(
+                    'Only active users can be selected.'
+                ))
 
     def _check_branch_password(self, password):
         self.ensure_one()
