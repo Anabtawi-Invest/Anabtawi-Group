@@ -15,11 +15,15 @@ selected in Settings.
         'base_setup',
         'hr',
         'mail',
+        'stock',
         'web',
     ],
     'data': [
+        'security/ir.model.access.csv',
         'views/hr_employee_views.xml',
         'views/res_config_settings_views.xml',
+        'views/res_users_views.xml',
+        'views/acting_branch_access_views.xml',
         'views/login_templates.xml',
     ],
     'assets': {
