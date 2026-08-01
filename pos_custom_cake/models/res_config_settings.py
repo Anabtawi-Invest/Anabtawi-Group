@@ -21,6 +21,10 @@ class ResConfigSettings(models.TransientModel):
         related="company_id.cake_cost_divisor",
         readonly=False,
     )
+    cake_overhead = fields.Float(
+        related="company_id.cake_overhead",
+        readonly=False,
+    )
     cake_tax_rate = fields.Float(
         related="company_id.cake_tax_rate",
         readonly=False,

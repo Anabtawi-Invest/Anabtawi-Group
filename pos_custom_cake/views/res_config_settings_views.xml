@@ -17,8 +17,12 @@
                     <setting string="Sugar Paste Qty per Piece">
                         <field name="cake_sugar_paste_qty"/>
                     </setting>
+                    <setting string="Overhead (%)"
+                             help="Divide total cost by (100% - overhead) before applying the cost divisor. Example: 10% divides by 0.90 first.">
+                        <field name="cake_overhead"/>
+                    </setting>
                     <setting string="Cost Divisor"
-                             help="Selling price before tax = total cost / divisor (default 0.63).">
+                             help="Selling price before tax = cost after overhead / divisor (default 0.63).">
                         <field name="cake_cost_divisor"/>
                     </setting>
                     <setting string="Tax Rate (%)"

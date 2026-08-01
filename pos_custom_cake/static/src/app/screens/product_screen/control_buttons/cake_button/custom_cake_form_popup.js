@@ -73,6 +73,8 @@ export class CustomCakeFormPopup extends Component {
             priceSummary: _t("Price Summary"),
             sugarPasteCost: _t("Sugar Paste Cost"),
             totalComponentsCost: _t("Total Components Cost"),
+            costAfterOverhead: _t("Cost After Overhead"),
+            overhead: _t("Overhead"),
             sellingPriceBeforeTax: _t("Selling Price Before Tax"),
             tax: _t("Tax"),
             finalSellingPrice: _t("Final Selling Price"),
@@ -106,6 +108,22 @@ export class CustomCakeFormPopup extends Component {
         return this.state.config?.cost_divisor || 0.63;
     }
 
+    get overheadPercent() {
+        return this.state.config?.overhead || 0;
+    }
+
+    get hasOverhead() {
+        return this.overheadPercent > 0;
+    }
+
+    _getOverheadDivisor() {
+        const overhead = this.overheadPercent;
+        if (!overhead) {
+            return 1;
+        }
+        return (100 - overhead) / 100;
+    }
+
     _getSelectedPieces() {
         const sizeId = Number(this.state.cake_size_id);
         if (!sizeId) {
@@ -133,6 +151,7 @@ export class CustomCakeFormPopup extends Component {
         const empty = {
             total_components_cost: 0,
             sugar_paste_cost: 0,
+            cost_after_overhead: 0,
             price_before_tax: 0,
             tax_amount: 0,
             final_price: 0,
@@ -157,14 +176,17 @@ export class CustomCakeFormPopup extends Component {
         const totalCost = componentsCost + sugarPasteCost;
 
         const currency = this.props.pos.currency;
+        const overheadDivisor = this._getOverheadDivisor();
         const divisor = this.costDivisor || 0.63;
         const taxRate = this.taxRate / 100;
-        const priceBeforeTax = roundCurrency(totalCost / divisor, currency);
+        const costAfterOverhead = roundCurrency(totalCost / overheadDivisor, currency);
+        const priceBeforeTax = roundCurrency(costAfterOverhead / divisor, currency);
         const taxAmount = roundCurrency(priceBeforeTax * taxRate, currency);
         const finalPrice = roundCurrency(priceBeforeTax + taxAmount, currency);
         return {
             total_components_cost: totalCost,
             sugar_paste_cost: sugarPasteCost,
+            cost_after_overhead: costAfterOverhead,
             price_before_tax: priceBeforeTax,
             tax_amount: taxAmount,
             final_price: finalPrice,
