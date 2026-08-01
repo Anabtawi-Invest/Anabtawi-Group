@@ -141,13 +141,13 @@ class PosCakeOrder(models.Model):
             category_line = CategoryLine.browse(line_id).exists()
             if not category_line:
                 continue
-            line_total = category_line.cost * pieces
+            line_total = (category_line.quantity or 1.0) * category_line.cost * pieces
             component_vals.append(
                 {
                     "category_id": category_line.category_id.id,
                     "category_line_id": category_line.id,
                     "product_id": category_line.product_id.id,
-                    "configured_qty": 1.0,
+                    "configured_qty": category_line.quantity or 1.0,
                     "unit_cost": category_line.cost,
                     "total_cost": line_total,
                 }
@@ -456,6 +456,7 @@ class PosCakeOrder(models.Model):
                         "id": line.id,
                         "product_id": line.product_id.id,
                         "product_name": line.product_id.with_context(lang=lang).display_name,
+                        "quantity": line.quantity or 1.0,
                         "cost": line.cost,
                     }
                 )

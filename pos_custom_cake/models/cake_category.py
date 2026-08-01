@@ -21,12 +21,20 @@ class CakeCategoryLine(models.Model):
 
     category_id = fields.Many2one("cake.category", string="Category", required=True, ondelete="cascade")
     product_id = fields.Many2one("product.product", string="Product", required=True)
+    quantity = fields.Float(
+        string="Quantity",
+        default=1.0,
+        digits="Product Unit",
+        help="Quantity used per cake piece in manufacturing and costing.",
+    )
     cost = fields.Float(string="Cost", required=True, digits="Product Price")
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
 
-    @api.constrains("cost")
+    @api.constrains("cost", "quantity")
     def _check_positive_values(self):
         for line in self:
             if line.cost < 0:
                 raise ValidationError(_("Cost cannot be negative."))
+            if line.quantity < 0:
+                raise ValidationError(_("Quantity cannot be negative."))
