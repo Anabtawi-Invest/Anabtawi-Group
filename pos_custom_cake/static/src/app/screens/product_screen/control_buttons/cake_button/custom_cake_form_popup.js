@@ -73,6 +73,8 @@ export class CustomCakeFormPopup extends Component {
             priceSummary: _t("Price Summary"),
             sugarPasteCost: _t("Sugar Paste Cost"),
             totalComponentsCost: _t("Total Components Cost"),
+            componentsCost: _t("Components Cost"),
+            cakeBase: _t("Cake Base"),
             costAfterOverhead: _t("Cost After Overhead"),
             overhead: _t("Overhead"),
             sellingPriceBeforeTax: _t("Selling Price Before Tax"),
@@ -124,13 +126,24 @@ export class CustomCakeFormPopup extends Component {
         return (100 - overhead) / 100;
     }
 
-    _getSelectedPieces() {
+    _getSelectedSize() {
         const sizeId = Number(this.state.cake_size_id);
         if (!sizeId) {
-            return 1;
+            return null;
         }
-        const size = this.sizes.find((s) => Number(s.id) === sizeId);
-        return size?.pieces || 1;
+        return this.sizes.find((s) => Number(s.id) === sizeId) || null;
+    }
+
+    _getSelectedPieces() {
+        return this._getSelectedSize()?.pieces || 1;
+    }
+
+    _getCakeBaseCost() {
+        return this._getSelectedSize()?.cake_base_cost || 0;
+    }
+
+    get hasCakeBase() {
+        return this._getCakeBaseCost() > 0;
     }
 
     get hasSugarPaste() {
@@ -149,8 +162,10 @@ export class CustomCakeFormPopup extends Component {
     get priceSummary() {
         const config = this.state.config;
         const empty = {
-            total_components_cost: 0,
+            components_cost: 0,
+            cake_base_cost: 0,
             sugar_paste_cost: 0,
+            total_components_cost: 0,
             cost_after_overhead: 0,
             price_before_tax: 0,
             tax_amount: 0,
@@ -173,7 +188,8 @@ export class CustomCakeFormPopup extends Component {
             }
         }
         const sugarPasteCost = this._getSugarPasteCost(config, pieces);
-        const totalCost = componentsCost + sugarPasteCost;
+        const cakeBaseCost = this._getCakeBaseCost();
+        const totalCost = componentsCost + sugarPasteCost + cakeBaseCost;
 
         const currency = this.props.pos.currency;
         const overheadDivisor = this._getOverheadDivisor();
@@ -184,8 +200,10 @@ export class CustomCakeFormPopup extends Component {
         const taxAmount = roundCurrency(priceBeforeTax * taxRate, currency);
         const finalPrice = roundCurrency(priceBeforeTax + taxAmount, currency);
         return {
-            total_components_cost: totalCost,
+            components_cost: componentsCost,
+            cake_base_cost: cakeBaseCost,
             sugar_paste_cost: sugarPasteCost,
+            total_components_cost: totalCost,
             cost_after_overhead: costAfterOverhead,
             price_before_tax: priceBeforeTax,
             tax_amount: taxAmount,

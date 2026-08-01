@@ -71,6 +71,11 @@ class PosCakeOrder(models.Model):
         currency_field="currency_id",
         readonly=True,
     )
+    cake_base_cost = fields.Monetary(
+        string="Cake Base",
+        currency_field="currency_id",
+        readonly=True,
+    )
     price_before_tax = fields.Monetary(
         string="Selling Price Before Tax",
         currency_field="currency_id",
@@ -243,6 +248,9 @@ class PosCakeOrder(models.Model):
                 }
             )
 
+        cake_base_cost = cake_size.cake_base_cost or 0.0
+        total_cost += cake_base_cost
+
         _, price_before_tax, tax_amount, final_price = self._compute_prices(total_cost, company)
 
         order_vals = {
@@ -253,6 +261,7 @@ class PosCakeOrder(models.Model):
             "cake_size_id": cake_size.id,
             "pieces": cake_size.pieces,
             "sugar_paste": sugar_paste,
+            "cake_base_cost": cake_base_cost,
             "total_components_cost": total_cost,
             "price_before_tax": price_before_tax,
             "tax_amount": tax_amount,
@@ -373,6 +382,7 @@ class PosCakeOrder(models.Model):
             "product_name": self.product_id.display_name,
             "pieces": self.pieces,
             "sugar_paste": self.sugar_paste,
+            "cake_base_cost": self.cake_base_cost,
             "total_components_cost": self.total_components_cost,
             "price_before_tax": self.price_before_tax,
             "tax_amount": self.tax_amount,
@@ -469,6 +479,7 @@ class PosCakeOrder(models.Model):
                 "name": size.name,
                 "product_id": size.product_id.id,
                 "product_name": size.product_id.with_context(lang=lang).display_name,
+                "cake_base_cost": size.cake_base_cost or 0.0,
             }
             for size in sizes
         ]
@@ -498,18 +509,22 @@ class PosCakeOrder(models.Model):
         sugar_paste = bool(payload.get("sugar_paste"))
         cake_size_id = payload.get("cake_size_id")
         pieces = 1
+        cake_base_cost = 0.0
         if cake_size_id:
             cake_size = self.env["cake.size"].sudo().browse(int(cake_size_id)).exists()
             if cake_size:
                 pieces = cake_size.pieces
+                cake_base_cost = cake_size.cake_base_cost or 0.0
         _, total_cost = self._prepare_component_lines(selected_lines, pieces)
         sugar_total, _product, _qty, _unit_cost = self._get_sugar_paste_total_cost(
             company, pieces, sugar_paste
         )
         total_cost += sugar_total
+        total_cost += cake_base_cost
         _total, price_before_tax, tax_amount, final_price = self._compute_prices(total_cost, company)
         return {
             "total_components_cost": total_cost,
+            "cake_base_cost": cake_base_cost,
             "price_before_tax": price_before_tax,
             "tax_amount": tax_amount,
             "final_price": final_price,

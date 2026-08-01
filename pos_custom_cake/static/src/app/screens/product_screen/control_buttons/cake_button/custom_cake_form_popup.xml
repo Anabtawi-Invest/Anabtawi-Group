@@ -87,12 +87,20 @@
                     <div class="price-summary bg-light border rounded p-3 mt-3">
                         <h5 class="fw-bold mb-3">💰 <t t-esc="labels.priceSummary"/></h5>
                         <div class="d-flex justify-content-between mb-1">
-                            <span t-esc="labels.totalComponentsCost"/>
-                            <span t-esc="formatAmount(priceSummary.total_components_cost)"/>
+                            <span t-esc="labels.componentsCost"/>
+                            <span t-esc="formatAmount(priceSummary.components_cost)"/>
+                        </div>
+                        <div t-if="hasCakeBase" class="d-flex justify-content-between mb-1 text-muted">
+                            <span t-esc="labels.cakeBase"/>
+                            <span t-esc="formatAmount(priceSummary.cake_base_cost)"/>
                         </div>
                         <div t-if="hasSugarPaste" class="d-flex justify-content-between mb-1 text-muted">
                             <span t-esc="labels.sugarPasteCost"/>
                             <span t-esc="formatAmount(priceSummary.sugar_paste_cost)"/>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1 fw-bold">
+                            <span t-esc="labels.totalComponentsCost"/>
+                            <span t-esc="formatAmount(priceSummary.total_components_cost)"/>
                         </div>
                         <div t-if="hasOverhead" class="d-flex justify-content-between mb-1 text-muted">
                             <span><t t-esc="labels.costAfterOverhead"/> (<t t-esc="labels.overhead"/>: <t t-esc="overheadPercent"/>%)</span>

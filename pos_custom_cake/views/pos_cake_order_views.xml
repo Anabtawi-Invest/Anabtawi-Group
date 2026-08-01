@@ -39,6 +39,7 @@
                     </group>
                     <group string="Pricing">
                         <group>
+                            <field name="cake_base_cost"/>
                             <field name="total_components_cost"/>
                             <field name="price_before_tax"/>
                         </group>
