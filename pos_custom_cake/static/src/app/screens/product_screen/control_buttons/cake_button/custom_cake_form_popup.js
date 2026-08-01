@@ -76,7 +76,7 @@ export class CustomCakeFormPopup extends Component {
             componentsCost: _t("Components Cost"),
             cakeBase: _t("Cake Base"),
             costAfterOverhead: _t("Cost After Overhead"),
-            overhead: _t("Overhead"),
+            overheadDivisor: _t("Overhead Divisor"),
             sellingPriceBeforeTax: _t("Selling Price Before Tax"),
             tax: _t("Tax"),
             finalSellingPrice: _t("Final Selling Price"),
@@ -110,20 +110,17 @@ export class CustomCakeFormPopup extends Component {
         return this.state.config?.cost_divisor || 0.63;
     }
 
-    get overheadPercent() {
+    get overheadDivisorValue() {
         return this.state.config?.overhead || 0;
     }
 
     get hasOverhead() {
-        return this.overheadPercent > 0;
+        return this.overheadDivisorValue > 0;
     }
 
     _getOverheadDivisor() {
-        const overhead = this.overheadPercent;
-        if (!overhead) {
-            return 1;
-        }
-        return (100 - overhead) / 100;
+        const overheadDivisor = this.overheadDivisorValue;
+        return overheadDivisor > 0 ? overheadDivisor : 1;
     }
 
     _getSelectedSize() {

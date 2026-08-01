@@ -25,11 +25,11 @@ class ResCompany(models.Model):
         help="Selling price before tax = cost after overhead / this divisor.",
     )
     cake_overhead = fields.Float(
-        string="Overhead (%)",
+        string="Overhead Divisor",
         default=0.0,
         help=(
-            "Overhead percentage applied before the cost divisor. "
-            "Example: 10%% divides total cost by 0.90 first, then by the cost divisor."
+            "Divide total components cost by this value before the cost divisor. "
+            "Example: 0.30 then cost divisor 0.63. Leave 0 to skip this step."
         ),
     )
     cake_tax_rate = fields.Float(

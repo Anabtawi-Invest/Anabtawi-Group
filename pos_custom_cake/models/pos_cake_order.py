@@ -108,15 +108,11 @@ class PosCakeOrder(models.Model):
         company = company or self.env.company
         divisor = company.cake_cost_divisor or 0.63
         tax_rate = company.cake_tax_rate or 16.0
-        overhead_percent = company.cake_overhead or 0.0
-        if float_is_zero(overhead_percent, precision_digits=6):
+        overhead_divisor = company.cake_overhead or 0.0
+        if float_is_zero(overhead_divisor, precision_digits=6):
             overhead_divisor = 1.0
-        else:
-            if overhead_percent >= 100.0:
-                raise ValidationError(_("Overhead must be less than 100%."))
-            overhead_divisor = (100.0 - overhead_percent) / 100.0
-            if float_is_zero(overhead_divisor, precision_digits=6):
-                raise ValidationError(_("Overhead must be less than 100%."))
+        elif overhead_divisor <= 0:
+            raise ValidationError(_("Overhead divisor must be greater than zero."))
         if float_is_zero(divisor, precision_digits=6):
             raise ValidationError(_("Cost divisor must be greater than zero."))
         return overhead_divisor, divisor, tax_rate

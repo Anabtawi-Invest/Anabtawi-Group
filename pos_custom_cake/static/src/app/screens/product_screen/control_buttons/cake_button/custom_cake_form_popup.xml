@@ -103,7 +103,7 @@
                             <span t-esc="formatAmount(priceSummary.total_components_cost)"/>
                         </div>
                         <div t-if="hasOverhead" class="d-flex justify-content-between mb-1 text-muted">
-                            <span><t t-esc="labels.costAfterOverhead"/> (<t t-esc="labels.overhead"/>: <t t-esc="overheadPercent"/>%)</span>
+                            <span><t t-esc="labels.costAfterOverhead"/> (<t t-esc="labels.overheadDivisor"/>: <t t-esc="overheadDivisorValue"/>)</span>
                             <span t-esc="formatAmount(priceSummary.cost_after_overhead)"/>
                         </div>
                         <div class="d-flex justify-content-between mb-1">
