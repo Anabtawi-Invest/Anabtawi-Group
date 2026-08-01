@@ -19,7 +19,6 @@ class IrAsset(models.Model):
             """
             DELETE FROM ir_asset
              WHERE path LIKE %s
-               AND COALESCE(directive, 'append') != 'remove'
             """,
             (LEGACY_SH_POS_ASSET_PREFIX + '%',),
         )

@@ -4,24 +4,19 @@ _logger = logging.getLogger(__name__)
 
 
 def post_init_hook(env):
-    _cleanup_legacy_analytic_module(env)
+    _cleanup_legacy_analytic_assets(env)
 
 
-def _cleanup_legacy_analytic_module(env):
+def _cleanup_legacy_analytic_assets(env):
     env.cr.execute(
         """
         DELETE FROM ir_asset
          WHERE path LIKE 'sh_pos_analytic_tags/%'
-           AND directive != 'remove'
         """
     )
-    ghost_module = env['ir.module.module'].sudo().search([
-        ('name', '=', 'sh_pos_analytic_tags'),
-    ], limit=1)
-    if ghost_module and ghost_module.state == 'installed':
-        ghost_module.write({'state': 'uninstalled'})
+    if env.cr.rowcount:
         _logger.info(
-            "Marked obsolete module sh_pos_analytic_tags as uninstalled "
-            "(replaced by pos_analytical)."
+            "pos_analytical: removed %s legacy sh_pos_analytic_tags asset record(s).",
+            env.cr.rowcount,
         )
     env.registry.clear_cache('assets')
