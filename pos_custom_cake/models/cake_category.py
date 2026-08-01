@@ -27,7 +27,7 @@ class CakeCategoryLine(models.Model):
         digits="Product Unit",
         help="Quantity used per cake piece in manufacturing and costing.",
     )
-    cost = fields.Float(string="Cost", required=True, digits="Product Price")
+    cost = fields.Float(string="Cost per Unit", required=True, digits="Product Price")
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
 
@@ -35,6 +35,6 @@ class CakeCategoryLine(models.Model):
     def _check_positive_values(self):
         for line in self:
             if line.cost < 0:
-                raise ValidationError(_("Cost cannot be negative."))
+                raise ValidationError(_("Cost per unit cannot be negative."))
             if line.quantity < 0:
                 raise ValidationError(_("Quantity cannot be negative."))
