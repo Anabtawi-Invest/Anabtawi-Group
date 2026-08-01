@@ -6,6 +6,9 @@
         <field name="inherit_id" ref="hr.view_employee_form"/>
         <field name="arch" type="xml">
             <xpath expr="//group[@name='identification_group']" position="inside">
+                <field name="acting_login_user_id"
+                       widget="many2one_avatar_user"
+                       options="{'no_create': True}"/>
                 <field name="acting_login_password"
                        password="True"
                        placeholder="Set password used at login"/>

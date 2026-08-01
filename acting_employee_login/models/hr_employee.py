@@ -1,12 +1,19 @@
 # -*- coding: utf-8 -*-
 
 from odoo import api, fields, models
-from odoo.exceptions import AccessDenied, ValidationError
+from odoo.exceptions import AccessDenied
 
 
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
+    acting_login_user_id = fields.Many2one(
+        'res.users',
+        string='Acting Login User',
+        help='Odoo user this employee may sign in with at the second login step. '
+             'Multiple employees can share the same acting login user.',
+        groups='hr.group_hr_user',
+    )
     acting_login_password = fields.Char(
         string='Acting Login Password',
         compute='_compute_acting_login_password',
@@ -15,7 +22,7 @@ class HrEmployee(models.Model):
         copy=False,
         groups='hr.group_hr_user',
         help='Password used together with the employee number on the login page. '
-             'The employee must also be linked to the user account they sign in with.',
+             'The employee must also be linked to the acting login user they sign in with.',
     )
     acting_login_password_hash = fields.Char(
         string='Acting Login Password Hash',
@@ -48,21 +55,6 @@ class HrEmployee(models.Model):
             password, self.acting_login_password_hash
         )
 
-    @api.constrains('user_id')
-    def _check_acting_login_user_unique(self):
-        for employee in self.filtered('user_id'):
-            duplicate = self.search([
-                ('user_id', '=', employee.user_id.id),
-                ('id', '!=', employee.id),
-            ], limit=1)
-            if duplicate:
-                raise ValidationError(self.env._(
-                    'User "%(user)s" is already linked to employee "%(employee)s". '
-                    'Each user can only be linked to one employee.',
-                    user=employee.user_id.display_name,
-                    employee=duplicate.display_name,
-                ))
-
     @api.model
     def _authenticate_acting_employee(self, employee_number, password, user=None):
         """Return the employee matching number + password + linked user, or raise."""
@@ -85,7 +77,11 @@ class HrEmployee(models.Model):
                 self.env._('Wrong employee number or employee password.')
             )
 
-        if not user or not employee.user_id or employee.user_id.id != user.id:
+        if (
+            not user
+            or not employee.acting_login_user_id
+            or employee.acting_login_user_id.id != user.id
+        ):
             raise AccessDenied(
                 self.env._('This employee is not linked to this user.')
             )
