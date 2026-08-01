@@ -150,8 +150,7 @@ export class CustomCakeFormPopup extends Component {
             }
             const line = category.lines.find((l) => l.id === selectedId);
             if (line) {
-                const lineCost = line.total_cost ?? line.cost * (line.quantity || 1);
-                componentsCost += lineCost * pieces;
+                componentsCost += (line.cost || 0) * pieces;
             }
         }
         const sugarPasteCost = this._getSugarPasteCost(config, pieces);
