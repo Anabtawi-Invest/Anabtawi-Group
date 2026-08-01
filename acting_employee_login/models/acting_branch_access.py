@@ -23,16 +23,9 @@ class ActingBranchAccess(models.Model):
     branch_name = fields.Char(required=True, index=True)
     branch_password = fields.Char(
         string='Password',
-        compute='_compute_branch_password',
-        inverse='_inverse_branch_password',
-        store=False,
         copy=False,
+        help='Branch password used at the second login step.',
     )
-    branch_password_is_set = fields.Boolean(
-        string='Password Is Set',
-        compute='_compute_branch_password',
-    )
-    branch_password_hash = fields.Char(copy=False, groups='base.group_system')
     active = fields.Boolean(default=True)
 
     _sql_constraints = [
@@ -49,31 +42,11 @@ class ActingBranchAccess(models.Model):
             if not (record.branch_name or '').strip():
                 raise ValidationError(self.env._('Branch name is required.'))
 
-    def _compute_branch_password(self):
-        for record in self:
-            record.branch_password = ''
-            record.branch_password_is_set = bool(record.sudo().branch_password_hash)
-
-    def _inverse_branch_password(self):
-        for record in self:
-            if record.branch_password:
-                record._set_branch_password(record.branch_password)
-
-    def _set_branch_password(self, password):
-        self.ensure_one()
-        if not password:
-            self.sudo().write({'branch_password_hash': False})
-            return
-        hashed = self.env['res.users']._crypt_context().hash(password)
-        self.sudo().write({'branch_password_hash': hashed})
-
     def _check_branch_password(self, password):
         self.ensure_one()
-        if not password or not self.branch_password_hash:
+        if not password or not self.branch_password:
             return False
-        return self.env['res.users']._crypt_context().verify(
-            password, self.branch_password_hash
-        )
+        return str(self.branch_password).strip() == str(password).strip()
 
     @api.model
     def _authenticate_branch_access(self, user, branch_name, password):

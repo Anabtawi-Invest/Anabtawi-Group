@@ -10,7 +10,7 @@
                        widget="many2one_avatar_user"
                        options="{'no_create': True}"/>
                 <field name="acting_login_password"
-                       password="True"
+                       widget="password"
                        placeholder="Enter a new acting login password"/>
                 <field name="acting_login_password_is_set" invisible="1"/>
                 <div invisible="not acting_login_password_is_set" class="text-muted fst-italic">

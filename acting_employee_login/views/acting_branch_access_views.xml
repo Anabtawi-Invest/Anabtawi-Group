@@ -21,16 +21,9 @@
                     <group>
                         <field name="user_id"/>
                         <field name="branch_name"/>
-                        <field name="branch_password_is_set" invisible="1"/>
-                        <label for="branch_password" string="Password"/>
-                        <div class="o_row">
-                            <field name="branch_password" password="True" nolabel="1"
-                                   placeholder="Enter a new branch password"/>
-                            <span invisible="not branch_password_is_set"
-                                  class="text-muted fst-italic">
-                                Password is set. Leave empty to keep it.
-                            </span>
-                        </div>
+                        <field name="branch_password"
+                               widget="password_eye_char"
+                               password="True"/>
                         <field name="active"/>
                     </group>
                 </sheet>
