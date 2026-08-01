@@ -11,7 +11,11 @@
                        options="{'no_create': True}"/>
                 <field name="acting_login_password"
                        password="True"
-                       placeholder="Set password used at login"/>
+                       placeholder="Enter a new acting login password"/>
+                <field name="acting_login_password_is_set" invisible="1"/>
+                <div invisible="not acting_login_password_is_set" class="text-muted fst-italic">
+                    Password is set. Leave empty to keep it.
+                </div>
             </xpath>
         </field>
     </record>

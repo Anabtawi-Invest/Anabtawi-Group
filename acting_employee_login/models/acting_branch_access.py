@@ -28,6 +28,10 @@ class ActingBranchAccess(models.Model):
         store=False,
         copy=False,
     )
+    branch_password_is_set = fields.Boolean(
+        string='Password Is Set',
+        compute='_compute_branch_password',
+    )
     branch_password_hash = fields.Char(copy=False, groups='base.group_system')
     active = fields.Boolean(default=True)
 
@@ -48,18 +52,20 @@ class ActingBranchAccess(models.Model):
     def _compute_branch_password(self):
         for record in self:
             record.branch_password = ''
+            record.branch_password_is_set = bool(record.sudo().branch_password_hash)
 
     def _inverse_branch_password(self):
         for record in self:
-            record._set_branch_password(record.branch_password or '')
+            if record.branch_password:
+                record._set_branch_password(record.branch_password)
 
     def _set_branch_password(self, password):
         self.ensure_one()
         if not password:
-            self.write({'branch_password_hash': False})
+            self.sudo().write({'branch_password_hash': False})
             return
         hashed = self.env['res.users']._crypt_context().hash(password)
-        self.write({'branch_password_hash': hashed})
+        self.sudo().write({'branch_password_hash': hashed})
 
     def _check_branch_password(self, password):
         self.ensure_one()

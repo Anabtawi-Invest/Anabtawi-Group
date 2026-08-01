@@ -24,6 +24,11 @@ class HrEmployee(models.Model):
         help='Password used together with the employee number on the login page. '
              'The employee must also be linked to the acting login user they sign in with.',
     )
+    acting_login_password_is_set = fields.Boolean(
+        string='Password Is Set',
+        compute='_compute_acting_login_password',
+        groups='hr.group_hr_user',
+    )
     acting_login_password_hash = fields.Char(
         string='Acting Login Password Hash',
         copy=False,
@@ -33,11 +38,14 @@ class HrEmployee(models.Model):
     def _compute_acting_login_password(self):
         for employee in self:
             employee.acting_login_password = ''
+            employee.acting_login_password_is_set = bool(
+                employee.sudo().acting_login_password_hash
+            )
 
     def _inverse_acting_login_password(self):
         for employee in self:
-            password = employee.acting_login_password or ''
-            employee._set_acting_login_password(password)
+            if employee.acting_login_password:
+                employee._set_acting_login_password(employee.acting_login_password)
 
     def _set_acting_login_password(self, password):
         self.ensure_one()
