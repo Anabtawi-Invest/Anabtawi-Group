@@ -18,13 +18,11 @@ ACTING_LOGIN_PARAMS = {'acting_employee_number', 'acting_employee_password'}
 
 class ActingEmployeeHome(Home):
 
-    def _store_acting_employee_session(self, employee):
-        request.session['acting_employee_id'] = employee.id
-        request.session['acting_employee_name'] = employee.name
-
-    def _clear_acting_employee_session(self):
+    def _clear_acting_session(self):
         request.session.pop('acting_employee_id', None)
         request.session.pop('acting_employee_name', None)
+        request.session.pop('acting_branch_access_id', None)
+        request.session.pop('acting_branch_name', None)
 
     def _login_error_values(self, error_message):
         values = {
@@ -70,20 +68,12 @@ class ActingEmployeeHome(Home):
             auth_info = request.session.authenticate(request.env, credential)
             request.update_env(user=auth_info['uid'])
 
-            user = request.env['res.users'].browse(auth_info['uid'])
-            employee = request.env['hr.employee']._authenticate_acting_employee(
-                request.params.get('acting_employee_number'),
-                request.params.get('acting_employee_password'),
-                user=user,
-            )
-            self._store_acting_employee_session(employee)
-
             request.params['login_success'] = True
             return request.redirect(
                 self._login_redirect(auth_info['uid'], redirect=redirect)
             )
         except AccessDenied as exc:
-            self._clear_acting_employee_session()
+            self._clear_acting_session()
             request.session.logout(keep_db=True)
             if request.env.uid:
                 request.env['ir.http']._auth_method_public()

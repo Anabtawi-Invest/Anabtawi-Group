@@ -3,6 +3,7 @@
 import logging
 
 from odoo import api, fields, models
+from odoo.exceptions import AccessDenied
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
@@ -39,11 +40,26 @@ class ResUsers(models.Model):
         login = (login or '').strip()
         if not login:
             return self.env['res.users']
-        return self.sudo().search(
+        user = self.sudo().search(
             self._get_login_domain(login),
             order=self._get_login_order(),
             limit=1,
         )
+        if not user:
+            user = self.sudo().search([('login', '=ilike', login)], limit=1)
+        if not user:
+            access = self.env['acting.branch.access'].sudo().search([
+                ('user_id.login', '=ilike', login),
+            ], limit=1)
+            user = access.user_id
+        return user
+
+    def _acting_login_is_branch_user(self, user):
+        if not user:
+            return False
+        if user.is_branch_user:
+            return True
+        return bool(user.sudo().acting_branch_access_ids)
 
     def _authenticate_second_step_from_request(self, login):
         """Validate employee or branch credentials before session auth."""
@@ -51,7 +67,7 @@ class ResUsers(models.Model):
         password = request.params.get('acting_employee_password')
         user = self._lookup_user_by_login(login)
 
-        if user and user.is_branch_user:
+        if self._acting_login_is_branch_user(user):
             _logger.warning(
                 "acting_employee_login auth: validating branch access login=%r "
                 "user_id=%s is_branch_user=%s branch_name=%r has_password=%s",
@@ -74,6 +90,10 @@ class ResUsers(models.Model):
             (second_step_id or '')[:80],
             bool(password),
         )
+        if not user:
+            raise AccessDenied(
+                self.env._('Wrong login/password')
+            )
         return self.env['hr.employee'].sudo()._authenticate_acting_employee(
             second_step_id, password, user=user
         )
