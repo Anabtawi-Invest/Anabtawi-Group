@@ -98,6 +98,10 @@ class InternalTransferReportWizard(models.TransientModel):
         category = product.product_tmpl_id.factory_plan_category
         return category if category else self.env._('Non')
 
+    def _get_picking_created_by_display(self, picking):
+        """Return acting employee name, branch name, or Odoo user."""
+        return picking.created_by_display or self.env._('Undefined')
+
     def _get_move_uom_name(self, move):
         return move.product_uom.display_name or move.product_id.uom_id.display_name or ''
 
@@ -180,7 +184,7 @@ class InternalTransferReportWizard(models.TransientModel):
                 'transfer_reference': picking.name or '',
                 'product_name': move.product_id.display_name,
                 'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
-                'created_by': picking.create_uid.display_name or self.env._('Undefined'),
+                'created_by': self._get_picking_created_by_display(picking),
                 'creating_date': picking.create_date,
                 'demand': move.product_uom_qty,
                 'product_uom': self._get_move_uom_name(move),
