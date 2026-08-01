@@ -2,7 +2,7 @@
 
 import logging
 
-from odoo import models
+from odoo import api, fields, models
 
 from ..acting_log import _session_snapshot, log_chatter_debug
 
@@ -13,6 +13,73 @@ PREcommit_IDENTITY_KEY = 'acting_employee_login.identity'
 
 class MailThread(models.AbstractModel):
     _inherit = 'mail.thread'
+
+    acting_employee_id = fields.Many2one(
+        'hr.employee',
+        string='Acting Employee',
+        index=True,
+        ondelete='set null',
+        copy=False,
+        readonly=True,
+    )
+    acting_employee_name = fields.Char(
+        string='Acting Employee Name',
+        copy=False,
+        readonly=True,
+    )
+    acting_branch_access_id = fields.Many2one(
+        'acting.branch.access',
+        string='Acting Branch Access',
+        index=True,
+        ondelete='set null',
+        copy=False,
+        readonly=True,
+    )
+    acting_branch_name = fields.Char(
+        string='Acting Branch Name',
+        copy=False,
+        readonly=True,
+    )
+    created_by_display = fields.Char(
+        string='Created By',
+        compute='_compute_created_by_display',
+    )
+
+    @api.depends(
+        'acting_employee_name',
+        'acting_branch_name',
+        'create_uid',
+    )
+    def _compute_created_by_display(self):
+        for record in self:
+            if record.acting_employee_name:
+                record.created_by_display = record.acting_employee_name
+            elif record.acting_branch_name:
+                record.created_by_display = record.acting_branch_name
+            elif record.create_uid:
+                record.created_by_display = record.create_uid.display_name
+            else:
+                record.created_by_display = ''
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        identity_fields = {
+            'acting_employee_id',
+            'acting_employee_name',
+            'acting_branch_access_id',
+            'acting_branch_name',
+        }
+        enriched_vals_list = []
+        for vals in vals_list:
+            vals = dict(vals)
+            if not identity_fields.intersection(vals):
+                acting_vals = self.env['mail.message']._get_acting_identity_vals(
+                    self._name
+                )
+                if acting_vals:
+                    vals.update(acting_vals)
+            enriched_vals_list.append(vals)
+        return super().create(enriched_vals_list)
 
     def _get_message_create_valid_field_names(self):
         return super()._get_message_create_valid_field_names() | {

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_tree_acting_created_by" model="ir.ui.view">
+        <field name="name">stock.picking.list.acting.created.by</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="before">
+                <field name="create_date" optional="show"/>
+                <field name="created_by_display" string="Created by" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

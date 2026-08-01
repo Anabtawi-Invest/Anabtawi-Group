@@ -10,7 +10,7 @@ username in chatter for models belonging to modules selected in Settings.
     """,
     'category': 'Hidden',
     'author': 'enbtawi',
-    'version': '19.0.1.2.2',
+    'version': '19.0.1.2.3',
     'depends': [
         'base_setup',
         'hr',
@@ -25,6 +25,7 @@ username in chatter for models belonging to modules selected in Settings.
         'views/res_config_settings_views.xml',
         'views/res_users_views.xml',
         'views/acting_branch_access_views.xml',
+        'views/stock_picking_views.xml',
         'views/login_templates.xml',
     ],
     'assets': {
