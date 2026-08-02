@@ -71,6 +71,11 @@ class PosCakeOrder(models.Model):
         currency_field="currency_id",
         readonly=True,
     )
+    cake_base_cost = fields.Monetary(
+        string="Cake Base",
+        currency_field="currency_id",
+        readonly=True,
+    )
     price_before_tax = fields.Monetary(
         string="Selling Price Before Tax",
         currency_field="currency_id",
@@ -103,17 +108,23 @@ class PosCakeOrder(models.Model):
         company = company or self.env.company
         divisor = company.cake_cost_divisor or 0.63
         tax_rate = company.cake_tax_rate or 16.0
+        overhead_divisor = company.cake_overhead or 0.0
+        if float_is_zero(overhead_divisor, precision_digits=6):
+            overhead_divisor = 1.0
+        elif overhead_divisor <= 0:
+            raise ValidationError(_("Overhead divisor must be greater than zero."))
         if float_is_zero(divisor, precision_digits=6):
             raise ValidationError(_("Cost divisor must be greater than zero."))
-        return divisor, tax_rate
+        return overhead_divisor, divisor, tax_rate
 
     @api.model
     def _compute_prices(self, total_cost, company=None):
         company = company or self.env.company
         currency = company.currency_id
         rounding = currency.rounding or 0.01
-        divisor, tax_rate = self._get_pricing_params(company)
-        price_before_tax = float_round(total_cost / divisor, precision_rounding=rounding)
+        overhead_divisor, divisor, tax_rate = self._get_pricing_params(company)
+        cost_after_overhead = float_round(total_cost / overhead_divisor, precision_rounding=rounding)
+        price_before_tax = float_round(cost_after_overhead / divisor, precision_rounding=rounding)
         tax_amount = float_round(price_before_tax * (tax_rate / 100.0), precision_rounding=rounding)
         final_price = float_round(price_before_tax + tax_amount, precision_rounding=rounding)
         return total_cost, price_before_tax, tax_amount, final_price
@@ -130,13 +141,13 @@ class PosCakeOrder(models.Model):
             category_line = CategoryLine.browse(line_id).exists()
             if not category_line:
                 continue
-            line_total = category_line.total_cost * pieces
+            line_total = (category_line.quantity or 1.0) * category_line.cost * pieces
             component_vals.append(
                 {
                     "category_id": category_line.category_id.id,
                     "category_line_id": category_line.id,
                     "product_id": category_line.product_id.id,
-                    "configured_qty": category_line.quantity,
+                    "configured_qty": category_line.quantity or 1.0,
                     "unit_cost": category_line.cost,
                     "total_cost": line_total,
                 }
@@ -233,6 +244,9 @@ class PosCakeOrder(models.Model):
                 }
             )
 
+        cake_base_cost = cake_size.cake_base_cost or 0.0
+        total_cost += cake_base_cost
+
         _, price_before_tax, tax_amount, final_price = self._compute_prices(total_cost, company)
 
         order_vals = {
@@ -243,6 +257,7 @@ class PosCakeOrder(models.Model):
             "cake_size_id": cake_size.id,
             "pieces": cake_size.pieces,
             "sugar_paste": sugar_paste,
+            "cake_base_cost": cake_base_cost,
             "total_components_cost": total_cost,
             "price_before_tax": price_before_tax,
             "tax_amount": tax_amount,
@@ -363,6 +378,7 @@ class PosCakeOrder(models.Model):
             "product_name": self.product_id.display_name,
             "pieces": self.pieces,
             "sugar_paste": self.sugar_paste,
+            "cake_base_cost": self.cake_base_cost,
             "total_components_cost": self.total_components_cost,
             "price_before_tax": self.price_before_tax,
             "tax_amount": self.tax_amount,
@@ -440,9 +456,8 @@ class PosCakeOrder(models.Model):
                         "id": line.id,
                         "product_id": line.product_id.id,
                         "product_name": line.product_id.with_context(lang=lang).display_name,
-                        "quantity": line.quantity,
+                        "quantity": line.quantity or 1.0,
                         "cost": line.cost,
-                        "total_cost": line.total_cost,
                     }
                 )
             category_data.append(
@@ -461,6 +476,7 @@ class PosCakeOrder(models.Model):
                 "name": size.name,
                 "product_id": size.product_id.id,
                 "product_name": size.product_id.with_context(lang=lang).display_name,
+                "cake_base_cost": size.cake_base_cost or 0.0,
             }
             for size in sizes
         ]
@@ -477,6 +493,7 @@ class PosCakeOrder(models.Model):
             "sugar_paste_cost": sugar_cost or 0.0,
             "sugar_paste_qty": company.cake_sugar_paste_qty or 1.0,
             "cost_divisor": company.cake_cost_divisor or 0.63,
+            "overhead": company.cake_overhead or 0.0,
             "tax_rate": company.cake_tax_rate or 16.0,
             "currency_id": company.currency_id.id,
         }
@@ -489,18 +506,22 @@ class PosCakeOrder(models.Model):
         sugar_paste = bool(payload.get("sugar_paste"))
         cake_size_id = payload.get("cake_size_id")
         pieces = 1
+        cake_base_cost = 0.0
         if cake_size_id:
             cake_size = self.env["cake.size"].sudo().browse(int(cake_size_id)).exists()
             if cake_size:
                 pieces = cake_size.pieces
+                cake_base_cost = cake_size.cake_base_cost or 0.0
         _, total_cost = self._prepare_component_lines(selected_lines, pieces)
         sugar_total, _product, _qty, _unit_cost = self._get_sugar_paste_total_cost(
             company, pieces, sugar_paste
         )
         total_cost += sugar_total
+        total_cost += cake_base_cost
         _total, price_before_tax, tax_amount, final_price = self._compute_prices(total_cost, company)
         return {
             "total_components_cost": total_cost,
+            "cake_base_cost": cake_base_cost,
             "price_before_tax": price_before_tax,
             "tax_amount": tax_amount,
             "final_price": final_price,

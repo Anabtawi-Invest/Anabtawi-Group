@@ -9,6 +9,7 @@
                     <group>
                         <field name="pieces"/>
                         <field name="product_id"/>
+                        <field name="cake_base_cost"/>
                         <field name="name" readonly="1"/>
                         <field name="active"/>
                     </group>
@@ -24,6 +25,7 @@
             <list string="Cake Sizes">
                 <field name="pieces"/>
                 <field name="product_id"/>
+                <field name="cake_base_cost"/>
                 <field name="name"/>
                 <field name="active"/>
             </list>

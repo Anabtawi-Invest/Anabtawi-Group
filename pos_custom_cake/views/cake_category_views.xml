@@ -27,7 +27,6 @@
                                     <field name="product_id"/>
                                     <field name="quantity"/>
                                     <field name="cost"/>
-                                    <field name="total_cost" readonly="1"/>
                                     <field name="active" column_invisible="1"/>
                                 </list>
                             </field>
