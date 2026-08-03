@@ -11,8 +11,6 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
-_LAST_LOGIN_TOUCH_SECONDS = 300
-
 
 class AnabtawiMobileDevice(models.Model):
     _name = "anabtawi.mobile.device"
@@ -91,7 +89,7 @@ class AnabtawiMobileDevice(models.Model):
         except (TypeError, ValueError):
             return 30
 
-    def _apply_new_tokens(self, plain_token, ip_address=None, extra_vals=None):
+    def _apply_new_tokens(self, plain_token, ip_address=None):
         digest = self._hash_plain_token(plain_token)
         vals = {
             "token_hash": digest,
@@ -102,6 +100,7 @@ class AnabtawiMobileDevice(models.Model):
         }
         if ip_address:
             vals["last_ip"] = ip_address
+<<<<<<< Updated upstream
         if extra_vals:
             vals.update(extra_vals)
         self._safe_write_device(vals)
@@ -132,6 +131,9 @@ class AnabtawiMobileDevice(models.Model):
             ):
                 vals["last_login"] = now
             device._safe_write_device(vals)
+=======
+        self.sudo().write(vals)
+>>>>>>> Stashed changes
 
     @api.model
     def register_or_refresh_login(self, user, device_uid_clean, device_name=None, ip_address=None, platform=None, manufacturer=None, model_name=None, app_version=None):
@@ -178,9 +180,8 @@ class AnabtawiMobileDevice(models.Model):
                 vals["app_version"] = app_version
             if ip_address:
                 vals["last_ip"] = ip_address
-            active_same_device._apply_new_tokens(
-                plain, ip_address=ip_address, extra_vals=vals
-            )
+            active_same_device.write(vals)
+            active_same_device._apply_new_tokens(plain, ip_address=ip_address)
             return {"access_token": plain}
 
         inactive_device = self_sudo.search([
@@ -201,9 +202,8 @@ class AnabtawiMobileDevice(models.Model):
             if ip_address:
                 vals["registered_ip"] = inactive_device.registered_ip or ip_address
                 vals["last_ip"] = ip_address
-            inactive_device._apply_new_tokens(
-                plain, ip_address=ip_address, extra_vals=vals
-            )
+            inactive_device.write(vals)
+            inactive_device._apply_new_tokens(plain, ip_address=ip_address)
             return {"access_token": plain}
 
         digest = self_sudo._hash_plain_token(plain)
@@ -251,7 +251,10 @@ class AnabtawiMobileDevice(models.Model):
         if not device.user_id.active:
             device.action_revoke_token()
             return self.env["res.users"]
-        device._touch_last_activity(ip_address=ip_address)
+        vals = {"last_login": fields.Datetime.now()}
+        if ip_address:
+            vals["last_ip"] = ip_address
+        device.sudo().write(vals)
         return device.user_id
 
     @api.model

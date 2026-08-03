@@ -1,6 +1,6 @@
-{
+﻿{
     "name": "Anabtawi Employee App PWA",
-    "version": "19.0.1.1.9",
+    "version": "19.0.1.2.0",
     "summary": "Installable Employee App PWA for Odoo 19",
     "category": "Human Resources",
     "author": "Anabtawi Group",
@@ -18,3 +18,6 @@
     "installable": True,
     "application": True,
 }
+
+
+
