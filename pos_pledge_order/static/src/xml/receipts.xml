@@ -177,8 +177,8 @@
             </div>
         </xpath>
         
-        <!-- Add Pledge Amount section at the end (match any root element) -->
-        <xpath expr="/*" position="inside">
+        <!-- Pledge section before footer so it is included on thermal prints -->
+        <xpath expr="//div[hasclass('before-footer')]" position="inside">
             <!-- Calculate Pledge Amount from Order Lines -->
             <t t-if="props and props.order and props.order.lines">
                 <!-- First, check if ANY product is an employee service or delivery product -->
