@@ -5,7 +5,8 @@
             <div class="text-center">
                 <div class="fw-bolder" t-esc="props.receipt.companyName"/>
                 <div t-esc="props.receipt.posName"/>
-                <div class="pt-1">Advance Order Receipt</div>
+                <div class="pt-1" t-if="!props.receipt.isRefund">Advance Order Receipt</div>
+                <div class="pt-1" t-if="props.receipt.isRefund">Advance Refund Receipt</div>
             </div>
 
             <div class="pt-3">
@@ -31,7 +32,7 @@
                 </div>
             </div>
 
-            <div class="pt-3">
+            <div class="pt-3" t-if="!props.receipt.isRefund">
                 <div class="d-flex fw-bolder border-bottom pb-1">
                     <span class="w-50">Item</span>
                     <span class="w-25 text-center">Qty</span>
@@ -47,23 +48,31 @@
             </div>
 
             <div class="pt-3">
-                <div class="d-flex">
+                <div t-if="!props.receipt.isRefund" class="d-flex">
                     <span>Total</span>
                     <span class="ms-auto" t-esc="formatCurrency(props.receipt.total)"/>
                 </div>
-                <div class="d-flex">
+                <div t-if="props.receipt.isRefund" class="d-flex">
+                    <span>Original Order Total</span>
+                    <span class="ms-auto" t-esc="formatCurrency(props.receipt.total)"/>
+                </div>
+                <div t-if="!props.receipt.isRefund" class="d-flex">
                     <span>Advance Paid (deposit)</span>
                     <span class="ms-auto" t-esc="formatCurrency(props.receipt.advanceAmount)"/>
                 </div>
-                <div class="d-flex">
+                <div t-if="props.receipt.isRefund" class="d-flex fw-bolder text-danger">
+                    <span>Refunded to customer</span>
+                    <span class="ms-auto" t-esc="formatCurrency(props.receipt.advanceAmount)"/>
+                </div>
+                <div t-if="!props.receipt.isRefund" class="d-flex">
                     <span>Amount Tendered</span>
                     <span class="ms-auto" t-esc="formatCurrency(props.receipt.amountTendered)"/>
                 </div>
-                <div t-if="props.receipt.changeDue > 0" class="d-flex fw-bolder text-success">
+                <div t-if="!props.receipt.isRefund and props.receipt.changeDue > 0" class="d-flex fw-bolder text-success">
                     <span>Return to customer</span>
                     <span class="ms-auto" t-esc="formatCurrency(props.receipt.changeDue)"/>
                 </div>
-                <div class="d-flex fw-bolder">
+                <div t-if="!props.receipt.isRefund" class="d-flex fw-bolder">
                     <span>Remaining</span>
                     <span class="ms-auto" t-esc="formatCurrency(props.receipt.remainingAmount)"/>
                 </div>

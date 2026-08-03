@@ -10,6 +10,7 @@ import { rpc } from "@web/core/network/rpc";
 import { AdvanceOrderFormPopup } from "./advance_order_form_popup";
 import { AdvanceOrderReceipt } from "./advance_order_receipt";
 import { CompleteAdvanceOrderPopup } from "./complete_advance_order_popup";
+import { RefundAdvanceOrderPopup } from "./refund_advance_order_popup";
 import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
 
 function toNumber(value, fallback = 0) {
@@ -44,12 +45,25 @@ patch(ControlButtons.prototype, {
         return "btn btn-success btn-lg lh-lg";
     },
 
+    refundAdvanceOrderButtonClass() {
+        if (this.props.showRemainingButtons) {
+            return this.ui.isSmall
+                ? "btn btn-warning btn-md py-2 text-start"
+                : "btn btn-warning btn-lg py-5";
+        }
+        return "btn btn-warning btn-lg lh-lg";
+    },
+
     get advanceOrderButtonLabel() {
         return _t("Advance Order");
     },
 
     get completeAdvanceOrderButtonLabel() {
         return _t("Complete Advance Order");
+    },
+
+    get refundAdvanceOrderButtonLabel() {
+        return _t("Refund Advance");
     },
 
     _getCurrentOrder() {
@@ -106,12 +120,31 @@ patch(ControlButtons.prototype, {
             amountTendered: amountTendered,
             changeDue: changeDue,
             remainingAmount: Math.max(total - advanceAmount, 0),
+            isRefund: false,
             lines: (payload.lines || []).map((line) => ({
                 product_id: line.product_id,
                 name: line.product_name || line.full_product_name || "",
                 qty: line.qty,
                 subtotal: toNumber(line.qty, 0) * toNumber(line.price_unit, 0),
             })),
+        };
+    },
+
+    _buildRefundReceiptData({ result, popupPayload }) {
+        const refundAmount = toNumber(result?.advance_amount, popupPayload.advance_amount || 0);
+        return {
+            companyName: this.pos.company?.name || "",
+            posName: this.pos.config?.name || "",
+            reference: result?.name || popupPayload.reference || "",
+            date: new Date().toLocaleString(),
+            customerName: result?.partner_name || popupPayload.partner_name || "",
+            customerPhone: result?.partner_phone || popupPayload.partner_phone || "",
+            paymentMethod: result?.payment_method_name || popupPayload.payment_method_name || "",
+            currencyId: this.pos.currency?.id,
+            total: toNumber(result?.amount_total, popupPayload.amount_total || 0),
+            advanceAmount: refundAmount,
+            isRefund: true,
+            lines: [],
         };
     },
 
@@ -213,6 +246,48 @@ patch(ControlButtons.prototype, {
             this.notification.add(_t("Advance order completed successfully."), { type: "success" });
         } catch (error) {
             const msg = error?.data?.message || error?.message || _t("Failed to complete advance order.");
+            this.notification.add(msg, { type: "danger" });
+        }
+    },
+
+    async onClickRefundAdvanceOrder() {
+        const popupPayload = await makeAwaitable(this.dialog, RefundAdvanceOrderPopup, {
+            posConfigId: this.pos.config.id,
+            pos: this.pos,
+        });
+        if (!popupPayload?.advance_order_id) {
+            return;
+        }
+        try {
+            const result = await this.orm.call(
+                "pos.advance.order",
+                "action_refund_advance_payment",
+                [[popupPayload.advance_order_id]],
+                {
+                    pos_config_id: this.pos.config.id,
+                }
+            );
+            this.notification.add(
+                _t("Advance refunded: %s", result?.name || popupPayload.reference || ""),
+                { type: "success" }
+            );
+            try {
+                await this.printer.print(
+                    AdvanceOrderReceipt,
+                    {
+                        receipt: this._buildRefundReceiptData({ result, popupPayload }),
+                    },
+                    this.pos.printOptions
+                );
+            } catch (printError) {
+                const printMessage =
+                    printError?.body ||
+                    printError?.message ||
+                    _t("Advance refunded but receipt printing failed.");
+                this.notification.add(printMessage, { type: "warning" });
+            }
+        } catch (error) {
+            const msg = error?.data?.message || error?.message || _t("Failed to refund advance order.");
             this.notification.add(msg, { type: "danger" });
         }
     },

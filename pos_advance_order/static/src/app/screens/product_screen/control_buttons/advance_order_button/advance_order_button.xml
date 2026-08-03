@@ -18,6 +18,14 @@
                 <i class="fa fa-check-square-o me-2" role="img" t-att-aria-label="completeAdvanceOrderButtonLabel" t-att-title="completeAdvanceOrderButtonLabel"/>
                 <span t-esc="completeAdvanceOrderButtonLabel"/>
             </button>
+            <button
+                t-if="pos.config.enable_advance_order"
+                t-att-class="refundAdvanceOrderButtonClass()"
+                t-on-click="onClickRefundAdvanceOrder"
+                type="button">
+                <i class="fa fa-undo me-2" role="img" t-att-aria-label="refundAdvanceOrderButtonLabel" t-att-title="refundAdvanceOrderButtonLabel"/>
+                <span t-esc="refundAdvanceOrderButtonLabel"/>
+            </button>
         </xpath>
     </t>
 

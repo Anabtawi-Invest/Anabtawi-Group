@@ -152,7 +152,19 @@ class PosAdvanceOrder(models.Model):
     remaining_pos_order_id = fields.Many2one("pos.order", string="Remaining POS Order", readonly=True, copy=False)
     pledge_pos_order_id = fields.Many2one("pos.order", string="Pledge POS Order", readonly=True, copy=False)
     refund_advance_pos_order_id = fields.Many2one("pos.order", string="Refund Advance POS Order", readonly=True, copy=False)
+    advance_refund_move_id = fields.Many2one(
+        "account.move",
+        string="Advance Refund Entry",
+        readonly=True,
+        copy=False,
+        help="Reversal journal entry when the advance deposit is refunded.",
+    )
     return_pledge_pos_order_id = fields.Many2one("pos.order", string="Return Pledge POS Order", readonly=True, copy=False)
+    advance_payment_created = fields.Boolean(
+        string="Advance Payment Created",
+        compute="_compute_advance_payment_created",
+        store=True,
+    )
     advance_account_payment_id = fields.Many2one(
         "account.payment",
         string="Advance Account Payment",
@@ -527,6 +539,19 @@ class PosAdvanceOrder(models.Model):
     def _compute_pledge_count(self):
         for order in self:
             order.pledge_count = sum(order.pledge_line_ids.mapped("pledge_qty"))
+
+    @api.depends(
+        "advance_deposit_move_id",
+        "advance_pos_order_id",
+        "advance_account_payment_id",
+    )
+    def _compute_advance_payment_created(self):
+        for order in self:
+            order.advance_payment_created = bool(
+                order.advance_deposit_move_id
+                or order.advance_pos_order_id
+                or order.advance_account_payment_id
+            )
 
     @api.depends(
         "advance_pos_order_id.state",
@@ -980,8 +1005,54 @@ class PosAdvanceOrder(models.Model):
         return True
 
     def action_cancel(self):
+        for order in self:
+            if order.state == "advance_paid":
+                raise UserError(
+                    _("Use 'Refund Advance' to return the deposit to the customer and cancel this order.")
+                )
+            if order.advance_payment_created:
+                raise UserError(
+                    _("Use 'Refund Advance' to reverse the payment before cancelling this order.")
+                )
         self.write({"state": "cancel"})
         return True
+
+    def _validate_refund_advance(self, pos_config_id=None):
+        """Shared checks before refunding an advance deposit."""
+        self.ensure_one()
+        if self.state != "advance_paid":
+            raise UserError(_("You can only refund an advance that has been paid and not yet completed."))
+        if self.remaining_pos_order_id:
+            raise UserError(_("You cannot refund the deposit after the sale has been completed."))
+        if self.refund_advance_pos_order_id or self.advance_refund_move_id:
+            raise UserError(_("Advance refund payment is already created for this order."))
+        if not self.advance_payment_created:
+            raise UserError(_("Please create the advance payment first."))
+        if pos_config_id:
+            cid = pos_config_id
+            if hasattr(cid, "id"):
+                cid = cid.id
+            pay_cfg = self._get_advance_pos_config()
+            if int(cid) != pay_cfg.id:
+                raise UserError(
+                    _("Refund this advance from %s only (where the deposit was taken).")
+                    % pay_cfg.display_name
+                )
+
+    def _refund_summary_vals(self):
+        self.ensure_one()
+        pm = self.pos_payment_method_id
+        return {
+            "id": self.id,
+            "name": self.name,
+            "partner_id": self.partner_id.id,
+            "partner_name": self.partner_id.display_name,
+            "partner_phone": self.partner_id.phone or self.partner_id.mobile or "",
+            "advance_amount": self.advance_amount,
+            "amount_total": self.amount_total,
+            "payment_method_name": pm.display_name if pm else (self.payment_method or "").upper(),
+            "state": self.state,
+        }
 
     def unlink(self):
         # Business rule: Advance Orders must never be deleted (audit trail).
@@ -1590,52 +1661,64 @@ class PosAdvanceOrder(models.Model):
             amount_tendered=amount_tendered,
         )
 
-    def action_refund_advance_payment(self):
+    def action_refund_advance_payment(self, pos_config_id=None):
+        summary = None
         for order in self:
-            order.ensure_one()
-            if order.remaining_pos_order_id:
-                raise UserError(_("You cannot refund the deposit after the sale has been completed."))
-            if order.refund_advance_pos_order_id:
-                raise UserError(_("Advance refund payment is already created for this order."))
+            order._validate_refund_advance(pos_config_id=pos_config_id)
+            refund_amount = order.advance_amount or 0.0
+            currency = order.currency_id
 
             if order.advance_deposit_move_id:
                 if order.advance_deposit_move_id.state != "posted":
                     raise UserError(_("Only posted deposit entries can be reversed."))
-                rev = order.advance_deposit_move_id.with_context(
+                rev_moves = order.advance_deposit_move_id.with_context(
                     prefetch_fields=False,
                 )._reverse_moves(
                     default_values_list=[{"date": fields.Date.context_today(order)}],
                     cancel=True,
                 )
+                order.advance_refund_move_id = rev_moves[:1].id
                 order.state = "cancel"
                 order._invalidate_open_sessions_cash_balance()
-                continue
+            elif order.advance_pos_order_id:
+                pos_config = order._get_advance_pos_config()
+                if not pos_config.advance_deposit_product_id:
+                    raise UserError(_("Please set 'Advance Deposit Product' on the POS configuration first."))
 
-            if not order.advance_pos_order_id:
-                raise UserError(_("Please create the advance payment first."))
+                session = order._get_open_session(pos_config)
+                pm = order._get_pos_payment_method(session)
 
-            pos_config = order.from_pos_config_id or order.pos_config_id
-            if not pos_config.advance_deposit_product_id:
-                raise UserError(_("Please set 'Advance Deposit Product' on the POS configuration first."))
+                deposit_product = pos_config.advance_deposit_product_id
+                lines = [{
+                    "product_id": deposit_product.id,
+                    "qty": -1.0,
+                    "price_unit": refund_amount,
+                    "discount": 0.0,
+                    "tax_ids": [(6, 0, [])],
+                    "product_uom_id": deposit_product.uom_id.id,
+                    "name": _("Refund Advance"),
+                }]
+                pos_order = order._create_pos_order(session, lines)
+                order._pay_pos_order(pos_order, pm, pos_order.amount_total)
+                order.refund_advance_pos_order_id = pos_order.id
+                order.state = "cancel"
+                order._invalidate_open_sessions_cash_balance()
+            else:
+                raise UserError(_("No refundable advance payment found on this order."))
 
-            session = order._get_open_session(pos_config)
-            pm = order._get_pos_payment_method(session)
+            order.message_post(
+                body=_(
+                    "Advance deposit refunded: %(amount)s %(currency)s to %(customer)s.",
+                    amount=refund_amount,
+                    currency=currency.name,
+                    customer=order.partner_id.display_name,
+                ),
+                subject=_("Advance Refunded: %s") % order.name,
+            )
+            summary = order._refund_summary_vals()
 
-            deposit_product = pos_config.advance_deposit_product_id
-            lines = [{
-                "product_id": deposit_product.id,
-                "qty": -1.0,
-                "price_unit": order.advance_amount,
-                "discount": 0.0,
-                "tax_ids": [(6, 0, [])],
-                "product_uom_id": deposit_product.uom_id.id,
-                "name": _("Refund Advance"),
-            }]
-            pos_order = order._create_pos_order(session, lines)
-            order._pay_pos_order(pos_order, pm, pos_order.amount_total)
-            order.refund_advance_pos_order_id = pos_order.id
-            order.state = "cancel"
-
+        if len(self) == 1 and summary:
+            return summary
         return True
 
     def action_print_receipt(self):
