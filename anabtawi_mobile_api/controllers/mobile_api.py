@@ -93,25 +93,6 @@ class AnabtawiMobileAPI(http.Controller):
         if error:
             return error
         work_location = employee.work_location_id
-<<<<<<< Updated upstream
-        otp_number = ""
-        otp_expires_at = None
-        otp_expires_in_seconds = 0
-        now = fields.Datetime.now()
-        if "employee_password" in employee._fields and employee.employee_password:
-            expires_at = employee.employee_password_expires_at if "employee_password_expires_at" in employee._fields else False
-            if not expires_at or expires_at > now:
-                otp_number = str(employee.employee_password)
-                otp_expires_at = fields.Datetime.to_string(expires_at) if expires_at else None
-                if expires_at:
-                    otp_expires_in_seconds = max(0, int((expires_at - now).total_seconds()))
-        if not otp_number:
-            for field_name in ("otp_number", "employee_otp", "otp", "pin"):
-                if field_name in employee._fields and employee[field_name]:
-                    otp_number = str(employee[field_name])
-                    break
-=======
->>>>>>> Stashed changes
         return _json({
             "status": "ok",
             "uid": user.id,

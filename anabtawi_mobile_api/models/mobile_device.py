@@ -4,8 +4,6 @@ import logging
 import secrets
 from datetime import timedelta
 
-import psycopg2
-
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
@@ -100,40 +98,7 @@ class AnabtawiMobileDevice(models.Model):
         }
         if ip_address:
             vals["last_ip"] = ip_address
-<<<<<<< Updated upstream
-        if extra_vals:
-            vals.update(extra_vals)
-        self._safe_write_device(vals)
-
-    def _safe_write_device(self, vals):
-        """Write device fields, tolerating concurrent API touches on last_login."""
-        if not vals or not self:
-            return
-        try:
-            self.sudo().write(vals)
-        except psycopg2.errors.SerializationFailure:
-            _logger.debug(
-                "Concurrent update on mobile device %s ignored (fields: %s).",
-                self.ids,
-                sorted(vals.keys()),
-            )
-
-    def _touch_last_activity(self, ip_address=None):
-        """Refresh last activity without updating on every API request."""
-        now = fields.Datetime.now()
-        for device in self:
-            vals = {}
-            if ip_address and ip_address != device.last_ip:
-                vals["last_ip"] = ip_address
-            if (
-                not device.last_login
-                or (now - device.last_login).total_seconds() >= _LAST_LOGIN_TOUCH_SECONDS
-            ):
-                vals["last_login"] = now
-            device._safe_write_device(vals)
-=======
         self.sudo().write(vals)
->>>>>>> Stashed changes
 
     @api.model
     def register_or_refresh_login(self, user, device_uid_clean, device_name=None, ip_address=None, platform=None, manufacturer=None, model_name=None, app_version=None):

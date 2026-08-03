@@ -1,4 +1,4 @@
-﻿{
+{
     "name": "Anabtawi Employee App API",
     "version": "19.0.1.6.0",
     "summary": "Secure Employee App API for attendance, leave, overtime, OTP, password change, and single-device portal restriction",
