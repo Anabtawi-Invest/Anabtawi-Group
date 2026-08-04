@@ -1,4 +1,4 @@
-# Anabtawi Employee App API 
+# Anabtawi Employee App API
 
 Odoo 19 integration addon for the Anabtawi Employee App.
 

@@ -23,6 +23,3 @@
     "application": False,
 }
 
-
-
-

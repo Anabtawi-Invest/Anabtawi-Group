@@ -1,13 +1,11 @@
 import logging
-import os
 from datetime import datetime, time
 
 import pytz
 
 from odoo import _, fields, http
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessDenied, UserError, ValidationError
 from odoo.http import request
-
 
 
 _logger = logging.getLogger(__name__)
@@ -20,6 +18,13 @@ def _json(data, status=200):
 def _error(code, message, status=400):
     return _json({"error": code, "message": message}, status=status)
 
+
+
+def _client_ip():
+    forwarded = request.httprequest.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",", 1)[0].strip()
+    return request.httprequest.environ.get("REMOTE_ADDR", "") or ""
 
 def _parse_bearer(value):
     parts = (value or "").strip().split(" ", 1)
@@ -47,11 +52,184 @@ def _as_float(value):
 
 
 class AnabtawiMobileAPI(http.Controller):
+    def _client_ip(self):
+        headers = request.httprequest.headers
+        forwarded_for = headers.get("X-Forwarded-For") or ""
+        if forwarded_for:
+            return forwarded_for.split(",", 1)[0].strip()
+        return request.httprequest.environ.get("REMOTE_ADDR", "")
+
+    def _safe_has_group(self, user, group_xmlid):
+        try:
+            return bool(user.sudo().with_context(lang="en_US").has_group(group_xmlid))
+        except Exception:
+            return False
+
+    def _eligible_mobile_user(self, user):
+        """Allow Employee App login for any active Odoo user linked to an active employee.
+
+        This check applies only to Employee App API login. It does not override or
+        restrict normal Odoo backend (/odoo, /web/login) access from multiple devices.
+        """
+        if not user or not user.active:
+            return False
+        employee = request.env["hr.employee"].sudo().search([
+            ("user_id", "=", user.id),
+            ("active", "=", True),
+        ], limit=1)
+        return bool(employee)
+
+    @http.route(
+        "/anabtawi/mobile/auth/login",
+        type="http", auth="public", methods=["POST"], csrf=False,
+    )
+    def mobile_login(self, **kwargs):
+        try:
+            payload = request.get_json_data() if request.httprequest.is_json else {}
+        except Exception:
+            payload = {}
+        if not payload:
+            payload = {
+                "login": request.params.get("login"),
+                "password": request.params.get("password"),
+                "device_uid": request.params.get("device_uid"),
+                "device_name": request.params.get("device_name"),
+                "platform": request.params.get("platform"),
+                "manufacturer": request.params.get("manufacturer"),
+                "model_name": request.params.get("model_name"),
+                "app_version": request.params.get("app_version"),
+                "ip_address": request.params.get("ip_address"),
+            }
+        if not payload and kwargs:
+            payload = {k: v for k, v in kwargs.items() if v is not False}
+
+        login_name = (payload.get("login") or "").strip()
+        password = payload.get("password") or ""
+        device_uid = (payload.get("device_uid") or "").strip()
+        device_name = (payload.get("device_name") or "").strip()
+        platform = (payload.get("platform") or "").strip()
+        manufacturer = (payload.get("manufacturer") or "").strip()
+        model_name = (payload.get("model_name") or "").strip()
+        app_version = (payload.get("app_version") or "").strip()
+        ip_address = (payload.get("ip_address") or self._client_ip() or "").strip()
+
+        _logger.info(
+            "Employee App login request received: login=%s device_uid=%s device_name=%s ip=%s has_json=%s",
+            login_name,
+            device_uid,
+            device_name,
+            ip_address,
+            bool(request.httprequest.is_json),
+        )
+
+        if not login_name or not password:
+            _logger.warning("Mobile login rejected: missing login/password login=%s", login_name)
+            return request.make_json_response(
+                {"error": "invalid_request", "message": _("login and password are required.")},
+                status=400,
+            )
+        if not device_uid:
+            _logger.warning("Mobile login rejected: missing device_uid login=%s", login_name)
+            return request.make_json_response(
+                {"error": "invalid_request", "message": _("device_uid is required.")},
+                status=400,
+            )
+
+        wsgienv = {
+            "interactive": False,
+            "base_location": request.httprequest.url_root.rstrip("/"),
+            "HTTP_HOST": request.httprequest.environ.get("HTTP_HOST", ""),
+            "REMOTE_ADDR": request.httprequest.environ.get("REMOTE_ADDR", ""),
+        }
+        credential = {"type": "password", "login": login_name, "password": password}
+        try:
+            auth_info = request.env["res.users"].sudo().authenticate(credential, wsgienv)
+        except AccessDenied:
+            _logger.warning("Mobile login access denied: login=%s", login_name)
+            return request.make_json_response(
+                {"error": "access_denied", "message": _("Invalid login or password.")},
+                status=401,
+            )
+
+        uid = auth_info["uid"]
+        user = request.env["res.users"].sudo().browse(uid)
+        if not self._eligible_mobile_user(user):
+            _logger.warning("Mobile login forbidden by group eligibility: user_id=%s login=%s", user.id, login_name)
+            return request.make_json_response(
+                {"error": "forbidden", "message": _("This user cannot use the mobile login.")},
+                status=403,
+            )
+
+        try:
+            token_info = request.env["anabtawi.mobile.device"].register_or_refresh_login(
+                user, device_uid, device_name, ip_address=ip_address, platform=platform, manufacturer=manufacturer, model_name=model_name, app_version=app_version
+            )
+        except UserError as e:
+            _logger.warning(
+                "Mobile login rejected by device policy: user_id=%s login=%s device_uid=%s reason=%s",
+                user.id,
+                login_name,
+                device_uid,
+                e.args[0] if e.args else "unknown",
+                )
+            return request.make_json_response(
+                {"error": "DEVICE_ALREADY_REGISTERED", "message": e.args[0]},
+                status=403,
+            )
+
+        _logger.info("Mobile login success: user_id=%s login=%s device_uid=%s", user.id, login_name, device_uid)
+        return request.make_json_response({
+            "status": "ok",
+            "uid": user.id,
+            "login": user.login,
+            "access_token": token_info["access_token"],
+        }, status=200)
+
+    @http.route(
+        "/anabtawi/mobile/auth/me",
+        type="http", auth="public", methods=["GET", "POST"], csrf=False,
+    )
+    def mobile_me(self, **kwargs):
+        auth_header = request.httprequest.headers.get("Authorization", "")
+        plain = _parse_bearer(auth_header)
+        user = request.env["anabtawi.mobile.device"].authenticate_bearer_token(plain, ip_address=self._client_ip()) if plain else request.env["res.users"]
+
+        if not user:
+            return request.make_json_response(
+                {"error": "unauthorized", "message": _("Invalid or missing token.")},
+                status=401,
+            )
+
+        u = user.with_user(user)
+        return request.make_json_response({
+            "status": "ok",
+            "uid": user.id,
+            "login": user.login,
+            "is_portal": bool(u.has_group("base.group_portal")),
+            "is_internal": bool(u.has_group("base.group_user")),
+        }, status=200)
+
+    @http.route(
+        "/anabtawi/mobile/ping",
+        type="http", auth="public", methods=["GET"], csrf=False,
+    )
+    def mobile_ping(self, **kwargs):
+        auth_header = request.httprequest.headers.get("Authorization", "")
+        plain = _parse_bearer(auth_header)
+        user = request.env["anabtawi.mobile.device"].authenticate_bearer_token(plain, ip_address=self._client_ip()) if plain else request.env["res.users"]
+        if not user:
+            return request.make_json_response({"error": "unauthorized"}, status=401)
+        return request.make_json_response({
+            "status": "ok",
+            "message": "authenticated",
+            "uid": user.id,
+        }, status=200)
+
     def _authenticated_user(self):
         token = _parse_bearer(request.httprequest.headers.get("Authorization"))
         if not token:
             return None, None, _error("unauthorized", _("Authentication is required."), 401)
-        user = request.env["anabtawi.mobile.device"].authenticate_bearer_token(token)
+        user = request.env["anabtawi.mobile.device"].authenticate_bearer_token(token, ip_address=self._client_ip())
         if not user:
             return None, token, _error("session_expired", _("Your session has expired."), 401)
         return user, token, None
@@ -73,77 +251,54 @@ class AnabtawiMobileAPI(http.Controller):
             )
         return employee, user, token, None
 
+
     @http.route(
-        "/anabtawi/mobile/auth/login",
+        "/anabtawi/mobile/auth/change-password",
         type="http", auth="public", methods=["POST"], csrf=False,
     )
-    def login(self, **kwargs):
-        data = _payload()
-        login = (data.get("login") or "").strip()
-        password = data.get("password") or ""
-        device_uid = (data.get("device_uid") or "").strip()
-        device_name = (data.get("device_name") or "").strip()
-        platform = data.get("platform")
-        manufacturer = data.get("manufacturer")
-        model_name = data.get("model_name")
-        app_version = data.get("app_version")
-
-        if not login or not password:
-            return _error("invalid_credentials", _("Username and password are required."), 400)
-
-        if not device_uid:
-            return _error("invalid_device", _("Device identifier is required."), 400)
-
-        try:
-            uid = request.session.authenticate(request.db, login, password)
-        except (UserError, ValidationError) as exc:
-            return _error("invalid_credentials", exc.args[0] if exc.args else str(exc), 401)
-        except Exception:
-            return _error("invalid_credentials", _("Invalid username or password."), 401)
-
-        if not uid:
-            return _error("invalid_credentials", _("Invalid username or password."), 401)
-
-        user = request.env["res.users"].sudo().browse(uid)
-        ip_address = request.httprequest.remote_addr
-
-        try:
-            token_data = request.env["anabtawi.mobile.device"].register_or_refresh_login(
-                user=user,
-                device_uid_clean=device_uid,
-                device_name=device_name,
-                ip_address=ip_address,
-                platform=platform,
-                manufacturer=manufacturer,
-                model_name=model_name,
-                app_version=app_version,
-            )
-        except UserError as exc:
-            return _error("device_limit", exc.args[0] if exc.args else str(exc), 403)
-        except Exception as exc:
-            _logger.exception("Failed to register device for user_id=%s", user.id)
-            return _error("server_error", _("Device binding failed."), 500)
-
-        return _json({
-            "status": "ok",
-            "access_token": token_data.get("access_token"),
-            "uid": user.id,
-            "login": user.login,
-        })
-
-    @http.route(
-        "/anabtawi/mobile/auth/me",
-        type="http", auth="public", methods=["GET"], csrf=False,
-    )
-    def me(self, **kwargs):
+    def change_password(self, **kwargs):
         user, _token, error = self._authenticated_user()
         if error:
             return error
-        return _json({
-            "status": "ok",
-            "uid": user.id,
-            "login": user.login,
-        })
+        data = _payload()
+        current_password = data.get("current_password") or data.get("old_password") or ""
+        new_password = data.get("new_password") or ""
+        confirm_password = data.get("confirm_password") or ""
+
+        if not current_password or not new_password or not confirm_password:
+            return _error("invalid_request", _("Current password, new password, and confirmation are required."), 400)
+        if new_password != confirm_password:
+            return _error("password_mismatch", _("The new password and confirmation do not match."), 422)
+        if len(new_password) < 8:
+            return _error("weak_password", _("The new password must be at least 8 characters."), 422)
+        if current_password == new_password:
+            return _error("same_password", _("The new password must be different from the current password."), 422)
+
+        wsgienv = {
+            "interactive": False,
+            "base_location": request.httprequest.url_root.rstrip("/"),
+            "HTTP_HOST": request.httprequest.environ.get("HTTP_HOST", ""),
+            "REMOTE_ADDR": request.httprequest.environ.get("REMOTE_ADDR", ""),
+        }
+        credential = {"type": "password", "login": user.login, "password": current_password}
+        try:
+            auth_info = request.env["res.users"].sudo().authenticate(credential, wsgienv)
+        except AccessDenied:
+            return _error("invalid_current_password", _("The current password is incorrect."), 401)
+        except Exception:
+            _logger.exception("Password verification failed for user_id=%s", user.id)
+            return _error("server_error", _("The current password could not be verified."), 500)
+
+        if not auth_info or auth_info.get("uid") != user.id:
+            return _error("invalid_current_password", _("The current password is incorrect."), 401)
+
+        try:
+            user.sudo().write({"password": new_password})
+        except Exception:
+            _logger.exception("Password update failed for user_id=%s", user.id)
+            return _error("server_error", _("The password could not be changed."), 500)
+
+        return _json({"status": "ok", "success": True, "message": _("Password changed successfully.")}, 200)
 
     @http.route(
         "/anabtawi/mobile/auth/logout",
@@ -165,6 +320,22 @@ class AnabtawiMobileAPI(http.Controller):
         if error:
             return error
         work_location = employee.work_location_id
+        otp_number = ""
+        otp_expires_at = None
+        otp_expires_in_seconds = 0
+        now = fields.Datetime.now()
+        if "employee_password" in employee._fields and employee.employee_password:
+            expires_at = employee.employee_password_expires_at if "employee_password_expires_at" in employee._fields else False
+            if not expires_at or expires_at > now:
+                otp_number = str(employee.employee_password)
+                otp_expires_at = fields.Datetime.to_string(expires_at) if expires_at else None
+                if expires_at:
+                    otp_expires_in_seconds = max(0, int((expires_at - now).total_seconds()))
+        if not otp_number:
+            for field_name in ("otp_number", "employee_otp", "otp", "pin"):
+                if field_name in employee._fields and employee[field_name]:
+                    otp_number = str(employee[field_name])
+                    break
         return _json({
             "status": "ok",
             "uid": user.id,
@@ -175,9 +346,49 @@ class AnabtawiMobileAPI(http.Controller):
             "department_name": employee.department_id.name if employee.department_id else "",
             "work_location": work_location.name if work_location else "",
             "mobile_phone": employee.mobile_phone or "",
+            "otp_number": otp_number,
+            "employee_otp": otp_number,
+            "otp_source": "employee_request.hr.employee.employee_password" if "employee_password" in employee._fields else "hr.employee",
+            "otp_expires_at": otp_expires_at,
+            "otp_expires_in_seconds": otp_expires_in_seconds,
             "company_name": employee.company_id.name,
             "geo_required": employee._is_portal_geo_tracking_required(),
             "allow_remote": bool(employee.allow_remote_attendance),
+            "device": {
+                "device_uid": employee.employee_app_device_uid or "",
+                "device_name": employee.employee_app_device_name or "",
+                "platform": employee.employee_app_platform or "",
+                "manufacturer": employee.employee_app_manufacturer or "",
+                "model_name": employee.employee_app_model_name or "",
+                "app_version": employee.employee_app_version or "",
+                "registered_ip": employee.employee_app_registered_ip or "",
+                "last_ip": employee.employee_app_last_ip or "",
+                "registered_at": fields.Datetime.to_string(employee.employee_app_registered_at) if employee.employee_app_registered_at else None,
+                "last_login": fields.Datetime.to_string(employee.employee_app_last_login) if employee.employee_app_last_login else None,
+            },
+        })
+
+    @http.route(
+        "/anabtawi/mobile/employee/otp/generate",
+        type="http", auth="public", methods=["POST"], csrf=False,
+    )
+    def employee_generate_otp(self, **kwargs):
+        employee, user, _token, error = self._require_employee()
+        if error:
+            return error
+        if not hasattr(employee, "action_generate_employee_portal_otp"):
+            return _error("otp_not_available", _("Employee OTP generation is not installed."), 501)
+        result = employee.sudo().action_generate_employee_portal_otp()
+        otp = result.get("employee_otp") or result.get("otp_number") or ""
+        return _json({
+            "status": "ok",
+            "success": True,
+            "uid": user.id,
+            "employee_id": employee.id,
+            "employee_otp": otp,
+            "otp_number": otp,
+            "otp_expires_at": result.get("otp_expires_at"),
+            "expires_in_seconds": result.get("expires_in_seconds", 300),
         })
 
     def _today_bounds_utc(self, employee):
@@ -369,6 +580,28 @@ class AnabtawiMobileAPI(http.Controller):
             "request_date_to": date_to,
             "name": reason,
         }
+        if bool(data.get("request_unit_hours")):
+            hour_from = _as_float(data.get("request_hour_from"))
+            hour_to = _as_float(data.get("request_hour_to"))
+            if leave_type.request_unit != "hour":
+                return _error(
+                    "hourly_leave_type_required",
+                    _("This time off type must use the Hours request unit."),
+                    422,
+                )
+            if date_from != date_to:
+                return _error("invalid_hourly_leave", _("An hourly request must use one date."), 422)
+            if hour_from is None or hour_to is None or hour_from < 0 or hour_to > 24 or hour_to <= hour_from:
+                return _error(
+                    "invalid_leave_time",
+                    _("Enter a valid start and end time; the end must be after the start."),
+                    422,
+                )
+            vals.update({
+                "request_unit_hours": True,
+                "request_hour_from": hour_from,
+                "request_hour_to": hour_to,
+            })
         if bool(data.get("request_unit_half")):
             if date_from != date_to:
                 return _error("invalid_half_day", _("A half-day request must use one date."), 422)
@@ -403,16 +636,89 @@ class AnabtawiMobileAPI(http.Controller):
             "type": leave.holiday_status_id.name,
             "date_from": fields.Date.to_string(leave.request_date_from) if leave.request_date_from else None,
             "date_to": fields.Date.to_string(leave.request_date_to) if leave.request_date_to else None,
+            "hour_from": round(leave.request_hour_from, 4) if leave.request_unit_hours else None,
+            "hour_to": round(leave.request_hour_to, 4) if leave.request_unit_hours else None,
             "days": round(leave.number_of_days or 0.0, 2),
             "state": leave.state,
         } for leave in leaves]})
 
-    def _overtime_categories(self, employee):
-        domain = [("is_overtime_category", "=", True)]
+    def _ensure_default_overtime_categories(self, employee):
+        """Create/read the standard Employee App overtime categories.
+
+        The PWA depends on /anabtawi/mobile/overtime/categories returning real
+        approval.category records. Some databases do not have the categories
+        created yet, so the API safely creates them when the overtime bridge
+        fields are available. This is limited to approval.category only and does
+        not change normal Odoo login/session behavior.
+        """
         Category = request.env["approval.category"].sudo()
+        if "is_overtime_category" not in Category._fields:
+            _logger.warning("Overtime category field is_overtime_category is missing on approval.category")
+            return Category.browse()
+
+        default_categories = [
+            ("Regular Weekday OT", 10),
+            ("Weekend / Weekly Off OT", 20),
+            ("Public Holiday OT", 30),
+            ("Emergency OT", 40),
+        ]
+
+        created_or_found = Category.browse()
+        for name, sequence in default_categories:
+            domain = [
+                ("name", "=", name),
+                ("is_overtime_category", "=", True),
+            ]
+            if "company_id" in Category._fields:
+                domain.append(("company_id", "in", [False, employee.company_id.id]))
+
+            category = Category.search(domain, limit=1)
+            if not category:
+                vals = {
+                    "name": name,
+                    "is_overtime_category": True,
+                }
+                if "sequence" in Category._fields:
+                    vals["sequence"] = sequence
+                if "company_id" in Category._fields and employee.company_id:
+                    vals["company_id"] = employee.company_id.id
+
+                # Optional metadata fields used by some overtime bridge versions.
+                if "overtime_multiplier" in Category._fields:
+                    vals["overtime_multiplier"] = 1.25 if name == "Regular Weekday OT" else 1.5
+                if "overtime_rate" in Category._fields:
+                    vals["overtime_rate"] = 1.25 if name == "Regular Weekday OT" else 1.5
+                if "description" in Category._fields:
+                    vals["description"] = _("Employee App overtime category")
+
+                try:
+                    category = Category.create(vals)
+                    _logger.info("Created Employee App overtime category: %s", name)
+                except Exception:
+                    _logger.exception("Could not create Employee App overtime category: %s", name)
+                    continue
+            created_or_found |= category
+        return created_or_found
+
+    def _overtime_categories(self, employee):
+        Category = request.env["approval.category"].sudo()
+        if "is_overtime_category" in Category._fields:
+            # Always top up any missing standard categories, not just when the
+            # table is completely empty — otherwise a database with 1-2
+            # manually created categories never gets the rest auto-created.
+            self._ensure_default_overtime_categories(employee)
+
+        domain = []
+        if "is_overtime_category" in Category._fields:
+            domain.append(("is_overtime_category", "=", True))
+        else:
+            # Fallback only for very old/partial bridge deployments.
+            domain = ["|", "|", ("name", "ilike", "overtime"), ("name", "ilike", "OT"), ("name", "ilike", "اضافي")]
+
         if "company_id" in Category._fields:
             domain.append(("company_id", "in", [False, employee.company_id.id]))
-        return Category.search(domain, order="sequence, id")
+
+        return Category.search(domain, order="sequence, id" if "sequence" in Category._fields else "id")
 
     @http.route(
         "/anabtawi/mobile/overtime/categories",
@@ -504,70 +810,80 @@ class AnabtawiMobileAPI(http.Controller):
             "state": approval.request_status,
         } for approval in approvals]})
 
+
     @http.route(
         "/anabtawi/mobile/payslips/list",
         type="http", auth="public", methods=["GET"], csrf=False,
     )
-    def payslips_list(self, **kwargs):
-        employee, user, _token, error = self._require_employee()
+    def payslip_list(self, **kwargs):
+        employee, _user, _token, error = self._require_employee()
         if error:
             return error
 
-        if "hr.payslip" not in request.env:
-            return _json({"status": "ok", "records": []})
+        records = request.env["hr.payslip"].sudo().search(
+            [
+                ("employee_id", "=", employee.id),
+                ("state", "in", ["done", "paid"]),
+            ],
+            order="date_to desc, id desc",
+            limit=50,
+        )
 
-        payslips = request.env["hr.payslip"].sudo().search([
-            ("employee_id", "=", employee.id),
-        ], order="date_to desc, id desc", limit=50)
-
-        records = []
-        for slip in payslips:
-            records.append({
-                "id": slip.id,
-                "name": slip.name or _("Payslip"),
-                "number": getattr(slip, "number", "") or "",
-                "date_from": fields.Date.to_string(slip.date_from) if getattr(slip, "date_from", False) else None,
-                "date_to": fields.Date.to_string(slip.date_to) if getattr(slip, "date_to", False) else None,
-                "net_wage": getattr(slip, "net_wage", getattr(slip, "basic_wage", 0.0)) or 0.0,
-                "currency": slip.company_id.currency_id.symbol if slip.company_id and slip.company_id.currency_id else "$",
-                "state": getattr(slip, "state", "done"),
-            })
-        return _json({"status": "ok", "records": records})
+        return _json({
+            "status": "ok",
+            "records": [
+                {
+                    "id": payslip.id,
+                    "number": payslip.number or f"PAY/{payslip.id}",
+                    "name": payslip.name or _("Payslip"),
+                    "date_from": fields.Date.to_string(payslip.date_from) if payslip.date_from else None,
+                    "date_to": fields.Date.to_string(payslip.date_to) if payslip.date_to else None,
+                    "net_wage": round(payslip.net_wage or 0.0, 2) if hasattr(payslip, "net_wage") else 0.0,
+                    "basic_wage": round(payslip.basic_wage or 0.0, 2) if hasattr(payslip, "basic_wage") else 0.0,
+                    "state": payslip.state,
+                }
+                for payslip in records
+            ],
+        })
 
     @http.route(
         "/anabtawi/mobile/payslips/download",
         type="http", auth="public", methods=["GET"], csrf=False,
     )
     def payslip_download(self, **kwargs):
-        employee, user, _token, error = self._require_employee()
+        employee, _user, _token, error = self._require_employee()
         if error:
             return error
 
+        data = _payload()
         try:
-            payslip_id = int(kwargs.get("id") or 0)
+            payslip_id = int(kwargs.get("id") or data.get("id") or 0)
         except (TypeError, ValueError):
-            payslip_id = 0
+            return _error("invalid_request", _("Valid payslip ID is required."), 400)
 
-        if not payslip_id or "hr.payslip" not in request.env:
-            return _error("invalid_request", _("Payslip ID is required."), 400)
+        if not payslip_id:
+            return _error("invalid_request", _("Valid payslip ID is required."), 400)
 
-        payslip = request.env["hr.payslip"].sudo().browse(payslip_id)
-        if not payslip.exists() or payslip.employee_id.id != employee.id:
+        payslip = request.env["hr.payslip"].sudo().search(
+            [
+                ("id", "=", payslip_id),
+                ("employee_id", "=", employee.id),
+                ("state", "in", ["done", "paid"]),
+            ],
+            limit=1,
+        )
+
+        if not payslip:
             return _error("not_found", _("Payslip not found or access denied."), 404)
 
-        pdf_content = None
-        report_xml_ids = ["hr_payroll.action_report_payslip", "hr_payroll_community.action_report_payslip"]
-        for xml_id in report_xml_ids:
-            try:
-                pdf_content, _ = request.env["ir.actions.report"].sudo()._render_qweb_pdf(xml_id, [payslip.id])
-                if pdf_content:
-                    break
-            except Exception:
-                continue
-
-        if not pdf_content:
-            _logger.error("Failed to render PDF for payslip ID=%s", payslip.id)
-            return _error("pdf_error", _("Could not generate payslip PDF report."), 500)
+        try:
+            report_name = "hr_payroll.report_payslip"
+            pdf_content, _format = request.env["ir.actions.report"].sudo()._render_qweb_pdf(
+                report_name, [payslip.id]
+            )
+        except Exception:
+            _logger.exception("Failed to render PDF for payslip_id=%s", payslip.id)
+            return _error("pdf_failed", _("Could not generate payslip PDF."), 500)
 
         filename = f"Payslip_{payslip.number or payslip.id}.pdf"
         headers = [
@@ -633,6 +949,3 @@ class AnabtawiMobileAPI(http.Controller):
                 content = f.read()
             return request.make_response(content, [("Content-Type", "text/html; charset=utf-8")])
         return _error("not_found", _("PWA application files not found."), 404)
-
-
-
