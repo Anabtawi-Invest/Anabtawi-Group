@@ -898,17 +898,22 @@ class AnabtawiMobileAPI(http.Controller):
         type="http", auth="public", methods=["GET"], csrf=False, sitemap=False,
     )
     def check_app_update(self, **kwargs):
-        latest_version = request.env["ir.config_parameter"].sudo().get_param("anabtawi_mobile.latest_version", "1.2.0")
-        min_version = request.env["ir.config_parameter"].sudo().get_param("anabtawi_mobile.min_version", "1.0.0")
-        update_message = request.env["ir.config_parameter"].sudo().get_param(
+        config = request.env["ir.config_parameter"].sudo()
+        latest_version = config.get_param("anabtawi_mobile.latest_version")
+        if not latest_version:
+            config.set_param("anabtawi_mobile.latest_version", "1.2.0")
+            latest_version = "1.2.0"
+
+        min_version = config.get_param("anabtawi_mobile.min_version", "1.0.0")
+        update_message = config.get_param(
             "anabtawi_mobile.update_message",
             _("A new version of the Anabtawi Employee App (v1.2.0) with Payslip support is available. Please update to continue.")
         )
-        download_url = request.env["ir.config_parameter"].sudo().get_param(
+        download_url = config.get_param(
             "anabtawi_mobile.download_url",
             "/anabtawi/mobile/apk/download"
         )
-        force_update = request.env["ir.config_parameter"].sudo().get_param("anabtawi_mobile.force_update", "False").lower() in ("true", "1", "yes")
+        force_update = config.get_param("anabtawi_mobile.force_update", "False").lower() in ("true", "1", "yes")
 
         return _json({
             "status": "ok",

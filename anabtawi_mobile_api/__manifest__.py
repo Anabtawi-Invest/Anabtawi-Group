@@ -16,6 +16,7 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        "data/ir_config_parameter_data.xml",
         "views/mobile_device_views.xml",
     ],
     "post_init_hook": "post_init_hook",

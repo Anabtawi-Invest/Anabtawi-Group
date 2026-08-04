@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="param_anabtawi_mobile_latest_version" model="ir.config_parameter">
+            <field name="key">anabtawi_mobile.latest_version</field>
+            <field name="value">1.2.0</field>
+        </record>
+        <record id="param_anabtawi_mobile_min_version" model="ir.config_parameter">
+            <field name="key">anabtawi_mobile.min_version</field>
+            <field name="value">1.0.0</field>
+        </record>
+        <record id="param_anabtawi_mobile_download_url" model="ir.config_parameter">
+            <field name="key">anabtawi_mobile.download_url</field>
+            <field name="value">/anabtawi/mobile/apk/download</field>
+        </record>
+        <record id="param_anabtawi_mobile_update_message" model="ir.config_parameter">
+            <field name="key">anabtawi_mobile.update_message</field>
+            <field name="value">A new version of the Anabtawi Employee App (v1.2.0) with Payslip support is available. Please update to continue.</field>
+        </record>
+    </data>
+</odoo>
