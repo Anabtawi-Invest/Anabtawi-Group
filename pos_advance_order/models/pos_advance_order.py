@@ -1047,7 +1047,7 @@ class PosAdvanceOrder(models.Model):
             "name": self.name,
             "partner_id": self.partner_id.id,
             "partner_name": self.partner_id.display_name,
-            "partner_phone": self.partner_id.phone or self.partner_id.mobile or "",
+            "partner_phone": self.partner_id.phone or "",
             "advance_amount": self.advance_amount,
             "amount_total": self.amount_total,
             "payment_method_name": pm.display_name if pm else (self.payment_method or "").upper(),

@@ -156,10 +156,10 @@ export class RefundAdvanceOrderPopup extends Component {
                 const partners = await this.orm.searchRead(
                     "res.partner",
                     [["id", "in", partnerIds]],
-                    ["id", "phone", "mobile"]
+                    ["id", "phone"]
                 );
                 partnerPhoneById = (partners || []).reduce((acc, p) => {
-                    acc[p.id] = p.phone || p.mobile || "";
+                    acc[p.id] = p.phone || "";
                     return acc;
                 }, {});
             }

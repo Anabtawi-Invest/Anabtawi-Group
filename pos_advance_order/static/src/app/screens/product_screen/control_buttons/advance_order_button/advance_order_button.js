@@ -112,7 +112,7 @@ patch(ControlButtons.prototype, {
             reference: result?.name || "",
             date: new Date().toLocaleString(),
             customerName: partner?.name || "",
-            customerPhone: partner?.phone || partner?.mobile || "",
+            customerPhone: partner?.phone || "",
             paymentMethod: payload.payment_method_name || payload.payment_method,
             currencyId: this.pos.currency?.id,
             total: total,
