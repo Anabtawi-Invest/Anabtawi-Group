@@ -74,6 +74,78 @@ class AnabtawiMobileAPI(http.Controller):
         return employee, user, token, None
 
     @http.route(
+        "/anabtawi/mobile/auth/login",
+        type="http", auth="public", methods=["POST"], csrf=False,
+    )
+    def login(self, **kwargs):
+        data = _payload()
+        login = (data.get("login") or "").strip()
+        password = data.get("password") or ""
+        device_uid = (data.get("device_uid") or "").strip()
+        device_name = (data.get("device_name") or "").strip()
+        platform = data.get("platform")
+        manufacturer = data.get("manufacturer")
+        model_name = data.get("model_name")
+        app_version = data.get("app_version")
+
+        if not login or not password:
+            return _error("invalid_credentials", _("Username and password are required."), 400)
+
+        if not device_uid:
+            return _error("invalid_device", _("Device identifier is required."), 400)
+
+        try:
+            uid = request.session.authenticate(request.db, login, password)
+        except (UserError, ValidationError) as exc:
+            return _error("invalid_credentials", exc.args[0] if exc.args else str(exc), 401)
+        except Exception:
+            return _error("invalid_credentials", _("Invalid username or password."), 401)
+
+        if not uid:
+            return _error("invalid_credentials", _("Invalid username or password."), 401)
+
+        user = request.env["res.users"].sudo().browse(uid)
+        ip_address = request.httprequest.remote_addr
+
+        try:
+            token_data = request.env["anabtawi.mobile.device"].register_or_refresh_login(
+                user=user,
+                device_uid_clean=device_uid,
+                device_name=device_name,
+                ip_address=ip_address,
+                platform=platform,
+                manufacturer=manufacturer,
+                model_name=model_name,
+                app_version=app_version,
+            )
+        except UserError as exc:
+            return _error("device_limit", exc.args[0] if exc.args else str(exc), 403)
+        except Exception as exc:
+            _logger.exception("Failed to register device for user_id=%s", user.id)
+            return _error("server_error", _("Device binding failed."), 500)
+
+        return _json({
+            "status": "ok",
+            "access_token": token_data.get("access_token"),
+            "uid": user.id,
+            "login": user.login,
+        })
+
+    @http.route(
+        "/anabtawi/mobile/auth/me",
+        type="http", auth="public", methods=["GET"], csrf=False,
+    )
+    def me(self, **kwargs):
+        user, _token, error = self._authenticated_user()
+        if error:
+            return error
+        return _json({
+            "status": "ok",
+            "uid": user.id,
+            "login": user.login,
+        })
+
+    @http.route(
         "/anabtawi/mobile/auth/logout",
         type="http", auth="public", methods=["POST"], csrf=False,
     )
