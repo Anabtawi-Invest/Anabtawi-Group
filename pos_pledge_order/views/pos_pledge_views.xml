@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <!-- Pledge List View -->
+    <record id="view_pos_pledge_tree" model="ir.ui.view">
+        <field name="name">pos.pledge.tree</field>
+        <field name="model">pos.pledge</field>
+        <field name="arch" type="xml">
+            <list string="Pledges">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="pos_config_id"/>
+                <field name="pledge_amount"/>
+                <field name="case_type"/>
+                <field name="state"/>
+                <field name="create_date"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Pledge Form View -->
+    <record id="view_pos_pledge_form" model="ir.ui.view">
+        <field name="name">pos.pledge.form</field>
+        <field name="model">pos.pledge</field>
+        <field name="arch" type="xml">
+            <form string="Pledge">
+                <header>
+                    <button name="action_return_pledge" 
+                            type="object" 
+                            string="Return Pledge" 
+                            class="btn-primary"
+                            invisible="state != 'active'"/>
+                    <button name="action_cancel" 
+                            type="object" 
+                            string="Cancel" 
+                            class="btn-secondary"
+                            invisible="state != 'active'"/>
+                    <button name="action_link_payments" 
+                            type="object" 
+                            string="Link Payments" 
+                            class="btn-secondary"
+                            invisible="not pos_order_id"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    
+                    <group>
+                        <group>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="employee_id" readonly="1"/>
+                            <field name="pos_order_id" readonly="1"/>
+                            <field name="pos_config_id" readonly="1"/>
+                            <field name="case_type" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="pledge_amount" readonly="1"/>
+                            <field name="employee_amount" readonly="1" invisible="employee_amount == 0"/>
+                            <field name="delivery_amount" readonly="1" invisible="delivery_amount == 0"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    
+                    <notebook>
+                        <page string="Products">
+                            <group>
+                                <field name="pledge_products" readonly="1"/>
+                                <field name="employee_product_id" readonly="1" invisible="not employee_product_id"/>
+                                <field name="delivery_product_id" readonly="1" invisible="not delivery_product_id"/>
+                            </group>
+                        </page>
+                        
+                        <page string="Payments">
+                            <group string="Independent Payments">
+                                <field name="pledge_payment_id" readonly="1"/>
+                                <field name="employee_payment_id" readonly="1" invisible="not employee_payment_id"/>
+                                <field name="delivery_payment_id" readonly="1" invisible="not delivery_payment_id"/>
+                                <field name="return_payment_id" readonly="1" invisible="not return_payment_id"/>
+                                <field name="return_date" readonly="1" invisible="not return_date"/>
+                            </group>
+                            <group string="Legacy Journal Entries" invisible="not pledge_move_id and not employee_move_id and not delivery_move_id">
+                                <field name="pledge_move_id" readonly="1"/>
+                                <field name="employee_move_id" readonly="1" invisible="not employee_move_id"/>
+                                <field name="delivery_move_id" readonly="1" invisible="not delivery_move_id"/>
+                                <field name="return_move_id" readonly="1" invisible="not return_move_id"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Pledge Action -->
+    <record id="action_pos_pledge" model="ir.actions.act_window">
+        <field name="name">Pledges (Rahn)</field>
+        <field name="res_model">pos.pledge</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No pledges found. Pledges will be created automatically when processing orders with pledge products.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Items -->
+<!--    <menuitem id="menu_pos_pledge_root"-->
+<!--              name="Pledges"-->
+<!--              parent="point_of_sale.menu_point_root"-->
+<!--              sequence="60"/>-->
+
+<!--    <menuitem id="menu_pos_pledge"-->
+<!--              name="Pledge Records"-->
+<!--              parent="menu_pos_pledge_root"-->
+<!--              action="action_pos_pledge"-->
+<!--              sequence="10"/>-->
+
+</odoo>
+

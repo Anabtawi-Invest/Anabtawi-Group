@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        
+        <!-- Sequence for Pledge Records -->
+        <record id="sequence_pos_pledge" model="ir.sequence">
+            <field name="name">POS Pledge Sequence</field>
+            <field name="code">pos.pledge</field>
+            <field name="prefix">PLEDGE/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+    </data>
+</odoo>
+

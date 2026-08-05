@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension" owl="1">
+        <!-- Same anchor as pos_advance_order: always present (do not depend on payment_amount). -->
+        <xpath expr="//PaymentMethodBreakdown[@title.translate='Cash In / Out']" position="before">
+            <div
+                t-if="shouldShowPledgeCashInLine()"
+                class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                <span t-esc="pledgeCashInLabel()"/>
+                <span class="align-top" t-esc="env.utils.formatCurrency(props.default_cash_details.pledge_cash_in || 0)"/>
+            </div>
+            <div
+                t-if="shouldShowPledgeCashOutLine()"
+                class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                <span t-esc="pledgeCashOutLabel()"/>
+                <span class="align-top" t-esc="env.utils.formatCurrency(props.default_cash_details.pledge_cash_out || 0)"/>
+            </div>
+        </xpath>
+        <xpath expr="//span[@t-esc='pm.name']/parent::div" position="after">
+            <div
+                t-if="shouldShowPledgeBankInLine(pm)"
+                class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                <span t-esc="pledgeBankInLabel(pm)"/>
+                <span class="align-top" t-esc="env.utils.formatCurrency(pm.pledge_pm_in || 0)"/>
+            </div>
+            <div
+                t-if="shouldShowPledgeBankOutLine(pm)"
+                class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                <span t-esc="pledgeBankOutLabel(pm)"/>
+                <span class="align-top" t-esc="env.utils.formatCurrency(pm.pledge_pm_out || 0)"/>
+            </div>
+        </xpath>
+    </t>
+</templates>
