@@ -111,7 +111,6 @@ class PosAdvanceOrderController(http.Controller):
         }
         if employee_id:
             create_vals["employee_id"] = int(employee_id)
-            create_vals["with_employee"] = True
         if discount_id:
             create_vals["discount_id"] = int(discount_id)
 

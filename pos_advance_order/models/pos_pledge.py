@@ -26,7 +26,7 @@ class PosAdvanceOrderPledge(models.Model):
         compute="_compute_employee_id",
         store=True,
         readonly=True,
-        help="Filled from the linked Advance Order employee when With Employee is enabled.",
+        help="Filled from the linked advance order or POS order employee when set.",
     )
     product_id = fields.Many2one(
         "product.product",
@@ -103,17 +103,19 @@ class PosAdvanceOrderPledge(models.Model):
             rec.pledge_subtotal = (rec.pledge_qty or 0.0) * (rec.pledge_amount_unit or 0.0)
 
     @api.depends(
-        "order_id.with_employee",
         "order_id.employee_id",
+        "pos_order_id.employee_id",
         "pos_order_id.advance_order_id",
-        "pos_order_id.advance_order_id.with_employee",
         "pos_order_id.advance_order_id.employee_id",
     )
     def _compute_employee_id(self):
         for rec in self:
             order = rec.order_id or rec.pos_order_id.advance_order_id
-            if order and order.with_employee and order.employee_id:
+            pos_order = rec.pos_order_id
+            if order and order.employee_id:
                 rec.employee_id = order.employee_id.id
+            elif pos_order and pos_order.employee_id:
+                rec.employee_id = pos_order.employee_id.id
             else:
                 rec.employee_id = False
 

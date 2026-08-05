@@ -1,0 +1,1003 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following module:
+# 	* pos_pledge_order
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-05 00:00+0000\n"
+"PO-Revision-Date: 2026-08-05 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+#. module: pos_pledge_order
+#: model:ir.module.module,summary:pos_pledge_order
+msgid "Manage pledge (Rahn) scenarios with employees, delivery, and accounting"
+msgstr "إدارة سيناريوهات الرهن مع الموظفين والتوصيل والمحاسبة"
+
+#. module: pos_pledge_order
+msgid "POS Pledge (Rahn) Management"
+msgstr "إدارة رهن نقطة البيع"
+
+#. module: pos_pledge_order
+#: model:ir.model,name:pos_pledge_order.model_pos_pledge
+msgid "POS Pledge (Rahn) Record"
+msgstr "سجل رهن نقطة البيع"
+
+#. module: pos_pledge_order
+#: model:ir.model,name:pos_pledge_order.model_pos_site_service_menu
+msgid "POS Site Service Menu"
+msgstr "قائمة خدمة الموقع"
+
+#. module: pos_pledge_order
+#: model:ir.model,name:pos_pledge_order.model_pos_site_service_product_line
+msgid "POS Site Service Product Line"
+msgstr "سطر منتج خدمة الموقع"
+
+#. module: pos_pledge_order
+#: model:ir.actions.act_window,name:pos_pledge_order.action_pos_site_service_menu
+#: model:ir.ui.menu,name:pos_pledge_order.menu_pos_site_service
+msgid "Site Service"
+msgstr "خدمة الموقع"
+
+#. module: pos_pledge_order
+#: model:ir.actions.act_window,name:pos_pledge_order.action_pos_pledge
+msgid "Pledges (Rahn)"
+msgstr "الرهونات"
+
+#. module: pos_pledge_order
+#: model:ir.sequence,name:pos_pledge_order.seq_pos_pledge
+msgid "POS Pledge Sequence"
+msgstr "تسلسل رهن نقطة البيع"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__name
+msgid "Pledge Reference"
+msgstr "مرجع الرهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__pos_order_id
+msgid "POS Order"
+msgstr "طلب نقطة البيع"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__pos_config_id
+msgid "POS Configuration"
+msgstr "إعدادات نقطة البيع"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__partner_id
+msgid "Customer"
+msgstr "العميل"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__employee_id
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_order__employee_id
+msgid "Employee"
+msgstr "الموظف"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__pledge_products
+msgid "Pledge Products"
+msgstr "منتجات الرهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__employee_product_id
+msgid "Employee Service"
+msgstr "خدمة الموظف"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__delivery_product_id
+msgid "Delivery Service"
+msgstr "خدمة التوصيل"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__pledge_amount
+#: model:ir.model.fields,field_description:pos_pledge_order.field_product_template__pledge_amount
+msgid "Pledge Amount"
+msgstr "مبلغ الرهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__employee_amount
+msgid "Employee Service Amount"
+msgstr "مبلغ خدمة الموظف"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__delivery_amount
+msgid "Delivery Service Amount"
+msgstr "مبلغ خدمة التوصيل"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__state
+msgid "Status"
+msgstr "الحالة"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields.selection,name:pos_pledge_order.selection__pos_pledge__state__active
+msgid "Active"
+msgstr "نشط"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields.selection,name:pos_pledge_order.selection__pos_pledge__state__returned
+msgid "Returned"
+msgstr "مُرتجَع"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields.selection,name:pos_pledge_order.selection__pos_pledge__state__cancelled
+msgid "Cancelled"
+msgstr "ملغى"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__pledge_payment_id
+msgid "Pledge Payment"
+msgstr "دفعة الرهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__employee_payment_id
+msgid "Employee Payment"
+msgstr "دفعة الموظف"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__delivery_payment_id
+msgid "Delivery Payment"
+msgstr "دفعة التوصيل"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__return_payment_id
+msgid "Return/Refund Payment"
+msgstr "دفعة الإرجاع/الاسترداد"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__pledge_move_id
+msgid "Pledge Journal Entry (Legacy)"
+msgstr "قيد يومية الرهن (قديم)"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__employee_move_id
+msgid "Employee Journal Entry (Legacy)"
+msgstr "قيد يومية الموظف (قديم)"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__delivery_move_id
+msgid "Delivery Journal Entry (Legacy)"
+msgstr "قيد يومية التوصيل (قديم)"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__return_move_id
+msgid "Return Journal Entry (Legacy)"
+msgstr "قيد يومية الإرجاع (قديم)"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__return_date
+msgid "Return Date"
+msgstr "تاريخ الإرجاع"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_pledge__case_type
+msgid "Business Case"
+msgstr "الحالة التشغيلية"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields.selection,name:pos_pledge_order.selection__pos_pledge__case_type__case1
+msgid "Case 1: Employee Only"
+msgstr "الحالة 1: موظف فقط"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields.selection,name:pos_pledge_order.selection__pos_pledge__case_type__case2
+msgid "Case 2: Pledge Only"
+msgstr "الحالة 2: رهن فقط"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields.selection,name:pos_pledge_order.selection__pos_pledge__case_type__case3
+msgid "Case 3: Pledge + Delivery"
+msgstr "الحالة 3: رهن + توصيل"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields.selection,name:pos_pledge_order.selection__pos_pledge__case_type__case4
+msgid "Case 4: Pledge + Employee + Delivery"
+msgstr "الحالة 4: رهن + موظف + توصيل"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields.selection,name:pos_pledge_order.selection__pos_pledge__case_type__case5
+msgid "Case 5: Pledge + Employee"
+msgstr "الحالة 5: رهن + موظف"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields.selection,name:pos_pledge_order.selection__pos_pledge__case_type__case6
+msgid "Case 6: Employee + Delivery"
+msgstr "الحالة 6: موظف + توصيل"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields.selection,name:pos_pledge_order.selection__pos_pledge__case_type__mixed
+msgid "Mixed Scenario"
+msgstr "سيناريو مختلط"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_site_service_menu__name
+msgid "Menu Name"
+msgstr "اسم القائمة"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_site_service_menu__enable_site_service
+msgid "Site Service"
+msgstr "خدمة الموقع"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_site_service_menu__pos_config_id
+msgid "Point of Sale"
+msgstr "نقطة البيع"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_site_service_menu__threshold
+msgid "Threshold"
+msgstr "العتبة"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_site_service_menu__service_product_id
+msgid "Service Product"
+msgstr "منتج الخدمة"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_site_service_menu__service_price
+msgid "Service Price"
+msgstr "سعر الخدمة"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_site_service_menu__line_ids
+#: model:ir.ui.view,arch_db:pos_pledge_order.view_pos_site_service_menu_form
+msgid "Products"
+msgstr "المنتجات"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_site_service_product_line__menu_id
+msgid "Site Service Menu"
+msgstr "قائمة خدمة الموقع"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_site_service_product_line__product_id
+msgid "Product"
+msgstr "المنتج"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_site_service_product_line__multiple
+msgid "Multiple"
+msgstr "المضاعف"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_config__pos_pledge_liability_account_id
+msgid "Pledge Liability Account"
+msgstr "حساب التزامات الرهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_config__pledge_product_id
+msgid "Pledge Product"
+msgstr "منتج الرهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_product_template__has_pledge
+msgid "Has Pledge"
+msgstr "له رهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_product_template__is_pledge_product
+msgid "Is Pledge Product"
+msgstr "منتج رهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_product_template__is_plege
+msgid "Is Pledge"
+msgstr "رهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_product_template__is_employee_service
+msgid "Is Employee Service"
+msgstr "خدمة موظف"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_product_template__is_delivery_product
+msgid "Is Delivery Product"
+msgstr "منتج توصيل"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_order__pledge_id
+msgid "Pledge Record"
+msgstr "سجل الرهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_order__has_pledge
+msgid "Has Pledge"
+msgstr "له رهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_order__has_employee_service
+msgid "Has Employee Service"
+msgstr "يحتوي على خدمة موظف"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_order__employee_id
+msgid "Service Employee"
+msgstr "موظف الخدمة"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_order__pledge_product_qty
+msgid "Pledge Product Quantity"
+msgstr "كمية منتجات الرهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_order__total_pledge_amount
+msgid "Total Pledge Amount"
+msgstr "إجمالي مبلغ الرهن"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_order_line__is_pledge_related
+msgid "Pledge Related"
+msgstr "مرتبط بالرهن"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_site_service_menu_list
+msgid "Site Service Menus"
+msgstr "قوائم خدمة الموقع"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_site_service_menu_form
+msgid "Site Service Menu"
+msgstr "قائمة خدمة الموقع"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_site_service_menu_search
+msgid "Enabled"
+msgstr "مفعّل"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_site_service_menu_search
+msgid "Disabled"
+msgstr "معطّل"
+
+#. module: pos_pledge_order
+#: model_terms:ir.actions.act_window,help:pos_pledge_order.action_pos_site_service_menu
+msgid "Create a site service menu for a Point of Sale."
+msgstr "أنشئ قائمة خدمة موقع لنقطة بيع."
+
+#. module: pos_pledge_order
+#: model_terms:ir.actions.act_window,help:pos_pledge_order.action_pos_site_service_menu
+msgid "Define the threshold, service product, price, and the products included in the score calculation."
+msgstr "حدّد العتبة ومنتج الخدمة والسعر والمنتجات المشمولة في احتساب النقاط."
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.pos_config_view_form_pledge
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.product_template_form_view_pledge
+msgid "Pledge (Rahn) Configuration"
+msgstr "إعدادات الرهن"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_order_form_pledge
+msgid "Pledge Info"
+msgstr "معلومات الرهن"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_order_form_pledge
+msgid "Pledge (Rahn) Information"
+msgstr "معلومات الرهن"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_pledge_tree
+msgid "Pledges"
+msgstr "الرهونات"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_pledge_form
+msgid "Pledge"
+msgstr "الرهن"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_pledge_form
+msgid "Return Pledge"
+msgstr "إرجاع الرهن"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_pledge_form
+msgid "Cancel"
+msgstr "إلغاء"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_pledge_form
+msgid "Link Payments"
+msgstr "ربط المدفوعات"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_pledge_form
+msgid "Payments"
+msgstr "المدفوعات"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_pledge_form
+msgid "Independent Payments"
+msgstr "مدفوعات مستقلة"
+
+#. module: pos_pledge_order
+#: model_terms:ir.ui.view,arch_db:pos_pledge_order.view_pos_pledge_form
+msgid "Legacy Journal Entries"
+msgstr "قيود يومية قديمة"
+
+#. module: pos_pledge_order
+#: model_terms:ir.actions.act_window,help:pos_pledge_order.action_pos_pledge
+msgid "No pledges found. Pledges will be created automatically when processing orders with pledge products."
+msgstr "لا توجد رهونات. سيتم إنشاء الرهونات تلقائياً عند معالجة الطلبات التي تحتوي على منتجات رهن."
+
+#. module: pos_pledge_order
+msgid "New"
+msgstr "جديد"
+
+#. module: pos_pledge_order
+msgid "Missing required fields for pledge creation"
+msgstr "حقول مطلوبة مفقودة لإنشاء الرهن"
+
+#. module: pos_pledge_order
+msgid "POS Order not found"
+msgstr "طلب نقطة البيع غير موجود"
+
+#. module: pos_pledge_order
+msgid "Only active pledges can be returned: %s"
+msgstr "يمكن إرجاع الرهونات النشطة فقط: %s"
+
+#. module: pos_pledge_order
+msgid "No posted pledge journal entry is linked to %s. Cannot reverse."
+msgstr "لا يوجد قيد يومية مرحّل مرتبط بـ %s. لا يمكن عكس القيد."
+
+#. module: pos_pledge_order
+msgid "Pledge return - %s"
+msgstr "إرجاع رهن - %s"
+
+#. module: pos_pledge_order
+msgid "Site service threshold must be greater than zero."
+msgstr "يجب أن تكون عتبة خدمة الموقع أكبر من صفر."
+
+#. module: pos_pledge_order
+msgid "Please select a service product for site service."
+msgstr "يرجى اختيار منتج خدمة لخدمة الموقع."
+
+#. module: pos_pledge_order
+msgid "Site service price cannot be negative."
+msgstr "لا يمكن أن يكون سعر خدمة الموقع سالباً."
+
+#. module: pos_pledge_order
+msgid "Multiple must be greater than zero."
+msgstr "يجب أن يكون المضاعف أكبر من صفر."
+
+#. module: pos_pledge_order
+msgid "Only one site service menu is allowed per Point of Sale configuration."
+msgstr "يُسمح بقائمة خدمة موقع واحدة فقط لكل إعداد نقطة بيع."
+
+#. module: pos_pledge_order
+msgid "Please define an inbound payment method on journal %s for pledge deposit posting."
+msgstr "يرجى تعريف طريقة دفع واردة في دفتر %s لترحيل إيداع الرهن."
+
+#. module: pos_pledge_order
+msgid "Please set 'Pledge Liability Account' on the POS configuration first."
+msgstr "يرجى تعيين 'حساب التزامات الرهن' في إعدادات نقطة البيع أولاً."
+
+#. module: pos_pledge_order
+msgid "A customer is required to post pledge deposit for order %s."
+msgstr "يلزم وجود عميل لترحيل إيداع الرهن للطلب %s."
+
+#. module: pos_pledge_order
+msgid "Configure payment methods with journals on the POS to post pledge deposits."
+msgstr "قم بإعداد طرق الدفع مع دفاتر اليومية في نقطة البيع لترحيل إيداعات الرهن."
+
+#. module: pos_pledge_order
+msgid ""
+"Configure an inbound payment method with a payment account on journal '%s' "
+"so pledge deposits can be posted."
+msgstr ""
+"قم بإعداد طريقة دفع واردة مع حساب دفع في دفتر '%s' "
+"حتى يمكن ترحيل إيداعات الرهن."
+
+#. module: pos_pledge_order
+msgid "POS pledge deposit - %s"
+msgstr "إيداع رهن نقطة البيع - %s"
+
+#. module: pos_pledge_order
+msgid "Pledge deposit %s"
+msgstr "إيداع رهن %s"
+
+#. module: pos_pledge_order
+msgid ""
+"The cash journal \"%s\" is already used in another POS configuration. "
+"Please configure a different cash journal for this POS configuration, "
+"or remove it from the other configuration first."
+msgstr ""
+"دفتر النقد \"%s\" مستخدم بالفعل في إعداد نقطة بيع أخرى. "
+"يرجى إعداد دفتر نقد مختلف لهذه النقطة، "
+"أو إزالته من الإعداد الآخر أولاً."
+
+#. module: pos_pledge_order
+msgid "Price discount from %(original_price)s to %(discounted_price)s"
+msgstr "خصم السعر من %(original_price)s إلى %(discounted_price)s"
+
+#. module: pos_pledge_order
+msgid "Cash pledge (deposit) %s"
+msgstr "رهن نقدي (إيداع) %s"
+
+#. module: pos_pledge_order
+msgid "Cash pledge (return / cash out) %s"
+msgstr "رهن نقدي (إرجاع / صرف نقدي) %s"
+
+#. module: pos_pledge_order
+msgid "Payment method"
+msgstr "طريقة الدفع"
+
+#. module: pos_pledge_order
+msgid "Pledge deposit (%s) — %s"
+msgstr "إيداع رهن (%s) — %s"
+
+#. module: pos_pledge_order
+msgid "Pledge return / cash out (%s) — %s"
+msgstr "إرجاع رهن / صرف نقدي (%s) — %s"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Product template is not ready yet. Please retry."
+msgstr "قالب المنتج غير جاهز بعد. يرجى المحاولة مجدداً."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Product data is still initializing. Please try again."
+msgstr "بيانات المنتج ما زالت تُحمّل. يرجى المحاولة مجدداً."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Select Employee"
+msgstr "اختيار موظف"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Return Pledge"
+msgstr "إرجاع الرهن"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Return Employee Pledge"
+msgstr "إرجاع رهن موظف"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Return Customer Pledge"
+msgstr "إرجاع رهن عميل"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Select Return Type"
+msgstr "اختر نوع الإرجاع"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Employee Pledge"
+msgstr "رهن موظف"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Customer Pledge"
+msgstr "رهن عميل"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Return %s - %s for %s (%s)?"
+msgstr "إرجاع %s - %s لـ %s (%s)؟"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "✓ Yes, Return This Pledge"
+msgstr "✓ نعم، أرجع هذا الرهن"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "✗ Cancel"
+msgstr "✗ إلغاء"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Pledge returned successfully. Reversal entry created."
+msgstr "تم إرجاع الرهن بنجاح. تم إنشاء قيد عكسي."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Failed to return pledge"
+msgstr "فشل إرجاع الرهن"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "No order selected"
+msgstr "لم يتم اختيار طلب"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Employee selected: %s"
+msgstr "تم اختيار الموظف: %s"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Failed to select employee"
+msgstr "فشل اختيار الموظف"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Customer Required"
+msgstr "العميل مطلوب"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "This order has a pledge. Please choose a customer before proceeding."
+msgstr "هذا الطلب يحتوي على رهن. يرجى اختيار عميل قبل المتابعة."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Error: Employee service and delivery service cannot be in the same order. Please choose one of them."
+msgstr "خطأ: لا يمكن أن تكون خدمة الموظف وخدمة التوصيل في نفس الطلب. يرجى اختيار واحدة منهما."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Please select an employee before validating this order. The order contains employee service products."
+msgstr "يرجى اختيار موظف قبل تأكيد هذا الطلب. الطلب يحتوي على منتجات خدمة موظف."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Dual receipts printed: Internal + Customer"
+msgstr "تمت طباعة إيصالين: داخلي + عميل"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Warning: Failed to print one or more pledge receipts"
+msgstr "تحذير: فشلت طباعة واحد أو أكثر من إيصالات الرهن"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Order not synced, pledge record not created"
+msgstr "الطلب غير متزامن، لم يتم إنشاء سجل الرهن"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Pledge record created: %s"
+msgstr "تم إنشاء سجل الرهن: %s"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pos_pledge.js:0
+msgid "Failed to create pledge record: %s"
+msgstr "فشل إنشاء سجل الرهن: %s"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/employee_selection_popup.js:0
+msgid "Search employee by name or job title..."
+msgstr "ابحث عن موظف بالاسم أو المسمى الوظيفي..."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/employee_selection_popup.js:0
+msgid "No employees found"
+msgstr "لم يتم العثور على موظفين"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/employee_selection_popup.js:0
+msgid "Failed to load employees"
+msgstr "فشل تحميل الموظفين"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/employee_selection_popup.js:0
+msgid "No employee found."
+msgstr "لم يتم العثور على موظف."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Select Pledge to Return"
+msgstr "اختر رهناً للإرجاع"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Pledge Details"
+msgstr "تفاصيل الرهن"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Search by pledge number, customer name, phone, or employee name..."
+msgstr "ابحث برقم الرهن أو اسم العميل أو الهاتف أو اسم الموظف..."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "No active pledges found."
+msgstr "لا توجد رهونات نشطة."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "No pledges match your search."
+msgstr "لا توجد رهونات مطابقة لبحثك."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Show"
+msgstr "عرض"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Select"
+msgstr "اختيار"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Close"
+msgstr "إغلاق"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Customer:"
+msgstr "العميل:"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Employee:"
+msgstr "الموظف:"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Amounts"
+msgstr "المبالغ"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Pledge Amount:"
+msgstr "مبلغ الرهن:"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Employee Service:"
+msgstr "خدمة الموظف:"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Delivery Service:"
+msgstr "خدمة التوصيل:"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Qty"
+msgstr "الكمية"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Case Type:"
+msgstr "نوع الحالة:"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Created:"
+msgstr "تاريخ الإنشاء:"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Returned:"
+msgstr "تاريخ الإرجاع:"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "%s active pledge(s) found"
+msgstr "تم العثور على %s رهن/رهون نشطة"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Showing %s of %s pledges"
+msgstr "عرض %s من %s رهن"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "POS Pledge"
+msgstr "رهن نقطة البيع"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Failed to load pledges"
+msgstr "فشل تحميل الرهونات"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "No pledge found."
+msgstr "لم يتم العثور على رهن."
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Failed to load pledge details"
+msgstr "فشل تحميل تفاصيل الرهن"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_list_popup.js:0
+msgid "Failed to load pledge details: %s"
+msgstr "فشل تحميل تفاصيل الرهن: %s"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_closing_popup.js:0
+msgid "Pledge deposits (cash in)"
+msgstr "إيداعات الرهن (نقد وارد)"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_closing_popup.js:0
+msgid "Pledge returns (cash out)"
+msgstr "مرتجعات الرهن (نقد صادر)"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_closing_popup.js:0
+msgid "Pledge deposit"
+msgstr "إيداع رهن"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_closing_popup.js:0
+msgid "Pledge deposit (%s)"
+msgstr "إيداع رهن (%s)"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_closing_popup.js:0
+msgid "Pledge return"
+msgstr "إرجاع رهن"
+
+#. module: pos_pledge_order
+#. odoo-javascript
+#: code:addons/pos_pledge_order/static/src/js/pledge_closing_popup.js:0
+msgid "Pledge return (%s)"
+msgstr "إرجاع رهن (%s)"
+
+#. module: pos_pledge_order
+msgid "When enabled, the cutting service logic is applied at POS for this configuration."
+msgstr "عند التفعيل، يُطبَّق منطق خدمة التقطيع في نقطة البيع لهذا الإعداد."
+
+#. module: pos_pledge_order
+msgid "Minimum score (sum of Quantity × Multiple) required to waive the cutting service."
+msgstr "الحد الأدنى للنقاط (مجموع الكمية × المضاعف) المطلوب للإعفاء من خدمة التقطيع."
+
+#. module: pos_pledge_order
+msgid "Product representing the on-site cutting service."
+msgstr "المنتج الذي يمثل خدمة التقطيع في الموقع."
+
+#. module: pos_pledge_order
+msgid "Unit price used when the service product is added automatically."
+msgstr "سعر الوحدة المستخدم عند إضافة منتج الخدمة تلقائياً."
+
+#. module: pos_pledge_order
+msgid "Weight factor used in site service score: Quantity × Multiple."
+msgstr "عامل الوزن المستخدم في احتساب خدمة الموقع: الكمية × المضاعف."
+
+#. module: pos_pledge_order
+msgid "Separate liability account for POS pledge (rahn) deposits (credit on pledge receipt; reversed on return). Independent from the advance-order POS Advance account."
+msgstr "حساب التزامات منفصل لإيداعات رهن نقطة البيع (دائن عند استلام الرهن؛ يُعكس عند الإرجاع). مستقل عن حساب العربون في طلبات المسبق."
+
+#. module: pos_pledge_order
+msgid "Product used to record pledge amount as a dedicated POS order line."
+msgstr "المنتج المستخدم لتسجيل مبلغ الرهن كسطر طلب مستقل في نقطة البيع."
+
+#. module: pos_pledge_order
+msgid "Backward compatible alias of 'Has Pledge'."
+msgstr "اسم بديل متوافق مع الإصدارات السابقة لحقل 'له رهن'."
+
+#. module: pos_pledge_order
+msgid "Alias field for backward compatibility with custom naming."
+msgstr "حقل بديل للتوافق مع التسميات المخصصة القديمة."
+
+#. module: pos_pledge_order
+msgid "Check this if the product represents an employee service"
+msgstr "فعّل هذا إذا كان المنتج يمثل خدمة موظف"
+
+#. module: pos_pledge_order
+msgid "Check this if the product represents a delivery service"
+msgstr "فعّل هذا إذا كان المنتج يمثل خدمة توصيل"
+
+#. module: pos_pledge_order
+msgid "Legacy: separate POS order used before pledge was posted as accounting only."
+msgstr "قديم: طلب نقطة بيع منفصل كان يُستخدم قبل ترحيل الرهن محاسبياً فقط."
+
+#. module: pos_pledge_order
+msgid "Posted as: Dr liquidity / Cr Pledge Liability Account from POS config (pledge not in pos.payment)."
+msgstr "يُرحَّل كـ: مدين السيولة / دائن حساب التزامات الرهن من إعدادات نقطة البيع (الرهن ليس في مدفوعات نقطة البيع)."
+
+#. module: pos_pledge_order
+msgid "Pledge Products Snapshot"
+msgstr "لقطة منتجات الرهن"
+
+#. module: pos_pledge_order
+msgid "Pledge Generated Order"
+msgstr "طلب مُولَّد من الرهن"
+
+#. module: pos_pledge_order
+msgid "Technical flag for POS orders generated automatically by pledge flow."
+msgstr "علامة تقنية للطلبات التي يُنشئها تدفق الرهن تلقائياً."
+
+#. module: pos_pledge_order
+msgid "Pledge Payments Created"
+msgstr "تم إنشاء مدفوعات الرهن"
+
+#. module: pos_pledge_order
+msgid "Indicates if pledge/employee/delivery payments have been created"
+msgstr "يشير إلى ما إذا تم إنشاء مدفوعات الرهن/الموظف/التوصيل"
+
+#. module: pos_pledge_order
+msgid "Indicates if this order contains employee service products"
+msgstr "يشير إلى ما إذا كان هذا الطلب يحتوي على منتجات خدمة موظف"
+
+#. module: pos_pledge_order
+msgid "Employee associated with this order for service delivery"
+msgstr "الموظف المرتبط بهذا الطلب لتقديم الخدمة"
+
+#. module: pos_pledge_order
+msgid "Total quantity of pledge products in this order"
+msgstr "إجمالي كمية منتجات الرهن في هذا الطلب"
+
+#. module: pos_pledge_order
+msgid "Total amount for pledge products in this order"
+msgstr "إجمالي مبلغ منتجات الرهن في هذا الطلب"
+
+#. module: pos_pledge_order
+msgid "Note:"
+msgstr "ملاحظة:"
+
+#. module: pos_pledge_order
+msgid "Orders with pledge items will NOT automatically create customer invoices. Pledge orders will be tracked in the pledge menu automatically."
+msgstr "الطلبات التي تحتوي على عناصر رهن لن تُنشئ فواتير عملاء تلقائياً. سيتم تتبع طلبات الرهن في قائمة الرهونات تلقائياً."

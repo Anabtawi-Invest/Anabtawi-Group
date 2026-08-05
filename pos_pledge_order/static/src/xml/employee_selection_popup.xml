@@ -2,14 +2,14 @@
 <templates xml:space="preserve">
 
     <t t-name="pos_pledge.EmployeeSelectionPopup" owl="1">
-        <Dialog title="'Select Employee'" size="'md'">
+        <Dialog t-att-title="title" size="'md'">
             <div class="employee-selection-popup">
                 <!-- Search Bar -->
                 <div class="search-bar mb-3">
                     <input
                         type="text"
                         class="form-control"
-                        placeholder="Search employee by name or job title..."
+                        t-att-placeholder="searchPlaceholder"
                         t-model="state.search"
                         t-on-input="(ev) => this.onSearchInput(ev)"
                         t-on-keydown="(ev) => this.onSearchKeydown(ev)"
@@ -22,7 +22,7 @@
                     <t t-if="filteredEmployees.length === 0">
                         <div class="text-center p-4 text-muted">
                             <i class="fa fa-user-times fa-2x mb-2"/>
-                            <p>No employees found</p>
+                            <p t-esc="noEmployeesFoundLabel"/>
                         </div>
                     </t>
 
@@ -55,7 +55,7 @@
                         class="btn btn-secondary me-2"
                         t-on-click="() => this.cancel()"
                     >
-                        Cancel
+                        t-esc="cancelLabel"
                     </button>
                 </div>
             </div>

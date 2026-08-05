@@ -202,6 +202,14 @@ patch(ControlButtons.prototype, {
     /**
      * Handle Return Pledge button click
      */
+    get selectEmployeeLabel() {
+        return _t("Select Employee");
+    },
+
+    get returnPledgeLabel() {
+        return _t("Return Pledge");
+    },
+
     async onClickReturnPledge() {
         console.log("[PLEDGE] ========================================");
         console.log("[PLEDGE] Return Pledge button clicked!");

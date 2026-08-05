@@ -85,7 +85,6 @@ class PosAdvanceOrder(models.Model):
         store=True,
         readonly=True,
     )
-    with_employee = fields.Boolean(string="With Employee", default=False)
     employee_id = fields.Many2one("hr.employee", string="Employee")
     payment_method = fields.Selection(
         [

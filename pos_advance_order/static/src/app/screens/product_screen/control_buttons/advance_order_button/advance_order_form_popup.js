@@ -55,10 +55,7 @@ export class AdvanceOrderFormPopup extends Component {
             from_pos_config_id: this.props.posConfigId || null,
             picking_pos_config_id: this.props.posConfigId || null,
             pricelist_name: "",
-            with_employee: false,
-            employee_id: null,
             discount_id: null,
-            employees: [],
             discounts: [],
             pos_configs: [],
             payment_methods: paymentMethods,
@@ -126,16 +123,12 @@ export class AdvanceOrderFormPopup extends Component {
 
     async _loadPopupData() {
         const companyId = this.props.companyId || false;
-        const employeeDomain = companyId
-            ? ["|", ["company_id", "=", false], ["company_id", "=", companyId]]
-            : [];
         const discountDomain = [["active", "=", true]];
         if (companyId) {
             discountDomain.push(["company_id", "=", companyId]);
         }
         try {
-            const [employees, discounts, posConfigs] = await Promise.all([
-                this.orm.searchRead("hr.employee", employeeDomain, ["id", "name"], { limit: 200 }),
+            const [discounts, posConfigs] = await Promise.all([
                 this.orm.searchRead(
                     "pos.advance.discount",
                     discountDomain,
@@ -149,7 +142,6 @@ export class AdvanceOrderFormPopup extends Component {
                     { limit: 200 }
                 ),
             ]);
-            this.state.employees = employees || [];
             this.state.discounts = discounts || [];
             this.state.pos_configs = posConfigs || [];
             this.state.from_pos_config_id = this.props.posConfigId || this.state.from_pos_config_id;
@@ -207,17 +199,6 @@ export class AdvanceOrderFormPopup extends Component {
         this._syncPricelistName();
     }
 
-    onWithEmployeeChange(ev) {
-        this.state.with_employee = !!ev.target.checked;
-        if (!this.state.with_employee) {
-            this.state.employee_id = null;
-        }
-    }
-
-    onEmployeeChange(ev) {
-        this.state.employee_id = ev.target.value ? parseInt(ev.target.value, 10) : null;
-    }
-
     onDiscountChange(ev) {
         this.state.discount_id = ev.target.value ? parseInt(ev.target.value, 10) : null;
     }
@@ -262,10 +243,6 @@ export class AdvanceOrderFormPopup extends Component {
             );
             return;
         }
-        if (this.state.with_employee && !this.state.employee_id) {
-            this.notification.add(_t("Please select an employee."), { type: "warning" });
-            return;
-        }
         const selectedPm = this.state.payment_methods.find(
             (pm) => pm.id === this.state.selected_payment_method_id
         );
@@ -276,7 +253,6 @@ export class AdvanceOrderFormPopup extends Component {
             payment_method_name: selectedPm?.name || "",
             from_pos_config_id: currentFromPosId,
             pos_config_id: this.state.picking_pos_config_id,
-            employee_id: this.state.with_employee ? this.state.employee_id : false,
             discount_id: this.state.discount_id || false,
         });
         this.props.close();
