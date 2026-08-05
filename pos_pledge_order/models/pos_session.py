@@ -16,6 +16,11 @@ class PosSession(models.Model):
         for model_name in ("pos.site.service.menu", "pos.site.service.product.line"):
             if model_name not in models_to_load:
                 models_to_load.append(model_name)
+                _logger.info(
+                    "[SITE_SERVICE] Registered POS data model %s for config id=%s",
+                    model_name,
+                    config.id,
+                )
         return models_to_load
 
     def get_session_orders(self):

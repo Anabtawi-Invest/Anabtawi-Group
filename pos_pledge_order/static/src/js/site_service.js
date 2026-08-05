@@ -28,6 +28,12 @@ function getSiteServiceConfig(pos) {
         return null;
     }
     const menuModel = pos.models?.["pos.site.service.menu"];
+    if (!menuModel) {
+        console.warn(
+            `[SITE_SERVICE] Model pos.site.service.menu is missing from POS data (config id=${config.id})`
+        );
+        return null;
+    }
     const menu = (menuModel?.getAll?.() || []).find(
         (record) =>
             normalizeId(record.pos_config_id) === config.id && record.enable_site_service
@@ -101,6 +107,9 @@ async function syncSiteServiceLine(pos, order) {
         }
         const serviceProduct = pos.models["product.product"].get(menuConfig.serviceProductId);
         if (!serviceProduct) {
+            console.warn(
+                `[SITE_SERVICE] Service product id=${menuConfig.serviceProductId} not found in POS data for config id=${pos.config?.id}`
+            );
             return;
         }
         const addedLine = await pos.addLineToOrder(
@@ -119,6 +128,11 @@ async function syncSiteServiceLine(pos, order) {
         if (line) {
             line.is_site_service_auto = true;
         }
+    } catch (error) {
+        console.error(
+            `[SITE_SERVICE] Failed to sync site service line for order id=${order.id}, config id=${pos.config?.id}:`,
+            error
+        );
     } finally {
         order._syncingSiteService = false;
     }
@@ -129,7 +143,12 @@ function scheduleSiteServiceSync(order) {
     if (!order || !pos || order._syncingSiteService) {
         return;
     }
-    syncSiteServiceLine(pos, order);
+    syncSiteServiceLine(pos, order).catch((error) => {
+        console.error(
+            `[SITE_SERVICE] Unhandled sync error for order id=${order.id}:`,
+            error
+        );
+    });
 }
 
 patch(PosOrderline.prototype, {

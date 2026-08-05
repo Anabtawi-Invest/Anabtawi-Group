@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'POS Pledge (Rahn) Management',
-    'version': '19.0.1.0.24',
+    'version': '19.0.1.0.25',
     'category': 'Point of Sale',
     'summary': 'Manage pledge (Rahn) scenarios with employees, delivery, and accounting',
     'description': """
@@ -51,4 +51,5 @@
     'application': False,
     'auto_install': False,
     'license': 'LGPL-3',
+    'post_init_hook': 'post_init_hook',
 }

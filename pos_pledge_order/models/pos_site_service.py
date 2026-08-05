@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class PosSiteServiceMenu(models.Model):
@@ -80,6 +84,23 @@ class PosSiteServiceMenu(models.Model):
                 raise ValidationError(_("Site service price cannot be negative."))
 
     @api.model
+    def _load_pos_data_search_read(self, data, config):
+        try:
+            records = super()._load_pos_data_search_read(data, config)
+            _logger.info(
+                "[SITE_SERVICE] Loaded %s menu record(s) for POS config id=%s",
+                len(records),
+                config.id,
+            )
+            return records
+        except Exception:
+            _logger.exception(
+                "[SITE_SERVICE] Failed to load pos.site.service.menu for POS config id=%s",
+                config.id,
+            )
+            raise
+
+    @api.model
     def _load_pos_data_domain(self, data, config):
         return [("pos_config_id", "=", config.id), ("active", "=", True)]
 
@@ -109,6 +130,11 @@ class PosSiteServiceProductLine(models.Model):
         ondelete="cascade",
         index=True,
     )
+    active = fields.Boolean(
+        related="menu_id.active",
+        store=True,
+        readonly=True,
+    )
     product_id = fields.Many2one(
         "product.product",
         string="Product",
@@ -129,9 +155,26 @@ class PosSiteServiceProductLine(models.Model):
                 raise ValidationError(_("Multiple must be greater than zero."))
 
     @api.model
+    def _load_pos_data_search_read(self, data, config):
+        try:
+            records = super()._load_pos_data_search_read(data, config)
+            _logger.info(
+                "[SITE_SERVICE] Loaded %s product line(s) for POS config id=%s",
+                len(records),
+                config.id,
+            )
+            return records
+        except Exception:
+            _logger.exception(
+                "[SITE_SERVICE] Failed to load pos.site.service.product.line for POS config id=%s",
+                config.id,
+            )
+            raise
+
+    @api.model
     def _load_pos_data_domain(self, data, config):
         return [("menu_id.pos_config_id", "=", config.id)]
 
     @api.model
     def _load_pos_data_fields(self, config):
-        return ["id", "menu_id", "product_id", "multiple"]
+        return ["id", "menu_id", "product_id", "multiple", "active"]
