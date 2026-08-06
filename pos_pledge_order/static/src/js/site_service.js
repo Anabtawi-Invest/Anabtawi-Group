@@ -6,6 +6,9 @@ import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { patch } from "@web/core/utils/patch";
 
+/** @type {import("@point_of_sale/app/services/pos_store").PosStore | null} */
+let posStoreRef = null;
+
 function normalizeId(value) {
     if (!value) {
         return null;
@@ -22,6 +25,16 @@ function normalizeId(value) {
     return null;
 }
 
+function resolvePos(order) {
+    return order?._siteServicePos || posStoreRef;
+}
+
+function attachPosToOrder(order, pos) {
+    if (order && pos) {
+        order._siteServicePos = pos;
+    }
+}
+
 function getSiteServiceConfig(pos) {
     const config = pos?.config;
     if (!config) {
@@ -34,10 +47,9 @@ function getSiteServiceConfig(pos) {
         );
         return null;
     }
-    const menu = (menuModel?.getAll?.() || []).find(
-        (record) => record.enable_site_service
-    );
-    if (!menu) {
+    const menus = menuModel.getAll?.() || [];
+    const menu = menus.find((record) => record.enable_site_service) || menus[0];
+    if (!menu || !menu.enable_site_service) {
         return null;
     }
     const serviceProductId = normalizeId(menu.service_product_id);
@@ -45,8 +57,9 @@ function getSiteServiceConfig(pos) {
         return null;
     }
     const lineModel = pos.models?.["pos.site.service.product.line"];
+    const menuId = normalizeId(menu.id);
     const productLines = (lineModel?.getAll?.() || []).filter(
-        (line) => normalizeId(line.menu_id) === menu.id
+        (line) => normalizeId(line.menu_id) === menuId
     );
     return {
         threshold: menu.threshold ?? 31,
@@ -65,7 +78,7 @@ function computeSiteServiceScore(order, menuConfig) {
         }
     }
     let score = 0;
-    const orderLines = order.getOrderlines ? order.getOrderlines() : order.lines || [];
+    const orderLines = order.lines || (order.getOrderlines?.() || []);
     for (const orderLine of orderLines) {
         if (orderLine.is_site_service_auto) {
             continue;
@@ -75,22 +88,38 @@ function computeSiteServiceScore(order, menuConfig) {
         if (!productId || !multiplesByProduct.has(productId)) {
             continue;
         }
-        const qty = orderLine.get_quantity?.() ?? orderLine.qty ?? 0;
+        const qty = orderLine.getQuantity?.() ?? orderLine.qty ?? 0;
         score += qty * multiplesByProduct.get(productId);
     }
     return score;
 }
 
 function getSiteServiceAutoLines(order) {
-    const orderLines = order.getOrderlines ? order.getOrderlines() : order.lines || [];
+    const orderLines = order.lines || (order.getOrderlines?.() || []);
     return orderLines.filter((line) => line.is_site_service_auto);
+}
+
+async function addSiteServiceLine(pos, order, menuConfig, serviceProduct) {
+    attachPosToOrder(order, pos);
+    return pos.addLineToOrder(
+        {
+            product_id: serviceProduct,
+            product_tmpl_id: serviceProduct.product_tmpl_id,
+            qty: 1,
+            price_unit: menuConfig.servicePrice,
+            price_type: "manual",
+        },
+        order,
+        { force: true },
+        false
+    );
 }
 
 async function syncSiteServiceLine(pos, order) {
     if (!order || order._syncingSiteService) {
         return;
     }
-    order._siteServicePos = pos;
+    attachPosToOrder(order, pos);
     const menuConfig = getSiteServiceConfig(pos);
     order._syncingSiteService = true;
     try {
@@ -102,6 +131,9 @@ async function syncSiteServiceLine(pos, order) {
         }
         const score = computeSiteServiceScore(order, menuConfig);
         if (score >= menuConfig.threshold) {
+            console.info(
+                `[SITE_SERVICE] Score ${score} >= threshold ${menuConfig.threshold}; service waived.`
+            );
             return;
         }
         const serviceProduct = pos.models["product.product"].get(menuConfig.serviceProductId);
@@ -111,22 +143,14 @@ async function syncSiteServiceLine(pos, order) {
             );
             return;
         }
-        const addedLine = await pos.addLineToOrder(
-            {
-                product_id: serviceProduct,
-                product_tmpl_id: serviceProduct.product_tmpl_id,
-                qty: 1,
-                price_unit: menuConfig.servicePrice,
-                price_type: "manual",
-            },
-            order,
-            { force: true },
-            false
-        );
+        const addedLine = await addSiteServiceLine(pos, order, menuConfig, serviceProduct);
         const line = addedLine || order.getSelectedOrderline?.();
         if (line) {
             line.is_site_service_auto = true;
         }
+        console.info(
+            `[SITE_SERVICE] Added service line (score=${score}, threshold=${menuConfig.threshold}).`
+        );
     } catch (error) {
         console.error(
             `[SITE_SERVICE] Failed to sync site service line for order id=${order.id}, config id=${pos.config?.id}:`,
@@ -138,17 +162,47 @@ async function syncSiteServiceLine(pos, order) {
 }
 
 function scheduleSiteServiceSync(order) {
-    const pos = order?._siteServicePos;
-    if (!order || !pos || order._syncingSiteService) {
+    if (!order || order._syncingSiteService) {
+        return;
+    }
+    const pos = resolvePos(order);
+    if (!pos) {
         return;
     }
     syncSiteServiceLine(pos, order).catch((error) => {
-        console.error(
-            `[SITE_SERVICE] Unhandled sync error for order id=${order.id}:`,
-            error
-        );
+        console.error(`[SITE_SERVICE] Unhandled sync error for order id=${order.id}:`, error);
     });
 }
+
+patch(PosStore.prototype, {
+    async setup(...args) {
+        await super.setup(...args);
+        posStoreRef = this;
+    },
+
+    async addLineToOrder(vals, order, opts = {}, configure = true) {
+        if (order) {
+            attachPosToOrder(order, this);
+        }
+        const result = await super.addLineToOrder(vals, order, opts, configure);
+        if (order && !order._syncingSiteService) {
+            await syncSiteServiceLine(this, order);
+        }
+        return result;
+    },
+
+    async addLineToCurrentOrder(vals, opts = {}, configure = true) {
+        const order = this.getOrder();
+        if (order) {
+            attachPosToOrder(order, this);
+        }
+        const result = await super.addLineToCurrentOrder(vals, opts, configure);
+        if (order && !order._syncingSiteService) {
+            await syncSiteServiceLine(this, order);
+        }
+        return result;
+    },
+});
 
 patch(PosOrderline.prototype, {
     setup(vals) {
@@ -166,19 +220,8 @@ patch(PosOrderline.prototype, {
 patch(PosOrder.prototype, {
     removeOrderline(line) {
         const result = super.removeOrderline(...arguments);
-        scheduleSiteServiceSync(this);
-        return result;
-    },
-});
-
-patch(PosStore.prototype, {
-    async addLineToOrder(vals, order, opts = {}, configure = true) {
-        if (order) {
-            order._siteServicePos = this;
-        }
-        const result = await super.addLineToOrder(vals, order, opts, configure);
-        if (order && !order._syncingSiteService) {
-            await syncSiteServiceLine(this, order);
+        if (!this._syncingSiteService) {
+            scheduleSiteServiceSync(this);
         }
         return result;
     },
@@ -188,7 +231,7 @@ patch(PaymentScreen.prototype, {
     async validateOrder(isForceValidate) {
         const order = this.pos.selectedOrder;
         if (order) {
-            order._siteServicePos = this.pos;
+            attachPosToOrder(order, this.pos);
             await syncSiteServiceLine(this.pos, order);
         }
         return super.validateOrder(isForceValidate);
