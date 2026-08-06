@@ -5,11 +5,9 @@ _logger = logging.getLogger(__name__)
 
 
 def post_init_hook(env):
-    """Log module readiness and ensure one site service record per company."""
+    """Log module readiness and ensure the single global site service record exists."""
     try:
-        companies = env["res.company"].sudo().search([])
-        for company in companies:
-            env["pos.site.service.menu"].with_company(company).get_company_settings(company.id)
+        env["pos.site.service.menu"].sudo().get_settings()
 
         module = env["ir.module.module"].search([("name", "=", "pos_pledge_order")], limit=1)
         version = module.latest_version if module else "unknown"

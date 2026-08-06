@@ -15,13 +15,6 @@ class PosSiteServiceMenu(models.Model):
 
     name = fields.Char(string="Menu Name", required=True, default="Site Service")
     active = fields.Boolean(default=True)
-    company_id = fields.Many2one(
-        "res.company",
-        string="Company",
-        required=True,
-        default=lambda self: self.env.company,
-        index=True,
-    )
     enable_site_service = fields.Boolean(
         string="Site Service",
         default=False,
@@ -49,10 +42,11 @@ class PosSiteServiceMenu(models.Model):
         string="Products",
     )
 
-    _company_unique = models.Constraint(
-        "unique(company_id)",
-        "Only one site service configuration is allowed per company.",
-    )
+    @api.model_create_multi
+    def create(self, vals_list):
+        if self.search_count([]):
+            raise ValidationError(_("Only one site service configuration is allowed for all companies."))
+        return super().create(vals_list)
 
     @api.constrains(
         "enable_site_service",
@@ -72,20 +66,16 @@ class PosSiteServiceMenu(models.Model):
                 raise ValidationError(_("Site service price cannot be negative."))
 
     @api.model
-    def get_company_settings(self, company_id=None):
-        """Return the single site service record for a company, creating it if needed."""
-        company_id = company_id or self.env.company.id
-        menu = self.search([("company_id", "=", company_id)], limit=1)
+    def get_settings(self):
+        """Return the single global site service record, creating it if needed."""
+        menu = self.search([], limit=1)
         if not menu:
-            menu = self.create({
-                "name": _("Site Service"),
-                "company_id": company_id,
-            })
+            menu = self.create({"name": _("Site Service")})
         return menu
 
     @api.model
     def action_open_settings(self):
-        menu = self.get_company_settings()
+        menu = self.get_settings()
         return {
             "type": "ir.actions.act_window",
             "name": _("Site Service"),
@@ -100,9 +90,8 @@ class PosSiteServiceMenu(models.Model):
         try:
             records = super()._load_pos_data_search_read(data, config)
             _logger.info(
-                "[SITE_SERVICE] Loaded %s menu record(s) for company id=%s (POS config id=%s)",
+                "[SITE_SERVICE] Loaded %s global menu record(s) for POS config id=%s",
                 len(records),
-                config.company_id.id,
                 config.id,
             )
             return records
@@ -115,11 +104,7 @@ class PosSiteServiceMenu(models.Model):
 
     @api.model
     def _load_pos_data_domain(self, data, config):
-        return [
-            ("company_id", "=", config.company_id.id),
-            ("active", "=", True),
-            ("enable_site_service", "=", True),
-        ]
+        return [("active", "=", True), ("enable_site_service", "=", True)]
 
     @api.model
     def _load_pos_data_fields(self, config):
@@ -127,7 +112,6 @@ class PosSiteServiceMenu(models.Model):
             "id",
             "name",
             "enable_site_service",
-            "company_id",
             "threshold",
             "service_product_id",
             "service_price",
@@ -176,9 +160,8 @@ class PosSiteServiceProductLine(models.Model):
         try:
             records = super()._load_pos_data_search_read(data, config)
             _logger.info(
-                "[SITE_SERVICE] Loaded %s product line(s) for company id=%s (POS config id=%s)",
+                "[SITE_SERVICE] Loaded %s global product line(s) for POS config id=%s",
                 len(records),
-                config.company_id.id,
                 config.id,
             )
             return records
@@ -192,7 +175,6 @@ class PosSiteServiceProductLine(models.Model):
     @api.model
     def _load_pos_data_domain(self, data, config):
         return [
-            ("menu_id.company_id", "=", config.company_id.id),
             ("menu_id.active", "=", True),
             ("menu_id.enable_site_service", "=", True),
         ]
