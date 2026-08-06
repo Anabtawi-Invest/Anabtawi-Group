@@ -12,7 +12,7 @@
                     t-att-class="buttonClass"
                     t-on-click="() => this.onClickSelectEmployee()">
                 <i class="fa fa-user me-1"/>
-                Select Employee
+                <t t-esc="selectEmployeeLabel"/>
             </button>
 
             <!-- RETURN PLEDGE BUTTON -->
@@ -20,7 +20,7 @@
                     t-att-class="buttonClass"
                     t-on-click="() => this.onClickReturnPledge()">
                 <i class="fa fa-undo me-1"/>
-                Return Pledge
+                <t t-esc="returnPledgeLabel"/>
             </button>
 
         </xpath>

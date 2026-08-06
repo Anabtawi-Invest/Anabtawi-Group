@@ -2,14 +2,14 @@
 <templates xml:space="preserve">
 
 <t t-name="pos_pledge.PledgeListPopup">
-    <Dialog title="'Select Pledge to Return'">
+    <Dialog t-att-title="title">
         <div class="p-3">
             
             <!-- SEARCH BAR -->
             <div class="mb-3">
                 <input type="text"
                        class="form-control"
-                       placeholder="Search by pledge number, customer name, phone, or employee name..."
+                       t-att-placeholder="searchPlaceholder"
                        t-on-input="onSearchInput"
                        t-on-keydown="onSearchKeydown"
                        autofocus="autofocus"/>
@@ -21,10 +21,10 @@
                     <small class="text-muted">
                         <i class="fa fa-list me-1"/>
                         <t t-if="state.search">
-                            Showing <strong><t t-esc="filteredPledges.length"/></strong> of <strong><t t-esc="state.pledges.length"/></strong> pledges
+                            <t t-esc="showingPledgesLabel"/>
                         </t>
                         <t t-else="">
-                            <strong><t t-esc="state.pledges.length"/></strong> active pledge(s) found
+                            <t t-esc="activePledgesFoundLabel"/>
                         </t>
                     </small>
                 </div>
@@ -34,7 +34,7 @@
             <t t-if="!state.pledges.length">
                 <div class="alert alert-warning">
                     <i class="fa fa-exclamation-triangle me-2"/>
-                    No active pledges found.
+                    <t t-esc="noActivePledgesLabel"/>
                 </div>
             </t>
 
@@ -42,7 +42,7 @@
             <t t-if="state.pledges.length and !filteredPledges.length">
                 <div class="alert alert-info">
                     <i class="fa fa-search me-2"/>
-                    No pledges match your search.
+                    <t t-esc="noSearchResultsLabel"/>
                 </div>
             </t>
 
@@ -82,12 +82,12 @@
                                         <button class="btn btn-sm btn-info"
                                                 t-on-click.stop="() => this.showPledgeDetails(pledge)">
                                             <i class="fa fa-eye me-1"/>
-                                            Show
+                                            <t t-esc="showLabel"/>
                                         </button>
                                         <button class="btn btn-sm btn-primary"
                                                 t-on-click.stop="() => this.selectPledge(pledge)">
                                             <i class="fa fa-check me-1"/>
-                                            Select
+                                            <t t-esc="selectLabel"/>
                                         </button>
                                     </div>
                                 </div>
@@ -101,21 +101,18 @@
             <div class="mt-3 text-end">
                 <button class="btn btn-secondary" t-on-click="cancel">
                     <i class="fa fa-times me-1"/>
-                    Cancel
+                    <t t-esc="cancelLabel"/>
                 </button>
             </div>
 
         </div>
     </Dialog>
 
-    <!-- ===============================
-         PLEDGE DETAILS POPUP
-         =============================== -->
-    <Dialog t-if="state.selectedPledgeDetails" title="'Pledge Details'">
+    <!-- PLEDGE DETAILS POPUP -->
+    <Dialog t-if="state.selectedPledgeDetails" t-att-title="detailsTitle">
         <div class="p-3">
             <t t-set="pledge" t-value="state.selectedPledgeDetails"/>
             
-            <!-- Pledge Header -->
             <div class="mb-3">
                 <h4 class="mb-2">
                     <i class="fa fa-handshake-o me-2 text-info"/>
@@ -126,10 +123,9 @@
                 </div>
             </div>
 
-            <!-- Customer & Employee Info -->
             <div class="mb-3">
                 <div class="mb-2">
-                    <strong><i class="fa fa-user me-1 text-muted"/> Customer:</strong>
+                    <strong><i class="fa fa-user me-1 text-muted"/> <t t-esc="customerLabel"/></strong>
                     <div class="ms-3"><t t-esc="pledge.partner_id[1]"/></div>
                     <t t-if="pledge.partner_phone">
                         <div class="ms-3 text-muted">
@@ -140,33 +136,32 @@
                 </div>
                 <t t-if="pledge.employee_name">
                     <div class="mb-2">
-                        <strong><i class="fa fa-user-tie me-1 text-primary"/> Employee:</strong>
+                        <strong><i class="fa fa-user-tie me-1 text-primary"/> <t t-esc="employeeLabel"/></strong>
                         <div class="ms-3"><t t-esc="pledge.employee_name"/></div>
                     </div>
                 </t>
             </div>
 
-            <!-- Amounts -->
             <div class="mb-3">
-                <h5 class="mb-2">Amounts</h5>
+                <h5 class="mb-2"><t t-esc="amountsLabel"/></h5>
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered">
                         <tbody>
                             <tr>
-                                <td><strong>Pledge Amount:</strong></td>
+                                <td><strong><t t-esc="pledgeAmountLabel"/></strong></td>
                                 <td class="text-end text-success">
                                     <strong><t t-esc="formatCurrency(pledge.pledge_amount)"/></strong>
                                 </td>
                             </tr>
                             <t t-if="pledge.employee_amount and pledge.employee_amount > 0">
                                 <tr>
-                                    <td>Employee Service:</td>
+                                    <td><t t-esc="employeeServiceLabel"/></td>
                                     <td class="text-end"><t t-esc="formatCurrency(pledge.employee_amount)"/></td>
                                 </tr>
                             </t>
                             <t t-if="pledge.delivery_amount and pledge.delivery_amount > 0">
                                 <tr>
-                                    <td>Delivery Service:</td>
+                                    <td><t t-esc="deliveryServiceLabel"/></td>
                                     <td class="text-end"><t t-esc="formatCurrency(pledge.delivery_amount)"/></td>
                                 </tr>
                             </t>
@@ -175,16 +170,15 @@
                 </div>
             </div>
 
-            <!-- Products -->
             <t t-if="pledge.products and pledge.products.length">
                 <div class="mb-3">
-                    <h5 class="mb-2">Products</h5>
+                    <h5 class="mb-2"><t t-esc="productsLabel"/></h5>
                     <div class="table-responsive">
                         <table class="table table-sm table-bordered">
                             <thead>
                                 <tr>
-                                    <th>Product</th>
-                                    <th class="text-end">Qty</th>
+                                    <th><t t-esc="productColumnLabel"/></th>
+                                    <th class="text-end"><t t-esc="qtyColumnLabel"/></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -200,31 +194,29 @@
                 </div>
             </t>
 
-            <!-- Case Type & Dates -->
             <div class="mb-3">
                 <div class="mb-2">
-                    <strong>Case Type:</strong>
+                    <strong><t t-esc="caseTypeLabel"/></strong>
                     <span class="badge bg-info ms-2"><t t-esc="pledge.case_type.toUpperCase()"/></span>
                 </div>
                 <t t-if="pledge.create_date">
                     <div class="mb-2">
-                        <strong>Created:</strong>
+                        <strong><t t-esc="createdLabel"/></strong>
                         <span class="ms-2"><t t-esc="pledge.create_date"/></span>
                     </div>
                 </t>
                 <t t-if="pledge.return_date">
                     <div class="mb-2">
-                        <strong>Returned:</strong>
+                        <strong><t t-esc="returnedLabel"/></strong>
                         <span class="ms-2"><t t-esc="pledge.return_date"/></span>
                     </div>
                 </t>
             </div>
 
-            <!-- Footer -->
             <div class="mt-3 text-end">
                 <button class="btn btn-secondary" t-on-click="() => this.state.selectedPledgeDetails = null">
                     <i class="fa fa-times me-1"/>
-                    Close
+                    <t t-esc="closeLabel"/>
                 </button>
             </div>
         </div>

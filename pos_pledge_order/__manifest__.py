@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'POS Pledge (Rahn) Management',
-    'version': '19.0.1.0.20',
+    'version': '19.0.1.0.25',
     'category': 'Point of Sale',
     'summary': 'Manage pledge (Rahn) scenarios with employees, delivery, and accounting',
     'description': """
@@ -28,9 +28,11 @@
         'views/pos_order_views.xml',
         'views/pos_pledge_views.xml',
         'views/pos_config_views.xml',
+        'views/pos_site_service_views.xml',
     ],
     'assets': {
         'point_of_sale._assets_pos': [
+            'pos_pledge_order/static/src/js/site_service.js',
             'pos_pledge_order/static/src/js/pos_orderline_tax_group_labels_patch.js',
             'pos_pledge_order/static/src/js/pledge_closing_popup.js',
             'pos_pledge_order/static/src/xml/pledge_closing_popup.xml',
@@ -49,4 +51,5 @@
     'application': False,
     'auto_install': False,
     'license': 'LGPL-3',
+    'post_init_hook': 'post_init_hook',
 }

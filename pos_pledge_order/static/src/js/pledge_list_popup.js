@@ -30,6 +30,98 @@ export class PledgeListPopup extends Component {
         onMounted(() => this._loadPledges());
     }
 
+    get title() {
+        return _t("Select Pledge to Return");
+    }
+
+    get detailsTitle() {
+        return _t("Pledge Details");
+    }
+
+    get searchPlaceholder() {
+        return _t("Search by pledge number, customer name, phone, or employee name...");
+    }
+
+    get noActivePledgesLabel() {
+        return _t("No active pledges found.");
+    }
+
+    get noSearchResultsLabel() {
+        return _t("No pledges match your search.");
+    }
+
+    get showLabel() {
+        return _t("Show");
+    }
+
+    get selectLabel() {
+        return _t("Select");
+    }
+
+    get cancelLabel() {
+        return _t("Cancel");
+    }
+
+    get closeLabel() {
+        return _t("Close");
+    }
+
+    get customerLabel() {
+        return _t("Customer:");
+    }
+
+    get employeeLabel() {
+        return _t("Employee:");
+    }
+
+    get amountsLabel() {
+        return _t("Amounts");
+    }
+
+    get pledgeAmountLabel() {
+        return _t("Pledge Amount:");
+    }
+
+    get employeeServiceLabel() {
+        return _t("Employee Service:");
+    }
+
+    get deliveryServiceLabel() {
+        return _t("Delivery Service:");
+    }
+
+    get productsLabel() {
+        return _t("Products");
+    }
+
+    get productColumnLabel() {
+        return _t("Product");
+    }
+
+    get qtyColumnLabel() {
+        return _t("Qty");
+    }
+
+    get caseTypeLabel() {
+        return _t("Case Type:");
+    }
+
+    get createdLabel() {
+        return _t("Created:");
+    }
+
+    get returnedLabel() {
+        return _t("Returned:");
+    }
+
+    get activePledgesFoundLabel() {
+        return _t("%s active pledge(s) found", this.state.pledges.length);
+    }
+
+    get showingPledgesLabel() {
+        return _t("Showing %s of %s pledges", this.filteredPledges.length, this.state.pledges.length);
+    }
+
     // ==================================
     // LOAD ACTIVE PLEDGES (FILTERED BY RETURN TYPE)
     // ==================================

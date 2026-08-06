@@ -10,6 +10,19 @@ _logger = logging.getLogger(__name__)
 class PosSession(models.Model):
     _inherit = 'pos.session'
 
+    @api.model
+    def _load_pos_data_models(self, config):
+        models_to_load = super()._load_pos_data_models(config)
+        for model_name in ("pos.site.service.menu", "pos.site.service.product.line"):
+            if model_name not in models_to_load:
+                models_to_load.append(model_name)
+                _logger.info(
+                    "[SITE_SERVICE] Registered POS data model %s for config id=%s",
+                    model_name,
+                    config.id,
+                )
+        return models_to_load
+
     def get_session_orders(self):
         """Exclude legacy technical pledge orders from session aggregates."""
         orders = super().get_session_orders()
@@ -29,15 +42,6 @@ class PosSession(models.Model):
         """
         self.ensure_one()
         cur = self.currency_id
-        if not self.start_at:
-            return {
-                "cash_in": 0.0,
-                "cash_out": 0.0,
-                "cash": 0.0,
-                "by_pm_in": {},
-                "by_pm_out": {},
-                "by_pm": {},
-            }
         end = self.stop_at or fields.Datetime.now()
         cash_in = 0.0
         cash_out = 0.0
