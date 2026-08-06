@@ -101,11 +101,11 @@ patch(ControlButtons.prototype, {
             .filter(Boolean);
     },
 
-    _applySiteServiceToAdvanceLines(lines, siteServiceEnabled) {
+    _applySiteServiceToAdvanceLines(lines, siteServiceEnabled, siteServiceConfig) {
         if (!siteServiceEnabled) {
             return lines;
         }
-        const result = appendSiteServiceLineIfNeeded(lines, this.pos);
+        const result = appendSiteServiceLineIfNeeded(lines, this.pos, siteServiceConfig);
         if (result.missingProduct) {
             this.notification.add(
                 _t("Site service product is not available in this Point of Sale."),
@@ -208,7 +208,8 @@ patch(ControlButtons.prototype, {
 
         const lines = this._applySiteServiceToAdvanceLines(
             baseLines,
-            popupPayload.site_service
+            popupPayload.site_service,
+            popupPayload.site_service_config
         );
         if (!lines.length) {
             this.notification.add(_t("Please add at least one product line."), { type: "warning" });

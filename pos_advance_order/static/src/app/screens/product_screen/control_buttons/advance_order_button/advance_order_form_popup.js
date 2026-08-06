@@ -5,7 +5,7 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { formatCurrency } from "@web/core/currency";
-import { getSiteServiceConfig } from "@pos_advance_order/js/site_service_utils";
+import { getSiteServiceConfig, resolveSiteServiceConfig } from "@pos_advance_order/js/site_service_utils";
 
 /** Same filtering idea as PaymentScreen (minimal + pay_later) plus exclusions for advances. */
 export function getAdvanceEligiblePaymentMethods(pos) {
@@ -61,7 +61,8 @@ export class AdvanceOrderFormPopup extends Component {
             pos_configs: [],
             payment_methods: paymentMethods,
             site_service: false,
-            site_service_available: !!getSiteServiceConfig(this.props.pos),
+            site_service_available: false,
+            site_service_config: null,
         });
 
         onMounted(async () => {
@@ -148,6 +149,9 @@ export class AdvanceOrderFormPopup extends Component {
             this.state.discounts = discounts || [];
             this.state.pos_configs = posConfigs || [];
             this.state.from_pos_config_id = this.props.posConfigId || this.state.from_pos_config_id;
+            const siteServiceConfig = await resolveSiteServiceConfig(this.props.pos, this.orm);
+            this.state.site_service_config = siteServiceConfig;
+            this.state.site_service_available = !!siteServiceConfig;
             if (!this.state.from_pos_config_id && this.state.pos_configs.length) {
                 this.state.from_pos_config_id = this.state.pos_configs[0].id;
             }
@@ -212,7 +216,7 @@ export class AdvanceOrderFormPopup extends Component {
 
     get siteServiceUnavailableText() {
         return _t(
-            "Site Service is not configured. Enable it under Point of Sale → Site Service."
+            "Site Service is not enabled. Go to Point of Sale → Site Service and enable it with a service product."
         );
     }
 
@@ -272,6 +276,7 @@ export class AdvanceOrderFormPopup extends Component {
             pos_config_id: this.state.picking_pos_config_id,
             discount_id: this.state.discount_id || false,
             site_service: this.state.site_service,
+            site_service_config: this.state.site_service_config,
         });
         this.props.close();
     }

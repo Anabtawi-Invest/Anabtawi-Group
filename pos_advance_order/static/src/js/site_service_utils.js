@@ -43,8 +43,55 @@ export function getSiteServiceConfig(pos) {
         threshold: menu.threshold ?? 31,
         serviceProductId,
         servicePrice: menu.service_price ?? 0,
+        serviceProductName: "",
         productLines,
     };
+}
+
+/** Load site service from backend when POS data models are not loaded yet. */
+export async function fetchSiteServiceConfigFromServer(orm) {
+    try {
+        const menus = await orm.searchRead(
+            "pos.site.service.menu",
+            [
+                ["active", "=", true],
+                ["enable_site_service", "=", true],
+            ],
+            ["id", "enable_site_service", "threshold", "service_product_id", "service_price"],
+            { limit: 1 }
+        );
+        if (!menus.length) {
+            return null;
+        }
+        const menu = menus[0];
+        const serviceProductId = normalizeId(menu.service_product_id);
+        if (!serviceProductId) {
+            return null;
+        }
+        const productLines = await orm.searchRead(
+            "pos.site.service.product.line",
+            [["menu_id", "=", menu.id]],
+            ["product_id", "multiple"]
+        );
+        return {
+            threshold: menu.threshold ?? 31,
+            serviceProductId,
+            servicePrice: menu.service_price ?? 0,
+            serviceProductName: Array.isArray(menu.service_product_id)
+                ? menu.service_product_id[1]
+                : "",
+            productLines: productLines.map((line) => ({
+                product_id: line.product_id,
+                multiple: line.multiple,
+            })),
+        };
+    } catch {
+        return null;
+    }
+}
+
+export async function resolveSiteServiceConfig(pos, orm) {
+    return getSiteServiceConfig(pos) || (orm ? await fetchSiteServiceConfigFromServer(orm) : null);
 }
 
 export function computeSiteServiceScoreFromLines(lines, menuConfig) {
@@ -70,36 +117,41 @@ export function computeSiteServiceScoreFromLines(lines, menuConfig) {
     return score;
 }
 
-export function appendSiteServiceLineIfNeeded(lines, pos) {
-    const menuConfig = getSiteServiceConfig(pos);
-    if (!menuConfig) {
+export function appendSiteServiceLineIfNeeded(lines, pos, menuConfig = null) {
+    const config = menuConfig || getSiteServiceConfig(pos);
+    if (!config) {
         return { lines: lines || [], added: false, score: 0, menuConfig: null };
     }
     const productLines = (lines || []).filter((line) => !line.is_site_service_auto);
-    const score = computeSiteServiceScoreFromLines(productLines, menuConfig);
-    if (score >= menuConfig.threshold) {
-        return { lines: productLines, added: false, score, menuConfig };
+    const score = computeSiteServiceScoreFromLines(productLines, config);
+    if (score >= config.threshold) {
+        return { lines: productLines, added: false, score, menuConfig: config };
     }
-    const serviceProduct = pos.models["product.product"].get(menuConfig.serviceProductId);
-    if (!serviceProduct) {
-        return { lines: productLines, added: false, score, menuConfig, missingProduct: true };
+    const serviceProduct = pos.models?.["product.product"]?.get(config.serviceProductId);
+    const serviceProductName =
+        serviceProduct?.display_name ||
+        serviceProduct?.name ||
+        config.serviceProductName ||
+        "";
+    if (!serviceProduct && !serviceProductName) {
+        return { lines: productLines, added: false, score, menuConfig: config, missingProduct: true };
     }
-    if (productLines.some((line) => normalizeId(line.product_id) === menuConfig.serviceProductId)) {
-        return { lines: productLines, added: false, score, menuConfig };
+    if (productLines.some((line) => normalizeId(line.product_id) === config.serviceProductId)) {
+        return { lines: productLines, added: false, score, menuConfig: config };
     }
     return {
         lines: [
             ...productLines,
             {
-                product_id: menuConfig.serviceProductId,
-                product_name: serviceProduct.display_name || serviceProduct.name || "",
+                product_id: config.serviceProductId,
+                product_name: serviceProductName,
                 qty: 1,
-                price_unit: menuConfig.servicePrice,
+                price_unit: config.servicePrice,
                 is_site_service_auto: true,
             },
         ],
         added: true,
         score,
-        menuConfig,
+        menuConfig: config,
     };
 }
