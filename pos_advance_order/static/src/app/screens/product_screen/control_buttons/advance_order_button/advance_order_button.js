@@ -12,6 +12,9 @@ import { AdvanceOrderReceipt } from "./advance_order_receipt";
 import { CompleteAdvanceOrderPopup } from "./complete_advance_order_popup";
 import { RefundAdvanceOrderPopup } from "./refund_advance_order_popup";
 import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
+import {
+    appendSiteServiceLineIfNeeded,
+} from "@pos_advance_order/js/site_service_utils";
 
 function toNumber(value, fallback = 0) {
     const num = Number(value);
@@ -78,6 +81,9 @@ patch(ControlButtons.prototype, {
         const orderLines = order?.getOrderlines?.() || order?.lines || [];
         return orderLines
             .map((line) => {
+                if (line.is_site_service_auto) {
+                    return null;
+                }
                 const product = line.getProduct?.() || line.product || line.product_id;
                 const productId = product?.id || product;
                 const qty = toNumber(line.getQuantity?.() ?? line.qty ?? 0);
@@ -93,6 +99,30 @@ patch(ControlButtons.prototype, {
                 };
             })
             .filter(Boolean);
+    },
+
+    _applySiteServiceToAdvanceLines(lines, siteServiceEnabled) {
+        if (!siteServiceEnabled) {
+            return lines;
+        }
+        const result = appendSiteServiceLineIfNeeded(lines, this.pos);
+        if (result.missingProduct) {
+            this.notification.add(
+                _t("Site service product is not available in this Point of Sale."),
+                { type: "warning" }
+            );
+            return result.lines;
+        }
+        if (result.added) {
+            console.info(
+                `[SITE_SERVICE] Advance order: added service line (score=${result.score}, threshold=${result.menuConfig.threshold}).`
+            );
+        } else if (result.menuConfig) {
+            console.info(
+                `[SITE_SERVICE] Advance order: service waived (score=${result.score}, threshold=${result.menuConfig.threshold}).`
+            );
+        }
+        return result.lines;
     },
 
     _buildAdvanceReceiptData({ result, partner, payload }) {
@@ -161,8 +191,8 @@ patch(ControlButtons.prototype, {
             return;
         }
 
-        const lines = this._prepareLines(order);
-        if (!lines.length) {
+        const baseLines = this._prepareLines(order);
+        if (!baseLines.length) {
             this.notification.add(_t("Please add at least one product line."), { type: "warning" });
             return;
         }
@@ -173,6 +203,15 @@ patch(ControlButtons.prototype, {
             companyId: this.pos.company?.id,
         });
         if (!popupPayload) {
+            return;
+        }
+
+        const lines = this._applySiteServiceToAdvanceLines(
+            baseLines,
+            popupPayload.site_service
+        );
+        if (!lines.length) {
+            this.notification.add(_t("Please add at least one product line."), { type: "warning" });
             return;
         }
 
@@ -194,6 +233,7 @@ patch(ControlButtons.prototype, {
             payment_method_name: popupPayload.payment_method_name || "",
             employee_id: popupPayload.employee_id || false,
             discount_id: popupPayload.discount_id || false,
+            site_service: popupPayload.site_service || false,
             lines: lines,
         };
 

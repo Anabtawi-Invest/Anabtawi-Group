@@ -5,6 +5,7 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { formatCurrency } from "@web/core/currency";
+import { getSiteServiceConfig } from "@pos_advance_order/js/site_service_utils";
 
 /** Same filtering idea as PaymentScreen (minimal + pay_later) plus exclusions for advances. */
 export function getAdvanceEligiblePaymentMethods(pos) {
@@ -59,6 +60,8 @@ export class AdvanceOrderFormPopup extends Component {
             discounts: [],
             pos_configs: [],
             payment_methods: paymentMethods,
+            site_service: false,
+            site_service_available: !!getSiteServiceConfig(this.props.pos),
         });
 
         onMounted(async () => {
@@ -203,6 +206,16 @@ export class AdvanceOrderFormPopup extends Component {
         this.state.discount_id = ev.target.value ? parseInt(ev.target.value, 10) : null;
     }
 
+    onSiteServiceChange(ev) {
+        this.state.site_service = ev.target.checked;
+    }
+
+    get siteServiceUnavailableText() {
+        return _t(
+            "Site Service is not configured. Enable it under Point of Sale → Site Service."
+        );
+    }
+
     get discountLabelSuffix() {
         return (discount) =>
             discount.discount_type === "percent"
@@ -243,6 +256,10 @@ export class AdvanceOrderFormPopup extends Component {
             );
             return;
         }
+        if (this.state.site_service && !this.state.site_service_available) {
+            this.notification.add(this.siteServiceUnavailableText, { type: "warning" });
+            return;
+        }
         const selectedPm = this.state.payment_methods.find(
             (pm) => pm.id === this.state.selected_payment_method_id
         );
@@ -254,6 +271,7 @@ export class AdvanceOrderFormPopup extends Component {
             from_pos_config_id: currentFromPosId,
             pos_config_id: this.state.picking_pos_config_id,
             discount_id: this.state.discount_id || false,
+            site_service: this.state.site_service,
         });
         this.props.close();
     }

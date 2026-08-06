@@ -5,25 +5,14 @@ import { PosOrder } from "@point_of_sale/app/models/pos_order";
 import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { patch } from "@web/core/utils/patch";
+import {
+    computeSiteServiceScoreFromLines,
+    getSiteServiceConfig,
+    normalizeId,
+} from "@pos_advance_order/js/site_service_utils";
 
 /** @type {import("@point_of_sale/app/services/pos_store").PosStore | null} */
 let posStoreRef = null;
-
-function normalizeId(value) {
-    if (!value) {
-        return null;
-    }
-    if (typeof value === "number") {
-        return value;
-    }
-    if (Array.isArray(value)) {
-        return value[0] || null;
-    }
-    if (typeof value === "object" && value.id) {
-        return value.id;
-    }
-    return null;
-}
 
 function resolvePos(order) {
     return order?._siteServicePos || posStoreRef;
@@ -35,63 +24,14 @@ function attachPosToOrder(order, pos) {
     }
 }
 
-function getSiteServiceConfig(pos) {
-    const config = pos?.config;
-    if (!config) {
-        return null;
-    }
-    const menuModel = pos.models?.["pos.site.service.menu"];
-    if (!menuModel) {
-        console.warn(
-            `[SITE_SERVICE] Model pos.site.service.menu is missing from POS data (config id=${config.id})`
-        );
-        return null;
-    }
-    const menus = menuModel.getAll?.() || [];
-    const menu = menus.find((record) => record.enable_site_service) || menus[0];
-    if (!menu || !menu.enable_site_service) {
-        return null;
-    }
-    const serviceProductId = normalizeId(menu.service_product_id);
-    if (!serviceProductId) {
-        return null;
-    }
-    const lineModel = pos.models?.["pos.site.service.product.line"];
-    const menuId = normalizeId(menu.id);
-    const productLines = (lineModel?.getAll?.() || []).filter(
-        (line) => normalizeId(line.menu_id) === menuId
-    );
-    return {
-        threshold: menu.threshold ?? 31,
-        serviceProductId,
-        servicePrice: menu.service_price ?? 0,
-        productLines,
-    };
-}
-
 function computeSiteServiceScore(order, menuConfig) {
-    const multiplesByProduct = new Map();
-    for (const line of menuConfig.productLines) {
-        const productId = normalizeId(line.product_id);
-        if (productId) {
-            multiplesByProduct.set(productId, line.multiple || 0);
-        }
-    }
-    let score = 0;
     const orderLines = order.lines || (order.getOrderlines?.() || []);
-    for (const orderLine of orderLines) {
-        if (orderLine.is_site_service_auto) {
-            continue;
-        }
-        const product = orderLine.getProduct?.() || orderLine.product_id || orderLine.product;
-        const productId = normalizeId(product);
-        if (!productId || !multiplesByProduct.has(productId)) {
-            continue;
-        }
-        const qty = orderLine.getQuantity?.() ?? orderLine.qty ?? 0;
-        score += qty * multiplesByProduct.get(productId);
-    }
-    return score;
+    const lines = orderLines.map((orderLine) => ({
+        product_id: normalizeId(orderLine.getProduct?.() || orderLine.product_id || orderLine.product),
+        qty: orderLine.getQuantity?.() ?? orderLine.qty ?? 0,
+        is_site_service_auto: orderLine.is_site_service_auto,
+    }));
+    return computeSiteServiceScoreFromLines(lines, menuConfig);
 }
 
 function getSiteServiceAutoLines(order) {

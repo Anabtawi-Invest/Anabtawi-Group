@@ -34,6 +34,7 @@ class PosAdvanceOrderController(http.Controller):
         payment_method_id = payload.get("payment_method_id")
         employee_id = payload.get("employee_id")
         discount_id = payload.get("discount_id")
+        site_service = bool(payload.get("site_service"))
 
         if not partner_id:
             raise ValidationError("Customer is required.")
@@ -109,6 +110,8 @@ class PosAdvanceOrderController(http.Controller):
             "amount_tendered": amount_tendered,
             "line_ids": line_vals,
         }
+        if site_service:
+            create_vals["site_service"] = True
         if employee_id:
             create_vals["employee_id"] = int(employee_id)
         if discount_id:

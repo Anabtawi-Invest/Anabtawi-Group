@@ -86,6 +86,11 @@ class PosAdvanceOrder(models.Model):
         readonly=True,
     )
     employee_id = fields.Many2one("hr.employee", string="Employee")
+    site_service = fields.Boolean(
+        string="Site Service",
+        default=False,
+        help="When enabled, site service scoring was applied when creating this advance order.",
+    )
     payment_method = fields.Selection(
         [
             ("cash", "Cash"),

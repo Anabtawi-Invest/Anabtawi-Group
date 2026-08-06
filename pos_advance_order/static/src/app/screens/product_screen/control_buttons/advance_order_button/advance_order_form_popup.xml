@@ -118,6 +118,28 @@
                     </div>
                 </div>
 
+                <div class="form-group mb-3">
+                    <div class="form-check">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="advance_site_service"
+                            t-att-checked="state.site_service"
+                            t-on-change="onSiteServiceChange"
+                            t-att-disabled="state.loading or !state.site_service_available ? 'disabled' : undefined"
+                        />
+                        <label class="form-check-label" for="advance_site_service">
+                            <strong>Site Service</strong>
+                        </label>
+                    </div>
+                    <small t-if="state.site_service_available" class="form-text text-muted">
+                        When enabled, the cutting service product is added if the score (Quantity × Multiple) is below the configured threshold.
+                    </small>
+                    <small t-else="" class="form-text text-warning">
+                        <t t-esc="siteServiceUnavailableText"/>
+                    </small>
+                </div>
+
                 <div class="form-group mb-1">
                     <label><strong>Discount (Optional)</strong></label>
                     <select

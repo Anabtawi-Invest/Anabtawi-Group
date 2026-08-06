@@ -161,6 +161,7 @@
                             <field name="pos_config_id" required="1" readonly="state != 'draft'"/>
                             <field name="pricelist_id" readonly="1"/>
                             <field name="employee_id" readonly="state != 'draft'"/>
+                            <field name="site_service" readonly="state != 'draft'"/>
                             <field name="payment_progress" readonly="1"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
