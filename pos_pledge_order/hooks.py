@@ -5,8 +5,12 @@ _logger = logging.getLogger(__name__)
 
 
 def post_init_hook(env):
-    """Log module readiness and basic Site Service diagnostics after install/upgrade."""
+    """Log module readiness and ensure one site service record per company."""
     try:
+        companies = env["res.company"].sudo().search([])
+        for company in companies:
+            env["pos.site.service.menu"].with_company(company).get_company_settings(company.id)
+
         module = env["ir.module.module"].search([("name", "=", "pos_pledge_order")], limit=1)
         version = module.latest_version if module else "unknown"
         menu_count = env["pos.site.service.menu"].sudo().search_count([])

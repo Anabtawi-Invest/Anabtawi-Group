@@ -35,8 +35,7 @@ function getSiteServiceConfig(pos) {
         return null;
     }
     const menu = (menuModel?.getAll?.() || []).find(
-        (record) =>
-            normalizeId(record.pos_config_id) === config.id && record.enable_site_service
+        (record) => record.enable_site_service
     );
     if (!menu) {
         return null;

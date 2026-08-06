@@ -11,27 +11,21 @@ class PosSiteServiceMenu(models.Model):
     _name = "pos.site.service.menu"
     _description = "POS Site Service Menu"
     _inherit = ["pos.load.mixin"]
-    _order = "name, id"
+    _order = "id"
 
-    name = fields.Char(string="Menu Name", required=True)
+    name = fields.Char(string="Menu Name", required=True, default="Site Service")
     active = fields.Boolean(default=True)
+    company_id = fields.Many2one(
+        "res.company",
+        string="Company",
+        required=True,
+        default=lambda self: self.env.company,
+        index=True,
+    )
     enable_site_service = fields.Boolean(
         string="Site Service",
         default=False,
-        help="When enabled, the cutting service logic is applied at POS for this configuration.",
-    )
-    pos_config_id = fields.Many2one(
-        "pos.config",
-        string="Point of Sale",
-        required=True,
-        ondelete="cascade",
-        index=True,
-    )
-    company_id = fields.Many2one(
-        "res.company",
-        related="pos_config_id.company_id",
-        store=True,
-        readonly=True,
+        help="When enabled, the cutting service logic is applied at every Point of Sale.",
     )
     threshold = fields.Float(
         string="Threshold",
@@ -55,16 +49,10 @@ class PosSiteServiceMenu(models.Model):
         string="Products",
     )
 
-    _pos_config_unique = models.Constraint(
-        "unique(pos_config_id)",
-        "Only one site service menu is allowed per Point of Sale configuration.",
+    _company_unique = models.Constraint(
+        "unique(company_id)",
+        "Only one site service configuration is allowed per company.",
     )
-
-    @api.onchange("pos_config_id")
-    def _onchange_pos_config_id(self):
-        for menu in self:
-            if menu.pos_config_id and not menu.name:
-                menu.name = menu.pos_config_id.display_name
 
     @api.constrains(
         "enable_site_service",
@@ -84,12 +72,37 @@ class PosSiteServiceMenu(models.Model):
                 raise ValidationError(_("Site service price cannot be negative."))
 
     @api.model
+    def get_company_settings(self, company_id=None):
+        """Return the single site service record for a company, creating it if needed."""
+        company_id = company_id or self.env.company.id
+        menu = self.search([("company_id", "=", company_id)], limit=1)
+        if not menu:
+            menu = self.create({
+                "name": _("Site Service"),
+                "company_id": company_id,
+            })
+        return menu
+
+    @api.model
+    def action_open_settings(self):
+        menu = self.get_company_settings()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Site Service"),
+            "res_model": "pos.site.service.menu",
+            "view_mode": "form",
+            "res_id": menu.id,
+            "target": "current",
+        }
+
+    @api.model
     def _load_pos_data_search_read(self, data, config):
         try:
             records = super()._load_pos_data_search_read(data, config)
             _logger.info(
-                "[SITE_SERVICE] Loaded %s menu record(s) for POS config id=%s",
+                "[SITE_SERVICE] Loaded %s menu record(s) for company id=%s (POS config id=%s)",
                 len(records),
+                config.company_id.id,
                 config.id,
             )
             return records
@@ -102,7 +115,11 @@ class PosSiteServiceMenu(models.Model):
 
     @api.model
     def _load_pos_data_domain(self, data, config):
-        return [("pos_config_id", "=", config.id), ("active", "=", True)]
+        return [
+            ("company_id", "=", config.company_id.id),
+            ("active", "=", True),
+            ("enable_site_service", "=", True),
+        ]
 
     @api.model
     def _load_pos_data_fields(self, config):
@@ -110,7 +127,7 @@ class PosSiteServiceMenu(models.Model):
             "id",
             "name",
             "enable_site_service",
-            "pos_config_id",
+            "company_id",
             "threshold",
             "service_product_id",
             "service_price",
@@ -159,8 +176,9 @@ class PosSiteServiceProductLine(models.Model):
         try:
             records = super()._load_pos_data_search_read(data, config)
             _logger.info(
-                "[SITE_SERVICE] Loaded %s product line(s) for POS config id=%s",
+                "[SITE_SERVICE] Loaded %s product line(s) for company id=%s (POS config id=%s)",
                 len(records),
+                config.company_id.id,
                 config.id,
             )
             return records
@@ -173,7 +191,11 @@ class PosSiteServiceProductLine(models.Model):
 
     @api.model
     def _load_pos_data_domain(self, data, config):
-        return [("menu_id.pos_config_id", "=", config.id)]
+        return [
+            ("menu_id.company_id", "=", config.company_id.id),
+            ("menu_id.active", "=", True),
+            ("menu_id.enable_site_service", "=", True),
+        ]
 
     @api.model
     def _load_pos_data_fields(self, config):
