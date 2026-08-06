@@ -100,7 +100,11 @@ class InternalTransferReportWizard(models.TransientModel):
 
     def _get_picking_created_by_display(self, picking):
         """Return acting employee name, branch name, or Odoo user."""
-        return picking.created_by_display or self.env._('Undefined')
+        if 'created_by_display' in picking._fields:
+            return picking.created_by_display or self.env._('Undefined')
+        if picking.create_uid:
+            return picking.create_uid.display_name
+        return self.env._('Undefined')
 
     def _get_move_uom_name(self, move):
         return move.product_uom.display_name or move.product_id.uom_id.display_name or ''
