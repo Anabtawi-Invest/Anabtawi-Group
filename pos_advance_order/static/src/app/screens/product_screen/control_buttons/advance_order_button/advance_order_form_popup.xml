@@ -47,12 +47,14 @@
                         <strong>Advance Amount <span class="text-danger">*</span></strong>
                     </label>
                     <input
-                        type="number"
+                        type="text"
+                        inputmode="decimal"
                         class="form-control"
-                        min="0"
-                        step="0.01"
-                        t-att-value="state.advance_amount"
+                        autocomplete="off"
+                        placeholder="0.00"
+                        t-att-value="state.advance_amount_str"
                         t-on-input="onAdvanceAmountInput"
+                        t-on-blur="onAdvanceAmountBlur"
                         t-att-disabled="state.loading ? 'disabled' : undefined"
                     />
                 </div>
@@ -62,12 +64,14 @@
                         <strong>Amount Tendered <span class="text-danger">*</span></strong>
                     </label>
                     <input
-                        type="number"
+                        type="text"
+                        inputmode="decimal"
                         class="form-control"
-                        min="0"
-                        step="0.01"
-                        t-att-value="state.amount_tendered"
+                        autocomplete="off"
+                        placeholder="0.00"
+                        t-att-value="state.amount_tendered_str"
                         t-on-input="onAmountTenderedInput"
+                        t-on-blur="onAmountTenderedBlur"
                         t-att-disabled="state.loading ? 'disabled' : undefined"
                     />
                     <small class="form-text text-muted">

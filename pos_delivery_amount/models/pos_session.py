@@ -41,6 +41,28 @@ class PosSession(models.Model):
         copy=False,
     )
 
+    @api.depends(
+        "payment_method_ids",
+        "order_ids",
+        "cash_register_balance_start",
+        "cash_register_balance_end_real",
+        "statement_line_ids.amount",
+        "delivery_line_ids.amount",
+    )
+    def _compute_cash_balance(self):
+        """Subtract delivered cash from theoretical balance (matches closing popup)."""
+        super()._compute_cash_balance()
+        for session in self:
+            delivered = session._get_delivered_total()
+            if session.currency_id.is_zero(delivered):
+                continue
+            session.cash_register_balance_end = session.currency_id.round(
+                session.cash_register_balance_end - delivered
+            )
+            session.cash_register_difference = session.currency_id.round(
+                session.cash_register_balance_end_real - session.cash_register_balance_end
+            )
+
     @api.depends("delivery_line_ids.amount", "delivery_line_ids.move_id")
     def _compute_delivery_totals(self):
         for session in self:
@@ -111,8 +133,12 @@ class PosSession(models.Model):
 
     def _get_available_cash_for_delivery(self):
         self.ensure_one()
-        available = self._get_cash_balance_for_delivery() - self._get_delivered_total()
-        return max(0.0, available)
+        if self.state in ("closing_control", "closed"):
+            available = (self.cash_register_balance_end_real or 0.0) - self._get_delivered_total()
+        else:
+            # cash_register_balance_end already excludes delivered amounts
+            available = self.cash_register_balance_end or 0.0
+        return max(0.0, self.currency_id.round(available))
 
     def _validate_delivery_amount(self, amount):
         self.ensure_one()
