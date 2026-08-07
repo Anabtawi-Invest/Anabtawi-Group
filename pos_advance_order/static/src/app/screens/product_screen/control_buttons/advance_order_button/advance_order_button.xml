@@ -31,7 +31,27 @@
 
     <!-- Closing Register: show advance deposits and applied amounts clearly -->
     <t t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension" owl="1">
-        <xpath expr="//div[@t-if='props.default_cash_details.payment_amount']" position="after">
+        <xpath expr="//div[hasclass('payment-methods-overview')]" position="before">
+            <div t-if="props.advance_deposit_details and props.advance_deposit_details.total_amount" class="w-100 mb-3 p-2 border rounded bg-light">
+                <div class="d-flex align-items-center justify-content-between fw-bold">
+                    <span>Advance deposits received</span>
+                    <span t-esc="env.utils.formatCurrency(props.advance_deposit_details.total_amount)"/>
+                </div>
+                <div t-if="props.advance_deposit_details.cash_amount" class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                    <span>Cash deposits</span>
+                    <span t-esc="env.utils.formatCurrency(props.advance_deposit_details.cash_amount)"/>
+                </div>
+                <div t-if="props.advance_deposit_details.bank_amount" class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                    <span>Bank deposits</span>
+                    <span t-esc="env.utils.formatCurrency(props.advance_deposit_details.bank_amount)"/>
+                </div>
+                <div class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                    <span>Advance orders</span>
+                    <span t-esc="props.advance_deposit_details.count"/>
+                </div>
+            </div>
+        </xpath>
+        <xpath expr="//div[@t-if='pos.config.cash_control']/div[contains(@class, 'fs-3')]" position="after">
             <div t-if="props.default_cash_details.advance_deposit_amount" class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
                 <span>Advance deposits received</span>
                 <span t-esc="env.utils.formatCurrency(props.default_cash_details.advance_deposit_amount)"/>

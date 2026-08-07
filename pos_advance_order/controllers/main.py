@@ -32,6 +32,7 @@ class PosAdvanceOrderController(http.Controller):
         advance_amount = float(payload.get("advance_amount") or 0.0)
         amount_tendered = float(payload.get("amount_tendered") or 0.0)
         payment_method_id = payload.get("payment_method_id")
+        deposit_pos_session_id = payload.get("deposit_pos_session_id")
         employee_id = payload.get("employee_id")
         discount_id = payload.get("discount_id")
         site_service = bool(payload.get("site_service"))
@@ -100,6 +101,24 @@ class PosAdvanceOrderController(http.Controller):
         pm = request.env["pos.payment.method"].sudo().browse(int(payment_method_id))
         self._validate_advance_payment_method(pm, from_pos_config)
 
+        deposit_session = request.env["pos.session"]
+        if deposit_pos_session_id:
+            deposit_session = (
+                request.env["pos.session"]
+                .sudo()
+                .browse(int(deposit_pos_session_id))
+                .exists()
+            )
+            if (
+                not deposit_session
+                or deposit_session.state not in ("opened", "closing_control")
+                or deposit_session.rescue
+            ):
+                deposit_session = request.env["pos.session"]
+            elif deposit_session.config_id != from_pos_config:
+                # Cashier is on this session; trust the active POS session over the form default.
+                from_pos_config = deposit_session.config_id
+
         create_vals = {
             "partner_id": partner.id,
             "pos_config_id": pos_config.id,
@@ -110,6 +129,8 @@ class PosAdvanceOrderController(http.Controller):
             "amount_tendered": amount_tendered,
             "line_ids": line_vals,
         }
+        if deposit_session:
+            create_vals["deposit_pos_session_id"] = deposit_session.id
         if site_service:
             create_vals["site_service"] = True
         if employee_id:

@@ -57,21 +57,31 @@ class PosSession(models.Model):
             ("state", "not in", ("draft", "cancel")),
             ("advance_deposit_move_id.state", "=", "posted"),
         ]
-        deposited = AdvanceOrder.search(base_domain + [("deposit_pos_session_id", "=", self.id)])
-
-        if not self.start_at:
-            return deposited
-
         end = self.stop_at or fields.Datetime.now()
-        legacy = AdvanceOrder.browse()
-        for adv_order in AdvanceOrder.search(base_domain + [("deposit_pos_session_id", "=", False)]):
+        deposited = AdvanceOrder.browse()
+        for adv_order in AdvanceOrder.search(base_domain):
+            if adv_order.deposit_pos_session_id == self:
+                deposited |= adv_order
+                continue
             pay_cfg = adv_order.from_pos_config_id or adv_order.pos_config_id
             if pay_cfg != self.config_id:
                 continue
             move = adv_order.advance_deposit_move_id
-            if move and self.start_at <= move.create_date <= end:
-                legacy |= adv_order
-        return deposited | legacy
+            if not move:
+                continue
+            if self.start_at:
+                if not (self.start_at <= move.create_date <= end):
+                    continue
+            elif adv_order.deposit_pos_session_id:
+                continue
+            deposited |= adv_order
+        _logger.info(
+            "[ADV_CLOSING] session=%s(%s) deposited_advances=%s",
+            self.name,
+            self.id,
+            deposited.mapped("name"),
+        )
+        return deposited
 
     def _get_deposited_advance_summary(self):
         """Split deposited advances by liquidity type for closing register display."""
@@ -249,14 +259,27 @@ class PosSession(models.Model):
             )
         ]
 
+        deposit_bank = deposited_summary["bank"]
+        deposit_total = self.currency_id.round(deposit_cash + deposit_bank)
+        deposit_count = (deposited_summary.get("cash_count") or 0) + (
+            deposited_summary.get("bank_count") or 0
+        )
+        data["advance_deposit_details"] = {
+            "cash_amount": deposit_cash,
+            "bank_amount": deposit_bank,
+            "total_amount": deposit_total,
+            "count": deposit_count,
+        }
+
         data["default_cash_details"] = default_cash or data.get("default_cash_details")
         data["non_cash_payment_methods"] = non_cash
         _logger.info(
-            "[ADV_CLOSING] session=%s(%s) default_cash=%s non_cash_rows=%s",
+            "[ADV_CLOSING] session=%s(%s) default_cash=%s non_cash_rows=%s advance_deposit_details=%s",
             self.name,
             self.id,
             data.get("default_cash_details"),
             data.get("non_cash_payment_methods"),
+            data.get("advance_deposit_details"),
         )
         return data
 

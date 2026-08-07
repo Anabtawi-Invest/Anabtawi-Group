@@ -248,6 +248,7 @@ patch(ControlButtons.prototype, {
             partner_id: partner.id,
             pos_config_id: popupPayload.pos_config_id || this.pos.config.id,
             from_pos_config_id: popupPayload.from_pos_config_id || this.pos.config.id,
+            deposit_pos_session_id: this.pos.session?.id,
             advance_amount: advanceAmount,
             amount_tendered: amountTendered,
             payment_method_id: popupPayload.payment_method_id,

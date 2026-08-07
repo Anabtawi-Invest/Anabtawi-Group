@@ -676,15 +676,28 @@ class PosAdvanceOrder(models.Model):
             raise UserError(_("No opened POS session found for %s. Please open a session first.") % config.display_name)
         return session
 
-    def _link_deposit_pos_session(self):
-        """Store the open From POS session when the deposit is collected (closing register only)."""
+    def _link_deposit_pos_session(self, session_id=None):
+        """Store the POS session that collected the deposit (closing register only)."""
         self.ensure_one()
         if self.deposit_pos_session_id:
             return self.deposit_pos_session_id
+        Session = self.env["pos.session"].sudo()
+        session = Session.browse()
+        if session_id:
+            session = Session.browse(int(session_id)).exists()
+        if session and session.state in ("opened", "closing_control") and not session.rescue:
+            self.sudo().write({"deposit_pos_session_id": session.id})
+            _logger.info(
+                "[ADV_DEPOSIT] Linked deposit session from POS payload: advance=%s session=%s(%s)",
+                self.name,
+                session.name,
+                session.id,
+            )
+            return session
         from_pos = self.from_pos_config_id or self.pos_config_id
         if not from_pos:
-            return self.env["pos.session"]
-        session = self.env["pos.session"].sudo().search(
+            return Session
+        session = Session.search(
             [
                 ("config_id", "=", from_pos.id),
                 ("state", "in", ("opened", "closing_control")),
@@ -694,7 +707,20 @@ class PosAdvanceOrder(models.Model):
             limit=1,
         )
         if session:
-            self.deposit_pos_session_id = session.id
+            self.sudo().write({"deposit_pos_session_id": session.id})
+            _logger.info(
+                "[ADV_DEPOSIT] Linked deposit session from From POS: advance=%s session=%s(%s) config=%s",
+                self.name,
+                session.name,
+                session.id,
+                from_pos.display_name,
+            )
+        else:
+            _logger.warning(
+                "[ADV_DEPOSIT] No open session to link deposit: advance=%s from_pos=%s",
+                self.name,
+                from_pos.display_name,
+            )
         return session
 
     def _get_pos_payment_method(self, session):
