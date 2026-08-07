@@ -96,14 +96,24 @@ class PosSession(models.Model):
         deposited = self.env["pos.advance.order"].browse()
         for ao in candidates:
             reasons = []
-            if ao.company_id != self.company_id:
-                reasons.append(f"company_mismatch ao={ao.company_id.id} session={self.company_id.id}")
             if ao.state in ("draft", "cancel"):
                 reasons.append(f"bad_state={ao.state}")
             if not ao.advance_deposit_move_id:
                 reasons.append("no_deposit_move")
             elif ao.advance_deposit_move_id.state != "posted":
                 reasons.append(f"move_state={ao.advance_deposit_move_id.state}")
+            elif ao.company_id != self.company_id:
+                # Registered on this session explicitly; accept despite wrong company_id
+                # on legacy records (admin default company vs POS session company).
+                _logger.warning(
+                    "[ADV_TRACE] session=%s accepting message-linked advance=%s(%s) "
+                    "despite company_mismatch ao=%s session=%s",
+                    self.id,
+                    ao.name,
+                    ao.id,
+                    ao.company_id.id,
+                    self.company_id.id,
+                )
             if reasons:
                 _logger.warning(
                     "[ADV_TRACE] session=%s rejected advance=%s(%s) reasons=%s",

@@ -122,8 +122,30 @@ class PosAdvanceOrderController(http.Controller):
                 # Cashier is on this session; trust the active POS session over the form default.
                 from_pos_config = deposit_session.config_id
 
+        if not deposit_session:
+            deposit_session = (
+                request.env["pos.session"]
+                .sudo()
+                .search(
+                    [
+                        ("config_id", "=", from_pos_config.id),
+                        ("state", "in", ("opened", "closing_control")),
+                        ("rescue", "=", False),
+                    ],
+                    order="id desc",
+                    limit=1,
+                )
+            )
+
+        company = (
+            deposit_session.company_id
+            if deposit_session
+            else from_pos_config.company_id
+        )
+
         create_vals = {
             "partner_id": partner.id,
+            "company_id": company.id,
             "pos_config_id": pos_config.id,
             "from_pos_config_id": from_pos_config.id,
             "picking_date": fields.Datetime.now(),
@@ -145,7 +167,7 @@ class PosAdvanceOrderController(http.Controller):
 
         _logger.info(
             "[ADV_TRACE] create_advance_order payload_session=%s resolved_session=%s(%s) "
-            "session_state=%s from_pos=%s picking_pos=%s pm=%s amount=%s ctx=%s",
+            "session_state=%s from_pos=%s picking_pos=%s pm=%s amount=%s company=%s ctx=%s",
             deposit_pos_session_id,
             deposit_session.name if deposit_session else False,
             deposit_session.id if deposit_session else False,
@@ -154,25 +176,36 @@ class PosAdvanceOrderController(http.Controller):
             pos_config.id,
             pm.id,
             advance_amount,
+            company.id,
             deposit_ctx,
         )
 
-        AdvanceOrder = request.env["pos.advance.order"].sudo().with_context(**deposit_ctx)
+        AdvanceOrder = (
+            request.env["pos.advance.order"]
+            .sudo()
+            .with_context(**deposit_ctx, allowed_company_ids=company.ids)
+            .with_company(company)
+        )
         order = AdvanceOrder.create(create_vals)
-        order.action_confirm()
+        order.with_context(**deposit_ctx).action_confirm()
 
         if order.advance_amount > 0:
-            order.action_create_payment()
+            order.with_context(**deposit_ctx).action_create_payment(
+                deposit_pos_session_id=deposit_session.id if deposit_session else None,
+            )
+            if deposit_session and order.advance_deposit_move_id:
+                order._register_deposit_on_pos_session(deposit_session)
 
         _logger.info(
             "[ADV_TRACE] create_advance_order done advance=%s id=%s state=%s "
-            "deposit_move=%s move_ref=%s from_pos=%s",
+            "deposit_move=%s move_ref=%s from_pos=%s company=%s",
             order.name,
             order.id,
             order.state,
             order.advance_deposit_move_id.id if order.advance_deposit_move_id else False,
             order.advance_deposit_move_id.ref if order.advance_deposit_move_id else False,
             order.from_pos_config_id.id,
+            order.company_id.id,
         )
 
         return {

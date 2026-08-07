@@ -1432,9 +1432,20 @@ class PosAdvanceOrder(models.Model):
             if sessions:
                 sessions.invalidate_recordset(["cash_register_balance_end", "cash_register_difference"])
 
-    def action_create_payment(self):
+    def action_create_payment(self, deposit_pos_session_id=None):
         for order in self:
             order.ensure_one()
+            ctx_session = (
+                deposit_pos_session_id
+                or order.env.context.get("pos_advance_deposit_session_id")
+            )
+            _logger.info(
+                "[ADV_TRACE] action_create_payment advance=%s(%s) ctx_session=%s env_context=%s",
+                order.name,
+                order.id,
+                ctx_session,
+                order.env.context.get("pos_advance_deposit_session_id"),
+            )
             if order.state != "confirmed":
                 raise UserError(_("You can only create a payment on a Confirmed advance order."))
             if (
@@ -1446,7 +1457,9 @@ class PosAdvanceOrder(models.Model):
             if not order.advance_amount or order.advance_amount <= 0:
                 raise UserError(_("Advance amount must be greater than zero to create a payment."))
 
-            order._post_advance_deposit_move()
+            order.with_context(
+                pos_advance_deposit_session_id=ctx_session
+            )._post_advance_deposit_move()
             order.state = "advance_paid"
             _logger.info(
                 "[ADV_DEPOSIT] action_create_payment completed: advance=%s state=%s deposit_move=%s",
