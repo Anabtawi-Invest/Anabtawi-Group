@@ -13,6 +13,7 @@
         "hr",
         "employee_request",
         "mail",
+        "pos_settle_due",
     ],
     "data": [
         "security/ir.model.access.csv",

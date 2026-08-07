@@ -2,7 +2,7 @@
 from collections import defaultdict
 import logging
 
-from odoo import _, api, fields, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_compare, float_is_zero
 
@@ -369,10 +369,76 @@ class PosSession(models.Model):
         return super()._get_split_receivable_vals(payment, amount, amount_converted)
 
     def _reconcile_account_move_lines(self, data):
+        data = self._split_advance_application_pay_later_lines(data)
         data = super()._reconcile_account_move_lines(data)
         if self.config_id.enable_advance_order:
             self._reconcile_advance_completion_settlements(data)
         return data
+
+    def _split_advance_application_pay_later_lines(self, data):
+        """Keep advance pay_later debits out of pos_settle_due reconciliation."""
+        if not self.config_id.enable_advance_order:
+            return data
+        pay_later_lines = data.get("pay_later_move_lines")
+        if not pay_later_lines:
+            return data
+
+        advance_lines = self._get_advance_application_pay_later_lines(pay_later_lines)
+        if not advance_lines:
+            return data
+
+        data = dict(data)
+        data["pay_later_move_lines"] = pay_later_lines - advance_lines
+        data["advance_application_pay_later_lines"] = advance_lines
+        _logger.info(
+            "[ADV_SETTLEMENT_RECON] Excluded %s advance pay_later line(s) from settle_due: %s",
+            len(advance_lines),
+            advance_lines.ids,
+        )
+        return data
+
+    def _get_advance_application_pay_later_lines(self, pay_later_lines):
+        """Session move lines created for prepaid advance (pay_later) on completion orders."""
+        self.ensure_one()
+        advance_lines = self.env["account.move.line"]
+        rounding = self.currency_id.rounding
+
+        for order in self._get_closed_orders():
+            advance = order.advance_order_id
+            if not advance or not advance.remaining_pos_order_id:
+                continue
+            if order.id != advance.remaining_pos_order_id.id:
+                continue
+            receivable_account = advance._get_advance_receivable_account()
+            if not receivable_account:
+                continue
+            try:
+                advance_application_pm = advance._get_advance_application_payment_method(self)
+            except UserError:
+                continue
+
+            for payment in order.payment_ids.filtered(
+                lambda pay: pay.payment_method_id == advance_application_pm
+                and not float_is_zero(pay.amount, precision_rounding=rounding)
+            ):
+                accounting_partner = self.env["res.partner"]._find_accounting_partner(
+                    payment.partner_id
+                )
+                payment_lines = pay_later_lines.filtered(
+                    lambda line: (
+                        line.account_id == receivable_account
+                        and line.balance > 0
+                        and float_compare(
+                            line.balance, payment.amount, precision_rounding=rounding
+                        ) == 0
+                        and (
+                            not accounting_partner
+                            or line.partner_id == accounting_partner
+                        )
+                    )
+                )
+                advance_lines |= payment_lines
+        return advance_lines
 
     def _reconcile_advance_completion_settlements(self, data):
         """Match settlement receivable credits with POS pay_later debits after session close."""
@@ -407,6 +473,7 @@ class PosSession(models.Model):
                     settlement_move,
                     amount,
                     rounding,
+                    data,
                     match_advance_application_pm=(
                         settlement_move == advance.advance_completion_settlement_move_id
                     ),
@@ -419,6 +486,7 @@ class PosSession(models.Model):
         settlement_move,
         amount,
         rounding,
+        data,
         match_advance_application_pm=True,
     ):
         if float_is_zero(amount, precision_rounding=rounding):
@@ -455,14 +523,27 @@ class PosSession(models.Model):
         if settlement_line.reconciled:
             return
 
-        session_lines = self.move_id.line_ids.filtered(
-            lambda line: (
-                line.account_id == receivable_account
-                and not line.reconciled
-                and line.balance > 0
-                and float_compare(line.balance, amount, precision_rounding=rounding) == 0
+        advance_pay_later_lines = data.get("advance_application_pay_later_lines")
+        session_lines = self.env["account.move.line"]
+        if advance_pay_later_lines:
+            session_lines = advance_pay_later_lines.filtered(
+                lambda line: (
+                    line.account_id == receivable_account
+                    and not line.reconciled
+                    and line.balance > 0
+                    and float_compare(line.balance, amount, precision_rounding=rounding) == 0
+                )
             )
-        )
+
+        if not session_lines:
+            session_lines = self.move_id.line_ids.filtered(
+                lambda line: (
+                    line.account_id == receivable_account
+                    and not line.reconciled
+                    and line.balance > 0
+                    and float_compare(line.balance, amount, precision_rounding=rounding) == 0
+                )
+            )
 
         try:
             advance_application_pm = (
@@ -523,10 +604,9 @@ class PosSession(models.Model):
 
         try:
             lines_to_reconcile.with_context(no_cash_basis=True).reconcile()
-        except UserError as err:
-            if err.args and err.args[0] == _(
-                "You are trying to reconcile some entries that are already reconciled."
-            ):
+        except UserError:
+            lines_to_reconcile.invalidate_recordset(["reconciled", "full_reconcile_id"])
+            if all(line.reconciled for line in lines_to_reconcile):
                 _logger.info(
                     "[ADV_SETTLEMENT_RECON] Already reconciled: advance=%s settlement=%s session_line=%s",
                     advance.name,
