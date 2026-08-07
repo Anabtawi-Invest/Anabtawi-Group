@@ -4,7 +4,7 @@ import logging
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError
-from odoo.tools import float_is_zero
+from odoo.tools import float_compare, float_is_zero
 
 _logger = logging.getLogger(__name__)
 
@@ -367,3 +367,175 @@ class PosSession(models.Model):
             }
             return self._debit_amounts(partial_vals, amount, amount_converted)
         return super()._get_split_receivable_vals(payment, amount, amount_converted)
+
+    def _reconcile_account_move_lines(self, data):
+        data = super()._reconcile_account_move_lines(data)
+        if self.config_id.enable_advance_order:
+            self._reconcile_advance_completion_settlements(data)
+        return data
+
+    def _reconcile_advance_completion_settlements(self, data):
+        """Match settlement receivable credits with POS pay_later debits after session close."""
+        self.ensure_one()
+        if not self.move_id:
+            return
+
+        rounding = self.currency_id.rounding
+        pay_later_lines = data.get("pay_later_move_lines") or self.env["account.move.line"]
+        session_debit_pool = (pay_later_lines | self.move_id.line_ids).filtered(
+            lambda line: (
+                line.move_id == self.move_id
+                and not line.reconciled
+                and line.balance > 0
+            )
+        )
+
+        for order in self._get_closed_orders():
+            advance = order.advance_order_id
+            if not advance or not advance.remaining_pos_order_id:
+                continue
+            if order.id != advance.remaining_pos_order_id.id:
+                continue
+
+            for settlement_move, amount, settlement_order in (
+                (advance.advance_completion_settlement_move_id, advance.advance_amount, order),
+                (
+                    advance.pledge_completion_settlement_move_id,
+                    advance.pledge_amount,
+                    advance.pledge_pos_order_id,
+                ),
+            ):
+                if not settlement_move or not settlement_order:
+                    continue
+                if settlement_order.session_id != self:
+                    continue
+                self._reconcile_advance_settlement_move(
+                    advance,
+                    settlement_order,
+                    settlement_move,
+                    amount,
+                    session_debit_pool,
+                    rounding,
+                    match_advance_application_pm=(
+                        settlement_move == advance.advance_completion_settlement_move_id
+                    ),
+                )
+
+    def _reconcile_advance_settlement_move(
+        self,
+        advance,
+        pos_order,
+        settlement_move,
+        amount,
+        session_debit_pool,
+        rounding,
+        match_advance_application_pm=True,
+    ):
+        if float_is_zero(amount, precision_rounding=rounding):
+            return
+
+        receivable_account = advance._get_advance_receivable_account()
+        if not receivable_account or not receivable_account.reconcile:
+            return
+
+        settlement_lines = settlement_move.line_ids.filtered(
+            lambda line: (
+                line.account_id == receivable_account
+                and not line.reconciled
+                and line.balance < 0
+            )
+        )
+        if not settlement_lines:
+            return
+
+        accounting_partner = self.env["res.partner"]._find_accounting_partner(
+            advance.partner_id
+        )
+        if accounting_partner:
+            settlement_lines = settlement_lines.filtered(
+                lambda line: (
+                    not line.partner_id or line.partner_id == accounting_partner
+                )
+            )
+        if not settlement_lines:
+            return
+
+        session_lines = session_debit_pool.filtered(
+            lambda line: (
+                line.account_id == receivable_account
+                and float_compare(line.balance, amount, precision_rounding=rounding) == 0
+            )
+        )
+
+        try:
+            advance_application_pm = (
+                advance._get_advance_application_payment_method(self)
+                if match_advance_application_pm
+                else self.env["pos.payment.method"]
+            )
+        except UserError:
+            advance_application_pm = self.env["pos.payment.method"]
+
+        payment_domain = lambda pay: pay.amount > 0
+        if match_advance_application_pm and advance_application_pm:
+            payment_domain = lambda pay: (
+                pay.amount > 0 and pay.payment_method_id == advance_application_pm
+            )
+        advance_payment = pos_order.payment_ids.filtered(payment_domain)[:1]
+
+        if advance_payment and advance_payment.payment_method_id.split_transactions and accounting_partner:
+            partner_lines = session_lines.filtered(
+                lambda line: line.partner_id == accounting_partner
+            )
+            if partner_lines:
+                session_lines = partner_lines
+        elif accounting_partner:
+            partner_lines = session_lines.filtered(
+                lambda line: line.partner_id == accounting_partner
+            )
+            if partner_lines:
+                session_lines = partner_lines
+
+        if not session_lines:
+            _logger.warning(
+                "[ADV_SETTLEMENT_RECON] No session debit line: advance=%s settlement=%s amount=%s partner=%s",
+                advance.name,
+                settlement_move.id,
+                amount,
+                accounting_partner.id if accounting_partner else False,
+            )
+            return
+
+        session_line = session_lines[:1]
+        lines_to_reconcile = session_line | settlement_lines
+        if float_compare(
+            sum(lines_to_reconcile.mapped("balance")),
+            0.0,
+            precision_rounding=rounding,
+        ) != 0:
+            _logger.warning(
+                "[ADV_SETTLEMENT_RECON] Unbalanced lines: advance=%s settlement=%s balances=%s",
+                advance.name,
+                settlement_move.id,
+                lines_to_reconcile.mapped("balance"),
+            )
+            return
+
+        try:
+            lines_to_reconcile.with_context(no_cash_basis=True).reconcile()
+        except Exception:
+            _logger.exception(
+                "[ADV_SETTLEMENT_RECON] Failed: advance=%s settlement=%s session_line=%s",
+                advance.name,
+                settlement_move.id,
+                session_line.id,
+            )
+            raise
+
+        _logger.info(
+            "[ADV_SETTLEMENT_RECON] Reconciled advance=%s settlement=%s session_line=%s settlement_lines=%s",
+            advance.name,
+            settlement_move.id,
+            session_line.id,
+            settlement_lines.ids,
+        )
