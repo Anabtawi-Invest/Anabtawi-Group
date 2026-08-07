@@ -9,12 +9,31 @@ from odoo.tools import float_compare, float_is_zero
 
 _logger = logging.getLogger(__name__)
 
+_DEPOSIT_SESSION_COLUMN = {}
+
 
 class PosAdvanceOrder(models.Model):
     _name = "pos.advance.order"
     _description = "POS Advance Order"
     _inherit = ["product.catalog.mixin", "mail.thread", "mail.activity.mixin"]
     _order = "id desc"
+
+    @api.model
+    def _deposit_session_column_exists(self):
+        """True once pos_advance_order has been upgraded with deposit_pos_session_id."""
+        dbname = self.env.cr.dbname
+        if dbname not in _DEPOSIT_SESSION_COLUMN:
+            self.env.cr.execute(
+                """
+                SELECT 1
+                  FROM information_schema.columns
+                 WHERE table_name = 'pos_advance_order'
+                   AND column_name = 'deposit_pos_session_id'
+                 LIMIT 1
+                """
+            )
+            _DEPOSIT_SESSION_COLUMN[dbname] = bool(self.env.cr.fetchone())
+        return _DEPOSIT_SESSION_COLUMN[dbname]
 
     name = fields.Char(string="Reference", required=True, readonly=True, default="New")
     state = fields.Selection(
@@ -679,6 +698,13 @@ class PosAdvanceOrder(models.Model):
     def _link_deposit_pos_session(self, session_id=None):
         """Store the POS session that collected the deposit (closing register only)."""
         self.ensure_one()
+        if not self._deposit_session_column_exists():
+            _logger.warning(
+                "[ADV_DEPOSIT] deposit_pos_session_id column missing; upgrade pos_advance_order "
+                "(advance=%s)",
+                self.name,
+            )
+            return self.env["pos.session"]
         if self.deposit_pos_session_id:
             return self.deposit_pos_session_id
         Session = self.env["pos.session"].sudo()
