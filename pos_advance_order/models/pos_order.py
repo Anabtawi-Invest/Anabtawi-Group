@@ -1,5 +1,6 @@
 import logging
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 from odoo.tools import float_compare, float_repr
 
 _logger = logging.getLogger(__name__)
@@ -213,6 +214,23 @@ class PosOrder(models.Model):
                                 order.id,
                                 settle_move.id,
                             )
+                        except UserError as err:
+                            if err.args and err.args[0] == _(
+                                "You are trying to reconcile some entries that are already reconciled."
+                            ):
+                                _logger.info(
+                                    "[ADV_RECON] Settlement already reconciled: order=%s move=%s",
+                                    order.id,
+                                    settle_move.id,
+                                )
+                            else:
+                                _logger.exception(
+                                    "[ADV_RECON] Completion settlement reconcile failed: order=%s move=%s error=%s",
+                                    order.id,
+                                    settle_move.id,
+                                    err,
+                                )
+                                raise
                         except Exception as e:
                             _logger.exception(
                                 "[ADV_RECON] Completion settlement reconcile failed: order=%s move=%s error=%s",

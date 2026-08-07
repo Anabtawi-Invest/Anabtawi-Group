@@ -2,7 +2,7 @@
 from collections import defaultdict
 import logging
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_compare, float_is_zero
 
@@ -381,14 +381,6 @@ class PosSession(models.Model):
             return
 
         rounding = self.currency_id.rounding
-        pay_later_lines = data.get("pay_later_move_lines") or self.env["account.move.line"]
-        session_debit_pool = (pay_later_lines | self.move_id.line_ids).filtered(
-            lambda line: (
-                line.move_id == self.move_id
-                and not line.reconciled
-                and line.balance > 0
-            )
-        )
 
         for order in self._get_closed_orders():
             advance = order.advance_order_id
@@ -414,7 +406,6 @@ class PosSession(models.Model):
                     settlement_order,
                     settlement_move,
                     amount,
-                    session_debit_pool,
                     rounding,
                     match_advance_application_pm=(
                         settlement_move == advance.advance_completion_settlement_move_id
@@ -427,7 +418,6 @@ class PosSession(models.Model):
         pos_order,
         settlement_move,
         amount,
-        session_debit_pool,
         rounding,
         match_advance_application_pm=True,
     ):
@@ -443,6 +433,7 @@ class PosSession(models.Model):
                 line.account_id == receivable_account
                 and not line.reconciled
                 and line.balance < 0
+                and float_compare(abs(line.balance), amount, precision_rounding=rounding) == 0
             )
         )
         if not settlement_lines:
@@ -452,17 +443,23 @@ class PosSession(models.Model):
             advance.partner_id
         )
         if accounting_partner:
-            settlement_lines = settlement_lines.filtered(
+            partner_settlement = settlement_lines.filtered(
                 lambda line: (
                     not line.partner_id or line.partner_id == accounting_partner
                 )
             )
-        if not settlement_lines:
+            if partner_settlement:
+                settlement_lines = partner_settlement
+
+        settlement_line = settlement_lines[:1]
+        if settlement_line.reconciled:
             return
 
-        session_lines = session_debit_pool.filtered(
+        session_lines = self.move_id.line_ids.filtered(
             lambda line: (
                 line.account_id == receivable_account
+                and not line.reconciled
+                and line.balance > 0
                 and float_compare(line.balance, amount, precision_rounding=rounding) == 0
             )
         )
@@ -507,7 +504,10 @@ class PosSession(models.Model):
             return
 
         session_line = session_lines[:1]
-        lines_to_reconcile = session_line | settlement_lines
+        if not session_line or session_line.reconciled or settlement_line.reconciled:
+            return
+
+        lines_to_reconcile = session_line | settlement_line
         if float_compare(
             sum(lines_to_reconcile.mapped("balance")),
             0.0,
@@ -523,7 +523,17 @@ class PosSession(models.Model):
 
         try:
             lines_to_reconcile.with_context(no_cash_basis=True).reconcile()
-        except Exception:
+        except UserError as err:
+            if err.args and err.args[0] == _(
+                "You are trying to reconcile some entries that are already reconciled."
+            ):
+                _logger.info(
+                    "[ADV_SETTLEMENT_RECON] Already reconciled: advance=%s settlement=%s session_line=%s",
+                    advance.name,
+                    settlement_move.id,
+                    session_line.id,
+                )
+                return
             _logger.exception(
                 "[ADV_SETTLEMENT_RECON] Failed: advance=%s settlement=%s session_line=%s",
                 advance.name,
@@ -533,9 +543,9 @@ class PosSession(models.Model):
             raise
 
         _logger.info(
-            "[ADV_SETTLEMENT_RECON] Reconciled advance=%s settlement=%s session_line=%s settlement_lines=%s",
+            "[ADV_SETTLEMENT_RECON] Reconciled advance=%s settlement=%s session_line=%s settlement_line=%s",
             advance.name,
             settlement_move.id,
             session_line.id,
-            settlement_lines.ids,
+            settlement_line.id,
         )
