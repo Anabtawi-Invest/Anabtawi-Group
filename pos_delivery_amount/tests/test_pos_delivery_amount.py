@@ -98,9 +98,11 @@ class TestPosDeliveryAmount(TestPoSCommon):
             session.action_process_delivery_amount(10.0)
 
     def test_delivery_amount_reduces_cash_difference_at_closing(self):
-        """Counted cash after delivery must not trigger a false cash loss entry."""
-        session = self.open_new_session(opening_cash=195.0)
-        session.post_closing_cash_details(164.0)
+        """Full drawer count, then delivery: no false observed cash difference."""
+        session = self.open_new_session(opening_cash=18.0)
+        session.post_closing_cash_details(18.0)
         session.update_closing_control_state_session("Closing with delivery")
-        session.action_process_delivery_amount(31.0)
+        session.action_process_delivery_amount(4.0)
+        session.action_process_delivery_amount(2.0)
+        self.assertEqual(session.cash_register_balance_end_real, 12.0)
         self.assertEqual(session.cash_register_difference, 0.0)

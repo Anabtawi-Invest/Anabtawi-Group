@@ -40,6 +40,12 @@ class PosSession(models.Model):
         readonly=True,
         copy=False,
     )
+    closing_cash_details_posted = fields.Boolean(
+        string="Closing Cash Count Posted",
+        readonly=True,
+        copy=False,
+        help="Set when the cashier submits the closing cash count, before Cash Delivery at session end.",
+    )
 
     @api.depends(
         "payment_method_ids",
@@ -133,12 +139,34 @@ class PosSession(models.Model):
 
     def _get_available_cash_for_delivery(self):
         self.ensure_one()
+        if self.closing_cash_details_posted:
+            # Counted cash is reduced as each closing delivery is processed.
+            return max(0.0, self.currency_id.round(self.cash_register_balance_end_real or 0.0))
         if self.state in ("closing_control", "closed"):
             available = (self.cash_register_balance_end_real or 0.0) - self._get_delivered_total()
         else:
             # cash_register_balance_end already excludes delivered amounts
             available = self.cash_register_balance_end or 0.0
         return max(0.0, self.currency_id.round(available))
+
+    def _adjust_counted_cash_for_closing_delivery(self, amount):
+        """Reduce counted cash when delivery is taken out after the closing count."""
+        self.ensure_one()
+        if (
+            not self.closing_cash_details_posted
+            or not self.config_id.cash_control
+            or self.currency_id.is_zero(amount)
+        ):
+            return
+        self.cash_register_balance_end_real = self.currency_id.round(
+            (self.cash_register_balance_end_real or 0.0) - amount
+        )
+
+    def post_closing_cash_details(self, counted_cash):
+        result = super().post_closing_cash_details(counted_cash)
+        if result.get("successful"):
+            self.closing_cash_details_posted = True
+        return result
 
     def _validate_delivery_amount(self, amount):
         self.ensure_one()
@@ -312,6 +340,7 @@ class PosSession(models.Model):
                 "move_id": move.id,
             }
         )
+        self._adjust_counted_cash_for_closing_delivery(amount)
         self._ensure_delivery_report_line()
 
         timestamp = fields.Datetime.context_timestamp(self, fields.Datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
