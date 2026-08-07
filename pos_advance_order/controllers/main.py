@@ -129,8 +129,6 @@ class PosAdvanceOrderController(http.Controller):
             "amount_tendered": amount_tendered,
             "line_ids": line_vals,
         }
-        if deposit_session and request.env["pos.advance.order"].sudo()._deposit_session_column_exists():
-            create_vals["deposit_pos_session_id"] = deposit_session.id
         if site_service:
             create_vals["site_service"] = True
         if employee_id:

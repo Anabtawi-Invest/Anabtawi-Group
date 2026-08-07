@@ -49,52 +49,9 @@ class PosSession(models.Model):
             )
 
     def _advance_orders_deposited_in_session(self):
-        """Advance orders whose deposit was collected during this POS session."""
+        """Advance orders whose deposit move was posted during this POS session window."""
         self.ensure_one()
         AdvanceOrder = self.env["pos.advance.order"].sudo()
-        has_session_col = AdvanceOrder._deposit_session_column_exists()
-        if not has_session_col:
-            _logger.warning(
-                "[ADV_CLOSING] deposit_pos_session_id column missing on %s; "
-                "upgrade pos_advance_order. Falling back to deposit move date matching.",
-                self.name,
-            )
-            return self._advance_orders_deposited_in_session_legacy_sql(AdvanceOrder)
-        base_domain = [
-            ("company_id", "=", self.company_id.id),
-            ("state", "not in", ("draft", "cancel")),
-            ("advance_deposit_move_id.state", "=", "posted"),
-        ]
-        end = self.stop_at or fields.Datetime.now()
-        deposited = AdvanceOrder.browse()
-        for adv_order in AdvanceOrder.search(base_domain):
-            if adv_order.deposit_pos_session_id == self:
-                deposited |= adv_order
-                continue
-            pay_cfg = adv_order.from_pos_config_id or adv_order.pos_config_id
-            if pay_cfg != self.config_id:
-                continue
-            move = adv_order.advance_deposit_move_id
-            if not move:
-                continue
-            if not self.start_at:
-                continue
-            if not (self.start_at <= move.create_date <= end):
-                continue
-            if adv_order.deposit_pos_session_id and adv_order.deposit_pos_session_id != self:
-                continue
-            deposited |= adv_order
-        _logger.info(
-            "[ADV_CLOSING] session=%s(%s) deposited_advances=%s",
-            self.name,
-            self.id,
-            deposited.mapped("name"),
-        )
-        return deposited
-
-    def _advance_orders_deposited_in_session_legacy_sql(self, AdvanceOrder):
-        """Match deposits by From POS + move date when DB column is not upgraded yet."""
-        self.ensure_one()
         if not self.start_at:
             return AdvanceOrder.browse()
         end = self.stop_at or fields.Datetime.now()
@@ -112,10 +69,9 @@ class PosSession(models.Model):
             """,
             (self.company_id.id, self.config_id.id, self.start_at, end),
         )
-        ids = [row[0] for row in self.env.cr.fetchall()]
-        deposited = AdvanceOrder.browse(ids)
+        deposited = AdvanceOrder.browse([row[0] for row in self.env.cr.fetchall()])
         _logger.info(
-            "[ADV_CLOSING] session=%s(%s) legacy_sql_deposited=%s",
+            "[ADV_CLOSING] session=%s(%s) deposited_advances=%s",
             self.name,
             self.id,
             deposited.mapped("name"),
@@ -134,7 +90,6 @@ class PosSession(models.Model):
         }
         if not self.config_id.enable_advance_order:
             return summary
-        AdvanceOrder = self.env["pos.advance.order"].sudo()
         deposited = self._advance_orders_deposited_in_session()
         if not deposited:
             return summary
@@ -143,21 +98,11 @@ class PosSession(models.Model):
         bank_total = 0.0
         cash_count = 0
         bank_count = 0
-        read_fields = ["advance_amount", "pos_payment_method_id", "payment_method"]
-        if AdvanceOrder._deposit_session_column_exists():
-            adv_rows = deposited
-        else:
-            adv_rows = deposited.read(read_fields)
-        for adv_order in adv_rows:
-            if isinstance(adv_order, dict):
-                amount = adv_order.get("advance_amount") or 0.0
-                pm_id = (adv_order.get("pos_payment_method_id") or [False])[0]
-                pm = self.env["pos.payment.method"].browse(pm_id) if pm_id else self.env["pos.payment.method"]
-                payment_method = adv_order.get("payment_method")
-            else:
-                amount = adv_order.advance_amount or 0.0
-                pm = adv_order.pos_payment_method_id
-                payment_method = adv_order.payment_method
+        for row in deposited.read(["advance_amount", "pos_payment_method_id", "payment_method"]):
+            amount = row.get("advance_amount") or 0.0
+            pm_id = (row.get("pos_payment_method_id") or [False])[0]
+            pm = self.env["pos.payment.method"].browse(pm_id) if pm_id else self.env["pos.payment.method"]
+            payment_method = row.get("payment_method")
             if currency.is_zero(amount):
                 continue
             is_cash = (pm and pm.type == "cash") or (not pm and payment_method == "cash")

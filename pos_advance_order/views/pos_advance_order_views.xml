@@ -227,7 +227,6 @@
 
                         <field name="amount_remaining" widget="monetary" readonly="1"/>
                         <field name="from_pos_config_id" readonly="state != 'draft'"/>
-                        <field name="deposit_pos_session_id" readonly="1" groups="point_of_sale.group_pos_user"/>
                         <field name="advance_pos_order_id" readonly="1" invisible="not advance_pos_order_id"/>
                         <field name="refund_advance_pos_order_id" readonly="1" invisible="not refund_advance_pos_order_id"/>
                         <field name="advance_refund_move_id" readonly="1" groups="account.group_account_invoice" invisible="not advance_refund_move_id"/>
