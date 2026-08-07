@@ -52,9 +52,12 @@ class PosSession(models.Model):
         """Advance orders whose deposit move was posted during this POS session window."""
         self.ensure_one()
         AdvanceOrder = self.env["pos.advance.order"].sudo()
-        if not self.start_at:
+        start = self.start_at or self.create_date
+        if not start:
             return AdvanceOrder.browse()
         end = self.stop_at or fields.Datetime.now()
+        session_ref_pattern = f"%[pos_session_id:{self.id}]%"
+        journal_ids = self.payment_method_ids.mapped("journal_id").ids or [0]
         self.env.cr.execute(
             """
             SELECT ao.id
@@ -63,13 +66,51 @@ class PosSession(models.Model):
              WHERE ao.company_id = %s
                AND ao.state NOT IN ('draft', 'cancel')
                AND am.state = 'posted'
-               AND COALESCE(ao.from_pos_config_id, ao.pos_config_id) = %s
                AND am.create_date >= %s
                AND am.create_date <= %s
+               AND (
+                    COALESCE(ao.from_pos_config_id, ao.pos_config_id) = %s
+                    OR am.ref LIKE %s
+                    OR am.journal_id = ANY(%s)
+               )
             """,
-            (self.company_id.id, self.config_id.id, self.start_at, end),
+            (
+                self.company_id.id,
+                start,
+                end,
+                self.config_id.id,
+                session_ref_pattern,
+                journal_ids,
+            ),
         )
         deposited = AdvanceOrder.browse([row[0] for row in self.env.cr.fetchall()])
+        if not deposited:
+            self.env.cr.execute(
+                """
+                SELECT COUNT(*)
+                  FROM pos_advance_order ao
+                  JOIN account_move am ON am.id = ao.advance_deposit_move_id
+                 WHERE ao.company_id = %s
+                   AND ao.state NOT IN ('draft', 'cancel')
+                   AND am.state = 'posted'
+                   AND am.create_date >= %s
+                   AND am.create_date <= %s
+                """,
+                (self.company_id.id, start, end),
+            )
+            window_count = self.env.cr.fetchone()[0]
+            _logger.warning(
+                "[ADV_CLOSING] session=%s(%s) config=%s start=%s end=%s "
+                "window_deposits=%s journals=%s ref_pattern=%s",
+                self.name,
+                self.id,
+                self.config_id.id,
+                start,
+                end,
+                window_count,
+                journal_ids,
+                session_ref_pattern,
+            )
         _logger.info(
             "[ADV_CLOSING] session=%s(%s) deposited_advances=%s",
             self.name,
@@ -88,8 +129,6 @@ class PosSession(models.Model):
             "bank_count": 0,
             "by_payment_method": {},
         }
-        if not self.config_id.enable_advance_order:
-            return summary
         deposited = self._advance_orders_deposited_in_session()
         if not deposited:
             return summary
@@ -136,11 +175,17 @@ class PosSession(models.Model):
         data = super().get_closing_control_data()
         self.ensure_one()
         cfg = self.config_id
-        if not cfg.enable_advance_order:
-            return data
 
         deposited_summary = self._get_deposited_advance_summary()
         deposit_cash = deposited_summary["cash"]
+        deposit_bank = deposited_summary["bank"]
+        deposit_total = self.currency_id.round(deposit_cash + deposit_bank)
+        has_deposits = not float_is_zero(
+            deposit_total, precision_rounding=self.currency_id.rounding
+        )
+        if not cfg.enable_advance_order and not has_deposits:
+            return data
+
         deposited_by_pm = deposited_summary.get("by_payment_method", {})
         _logger.info(
             "[ADV_CLOSING] session=%s(%s) deposit_cash=%s deposited_by_pm=%s",
@@ -259,8 +304,6 @@ class PosSession(models.Model):
             )
         ]
 
-        deposit_bank = deposited_summary["bank"]
-        deposit_total = self.currency_id.round(deposit_cash + deposit_bank)
         deposit_count = (deposited_summary.get("cash_count") or 0) + (
             deposited_summary.get("bank_count") or 0
         )

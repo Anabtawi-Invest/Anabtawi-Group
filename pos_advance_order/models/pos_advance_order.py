@@ -1174,6 +1174,18 @@ class PosAdvanceOrder(models.Model):
         )
 
         tendered_amount = self.amount_tendered or self.advance_amount
+        deposit_session = self.env["pos.session"].sudo().search(
+            [
+                ("config_id", "=", self._get_advance_pos_config().id),
+                ("state", "in", ("opened", "closing_control")),
+                ("rescue", "=", False),
+            ],
+            order="id desc",
+            limit=1,
+        )
+        deposit_ref = _("Advance deposit - %s") % self.name
+        if deposit_session:
+            deposit_ref = _("%s [pos_session_id:%s]") % (deposit_ref, deposit_session.id)
         move_lines = [
             Command.create({
                 "name": _("Advance deposit %s") % self.name,
@@ -1207,7 +1219,7 @@ class PosAdvanceOrder(models.Model):
             "move_type": "entry",
             "journal_id": journal.id,
             "date": fields.Date.context_today(self),
-            "ref": _("Advance deposit - %s") % self.name,
+            "ref": deposit_ref,
             "partner_id": self.partner_id.id,
             "line_ids": move_lines,
         })
@@ -1216,9 +1228,11 @@ class PosAdvanceOrder(models.Model):
         # Legacy field retained: old flows used liability transfer move; reuse for invoice fallback.
         self.advance_liability_move_id = move.id
         _logger.info(
-            "[ADV_DEPOSIT] Posted deposit move advance=%s move_id=%s",
+            "[ADV_DEPOSIT] Posted deposit move advance=%s move_id=%s session=%s ref=%s",
             self.name,
             move.id,
+            deposit_session.id if deposit_session else False,
+            deposit_ref,
         )
         return move
 
