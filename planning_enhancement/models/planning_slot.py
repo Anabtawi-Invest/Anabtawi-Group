@@ -10,6 +10,27 @@ _logger = logging.getLogger(__name__)
 class PlanningSlot(models.Model):
     _inherit = "planning.slot"
 
+    def _planning_enhancement_needs_sudo_contract_data(self):
+        return (
+            not self.env.user.has_group('hr.group_hr_user')
+            and self.env.user.has_group('planning.group_planning_user')
+        )
+
+    @api.model
+    def _gantt_resource_employees_working_periods(self, groups, start_date, stop_date):
+        if self._planning_enhancement_needs_sudo_contract_data():
+            return super(PlanningSlot, self.sudo())._gantt_resource_employees_working_periods(
+                groups, start_date, stop_date,
+            )
+        return super()._gantt_resource_employees_working_periods(groups, start_date, stop_date)
+
+    def _gantt_progress_bar_resource_id(self, res_ids, start, stop):
+        if self._planning_enhancement_needs_sudo_contract_data():
+            return super(PlanningSlot, self.sudo())._gantt_progress_bar_resource_id(
+                res_ids, start, stop,
+            )
+        return super()._gantt_progress_bar_resource_id(res_ids, start, stop)
+
     extra_hours_display = fields.Float(
         string="Extra Hours",
         compute="_compute_extra_hours_display",
