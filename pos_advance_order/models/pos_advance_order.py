@@ -20,7 +20,7 @@ class PosAdvanceOrder(models.Model):
 
     @api.model
     def _deposit_session_column_exists(self):
-        """True once pos_advance_order has been upgraded with deposit_pos_session_id."""
+        """True once pos_advance_order has deposit_pos_session_id in the database."""
         dbname = self.env.cr.dbname
         if dbname not in _DEPOSIT_SESSION_COLUMN:
             self.env.cr.execute(
@@ -34,6 +34,91 @@ class PosAdvanceOrder(models.Model):
             )
             _DEPOSIT_SESSION_COLUMN[dbname] = bool(self.env.cr.fetchone())
         return _DEPOSIT_SESSION_COLUMN[dbname]
+
+    @api.model
+    def _register_hook(self):
+        """Create the deposit session column when code is deployed before -u pos_advance_order."""
+        super()._register_hook()
+        if not self._deposit_session_column_exists():
+            self._ensure_deposit_session_column()
+
+    @api.model
+    def _ensure_deposit_session_column(self):
+        """Add deposit_pos_session_id without uninstall/reinstall (Odoo.sh safe deploy)."""
+        if self._deposit_session_column_exists():
+            return
+        _logger.warning(
+            "[ADV_DEPOSIT] Creating missing deposit_pos_session_id column on pos_advance_order "
+            "(database=%s). Run -u pos_advance_order when possible; data is preserved.",
+            self.env.cr.dbname,
+        )
+        self.env.cr.execute(
+            """
+            ALTER TABLE pos_advance_order
+            ADD COLUMN IF NOT EXISTS deposit_pos_session_id INTEGER
+            """
+        )
+        self.env.cr.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                      FROM pg_constraint
+                     WHERE conname = 'pos_advance_order_deposit_pos_session_id_fkey'
+                ) THEN
+                    ALTER TABLE pos_advance_order
+                    ADD CONSTRAINT pos_advance_order_deposit_pos_session_id_fkey
+                    FOREIGN KEY (deposit_pos_session_id)
+                    REFERENCES pos_session(id) ON DELETE SET NULL;
+                END IF;
+            END $$;
+            """
+        )
+        self.env.cr.execute(
+            """
+            CREATE INDEX IF NOT EXISTS pos_advance_order_deposit_pos_session_id_index
+            ON pos_advance_order (deposit_pos_session_id)
+            """
+        )
+        _DEPOSIT_SESSION_COLUMN[self.env.cr.dbname] = True
+        self._backfill_deposit_pos_session_ids()
+
+    @api.model
+    def _backfill_deposit_pos_session_ids(self):
+        """Link existing advance deposits to the POS session that collected them."""
+        self.env.cr.execute(
+            """
+            UPDATE pos_advance_order ao
+               SET deposit_pos_session_id = matched.session_id
+              FROM (
+                    SELECT ao2.id AS advance_id,
+                           (
+                               SELECT ps.id
+                                 FROM pos_session ps
+                                 JOIN account_move am ON am.id = ao2.advance_deposit_move_id
+                                WHERE ps.config_id = COALESCE(ao2.from_pos_config_id, ao2.pos_config_id)
+                                  AND ps.company_id = ao2.company_id
+                                  AND ps.rescue IS FALSE
+                                  AND ps.start_at IS NOT NULL
+                                  AND am.create_date >= ps.start_at
+                                  AND am.create_date <= COALESCE(ps.stop_at, NOW() AT TIME ZONE 'UTC')
+                                ORDER BY ps.id DESC
+                                LIMIT 1
+                           ) AS session_id
+                      FROM pos_advance_order ao2
+                     WHERE ao2.deposit_pos_session_id IS NULL
+                       AND ao2.advance_deposit_move_id IS NOT NULL
+                       AND ao2.state NOT IN ('draft', 'cancel')
+                   ) matched
+             WHERE ao.id = matched.advance_id
+               AND matched.session_id IS NOT NULL
+            """
+        )
+        _logger.info(
+            "[ADV_DEPOSIT] Backfilled deposit_pos_session_id on %s advance order(s)",
+            self.env.cr.rowcount,
+        )
 
     name = fields.Char(string="Reference", required=True, readonly=True, default="New")
     state = fields.Selection(
