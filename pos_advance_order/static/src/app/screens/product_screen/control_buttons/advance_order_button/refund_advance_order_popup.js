@@ -5,6 +5,7 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { formatCurrency } from "@web/core/currency";
+import { getAdvanceEligiblePaymentMethods } from "./advance_order_form_popup";
 
 export class RefundAdvanceOrderPopup extends Component {
     static template = "pos_advance_order.RefundAdvanceOrderPopup";
@@ -19,12 +20,16 @@ export class RefundAdvanceOrderPopup extends Component {
     setup() {
         this.orm = useService("orm");
         this.notification = useService("notification");
+        const paymentMethods = getAdvanceEligiblePaymentMethods(this.props.pos);
+        const defaultPmId = paymentMethods.length ? paymentMethods[0].id : null;
 
         this.state = useState({
             loading: true,
             search: "",
             selected_order_id: null,
             advance_orders: [],
+            payment_methods: paymentMethods,
+            selected_payment_method_id: defaultPmId,
         });
 
         onMounted(async () => {
@@ -67,6 +72,10 @@ export class RefundAdvanceOrderPopup extends Component {
         return this._tr("Type customer name or phone...", "اكتب اسم العميل أو رقم الهاتف...");
     }
 
+    get paymentMethodLabel() {
+        return this._tr("Refund payment method", "طريقة دفع الاسترداد");
+    }
+
     get colAdvanceLabel() {
         return this._tr("Advance", "العربون");
     }
@@ -106,6 +115,13 @@ export class RefundAdvanceOrderPopup extends Component {
         return this._tr("Refund", "استرداد");
     }
 
+    get noEligiblePaymentMethodsText() {
+        return this._tr(
+            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration.",
+            "لا توجد طرق دفع متاحة على نقطة البيع هذه. أضف طرق دفع نقدية أو بنكية يدوية بدون تكامل طرف أو QR في إعدادات نقطة البيع."
+        );
+    }
+
     get selectedRefundAmountFmt() {
         const currencyId = this.props.pos?.currency?.id;
         const sel = this.state.advance_orders.find((o) => o.id === this.state.selected_order_id);
@@ -115,9 +131,37 @@ export class RefundAdvanceOrderPopup extends Component {
 
     get refundHintText() {
         return this._tr(
-            "The deposit will be returned using the original payment method. The order will be cancelled.",
-            "سيتم إرجاع العربون بنفس طريقة الدفع الأصلية وسيتم إلغاء الطلب."
+            "The deposit will be returned from the selected payment method. The order will be cancelled.",
+            "سيتم إرجاع العربون من طريقة الدفع المختارة وسيتم إلغاء الطلب."
         );
+    }
+
+    paymentMethodIconSrc(pm) {
+        if (!pm) {
+            return "";
+        }
+        if (pm.image) {
+            return `/web/image/pos.payment.method/${pm.id}/image`;
+        }
+        if (pm.type === "cash") {
+            return "/point_of_sale/static/src/img/money.png";
+        }
+        return "/point_of_sale/static/src/img/card-bank.png";
+    }
+
+    isPaymentSelected(pm) {
+        return pm.id === this.state.selected_payment_method_id;
+    }
+
+    paymentMethodRowClass(pm) {
+        const selected = this.isPaymentSelected(pm);
+        return (
+            `button paymentmethod btn btn-secondary btn-lg lh-lg d-flex justify-content-between align-items-center flex-fill text-start ${selected ? "border border-3 border-primary" : "opacity-75"}`
+        );
+    }
+
+    selectPaymentMethod(pm) {
+        this.state.selected_payment_method_id = pm.id;
     }
 
     async _loadAdvanceOrders() {
@@ -199,6 +243,11 @@ export class RefundAdvanceOrderPopup extends Component {
 
     selectOrder(orderId) {
         this.state.selected_order_id = orderId;
+        const order = this.state.advance_orders.find((o) => o.id === orderId);
+        const origPmId = order?.pos_payment_method_id?.[0];
+        if (origPmId && this.state.payment_methods.some((pm) => pm.id === origPmId)) {
+            this.state.selected_payment_method_id = origPmId;
+        }
     }
 
     confirm() {
@@ -209,11 +258,22 @@ export class RefundAdvanceOrderPopup extends Component {
             );
             return;
         }
+        if (!this.state.selected_payment_method_id) {
+            this.notification.add(
+                this._tr("Please select a payment method.", "يرجى اختيار طريقة دفع."),
+                { type: "warning" }
+            );
+            return;
+        }
         const selected = this.state.advance_orders.find((o) => o.id === this.state.selected_order_id);
+        const selectedPm = this.state.payment_methods.find(
+            (pm) => pm.id === this.state.selected_payment_method_id
+        );
         this.props.getPayload({
             advance_order_id: this.state.selected_order_id,
             advance_amount: Number(selected?.advance_amount ?? 0),
-            payment_method_name: selected?.payment_method_name || "",
+            payment_method_id: this.state.selected_payment_method_id,
+            payment_method_name: selectedPm?.name || selected?.payment_method_name || "",
             partner_name: selected?.partner_id?.[1] || "",
             partner_phone: selected?.partner_phone || "",
             reference: selected?.name || "",

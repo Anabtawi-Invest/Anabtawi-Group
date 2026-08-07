@@ -10,6 +10,7 @@ from odoo.tools import float_compare, float_is_zero
 _logger = logging.getLogger(__name__)
 
 _ADV_DEPOSIT_MSG_RE = re.compile(r"ADV_DEPOSIT:(\d+)")
+_ADV_REFUND_MSG_RE = re.compile(r"ADV_REFUND:(\d+):(\d+):([\d.]+)")
 
 
 class PosSession(models.Model):
@@ -29,7 +30,11 @@ class PosSession(models.Model):
             if not session.config_id.enable_advance_order:
                 continue
             deposited_summary = session._get_deposited_advance_summary()
-            extra_cash = deposited_summary.get("cash") or 0.0
+            refunded_summary = session._get_refunded_advance_summary()
+            extra_cash = session.currency_id.round(
+                (deposited_summary.get("cash") or 0.0)
+                - (refunded_summary.get("cash") or 0.0)
+            )
             if session.currency_id.is_zero(extra_cash):
                 continue
             before_end = session.cash_register_balance_end or 0.0
@@ -317,6 +322,81 @@ class PosSession(models.Model):
         )
         return summary
 
+    def _get_refunded_advance_summary(self):
+        """Split advance refunds registered on this session by payment method (closing register)."""
+        self.ensure_one()
+        summary = {
+            "cash": 0.0,
+            "bank": 0.0,
+            "cash_count": 0,
+            "bank_count": 0,
+            "by_payment_method": {},
+        }
+        messages = self.env["mail.message"].sudo().search(
+            [
+                ("model", "=", "pos.session"),
+                ("res_id", "=", self.id),
+                ("body", "ilike", "ADV_REFUND:"),
+            ],
+            order="id desc",
+        )
+        if not messages:
+            return summary
+
+        currency = self.currency_id
+        cash_total = 0.0
+        bank_total = 0.0
+        cash_count = 0
+        bank_count = 0
+        seen_markers = set()
+        for message in messages:
+            body = message.body or ""
+            for advance_id, pm_id_str, amount_str in _ADV_REFUND_MSG_RE.findall(body):
+                marker = f"{advance_id}:{pm_id_str}:{amount_str}"
+                if marker in seen_markers:
+                    continue
+                seen_markers.add(marker)
+                amount = currency.round(float(amount_str))
+                if currency.is_zero(amount):
+                    continue
+                pm_id = int(pm_id_str)
+                pm = self.env["pos.payment.method"].browse(pm_id)
+                is_cash = pm and pm.type == "cash"
+                pm_key = pm.id if pm else False
+                pm_bucket = summary["by_payment_method"].setdefault(
+                    pm_key,
+                    {
+                        "amount": 0.0,
+                        "count": 0,
+                        "type": pm.type if pm else "bank",
+                    },
+                )
+                pm_bucket["amount"] += amount
+                pm_bucket["count"] += 1
+                if is_cash:
+                    cash_total += amount
+                    cash_count += 1
+                else:
+                    bank_total += amount
+                    bank_count += 1
+
+        summary["cash"] = currency.round(cash_total)
+        summary["bank"] = currency.round(bank_total)
+        summary["cash_count"] = cash_count
+        summary["bank_count"] = bank_count
+        for bucket in summary["by_payment_method"].values():
+            bucket["amount"] = currency.round(bucket["amount"])
+        _logger.info(
+            "[ADV_TRACE] session=%s(%s) refund_summary cash=%s bank=%s count=%s by_pm=%s",
+            self.name,
+            self.id,
+            summary["cash"],
+            summary["bank"],
+            summary["cash_count"] + summary["bank_count"],
+            summary["by_payment_method"],
+        )
+        return summary
+
     def get_closing_control_data(self):
         """Keep reclassification logic and only change advance presentation in closing UI."""
         self.ensure_one()
@@ -335,22 +415,34 @@ class PosSession(models.Model):
         cfg = self.config_id
 
         deposited_summary = self._get_deposited_advance_summary()
+        refunded_summary = self._get_refunded_advance_summary()
         deposit_cash = deposited_summary["cash"]
         deposit_bank = deposited_summary["bank"]
+        refund_cash = refunded_summary["cash"]
+        refund_bank = refunded_summary["bank"]
         deposit_total = self.currency_id.round(deposit_cash + deposit_bank)
+        refund_total = self.currency_id.round(refund_cash + refund_bank)
         has_deposits = not float_is_zero(
             deposit_total, precision_rounding=self.currency_id.rounding
         )
+        has_refunds = not float_is_zero(
+            refund_total, precision_rounding=self.currency_id.rounding
+        )
         _logger.info(
-            "[ADV_TRACE] session=%s(%s) has_deposits=%s total=%s cash=%s bank=%s",
+            "[ADV_TRACE] session=%s(%s) has_deposits=%s deposit_total=%s cash=%s bank=%s "
+            "has_refunds=%s refund_total=%s refund_cash=%s refund_bank=%s",
             self.name,
             self.id,
             has_deposits,
             deposit_total,
             deposit_cash,
             deposit_bank,
+            has_refunds,
+            refund_total,
+            refund_cash,
+            refund_bank,
         )
-        if not cfg.enable_advance_order and not has_deposits:
+        if not cfg.enable_advance_order and not has_deposits and not has_refunds:
             _logger.info(
                 "[ADV_TRACE] session=%s(%s) SKIP advance UI (enable_advance_order=False, no deposits)",
                 self.name,
@@ -399,10 +491,12 @@ class PosSession(models.Model):
         non_cash = list(data.get("non_cash_payment_methods") or [])
         if default_cash:
             default_cash["advance_deposit_amount"] = 0.0
+            default_cash["advance_refund_amount"] = 0.0
             default_cash["advance_applied_amount"] = 0.0
             default_cash["advance_payment_amount"] = 0.0
         for row in non_cash:
             row["advance_deposit_amount"] = 0.0
+            row["advance_refund_amount"] = 0.0
             row["advance_applied_amount"] = 0.0
             row["advance_payment_amount"] = 0.0
 
@@ -466,6 +560,45 @@ class PosSession(models.Model):
             target_row["amount"] = self.currency_id.round(
                 (target_row.get("amount") or 0.0) + deposit_amount
             )
+            target_row["payment_amount"] = self.currency_id.round(
+                (target_row.get("payment_amount") or 0.0) + deposit_amount
+            )
+
+        refunded_by_pm = refunded_summary.get("by_payment_method", {})
+        if default_cash and not float_is_zero(refund_cash, precision_rounding=rounding):
+            default_cash["advance_refund_amount"] = self.currency_id.round(refund_cash)
+            default_cash["amount"] = self.currency_id.round(
+                (default_cash.get("amount") or 0.0) - refund_cash
+            )
+            default_cash["payment_amount"] = self.currency_id.round(
+                (default_cash.get("payment_amount") or 0.0) - refund_cash
+            )
+
+        for pm_id, bucket in refunded_by_pm.items():
+            refund_amount = self.currency_id.round(bucket.get("amount") or 0.0)
+            if float_is_zero(refund_amount, precision_rounding=rounding):
+                continue
+            if bucket.get("type") == "cash":
+                continue
+
+            target_row = None
+            if pm_id and pm_id in non_cash_by_id:
+                target_row = non_cash_by_id[pm_id]
+            else:
+                target_row = bank_fallback_row
+
+            if not target_row:
+                continue
+
+            target_row["advance_refund_amount"] = self.currency_id.round(
+                (target_row.get("advance_refund_amount") or 0.0) + refund_amount
+            )
+            target_row["amount"] = self.currency_id.round(
+                (target_row.get("amount") or 0.0) - refund_amount
+            )
+            target_row["payment_amount"] = self.currency_id.round(
+                (target_row.get("payment_amount") or 0.0) - refund_amount
+            )
 
         non_cash = [
             row
@@ -473,11 +606,15 @@ class PosSession(models.Model):
             if (
                 not float_is_zero(row.get("amount") or 0.0, precision_rounding=rounding)
                 or not float_is_zero(row.get("advance_deposit_amount") or 0.0, precision_rounding=rounding)
+                or not float_is_zero(row.get("advance_refund_amount") or 0.0, precision_rounding=rounding)
             )
         ]
 
         deposit_count = (deposited_summary.get("cash_count") or 0) + (
             deposited_summary.get("bank_count") or 0
+        )
+        refund_count = (refunded_summary.get("cash_count") or 0) + (
+            refunded_summary.get("bank_count") or 0
         )
         data["advance_deposit_details"] = {
             "cash_amount": deposit_cash,
@@ -485,16 +622,23 @@ class PosSession(models.Model):
             "total_amount": deposit_total,
             "count": deposit_count,
         }
+        data["advance_refund_details"] = {
+            "cash_amount": refund_cash,
+            "bank_amount": refund_bank,
+            "total_amount": refund_total,
+            "count": refund_count,
+        }
 
         data["default_cash_details"] = default_cash or data.get("default_cash_details")
         data["non_cash_payment_methods"] = non_cash
         _logger.info(
-            "[ADV_CLOSING] session=%s(%s) default_cash=%s non_cash_rows=%s advance_deposit_details=%s",
+            "[ADV_CLOSING] session=%s(%s) default_cash=%s non_cash_rows=%s advance_deposit_details=%s advance_refund_details=%s",
             self.name,
             self.id,
             data.get("default_cash_details"),
             data.get("non_cash_payment_methods"),
             data.get("advance_deposit_details"),
+            data.get("advance_refund_details"),
         )
         return data
 

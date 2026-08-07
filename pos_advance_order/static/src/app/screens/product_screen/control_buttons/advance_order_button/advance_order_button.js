@@ -332,6 +332,8 @@ patch(ControlButtons.prototype, {
                 [[popupPayload.advance_order_id]],
                 {
                     pos_config_id: this.pos.config.id,
+                    pos_payment_method_id: popupPayload.payment_method_id,
+                    refund_pos_session_id: this.pos.session?.id,
                 }
             );
             this.notification.add(
