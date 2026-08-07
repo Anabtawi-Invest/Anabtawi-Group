@@ -9,6 +9,8 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
+PORTAL_ATTENDANCE_LOCK_MINUTES = 2
+
 
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
@@ -34,7 +36,7 @@ class HrEmployee(models.Model):
              "of any of these work locations (each location uses its own lat/lon/radius).",
     )
 
-    def _acquire_portal_attendance_action_lock(self, lock_minutes=10):
+    def _acquire_portal_attendance_action_lock(self, lock_minutes=PORTAL_ATTENDANCE_LOCK_MINUTES):
         self.ensure_one()
         _logger.info(
             "portal_check_in lock acquire requested: employee_id=%s lock_minutes=%s",
@@ -69,8 +71,8 @@ class HrEmployee(models.Model):
             )
             raise UserError(
                 _(
-                    "Attendance action already submitted. Please wait 10 minutes before trying again."
-                )
+                    "Attendance action already submitted. Please wait %(minutes)s minutes before trying again."
+                ) % {'minutes': lock_minutes}
             )
         new_lock_until = now + timedelta(minutes=lock_minutes)
         self.write({'portal_attendance_lock_until': new_lock_until})

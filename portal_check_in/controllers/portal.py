@@ -295,7 +295,7 @@ class PortalCheckInController(http.Controller):
                 current_path,
                 employee.portal_attendance_lock_until,
             )
-            employee._acquire_portal_attendance_action_lock(lock_minutes=10)
+            employee._acquire_portal_attendance_action_lock()
             lock_acquired = True
             employee.invalidate_recordset(['portal_attendance_lock_until'])
             _logger.info(
