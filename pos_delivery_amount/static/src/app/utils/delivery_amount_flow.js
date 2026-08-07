@@ -22,7 +22,14 @@ export async function fetchDeliveryAmountPopupData(pos) {
     return pos.data.call("pos.session", "get_delivery_amount_popup_data", [pos.session.id]);
 }
 
-export async function askDeliveryAmount(dialog, { maxAmount, deliveredTotal = 0 }) {
+export async function fetchClosingDeliveryPopupData(pos) {
+    return pos.data.call("pos.session", "get_closing_delivery_popup_data", [pos.session.id]);
+}
+
+export async function askDeliveryAmount(
+    dialog,
+    { maxAmount, deliveredTotal = 0, title = _t("Cash Delivery"), fieldLabel = _t("Delivery Amount") }
+) {
     const deliveredLabel = deliveredTotal
         ? _t("Available Cash (already delivered: %s)", deliveredTotal)
         : _t("Available Cash");
@@ -31,8 +38,8 @@ export async function askDeliveryAmount(dialog, { maxAmount, deliveredTotal = 0 
         const result = await makeAwaitable(dialog, DeliveryAmountPopup, {
             defaultAmount: 0,
             maxAmount,
-            title: _t("Cash Delivery"),
-            fieldLabel: _t("Delivery Amount"),
+            title,
+            fieldLabel,
             maxLabel: deliveredLabel,
         });
 
@@ -85,6 +92,25 @@ export async function processDeliveryAmount(pos, dialog, amount) {
         }
         await makeAwaitable(dialog, AlertDialog, {
             title: _t("Cash Delivery"),
+            body: extractDeliveryAmountErrorMessage(error),
+        });
+        return null;
+    }
+}
+
+export async function processClosingDeliveryAmount(pos, dialog, amount) {
+    try {
+        return await pos.data.call(
+            "pos.session",
+            "action_process_closing_delivery_amount",
+            [pos.session.id, amount]
+        );
+    } catch (error) {
+        if (error instanceof ConnectionLostError) {
+            throw error;
+        }
+        await makeAwaitable(dialog, AlertDialog, {
+            title: _t("Closing Delivery Amount"),
             body: extractDeliveryAmountErrorMessage(error),
         });
         return null;

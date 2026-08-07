@@ -6,8 +6,8 @@ import { ConnectionLostError } from "@web/core/network/rpc";
 import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
 import {
     askDeliveryAmount,
-    fetchDeliveryAmountPopupData,
-    processDeliveryAmount,
+    fetchClosingDeliveryPopupData,
+    processClosingDeliveryAmount,
 } from "@pos_delivery_amount/app/utils/delivery_amount_flow";
 
 patch(ClosePosPopup.prototype, {
@@ -52,15 +52,16 @@ patch(ClosePosPopup.prototype, {
 
         let popupData = { configured: false, max_amount: 0, delivered_total: 0 };
         try {
-            popupData = await fetchDeliveryAmountPopupData(this.pos);
+            popupData = await fetchClosingDeliveryPopupData(this.pos);
         } catch (error) {
-            console.warn("[pos_delivery_amount] Could not load delivery popup data.", error);
+            console.warn("[pos_delivery_amount] Could not load closing delivery popup data.", error);
         }
 
         if (popupData.configured) {
             const deliveryAmount = await askDeliveryAmount(this.dialog, {
                 maxAmount: popupData.max_amount,
                 deliveredTotal: popupData.delivered_total,
+                title: _t("Closing Delivery Amount"),
             });
             if (deliveryAmount === undefined) {
                 return;
@@ -68,7 +69,7 @@ patch(ClosePosPopup.prototype, {
 
             await this._waitForDialogRenderCycle();
 
-            const deliveryResponse = await processDeliveryAmount(
+            const deliveryResponse = await processClosingDeliveryAmount(
                 this.pos,
                 this.dialog,
                 deliveryAmount

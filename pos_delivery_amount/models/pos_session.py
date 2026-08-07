@@ -40,12 +40,6 @@ class PosSession(models.Model):
         readonly=True,
         copy=False,
     )
-    closing_cash_details_posted = fields.Boolean(
-        string="Closing Cash Count Posted",
-        readonly=True,
-        copy=False,
-        help="Set when the cashier submits the closing cash count, before Cash Delivery at session end.",
-    )
 
     @api.depends(
         "payment_method_ids",
@@ -54,12 +48,13 @@ class PosSession(models.Model):
         "cash_register_balance_end_real",
         "statement_line_ids.amount",
         "delivery_line_ids.amount",
+        "delivery_line_ids.is_closing_delivery",
     )
     def _compute_cash_balance(self):
-        """Subtract delivered cash from theoretical balance (matches closing popup)."""
+        """Subtract in-session deliveries only; closing deliveries are accounting-only."""
         super()._compute_cash_balance()
         for session in self:
-            delivered = session._get_delivered_total()
+            delivered = session._get_session_delivered_total()
             if session.currency_id.is_zero(delivered):
                 continue
             session.cash_register_balance_end = session.currency_id.round(
@@ -127,46 +122,35 @@ class PosSession(models.Model):
         opening_date = fields.Date.to_string(fields.Date.to_date(self.start_at)) if self.start_at else ""
         return _("Deliver Amount From %(pos)s - %(opening)s", pos=self.config_id.name, opening=opening_date)
 
+    def _get_session_delivery_lines(self):
+        self.ensure_one()
+        return self.delivery_line_ids.filtered(lambda line: not line.is_closing_delivery)
+
+    def _get_closing_delivery_lines(self):
+        self.ensure_one()
+        return self.delivery_line_ids.filtered("is_closing_delivery")
+
+    def _get_session_delivered_total(self):
+        self.ensure_one()
+        return sum(self._get_session_delivery_lines().mapped("amount"))
+
+    def _get_closing_delivered_total(self):
+        self.ensure_one()
+        return sum(self._get_closing_delivery_lines().mapped("amount"))
+
     def _get_delivered_total(self):
         self.ensure_one()
         return sum(self.delivery_line_ids.mapped("amount"))
 
-    def _get_cash_balance_for_delivery(self):
-        self.ensure_one()
-        if self.state in ("closing_control", "closed"):
-            return self.cash_register_balance_end_real or 0.0
-        return self.cash_register_balance_end or 0.0
-
     def _get_available_cash_for_delivery(self):
         self.ensure_one()
-        if self.closing_cash_details_posted:
-            # Counted cash is reduced as each closing delivery is processed.
-            return max(0.0, self.currency_id.round(self.cash_register_balance_end_real or 0.0))
-        if self.state in ("closing_control", "closed"):
-            available = (self.cash_register_balance_end_real or 0.0) - self._get_delivered_total()
-        else:
-            # cash_register_balance_end already excludes delivered amounts
-            available = self.cash_register_balance_end or 0.0
-        return max(0.0, self.currency_id.round(available))
+        return max(0.0, self.currency_id.round(self.cash_register_balance_end or 0.0))
 
-    def _adjust_counted_cash_for_closing_delivery(self, amount):
-        """Reduce counted cash when delivery is taken out after the closing count."""
+    def _get_available_cash_for_closing_delivery(self):
         self.ensure_one()
-        if (
-            not self.closing_cash_details_posted
-            or not self.config_id.cash_control
-            or self.currency_id.is_zero(amount)
-        ):
-            return
-        self.cash_register_balance_end_real = self.currency_id.round(
-            (self.cash_register_balance_end_real or 0.0) - amount
-        )
-
-    def post_closing_cash_details(self, counted_cash):
-        result = super().post_closing_cash_details(counted_cash)
-        if result.get("successful"):
-            self.closing_cash_details_posted = True
-        return result
+        counted = self.cash_register_balance_end_real or 0.0
+        already_delivered = self._get_closing_delivered_total()
+        return max(0.0, self.currency_id.round(counted - already_delivered))
 
     def _validate_delivery_amount(self, amount):
         self.ensure_one()
@@ -182,10 +166,23 @@ class PosSession(models.Model):
                 self.id,
                 amount,
                 available_cash,
-                self._get_delivered_total(),
+                self._get_session_delivered_total(),
                 self.env.user.id,
             )
             raise ValidationError(_("Delivery Amount cannot exceed available cash balance."))
+
+        return available_cash
+
+    def _validate_closing_delivery_amount(self, amount):
+        self.ensure_one()
+        if amount is None:
+            raise ValidationError(_("Delivery Amount is required."))
+        if amount < 0:
+            raise ValidationError(_("Delivery Amount must be positive or zero."))
+
+        available_cash = self._get_available_cash_for_closing_delivery()
+        if self.currency_id.compare_amounts(amount, available_cash) > 0:
+            raise ValidationError(_("Delivery Amount cannot exceed counted cash balance."))
 
         return available_cash
 
@@ -243,6 +240,17 @@ class PosSession(models.Model):
         move._post()
         return move
 
+    def _create_delivery_line(self, amount, move, is_closing_delivery=False):
+        self.ensure_one()
+        return self.env["pos.session.delivery.line"].sudo().create(
+            {
+                "session_id": self.id,
+                "amount": amount,
+                "move_id": move.id,
+                "is_closing_delivery": is_closing_delivery,
+            }
+        )
+
     def _ensure_delivery_report_line(self):
         self.ensure_one()
         if not self.delivery_line_ids:
@@ -283,13 +291,25 @@ class PosSession(models.Model):
         return {
             "configured": configured,
             "max_amount": self._get_available_cash_for_delivery(),
-            "delivered_total": self._get_delivered_total(),
+            "delivered_total": self._get_session_delivered_total(),
+        }
+
+    def get_closing_delivery_popup_data(self):
+        self.ensure_one()
+        config = self.config_id
+        configured = bool(
+            config.delivery_journal_id and config.delivery_intermediate_account_id
+        )
+        return {
+            "configured": configured,
+            "max_amount": self._get_available_cash_for_closing_delivery(),
+            "delivered_total": self._get_closing_delivered_total(),
         }
 
     def _get_delivery_closing_moves(self):
         self.ensure_one()
         moves = []
-        for index, line in enumerate(self.delivery_line_ids.sorted("create_date"), start=1):
+        for index, line in enumerate(self._get_session_delivery_lines().sorted("create_date"), start=1):
             amount = line.amount or 0.0
             if self.currency_id.is_zero(amount):
                 continue
@@ -308,7 +328,7 @@ class PosSession(models.Model):
         if not data.get("default_cash_details"):
             return data
 
-        delivered_total = self._get_delivered_total()
+        delivered_total = self._get_session_delivered_total()
         delivery_moves = self._get_delivery_closing_moves()
         delivery_total = -delivered_total if not self.currency_id.is_zero(delivered_total) else 0.0
 
@@ -320,29 +340,8 @@ class PosSession(models.Model):
         data["default_cash_details"] = dc
         return data
 
-    def action_process_delivery_amount(self, amount):
+    def _post_delivery_success_message(self, amount, move):
         self.ensure_one()
-        if not self.env.user.has_group("point_of_sale.group_pos_user"):
-            raise AccessError(_("You do not have access to process delivery amount."))
-        if self.state == "closed":
-            raise UserError(_("This session is already closed."))
-
-        amount = float(amount or 0.0)
-        if self.currency_id.compare_amounts(amount, 0.0) == 0:
-            return {"successful": True}
-
-        self._validate_delivery_amount(amount)
-        move = self._create_delivery_move(amount)
-        self.env["pos.session.delivery.line"].sudo().create(
-            {
-                "session_id": self.id,
-                "amount": amount,
-                "move_id": move.id,
-            }
-        )
-        self._adjust_counted_cash_for_closing_delivery(amount)
-        self._ensure_delivery_report_line()
-
         timestamp = fields.Datetime.context_timestamp(self, fields.Datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
         amount_label = f"{self.currency_id.symbol or ''}{amount:.2f}"
         message = _(
@@ -359,4 +358,41 @@ class PosSession(models.Model):
             date=timestamp,
         )
         self.message_post(body=message)
+
+    def action_process_delivery_amount(self, amount):
+        """In-session cash delivery (تسليم النقد): affects available POS cash balance."""
+        self.ensure_one()
+        if not self.env.user.has_group("point_of_sale.group_pos_user"):
+            raise AccessError(_("You do not have access to process delivery amount."))
+        if self.state == "closed":
+            raise UserError(_("This session is already closed."))
+
+        amount = float(amount or 0.0)
+        if self.currency_id.compare_amounts(amount, 0.0) == 0:
+            return {"successful": True}
+
+        self._validate_delivery_amount(amount)
+        move = self._create_delivery_move(amount)
+        self._create_delivery_line(amount, move, is_closing_delivery=False)
+        self._ensure_delivery_report_line()
+        self._post_delivery_success_message(amount, move)
+        return {"successful": True}
+
+    def action_process_closing_delivery_amount(self, amount):
+        """Closing delivery after cash count: journal entry only, no cash register impact."""
+        self.ensure_one()
+        if not self.env.user.has_group("point_of_sale.group_pos_user"):
+            raise AccessError(_("You do not have access to process delivery amount."))
+        if self.state == "closed":
+            raise UserError(_("This session is already closed."))
+
+        amount = float(amount or 0.0)
+        if self.currency_id.compare_amounts(amount, 0.0) == 0:
+            return {"successful": True}
+
+        self._validate_closing_delivery_amount(amount)
+        move = self._create_delivery_move(amount)
+        self._create_delivery_line(amount, move, is_closing_delivery=True)
+        self._ensure_delivery_report_line()
+        self._post_delivery_success_message(amount, move)
         return {"successful": True}

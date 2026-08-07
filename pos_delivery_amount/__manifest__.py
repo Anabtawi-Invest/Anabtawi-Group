@@ -1,7 +1,7 @@
 {
     "name": "POS Delivery Amount",
     "summary": "Capture and post POS delivery amount at closing",
-    "version": "19.0.3.0.9",
+    "version": "19.0.3.1.0",
     "category": "Point of Sale",
     "author": "Anabtawi Group",
     "license": "LGPL-3",

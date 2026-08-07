@@ -31,3 +31,10 @@ class PosSessionDeliveryLine(models.Model):
         readonly=True,
         default=lambda self: self.env.user,
     )
+    is_closing_delivery = fields.Boolean(
+        string="At Session Closing",
+        readonly=True,
+        default=False,
+        help="Set when delivery is recorded after the closing cash count. "
+        "Does not affect POS cash register balance.",
+    )

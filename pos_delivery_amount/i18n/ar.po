@@ -108,6 +108,14 @@ msgid "Please configure the Differences between Delivery Amount and Real Amount 
 msgstr "يرجى إعداد حساب أمانات فائض/عجز صناديق الفروع في إعدادات نقطة البيع."
 
 #. module: pos_delivery_amount
+msgid "At Session Closing"
+msgstr "عند إغلاق الجلسة"
+
+#. module: pos_delivery_amount
+msgid "Closing Delivery Amount"
+msgstr "مبلغ التسليم عند الإغلاق"
+
+#. module: pos_delivery_amount
 msgid "Cash Delivery"
 msgstr "تسليم النقد"
 
