@@ -8,6 +8,15 @@
             <xpath expr="//field[@name='cash_register_balance_end_real']" position="after">
                 <field name="delivery_amount"/>
                 <field name="delivery_move_id" groups="account.group_account_readonly"/>
+                <field name="delivery_line_ids" groups="account.group_account_readonly">
+                    <list>
+                        <field name="amount" widget="monetary"/>
+                        <field name="is_closing_delivery"/>
+                        <field name="move_id"/>
+                        <field name="user_id"/>
+                        <field name="create_date"/>
+                    </list>
+                </field>
             </xpath>
         </field>
     </record>

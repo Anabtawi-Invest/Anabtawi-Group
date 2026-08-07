@@ -1,95 +1,31 @@
 /** @odoo-module **/
 
 import { _t } from "@web/core/l10n/translation";
-import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { patch } from "@web/core/utils/patch";
-import { ConnectionLostError, RPCError } from "@web/core/network/rpc";
-import { ask, makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
+import { ConnectionLostError } from "@web/core/network/rpc";
 import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
-import { DeliveryAmountPopup } from "@pos_delivery_amount/app/components/delivery_amount_popup/delivery_amount_popup";
+import {
+    askDeliveryAmount,
+    fetchClosingDeliveryPopupData,
+    processClosingDeliveryAmount,
+} from "@pos_delivery_amount/app/utils/delivery_amount_flow";
 
 patch(ClosePosPopup.prototype, {
-    _showDeliveryAmountError(message) {
-        this.dialog.add(AlertDialog, {
-            title: _t("Delivery Amount"),
-            body: message || _t("An error occurred while processing Delivery Amount."),
-        });
+    get deliveryMoveData() {
+        const moves = this.props.default_cash_details?.delivery_moves || [];
+        return {
+            total: this.props.default_cash_details?.delivery_total ?? 0,
+            moves: moves.map((move, index) => ({
+                id: move.id ?? index,
+                name: move.name,
+                amount: move.amount,
+            })),
+        };
     },
 
-    _extractDeliveryAmountErrorMessage(error) {
-        if (error instanceof RPCError) {
-            return (
-                error?.data?.arguments?.[0] ||
-                error?.data?.message ||
-                error?.message ||
-                _t("An error occurred while processing Delivery Amount.")
-            );
-        }
-        return error?.message || _t("An error occurred while processing Delivery Amount.");
-    },
-
-    async _waitForDialogRenderCycle() {
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-    },
-
-    async _askDeliveryAmount(countedCashBalance) {
-        while (true) {
-            const result = await makeAwaitable(this.dialog, DeliveryAmountPopup, {
-                defaultAmount: 0,
-                maxAmount: countedCashBalance,
-                title: _t("Delivery Amount"),
-                fieldLabel: _t("Delivery Amount"),
-            });
-
-            if (result === undefined) {
-                console.info("[pos_delivery_amount] Delivery amount entry canceled by user.");
-                return undefined;
-            }
-
-            if (result < 0) {
-                console.warn("[pos_delivery_amount] Invalid negative delivery amount.", { result });
-                await makeAwaitable(this.dialog, AlertDialog, {
-                    title: _t("Delivery Amount"),
-                    body: _t("Delivery Amount must be positive or zero."),
-                });
-                continue;
-            }
-
-            if (result > countedCashBalance) {
-                console.warn("[pos_delivery_amount] Delivery amount exceeds counted cash in popup validation.", {
-                    result,
-                    countedCashBalance,
-                });
-                await makeAwaitable(this.dialog, AlertDialog, {
-                    title: _t("Delivery Amount"),
-                    body: _t("Delivery Amount cannot exceed counted cash balance."),
-                });
-                continue;
-            }
-
-            if (this.pos.currency.isZero(result)) {
-                const proceed = await ask(this.dialog, {
-                    title: _t("Delivery Amount"),
-                    body: _t("Are you sure the Delivery Amount is zero?"),
-                    confirmLabel: _t("Yes"),
-                    cancelLabel: _t("No"),
-                });
-                if (!proceed) {
-                    continue;
-                }
-            }
-
-            return result;
-        }
-    },
-
-    _getCountedCashBalance() {
-        if (!this.pos.config.cash_control || !this.props.default_cash_details?.id) {
-            return 0;
-        }
-        return this.env.utils.parseValidFloat(
-            this.state.payments[this.props.default_cash_details.id].counted
-        );
+    shouldShowCashDeliveryLine() {
+        const total = this.props.default_cash_details?.delivery_total ?? 0;
+        return !!(this.pos.currency && !this.pos.currency.isZero(total));
     },
 
     async closeSession() {
@@ -114,17 +50,37 @@ patch(ClosePosPopup.prototype, {
             }
         }
 
-        const countedCashBalance = this._getCountedCashBalance();
-        const deliveryAmount = await this._askDeliveryAmount(countedCashBalance);
-        if (deliveryAmount === undefined) {
-            return;
+        let popupData = { configured: false, max_amount: 0, delivered_total: 0 };
+        try {
+            popupData = await fetchClosingDeliveryPopupData(this.pos);
+        } catch (error) {
+            console.warn("[pos_delivery_amount] Could not load closing delivery popup data.", error);
         }
-        console.info("[pos_delivery_amount] Delivery amount confirmed from popup.", {
-            deliveryAmount,
-            countedCashBalance,
-            sessionId: this.pos.session.id,
-        });
-        await this._waitForDialogRenderCycle();
+
+        if (popupData.configured) {
+            const deliveryAmount = await askDeliveryAmount(this.dialog, {
+                maxAmount: popupData.max_amount,
+                deliveredTotal: popupData.delivered_total,
+                title: _t("Closing Delivery Amount"),
+            });
+            if (deliveryAmount === undefined) {
+                return;
+            }
+
+            await this._waitForDialogRenderCycle();
+
+            const deliveryResponse = await processClosingDeliveryAmount(
+                this.pos,
+                this.dialog,
+                deliveryAmount
+            );
+            if (deliveryResponse === null) {
+                return;
+            }
+            if (!deliveryResponse?.successful) {
+                return this.handleClosingError(deliveryResponse);
+            }
+        }
 
         try {
             await this.pos.data.call("pos.session", "update_closing_control_state_session", [
@@ -132,34 +88,9 @@ patch(ClosePosPopup.prototype, {
                 this.state.notes,
             ]);
         } catch (error) {
-            // Keep original close flow error behavior for rescue/manual closing fallback.
             if (!error.data && error.data.message !== "This session is already closed.") {
                 throw error;
             }
-        }
-
-        let deliveryResponse;
-        try {
-            console.info("[pos_delivery_amount] Calling backend action_process_delivery_amount.", {
-                sessionId: this.pos.session.id,
-                deliveryAmount,
-            });
-            deliveryResponse = await this.pos.data.call(
-                "pos.session",
-                "action_process_delivery_amount",
-                [this.pos.session.id, deliveryAmount]
-            );
-        } catch (error) {
-            if (error instanceof ConnectionLostError) {
-                console.error("[pos_delivery_amount] Connection lost while processing delivery amount.", error);
-                throw error;
-            }
-            console.error("[pos_delivery_amount] Backend validation/error in action_process_delivery_amount.", error);
-            this._showDeliveryAmountError(this._extractDeliveryAmountErrorMessage(error));
-            return;
-        }
-        if (!deliveryResponse?.successful) {
-            return this.handleClosingError(deliveryResponse);
         }
 
         try {
@@ -190,5 +121,18 @@ patch(ClosePosPopup.prototype, {
         } finally {
             localStorage.removeItem(`pos.session.${odoo.pos_config_id}`);
         }
+    },
+
+    async _waitForDialogRenderCycle() {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+    },
+
+    _getCountedCashBalance() {
+        if (!this.pos.config.cash_control || !this.props.default_cash_details?.id) {
+            return 0;
+        }
+        return this.env.utils.parseValidFloat(
+            this.state.payments[this.props.default_cash_details.id].counted
+        );
     },
 });
