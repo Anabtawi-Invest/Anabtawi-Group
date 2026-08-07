@@ -49,42 +49,71 @@ class PosSession(models.Model):
             )
 
     def _advance_orders_deposited_in_session(self):
-        """Advance orders whose deposit move was posted during this POS session window."""
+        """Advance orders whose deposit belongs to this POS session."""
         self.ensure_one()
         AdvanceOrder = self.env["pos.advance.order"].sudo()
         start = self.start_at or self.create_date
+        if self.start_at and self.create_date:
+            start = min(self.start_at, self.create_date)
         if not start:
             return AdvanceOrder.browse()
         end = self.stop_at or fields.Datetime.now()
         session_ref_pattern = f"%[pos_session_id:{self.id}]%"
         journal_ids = self.payment_method_ids.mapped("journal_id").ids or [0]
+        config_id = self.config_id.id
         self.env.cr.execute(
             """
-            SELECT ao.id
+            SELECT DISTINCT ao.id
               FROM pos_advance_order ao
               JOIN account_move am ON am.id = ao.advance_deposit_move_id
              WHERE ao.company_id = %s
                AND ao.state NOT IN ('draft', 'cancel')
                AND am.state = 'posted'
-               AND am.create_date >= %s
-               AND am.create_date <= %s
                AND (
-                    COALESCE(ao.from_pos_config_id, ao.pos_config_id) = %s
-                    OR am.ref LIKE %s
-                    OR am.journal_id = ANY(%s)
+                    am.ref LIKE %s
+                    OR (
+                        am.create_date >= %s
+                        AND am.create_date <= %s
+                        AND (
+                            COALESCE(ao.from_pos_config_id, ao.pos_config_id) = %s
+                            OR am.journal_id = ANY(%s)
+                        )
+                    )
+                    OR (
+                        ao.create_date >= %s
+                        AND ao.create_date <= %s
+                        AND COALESCE(ao.from_pos_config_id, ao.pos_config_id) = %s
+                    )
                )
             """,
             (
                 self.company_id.id,
+                session_ref_pattern,
                 start,
                 end,
-                self.config_id.id,
-                session_ref_pattern,
+                config_id,
                 journal_ids,
+                start,
+                end,
+                config_id,
             ),
         )
         deposited = AdvanceOrder.browse([row[0] for row in self.env.cr.fetchall()])
         if not deposited:
+            self.env.cr.execute(
+                """
+                SELECT ao.id, ao.name, ao.state, ao.create_date,
+                       am.id, am.create_date, am.ref
+                  FROM pos_advance_order ao
+                  LEFT JOIN account_move am ON am.id = ao.advance_deposit_move_id
+                 WHERE ao.company_id = %s
+                   AND ao.state NOT IN ('draft', 'cancel')
+                 ORDER BY ao.id DESC
+                 LIMIT 5
+                """,
+                (self.company_id.id,),
+            )
+            recent = self.env.cr.fetchall()
             self.env.cr.execute(
                 """
                 SELECT COUNT(*)
@@ -101,15 +130,16 @@ class PosSession(models.Model):
             window_count = self.env.cr.fetchone()[0]
             _logger.warning(
                 "[ADV_CLOSING] session=%s(%s) config=%s start=%s end=%s "
-                "window_deposits=%s journals=%s ref_pattern=%s",
+                "window_deposits=%s journals=%s ref_pattern=%s recent_advances=%s",
                 self.name,
                 self.id,
-                self.config_id.id,
+                config_id,
                 start,
                 end,
                 window_count,
                 journal_ids,
                 session_ref_pattern,
+                recent,
             )
         _logger.info(
             "[ADV_CLOSING] session=%s(%s) deposited_advances=%s",

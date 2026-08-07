@@ -136,7 +136,12 @@ class PosAdvanceOrderController(http.Controller):
         if discount_id:
             create_vals["discount_id"] = int(discount_id)
 
-        order = request.env["pos.advance.order"].sudo().create(create_vals)
+        deposit_ctx = {}
+        if deposit_session:
+            deposit_ctx["pos_advance_deposit_session_id"] = deposit_session.id
+
+        AdvanceOrder = request.env["pos.advance.order"].sudo().with_context(**deposit_ctx)
+        order = AdvanceOrder.create(create_vals)
         order.action_confirm()
 
         if order.advance_amount > 0:

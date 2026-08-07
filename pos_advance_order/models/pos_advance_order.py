@@ -1174,15 +1174,19 @@ class PosAdvanceOrder(models.Model):
         )
 
         tendered_amount = self.amount_tendered or self.advance_amount
-        deposit_session = self.env["pos.session"].sudo().search(
-            [
-                ("config_id", "=", self._get_advance_pos_config().id),
-                ("state", "in", ("opened", "closing_control")),
-                ("rescue", "=", False),
-            ],
-            order="id desc",
-            limit=1,
-        )
+        deposit_session = self.env["pos.session"].sudo().browse(
+            self.env.context.get("pos_advance_deposit_session_id") or 0
+        ).exists()
+        if not deposit_session:
+            deposit_session = self.env["pos.session"].sudo().search(
+                [
+                    ("config_id", "=", self._get_advance_pos_config().id),
+                    ("state", "in", ("opened", "closing_control")),
+                    ("rescue", "=", False),
+                ],
+                order="id desc",
+                limit=1,
+            )
         deposit_ref = _("Advance deposit - %s") % self.name
         if deposit_session:
             deposit_ref = _("%s [pos_session_id:%s]") % (deposit_ref, deposit_session.id)
