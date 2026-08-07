@@ -8,13 +8,13 @@ import { ControlButtons } from "@point_of_sale/app/screens/product_screen/contro
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { rpc } from "@web/core/network/rpc";
 import { AdvanceOrderFormPopup } from "./advance_order_form_popup";
-import { AdvanceOrderReceipt } from "./advance_order_receipt";
 import { CompleteAdvanceOrderPopup } from "./complete_advance_order_popup";
 import { RefundAdvanceOrderPopup } from "./refund_advance_order_popup";
 import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
 import {
     appendSiteServiceLineIfNeeded,
 } from "@pos_advance_order/js/site_service_utils";
+import { printAdvanceOrderReceipt } from "@pos_advance_order/js/advance_order_print";
 
 function toNumber(value, fallback = 0) {
     const num = Number(value);
@@ -27,6 +27,20 @@ patch(ControlButtons.prototype, {
         this.pos = usePos();
         this.orm = useService("orm");
         this.printer = useService("printer");
+        this.renderer = useService("renderer");
+    },
+
+    async _printAdvanceReceipt(receiptData) {
+        if (this.props.close) {
+            this.props.close();
+            await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+        return printAdvanceOrderReceipt({
+            printer: this.printer,
+            renderer: this.renderer,
+            receiptData,
+            printOptions: this.pos.printOptions,
+        });
     },
 
     /** Same breakpoints as POS `buttonClass`, but distinct hue for Advance vs default grey controls. */
@@ -127,6 +141,7 @@ patch(ControlButtons.prototype, {
 
     _buildAdvanceReceiptData({ result, partner, payload }) {
         const total = toNumber(result?.amount_total, 0);
+        const pledgeAmount = toNumber(result?.pledge_amount, 0);
         const advanceAmount = toNumber(result?.advance_amount, payload.advance_amount || 0);
         const amountTendered = toNumber(
             result?.amount_tendered,
@@ -135,6 +150,10 @@ patch(ControlButtons.prototype, {
         const changeDue = toNumber(
             result?.change_amount,
             Math.max(amountTendered - advanceAmount, 0)
+        );
+        const remainingAmount = toNumber(
+            result?.amount_remaining,
+            Math.max(total - advanceAmount, 0)
         );
         return {
             companyName: this.pos.company?.name || "",
@@ -146,10 +165,11 @@ patch(ControlButtons.prototype, {
             paymentMethod: payload.payment_method_name || payload.payment_method,
             currencyId: this.pos.currency?.id,
             total: total,
+            pledgeAmount: pledgeAmount,
             advanceAmount: advanceAmount,
             amountTendered: amountTendered,
             changeDue: changeDue,
-            remainingAmount: Math.max(total - advanceAmount, 0),
+            remainingAmount: remainingAmount,
             isRefund: false,
             lines: (payload.lines || []).map((line) => ({
                 product_id: line.product_id,
@@ -242,16 +262,21 @@ patch(ControlButtons.prototype, {
             const result = await rpc("/pos/create_advance_order", payload);
             this.notification.add(_t("Advance order created: %s", result?.name || ""), { type: "success" });
             try {
-                await this.printer.print(
-                    AdvanceOrderReceipt,
-                    {
-                        receipt: this._buildAdvanceReceiptData({ result, partner, payload }),
-                    },
-                    this.pos.printOptions
+                const printResult = await this._printAdvanceReceipt(
+                    this._buildAdvanceReceiptData({ result, partner, payload })
                 );
+                if (!printResult?.printed) {
+                    this.notification.add(_t("Advance order created but receipt printing failed."), {
+                        type: "warning",
+                    });
+                }
             } catch (printError) {
                 const printMessage =
-                    printError?.body || printError?.message || _t("Advance order created but receipt printing failed.");
+                    printError?.message === "POPUP_BLOCKED"
+                        ? _t("Please allow pop-ups to print the advance order receipt.")
+                        : printError?.body ||
+                          printError?.message ||
+                          _t("Advance order created but receipt printing failed.");
                 this.notification.add(printMessage, { type: "warning" });
             }
             // Reset the POS cart after successful advance creation.
@@ -313,18 +338,21 @@ patch(ControlButtons.prototype, {
                 { type: "success" }
             );
             try {
-                await this.printer.print(
-                    AdvanceOrderReceipt,
-                    {
-                        receipt: this._buildRefundReceiptData({ result, popupPayload }),
-                    },
-                    this.pos.printOptions
+                const printResult = await this._printAdvanceReceipt(
+                    this._buildRefundReceiptData({ result, popupPayload })
                 );
+                if (!printResult?.printed) {
+                    this.notification.add(_t("Advance refunded but receipt printing failed."), {
+                        type: "warning",
+                    });
+                }
             } catch (printError) {
                 const printMessage =
-                    printError?.body ||
-                    printError?.message ||
-                    _t("Advance refunded but receipt printing failed.");
+                    printError?.message === "POPUP_BLOCKED"
+                        ? _t("Please allow pop-ups to print the refund receipt.")
+                        : printError?.body ||
+                          printError?.message ||
+                          _t("Advance refunded but receipt printing failed.");
                 this.notification.add(printMessage, { type: "warning" });
             }
         } catch (error) {
