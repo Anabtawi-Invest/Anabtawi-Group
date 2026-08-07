@@ -1229,6 +1229,8 @@ class PosAdvanceOrder(models.Model):
         })
         move.action_post()
         self.advance_deposit_move_id = move.id
+        if deposit_session:
+            self._register_deposit_on_pos_session(deposit_session)
         # Legacy field retained: old flows used liability transfer move; reuse for invoice fallback.
         self.advance_liability_move_id = move.id
         _logger.info(
@@ -1239,6 +1241,27 @@ class PosAdvanceOrder(models.Model):
             deposit_ref,
         )
         return move
+
+    def _register_deposit_on_pos_session(self, session):
+        """Link this advance deposit to the open POS session (closing register, no extra DB columns)."""
+        self.ensure_one()
+        if not session or session.state not in ("opened", "closing_control"):
+            return
+        marker = f"ADV_DEPOSIT:{self.id}"
+        if session.message_ids.filtered(
+            lambda msg: msg.body and marker in (msg.body or "")
+        ):
+            return
+        session.message_post(
+            body=f"<p>{marker}</p>",
+            subtype_xmlid="mail.mt_note",
+        )
+        _logger.info(
+            "[ADV_DEPOSIT] Registered advance=%s on session=%s(%s)",
+            self.name,
+            session.name,
+            session.id,
+        )
 
     def _post_advance_completion_settlement_move(self):
         """After full POS settlement: Dr liability / Cr POS advance receivable for the prepaid amount."""

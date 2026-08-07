@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 import logging
+import re
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import float_compare, float_is_zero
 
 _logger = logging.getLogger(__name__)
+
+_ADV_DEPOSIT_MSG_RE = re.compile(r"ADV_DEPOSIT:(\d+)")
 
 
 class PosSession(models.Model):
@@ -48,15 +51,48 @@ class PosSession(models.Model):
                 session.cash_register_difference,
             )
 
+    def _advance_orders_from_session_messages(self):
+        """Advance orders explicitly registered on this session at deposit time."""
+        self.ensure_one()
+        advance_ids = []
+        for message in self.message_ids:
+            body = message.body or ""
+            advance_ids.extend(int(adv_id) for adv_id in _ADV_DEPOSIT_MSG_RE.findall(body))
+        if not advance_ids:
+            return self.env["pos.advance.order"].browse()
+        deposited = (
+            self.env["pos.advance.order"]
+            .sudo()
+            .browse(list(set(advance_ids)))
+            .exists()
+            .filtered(
+                lambda ao: (
+                    ao.company_id == self.company_id
+                    and ao.state not in ("draft", "cancel")
+                    and ao.advance_deposit_move_id
+                    and ao.advance_deposit_move_id.state == "posted"
+                )
+            )
+        )
+        if deposited:
+            _logger.info(
+                "[ADV_CLOSING] session=%s(%s) message_deposited=%s",
+                self.name,
+                self.id,
+                deposited.mapped("name"),
+            )
+        return deposited
+
     def _advance_orders_deposited_in_session(self):
         """Advance orders whose deposit belongs to this POS session."""
         self.ensure_one()
         AdvanceOrder = self.env["pos.advance.order"].sudo()
+        from_messages = self._advance_orders_from_session_messages()
         start = self.start_at or self.create_date
         if self.start_at and self.create_date:
             start = min(self.start_at, self.create_date)
         if not start:
-            return AdvanceOrder.browse()
+            return from_messages
         end = self.stop_at or fields.Datetime.now()
         session_ref_pattern = f"%[pos_session_id:{self.id}]%"
         journal_ids = self.payment_method_ids.mapped("journal_id").ids or [0]
@@ -98,7 +134,8 @@ class PosSession(models.Model):
                 config_id,
             ),
         )
-        deposited = AdvanceOrder.browse([row[0] for row in self.env.cr.fetchall()])
+        from_sql = AdvanceOrder.browse([row[0] for row in self.env.cr.fetchall()])
+        deposited = from_messages | from_sql
         if not deposited:
             self.env.cr.execute(
                 """
