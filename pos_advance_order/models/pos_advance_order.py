@@ -1177,6 +1177,7 @@ class PosAdvanceOrder(models.Model):
         deposit_session = self.env["pos.session"].sudo().browse(
             self.env.context.get("pos_advance_deposit_session_id") or 0
         ).exists()
+        ctx_session_id = self.env.context.get("pos_advance_deposit_session_id")
         if not deposit_session:
             deposit_session = self.env["pos.session"].sudo().search(
                 [
@@ -1187,6 +1188,17 @@ class PosAdvanceOrder(models.Model):
                 order="id desc",
                 limit=1,
             )
+        _logger.info(
+            "[ADV_TRACE] post_deposit advance=%s ctx_session=%s resolved_session=%s(%s) "
+            "state=%s from_pos=%s journal=%s",
+            self.name,
+            ctx_session_id,
+            deposit_session.name if deposit_session else False,
+            deposit_session.id if deposit_session else False,
+            deposit_session.state if deposit_session else False,
+            self.from_pos_config_id.id,
+            journal.id,
+        )
         deposit_ref = _("Advance deposit - %s") % self.name
         if deposit_session:
             deposit_ref = _("%s [pos_session_id:%s]") % (deposit_ref, deposit_session.id)
@@ -1231,6 +1243,11 @@ class PosAdvanceOrder(models.Model):
         self.advance_deposit_move_id = move.id
         if deposit_session:
             self._register_deposit_on_pos_session(deposit_session)
+        else:
+            _logger.warning(
+                "[ADV_TRACE] post_deposit advance=%s NO_SESSION for marker/ref registration",
+                self.name,
+            )
         # Legacy field retained: old flows used liability transfer move; reuse for invoice fallback.
         self.advance_liability_move_id = move.id
         _logger.info(
@@ -1245,22 +1262,49 @@ class PosAdvanceOrder(models.Model):
     def _register_deposit_on_pos_session(self, session):
         """Link this advance deposit to the open POS session (closing register, no extra DB columns)."""
         self.ensure_one()
-        if not session or session.state not in ("opened", "closing_control"):
+        if not session:
+            _logger.warning(
+                "[ADV_TRACE] register_deposit advance=%s skipped: no session",
+                self.name,
+            )
+            return
+        if session.state not in ("opened", "closing_control"):
+            _logger.warning(
+                "[ADV_TRACE] register_deposit advance=%s session=%s(%s) skipped: state=%s",
+                self.name,
+                session.name,
+                session.id,
+                session.state,
+            )
             return
         marker = f"ADV_DEPOSIT:{self.id}"
-        if session.message_ids.filtered(
-            lambda msg: msg.body and marker in (msg.body or "")
-        ):
+        existing = self.env["mail.message"].sudo().search_count(
+            [
+                ("model", "=", "pos.session"),
+                ("res_id", "=", session.id),
+                ("body", "ilike", marker),
+            ]
+        )
+        if existing:
+            _logger.info(
+                "[ADV_TRACE] register_deposit advance=%s session=%s(%s) already_registered count=%s",
+                self.name,
+                session.name,
+                session.id,
+                existing,
+            )
             return
-        session.message_post(
+        msg = session.message_post(
             body=f"<p>{marker}</p>",
             subtype_xmlid="mail.mt_note",
         )
         _logger.info(
-            "[ADV_DEPOSIT] Registered advance=%s on session=%s(%s)",
+            "[ADV_TRACE] register_deposit advance=%s session=%s(%s) message_id=%s marker=%s",
             self.name,
             session.name,
             session.id,
+            msg.id if msg else False,
+            marker,
         )
 
     def _post_advance_completion_settlement_move(self):

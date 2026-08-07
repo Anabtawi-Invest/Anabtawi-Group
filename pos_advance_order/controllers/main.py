@@ -2,6 +2,9 @@ from odoo import _, fields, http
 from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 from odoo.tools import float_compare, float_is_zero
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class PosAdvanceOrderController(http.Controller):
@@ -140,12 +143,37 @@ class PosAdvanceOrderController(http.Controller):
         if deposit_session:
             deposit_ctx["pos_advance_deposit_session_id"] = deposit_session.id
 
+        _logger.info(
+            "[ADV_TRACE] create_advance_order payload_session=%s resolved_session=%s(%s) "
+            "session_state=%s from_pos=%s picking_pos=%s pm=%s amount=%s ctx=%s",
+            deposit_pos_session_id,
+            deposit_session.name if deposit_session else False,
+            deposit_session.id if deposit_session else False,
+            deposit_session.state if deposit_session else False,
+            from_pos_config.id,
+            pos_config.id,
+            pm.id,
+            advance_amount,
+            deposit_ctx,
+        )
+
         AdvanceOrder = request.env["pos.advance.order"].sudo().with_context(**deposit_ctx)
         order = AdvanceOrder.create(create_vals)
         order.action_confirm()
 
         if order.advance_amount > 0:
             order.action_create_payment()
+
+        _logger.info(
+            "[ADV_TRACE] create_advance_order done advance=%s id=%s state=%s "
+            "deposit_move=%s move_ref=%s from_pos=%s",
+            order.name,
+            order.id,
+            order.state,
+            order.advance_deposit_move_id.id if order.advance_deposit_move_id else False,
+            order.advance_deposit_move_id.ref if order.advance_deposit_move_id else False,
+            order.from_pos_config_id.id,
+        )
 
         return {
             "id": order.id,

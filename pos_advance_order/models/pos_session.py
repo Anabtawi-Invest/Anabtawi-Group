@@ -54,33 +54,73 @@ class PosSession(models.Model):
     def _advance_orders_from_session_messages(self):
         """Advance orders explicitly registered on this session at deposit time."""
         self.ensure_one()
+        # sudo: POS users may not read internal session notes via message_ids
+        messages = self.env["mail.message"].sudo().search(
+            [
+                ("model", "=", "pos.session"),
+                ("res_id", "=", self.id),
+                ("body", "ilike", "ADV_DEPOSIT:"),
+            ],
+            order="id desc",
+        )
+        message_ids_raw = []
         advance_ids = []
-        for message in self.message_ids:
+        for message in messages:
             body = message.body or ""
-            advance_ids.extend(int(adv_id) for adv_id in _ADV_DEPOSIT_MSG_RE.findall(body))
+            found = [int(adv_id) for adv_id in _ADV_DEPOSIT_MSG_RE.findall(body)]
+            message_ids_raw.append(
+                {"msg_id": message.id, "body": body[:200], "advance_ids": found}
+            )
+            advance_ids.extend(found)
+
+        _logger.info(
+            "[ADV_TRACE] session=%s(%s) message_scan count=%s parsed=%s details=%s "
+            "message_ids_rel_count=%s",
+            self.name,
+            self.id,
+            len(messages),
+            advance_ids,
+            message_ids_raw,
+            len(self.message_ids),
+        )
+
         if not advance_ids:
             return self.env["pos.advance.order"].browse()
-        deposited = (
+
+        candidates = (
             self.env["pos.advance.order"]
             .sudo()
             .browse(list(set(advance_ids)))
             .exists()
-            .filtered(
-                lambda ao: (
-                    ao.company_id == self.company_id
-                    and ao.state not in ("draft", "cancel")
-                    and ao.advance_deposit_move_id
-                    and ao.advance_deposit_move_id.state == "posted"
-                )
-            )
         )
-        if deposited:
-            _logger.info(
-                "[ADV_CLOSING] session=%s(%s) message_deposited=%s",
-                self.name,
-                self.id,
-                deposited.mapped("name"),
-            )
+        deposited = self.env["pos.advance.order"].browse()
+        for ao in candidates:
+            reasons = []
+            if ao.company_id != self.company_id:
+                reasons.append(f"company_mismatch ao={ao.company_id.id} session={self.company_id.id}")
+            if ao.state in ("draft", "cancel"):
+                reasons.append(f"bad_state={ao.state}")
+            if not ao.advance_deposit_move_id:
+                reasons.append("no_deposit_move")
+            elif ao.advance_deposit_move_id.state != "posted":
+                reasons.append(f"move_state={ao.advance_deposit_move_id.state}")
+            if reasons:
+                _logger.warning(
+                    "[ADV_TRACE] session=%s rejected advance=%s(%s) reasons=%s",
+                    self.id,
+                    ao.name,
+                    ao.id,
+                    reasons,
+                )
+            else:
+                deposited |= ao
+
+        _logger.info(
+            "[ADV_TRACE] session=%s(%s) message_deposited=%s",
+            self.name,
+            self.id,
+            deposited.mapped("name"),
+        )
         return deposited
 
     def _advance_orders_deposited_in_session(self):
@@ -136,6 +176,21 @@ class PosSession(models.Model):
         )
         from_sql = AdvanceOrder.browse([row[0] for row in self.env.cr.fetchall()])
         deposited = from_messages | from_sql
+
+        _logger.info(
+            "[ADV_TRACE] session=%s(%s) deposit_lookup start=%s end=%s config=%s "
+            "from_messages=%s from_sql=%s journals=%s ref_pattern=%s",
+            self.name,
+            self.id,
+            start,
+            end,
+            config_id,
+            from_messages.ids,
+            from_sql.ids,
+            journal_ids,
+            session_ref_pattern,
+        )
+
         if not deposited:
             self.env.cr.execute(
                 """
@@ -166,7 +221,7 @@ class PosSession(models.Model):
             )
             window_count = self.env.cr.fetchone()[0]
             _logger.warning(
-                "[ADV_CLOSING] session=%s(%s) config=%s start=%s end=%s "
+                "[ADV_TRACE] session=%s(%s) NO_DEPOSITS config=%s start=%s end=%s "
                 "window_deposits=%s journals=%s ref_pattern=%s recent_advances=%s",
                 self.name,
                 self.id,
@@ -179,10 +234,11 @@ class PosSession(models.Model):
                 recent,
             )
         _logger.info(
-            "[ADV_CLOSING] session=%s(%s) deposited_advances=%s",
+            "[ADV_CLOSING] session=%s(%s) deposited_advances=%s ids=%s",
             self.name,
             self.id,
             deposited.mapped("name"),
+            deposited.ids,
         )
         return deposited
 
@@ -198,6 +254,11 @@ class PosSession(models.Model):
         }
         deposited = self._advance_orders_deposited_in_session()
         if not deposited:
+            _logger.info(
+                "[ADV_TRACE] session=%s(%s) summary_empty (no deposited advances)",
+                self.name,
+                self.id,
+            )
             return summary
         currency = self.currency_id
         cash_total = 0.0
@@ -235,12 +296,32 @@ class PosSession(models.Model):
         summary["bank_count"] = bank_count
         for bucket in summary["by_payment_method"].values():
             bucket["amount"] = currency.round(bucket["amount"])
+        _logger.info(
+            "[ADV_TRACE] session=%s(%s) summary cash=%s bank=%s count=%s by_pm=%s",
+            self.name,
+            self.id,
+            summary["cash"],
+            summary["bank"],
+            summary["cash_count"] + summary["bank_count"],
+            summary["by_payment_method"],
+        )
         return summary
 
     def get_closing_control_data(self):
         """Keep reclassification logic and only change advance presentation in closing UI."""
-        data = super().get_closing_control_data()
         self.ensure_one()
+        _logger.info(
+            "[ADV_TRACE] get_closing_control_data START session=%s(%s) state=%s config=%s "
+            "enable_advance_order=%s start_at=%s user=%s",
+            self.name,
+            self.id,
+            self.state,
+            self.config_id.id,
+            self.config_id.enable_advance_order,
+            self.start_at,
+            self.env.user.login,
+        )
+        data = super().get_closing_control_data()
         cfg = self.config_id
 
         deposited_summary = self._get_deposited_advance_summary()
@@ -250,7 +331,21 @@ class PosSession(models.Model):
         has_deposits = not float_is_zero(
             deposit_total, precision_rounding=self.currency_id.rounding
         )
+        _logger.info(
+            "[ADV_TRACE] session=%s(%s) has_deposits=%s total=%s cash=%s bank=%s",
+            self.name,
+            self.id,
+            has_deposits,
+            deposit_total,
+            deposit_cash,
+            deposit_bank,
+        )
         if not cfg.enable_advance_order and not has_deposits:
+            _logger.info(
+                "[ADV_TRACE] session=%s(%s) SKIP advance UI (enable_advance_order=False, no deposits)",
+                self.name,
+                self.id,
+            )
             return data
 
         deposited_by_pm = deposited_summary.get("by_payment_method", {})
