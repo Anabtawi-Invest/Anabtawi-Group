@@ -1,6 +1,6 @@
 {
     'name': 'planning Enhancement',
-    'version': '19.0.1.0.4',
+    'version': '19.0.1.0.5',
     'summary': 'Cover lateness using OT buckets then Annual Leave (hours) then remaining lateness for payroll deduction. No OT Bank.',
     'category': 'Human Resources/Payroll',
     "author":"Anabtawi",

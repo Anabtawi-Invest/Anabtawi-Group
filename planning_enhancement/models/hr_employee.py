@@ -9,6 +9,21 @@ _logger = logging.getLogger(__name__)
 class HrEmployee(models.Model):
     _inherit = "hr.employee"
 
+    def _planning_enhancement_can_read_contract_versions(self):
+        """Planning managers need contract versions for the Gantt but not HR module access."""
+        return (
+            not self.env.su
+            and not self.env.user.has_group('hr.group_hr_user')
+            and self.env.user.has_group('planning.group_planning_user')
+        )
+
+    def _get_versions_with_contract_overlap_with_period(self, date_from, date_to):
+        if self._planning_enhancement_can_read_contract_versions():
+            return super(HrEmployee, self.sudo())._get_versions_with_contract_overlap_with_period(
+                date_from, date_to,
+            )
+        return super()._get_versions_with_contract_overlap_with_period(date_from, date_to)
+
     def _attendance_action_change(self, geo_information=None):
         """Block check-in when current extra hours exceed the configured limit."""
         self.ensure_one()
