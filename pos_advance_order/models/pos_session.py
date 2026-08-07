@@ -49,26 +49,29 @@ class PosSession(models.Model):
             )
 
     def _advance_orders_deposited_in_session(self):
-        """Advance orders whose deposit entry was posted during this session window."""
+        """Advance orders whose deposit was collected during this POS session."""
         self.ensure_one()
-        advance_orders = self.env["pos.advance.order"].sudo()
-        if not self.start_at:
-            return advance_orders.browse()
-        end = self.stop_at or fields.Datetime.now()
-        deposited = advance_orders.browse()
-        domain = [
+        AdvanceOrder = self.env["pos.advance.order"].sudo()
+        base_domain = [
             ("company_id", "=", self.company_id.id),
             ("state", "not in", ("draft", "cancel")),
             ("advance_deposit_move_id.state", "=", "posted"),
         ]
-        for adv_order in advance_orders.search(domain):
+        deposited = AdvanceOrder.search(base_domain + [("deposit_pos_session_id", "=", self.id)])
+
+        if not self.start_at:
+            return deposited
+
+        end = self.stop_at or fields.Datetime.now()
+        legacy = AdvanceOrder.browse()
+        for adv_order in AdvanceOrder.search(base_domain + [("deposit_pos_session_id", "=", False)]):
             pay_cfg = adv_order.from_pos_config_id or adv_order.pos_config_id
             if pay_cfg != self.config_id:
                 continue
             move = adv_order.advance_deposit_move_id
             if move and self.start_at <= move.create_date <= end:
-                deposited |= adv_order
-        return deposited
+                legacy |= adv_order
+        return deposited | legacy
 
     def _get_deposited_advance_summary(self):
         """Split deposited advances by liquidity type for closing register display."""
@@ -168,8 +171,12 @@ class PosSession(models.Model):
         dc_id = default_cash.get("id")
         non_cash = list(data.get("non_cash_payment_methods") or [])
         if default_cash:
+            default_cash["advance_deposit_amount"] = 0.0
+            default_cash["advance_applied_amount"] = 0.0
             default_cash["advance_payment_amount"] = 0.0
         for row in non_cash:
+            row["advance_deposit_amount"] = 0.0
+            row["advance_applied_amount"] = 0.0
             row["advance_payment_amount"] = 0.0
 
         for pm_id, payload in reclassified_advance_by_pm.items():
@@ -177,14 +184,17 @@ class PosSession(models.Model):
             if float_is_zero(amt, precision_rounding=rounding):
                 continue
             if dc_id and pm_id == dc_id:
-                default_cash["advance_payment_amount"] = self.currency_id.round(
-                    (default_cash.get("advance_payment_amount") or 0.0) + amt
+                default_cash["advance_applied_amount"] = self.currency_id.round(
+                    (default_cash.get("advance_applied_amount") or 0.0) + amt
                 )
                 continue
             for row in non_cash:
                 if row.get("id") == pm_id:
                     row["amount"] = self.currency_id.round(row["amount"] - amt)
                     row["number"] = max(0, (row.get("number") or 0) - payload["number"])
+                    row["advance_applied_amount"] = self.currency_id.round(
+                        (row.get("advance_applied_amount") or 0.0) + amt
+                    )
                     break
         _logger.info(
             "[ADV_CLOSING] session=%s(%s) reclassified_by_pm=%s",
@@ -193,14 +203,14 @@ class PosSession(models.Model):
             {pm_id: self.currency_id.round(v["amount"]) for pm_id, v in reclassified_advance_by_pm.items()},
         )
 
-        # Merge deposited cash advances into default cash line (instead of synthetic row).
-        if (
-            default_cash
-            and not float_is_zero(deposit_cash, precision_rounding=rounding)
-        ):
-            default_cash["advance_payment_amount"] = self.currency_id.round(deposit_cash)
+        if default_cash and not float_is_zero(deposit_cash, precision_rounding=rounding):
+            default_cash["advance_deposit_amount"] = self.currency_id.round(deposit_cash)
+            default_cash["advance_payment_amount"] = default_cash["advance_deposit_amount"]
             default_cash["amount"] = self.currency_id.round(
                 (default_cash.get("amount") or 0.0) + deposit_cash
+            )
+            default_cash["payment_amount"] = self.currency_id.round(
+                (default_cash.get("payment_amount") or 0.0) + deposit_cash
             )
 
         non_cash_by_id = {row.get("id"): row for row in non_cash}
@@ -211,7 +221,6 @@ class PosSession(models.Model):
             if float_is_zero(deposit_amount, precision_rounding=rounding):
                 continue
             if bucket.get("type") == "cash":
-                # Cash deposits were already merged into default cash details.
                 continue
 
             target_row = None
@@ -223,12 +232,21 @@ class PosSession(models.Model):
             if not target_row:
                 continue
 
-            target_row["advance_payment_amount"] = self.currency_id.round(deposit_amount)
+            target_row["advance_deposit_amount"] = self.currency_id.round(
+                (target_row.get("advance_deposit_amount") or 0.0) + deposit_amount
+            )
+            target_row["advance_payment_amount"] = target_row["advance_deposit_amount"]
+            target_row["amount"] = self.currency_id.round(
+                (target_row.get("amount") or 0.0) + deposit_amount
+            )
 
         non_cash = [
             row
             for row in non_cash
-            if not float_is_zero(row.get("amount") or 0.0, precision_rounding=rounding)
+            if (
+                not float_is_zero(row.get("amount") or 0.0, precision_rounding=rounding)
+                or not float_is_zero(row.get("advance_deposit_amount") or 0.0, precision_rounding=rounding)
+            )
         ]
 
         data["default_cash_details"] = default_cash or data.get("default_cash_details")

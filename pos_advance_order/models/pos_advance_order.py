@@ -152,6 +152,14 @@ class PosAdvanceOrder(models.Model):
         string="From POS",
         help="POS used to register the advance (deposit). The first POS order/payment will be recorded in its currently opened session.",
     )
+    deposit_pos_session_id = fields.Many2one(
+        "pos.session",
+        string="Deposit POS Session",
+        readonly=True,
+        copy=False,
+        index=True,
+        help="POS session open when the advance deposit was collected (used for closing register display only).",
+    )
     advance_pos_order_id = fields.Many2one("pos.order", string="Advance POS Order", readonly=True, copy=False)
     remaining_pos_order_id = fields.Many2one("pos.order", string="Remaining POS Order", readonly=True, copy=False)
     pledge_pos_order_id = fields.Many2one("pos.order", string="Pledge POS Order", readonly=True, copy=False)
@@ -666,6 +674,27 @@ class PosAdvanceOrder(models.Model):
         )
         if not session:
             raise UserError(_("No opened POS session found for %s. Please open a session first.") % config.display_name)
+        return session
+
+    def _link_deposit_pos_session(self):
+        """Store the open From POS session when the deposit is collected (closing register only)."""
+        self.ensure_one()
+        if self.deposit_pos_session_id:
+            return self.deposit_pos_session_id
+        from_pos = self.from_pos_config_id or self.pos_config_id
+        if not from_pos:
+            return self.env["pos.session"]
+        session = self.env["pos.session"].sudo().search(
+            [
+                ("config_id", "=", from_pos.id),
+                ("state", "in", ("opened", "closing_control")),
+                ("rescue", "=", False),
+            ],
+            order="id desc",
+            limit=1,
+        )
+        if session:
+            self.deposit_pos_session_id = session.id
         return session
 
     def _get_pos_payment_method(self, session):
@@ -1213,6 +1242,7 @@ class PosAdvanceOrder(models.Model):
         })
         move.action_post()
         self.advance_deposit_move_id = move.id
+        self._link_deposit_pos_session()
         # Legacy field retained: old flows used liability transfer move; reuse for invoice fallback.
         self.advance_liability_move_id = move.id
         _logger.info(

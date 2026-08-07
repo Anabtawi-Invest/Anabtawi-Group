@@ -374,12 +374,12 @@ patch(ClosePosPopup.prototype, {
 
     shouldShowAdvanceCashLine() {
         const dc = this.props.default_cash_details || {};
-        const amt = dc.advance_payment_amount ?? 0;
+        const amt = dc.advance_deposit_amount ?? dc.advance_payment_amount ?? 0;
         return !!(amt && this.pos.currency && !this.pos.currency.isZero(amt));
     },
 
     shouldShowAdvanceBankLine(pm) {
-        const amt = pm?.advance_payment_amount ?? 0;
+        const amt = pm?.advance_deposit_amount ?? pm?.advance_payment_amount ?? 0;
         return !!(amt && this.pos.currency && !this.pos.currency.isZero(amt));
     },
 });
