@@ -28,6 +28,22 @@ export class EmployeeSelectionPopup extends Component {
         onMounted(() => this._loadEmployees());
     }
 
+    get title() {
+        return _t("Select Employee");
+    }
+
+    get searchPlaceholder() {
+        return _t("Search employee by name or job title...");
+    }
+
+    get cancelLabel() {
+        return _t("Cancel");
+    }
+
+    get noEmployeesFoundLabel() {
+        return _t("No employees found");
+    }
+
     async _loadEmployees() {
         console.log("[PLEDGE] Loading employees for popup...");
         try {

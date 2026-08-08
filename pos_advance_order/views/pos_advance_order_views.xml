@@ -70,14 +70,14 @@
                         string="Create Payment"
                         class="btn-primary"
                         groups="point_of_sale.group_pos_manager"
-                        invisible="state in ('cancel','fully_paid') or state != 'confirmed' or advance_pos_order_id or advance_amount &lt;= 0 or pos_config_enable_advance_order"
+                        invisible="state in ('cancel','fully_paid') or state != 'confirmed' or advance_payment_created or advance_amount &lt;= 0 or pos_config_enable_advance_order"
                     />
                     <button
                         name="action_print_receipt"
                         type="object"
                         string="Print Receipt"
                         class="btn-secondary"
-                        invisible="state in ('cancel','fully_paid') or not advance_pos_order_id or remaining_pos_order_id"
+                        invisible="state in ('cancel','fully_paid') or not advance_payment_created or remaining_pos_order_id"
                     />
                     <button
                         name="action_print_full_receipt"
@@ -100,21 +100,30 @@
                         string="Create Remaining Payment"
                         class="btn-primary"
                         groups="point_of_sale.group_pos_manager"
-                        invisible="state in ('cancel','fully_paid') or state != 'advance_paid' or not advance_pos_order_id or remaining_pos_order_id"
+                        invisible="state in ('cancel','fully_paid') or state != 'advance_paid' or not advance_payment_created or remaining_pos_order_id"
+                    />
+                    <button
+                        name="action_refund_advance_payment"
+                        type="object"
+                        string="Refund Advance"
+                        class="btn-warning"
+                        groups="point_of_sale.group_pos_manager"
+                        confirm="The advance deposit will be returned to the customer and this order will be cancelled. Continue?"
+                        invisible="state != 'advance_paid' or not advance_payment_created or remaining_pos_order_id or refund_advance_pos_order_id or advance_refund_move_id"
                     />
                     <button
                         name="action_set_to_draft"
                         type="object"
                         string="Set to Draft"
                         class="btn-secondary"
-                        invisible="state == 'draft' or state in ('cancel','fully_paid')"
+                        invisible="state == 'draft' or state in ('cancel','fully_paid','advance_paid')"
                     />
                     <button
                         name="action_cancel"
                         type="object"
                         string="Cancel"
                         class="btn-secondary"
-                        invisible="state in ('cancel','fully_paid')"
+                        invisible="state in ('cancel','fully_paid','advance_paid')"
                     />
                     <button
                         name="action_add_from_catalog"
@@ -151,8 +160,8 @@
                             <field name="from_pos_config_id" readonly="state != 'draft'"/>
                             <field name="pos_config_id" required="1" readonly="state != 'draft'"/>
                             <field name="pricelist_id" readonly="1"/>
-                            <field name="with_employee" readonly="state != 'draft'"/>
-                            <field name="employee_id" invisible="not with_employee" readonly="state != 'draft'"/>
+                            <field name="employee_id" readonly="state != 'draft'"/>
+                            <field name="site_service" readonly="state != 'draft'"/>
                             <field name="payment_progress" readonly="1"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
@@ -219,6 +228,9 @@
                         <field name="amount_remaining" widget="monetary" readonly="1"/>
                         <field name="from_pos_config_id" readonly="state != 'draft'"/>
                         <field name="advance_pos_order_id" readonly="1" invisible="not advance_pos_order_id"/>
+                        <field name="refund_advance_pos_order_id" readonly="1" invisible="not refund_advance_pos_order_id"/>
+                        <field name="advance_refund_move_id" readonly="1" groups="account.group_account_invoice" invisible="not advance_refund_move_id"/>
+                        <field name="advance_payment_created" invisible="1"/>
                         <field name="remaining_pos_order_id" readonly="1" invisible="not remaining_pos_order_id"/>
                         <field name="pledge_pos_order_id" readonly="1" invisible="not pledge_pos_order_id"/>
                         <field name="return_pledge_pos_order_id" readonly="1" invisible="not return_pledge_pos_order_id"/>

@@ -2,6 +2,9 @@ from odoo import _, fields, http
 from odoo.exceptions import UserError, ValidationError
 from odoo.http import request
 from odoo.tools import float_compare, float_is_zero
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class PosAdvanceOrderController(http.Controller):
@@ -32,8 +35,16 @@ class PosAdvanceOrderController(http.Controller):
         advance_amount = float(payload.get("advance_amount") or 0.0)
         amount_tendered = float(payload.get("amount_tendered") or 0.0)
         payment_method_id = payload.get("payment_method_id")
+        deposit_pos_session_id = payload.get("deposit_pos_session_id")
         employee_id = payload.get("employee_id")
         discount_id = payload.get("discount_id")
+        site_service = bool(payload.get("site_service"))
+        _logger.warning(
+            "[PLEDGE_CLOSING] create_advance_order request site_service=%s raw=%s partner_id=%s",
+            site_service,
+            payload.get("site_service"),
+            partner_id,
+        )
 
         if not partner_id:
             raise ValidationError("Customer is required.")
@@ -99,8 +110,48 @@ class PosAdvanceOrderController(http.Controller):
         pm = request.env["pos.payment.method"].sudo().browse(int(payment_method_id))
         self._validate_advance_payment_method(pm, from_pos_config)
 
+        deposit_session = request.env["pos.session"]
+        if deposit_pos_session_id:
+            deposit_session = (
+                request.env["pos.session"]
+                .sudo()
+                .browse(int(deposit_pos_session_id))
+                .exists()
+            )
+            if (
+                not deposit_session
+                or deposit_session.state not in ("opened", "closing_control")
+                or deposit_session.rescue
+            ):
+                deposit_session = request.env["pos.session"]
+            elif deposit_session.config_id != from_pos_config:
+                # Cashier is on this session; trust the active POS session over the form default.
+                from_pos_config = deposit_session.config_id
+
+        if not deposit_session:
+            deposit_session = (
+                request.env["pos.session"]
+                .sudo()
+                .search(
+                    [
+                        ("config_id", "=", from_pos_config.id),
+                        ("state", "in", ("opened", "closing_control")),
+                        ("rescue", "=", False),
+                    ],
+                    order="id desc",
+                    limit=1,
+                )
+            )
+
+        company = (
+            deposit_session.company_id
+            if deposit_session
+            else from_pos_config.company_id
+        )
+
         create_vals = {
             "partner_id": partner.id,
+            "company_id": company.id,
             "pos_config_id": pos_config.id,
             "from_pos_config_id": from_pos_config.id,
             "picking_date": fields.Datetime.now(),
@@ -109,25 +160,71 @@ class PosAdvanceOrderController(http.Controller):
             "amount_tendered": amount_tendered,
             "line_ids": line_vals,
         }
+        if site_service:
+            create_vals["site_service"] = True
         if employee_id:
             create_vals["employee_id"] = int(employee_id)
-            create_vals["with_employee"] = True
         if discount_id:
             create_vals["discount_id"] = int(discount_id)
 
-        order = request.env["pos.advance.order"].sudo().create(create_vals)
-        order.action_confirm()
+        deposit_ctx = {}
+        if deposit_session:
+            deposit_ctx["pos_advance_deposit_session_id"] = deposit_session.id
+
+        _logger.info(
+            "[ADV_TRACE] create_advance_order payload_session=%s resolved_session=%s(%s) "
+            "session_state=%s from_pos=%s picking_pos=%s pm=%s amount=%s company=%s ctx=%s",
+            deposit_pos_session_id,
+            deposit_session.name if deposit_session else False,
+            deposit_session.id if deposit_session else False,
+            deposit_session.state if deposit_session else False,
+            from_pos_config.id,
+            pos_config.id,
+            pm.id,
+            advance_amount,
+            company.id,
+            deposit_ctx,
+        )
+
+        AdvanceOrder = (
+            request.env["pos.advance.order"]
+            .sudo()
+            .with_context(**deposit_ctx, allowed_company_ids=company.ids)
+            .with_company(company)
+        )
+        order = AdvanceOrder.create(create_vals)
+        order.with_context(**deposit_ctx).action_confirm()
 
         if order.advance_amount > 0:
-            order.action_create_payment()
+            order.with_context(**deposit_ctx).action_create_payment(
+                deposit_pos_session_id=deposit_session.id if deposit_session else None,
+            )
+            if deposit_session and order.advance_deposit_move_id:
+                order._register_deposit_on_pos_session(deposit_session)
+
+        _logger.info(
+            "[ADV_TRACE] create_advance_order done advance=%s id=%s state=%s site_service=%s "
+            "deposit_move=%s move_ref=%s from_pos=%s company=%s pledge_lines=%s",
+            order.name,
+            order.id,
+            order.state,
+            order.site_service,
+            order.advance_deposit_move_id.id if order.advance_deposit_move_id else False,
+            order.advance_deposit_move_id.ref if order.advance_deposit_move_id else False,
+            order.from_pos_config_id.id,
+            order.company_id.id,
+            order.pledge_line_ids.ids,
+        )
 
         return {
             "id": order.id,
             "name": order.name,
             "state": order.state,
             "amount_total": order.amount_total,
+            "pledge_amount": order.pledge_amount,
             "advance_amount": order.advance_amount,
             "amount_tendered": order.amount_tendered,
             "change_amount": order.change_amount,
+            "amount_remaining": order.amount_remaining,
             "advance_pos_order_id": order.advance_pos_order_id.id,
         }

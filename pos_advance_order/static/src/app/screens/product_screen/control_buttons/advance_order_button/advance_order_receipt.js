@@ -15,7 +15,11 @@ export class AdvanceOrderReceipt extends Component {
     }
 
     formatCurrency(amount) {
-        return formatCurrency(amount || 0, this.data.currencyId);
+        const value = amount || 0;
+        if (this.data.currencyId) {
+            return formatCurrency(value, this.data.currencyId);
+        }
+        return value.toFixed(2);
     }
 
     get paymentMethodLabel() {

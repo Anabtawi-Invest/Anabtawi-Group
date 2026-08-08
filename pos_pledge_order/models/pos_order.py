@@ -143,6 +143,93 @@ class PosOrder(models.Model):
             pledge_product_ids.append(line.product_id.id)
         return total_pledge_amount, list(set(pledge_product_ids)), total_pledge_qty
 
+    def _is_site_service_pledge_blocked(self):
+        """True when this POS order must not create pledge records or deposit moves."""
+        self.ensure_one()
+        advance = self.advance_order_id
+        if not advance:
+            return False
+        if getattr(advance, "site_service", False):
+            return True
+        if hasattr(advance, "_pledge_applies") and not advance._pledge_applies():
+            return True
+        return False
+
+    def _get_pledge_closing_debug_info(self):
+        """Build a diagnostic dict for closing-register pledge decisions."""
+        self.ensure_one()
+        advance = self.advance_order_id
+        pledge_totals = self._get_pledge_totals()
+        return {
+            "pos_order": self.name,
+            "pos_order_id": self.id,
+            "advance_order": advance.name if advance else False,
+            "advance_order_id": advance.id if advance else False,
+            "site_service": bool(advance.site_service) if advance else False,
+            "pledge_deposit_move_id": self.pledge_deposit_move_id.id if self.pledge_deposit_move_id else False,
+            "pledge_deposit_move_state": self.pledge_deposit_move_id.state if self.pledge_deposit_move_id else False,
+            "total_pledge_amount_field": self.total_pledge_amount or 0.0,
+            "pledge_product_qty": self.pledge_product_qty or 0,
+            "pledge_line_count": len(self.advance_pledge_line_ids),
+            "pledge_lines_site_service": self.advance_pledge_line_ids.filtered("order_id.site_service").ids,
+            "pledge_totals_amount": pledge_totals[0],
+            "pledge_totals_qty": pledge_totals[2],
+            "pledge_totals_products": pledge_totals[1],
+            "has_pledge_product_lines": any(
+                line.product_id.has_pledge for line in self.lines.filtered(lambda l: l.product_id)
+            ),
+        }
+
+    def _get_pledge_closing_amount(self):
+        """Pledge amount counted in closing register / daily sale (0 for Site Service)."""
+        self.ensure_one()
+        if self._is_site_service_pledge_blocked():
+            advance = self.advance_order_id
+            _logger.warning(
+                "[PLEDGE_CLOSING] EXCLUDE order=%s amount=0 reason=site_service_blocked "
+                "advance=%s site_service=%s",
+                self.name,
+                advance.name if advance else False,
+                bool(advance.site_service) if advance else False,
+            )
+            return 0.0
+        info = self._get_pledge_closing_debug_info()
+        site_service_pledge_lines = self.advance_pledge_line_ids.filtered("order_id.site_service")
+        if site_service_pledge_lines:
+            _logger.warning(
+                "[PLEDGE_CLOSING] EXCLUDE order=%s amount=0 reason=pledge_lines_on_site_service_advance "
+                "pledge_line_ids=%s info=%s",
+                self.name,
+                site_service_pledge_lines.ids,
+                info,
+            )
+            return 0.0
+        pledge_total = info["pledge_totals_amount"]
+        pids = info["pledge_totals_products"]
+        pledge_qty = info["pledge_totals_qty"]
+        cur = self.currency_id or self.company_id.currency_id
+        if pledge_qty <= 0 or cur.is_zero(pledge_total):
+            _logger.warning(
+                "[PLEDGE_CLOSING] EXCLUDE order=%s amount=0 reason=zero_pledge_totals "
+                "pledge_total=%s pledge_qty=%s info=%s",
+                self.name,
+                pledge_total,
+                pledge_qty,
+                info,
+            )
+            return 0.0
+        _logger.warning(
+            "[PLEDGE_CLOSING] INCLUDE order=%s closing_amount=%s pledge_total=%s pledge_qty=%s "
+            "products=%s info=%s",
+            self.name,
+            pledge_total,
+            pledge_total,
+            pledge_qty,
+            pids,
+            info,
+        )
+        return pledge_total
+
     def _get_pledge_totals(self):
         """Pledge from remaining lines, or from snapshot when lines were stripped at sync.
 
@@ -151,6 +238,14 @@ class PosOrder(models.Model):
         Multiple pledge SKUs still use **total_pledge_amount** from the POS snapshot (sum of lines).
         """
         self.ensure_one()
+        if self._is_site_service_pledge_blocked():
+            advance = self.advance_order_id
+            _logger.info(
+                "[PLEDGE][TRACE] _get_pledge_totals skipped site service advance=%s order=%s",
+                advance.name if advance else False,
+                self.name,
+            )
+            return 0.0, [], 0.0
         amt, pids, qty = self._compute_pledge_from_lines()
         _logger.info(
             "[PLEDGE][TRACE] _get_pledge_totals order=%s from_lines amount=%s qty=%s products=%s",
@@ -298,6 +393,14 @@ class PosOrder(models.Model):
             pos_order = self.with_context(pos_pledge_sync=True)
         res_id = super(PosOrder, pos_order)._process_order(order, existing_order)
         po = self.browse(res_id).sudo()
+        if po._is_site_service_pledge_blocked():
+            advance = po.advance_order_id
+            _logger.info(
+                "[PLEDGE][TRACE] skip _process_order pledge for site service advance=%s order=%s",
+                advance.name if advance else False,
+                po.name,
+            )
+            return res_id
         _logger.warning(
             "[PLEDGE][TRACE] _process_order done order=%s lines=%s pledge_lines=%s snapshot_total=%s",
             po.name,
@@ -414,6 +517,15 @@ class PosOrder(models.Model):
     def _post_pledge_deposit_move(self):
         """Dr liquidity (same journal as POS payments) / Cr pledge liability — pledge not in pos.payment totals."""
         self.ensure_one()
+        if self._is_site_service_pledge_blocked():
+            advance = self.advance_order_id
+            _logger.warning(
+                "[PLEDGE_CLOSING] skip _post_pledge_deposit_move order=%s advance=%s site_service=%s",
+                self.name,
+                advance.name if advance else False,
+                bool(advance.site_service) if advance else False,
+            )
+            return self.env["account.move"]
         if self.pledge_deposit_move_id:
             return self.pledge_deposit_move_id
 
@@ -484,6 +596,15 @@ class PosOrder(models.Model):
     def _create_pledge_collection_orders(self):
         """On paid orders with pledge lines: post liability move + create pos.advance.order.pledge lines."""
         for order in self:
+            if order._is_site_service_pledge_blocked():
+                advance = order.advance_order_id
+                _logger.warning(
+                    "[PLEDGE_CLOSING] skip _create_pledge_collection_orders order=%s advance=%s site_service=%s",
+                    order.name,
+                    advance.name if advance else False,
+                    bool(advance.site_service) if advance else False,
+                )
+                continue
             _logger.info(
                 "[PLEDGE][TRACE] _create_pledge_collection_orders order=%s state=%s partner=%s is_pledge_generated=%s",
                 order.name,
@@ -544,6 +665,13 @@ class PosOrder(models.Model):
                 )
                 _logger.exception(
                     "[PLEDGE][TRACE] create pos.advance.order.pledge failed for order=%s",
+                    order.name,
+                )
+                continue
+
+            if not line_id:
+                _logger.warning(
+                    "[PLEDGE_CLOSING] skip _post_pledge_deposit_move order=%s reason=create_from_pos_skipped",
                     order.name,
                 )
                 continue

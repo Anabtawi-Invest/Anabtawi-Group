@@ -85,8 +85,13 @@ class PosAdvanceOrder(models.Model):
         store=True,
         readonly=True,
     )
-    with_employee = fields.Boolean(string="With Employee", default=False)
     employee_id = fields.Many2one("hr.employee", string="Employee")
+    site_service = fields.Boolean(
+        string="Site Service",
+        default=False,
+        help="When enabled, site service scoring was applied when creating this advance order. "
+        "No pledge lines or pledge collection are created for this order.",
+    )
     payment_method = fields.Selection(
         [
             ("cash", "Cash"),
@@ -152,7 +157,19 @@ class PosAdvanceOrder(models.Model):
     remaining_pos_order_id = fields.Many2one("pos.order", string="Remaining POS Order", readonly=True, copy=False)
     pledge_pos_order_id = fields.Many2one("pos.order", string="Pledge POS Order", readonly=True, copy=False)
     refund_advance_pos_order_id = fields.Many2one("pos.order", string="Refund Advance POS Order", readonly=True, copy=False)
+    advance_refund_move_id = fields.Many2one(
+        "account.move",
+        string="Advance Refund Entry",
+        readonly=True,
+        copy=False,
+        help="Reversal journal entry when the advance deposit is refunded.",
+    )
     return_pledge_pos_order_id = fields.Many2one("pos.order", string="Return Pledge POS Order", readonly=True, copy=False)
+    advance_payment_created = fields.Boolean(
+        string="Advance Payment Created",
+        compute="_compute_advance_payment_created",
+        store=True,
+    )
     advance_account_payment_id = fields.Many2one(
         "account.payment",
         string="Advance Account Payment",
@@ -246,6 +263,11 @@ class PosAdvanceOrder(models.Model):
                 uom=line.product_uom_id,
                 date=self.picking_date,
             )
+
+    def _pledge_applies(self):
+        """Pledge is disabled when Site Service was selected on the advance popup."""
+        self.ensure_one()
+        return not self.site_service
 
     def _send_create_payment_email_to_manager(self):
         """Notify the configured manager on the Picking POS when advance payment is created."""
@@ -529,6 +551,19 @@ class PosAdvanceOrder(models.Model):
             order.pledge_count = sum(order.pledge_line_ids.mapped("pledge_qty"))
 
     @api.depends(
+        "advance_deposit_move_id",
+        "advance_pos_order_id",
+        "advance_account_payment_id",
+    )
+    def _compute_advance_payment_created(self):
+        for order in self:
+            order.advance_payment_created = bool(
+                order.advance_deposit_move_id
+                or order.advance_pos_order_id
+                or order.advance_account_payment_id
+            )
+
+    @api.depends(
         "advance_pos_order_id.state",
         "remaining_pos_order_id.state",
         "advance_deposit_move_id.state",
@@ -562,8 +597,15 @@ class PosAdvanceOrder(models.Model):
         For each product in lines that has_pledge=True:
         - create/update a pledge line with pledge_qty = total product qty in the order
         - pledge_amount_unit = product template pledge_amount
+
+        Site Service advance orders (popup checkbox) never carry pledge.
         """
         for order in self:
+            if order.site_service:
+                if order.pledge_line_ids:
+                    order.write({"pledge_line_ids": [fields.Command.delete(pl.id) for pl in order.pledge_line_ids]})
+                continue
+
             # Link pledge lines to the POS order which collected the pledge (remaining payment order)
             linked_pos_order_id = False
             if order.pledge_pos_order_id:
@@ -678,6 +720,25 @@ class PosAdvanceOrder(models.Model):
             return pm
         return self._get_pos_payment_method(session)
 
+    def _resolve_refund_payment_method(self, session, pos_payment_method_id=None):
+        """POS payment method used to pay out the advance refund (cashier choice)."""
+        self.ensure_one()
+        if pos_payment_method_id:
+            pm = self.env["pos.payment.method"].sudo().browse(int(pos_payment_method_id))
+            if not pm.exists():
+                raise UserError(_("Invalid POS payment method."))
+            methods = session.payment_method_ids
+            if pm.id not in methods.ids:
+                raise UserError(_("This payment method is not available on the opened POS session."))
+            if pm.type == "pay_later":
+                raise UserError(_("Customer account payments cannot be used for advance refunds."))
+            if pm.payment_method_type and pm.payment_method_type != "none":
+                raise UserError(
+                    _("Integrated POS payment methods (terminal / QR) are not supported for advance refunds.")
+                )
+            return pm
+        return self._get_pos_payment_method(session)
+
     def _get_pay_later_payment_method(self, session):
         """Customer-account method used for the prepaid portion when completing on POS."""
         self.ensure_one()
@@ -694,12 +755,75 @@ class PosAdvanceOrder(models.Model):
         self.ensure_one()
         cfg = self.pos_config_id
         pm = cfg.pos_advance_application_payment_method_id
-        if pm and pm.id in session.payment_method_ids.ids:
-            # Advance application must go through pay_later so settlement
-            # (Dr liability / Cr advance receivable) is fully consumed.
-            if pm.type == "pay_later":
-                return pm
+        if pm:
+            return pm
         return self._get_pay_later_payment_method(session)
+
+    def _is_advance_deposited_in_session(self, session):
+        """True when this advance deposit was registered on the given POS session."""
+        self.ensure_one()
+        if not session:
+            return False
+        marker = f"ADV_DEPOSIT:{self.id}"
+        return bool(
+            self.env["mail.message"]
+            .sudo()
+            .search_count(
+                [
+                    ("model", "=", "pos.session"),
+                    ("res_id", "=", session.id),
+                    ("body", "ilike", marker),
+                ]
+            )
+        )
+
+    def _get_deposit_payment_method_for_session(self, session):
+        """Payment method used for the advance deposit, validated on the completion session."""
+        self.ensure_one()
+        pm = self.pos_payment_method_id
+        if not pm:
+            raise UserError(_("No payment method is set on this advance order."))
+        if pm.id not in session.payment_method_ids.ids:
+            pm = self._get_pos_payment_method(session)
+        if pm.type == "pay_later":
+            raise UserError(
+                _("The advance deposit payment method cannot be Customer Account for same-session completion.")
+            )
+        if pm.payment_method_type and pm.payment_method_type != "none":
+            raise UserError(
+                _(
+                    "Integrated POS payment methods (terminal / QR) cannot represent the prepaid advance portion."
+                )
+            )
+        return pm
+
+    def _register_same_session_apply_payment(self, session, payment):
+        """Mark a completion payment line as prepaid advance (same session as deposit)."""
+        self.ensure_one()
+        if not session or not payment:
+            return
+        marker = f"ADV_SAME_SESSION_APPLY:{self.id}:{payment.id}"
+        existing = self.env["mail.message"].sudo().search_count(
+            [
+                ("model", "=", "pos.session"),
+                ("res_id", "=", session.id),
+                ("body", "ilike", marker),
+            ]
+        )
+        if existing:
+            return
+        session.message_post(
+            body=f"<p>{marker}</p>",
+            subtype_xmlid="mail.mt_note",
+        )
+        _logger.info(
+            "[ADV_TRACE] same_session_apply advance=%s session=%s(%s) payment=%s marker=%s",
+            self.name,
+            session.name,
+            session.id,
+            payment.id,
+            marker,
+        )
 
     def _normalize_tax_ids(self, tax_value):
         """Normalize tax_ids input (either [Command/set], [(6,0,ids)], ids list) -> ids list."""
@@ -941,6 +1065,7 @@ class PosAdvanceOrder(models.Model):
         return "bank"
 
     def action_confirm(self):
+        confirmed = self.browse()
         for order in self:
             if order.state != "draft":
                 continue
@@ -972,7 +1097,9 @@ class PosAdvanceOrder(models.Model):
                 raise UserError(_("Amount tendered cannot be less than advance amount."))
 
             order.state = "confirmed"
+            confirmed |= order
 
+        confirmed._sync_pledge_lines()
         return True
 
     def action_set_to_draft(self):
@@ -980,8 +1107,54 @@ class PosAdvanceOrder(models.Model):
         return True
 
     def action_cancel(self):
+        for order in self:
+            if order.state == "advance_paid":
+                raise UserError(
+                    _("Use 'Refund Advance' to return the deposit to the customer and cancel this order.")
+                )
+            if order.advance_payment_created:
+                raise UserError(
+                    _("Use 'Refund Advance' to reverse the payment before cancelling this order.")
+                )
         self.write({"state": "cancel"})
         return True
+
+    def _validate_refund_advance(self, pos_config_id=None):
+        """Shared checks before refunding an advance deposit."""
+        self.ensure_one()
+        if self.state != "advance_paid":
+            raise UserError(_("You can only refund an advance that has been paid and not yet completed."))
+        if self.remaining_pos_order_id:
+            raise UserError(_("You cannot refund the deposit after the sale has been completed."))
+        if self.refund_advance_pos_order_id or self.advance_refund_move_id:
+            raise UserError(_("Advance refund payment is already created for this order."))
+        if not self.advance_payment_created:
+            raise UserError(_("Please create the advance payment first."))
+        if pos_config_id:
+            cid = pos_config_id
+            if hasattr(cid, "id"):
+                cid = cid.id
+            pay_cfg = self._get_advance_pos_config()
+            if int(cid) != pay_cfg.id:
+                raise UserError(
+                    _("Refund this advance from %s only (where the deposit was taken).")
+                    % pay_cfg.display_name
+                )
+
+    def _refund_summary_vals(self, refund_pm=None):
+        self.ensure_one()
+        pm = refund_pm or self.pos_payment_method_id
+        return {
+            "id": self.id,
+            "name": self.name,
+            "partner_id": self.partner_id.id,
+            "partner_name": self.partner_id.display_name,
+            "partner_phone": self.partner_id.phone or "",
+            "advance_amount": self.advance_amount,
+            "amount_total": self.amount_total,
+            "payment_method_name": pm.display_name if pm else (self.payment_method or "").upper(),
+            "state": self.state,
+        }
 
     def unlink(self):
         # Business rule: Advance Orders must never be deleted (audit trail).
@@ -1099,6 +1272,34 @@ class PosAdvanceOrder(models.Model):
         )
 
         tendered_amount = self.amount_tendered or self.advance_amount
+        deposit_session = self.env["pos.session"].sudo().browse(
+            self.env.context.get("pos_advance_deposit_session_id") or 0
+        ).exists()
+        ctx_session_id = self.env.context.get("pos_advance_deposit_session_id")
+        if not deposit_session:
+            deposit_session = self.env["pos.session"].sudo().search(
+                [
+                    ("config_id", "=", self._get_advance_pos_config().id),
+                    ("state", "in", ("opened", "closing_control")),
+                    ("rescue", "=", False),
+                ],
+                order="id desc",
+                limit=1,
+            )
+        _logger.info(
+            "[ADV_TRACE] post_deposit advance=%s ctx_session=%s resolved_session=%s(%s) "
+            "state=%s from_pos=%s journal=%s",
+            self.name,
+            ctx_session_id,
+            deposit_session.name if deposit_session else False,
+            deposit_session.id if deposit_session else False,
+            deposit_session.state if deposit_session else False,
+            self.from_pos_config_id.id,
+            journal.id,
+        )
+        deposit_ref = _("Advance deposit - %s") % self.name
+        if deposit_session:
+            deposit_ref = _("%s [pos_session_id:%s]") % (deposit_ref, deposit_session.id)
         move_lines = [
             Command.create({
                 "name": _("Advance deposit %s") % self.name,
@@ -1132,20 +1333,130 @@ class PosAdvanceOrder(models.Model):
             "move_type": "entry",
             "journal_id": journal.id,
             "date": fields.Date.context_today(self),
-            "ref": _("Advance deposit - %s") % self.name,
+            "ref": deposit_ref,
             "partner_id": self.partner_id.id,
             "line_ids": move_lines,
         })
         move.action_post()
         self.advance_deposit_move_id = move.id
+        if deposit_session:
+            self._register_deposit_on_pos_session(deposit_session)
+        else:
+            _logger.warning(
+                "[ADV_TRACE] post_deposit advance=%s NO_SESSION for marker/ref registration",
+                self.name,
+            )
         # Legacy field retained: old flows used liability transfer move; reuse for invoice fallback.
         self.advance_liability_move_id = move.id
         _logger.info(
-            "[ADV_DEPOSIT] Posted deposit move advance=%s move_id=%s",
+            "[ADV_DEPOSIT] Posted deposit move advance=%s move_id=%s session=%s ref=%s",
             self.name,
             move.id,
+            deposit_session.id if deposit_session else False,
+            deposit_ref,
         )
         return move
+
+    def _register_deposit_on_pos_session(self, session):
+        """Link this advance deposit to the open POS session (closing register, no extra DB columns)."""
+        self.ensure_one()
+        if not session:
+            _logger.warning(
+                "[ADV_TRACE] register_deposit advance=%s skipped: no session",
+                self.name,
+            )
+            return
+        if session.state not in ("opened", "closing_control"):
+            _logger.warning(
+                "[ADV_TRACE] register_deposit advance=%s session=%s(%s) skipped: state=%s",
+                self.name,
+                session.name,
+                session.id,
+                session.state,
+            )
+            return
+        marker = f"ADV_DEPOSIT:{self.id}"
+        existing = self.env["mail.message"].sudo().search_count(
+            [
+                ("model", "=", "pos.session"),
+                ("res_id", "=", session.id),
+                ("body", "ilike", marker),
+            ]
+        )
+        if existing:
+            _logger.info(
+                "[ADV_TRACE] register_deposit advance=%s session=%s(%s) already_registered count=%s",
+                self.name,
+                session.name,
+                session.id,
+                existing,
+            )
+            return
+        msg = session.message_post(
+            body=f"<p>{marker}</p>",
+            subtype_xmlid="mail.mt_note",
+        )
+        _logger.info(
+            "[ADV_TRACE] register_deposit advance=%s session=%s(%s) message_id=%s marker=%s",
+            self.name,
+            session.name,
+            session.id,
+            msg.id if msg else False,
+            marker,
+        )
+
+    def _register_refund_on_pos_session(self, session, refund_pm, amount):
+        """Link this advance refund to the open POS session (closing register, no extra DB columns)."""
+        self.ensure_one()
+        if not session or not refund_pm:
+            _logger.warning(
+                "[ADV_TRACE] register_refund advance=%s skipped: session=%s pm=%s",
+                self.name,
+                session.id if session else False,
+                refund_pm.id if refund_pm else False,
+            )
+            return
+        if session.state not in ("opened", "closing_control"):
+            _logger.warning(
+                "[ADV_TRACE] register_refund advance=%s session=%s(%s) skipped: state=%s",
+                self.name,
+                session.name,
+                session.id,
+                session.state,
+            )
+            return
+        rounded_amount = self.currency_id.round(amount or 0.0)
+        if self.currency_id.is_zero(rounded_amount):
+            return
+        marker = f"ADV_REFUND:{self.id}:{refund_pm.id}:{rounded_amount}"
+        existing = self.env["mail.message"].sudo().search_count(
+            [
+                ("model", "=", "pos.session"),
+                ("res_id", "=", session.id),
+                ("body", "ilike", marker),
+            ]
+        )
+        if existing:
+            _logger.info(
+                "[ADV_TRACE] register_refund advance=%s session=%s(%s) already_registered count=%s",
+                self.name,
+                session.name,
+                session.id,
+                existing,
+            )
+            return
+        msg = session.message_post(
+            body=f"<p>{marker}</p>",
+            subtype_xmlid="mail.mt_note",
+        )
+        _logger.info(
+            "[ADV_TRACE] register_refund advance=%s session=%s(%s) message_id=%s marker=%s",
+            self.name,
+            session.name,
+            session.id,
+            msg.id if msg else False,
+            marker,
+        )
 
     def _post_advance_completion_settlement_move(self):
         """After full POS settlement: Dr liability / Cr POS advance receivable for the prepaid amount."""
@@ -1272,9 +1583,20 @@ class PosAdvanceOrder(models.Model):
             if sessions:
                 sessions.invalidate_recordset(["cash_register_balance_end", "cash_register_difference"])
 
-    def action_create_payment(self):
+    def action_create_payment(self, deposit_pos_session_id=None):
         for order in self:
             order.ensure_one()
+            ctx_session = (
+                deposit_pos_session_id
+                or order.env.context.get("pos_advance_deposit_session_id")
+            )
+            _logger.info(
+                "[ADV_TRACE] action_create_payment advance=%s(%s) ctx_session=%s env_context=%s",
+                order.name,
+                order.id,
+                ctx_session,
+                order.env.context.get("pos_advance_deposit_session_id"),
+            )
             if order.state != "confirmed":
                 raise UserError(_("You can only create a payment on a Confirmed advance order."))
             if (
@@ -1286,7 +1608,9 @@ class PosAdvanceOrder(models.Model):
             if not order.advance_amount or order.advance_amount <= 0:
                 raise UserError(_("Advance amount must be greater than zero to create a payment."))
 
-            order._post_advance_deposit_move()
+            order.with_context(
+                pos_advance_deposit_session_id=ctx_session
+            )._post_advance_deposit_move()
             order.state = "advance_paid"
             _logger.info(
                 "[ADV_DEPOSIT] action_create_payment completed: advance=%s state=%s deposit_move=%s",
@@ -1369,13 +1693,56 @@ class PosAdvanceOrder(models.Model):
                     _("Order total does not match remaining plus advance. Recalculate the advance order.")
                 )
 
+            same_session_completion = order._is_advance_deposited_in_session(session)
+            deposit_pm = False
             payouts = [(pm, remaining_tendered)]
             if not float_is_zero(remaining_change, precision_rounding=rounding):
                 payouts.append((pm, -remaining_change))
             if not float_is_zero(advance_part, precision_rounding=rounding):
-                adv_pm = order._get_advance_application_payment_method(session)
-                payouts.append((adv_pm, advance_part))
+                if same_session_completion:
+                    deposit_pm = order._get_deposit_payment_method_for_session(session)
+                    payouts.append((deposit_pm, advance_part))
+                    _logger.info(
+                        "[ADV_TRACE] same_session_completion advance=%s session=%s(%s) "
+                        "deposit_pm=%s advance_part=%s",
+                        order.name,
+                        session.name,
+                        session.id,
+                        deposit_pm.id,
+                        advance_part,
+                    )
+                else:
+                    adv_pm = order._get_advance_application_payment_method(session)
+                    payouts.append((adv_pm, advance_part))
+            if order.site_service:
+                _logger.warning(
+                    "[PLEDGE_CLOSING] action_create_remaining_payment clearing pledge snapshot "
+                    "advance=%s pos_order=%s site_service=True",
+                    order.name,
+                    pos_order.name,
+                )
+                pos_order.sudo().write({
+                    "total_pledge_amount": 0.0,
+                    "pledge_product_qty": 0,
+                    "pledge_snapshot_product_ids": [(5, 0, 0)],
+                })
             order._pay_pos_order_multi(pos_order, payouts)
+            if same_session_completion and deposit_pm and not float_is_zero(
+                advance_part, precision_rounding=rounding
+            ):
+                apply_payment = pos_order.payment_ids.filtered(
+                    lambda pay: (
+                        pay.payment_method_id == deposit_pm
+                        and float_compare(
+                            pay.amount,
+                            advance_part,
+                            precision_rounding=rounding,
+                        )
+                        == 0
+                    )
+                )[:1]
+                if apply_payment:
+                    order._register_same_session_apply_payment(session, apply_payment)
             order.remaining_pos_order_id = pos_order.id
             order.remaining_amount_tendered = remaining_tendered
             order.remaining_change_amount = remaining_change
@@ -1396,7 +1763,12 @@ class PosAdvanceOrder(models.Model):
                 or order.pledge_line_ids
                 or has_pledge_on_lines
             )
-            if has_pledge_indicators:
+            if order.site_service:
+                _logger.info(
+                    "[ADV_PLEDGE_DEBUG] skipped pledge processing advance=%s reason=site_service_enabled",
+                    order.name,
+                )
+            elif has_pledge_indicators:
                 _logger.warning(
                     "[ADV_PLEDGE_DEBUG] completion start advance=%s pos_order=%s pledge_amount=%s "
                     "order_pledge_lines=%s pos_lines=%s pos_pledge_products=%s",
@@ -1590,52 +1962,97 @@ class PosAdvanceOrder(models.Model):
             amount_tendered=amount_tendered,
         )
 
-    def action_refund_advance_payment(self):
+    def action_refund_advance_payment(
+        self,
+        pos_config_id=None,
+        pos_payment_method_id=None,
+        refund_pos_session_id=None,
+    ):
+        summary = None
         for order in self:
-            order.ensure_one()
-            if order.remaining_pos_order_id:
-                raise UserError(_("You cannot refund the deposit after the sale has been completed."))
-            if order.refund_advance_pos_order_id:
-                raise UserError(_("Advance refund payment is already created for this order."))
+            order._validate_refund_advance(pos_config_id=pos_config_id)
+            refund_amount = order.advance_amount or 0.0
+            currency = order.currency_id
+            pos_config = order._get_advance_pos_config()
+            refund_session = False
+            if refund_pos_session_id:
+                refund_session = (
+                    order.env["pos.session"]
+                    .sudo()
+                    .browse(int(refund_pos_session_id))
+                    .exists()
+                )
+                if (
+                    refund_session
+                    and refund_session.config_id.id != pos_config.id
+                ):
+                    _logger.warning(
+                        "[ADV_TRACE] refund advance=%s session config mismatch session=%s expected=%s",
+                        order.name,
+                        refund_session.config_id.id,
+                        pos_config.id,
+                    )
+                    refund_session = False
+            if not refund_session:
+                refund_session = order._get_open_session(pos_config)
+            refund_pm = order._resolve_refund_payment_method(
+                refund_session, pos_payment_method_id
+            )
 
             if order.advance_deposit_move_id:
                 if order.advance_deposit_move_id.state != "posted":
                     raise UserError(_("Only posted deposit entries can be reversed."))
-                rev = order.advance_deposit_move_id.with_context(
+                rev_moves = order.advance_deposit_move_id.with_context(
                     prefetch_fields=False,
                 )._reverse_moves(
                     default_values_list=[{"date": fields.Date.context_today(order)}],
                     cancel=True,
                 )
+                order.advance_refund_move_id = rev_moves[:1].id
+                order.state = "cancel"
+                order._register_refund_on_pos_session(
+                    refund_session, refund_pm, refund_amount
+                )
+                order._invalidate_open_sessions_cash_balance()
+            elif order.advance_pos_order_id:
+                if not pos_config.advance_deposit_product_id:
+                    raise UserError(_("Please set 'Advance Deposit Product' on the POS configuration first."))
+
+                session = refund_session or order._get_open_session(pos_config)
+                pm = refund_pm
+
+                deposit_product = pos_config.advance_deposit_product_id
+                lines = [{
+                    "product_id": deposit_product.id,
+                    "qty": -1.0,
+                    "price_unit": refund_amount,
+                    "discount": 0.0,
+                    "tax_ids": [(6, 0, [])],
+                    "product_uom_id": deposit_product.uom_id.id,
+                    "name": _("Refund Advance"),
+                }]
+                pos_order = order._create_pos_order(session, lines)
+                order._pay_pos_order(pos_order, pm, pos_order.amount_total)
+                order.refund_advance_pos_order_id = pos_order.id
                 order.state = "cancel"
                 order._invalidate_open_sessions_cash_balance()
-                continue
+            else:
+                raise UserError(_("No refundable advance payment found on this order."))
 
-            if not order.advance_pos_order_id:
-                raise UserError(_("Please create the advance payment first."))
+            order.message_post(
+                body=_(
+                    "Advance deposit refunded: %(amount)s %(currency)s to %(customer)s via %(method)s.",
+                    amount=refund_amount,
+                    currency=currency.name,
+                    customer=order.partner_id.display_name,
+                    method=refund_pm.display_name,
+                ),
+                subject=_("Advance Refunded: %s") % order.name,
+            )
+            summary = order._refund_summary_vals(refund_pm=refund_pm)
 
-            pos_config = order.from_pos_config_id or order.pos_config_id
-            if not pos_config.advance_deposit_product_id:
-                raise UserError(_("Please set 'Advance Deposit Product' on the POS configuration first."))
-
-            session = order._get_open_session(pos_config)
-            pm = order._get_pos_payment_method(session)
-
-            deposit_product = pos_config.advance_deposit_product_id
-            lines = [{
-                "product_id": deposit_product.id,
-                "qty": -1.0,
-                "price_unit": order.advance_amount,
-                "discount": 0.0,
-                "tax_ids": [(6, 0, [])],
-                "product_uom_id": deposit_product.uom_id.id,
-                "name": _("Refund Advance"),
-            }]
-            pos_order = order._create_pos_order(session, lines)
-            order._pay_pos_order(pos_order, pm, pos_order.amount_total)
-            order.refund_advance_pos_order_id = pos_order.id
-            order.state = "cancel"
-
+        if len(self) == 1 and summary:
+            return summary
         return True
 
     def action_print_receipt(self):
@@ -1691,7 +2108,9 @@ class PosAdvanceOrder(models.Model):
             if vals.get("pos_payment_method_id") and "payment_method" not in vals:
                 pm = PaymentMethod.browse(vals["pos_payment_method_id"])
                 vals["payment_method"] = self._payment_method_selection_from_pos_pm(pm)
-        return super().create(vals_list)
+        orders = super().create(vals_list)
+        orders._sync_pledge_lines()
+        return orders
 
     # -------------------------------------------------------------------------
     # Catalog integration (product.catalog.mixin)

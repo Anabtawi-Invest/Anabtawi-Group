@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 {
-    "name": "       POS Advance Order-two cashiers ",
+    "name": "POS Advance Order-two cashiers ",
     "author":"Anabtawi",
-    'version': '19.0.2.0.27',
+    'version': '19.0.2.0.61',
     "category": "Point of Sale",
     "summary": "Create and manage advance orders for POS pickup",
     "license": "LGPL-3",
@@ -13,6 +13,7 @@
         "hr",
         "employee_request",
         "mail",
+        "pos_settle_due",
     ],
     "data": [
         "security/ir.model.access.csv",
@@ -33,6 +34,9 @@
     ],
     "assets": {
         "point_of_sale._assets_pos": [
+            "pos_advance_order/static/src/css/advance_order_receipt.css",
+            "pos_advance_order/static/src/js/advance_order_print.js",
+            "pos_advance_order/static/src/js/site_service_utils.js",
             "pos_advance_order/static/src/app/screens/product_screen/payment_button_visibility.xml",
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_receipt.js",
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_receipt.xml",
@@ -40,6 +44,8 @@
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_form_popup.xml",
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/complete_advance_order_popup.js",
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/complete_advance_order_popup.xml",
+            "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/refund_advance_order_popup.js",
+            "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/refund_advance_order_popup.xml",
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_button.js",
             "pos_advance_order/static/src/app/screens/product_screen/control_buttons/advance_order_button/advance_order_button.xml",
         ],

@@ -5,7 +5,6 @@ console.log("[PLEDGE] Module loading started...", PLEDGE_ORDER_BUILD_TAG);
 
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
-import { ReceiptScreen } from "@point_of_sale/app/screens/receipt_screen/receipt_screen";
 import { SelectionPopup } from "@point_of_sale/app/components/popups/selection_popup/selection_popup";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { PledgeListPopup } from "@pos_pledge_order/js/pledge_list_popup";
@@ -203,6 +202,14 @@ patch(ControlButtons.prototype, {
     /**
      * Handle Return Pledge button click
      */
+    get selectEmployeeLabel() {
+        return _t("Select Employee");
+    },
+
+    get returnPledgeLabel() {
+        return _t("Return Pledge");
+    },
+
     async onClickReturnPledge() {
         console.log("[PLEDGE] ========================================");
         console.log("[PLEDGE] Return Pledge button clicked!");
@@ -273,7 +280,7 @@ patch(ControlButtons.prototype, {
 
             // Show pledge list popup with search (filtered by return_type)
             console.log("[PLEDGE] Showing pledge list popup with return_type:", returnType);
-            const selectedPledge = await new Promise((resolve) => {
+            const selection = await new Promise((resolve) => {
                 this.dialog.add(
                     PledgeListPopup,
                     {
@@ -292,48 +299,29 @@ patch(ControlButtons.prototype, {
                 );
             });
 
-            if (!selectedPledge) {
+            if (!selection || !selection.pledge) {
                 console.log("[PLEDGE] No pledge selected, cancelling");
                 return;
             }
 
+            const selectedPledge = selection.pledge;
+            const paymentMethodId = selection.payment_method_id;
+
             console.log("[PLEDGE] Selected pledge:", selectedPledge);
             console.log("[PLEDGE] Return type:", returnType);
+            console.log("[PLEDGE] Return payment method:", paymentMethodId);
 
-            // Confirm return
-            const returnTypeLabel = returnType === 'employee' 
-                ? _t("Employee Pledge") 
-                : _t("Customer Pledge");
-            
-            const confirmTitle = _t("Return %s - %s for %s (%s)?",
-                returnTypeLabel,
-                selectedPledge.name,
-                selectedPledge.partner_id[1],
-                this.pos.env.utils.formatCurrency(selectedPledge.pledge_amount)
-            );
-
-            const confirmReturn = await makeAwaitable(this.dialog, SelectionPopup, {
-                title: confirmTitle,
-                list: [
-                    { id: 'yes', label: _t("✓ Yes, Return This Pledge"), item: 'yes' },
-                    { id: 'no', label: _t("✗ Cancel"), item: 'no' },
-                ],
-            });
-
-            if (!confirmReturn || confirmReturn !== 'yes') {
-                console.log("[PLEDGE] User cancelled return");
-                return;
-            }
-
-            // Store return type for later use (will be used in backend logic)
-            // Pass return_type as context to backend method
             console.log("[PLEDGE] Calling action_return_pledge for ID:", selectedPledge.id, "Type:", returnType);
-            
+
             await this.env.services.orm.call(
                 "pos.advance.order.pledge",
                 "action_return_pledge",
                 [[selectedPledge.id]],
-                { context: { return_type: returnType } }
+                {
+                    pos_payment_method_id: paymentMethodId,
+                    pos_session_id: this.pos.session?.id || false,
+                    context: { return_type: returnType },
+                }
             );
             console.log("[PLEDGE] action_return_pledge completed successfully");
 
@@ -1191,493 +1179,4 @@ patch(PaymentScreen.prototype, {
 
 console.log("[PLEDGE] PaymentScreen patch applied");
 
-// =============================================================================
-// 4. Patch ReceiptScreen to add Print Customer Receipt functionality
-// =============================================================================
-patch(ReceiptScreen.prototype, {
-    setup() {
-        super.setup(...arguments);
-        console.log("[PLEDGE] ========================================");
-        console.log("[PLEDGE] ReceiptScreen setup complete!");
-        console.log("[PLEDGE] printFullReceipt available:", typeof this.printFullReceipt);
-        console.log("[PLEDGE] printCustomerReceipt available:", typeof this.printCustomerReceipt);
-        console.log("[PLEDGE] ========================================");
-    },
-    
-    /**
-     * Override receiptData getter to add pledge information (as metadata, not as lines)
-     */
-    get receiptData() {
-        const data = super.receiptData;
-        
-        console.log("[PLEDGE] receiptData getter called");
-        console.log("[PLEDGE] Super receipt data:", data);
-        
-        if (!this.currentOrder) {
-            console.log("[PLEDGE] No current order");
-            return data;
-        }
-        
-        console.log("[PLEDGE] Adding pledge info to receipt data");
-        
-        const lines = this.currentOrder.lines || [];
-        
-        // Calculate pledge details for separate section in QWeb
-        let totalPledgeAmount = 0;
-        const pledgeDetails = [];
-        
-        lines.forEach(line => {
-            const product = line.get_product();
-            if (product?.has_pledge === true) {
-                const pledgeAmount = product.pledge_amount || 0;
-                const quantity = line.get_quantity();
-                const lineTotal = pledgeAmount * quantity;
-                totalPledgeAmount += lineTotal;
-                
-                pledgeDetails.push({
-                    product_name: product.display_name || product.name,
-                    pledge_amount: pledgeAmount,
-                    quantity: quantity,
-                    total: lineTotal
-                });
-                
-                console.log("[PLEDGE] Pledge detail:", product.display_name, "=", lineTotal);
-            }
-        });
-        
-        // Add pledge information to receipt data (for QWeb template)
-        data.pledgeDetails = pledgeDetails;
-        data.totalPledgeAmount = totalPledgeAmount;
-        data.hasPledgeProducts = pledgeDetails.length > 0;
-        
-        console.log("[PLEDGE] Total pledge amount:", totalPledgeAmount);
-        console.log("[PLEDGE] Pledge details count:", pledgeDetails.length);
-        console.log("[PLEDGE] ✅ Final receipt data with pledge:", data);
-        console.log("[PLEDGE] ✅ pledgeDetails:", data.pledgeDetails);
-        console.log("[PLEDGE] ✅ totalPledgeAmount:", data.totalPledgeAmount);
-        
-        return data;
-    },
-    
-    /**
-     * Print full receipt with pledge section
-     * Hides delivery products if employee service exists
-     */
-    async printFullReceipt() {
-        console.log("[PLEDGE] ========================================");
-        console.log("[PLEDGE] 🎯 printFullReceipt() METHOD CALLED!");
-        console.log("[PLEDGE] ========================================");
-        
-        try {
-            const order = this.currentOrder;
-            
-            if (!order) {
-                console.log("[PLEDGE] ❌ No order found");
-                this.notification.add(_t("No order found"), { type: "warning" });
-                return;
-            }
-
-            console.log("[PLEDGE] ✅ Order found:", order.name);
-            console.log("[PLEDGE] Starting full receipt printing...");
-            
-            const lines = order.lines || [];
-            console.log("[PLEDGE] Total lines in order:", lines.length);
-            
-            // Hide pledge section when an employee is selected, even without employee service lines.
-            const hasSelectedEmployee = !!(order.employee_id && (order.employee_id.id || order.employee_id));
-
-            // Check if there's an employee service
-            const hasEmployeeService = lines.some(line => {
-                const product = line.product_id;
-                const isEmp = product?.is_employee_service === true;
-                if (isEmp) {
-                    console.log("[PLEDGE] 👨‍💼 Found employee service:", product?.display_name || product?.name);
-                }
-                return isEmp;
-            });
-            const hidePledgeByEmployee = hasEmployeeService || hasSelectedEmployee;
-            
-            console.log("[PLEDGE] Has employee service:", hasEmployeeService);
-            console.log("[PLEDGE] Has selected employee:", hasSelectedEmployee);
-            console.log("[PLEDGE] Hide pledge section:", hidePledgeByEmployee);
-            console.log("[PLEDGE] Will filter delivery products:", hidePledgeByEmployee);
-            
-            // Prepare receipt data
-            const company = this.pos.company;
-            const cashierName = order.getCashierName ? order.getCashierName() : (order.employee_id?.name || 'Cashier');
-            const orderPricelist =
-                (typeof order.get_pricelist === "function" && order.get_pricelist()) ||
-                (typeof order.getPricelist === "function" && order.getPricelist()) ||
-                order.pricelist ||
-                order.pricelist_id ||
-                this.pos?.config?.pricelist_id ||
-                this.pos?.default_pricelist;
-            const pricelistName =
-                orderPricelist?.name ||
-                (Array.isArray(orderPricelist) ? orderPricelist[1] : null) ||
-                "";
-            
-            const receiptData = {
-                company: {
-                    name: company.name,
-                    street: company.street,
-                    phone: company.phone,
-                    vat: company.vat,
-                    email: company.email,
-                },
-                cashier: cashierName,
-                name: order.name,
-                date: order.date_order ? new Date(order.date_order).toLocaleString() : new Date().toLocaleString(),
-                partner: order.partner_id ? {
-                    name: order.partner_id.name,
-                    phone: order.partner_id.phone,
-                } : null,
-                pricelist_name: pricelistName,
-                total_with_tax: this.env.utils.formatCurrency(order.amount_total || 0, false),
-                change: this.env.utils.formatCurrency(0, false),
-            };
-            
-            // Build orderlines - filter delivery if employee service exists
-            const fullOrderlines = [];
-            let total = 0;
-            
-            console.log("[PLEDGE] Building orderlines...");
-            
-            lines.forEach((line, index) => {
-                const product = line.product_id;
-                console.log(`[PLEDGE] Line ${index + 1}:`, product?.display_name || product?.name);
-                console.log(`[PLEDGE]   - is_employee_service:`, product?.is_employee_service);
-                console.log(`[PLEDGE]   - is_delivery_product:`, product?.is_delivery_product);
-                
-                // If employee service exists, skip delivery products
-                if (hidePledgeByEmployee && product?.is_delivery_product) {
-                    console.log("[PLEDGE] 🚫 SKIPPING delivery product (employee exists):", product.display_name || product.name);
-                    return;
-                }
-                
-                const quantity = line.qty;
-                const unitPrice = line.price_unit;
-                const priceWithTax = line.price_subtotal_incl;
-                
-                fullOrderlines.push({
-                    product_name: product.display_name || product.name,
-                    quantity: quantity.toString(),
-                    price: this.env.utils.formatCurrency(unitPrice, false),
-                    price_display: this.env.utils.formatCurrency(priceWithTax, false),
-                    is_employee_service: product?.is_employee_service || false,
-                    is_delivery_product: product?.is_delivery_product || false,
-                });
-                
-                total += priceWithTax;
-            });
-            
-            receiptData.orderlines = fullOrderlines;
-            receiptData.total = this.env.utils.formatCurrency(total, false);
-            
-            // Calculate pledge section
-            let pledgeTotal = 0;
-            const pledgeLines = [];
-            
-            lines.forEach(line => {
-                const product = line.product_id;
-                if (product?.has_pledge && !hidePledgeByEmployee) {
-                    const pledgeAmt = (product.pledge_amount || 0) * line.qty;
-                    pledgeTotal += pledgeAmt;
-                    pledgeLines.push({
-                        name: product.display_name || product.name,
-                        amount: pledgeAmt
-                    });
-                }
-            });
-            
-            receiptData.hasPledge = pledgeTotal > 0;
-            receiptData.pledgeLines = pledgeLines;
-            receiptData.pledgeTotal = this.env.utils.formatCurrency(pledgeTotal, false);
-            
-            console.log("[PLEDGE] ========================================");
-            console.log("[PLEDGE] 📋 Final Receipt Data:");
-            console.log("[PLEDGE]   - Total orderlines:", fullOrderlines.length);
-            console.log("[PLEDGE]   - Has pledge:", receiptData.hasPledge);
-            console.log("[PLEDGE]   - Orderlines:", fullOrderlines);
-            console.log("[PLEDGE] ========================================");
-            
-            // Build and print HTML
-            const html = this._buildFullReceiptHtml(receiptData);
-            console.log("[PLEDGE] 🖨️ Calling printHtmlReceipt...");
-            printHtmlReceipt(html, 'Full Receipt');
-            
-            this.notification.add(_t("Full receipt printed successfully"), { type: "success" });
-            console.log("[PLEDGE] ✅ Full receipt printed successfully!");
-            
-        } catch (error) {
-            console.error("[PLEDGE] Error printing full receipt:", error);
-            this.notification.add(
-                error.message || _t("Failed to print full receipt"),
-                { type: "danger" }
-            );
-        }
-    },
-    
-    /**
-     * Build full receipt HTML
-     */
-_buildFullReceiptHtml(receiptData) {
-    let html = `
-        <div class="pos-receipt">
-            <div class="pos-receipt-header text-center mb-3">
-                <h2>PLEDGE RECEIPT</h2>
-                <div class="mb-2">${receiptData.company.name || ''}</div>
-                ${receiptData.company.street ? `<div>${receiptData.company.street}</div>` : ''}
-                ${receiptData.company.phone ? `<div>Tel: ${receiptData.company.phone}</div>` : ''}
-            </div>
-
-            <div class="cashier mb-2">
-                <div>Cashier: ${receiptData.cashier}</div>
-                <div>Order: ${receiptData.name}</div>
-                <div>Date: ${receiptData.date}</div>
-                ${receiptData.pricelist_name ? `<div>Pricelist: ${receiptData.pricelist_name}</div>` : ''}
-            </div>
-
-            ${receiptData.partner ? `
-                <div class="partner-info mb-2">
-                    <div><strong>Customer: ${receiptData.partner.name}</strong></div>
-                    ${receiptData.partner.phone ? `<div>Phone: ${receiptData.partner.phone}</div>` : ''}
-                </div>
-            ` : ''}
-
-            <hr/>
-    `;
-
-    if (receiptData.hasPledge) {
-        html += `
-            <div style="margin-top: 20px; padding-top: 15px;">
-                <h4 style="text-align: center; font-weight: bold; text-decoration: underline;">
-                    معلومات الرهن / Pledge Information
-                </h4>
-                <table style="width: 100%; margin: 10px 0;">
-        `;
-
-        receiptData.pledgeLines.forEach(pline => {
-            html += `
-                    <tr>
-                        <td>${pline.name}</td>
-                        <td style="text-align: right;">
-                            ${this.env.utils.formatCurrency(pline.amount, false)}
-                        </td>
-                    </tr>
-            `;
-        });
-
-        html += `
-                    <tr style="border-top: 2px solid #000;">
-                        <td><strong>إجمالي الرهن:</strong></td>
-                        <td style="text-align: right;">
-                            <strong>${receiptData.pledgeTotal}</strong>
-                        </td>
-                    </tr>
-                </table>
-                <div style="text-align: center; font-size: 0.85em; color: #666; font-style: italic; border-top: 1px dashed #999; padding-top: 8px;">
-                    ⚠️ هذا المبلغ سيُرد عند إعادة المنتج<br/>
-                    This amount will be refunded upon product return
-                </div>
-            </div>
-        `;
-    } else {
-        html += `
-            <div style="text-align:center; margin-top:20px;">
-                No pledge items found.
-            </div>
-        `;
-    }
-
-    html += `
-            <div class="text-center mt-4">
-                <div>Thank you!</div>
-            </div>
-        </div>
-    `;
-
-    return html;
-},
-    
-    /**
-     * Print customer receipt (filtered - no pledge products, no virtual pledge lines)
-     */
-    async printCustomerReceipt() {
-        try {
-            const order = this.currentOrder;
-            
-            if (!order) {
-                this.notification.add(_t("No order found"), { type: "warning" });
-                return;
-            }
-
-            console.log("[PLEDGE] Printing customer receipt from Receipt Screen");
-            console.log("[PLEDGE] Order data:", order);
-
-            // Prepare receipt data manually from order properties
-            const company = this.pos.company;
-            const cashierName = order.getCashierName ? order.getCashierName() : (order.employee_id?.name || 'Cashier');
-            const pricelistName = getOrderPricelistName(order, this.pos);
-            
-            const receiptData = {
-                company: {
-                    name: company.name,
-                    street: company.street,
-                    phone: company.phone,
-                    vat: company.vat,
-                    email: company.email,
-                },
-                cashier: cashierName,
-                name: order.name,
-                date: order.date_order ? new Date(order.date_order).toLocaleString() : new Date().toLocaleString(),
-                partner: order.partner_id ? {
-                    name: order.partner_id.name,
-                    phone: order.partner_id.phone,
-                } : null,
-                pricelist_name: pricelistName,
-                total_with_tax: this.env.utils.formatCurrency(order.amount_total || order.priceIncl || 0, false),
-                change: this.env.utils.formatCurrency(0, false), // No change on completed orders
-            };
-
-            // Get order lines from the order
-            const lines = order.lines || [];
-            
-            console.log("[PLEDGE] Found order lines:", lines.length);
-
-            // Create customer orderlines - EXCLUDE employee service and delivery products
-            const customerLines = [];
-            let customerTotal = 0;
-            
-            lines.forEach(line => {
-                const product = line.product_id;
-                
-                // Skip employee service products (always hidden)
-                if (product?.is_employee_service) {
-                    console.log("[PLEDGE] Skipping employee service product:", product.display_name || product.name);
-                    return;
-                }
-                
-                // Skip delivery products (always hidden)
-                if (product?.is_delivery_product) {
-                    console.log("[PLEDGE] Skipping delivery product:", product.display_name || product.name);
-                    return;
-                }
-                
-                console.log("[PLEDGE] Adding line to customer receipt:", product?.display_name || product?.name);
-                
-                const quantity = line.qty;
-                const unitPrice = line.price_unit;
-                const priceWithTax = line.price_subtotal_incl;
-                
-                customerLines.push({
-                    product_name: product.display_name || product.name,
-                    quantity: quantity.toString(),
-                    price: this.env.utils.formatCurrency(unitPrice, false),
-                    price_display: this.env.utils.formatCurrency(priceWithTax, false),
-                });
-                
-                customerTotal += priceWithTax;
-            });
-
-            receiptData.customerOrderlines = customerLines;
-            receiptData.customer_total = this.env.utils.formatCurrency(customerTotal, false);
-            
-            console.log("[PLEDGE] Customer orderlines:", receiptData.customerOrderlines?.length || 0);
-            console.log("[PLEDGE] Customer total:", receiptData.customer_total);
-
-            if (!receiptData.customerOrderlines || receiptData.customerOrderlines.length === 0) {
-                this.notification.add(
-                    _t("This order only contains pledge/employee/delivery items. No customer items to print."),
-                    { type: "info" }
-                );
-                return;
-            }
-
-            // Render and print customer receipt
-            // Build the receipt HTML manually using template literals
-            const html = this._buildCustomerReceiptHtml(receiptData);
-            
-            // Print using helper function
-            printHtmlReceipt(html, 'Customer Receipt');
-
-            this.notification.add(_t("Customer receipt printed successfully"), { type: "success" });
-            console.log("[PLEDGE] ✅ Customer receipt printed from Receipt Screen");
-
-        } catch (error) {
-            console.error("[PLEDGE] Error printing customer receipt:", error);
-            this.notification.add(
-                error.message || _t("Failed to print customer receipt"),
-                { type: "danger" }
-            );
-        }
-    },
-
-    /**
-     * Build customer receipt HTML manually
-     */
-    _buildCustomerReceiptHtml(receiptData) {
-        let html = `
-            <div class="pos-receipt customer-receipt">
-                <div class="pos-receipt-header">
-                    <h2 class="text-center mb-3">RECEIPT</h2>
-                    <div class="text-center mb-2">
-                        <div class="mb-1">${receiptData.company.name || ''}</div>
-                        ${receiptData.company.street ? `<div>${receiptData.company.street}</div>` : ''}
-                        ${receiptData.company.phone ? `<div>Tel: ${receiptData.company.phone}</div>` : ''}
-                    </div>
-                    <div class="cashier mb-2">
-                        <div>Cashier: ${receiptData.cashier || ''}</div>
-                        <div>Order: ${receiptData.name || ''}</div>
-                        <div>Date: ${receiptData.date || ''}</div>
-                        ${receiptData.pricelist_name ? `<div>Pricelist: ${receiptData.pricelist_name}</div>` : ''}
-                    </div>
-                    ${receiptData.partner ? `
-                        <div class="partner-info mb-2">
-                            <div><strong>Customer: ${receiptData.partner.name}</strong></div>
-                            ${receiptData.partner.phone ? `<div>Phone: ${receiptData.partner.phone}</div>` : ''}
-                        </div>
-                    ` : ''}
-                </div>
-                <div class="pos-receipt-body">
-                    <div class="orderlines">
-        `;
-
-        // Add customer orderlines
-        receiptData.customerOrderlines.forEach(line => {
-            html += `
-                        <div class="orderline">
-                            <div class="d-flex justify-content-between">
-                                <div class="flex-grow-1">
-                                    <div class="product-name">${line.product_name}</div>
-                                    <div class="product-detail text-muted">${line.quantity} x ${line.price}</div>
-                                </div>
-                                <div class="price text-end">${line.price_display}</div>
-                            </div>
-                        </div>
-            `;
-        });
-
-        html += `
-                    </div>
-                    <div class="pos-receipt-amount mt-3">
-                        <table class="table-borderless w-100">
-                            <tr>
-                                <td class="text-end"><strong>TOTAL:</strong></td>
-                                <td class="text-end price"><strong>${receiptData.customer_total}</strong></td>
-                            </tr>
-                        </table>
-                    </div>
-                </div>
-                <div class="pos-receipt-footer text-center mt-4">
-                    <div>Thank you for your business!</div>
-                </div>
-            </div>
-        `;
-
-        return html;
-    },
-});
-
-console.log("[PLEDGE] ReceiptScreen patch applied");
 console.log("[PLEDGE] Module loaded successfully!", PLEDGE_ORDER_BUILD_TAG);

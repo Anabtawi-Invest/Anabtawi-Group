@@ -10,6 +10,19 @@ _logger = logging.getLogger(__name__)
 class PosSession(models.Model):
     _inherit = 'pos.session'
 
+    @api.model
+    def _load_pos_data_models(self, config):
+        models_to_load = super()._load_pos_data_models(config)
+        for model_name in ("pos.site.service.menu", "pos.site.service.product.line"):
+            if model_name not in models_to_load:
+                models_to_load.append(model_name)
+                _logger.info(
+                    "[SITE_SERVICE] Registered POS data model %s for config id=%s",
+                    model_name,
+                    config.id,
+                )
+        return models_to_load
+
     def get_session_orders(self):
         """Exclude legacy technical pledge orders from session aggregates."""
         orders = super().get_session_orders()
@@ -29,31 +42,69 @@ class PosSession(models.Model):
         """
         self.ensure_one()
         cur = self.currency_id
-        if not self.start_at:
-            return {
-                "cash_in": 0.0,
-                "cash_out": 0.0,
-                "cash": 0.0,
-                "by_pm_in": {},
-                "by_pm_out": {},
-                "by_pm": {},
-            }
         end = self.stop_at or fields.Datetime.now()
         cash_in = 0.0
         cash_out = 0.0
         by_pm_in = defaultdict(float)
         by_pm_out = defaultdict(float)
 
-        for order in self._get_closed_orders():
+        closed_orders = self._get_closed_orders()
+        _logger.warning(
+            "[PLEDGE_CLOSING] START session=%s(%s) state=%s closed_orders=%s",
+            self.name,
+            self.id,
+            self.state,
+            closed_orders.mapped("name"),
+        )
+
+        for order in closed_orders:
             move = order.sudo().pledge_deposit_move_id
-            if not move or move.state != "posted":
+            if not move:
+                _logger.warning(
+                    "[PLEDGE_CLOSING] SKIP order=%s reason=no_pledge_deposit_move info=%s",
+                    order.name,
+                    order._get_pledge_closing_debug_info(),
+                )
                 continue
-            amt = order.total_pledge_amount or 0.0
+            if move.state != "posted":
+                _logger.warning(
+                    "[PLEDGE_CLOSING] SKIP order=%s reason=pledge_move_not_posted move_id=%s state=%s info=%s",
+                    order.name,
+                    move.id,
+                    move.state,
+                    order._get_pledge_closing_debug_info(),
+                )
+                continue
+            amt = order._get_pledge_closing_amount()
+            if cur.is_zero(amt):
+                _logger.warning(
+                    "[PLEDGE_CLOSING] SKIP order=%s reason=closing_amount_zero "
+                    "move_id=%s move_ref=%s info=%s",
+                    order.name,
+                    move.id,
+                    move.name,
+                    order._get_pledge_closing_debug_info(),
+                )
+                continue
             for part in self._iter_pledge_journal_payment_split(amt, move):
                 if part[0] == "cash":
                     cash_in += part[1]
+                    _logger.warning(
+                        "[PLEDGE_CLOSING] ADD cash_in order=%s amount=%s running_cash_in=%s move_id=%s",
+                        order.name,
+                        part[1],
+                        cash_in,
+                        move.id,
+                    )
                 else:
-                    by_pm_in[part[1]] += part[2]
+                    by_pm_in[part[2]] += part[1]
+                    _logger.warning(
+                        "[PLEDGE_CLOSING] ADD pm_in order=%s pm_id=%s amount=%s move_id=%s",
+                        order.name,
+                        part[2],
+                        part[1],
+                        move.id,
+                    )
 
         PledgeLine = self.env["pos.advance.order.pledge"].sudo()
         returned_here = PledgeLine.search([
@@ -68,23 +119,50 @@ class PosSession(models.Model):
             order = pl.pos_order_id
             if not order or order.id in seen_orders:
                 continue
+            if not order._include_in_pledge_closing_summary():
+                continue
             seen_orders.add(order.id)
             move = order.sudo().pledge_deposit_move_id
             if not move or move.state != "posted":
                 continue
-            amt = order.total_pledge_amount or 0.0
-            for part in self._iter_pledge_journal_payment_split(amt, move):
+            amt = order._get_pledge_closing_amount()
+            if cur.is_zero(amt):
+                continue
+            return_pm = pl.return_payment_method_id
+            if return_pm:
+                if return_pm.type == "cash":
+                    cash_out += amt
+                    _logger.warning(
+                        "[PLEDGE_CLOSING] ADD cash_out order=%s amount=%s pm=%s pledge_line=%s",
+                        order.name,
+                        amt,
+                        return_pm.display_name,
+                        pl.id,
+                    )
+                else:
+                    by_pm_out[return_pm.id] += amt
+                    _logger.warning(
+                        "[PLEDGE_CLOSING] ADD pm_out order=%s amount=%s pm_id=%s pledge_line=%s",
+                        order.name,
+                        amt,
+                        return_pm.id,
+                        pl.id,
+                    )
+                continue
+            return_move = pl.return_move_id
+            split_move = return_move if return_move and return_move.state == "posted" else move
+            for part in self._iter_pledge_journal_payment_split(amt, split_move):
                 if part[0] == "cash":
                     cash_out += part[1]
                 else:
-                    by_pm_out[part[1]] += part[2]
+                    by_pm_out[part[2]] += part[1]
 
         cash_net = cur.round(cash_in - cash_out)
         by_pm_net = defaultdict(float)
         for pid in set(by_pm_in) | set(by_pm_out):
             by_pm_net[pid] = cur.round(by_pm_in[pid] - by_pm_out.get(pid, 0.0))
 
-        return {
+        result = {
             "cash_in": cur.round(cash_in),
             "cash_out": cur.round(cash_out),
             "cash": cash_net,
@@ -92,6 +170,13 @@ class PosSession(models.Model):
             "by_pm_out": {k: cur.round(v) for k, v in by_pm_out.items()},
             "by_pm": dict(by_pm_net),
         }
+        _logger.warning(
+            "[PLEDGE_CLOSING] END session=%s(%s) result=%s",
+            self.name,
+            self.id,
+            result,
+        )
+        return result
 
     def _iter_pledge_journal_payment_split(self, amount, move):
         """Yield ('cash', amt) or ('pm', pm_id, amt) for a pledge deposit move."""
@@ -157,6 +242,12 @@ class PosSession(models.Model):
     def get_closing_control_data(self):
         data = super().get_closing_control_data()
         summary = self._get_pledge_deposit_closing_summary()
+        _logger.warning(
+            "[PLEDGE_CLOSING] get_closing_control_data session=%s(%s) pledge_summary=%s",
+            self.name,
+            self.id,
+            summary,
+        )
         cur = self.currency_id
         cash_extra = summary["cash"]
         by_pm = summary["by_pm"]
