@@ -368,11 +368,13 @@ class PosAdvanceOrderPledge(models.Model):
             raise UserError(_("Configure at least one payment method on the POS to return pledges."))
         return pm
 
-    def action_return_pledge(self):
+    def action_return_pledge(self, pos_payment_method_id=None, pos_session_id=None):
         """Reverse pledge deposit move and mark pledge lines returned."""
         ctx = self.env.context
-        pos_payment_method_id = ctx.get("pos_payment_method_id")
-        pos_session_id = ctx.get("pos_session_id")
+        if pos_payment_method_id is None:
+            pos_payment_method_id = ctx.get("pos_payment_method_id")
+        if pos_session_id is None:
+            pos_session_id = ctx.get("pos_session_id")
         PledgeLine = self.env["pos.advance.order.pledge"]
         for pledge in self:
             if pledge.state == "returned" and pledge.return_move_id:
