@@ -11,6 +11,7 @@ _logger = logging.getLogger(__name__)
 
 _ADV_DEPOSIT_MSG_RE = re.compile(r"ADV_DEPOSIT:(\d+)")
 _ADV_REFUND_MSG_RE = re.compile(r"ADV_REFUND:(\d+):(\d+):([\d.]+)")
+_ADV_SAME_SESSION_APPLY_RE = re.compile(r"ADV_SAME_SESSION_APPLY:(\d+):(\d+)")
 
 
 class PosSession(models.Model):
@@ -399,6 +400,30 @@ class PosSession(models.Model):
         )
         return summary
 
+    def _get_same_session_apply_payment_ids(self):
+        """pos.payment ids flagged as prepaid advance on this session (not pay_later)."""
+        self.ensure_one()
+        messages = self.env["mail.message"].sudo().search(
+            [
+                ("model", "=", "pos.session"),
+                ("res_id", "=", self.id),
+                ("body", "ilike", "ADV_SAME_SESSION_APPLY:"),
+            ]
+        )
+        payment_ids = set()
+        for message in messages:
+            body = message.body or ""
+            for _advance_id, payment_id in _ADV_SAME_SESSION_APPLY_RE.findall(body):
+                payment_ids.add(int(payment_id))
+        if payment_ids:
+            _logger.info(
+                "[ADV_TRACE] session=%s(%s) same_session_apply_payments=%s",
+                self.name,
+                self.id,
+                sorted(payment_ids),
+            )
+        return payment_ids
+
     def get_closing_control_data(self):
         """Keep reclassification logic and only change advance presentation in closing UI."""
         self.ensure_one()
@@ -463,6 +488,7 @@ class PosSession(models.Model):
 
         rounding = self.currency_id.rounding
         orders = self._get_closed_orders()
+        same_session_apply_ids = self._get_same_session_apply_payment_ids()
         reclassified_advance_by_pm = defaultdict(lambda: {"amount": 0.0, "number": 0})
         for order in orders:
             advance = order.advance_order_id
@@ -470,6 +496,18 @@ class PosSession(models.Model):
                 continue
             remaining = advance.remaining_pos_order_id
             if not remaining or order.id != remaining.id:
+                continue
+            for pay in order.payment_ids:
+                if pay.amount <= 0.0:
+                    continue
+                if pay.id in same_session_apply_ids:
+                    advance_part = min(advance.advance_amount or 0.0, pay.amount)
+                    if float_is_zero(advance_part, precision_rounding=rounding):
+                        continue
+                    bucket = reclassified_advance_by_pm[pay.payment_method_id.id]
+                    bucket["amount"] += advance_part
+                    bucket["number"] += 1
+            if any(pay.id in same_session_apply_ids for pay in order.payment_ids):
                 continue
             try:
                 app_pm = advance._get_advance_application_payment_method(self)
@@ -684,6 +722,88 @@ class PosSession(models.Model):
                 del combine_advance[pm]
 
         data["combine_receivables_pay_later_advance"] = dict(combine_advance)
+        data = self._accumulate_same_session_advance_application_amounts(data)
+        return data
+
+    def _accumulate_same_session_advance_application_amounts(self, data):
+        """Move prepaid advance payment lines off cash/bank buckets (same session as deposit)."""
+        self.ensure_one()
+        apply_payment_ids = self._get_same_session_apply_payment_ids()
+        if not apply_payment_ids:
+            data["combine_advance_application_receivable"] = {}
+            return data
+
+        amounts_fn = lambda: {"amount": 0.0, "amount_converted": 0.0}
+        combine_advance_application = defaultdict(amounts_fn)
+        rounding = self.currency_id.rounding
+
+        combine_receivables_cash = data.get("combine_receivables_cash")
+        combine_receivables_bank = data.get("combine_receivables_bank")
+        payments = self.env["pos.payment"].sudo().browse(list(apply_payment_ids)).exists()
+
+        for payment in payments:
+            amount = payment.amount
+            if float_is_zero(amount, precision_rounding=rounding):
+                continue
+            payment_method = payment.payment_method_id
+            if payment_method.split_transactions:
+                continue
+            date = payment.payment_date
+            if payment_method.type == "cash" and combine_receivables_cash is not None:
+                combine_receivables_cash[payment_method] = self._update_amounts(
+                    combine_receivables_cash[payment_method],
+                    {"amount": -amount},
+                    date,
+                )
+            elif payment_method.type == "bank" and combine_receivables_bank is not None:
+                combine_receivables_bank[payment_method] = self._update_amounts(
+                    combine_receivables_bank[payment_method],
+                    {"amount": -amount},
+                    date,
+                )
+            combine_advance_application[payment_method] = self._update_amounts(
+                combine_advance_application[payment_method],
+                {"amount": amount},
+                date,
+            )
+
+        data["combine_advance_application_receivable"] = dict(combine_advance_application)
+        _logger.info(
+            "[ADV_TRACE] session=%s(%s) same_session_advance_application=%s",
+            self.name,
+            self.id,
+            {
+                pm.id: self.currency_id.round(vals["amount"])
+                for pm, vals in combine_advance_application.items()
+            },
+        )
+        return data
+
+    def _create_cash_statement_lines_and_cash_move_lines(self, data):
+        apply_payment_ids = self._get_same_session_apply_payment_ids()
+        split_advance_cash = {}
+        if apply_payment_ids:
+            split_receivables_cash = data.get("split_receivables_cash") or {}
+            for payment in list(split_receivables_cash.keys()):
+                if payment.id in apply_payment_ids:
+                    split_advance_cash[payment] = split_receivables_cash.pop(payment)
+            data["split_receivables_cash"] = split_receivables_cash
+
+        data = super()._create_cash_statement_lines_and_cash_move_lines(data)
+
+        if split_advance_cash:
+            MoveLine = data.get("MoveLine")
+            advance_receivable_vals = [
+                self._get_split_receivable_vals(
+                    payment, amounts["amount"], amounts["amount_converted"]
+                )
+                for payment, amounts in split_advance_cash.items()
+            ]
+            if advance_receivable_vals:
+                extra_lines = MoveLine.create(advance_receivable_vals)
+                data["split_cash_receivable_lines"] = (
+                    data.get("split_cash_receivable_lines") | extra_lines
+                )
         return data
 
     def _get_combine_advance_pay_later_receivable_vals(
@@ -722,6 +842,15 @@ class PosSession(models.Model):
                     payment_method, amounts["amount"], amounts["amount_converted"]
                 )
             )
+        combine_advance_application = data.get("combine_advance_application_receivable") or {}
+        for payment_method, amounts in combine_advance_application.items():
+            if float_is_zero(amounts["amount"], precision_rounding=rounding):
+                continue
+            vals.append(
+                self._get_combine_advance_pay_later_receivable_vals(
+                    payment_method, amounts["amount"], amounts["amount_converted"]
+                )
+            )
         for payment, amounts in split_receivables_pay_later.items():
             vals.append(
                 self._get_split_receivable_vals(
@@ -743,6 +872,15 @@ class PosSession(models.Model):
                 return super()._get_split_receivable_vals(
                     payment, amount, amount_converted
                 )
+            same_session_apply_ids = self._get_same_session_apply_payment_ids()
+            if payment.id in same_session_apply_ids:
+                acc = advance.pos_config_id.pos_advance_receivable_account_id
+                partial_vals = {
+                    "account_id": acc.id,
+                    "move_id": self.move_id.id,
+                    "name": "%s - %s (Advance prepaid)" % (self.name, payment.payment_method_id.name),
+                }
+                return self._debit_amounts(partial_vals, amount, amount_converted)
             try:
                 advance_application_pm = advance._get_advance_application_payment_method(self)
             except UserError:
@@ -800,10 +938,11 @@ class PosSession(models.Model):
         return data
 
     def _get_advance_application_pay_later_lines(self, pay_later_lines):
-        """Session move lines created for prepaid advance (pay_later) on completion orders."""
+        """Session move lines created for prepaid advance on completion orders."""
         self.ensure_one()
         advance_lines = self.env["account.move.line"]
         rounding = self.currency_id.rounding
+        same_session_apply_ids = self._get_same_session_apply_payment_ids()
 
         for order in self._get_closed_orders():
             advance = order.advance_order_id
@@ -814,6 +953,23 @@ class PosSession(models.Model):
             receivable_account = advance._get_advance_receivable_account()
             if not receivable_account:
                 continue
+
+            for payment in order.payment_ids.filtered(
+                lambda pay: pay.id in same_session_apply_ids
+                and not float_is_zero(pay.amount, precision_rounding=rounding)
+            ):
+                payment_lines = pay_later_lines.filtered(
+                    lambda line: (
+                        line.account_id == receivable_account
+                        and line.balance > 0
+                        and float_compare(
+                            line.balance, payment.amount, precision_rounding=rounding
+                        )
+                        == 0
+                    )
+                )
+                advance_lines |= payment_lines
+
             try:
                 advance_application_pm = advance._get_advance_application_payment_method(self)
             except UserError:
@@ -821,6 +977,7 @@ class PosSession(models.Model):
 
             for payment in order.payment_ids.filtered(
                 lambda pay: pay.payment_method_id == advance_application_pm
+                and pay.id not in same_session_apply_ids
                 and not float_is_zero(pay.amount, precision_rounding=rounding)
             ):
                 accounting_partner = self.env["res.partner"]._find_accounting_partner(
@@ -832,7 +989,8 @@ class PosSession(models.Model):
                         and line.balance > 0
                         and float_compare(
                             line.balance, payment.amount, precision_rounding=rounding
-                        ) == 0
+                        )
+                        == 0
                         and (
                             not accounting_partner
                             or line.partner_id == accounting_partner
@@ -956,12 +1114,18 @@ class PosSession(models.Model):
         except UserError:
             advance_application_pm = self.env["pos.payment.method"]
 
-        payment_domain = lambda pay: pay.amount > 0
-        if match_advance_application_pm and advance_application_pm:
-            payment_domain = lambda pay: (
-                pay.amount > 0 and pay.payment_method_id == advance_application_pm
+        same_session_apply_ids = self._get_same_session_apply_payment_ids()
+        advance_payment = pos_order.payment_ids.filtered(
+            lambda pay: pay.amount > 0
+            and (
+                pay.id in same_session_apply_ids
+                or (
+                    match_advance_application_pm
+                    and advance_application_pm
+                    and pay.payment_method_id == advance_application_pm
+                )
             )
-        advance_payment = pos_order.payment_ids.filtered(payment_domain)[:1]
+        )[:1]
 
         if advance_payment and advance_payment.payment_method_id.split_transactions and accounting_partner:
             partner_lines = session_lines.filtered(

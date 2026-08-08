@@ -749,6 +749,72 @@ class PosAdvanceOrder(models.Model):
                 return pm
         return self._get_pay_later_payment_method(session)
 
+    def _is_advance_deposited_in_session(self, session):
+        """True when this advance deposit was registered on the given POS session."""
+        self.ensure_one()
+        if not session:
+            return False
+        marker = f"ADV_DEPOSIT:{self.id}"
+        return bool(
+            self.env["mail.message"]
+            .sudo()
+            .search_count(
+                [
+                    ("model", "=", "pos.session"),
+                    ("res_id", "=", session.id),
+                    ("body", "ilike", marker),
+                ]
+            )
+        )
+
+    def _get_deposit_payment_method_for_session(self, session):
+        """Payment method used for the advance deposit, validated on the completion session."""
+        self.ensure_one()
+        pm = self.pos_payment_method_id
+        if not pm:
+            raise UserError(_("No payment method is set on this advance order."))
+        if pm.id not in session.payment_method_ids.ids:
+            pm = self._get_pos_payment_method(session)
+        if pm.type == "pay_later":
+            raise UserError(
+                _("The advance deposit payment method cannot be Customer Account for same-session completion.")
+            )
+        if pm.payment_method_type and pm.payment_method_type != "none":
+            raise UserError(
+                _(
+                    "Integrated POS payment methods (terminal / QR) cannot represent the prepaid advance portion."
+                )
+            )
+        return pm
+
+    def _register_same_session_apply_payment(self, session, payment):
+        """Mark a completion payment line as prepaid advance (same session as deposit)."""
+        self.ensure_one()
+        if not session or not payment:
+            return
+        marker = f"ADV_SAME_SESSION_APPLY:{self.id}:{payment.id}"
+        existing = self.env["mail.message"].sudo().search_count(
+            [
+                ("model", "=", "pos.session"),
+                ("res_id", "=", session.id),
+                ("body", "ilike", marker),
+            ]
+        )
+        if existing:
+            return
+        session.message_post(
+            body=f"<p>{marker}</p>",
+            subtype_xmlid="mail.mt_note",
+        )
+        _logger.info(
+            "[ADV_TRACE] same_session_apply advance=%s session=%s(%s) payment=%s marker=%s",
+            self.name,
+            session.name,
+            session.id,
+            payment.id,
+            marker,
+        )
+
     def _normalize_tax_ids(self, tax_value):
         """Normalize tax_ids input (either [Command/set], [(6,0,ids)], ids list) -> ids list."""
         if not tax_value:
@@ -1614,13 +1680,44 @@ class PosAdvanceOrder(models.Model):
                     _("Order total does not match remaining plus advance. Recalculate the advance order.")
                 )
 
+            same_session_completion = order._is_advance_deposited_in_session(session)
+            deposit_pm = False
             payouts = [(pm, remaining_tendered)]
             if not float_is_zero(remaining_change, precision_rounding=rounding):
                 payouts.append((pm, -remaining_change))
             if not float_is_zero(advance_part, precision_rounding=rounding):
-                adv_pm = order._get_advance_application_payment_method(session)
-                payouts.append((adv_pm, advance_part))
+                if same_session_completion:
+                    deposit_pm = order._get_deposit_payment_method_for_session(session)
+                    payouts.append((deposit_pm, advance_part))
+                    _logger.info(
+                        "[ADV_TRACE] same_session_completion advance=%s session=%s(%s) "
+                        "deposit_pm=%s advance_part=%s",
+                        order.name,
+                        session.name,
+                        session.id,
+                        deposit_pm.id,
+                        advance_part,
+                    )
+                else:
+                    adv_pm = order._get_advance_application_payment_method(session)
+                    payouts.append((adv_pm, advance_part))
             order._pay_pos_order_multi(pos_order, payouts)
+            if same_session_completion and deposit_pm and not float_is_zero(
+                advance_part, precision_rounding=rounding
+            ):
+                apply_payment = pos_order.payment_ids.filtered(
+                    lambda pay: (
+                        pay.payment_method_id == deposit_pm
+                        and float_compare(
+                            pay.amount,
+                            advance_part,
+                            precision_rounding=rounding,
+                        )
+                        == 0
+                    )
+                )[:1]
+                if apply_payment:
+                    order._register_same_session_apply_payment(session, apply_payment)
             order.remaining_pos_order_id = pos_order.id
             order.remaining_amount_tendered = remaining_tendered
             order.remaining_change_amount = remaining_change
