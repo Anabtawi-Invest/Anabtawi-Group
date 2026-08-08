@@ -80,6 +80,13 @@ class PosAdvanceOrderPledge(models.Model):
     )
     pledge_move_id = fields.Many2one("account.move", string="Pledge Move", readonly=True, copy=False)
     return_move_id = fields.Many2one("account.move", string="Return Move", readonly=True, copy=False)
+    return_payment_method_id = fields.Many2one(
+        "pos.payment.method",
+        string="Return Payment Method",
+        readonly=True,
+        copy=False,
+        help="POS payment method used when the pledge deposit was returned to the customer.",
+    )
 
     @api.depends(
         "order_id.currency_id",
@@ -330,8 +337,42 @@ class PosAdvanceOrderPledge(models.Model):
             )
         return created[:1].id
 
+    @api.model
+    def _resolve_return_payment_method(self, pos_order, pos_payment_method_id=None):
+        """Resolve the POS payment method used to pay the customer on pledge return."""
+        PaymentMethod = self.env["pos.payment.method"].sudo()
+        config = pos_order.config_id
+        if not config:
+            raise UserError(_("POS configuration not found for this pledge order."))
+        if pos_payment_method_id:
+            pm = PaymentMethod.browse(int(pos_payment_method_id))
+            if pm.exists() and pm.id in config.payment_method_ids.ids:
+                return pm
+            raise UserError(_("Selected payment method is not available on this POS."))
+        deposit_move = (
+            pos_order.pledge_deposit_move_id
+            if "pledge_deposit_move_id" in pos_order._fields
+            else self.env["account.move"]
+        )
+        if deposit_move and deposit_move.journal_id:
+            pm = config.payment_method_ids.filtered(
+                lambda p: p.journal_id == deposit_move.journal_id
+            )[:1]
+            if pm:
+                return pm
+        pm = config.payment_method_ids.filtered(lambda p: p.type == "cash" and p.journal_id)[:1]
+        if pm:
+            return pm
+        pm = config.payment_method_ids.filtered(lambda p: p.journal_id)[:1]
+        if not pm:
+            raise UserError(_("Configure at least one payment method on the POS to return pledges."))
+        return pm
+
     def action_return_pledge(self):
         """Reverse pledge deposit move and mark pledge lines returned."""
+        ctx = self.env.context
+        pos_payment_method_id = ctx.get("pos_payment_method_id")
+        pos_session_id = ctx.get("pos_session_id")
         PledgeLine = self.env["pos.advance.order.pledge"]
         for pledge in self:
             if pledge.state == "returned" and pledge.return_move_id:
@@ -376,6 +417,8 @@ class PosAdvanceOrderPledge(models.Model):
             if not move or move.state != "posted":
                 raise UserError(_("No posted pledge journal entry is linked to this pledge."))
 
+            return_pm = pledge._resolve_return_payment_method(pos_order, pos_payment_method_id)
+
             existing_return = related_lines.filtered(lambda l: l.return_move_id)[:1]
             reverse_move = existing_return.return_move_id
             if not reverse_move:
@@ -404,14 +447,34 @@ class PosAdvanceOrderPledge(models.Model):
                     "state": "returned",
                     "return_date": fields.Datetime.now(),
                     "return_move_id": reverse_move.id,
+                    "return_payment_method_id": return_pm.id,
                     "pledge_move_id": move.id,
                 }
             )
 
             sess = pos_order.session_id if pos_order else False
+            if pos_session_id:
+                refund_session = (
+                    self.env["pos.session"]
+                    .sudo()
+                    .browse(int(pos_session_id))
+                    .exists()
+                )
+                if (
+                    refund_session
+                    and refund_session.config_id == pos_order.config_id
+                    and refund_session.state in ("opened", "closing_control")
+                ):
+                    sess = refund_session
             if sess and sess.state in ("opened", "closing_control"):
                 sess.invalidate_recordset(
                     ["cash_register_balance_end", "cash_register_difference"]
+                )
+                _logger.info(
+                    "[PLEDGE] Returned pledge line(s) %s via payment method %s session=%s",
+                    related_lines.ids,
+                    return_pm.display_name,
+                    sess.name,
                 )
         return True
 
