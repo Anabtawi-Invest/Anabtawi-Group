@@ -427,6 +427,10 @@ class PosSession(models.Model):
             body = message.body or ""
             for _advance_id, payment_id in _ADV_SAME_SESSION_APPLY_RE.findall(body):
                 payment_ids.add(int(payment_id))
+
+        if not payment_ids and self.config_id.enable_advance_order:
+            payment_ids = self._fallback_same_session_apply_payment_ids()
+
         if payment_ids:
             _logger.info(
                 "[ADV_TRACE] session=%s(%s) same_session_apply_payments=%s",
@@ -434,6 +438,46 @@ class PosSession(models.Model):
                 self.id,
                 sorted(payment_ids),
             )
+        return payment_ids
+
+    def _fallback_same_session_apply_payment_ids(self):
+        """Detect same-session advance application payments when session markers are missing."""
+        self.ensure_one()
+        payment_ids = set()
+        rounding = self.currency_id.rounding
+        deposited_advances = self._advance_orders_from_session_messages()
+
+        for order in self._get_closed_orders():
+            advance = order.advance_order_id
+            if not advance or advance not in deposited_advances:
+                continue
+            remaining = advance.remaining_pos_order_id
+            if not remaining or order.id != remaining.id:
+                continue
+            deposit_pm = advance.pos_payment_method_id
+            advance_part = advance.advance_amount or 0.0
+            if not deposit_pm or float_is_zero(advance_part, precision_rounding=rounding):
+                continue
+            candidates = order.payment_ids.filtered(
+                lambda pay: (
+                    pay.amount > 0.0
+                    and pay.payment_method_id == deposit_pm
+                    and float_compare(
+                        pay.amount, advance_part, precision_rounding=rounding
+                    )
+                    == 0
+                )
+            )
+            if len(candidates) == 1:
+                payment_ids.add(candidates.id)
+            elif len(candidates) > 1:
+                _logger.warning(
+                    "[ADV_TRACE] session=%s(%s) ambiguous same_session_apply advance=%s candidates=%s",
+                    self.name,
+                    self.id,
+                    advance.name,
+                    candidates.ids,
+                )
         return payment_ids
 
     def get_closing_control_data(self):
@@ -703,43 +747,43 @@ class PosSession(models.Model):
     def _accumulate_amounts(self, data):
         data = super()._accumulate_amounts(data)
         combine = data.get("combine_receivables_pay_later")
-        if not combine:
+        if combine:
+            amounts_fn = lambda: {"amount": 0.0, "amount_converted": 0.0}
+            combine_advance = defaultdict(amounts_fn)
+            rounding = self.currency_id.rounding
+
+            for order in self._get_closed_orders():
+                if order.is_invoiced:
+                    continue
+                advance = order.advance_order_id
+                if not advance or not advance.pos_config_id.pos_advance_receivable_account_id:
+                    continue
+                for payment in order.payment_ids:
+                    pm = payment.payment_method_id
+                    if pm.type != "pay_later" or pm.split_transactions:
+                        continue
+                    amount = payment.amount
+                    if float_is_zero(amount, precision_rounding=rounding):
+                        continue
+                    date = payment.payment_date
+                    combine_advance[pm] = self._update_amounts(
+                        combine_advance[pm], {"amount": amount}, date
+                    )
+                    combine[pm] = self._update_amounts(
+                        combine[pm], {"amount": -amount}, date
+                    )
+
+            for pm in list(combine.keys()):
+                if float_is_zero(combine[pm]["amount"], precision_rounding=rounding):
+                    del combine[pm]
+            for pm in list(combine_advance.keys()):
+                if float_is_zero(combine_advance[pm]["amount"], precision_rounding=rounding):
+                    del combine_advance[pm]
+
+            data["combine_receivables_pay_later_advance"] = dict(combine_advance)
+        else:
             data["combine_receivables_pay_later_advance"] = {}
-            return data
 
-        amounts_fn = lambda: {"amount": 0.0, "amount_converted": 0.0}
-        combine_advance = defaultdict(amounts_fn)
-        rounding = self.currency_id.rounding
-
-        for order in self._get_closed_orders():
-            if order.is_invoiced:
-                continue
-            advance = order.advance_order_id
-            if not advance or not advance.pos_config_id.pos_advance_receivable_account_id:
-                continue
-            for payment in order.payment_ids:
-                pm = payment.payment_method_id
-                if pm.type != "pay_later" or pm.split_transactions:
-                    continue
-                amount = payment.amount
-                if float_is_zero(amount, precision_rounding=rounding):
-                    continue
-                date = payment.payment_date
-                combine_advance[pm] = self._update_amounts(
-                    combine_advance[pm], {"amount": amount}, date
-                )
-                combine[pm] = self._update_amounts(
-                    combine[pm], {"amount": -amount}, date
-                )
-
-        for pm in list(combine.keys()):
-            if float_is_zero(combine[pm]["amount"], precision_rounding=rounding):
-                del combine[pm]
-        for pm in list(combine_advance.keys()):
-            if float_is_zero(combine_advance[pm]["amount"], precision_rounding=rounding):
-                del combine_advance[pm]
-
-        data["combine_receivables_pay_later_advance"] = dict(combine_advance)
         data = self._accumulate_same_session_advance_application_amounts(data)
         return data
 
@@ -765,6 +809,7 @@ class PosSession(models.Model):
                 continue
             payment_method = payment.payment_method_id
             if payment_method.split_transactions:
+                # Split cash/bank: exclude from statement in _create_cash_statement_lines.
                 continue
             date = payment.payment_date
             if payment_method.type == "cash" and combine_receivables_cash is not None:
