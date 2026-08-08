@@ -89,7 +89,8 @@ class PosAdvanceOrder(models.Model):
     site_service = fields.Boolean(
         string="Site Service",
         default=False,
-        help="When enabled, site service scoring was applied when creating this advance order.",
+        help="When enabled, site service scoring was applied when creating this advance order. "
+        "No pledge lines or pledge collection are created for this order.",
     )
     payment_method = fields.Selection(
         [
@@ -262,6 +263,11 @@ class PosAdvanceOrder(models.Model):
                 uom=line.product_uom_id,
                 date=self.picking_date,
             )
+
+    def _pledge_applies(self):
+        """Pledge is disabled when Site Service was selected on the advance popup."""
+        self.ensure_one()
+        return not self.site_service
 
     def _send_create_payment_email_to_manager(self):
         """Notify the configured manager on the Picking POS when advance payment is created."""
@@ -591,8 +597,15 @@ class PosAdvanceOrder(models.Model):
         For each product in lines that has_pledge=True:
         - create/update a pledge line with pledge_qty = total product qty in the order
         - pledge_amount_unit = product template pledge_amount
+
+        Site Service advance orders (popup checkbox) never carry pledge.
         """
         for order in self:
+            if order.site_service:
+                if order.pledge_line_ids:
+                    order.write({"pledge_line_ids": [fields.Command.delete(pl.id) for pl in order.pledge_line_ids]})
+                continue
+
             # Link pledge lines to the POS order which collected the pledge (remaining payment order)
             linked_pos_order_id = False
             if order.pledge_pos_order_id:
@@ -1735,7 +1748,12 @@ class PosAdvanceOrder(models.Model):
                 or order.pledge_line_ids
                 or has_pledge_on_lines
             )
-            if has_pledge_indicators:
+            if order.site_service:
+                _logger.info(
+                    "[ADV_PLEDGE_DEBUG] skipped pledge processing advance=%s reason=site_service_enabled",
+                    order.name,
+                )
+            elif has_pledge_indicators:
                 _logger.warning(
                     "[ADV_PLEDGE_DEBUG] completion start advance=%s pos_order=%s pledge_amount=%s "
                     "order_pledge_lines=%s pos_lines=%s pos_pledge_products=%s",
