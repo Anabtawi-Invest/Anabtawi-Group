@@ -18,17 +18,6 @@ class PosConfig(models.Model):
                     )
                 )
 
-    @api.constrains("pos_advance_application_payment_method_id", "payment_method_ids")
-    def _check_advance_application_payment_method(self):
-        for cfg in self:
-            pm = cfg.pos_advance_application_payment_method_id
-            if pm and pm.id not in cfg.payment_method_ids.ids:
-                raise ValidationError(
-                    _(
-                        "The field 'Advance Application Payment Method' must be one of this POS payment methods."
-                    )
-                )
-
     enable_advance_order = fields.Boolean(string="Enable Advance Order")
     advance_order_manager_id = fields.Many2one(
         "res.users",
@@ -88,7 +77,6 @@ class PosConfig(models.Model):
         "pos.payment.method",
         string="Advance Application Payment Method",
         help="Shown as the second payment line on the completion POS order for the prepaid advance (e.g. 5 when cash is 25). "
-        "Create a dedicated method named e.g. 'Advance / عربون' (often type Customer Account / pay later) and add it to this POS. "
         "If empty, the first Customer Account method on the session is used.",
     )
 

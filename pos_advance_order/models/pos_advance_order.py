@@ -742,11 +742,8 @@ class PosAdvanceOrder(models.Model):
         self.ensure_one()
         cfg = self.pos_config_id
         pm = cfg.pos_advance_application_payment_method_id
-        if pm and pm.id in session.payment_method_ids.ids:
-            # Advance application must go through pay_later so settlement
-            # (Dr liability / Cr advance receivable) is fully consumed.
-            if pm.type == "pay_later":
-                return pm
+        if pm:
+            return pm
         return self._get_pay_later_payment_method(session)
 
     def _is_advance_deposited_in_session(self, session):
