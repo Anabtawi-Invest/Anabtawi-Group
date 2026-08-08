@@ -32,9 +32,21 @@ class PosSession(models.Model):
                 continue
             deposited_summary = session._get_deposited_advance_summary()
             refunded_summary = session._get_refunded_advance_summary()
+            same_session_apply_ids = session._get_same_session_apply_payment_ids()
+            same_session_cash_apply = 0.0
+            if same_session_apply_ids:
+                for pay in (
+                    session.env["pos.payment"]
+                    .sudo()
+                    .browse(list(same_session_apply_ids))
+                    .exists()
+                ):
+                    if pay.payment_method_id.type == "cash":
+                        same_session_cash_apply += pay.amount or 0.0
             extra_cash = session.currency_id.round(
                 (deposited_summary.get("cash") or 0.0)
                 - (refunded_summary.get("cash") or 0.0)
+                - same_session_cash_apply
             )
             if session.currency_id.is_zero(extra_cash):
                 continue
@@ -547,6 +559,12 @@ class PosSession(models.Model):
             if dc_id and pm_id == dc_id:
                 default_cash["advance_applied_amount"] = self.currency_id.round(
                     (default_cash.get("advance_applied_amount") or 0.0) + amt
+                )
+                default_cash["amount"] = self.currency_id.round(
+                    (default_cash.get("amount") or 0.0) - amt
+                )
+                default_cash["payment_amount"] = self.currency_id.round(
+                    (default_cash.get("payment_amount") or 0.0) - amt
                 )
                 continue
             for row in non_cash:
