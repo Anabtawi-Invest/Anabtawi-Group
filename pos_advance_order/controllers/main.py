@@ -197,15 +197,17 @@ class PosAdvanceOrderController(http.Controller):
                 order._register_deposit_on_pos_session(deposit_session)
 
         _logger.info(
-            "[ADV_TRACE] create_advance_order done advance=%s id=%s state=%s "
-            "deposit_move=%s move_ref=%s from_pos=%s company=%s",
+            "[ADV_TRACE] create_advance_order done advance=%s id=%s state=%s site_service=%s "
+            "deposit_move=%s move_ref=%s from_pos=%s company=%s pledge_lines=%s",
             order.name,
             order.id,
             order.state,
+            order.site_service,
             order.advance_deposit_move_id.id if order.advance_deposit_move_id else False,
             order.advance_deposit_move_id.ref if order.advance_deposit_move_id else False,
             order.from_pos_config_id.id,
             order.company_id.id,
+            order.pledge_line_ids.ids,
         )
 
         return {

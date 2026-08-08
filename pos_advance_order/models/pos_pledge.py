@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 
+import logging
 from collections import defaultdict
 
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class PosAdvanceOrderPledge(models.Model):
@@ -183,10 +186,37 @@ class PosAdvanceOrderPledge(models.Model):
             if not rec.order_id and not rec.pos_order_id:
                 raise ValidationError(_("Pledge line must be linked to an Advance Order or a POS Order."))
 
+    @api.model
+    def _pledge_is_blocked_for_vals(self, vals):
+        """Site Service advance orders must never create pledge records."""
+        advance = self.env["pos.advance.order"]
+        if vals.get("order_id"):
+            advance = advance.browse(vals["order_id"])
+        elif vals.get("pos_order_id"):
+            pos_order = self.env["pos.order"].browse(vals["pos_order_id"])
+            if pos_order.exists():
+                advance = pos_order.advance_order_id
+        if advance and advance.exists() and not advance._pledge_applies():
+            return advance
+        return False
+
     @api.model_create_multi
     def create(self, vals_list):
-        # Auto-fill order_id/partner_id when possible
+        allowed_vals = []
         for vals in vals_list:
+            blocked_advance = self._pledge_is_blocked_for_vals(vals)
+            if blocked_advance:
+                _logger.info(
+                    "[ADVANCE_ORDER] Blocked pledge line create for site service advance %s",
+                    blocked_advance.name,
+                )
+                continue
+            allowed_vals.append(vals)
+        if not allowed_vals:
+            return self.browse()
+
+        # Auto-fill order_id/partner_id when possible
+        for vals in allowed_vals:
             if not vals.get("order_id") and vals.get("pos_order_id"):
                 pos_order = self.env["pos.order"].browse(vals["pos_order_id"])
                 if pos_order.exists() and pos_order.advance_order_id:
@@ -202,7 +232,7 @@ class PosAdvanceOrderPledge(models.Model):
                     vals["partner_id"] = pos_order.partner_id.id
             if "receive_date" not in vals:
                 vals["receive_date"] = fields.Datetime.now()
-        return super().create(vals_list)
+        return super().create(allowed_vals)
 
     @api.model
     def create_from_pos(self, vals):
@@ -223,7 +253,16 @@ class PosAdvanceOrderPledge(models.Model):
         if not pos_order.exists():
             raise ValidationError(_("POS Order not found."))
 
-        advance_order_id = pos_order.advance_order_id.id if getattr(pos_order, "advance_order_id", False) else False
+        advance_order = pos_order.advance_order_id
+        if advance_order and not advance_order._pledge_applies():
+            _logger.info(
+                "[ADVANCE_ORDER] Skipped create_from_pos for site service advance %s on POS order %s",
+                advance_order.name,
+                pos_order.name,
+            )
+            return False
+
+        advance_order_id = advance_order.id if advance_order else False
 
         pledge_product_ids = vals.get("pledge_products") or []
         if not isinstance(pledge_product_ids, list):

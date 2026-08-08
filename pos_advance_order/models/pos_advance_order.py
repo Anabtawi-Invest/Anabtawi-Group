@@ -1065,6 +1065,7 @@ class PosAdvanceOrder(models.Model):
         return "bank"
 
     def action_confirm(self):
+        confirmed = self.browse()
         for order in self:
             if order.state != "draft":
                 continue
@@ -1096,7 +1097,9 @@ class PosAdvanceOrder(models.Model):
                 raise UserError(_("Amount tendered cannot be less than advance amount."))
 
             order.state = "confirmed"
+            confirmed |= order
 
+        confirmed._sync_pledge_lines()
         return True
 
     def action_set_to_draft(self):
@@ -2093,7 +2096,9 @@ class PosAdvanceOrder(models.Model):
             if vals.get("pos_payment_method_id") and "payment_method" not in vals:
                 pm = PaymentMethod.browse(vals["pos_payment_method_id"])
                 vals["payment_method"] = self._payment_method_selection_from_pos_pm(pm)
-        return super().create(vals_list)
+        orders = super().create(vals_list)
+        orders._sync_pledge_lines()
+        return orders
 
     # -------------------------------------------------------------------------
     # Catalog integration (product.catalog.mixin)
