@@ -32,17 +32,38 @@ class PosSession(models.Model):
         orders = super()._get_closed_orders()
         return orders.filtered(lambda o: not o.is_pledge_generated)
 
+    def _get_pledge_return_lines_for_closing(self):
+        """Pledge returns for this session's closing (same POS / same session)."""
+        self.ensure_one()
+        end = self.stop_at or fields.Datetime.now()
+        PledgeLine = self.env["pos.advance.order.pledge"].sudo()
+        on_this_session = PledgeLine.search([
+            ("state", "=", "returned"),
+            ("return_move_id.state", "=", "posted"),
+            ("return_pos_session_id", "=", self.id),
+            ("pos_order_id", "!=", False),
+        ])
+        legacy_same_pos = PledgeLine.search([
+            ("state", "=", "returned"),
+            ("return_move_id.state", "=", "posted"),
+            ("return_pos_session_id", "=", False),
+            ("return_move_id.create_date", ">=", self.start_at),
+            ("return_move_id.create_date", "<=", end),
+            ("pos_order_id", "!=", False),
+            ("pos_order_id.config_id", "=", self.config_id.id),
+        ])
+        return on_this_session | legacy_same_pos
+
     def _get_pledge_deposit_closing_summary(self):
         """Gross pledge cash effect from journal entries (not pos.payment), split in / out.
 
         - ``cash_in`` / ``by_pm_in``: pledge deposits for orders **in this session** (posted deposit JE).
-        - ``cash_out`` / ``by_pm_out``: pledge **returns** whose reversal move was posted in this
-          session window (cash left the drawer), for any linked POS order.
+        - ``cash_out`` / ``by_pm_out``: pledge **returns** on **this session**, or legacy returns on the
+          **same POS config** within this session's time window.
         - ``cash`` / ``by_pm``: net (in − out) for adjusting expected payment totals.
         """
         self.ensure_one()
         cur = self.currency_id
-        end = self.stop_at or fields.Datetime.now()
         cash_in = 0.0
         cash_out = 0.0
         by_pm_in = defaultdict(float)
@@ -106,14 +127,15 @@ class PosSession(models.Model):
                         move.id,
                     )
 
-        PledgeLine = self.env["pos.advance.order.pledge"].sudo()
-        returned_here = PledgeLine.search([
-            ("state", "=", "returned"),
-            ("return_move_id.state", "=", "posted"),
-            ("return_move_id.create_date", ">=", self.start_at),
-            ("return_move_id.create_date", "<=", end),
-            ("pos_order_id", "!=", False),
-        ])
+        returned_here = self._get_pledge_return_lines_for_closing()
+        _logger.warning(
+            "[PLEDGE_CLOSING] returns session=%s(%s) config=%s count=%s ids=%s",
+            self.name,
+            self.id,
+            self.config_id.id,
+            len(returned_here),
+            returned_here.ids,
+        )
         seen_orders = set()
         for pl in returned_here:
             order = pl.pos_order_id

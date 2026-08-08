@@ -87,6 +87,14 @@ class PosAdvanceOrderPledge(models.Model):
         copy=False,
         help="POS payment method used when the pledge deposit was returned to the customer.",
     )
+    return_pos_session_id = fields.Many2one(
+        "pos.session",
+        string="Return POS Session",
+        readonly=True,
+        copy=False,
+        index=True,
+        help="POS session where the pledge return was processed (used for closing register).",
+    )
 
     @api.depends(
         "order_id.currency_id",
@@ -464,10 +472,13 @@ class PosAdvanceOrderPledge(models.Model):
                 )
                 if (
                     refund_session
+                    and pos_order
                     and refund_session.config_id == pos_order.config_id
                     and refund_session.state in ("opened", "closing_control")
                 ):
                     sess = refund_session
+            if sess:
+                related_lines.write({"return_pos_session_id": sess.id})
             if sess and sess.state in ("opened", "closing_control"):
                 sess.invalidate_recordset(
                     ["cash_register_balance_end", "cash_register_difference"]
