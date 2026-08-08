@@ -39,6 +39,12 @@ class PosAdvanceOrderController(http.Controller):
         employee_id = payload.get("employee_id")
         discount_id = payload.get("discount_id")
         site_service = bool(payload.get("site_service"))
+        _logger.warning(
+            "[PLEDGE_CLOSING] create_advance_order request site_service=%s raw=%s partner_id=%s",
+            site_service,
+            payload.get("site_service"),
+            partner_id,
+        )
 
         if not partner_id:
             raise ValidationError("Customer is required.")

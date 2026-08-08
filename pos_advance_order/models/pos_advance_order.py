@@ -1715,6 +1715,12 @@ class PosAdvanceOrder(models.Model):
                     adv_pm = order._get_advance_application_payment_method(session)
                     payouts.append((adv_pm, advance_part))
             if order.site_service:
+                _logger.warning(
+                    "[PLEDGE_CLOSING] action_create_remaining_payment clearing pledge snapshot "
+                    "advance=%s pos_order=%s site_service=True",
+                    order.name,
+                    pos_order.name,
+                )
                 pos_order.sudo().write({
                     "total_pledge_amount": 0.0,
                     "pledge_product_qty": 0,
