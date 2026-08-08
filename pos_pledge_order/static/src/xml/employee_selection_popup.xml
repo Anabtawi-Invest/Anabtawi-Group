@@ -2,7 +2,7 @@
 <templates xml:space="preserve">
 
     <t t-name="pos_pledge.EmployeeSelectionPopup" owl="1">
-        <Dialog t-att-title="title" size="'md'">
+        <Dialog title="title" size="'md'">
             <div class="employee-selection-popup">
                 <!-- Search Bar -->
                 <div class="search-bar mb-3">

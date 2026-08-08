@@ -2,7 +2,7 @@
 <templates xml:space="preserve">
 
 <t t-name="pos_pledge.PledgeListPopup">
-    <Dialog t-att-title="title">
+    <Dialog title="title">
         <div class="p-3">
             
             <!-- SEARCH BAR -->
@@ -109,7 +109,7 @@
     </Dialog>
 
     <!-- PLEDGE DETAILS POPUP -->
-    <Dialog t-if="state.selectedPledgeDetails" t-att-title="detailsTitle">
+    <Dialog t-if="state.selectedPledgeDetails" title="detailsTitle">
         <div class="p-3">
             <t t-set="pledge" t-value="state.selectedPledgeDetails"/>
             
