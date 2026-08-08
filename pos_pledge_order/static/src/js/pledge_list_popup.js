@@ -5,6 +5,8 @@ import { useService } from "@web/core/utils/hooks";
 import { usePos } from "@point_of_sale/app/hooks/pos_hook";
 import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
+import { formatCurrency } from "@web/core/currency";
+import { getAdvanceEligiblePaymentMethods } from "@pos_advance_order/app/screens/product_screen/control_buttons/advance_order_button/advance_order_form_popup";
 
 export class PledgeListPopup extends Component {
     static template = "pos_pledge.PledgeListPopup";
@@ -19,12 +21,16 @@ export class PledgeListPopup extends Component {
         this.orm = useService("orm");
         this.notification = useService("notification");
         this.pos = usePos();
+        const paymentMethods = getAdvanceEligiblePaymentMethods(this.pos);
+        const defaultPmId = paymentMethods.length ? paymentMethods[0].id : null;
 
         this.state = useState({
             pledges: [],
-            selectedPledge: null,
+            selectedPledgeId: null,
             search: "",
             selectedPledgeDetails: null,
+            payment_methods: paymentMethods,
+            selected_payment_method_id: defaultPmId,
         });
 
         onMounted(() => this._loadPledges());
@@ -64,6 +70,26 @@ export class PledgeListPopup extends Component {
 
     get closeLabel() {
         return _t("Close");
+    }
+
+    get returnPledgeLabel() {
+        return _t("Return Pledge");
+    }
+
+    get paymentMethodLabel() {
+        return _t("Return payment method");
+    }
+
+    get returnHintText() {
+        return _t(
+            "The pledge amount will be returned to the customer from the selected payment method."
+        );
+    }
+
+    get noEligiblePaymentMethodsText() {
+        return _t(
+            "No eligible payment methods on this POS. Add manual cash or bank methods without terminal or QR integration in the Point of Sale configuration."
+        );
     }
 
     get customerLabel() {
@@ -122,32 +148,81 @@ export class PledgeListPopup extends Component {
         return _t("Showing %s of %s pledges", this.filteredPledges.length, this.state.pledges.length);
     }
 
+    get selectedPledge() {
+        return this.state.pledges.find((p) => p.id === this.state.selectedPledgeId) || null;
+    }
+
+    get selectedReturnAmountFmt() {
+        const currencyId = this.pos?.currency?.id;
+        const amount = this.selectedPledge ? Number(this.selectedPledge.pledge_amount ?? 0) : 0;
+        return formatCurrency(amount, currencyId);
+    }
+
+    paymentMethodIconSrc(pm) {
+        if (!pm) {
+            return "";
+        }
+        if (pm.image) {
+            return `/web/image/pos.payment.method/${pm.id}/image`;
+        }
+        if (pm.type === "cash") {
+            return "/point_of_sale/static/src/img/money.png";
+        }
+        return "/point_of_sale/static/src/img/card-bank.png";
+    }
+
+    isPaymentSelected(pm) {
+        return pm.id === this.state.selected_payment_method_id;
+    }
+
+    paymentMethodRowClass(pm) {
+        const selected = this.isPaymentSelected(pm);
+        return `button paymentmethod btn btn-secondary btn-lg lh-lg d-flex justify-content-between align-items-center flex-fill text-start ${selected ? "border border-3 border-primary" : "opacity-75"}`;
+    }
+
+    pledgeCardClass(pledge) {
+        const selected = this.state.selectedPledgeId === pledge.id;
+        return selected ? "card mb-2 border border-3 border-primary" : "card mb-2";
+    }
+
+    selectPaymentMethod(pm) {
+        this.state.selected_payment_method_id = pm.id;
+    }
+
     // ==================================
     // LOAD ACTIVE PLEDGES (FILTERED BY RETURN TYPE)
     // ==================================
     async _loadPledges() {
-        const returnType = this.props.returnType || 'customer';
+        const returnType = this.props.returnType || "customer";
         console.log("[PLEDGE] Loading active pledges for popup (return_type:", returnType, ")...");
-        
+
         try {
-            // Build domain based on return_type
-            const domain = [['state', '=', 'active']];
-            
-            if (returnType === 'employee') {
-                // Employee pledges: must have employee_id
-                domain.push(['employee_id', '!=', false]);
-                console.log("[PLEDGE] Filtering for employee pledges (with employee_id)");
+            const domain = [["state", "=", "active"]];
+
+            if (returnType === "employee") {
+                domain.push(["employee_id", "!=", false]);
             } else {
-                // Customer pledges: must NOT have employee_id
-                domain.push(['employee_id', '=', false]);
-                console.log("[PLEDGE] Filtering for customer pledges (without employee_id)");
+                domain.push(["employee_id", "=", false]);
             }
-            
+
             const rows = await this.orm.searchRead(
                 "pos.advance.order.pledge",
                 domain,
-                ['id', 'order_id', 'pos_order_id', 'partner_id', 'employee_id', 'product_id', 'pledge_qty', 'pledge_amount_unit', 'pledge_subtotal', 'create_date', 'state', 'return_date'],
-                { order: 'create_date desc' }
+                [
+                    "id",
+                    "order_id",
+                    "pos_order_id",
+                    "partner_id",
+                    "employee_id",
+                    "product_id",
+                    "pledge_qty",
+                    "pledge_amount_unit",
+                    "pledge_subtotal",
+                    "create_date",
+                    "state",
+                    "return_date",
+                ],
+                { order: "create_date desc" }
             );
             this.state.pledges = rows.map((row) => ({
                 ...row,
@@ -157,58 +232,52 @@ export class PledgeListPopup extends Component {
                 delivery_amount: 0,
                 case_type: "case2",
             }));
-            
-            // Load employee names for each pledge
+
             const employeeIds = this.state.pledges
-                .map(p => p.employee_id && p.employee_id[0])
-                .filter(id => id);
-            
+                .map((p) => p.employee_id && p.employee_id[0])
+                .filter((id) => id);
+
             if (employeeIds.length > 0) {
                 const employees = await this.orm.searchRead(
                     "hr.employee",
-                    [['id', 'in', employeeIds]],
-                    ['id', 'name'],
+                    [["id", "in", employeeIds]],
+                    ["id", "name"],
                     {}
                 );
-                
-                // Create a map of employee_id -> employee_name
+
                 const employeeMap = {};
-                employees.forEach(emp => {
+                employees.forEach((emp) => {
                     employeeMap[emp.id] = emp.name;
                 });
-                
-                // Add employee_name to each pledge
-                this.state.pledges = this.state.pledges.map(pledge => {
+
+                this.state.pledges = this.state.pledges.map((pledge) => {
                     if (pledge.employee_id && pledge.employee_id[0]) {
-                        pledge.employee_name = employeeMap[pledge.employee_id[0]] || '';
+                        pledge.employee_name = employeeMap[pledge.employee_id[0]] || "";
                     } else {
-                        pledge.employee_name = '';
+                        pledge.employee_name = "";
                     }
                     return pledge;
                 });
             }
-            
-            // Load partner phone numbers for search
-            const partnerIds = [...new Set(this.state.pledges.map(p => p.partner_id?.[0]).filter(Boolean))];
+
+            const partnerIds = [...new Set(this.state.pledges.map((p) => p.partner_id?.[0]).filter(Boolean))];
             if (partnerIds.length > 0) {
                 const partners = await this.orm.searchRead(
                     "res.partner",
                     [["id", "in", partnerIds]],
                     ["id", "phone"]
                 );
-                
-                // Create a map of partner_id -> phone
+
                 const partnerPhoneMap = {};
-                partners.forEach(partner => {
-                    partnerPhoneMap[partner.id] = partner.phone || '';
+                partners.forEach((partner) => {
+                    partnerPhoneMap[partner.id] = partner.phone || "";
                 });
-                
-                // Add phone to each pledge
-                this.state.pledges = this.state.pledges.map(pledge => {
+
+                this.state.pledges = this.state.pledges.map((pledge) => {
                     if (pledge.partner_id && pledge.partner_id[0]) {
-                        pledge.partner_phone = partnerPhoneMap[pledge.partner_id[0]] || '';
+                        pledge.partner_phone = partnerPhoneMap[pledge.partner_id[0]] || "";
                     } else {
-                        pledge.partner_phone = '';
+                        pledge.partner_phone = "";
                     }
                     return pledge;
                 });
@@ -216,41 +285,29 @@ export class PledgeListPopup extends Component {
             console.log("[PLEDGE] Loaded", this.state.pledges.length, "active pledges for return_type:", returnType);
         } catch (error) {
             console.error("[PLEDGE] Error loading pledges:", error);
-            this.notification.add(
-                _t("Failed to load pledges"),
-                { type: "danger" }
-            );
+            this.notification.add(_t("Failed to load pledges"), { type: "danger" });
         }
     }
 
-    // ==================================
-    // 🔍 SEARCH HANDLER
-    // ==================================
     onSearchInput(ev) {
         this.state.search = (ev.target.value || "").toLowerCase();
-        console.log("[PLEDGE] Search updated:", this.state.search);
     }
 
-    // ==================================
-    // 🔍 FILTERED PLEDGES
-    // ==================================
     get filteredPledges() {
         if (!this.state.search) {
             return this.state.pledges;
         }
 
         const searchLower = this.state.search.toLowerCase();
-        return this.state.pledges.filter(pledge =>
-            pledge.name?.toLowerCase().includes(searchLower) ||
-            pledge.partner_id?.[1]?.toLowerCase().includes(searchLower) ||
-            pledge.employee_name?.toLowerCase().includes(searchLower) ||
-            (pledge.partner_phone && pledge.partner_phone.toString().toLowerCase().includes(searchLower))
+        return this.state.pledges.filter(
+            (pledge) =>
+                pledge.name?.toLowerCase().includes(searchLower) ||
+                pledge.partner_id?.[1]?.toLowerCase().includes(searchLower) ||
+                pledge.employee_name?.toLowerCase().includes(searchLower) ||
+                (pledge.partner_phone && pledge.partner_phone.toString().toLowerCase().includes(searchLower))
         );
     }
 
-    // ==================================
-    // SEARCH KEYDOWN (Enter to select first)
-    // ==================================
     onSearchKeydown(ev) {
         if (ev.key !== "Enter") {
             return;
@@ -259,71 +316,81 @@ export class PledgeListPopup extends Component {
         ev.preventDefault();
 
         if (!this.filteredPledges.length) {
-            this.notification.add(
-                _t("No pledge found."),
-                { type: "warning" }
-            );
+            this.notification.add(_t("No pledge found."), { type: "warning" });
             return;
         }
 
-        const first = this.filteredPledges[0];
-        console.log("[PLEDGE] Enter pressed, selecting first pledge:", first);
-        this.selectPledge(first);
+        this.highlightPledge(this.filteredPledges[0]);
     }
 
-    // ==================================
-    // SELECT PLEDGE
-    // ==================================
-    selectPledge(pledge) {
-        console.log("[PLEDGE] Pledge selected:", pledge);
-        this.props.getPayload(pledge);
+    highlightPledge(pledge) {
+        this.state.selectedPledgeId = pledge.id;
+    }
+
+    confirmReturn() {
+        const pledge = this.selectedPledge;
+        if (!pledge) {
+            this.notification.add(_t("Please select a pledge to return."), { type: "warning" });
+            return;
+        }
+        if (!this.state.selected_payment_method_id) {
+            this.notification.add(_t("Please select a payment method."), { type: "warning" });
+            return;
+        }
+        const selectedPm = this.state.payment_methods.find(
+            (pm) => pm.id === this.state.selected_payment_method_id
+        );
+        this.props.getPayload({
+            pledge,
+            payment_method_id: this.state.selected_payment_method_id,
+            payment_method_name: selectedPm?.name || "",
+        });
         this.props.close();
     }
 
-    // ==================================
-    // CANCEL
-    // ==================================
     cancel() {
-        console.log("[PLEDGE] Pledge selection cancelled");
         this.props.getPayload(null);
         this.props.close();
     }
 
-    // ==================================
-    // SHOW PLEDGE DETAILS
-    // ==================================
     async showPledgeDetails(pledge) {
-        console.log("[PLEDGE] Showing details for pledge:", pledge);
-        
         try {
-            // Load full pledge details including products
             const pledgeDetails = await this.orm.searchRead(
                 "pos.advance.order.pledge",
-                [['id', '=', pledge.id]],
-                ['id', 'order_id', 'pos_order_id', 'partner_id', 'employee_id', 'product_id', 'pledge_qty', 'pledge_amount_unit', 'pledge_subtotal',
-                 'create_date', 'return_date', 'state'],
+                [["id", "=", pledge.id]],
+                [
+                    "id",
+                    "order_id",
+                    "pos_order_id",
+                    "partner_id",
+                    "employee_id",
+                    "product_id",
+                    "pledge_qty",
+                    "pledge_amount_unit",
+                    "pledge_subtotal",
+                    "create_date",
+                    "return_date",
+                    "state",
+                ],
                 { limit: 1 }
             );
-            
+
             if (!pledgeDetails || !pledgeDetails.length) {
-                this.notification.add(
-                    _t("Failed to load pledge details"),
-                    { type: "warning" }
-                );
+                this.notification.add(_t("Failed to load pledge details"), { type: "warning" });
                 return;
             }
-            
+
             const fullPledge = pledgeDetails[0];
-            
             const products = fullPledge.product_id
-                ? [{
-                    id: fullPledge.product_id[0],
-                    name: fullPledge.product_id[1],
-                    qty: fullPledge.pledge_qty || 1,
-                }]
+                ? [
+                      {
+                          id: fullPledge.product_id[0],
+                          name: fullPledge.product_id[1],
+                          qty: fullPledge.pledge_qty || 1,
+                      },
+                  ]
                 : [];
-            
-            // Combine all details
+
             this.state.selectedPledgeDetails = {
                 ...fullPledge,
                 name: fullPledge.order_id?.[1] || fullPledge.pos_order_id?.[1] || _t("POS Pledge"),
@@ -331,12 +398,10 @@ export class PledgeListPopup extends Component {
                 employee_amount: 0,
                 delivery_amount: 0,
                 case_type: "case2",
-                employee_name: pledge.employee_name || '',
-                partner_phone: pledge.partner_phone || '',
-                products: products
+                employee_name: pledge.employee_name || "",
+                partner_phone: pledge.partner_phone || "",
+                products,
             };
-            
-            console.log("[PLEDGE] Pledge details loaded:", this.state.selectedPledgeDetails);
         } catch (error) {
             console.error("[PLEDGE] Error loading pledge details:", error);
             this.notification.add(
@@ -346,9 +411,6 @@ export class PledgeListPopup extends Component {
         }
     }
 
-    // ==================================
-    // FORMAT CURRENCY
-    // ==================================
     formatCurrency(amount) {
         return this.pos.env.utils.formatCurrency(amount, false);
     }

@@ -2,9 +2,9 @@
 <templates xml:space="preserve">
 
 <t t-name="pos_pledge.PledgeListPopup">
-    <Dialog title="title">
+    <Dialog title="title" size="'lg'">
         <div class="p-3">
-            
+
             <!-- SEARCH BAR -->
             <div class="mb-3">
                 <input type="text"
@@ -47,11 +47,11 @@
             </t>
 
             <!-- PLEDGE LIST -->
-            <div class="pledge-list" t-if="filteredPledges.length" style="max-height: 400px; overflow-y: auto;">
+            <div class="pledge-list" t-if="filteredPledges.length" style="max-height: 320px; overflow-y: auto;">
                 <t t-foreach="filteredPledges" t-as="pledge" t-key="pledge.id">
-                    <div class="card mb-2" style="transition: all 0.2s;"
-                         onmouseover="this.style.backgroundColor='#f0f0f0'"
-                         onmouseout="this.style.backgroundColor='white'">
+                    <div t-att-class="pledgeCardClass(pledge)"
+                         style="transition: all 0.2s; cursor: pointer;"
+                         t-on-click="() => this.highlightPledge(pledge)">
                         <div class="card-body p-3">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div class="flex-grow-1">
@@ -69,10 +69,6 @@
                                             <strong><t t-esc="pledge.employee_name"/></strong>
                                         </p>
                                     </t>
-                                    <small class="text-muted">
-                                        <i class="fa fa-tag me-1"/>
-                                        <t t-esc="pledge.case_type.toUpperCase()"/>
-                                    </small>
                                 </div>
                                 <div class="text-end">
                                     <h4 class="mb-0 text-success">
@@ -85,7 +81,7 @@
                                             <t t-esc="showLabel"/>
                                         </button>
                                         <button class="btn btn-sm btn-primary"
-                                                t-on-click.stop="() => this.selectPledge(pledge)">
+                                                t-on-click.stop="() => this.highlightPledge(pledge)">
                                             <i class="fa fa-check me-1"/>
                                             <t t-esc="selectLabel"/>
                                         </button>
@@ -97,22 +93,64 @@
                 </t>
             </div>
 
-            <!-- FOOTER -->
-            <div class="mt-3 text-end">
-                <button class="btn btn-secondary" t-on-click="cancel">
-                    <i class="fa fa-times me-1"/>
-                    <t t-esc="cancelLabel"/>
-                </button>
-            </div>
+            <!-- PAYMENT METHOD -->
+            <t t-if="selectedPledge">
+                <div class="mt-3">
+                    <div class="alert alert-warning mb-3">
+                        <div>
+                            <strong><t t-esc="pledgeAmountLabel"/></strong>
+                            <span t-esc="selectedReturnAmountFmt"/>
+                        </div>
+                        <small class="d-block mt-1" t-esc="returnHintText"/>
+                    </div>
 
+                    <div class="form-group mb-0">
+                        <label><strong t-esc="paymentMethodLabel"/></label>
+                        <div t-if="!state.payment_methods.length"
+                             class="alert alert-warning mb-0">
+                            <span t-esc="noEligiblePaymentMethodsText"/>
+                        </div>
+                        <div t-else="" class="paymentmethods-container mb-0">
+                            <div class="paymentmethods d-flex flex-column gap-2">
+                                <t t-foreach="state.payment_methods" t-as="pm" t-key="pm.id">
+                                    <div role="button"
+                                         t-att-class="paymentMethodRowClass(pm)"
+                                         t-on-click="() => this.selectPaymentMethod(pm)">
+                                        <div class="payment-method-display d-flex align-items-center gap-2 text-wrap lh-sm">
+                                            <img class="payment-method-icon"
+                                                 t-att-src="paymentMethodIconSrc(pm)"
+                                                 alt=""/>
+                                            <span class="payment-name" t-esc="pm.name"/>
+                                        </div>
+                                        <span class="text-danger fw-bold" t-esc="selectedReturnAmountFmt"/>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
         </div>
+
+        <t t-set-slot="footer">
+            <button class="btn btn-secondary" t-on-click.stop="cancel">
+                <i class="fa fa-times me-1"/>
+                <t t-esc="cancelLabel"/>
+            </button>
+            <button class="btn btn-primary"
+                    t-on-click.stop="confirmReturn"
+                    t-att-disabled="!selectedPledge or !state.selected_payment_method_id ? 'disabled' : undefined">
+                <i class="fa fa-undo me-1"/>
+                <t t-esc="returnPledgeLabel"/>
+            </button>
+        </t>
     </Dialog>
 
     <!-- PLEDGE DETAILS POPUP -->
     <Dialog t-if="state.selectedPledgeDetails" title="detailsTitle">
         <div class="p-3">
             <t t-set="pledge" t-value="state.selectedPledgeDetails"/>
-            
+
             <div class="mb-3">
                 <h4 class="mb-2">
                     <i class="fa fa-handshake-o me-2 text-info"/>
@@ -153,18 +191,6 @@
                                     <strong><t t-esc="formatCurrency(pledge.pledge_amount)"/></strong>
                                 </td>
                             </tr>
-                            <t t-if="pledge.employee_amount and pledge.employee_amount > 0">
-                                <tr>
-                                    <td><t t-esc="employeeServiceLabel"/></td>
-                                    <td class="text-end"><t t-esc="formatCurrency(pledge.employee_amount)"/></td>
-                                </tr>
-                            </t>
-                            <t t-if="pledge.delivery_amount and pledge.delivery_amount > 0">
-                                <tr>
-                                    <td><t t-esc="deliveryServiceLabel"/></td>
-                                    <td class="text-end"><t t-esc="formatCurrency(pledge.delivery_amount)"/></td>
-                                </tr>
-                            </t>
                         </tbody>
                     </table>
                 </div>
@@ -193,25 +219,6 @@
                     </div>
                 </div>
             </t>
-
-            <div class="mb-3">
-                <div class="mb-2">
-                    <strong><t t-esc="caseTypeLabel"/></strong>
-                    <span class="badge bg-info ms-2"><t t-esc="pledge.case_type.toUpperCase()"/></span>
-                </div>
-                <t t-if="pledge.create_date">
-                    <div class="mb-2">
-                        <strong><t t-esc="createdLabel"/></strong>
-                        <span class="ms-2"><t t-esc="pledge.create_date"/></span>
-                    </div>
-                </t>
-                <t t-if="pledge.return_date">
-                    <div class="mb-2">
-                        <strong><t t-esc="returnedLabel"/></strong>
-                        <span class="ms-2"><t t-esc="pledge.return_date"/></span>
-                    </div>
-                </t>
-            </div>
 
             <div class="mt-3 text-end">
                 <button class="btn btn-secondary" t-on-click="() => this.state.selectedPledgeDetails = null">

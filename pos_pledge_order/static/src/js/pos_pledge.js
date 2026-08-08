@@ -280,7 +280,7 @@ patch(ControlButtons.prototype, {
 
             // Show pledge list popup with search (filtered by return_type)
             console.log("[PLEDGE] Showing pledge list popup with return_type:", returnType);
-            const selectedPledge = await new Promise((resolve) => {
+            const selection = await new Promise((resolve) => {
                 this.dialog.add(
                     PledgeListPopup,
                     {
@@ -299,48 +299,29 @@ patch(ControlButtons.prototype, {
                 );
             });
 
-            if (!selectedPledge) {
+            if (!selection || !selection.pledge) {
                 console.log("[PLEDGE] No pledge selected, cancelling");
                 return;
             }
 
+            const selectedPledge = selection.pledge;
+            const paymentMethodId = selection.payment_method_id;
+
             console.log("[PLEDGE] Selected pledge:", selectedPledge);
             console.log("[PLEDGE] Return type:", returnType);
+            console.log("[PLEDGE] Return payment method:", paymentMethodId);
 
-            // Confirm return
-            const returnTypeLabel = returnType === 'employee' 
-                ? _t("Employee Pledge") 
-                : _t("Customer Pledge");
-            
-            const confirmTitle = _t("Return %s - %s for %s (%s)?",
-                returnTypeLabel,
-                selectedPledge.name,
-                selectedPledge.partner_id[1],
-                this.pos.env.utils.formatCurrency(selectedPledge.pledge_amount)
-            );
-
-            const confirmReturn = await makeAwaitable(this.dialog, SelectionPopup, {
-                title: confirmTitle,
-                list: [
-                    { id: 'yes', label: _t("✓ Yes, Return This Pledge"), item: 'yes' },
-                    { id: 'no', label: _t("✗ Cancel"), item: 'no' },
-                ],
-            });
-
-            if (!confirmReturn || confirmReturn !== 'yes') {
-                console.log("[PLEDGE] User cancelled return");
-                return;
-            }
-
-            // Store return type for later use (will be used in backend logic)
-            // Pass return_type as context to backend method
             console.log("[PLEDGE] Calling action_return_pledge for ID:", selectedPledge.id, "Type:", returnType);
-            
+
             await this.env.services.orm.call(
                 "pos.advance.order.pledge",
                 "action_return_pledge",
                 [[selectedPledge.id]],
-                { context: { return_type: returnType } }
+                {
+                    pos_payment_method_id: paymentMethodId,
+                    pos_session_id: this.pos.session?.id || false,
+                    context: { return_type: returnType },
+                }
             );
             console.log("[PLEDGE] action_return_pledge completed successfully");
 

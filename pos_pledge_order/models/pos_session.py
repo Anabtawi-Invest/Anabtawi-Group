@@ -128,7 +128,30 @@ class PosSession(models.Model):
             amt = order._get_pledge_closing_amount()
             if cur.is_zero(amt):
                 continue
-            for part in self._iter_pledge_journal_payment_split(amt, move):
+            return_pm = pl.return_payment_method_id
+            if return_pm:
+                if return_pm.type == "cash":
+                    cash_out += amt
+                    _logger.warning(
+                        "[PLEDGE_CLOSING] ADD cash_out order=%s amount=%s pm=%s pledge_line=%s",
+                        order.name,
+                        amt,
+                        return_pm.display_name,
+                        pl.id,
+                    )
+                else:
+                    by_pm_out[return_pm.id] += amt
+                    _logger.warning(
+                        "[PLEDGE_CLOSING] ADD pm_out order=%s amount=%s pm_id=%s pledge_line=%s",
+                        order.name,
+                        amt,
+                        return_pm.id,
+                        pl.id,
+                    )
+                continue
+            return_move = pl.return_move_id
+            split_move = return_move if return_move and return_move.state == "posted" else move
+            for part in self._iter_pledge_journal_payment_split(amt, split_move):
                 if part[0] == "cash":
                     cash_out += part[1]
                 else:
