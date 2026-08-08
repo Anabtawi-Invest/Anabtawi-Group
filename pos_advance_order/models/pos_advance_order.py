@@ -1714,6 +1714,12 @@ class PosAdvanceOrder(models.Model):
                 else:
                     adv_pm = order._get_advance_application_payment_method(session)
                     payouts.append((adv_pm, advance_part))
+            if order.site_service:
+                pos_order.sudo().write({
+                    "total_pledge_amount": 0.0,
+                    "pledge_product_qty": 0,
+                    "pledge_snapshot_product_ids": [(5, 0, 0)],
+                })
             order._pay_pos_order_multi(pos_order, payouts)
             if same_session_completion and deposit_pm and not float_is_zero(
                 advance_part, precision_rounding=rounding
