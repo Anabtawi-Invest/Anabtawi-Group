@@ -150,15 +150,19 @@ class PosOrder(models.Model):
 
             if search_query and str(search_query).strip():
                 q = str(search_query).strip()
-                domain.append("|")
-                domain.append("|")
-                domain.append("|")
-                domain.append(("delivery_address_name", "ilike", q))
-                domain.append(("delivery_address_phone", "ilike", q))
-                domain.append(("name", "ilike", q))
-                domain.append(("pos_reference", "ilike", q))
+                domain.extend([
+                    "|", "|", "|", "|", "|", "|",
+                    ("delivery_address_name", "ilike", q),
+                    ("delivery_address_phone", "ilike", q),
+                    ("partner_id.name", "ilike", q),
+                    ("partner_id.mobile", "ilike", q),
+                    ("partner_id.phone", "ilike", q),
+                    ("name", "ilike", q),
+                    ("pos_reference", "ilike", q),
+                ])
 
-            orders = self.search(domain, order="date_order desc", limit=100)
+            # Sort by id desc first so newest created order is ALWAYS #1 at the top
+            orders = self.search(domain, order="id desc, date_order desc", limit=100)
             res = []
             for o in orders:
                 paid = sum(o.payment_ids.mapped("amount"))
