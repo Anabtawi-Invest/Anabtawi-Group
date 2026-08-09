@@ -39,6 +39,8 @@
             "pos_scheduled_orders/static/src/app/patches/payment_screen_patch.js",
             "pos_scheduled_orders/static/src/app/patches/order_receipt_patch.js",
             "pos_scheduled_orders/static/src/app/patches/order_receipt_patch.xml",
+            "pos_scheduled_orders/static/src/app/patches/close_pos_popup_patch.js",
+            "pos_scheduled_orders/static/src/app/patches/close_pos_popup_patch.xml",
         ],
     },
     "installable": True,

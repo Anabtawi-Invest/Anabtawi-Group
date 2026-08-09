@@ -42,19 +42,26 @@ export class CompleteScheduleModal extends Component {
         this.state.loading = true;
         this.state.error_message = "";
         try {
-            const posConfigId = this.props.pos?.config?.id;
+            const config = this.props.pos?.config || {};
+            const posConfigId = parseInt(config.id || (Array.isArray(config) ? config[0] : 0) || 0);
+            const searchQuery = String(this.state.searchQuery || "");
+
+            // Pass positional arguments [posConfigId, searchQuery] for 100% RPC method signature compatibility
             const res = await this.orm.call(
                 "pos.order",
                 "search_open_scheduled_orders",
-                [posConfigId, this.state.searchQuery]
+                [posConfigId, searchQuery]
             );
             this.state.orders = res || [];
-            if (this.state.orders.length > 0 && !this.state.selectedOrderId) {
+            if (this.state.orders.length > 0) {
                 this.selectOrder(this.state.orders[0]);
+            } else {
+                this.state.selectedOrderId = null;
             }
         } catch (e) {
             console.error("Error loading open scheduled orders:", e);
-            this.state.error_message = _t("فشل تحميل طلبات التواصي المعلقة.");
+            const msg = e?.data?.message || e?.message || _t("فشل تحميل طلبات التواصي المعلقة.");
+            this.state.error_message = msg;
         } finally {
             this.state.loading = false;
         }

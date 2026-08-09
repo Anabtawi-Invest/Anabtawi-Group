@@ -105,49 +105,61 @@ class PosOrder(models.Model):
         return True
 
     @api.model
-    def search_open_scheduled_orders(self, pos_config_id, search_query=""):
-        config = self.env["pos.config"].browse(pos_config_id)
-        config_ids = [pos_config_id]
-        if config and config.allowed_fulfillment_branch_ids:
-            config_ids.extend(config.allowed_fulfillment_branch_ids.ids)
+    def search_open_scheduled_orders(self, pos_config_id=False, search_query=""):
+        try:
+            config_ids = []
+            if pos_config_id:
+                try:
+                    cfg_id = int(pos_config_id)
+                    config_ids.append(cfg_id)
+                    config = self.env["pos.config"].browse(cfg_id)
+                    if config and config.allowed_fulfillment_branch_ids:
+                        config_ids.extend(config.allowed_fulfillment_branch_ids.ids)
+                except Exception:
+                    pass
 
-        domain = [
-            ("pos_config_id", "in", config_ids),
-            ("fulfillment_type", "!=", False),
-            ("is_advance_deposit", "=", True),
-        ]
-        if search_query and search_query.strip():
-            q = search_query.strip()
-            domain.append("|")
-            domain.append("|")
-            domain.append("|")
-            domain.append(("delivery_address_name", "ilike", q))
-            domain.append(("delivery_address_phone", "ilike", q))
-            domain.append(("name", "ilike", q))
-            domain.append(("pos_reference", "ilike", q))
+            domain = [
+                ("fulfillment_type", "in", ["pickup", "delivery"]),
+                ("state", "not in", ["cancel"]),
+            ]
+            if config_ids:
+                domain.append(("pos_config_id", "in", config_ids))
 
-        orders = self.search(domain, order="date_order desc", limit=50)
-        res = []
-        for o in orders:
-            paid = sum(o.payment_ids.mapped("amount"))
-            total = o.amount_total
-            due = total - paid
-            res.append({
-                "id": o.id,
-                "name": o.name or o.pos_reference or f"Order #{o.id}",
-                "pos_reference": o.pos_reference or "",
-                "date_order": str(o.date_order) if o.date_order else "",
-                "scheduled_datetime": o.scheduled_datetime or "",
-                "fulfillment_type": o.fulfillment_type or "pickup",
-                "customer_name": o.delivery_address_name or (o.partner_id.name if o.partner_id else ""),
-                "customer_phone": o.delivery_address_phone or (o.partner_id.mobile if o.partner_id else ""),
-                "street": o.delivery_street or "",
-                "city": o.delivery_city or "",
-                "amount_total": total,
-                "amount_paid": paid,
-                "amount_due": due if due > 0 else 0.0,
-            })
-        return res
+            if search_query and str(search_query).strip():
+                q = str(search_query).strip()
+                domain.append("|")
+                domain.append("|")
+                domain.append("|")
+                domain.append(("delivery_address_name", "ilike", q))
+                domain.append(("delivery_address_phone", "ilike", q))
+                domain.append(("name", "ilike", q))
+                domain.append(("pos_reference", "ilike", q))
+
+            orders = self.search(domain, order="date_order desc", limit=50)
+            res = []
+            for o in orders:
+                paid = sum(o.payment_ids.mapped("amount"))
+                total = o.amount_total
+                due = total - paid
+                if due > 0.001 or o.is_advance_deposit:
+                    res.append({
+                        "id": o.id,
+                        "name": o.name or o.pos_reference or f"Order #{o.id}",
+                        "pos_reference": o.pos_reference or "",
+                        "date_order": str(o.date_order) if o.date_order else "",
+                        "scheduled_datetime": o.scheduled_datetime or "",
+                        "fulfillment_type": o.fulfillment_type or "pickup",
+                        "customer_name": o.delivery_address_name or (o.partner_id.name if o.partner_id else ""),
+                        "customer_phone": o.delivery_address_phone or (o.partner_id.mobile if o.partner_id else ""),
+                        "street": o.delivery_street or "",
+                        "city": o.delivery_city or "",
+                        "amount_total": total,
+                        "amount_paid": paid,
+                        "amount_due": due if due > 0 else 0.0,
+                    })
+            return res
+        except Exception as e:
+            return []
 
     @api.model
     def action_complete_scheduled_order_from_pos(self, order_id, payment_method_id, amount_tendered):
