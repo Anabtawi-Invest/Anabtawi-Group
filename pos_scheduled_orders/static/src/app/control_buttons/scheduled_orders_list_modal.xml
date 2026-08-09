@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_scheduled_orders.ScheduledOrdersListModal">
+        <Dialog title="'قائمة طلبيات التواصي - List of Scheduled Orders'">
+            <div class="pos-scheduled-orders-list-modal container-fluid p-2" dir="rtl">
+                <t t-if="state.error_message">
+                    <div class="alert alert-danger fw-bold d-flex align-items-center mb-3" role="alert">
+                        <i class="fa fa-exclamation-triangle fs-4 me-2"/>
+                        <div><t t-esc="state.error_message"/></div>
+                    </div>
+                </t>
+
+                <div class="input-group input-group-lg mb-3">
+                    <span class="input-group-text"><i class="fa fa-search text-primary"/></span>
+                    <input type="text" class="form-control text-end" 
+                           t-model="state.searchQuery" 
+                           t-on-input="onSearchInput" 
+                           placeholder="ابحث باسم العميل، رقم الهاتف، أو رقم الطلب..."/>
+                </div>
+
+                <div class="card shadow-sm border mb-3">
+                    <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center py-2">
+                        <span><i class="fa fa-list me-1"/> طلبيات التواصي المسجلة بالنظام</span>
+                        <span class="badge bg-light text-dark fs-6"><t t-esc="state.orders.length"/> طلب</span>
+                    </div>
+                    <div class="card-body p-0" style="max-height: 380px; overflow-y: auto;">
+                        <t t-if="state.loading">
+                            <div class="text-center p-4">
+                                <i class="fa fa-spinner fa-spin fs-2 text-primary mb-2"/>
+                                <div class="fw-bold">جاري تحميل طلبيات التواصي...</div>
+                            </div>
+                        </t>
+                        <t t-elif="!state.orders.length">
+                            <div class="text-center p-4 text-muted">
+                                <i class="fa fa-info-circle fs-2 mb-2"/>
+                                <div class="fw-bold fs-6">لا توجد طلبيات تواصي حالية مطابقة للبحث.</div>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div class="list-group list-group-flush">
+                                <t t-foreach="state.orders" t-as="order" t-key="order.id">
+                                    <div t-attf-class="list-group-item text-end p-3 {{state.selectedOrderId === order.id ? 'bg-light border-primary' : ''}}"
+                                         t-on-click="() => this.selectOrder(order)">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <div>
+                                                <span class="fw-bold fs-5 text-primary me-2"><t t-esc="order.customer_name"/></span>
+                                                <small class="text-muted"><i class="fa fa-phone me-1"/> <t t-esc="order.customer_phone"/></small>
+                                            </div>
+                                            <span class="badge bg-warning text-dark fs-6"><t t-esc="order.name"/></span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center my-1 fs-6">
+                                            <span>
+                                                <i t-attf-class="fa {{order.fulfillment_type === 'delivery' ? 'fa-truck text-danger' : 'fa-shopping-bag text-primary'}} me-1"/>
+                                                <t t-esc="order.fulfillment_type === 'delivery' ? 'توصيل منزلي' : 'استلام من الفرع'"/>
+                                            </span>
+                                            <span><i class="fa fa-clock-o me-1"/> <t t-esc="order.scheduled_datetime"/></span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                                            <div class="small">
+                                                <span class="me-2">الإجمالي: <strong class="text-dark"><t t-esc="order.amount_total.toFixed(3)"/> JOD</strong></span>
+                                                <span class="me-2">العربون: <strong class="text-success"><t t-esc="order.amount_paid.toFixed(3)"/> JOD</strong></span>
+                                                <span>المتبقي: <strong class="text-danger fs-6"><t t-esc="order.amount_due.toFixed(3)"/> JOD</strong></span>
+                                            </div>
+                                            <button type="button" class="btn btn-primary fw-bold" 
+                                                    t-on-click="() => this.loadOrderToPOS(order)">
+                                                <i class="fa fa-arrow-left me-1"/> تحميل الطلب لسداد المتبقي
+                                            </button>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+            </div>
+
+            <t t-slot="footer">
+                <button type="button" class="btn btn-secondary btn-lg px-4" t-on-click="cancel">
+                    إغلاق (Close)
+                </button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

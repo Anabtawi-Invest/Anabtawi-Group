@@ -1,50 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="template" xml:space="preserve">
-    <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension">
-        <xpath expr="//div[hasclass('pos-receipt')]" position="after">
-            <!-- JoFotara ISTD Dual-Mode POS Receipt Banner in Arabic & English -->
+    <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension" owl="1">
+        <xpath expr="//div[contains(@class, 'pos-receipt-order-data')]" position="before">
             <t t-if="fulfillmentInfo">
-                <div class="pos-receipt-fulfillment-header mb-3 p-2 text-center" 
-                     style="border: 2px dashed #000; border-radius: 6px; background-color: #f9f9f9;" dir="rtl">
-                    
-                    <!-- Day 1 Partial Deposit Header Banner -->
-                    <t t-if="fulfillmentInfo.isAdvanceDeposit">
-                        <div style="font-size: 15px; font-weight: bold; text-transform: uppercase; color: #d9534f; border-bottom: 2px solid #d9534f; padding-bottom: 4px; margin-bottom: 6px;">
-                            *** سند عربون مقدم - ليس فاتورة ضريبية ***<br/>
-                            <span style="font-size: 11px; font-weight: normal; color: #333;">(ADVANCE DEPOSIT VOUCHER - NO JOFOTARA QR)</span>
+                <div class="scheduled-order-receipt-section border-top border-bottom py-2 my-2 text-center" dir="rtl" style="font-size: 13px;">
+                    <div class="fw-bold fs-6 text-uppercase border-bottom pb-1 mb-2 text-primary">
+                        <t t-esc="fulfillmentInfo.typeLabel"/>
+                    </div>
+                    <t t-if="fulfillmentInfo.contactName">
+                        <div class="d-flex justify-content-between my-1">
+                            <span>العميل:</span>
+                            <span class="fw-bold"><t t-esc="fulfillmentInfo.contactName"/></span>
+                        </div>
+                    </t>
+                    <t t-if="fulfillmentInfo.contactPhone">
+                        <div class="d-flex justify-content-between my-1">
+                            <span>رقم الهاتف:</span>
+                            <span class="fw-bold"><t t-esc="fulfillmentInfo.contactPhone"/></span>
+                        </div>
+                    </t>
+                    <t t-if="fulfillmentInfo.scheduledTime">
+                        <div class="d-flex justify-content-between my-1">
+                            <span>موعد التسليم:</span>
+                            <span class="fw-bold"><t t-esc="fulfillmentInfo.scheduledTime"/></span>
+                        </div>
+                    </t>
+                    <t t-if="fulfillmentInfo.address">
+                        <div class="d-flex justify-content-between my-1">
+                            <span>العنوان:</span>
+                            <span class="fw-bold"><t t-esc="fulfillmentInfo.address"/></span>
                         </div>
                     </t>
 
-                    <!-- Day 2 Final Tax Invoice Banner -->
-                    <t t-else="">
-                        <div style="font-size: 15px; font-weight: bold; text-transform: uppercase; color: #28a745; border-bottom: 2px solid #28a745; padding-bottom: 4px; margin-bottom: 6px;">
-                            *** فاتورة ضريبية قانونية (ممتثل لجوفوتارا ISTD) ***
+                    <div class="border-top pt-2 mt-2">
+                        <div class="d-flex justify-content-between my-1 fw-bold">
+                            <span>إجمالي قيمة الطلب:</span>
+                            <span><t t-esc="env.utils.formatCurrency(fulfillmentInfo.totalAmount)"/></span>
                         </div>
-                    </t>
-
-                    <div style="font-size: 14px; font-weight: bold; text-transform: uppercase; margin-bottom: 3px;">
-                        نوع الطلب: <t t-esc="fulfillmentInfo.typeLabel"/>
-                        <t t-if="fulfillmentInfo.isCatering"> (طلب ضيافة - CATERING)</t>
-                    </div>
-                    <div style="font-size: 13px; font-weight: bold; margin-bottom: 2px;">
-                        موعد وتاريخ التسليم: <t t-esc="fulfillmentInfo.scheduledTime"/>
-                    </div>
-                    <div style="font-size: 12px; margin-bottom: 2px;">
-                        بيانات العميل: <t t-esc="fulfillmentInfo.contactName"/> - <t t-esc="fulfillmentInfo.contactPhone"/>
-                    </div>
-                    <t t-if="fulfillmentInfo.isDelivery &amp;&amp; fulfillmentInfo.address">
-                        <div style="font-size: 12px; font-weight: bold; border-top: 1px dotted #ccc; padding-top: 2px; margin-top: 2px;">
-                            عنوان التوصيل: <t t-esc="fulfillmentInfo.address"/>
+                        <t t-if="fulfillmentInfo.advanceDepositPaid">
+                            <div class="d-flex justify-content-between my-1 text-primary">
+                                <span>العربون المدفوع سابقاً:</span>
+                                <span class="fw-bold"><t t-esc="env.utils.formatCurrency(fulfillmentInfo.advanceDepositPaid)"/></span>
+                            </div>
+                        </t>
+                        <t t-if="fulfillmentInfo.settledPaymentNow">
+                            <div class="d-flex justify-content-between my-1 text-success">
+                                <span>المبلغ المسدد الآن:</span>
+                                <span class="fw-bold"><t t-esc="env.utils.formatCurrency(fulfillmentInfo.settledPaymentNow)"/></span>
+                            </div>
+                        </t>
+                        <div class="d-flex justify-content-between my-1 fw-bold">
+                            <span>المتبقي المطلوب:</span>
+                            <span class="text-danger"><t t-esc="env.utils.formatCurrency(fulfillmentInfo.balanceDue)"/></span>
                         </div>
-                    </t>
-
-                    <!-- Deposit Summary on Day 1 Receipts -->
-                    <t t-if="fulfillmentInfo.isAdvanceDeposit">
-                        <div style="border-top: 1px dashed #000; margin-top: 5px; padding-top: 4px; font-size: 12px;">
-                            <div><strong>العربون المدفوع اليوم:</strong> <t t-esc="props.formatCurrency(fulfillmentInfo.depositPaidAmount)"/></div>
-                            <div style="font-weight: bold; color: #d9534f;"><strong>المبلغ المتبقي غير المدفوع:</strong> <t t-esc="props.formatCurrency(fulfillmentInfo.outstandingBalanceDue)"/></div>
-                        </div>
-                    </t>
+                    </div>
                 </div>
             </t>
         </xpath>

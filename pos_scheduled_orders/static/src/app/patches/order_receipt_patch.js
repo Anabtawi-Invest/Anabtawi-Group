@@ -41,10 +41,11 @@ patch(OrderReceipt.prototype, {
 
         const due = order.get_due?.() || 0;
         const total = order.get_total_with_tax?.() || 0;
-        const paid = Math.max(total - due, 0);
+        const advancePaid = order.advance_payment_amount || (total - due);
+        const settledNow = Math.max(total - advancePaid - due, 0);
 
         return {
-            typeLabel: fType === "pickup" ? "استلام من الفرع (STORE PICKUP)" : "توصيل منزلي (HOME DELIVERY)",
+            typeLabel: fType === "pickup" ? "طلب تواصي - استلام من الفرع" : "طلب تواصي - توصيل منزلي",
             isPickup: fType === "pickup",
             isDelivery: fType === "delivery",
             scheduledTime: scheduledFmt,
@@ -52,9 +53,11 @@ patch(OrderReceipt.prototype, {
             contactPhone: order.delivery_address_phone || "",
             address: fullAddress,
             isCatering: !!order.is_catering,
-            isAdvanceDeposit: !!order.is_advance_deposit || (due > 0 && paid > 0),
-            depositPaidAmount: paid,
-            outstandingBalanceDue: due,
+            isAdvanceDeposit: !!order.is_advance_deposit,
+            totalAmount: total,
+            advanceDepositPaid: advancePaid,
+            settledPaymentNow: settledNow,
+            balanceDue: due,
         };
     },
 });
