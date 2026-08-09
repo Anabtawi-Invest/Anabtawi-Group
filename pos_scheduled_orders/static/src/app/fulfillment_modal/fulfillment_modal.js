@@ -5,6 +5,15 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 
+function formatToOdooDatetime(val) {
+    if (!val) return false;
+    let str = String(val).trim().replace("T", " ");
+    if (str.length === 16) {
+        str += ":00";
+    }
+    return str;
+}
+
 export class FulfillmentModal extends Component {
     static template = "pos_scheduled_orders.FulfillmentModal";
     static components = { Dialog };
@@ -18,30 +27,78 @@ export class FulfillmentModal extends Component {
     setup() {
         this.notification = useService("notification");
         const order = this.props.order;
-        const partner = order?.getPartner?.() || order?.partner || null;
+        const currentPartner = order?.get_partner?.() || order?.partner || null;
 
         let initialDatetime = order.scheduled_datetime;
         if (!initialDatetime) {
             const now = new Date();
             now.setHours(now.getHours() + 2);
             now.setMinutes(0);
-            initialDatetime = now.toISOString().slice(0, 16);
-        } else if (typeof initialDatetime === "string" && initialDatetime.length > 16) {
-            initialDatetime = initialDatetime.slice(0, 16);
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, "0");
+            const day = String(now.getDate()).padStart(2, "0");
+            const hours = String(now.getHours()).padStart(2, "0");
+            const mins = String(now.getMinutes()).padStart(2, "0");
+            initialDatetime = `${year}-${month}-${day}T${hours}:${mins}`;
+        } else if (typeof initialDatetime === "string") {
+            initialDatetime = initialDatetime.trim().replace(" ", "T");
+            if (initialDatetime.length > 16) {
+                initialDatetime = initialDatetime.slice(0, 16);
+            }
         }
 
         this.state = useState({
             activeTab: order.fulfillment_type || "pickup",
-            customer_name: order.delivery_address_name || partner?.name || "",
-            mobile: order.delivery_address_phone || partner?.mobile || partner?.phone || "",
+            searchPartnerQuery: currentPartner?.name || "",
+            selectedPartner: currentPartner,
+            showPartnerDropdown: false,
+            customer_name: order.delivery_address_name || currentPartner?.name || "",
+            mobile: order.delivery_address_phone || currentPartner?.mobile || currentPartner?.phone || "",
             scheduled_datetime: initialDatetime,
-            street: order.delivery_street || partner?.street || "",
-            city: order.delivery_city || partner?.city || "",
-            zip: order.delivery_zip || partner?.zip || "",
-            building_apt: order.delivery_building_apt || partner?.building_apt || "",
+            street: order.delivery_street || currentPartner?.street || "",
+            city: order.delivery_city || currentPartner?.city || "",
+            zip: order.delivery_zip || currentPartner?.zip || "",
+            building_apt: order.delivery_building_apt || currentPartner?.building_apt || "",
             delivery_fee: order.delivery_fee || 0,
             error_message: "",
         });
+    }
+
+    get filteredPartners() {
+        const query = (this.state.searchPartnerQuery || "").trim().toLowerCase();
+        if (!query) {
+            return [];
+        }
+        const db = this.props.pos?.db;
+        const partners = db?.get_partners_sorted ? db.get_partners_sorted(100) : [];
+        return partners.filter((p) => {
+            const name = (p.name || "").toLowerCase();
+            const phone = (p.phone || "").toLowerCase();
+            const mobile = (p.mobile || "").toLowerCase();
+            const vat = (p.vat || "").toLowerCase();
+            return name.includes(query) || phone.includes(query) || mobile.includes(query) || vat.includes(query);
+        }).slice(0, 10);
+    }
+
+    onSearchPartnerInput(ev) {
+        this.state.searchPartnerQuery = ev.target.value;
+        this.state.customer_name = ev.target.value;
+        this.state.showPartnerDropdown = true;
+    }
+
+    selectPartner(partner) {
+        this.state.selectedPartner = partner;
+        this.state.customer_name = partner.name || "";
+        this.state.mobile = partner.mobile || partner.phone || "";
+        this.state.street = partner.street || "";
+        this.state.city = partner.city || "";
+        this.state.zip = partner.zip || "";
+        this.state.building_apt = partner.building_apt || "";
+        this.state.searchPartnerQuery = partner.name || "";
+        this.state.showPartnerDropdown = false;
+
+        // Assign partner to POS order
+        this.props.order.set_partner?.(partner);
     }
 
     setTab(tabName) {
@@ -125,9 +182,17 @@ export class FulfillmentModal extends Component {
             return;
         }
 
+        const partner = this.state.selectedPartner || this.props.order.get_partner?.();
+        if (partner) {
+            this.props.order.set_partner?.(partner);
+        }
+
+        const formattedOdooDatetime = formatToOdooDatetime(this.state.scheduled_datetime);
+
         this.props.getPayload({
             fulfillment_type: this.state.activeTab,
-            scheduled_datetime: this.state.scheduled_datetime,
+            scheduled_datetime: formattedOdooDatetime,
+            delivery_address_id: partner ? partner.id : false,
             delivery_address_name: this.state.customer_name.trim(),
             delivery_address_phone: this.state.mobile.trim(),
             delivery_street: this.state.street.trim(),

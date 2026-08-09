@@ -3,11 +3,23 @@
 import { patch } from "@web/core/utils/patch";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
+function cleanOdooDatetime(val) {
+    if (!val || val === "false" || val === "null") return false;
+    let str = String(val).trim().replace("T", " ");
+    if (str.length === 16) {
+        str += ":00";
+    }
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(str)) {
+        return str;
+    }
+    return false;
+}
+
 patch(PosOrder.prototype, {
     setup(vals) {
         super.setup(...arguments);
         this.fulfillment_type = vals?.fulfillment_type || this.fulfillment_type || null;
-        this.scheduled_datetime = vals?.scheduled_datetime || this.scheduled_datetime || "";
+        this.scheduled_datetime = cleanOdooDatetime(vals?.scheduled_datetime || this.scheduled_datetime) || false;
         this.is_advance_deposit = vals?.is_advance_deposit !== undefined ? vals.is_advance_deposit : false;
         this.jofotara_status = vals?.jofotara_status || this.jofotara_status || "pending";
         this.delivery_address_id = vals?.delivery_address_id || this.delivery_address_id || null;
@@ -25,7 +37,7 @@ patch(PosOrder.prototype, {
     getFulfillmentData() {
         return {
             fulfillment_type: this.fulfillment_type,
-            scheduled_datetime: this.scheduled_datetime,
+            scheduled_datetime: cleanOdooDatetime(this.scheduled_datetime),
             is_advance_deposit: this.is_advance_deposit,
             jofotara_status: this.jofotara_status,
             delivery_address_id: this.delivery_address_id,
@@ -44,7 +56,7 @@ patch(PosOrder.prototype, {
     setFulfillmentData(data) {
         this.update({
             fulfillment_type: data.fulfillment_type || null,
-            scheduled_datetime: data.scheduled_datetime || "",
+            scheduled_datetime: cleanOdooDatetime(data.scheduled_datetime) || false,
             is_advance_deposit: data.is_advance_deposit !== undefined ? data.is_advance_deposit : this.is_advance_deposit,
             jofotara_status: data.jofotara_status || this.jofotara_status,
             delivery_address_id: data.delivery_address_id || null,
@@ -64,7 +76,7 @@ patch(PosOrder.prototype, {
     export_as_JSON() {
         const json = super.export_as_JSON ? super.export_as_JSON() : {};
         json.fulfillment_type = this.fulfillment_type || false;
-        json.scheduled_datetime = this.scheduled_datetime || false;
+        json.scheduled_datetime = cleanOdooDatetime(this.scheduled_datetime) || false;
         json.is_advance_deposit = this.is_advance_deposit || false;
         json.jofotara_status = this.jofotara_status || "pending";
         json.delivery_address_id = this.delivery_address_id || false;
@@ -81,29 +93,32 @@ patch(PosOrder.prototype, {
     },
 
     init_from_JSON(json) {
+        if (json && json.scheduled_datetime) {
+            json.scheduled_datetime = cleanOdooDatetime(json.scheduled_datetime) || false;
+        }
         if (super.init_from_JSON) {
             super.init_from_JSON(json);
         }
-        this.fulfillment_type = json.fulfillment_type || null;
-        this.scheduled_datetime = json.scheduled_datetime || "";
-        this.is_advance_deposit = json.is_advance_deposit || false;
-        this.jofotara_status = json.jofotara_status || "pending";
-        this.delivery_address_id = json.delivery_address_id || null;
-        this.delivery_address_name = json.delivery_address_name || "";
-        this.delivery_address_phone = json.delivery_address_phone || "";
-        this.delivery_street = json.delivery_street || "";
-        this.delivery_city = json.delivery_city || "";
-        this.delivery_building_apt = json.delivery_building_apt || "";
-        this.delivery_zip = json.delivery_zip || "";
-        this.is_catering = json.is_catering || false;
-        this.delivery_fee = json.delivery_fee || 0;
-        this.catering_fee = json.catering_fee || 0;
+        this.fulfillment_type = json?.fulfillment_type || null;
+        this.scheduled_datetime = cleanOdooDatetime(json?.scheduled_datetime) || false;
+        this.is_advance_deposit = json?.is_advance_deposit || false;
+        this.jofotara_status = json?.jofotara_status || "pending";
+        this.delivery_address_id = json?.delivery_address_id || null;
+        this.delivery_address_name = json?.delivery_address_name || "";
+        this.delivery_address_phone = json?.delivery_address_phone || "";
+        this.delivery_street = json?.delivery_street || "";
+        this.delivery_city = json?.delivery_city || "";
+        this.delivery_building_apt = json?.delivery_building_apt || "";
+        this.delivery_zip = json?.delivery_zip || "";
+        this.is_catering = json?.is_catering || false;
+        this.delivery_fee = json?.delivery_fee || 0;
+        this.catering_fee = json?.catering_fee || 0;
     },
 
     serializeForORM(opts = {}) {
         const data = super.serializeForORM(opts);
         data.fulfillment_type = this.fulfillment_type || false;
-        data.scheduled_datetime = this.scheduled_datetime || false;
+        data.scheduled_datetime = cleanOdooDatetime(this.scheduled_datetime) || false;
         data.is_advance_deposit = this.is_advance_deposit || false;
         data.jofotara_status = this.jofotara_status || "pending";
         data.delivery_address_id = this.delivery_address_id || false;

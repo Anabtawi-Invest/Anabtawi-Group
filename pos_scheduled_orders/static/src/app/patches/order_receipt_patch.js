@@ -14,14 +14,22 @@ patch(OrderReceipt.prototype, {
             return null;
         }
 
-        let scheduledFmt = order.scheduled_datetime || "";
-        if (scheduledFmt) {
-            try {
-                const d = new Date(scheduledFmt);
-                scheduledFmt = d.toLocaleString();
-            } catch (e) {
-                // fallback
+        let scheduledFmt = "";
+        try {
+            const rawVal = order.scheduled_datetime;
+            if (rawVal) {
+                if (typeof rawVal === "string") {
+                    const cleanStr = rawVal.replace("T", " ");
+                    scheduledFmt = new Date(cleanStr.length === 16 ? cleanStr + ":00" : cleanStr).toLocaleString();
+                } else if (rawVal && (rawVal instanceof Date || rawVal.toJSDate)) {
+                    const d = rawVal.toJSDate ? rawVal.toJSDate() : rawVal;
+                    scheduledFmt = d.toLocaleString();
+                } else {
+                    scheduledFmt = String(rawVal);
+                }
             }
+        } catch (e) {
+            scheduledFmt = String(order.scheduled_datetime || "");
         }
 
         let fullAddress = [

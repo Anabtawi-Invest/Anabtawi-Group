@@ -29,6 +29,43 @@
                     </div>
                 </t>
 
+                <!-- Customer Database Live Search & Autocomplete -->
+                <div class="card p-3 bg-light border mb-3 position-relative">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fw-bold text-dark m-0 fs-6">
+                            <i class="fa fa-search me-1 text-primary"/> اختيار عميل مسجل بالنظام (Customer Database Search)
+                        </label>
+                        <t t-if="state.selectedPartner">
+                            <span class="badge bg-success p-2 fs-6">
+                                <i class="fa fa-check-circle me-1"/> عميل مرتبط: <t t-esc="state.selectedPartner.name"/>
+                            </span>
+                        </t>
+                    </div>
+                    <div class="input-group input-group-lg">
+                        <input type="text" class="form-control text-end" 
+                               t-model="state.searchPartnerQuery" 
+                               t-on-input="onSearchPartnerInput" 
+                               placeholder="ابحث بالاسم أو رقم الهاتف أو الرقم الضريبي..."/>
+                        <span class="input-group-text"><i class="fa fa-address-book"/></span>
+                    </div>
+
+                    <!-- Autocomplete Dropdown List -->
+                    <t t-if="state.showPartnerDropdown &amp;&amp; filteredPartners.length">
+                        <div class="list-group position-absolute w-100 shadow-lg mt-1 z-3" style="top: 100%; right: 0; max-height: 220px; overflow-y: auto;">
+                            <t t-foreach="filteredPartners" t-as="p" t-key="p.id">
+                                <button type="button" class="list-group-item list-group-item-action text-end p-2"
+                                        t-on-click="() => this.selectPartner(p)">
+                                    <div class="fw-bold text-primary"><t t-esc="p.name"/></div>
+                                    <small class="text-muted">
+                                        هاتف: <t t-esc="p.mobile || p.phone || 'غير مدخل'"/> | 
+                                        العنوان: <t t-esc="p.street || p.city || 'غير مدخل'"/>
+                                    </small>
+                                </button>
+                            </t>
+                        </div>
+                    </t>
+                </div>
+
                 <!-- Common Contact Fields -->
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
