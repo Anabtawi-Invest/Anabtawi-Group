@@ -23,6 +23,43 @@ class PosAdvanceOrderController(http.Controller):
                 _("Integrated POS payment methods (terminal / QR) are not supported for advance deposits.")
             )
 
+    def _ensure_pos_user(self):
+        user = request.env.user
+        if user.has_group("point_of_sale.group_pos_manager") or user.has_group(
+            "point_of_sale.group_pos_user"
+        ):
+            return user
+        raise ValidationError(_("You must be a Point of Sale user to perform this action."))
+
+    @http.route("/pos/advance_order_popup_data", type="jsonrpc", auth="user")
+    def advance_order_popup_data(self, company_id=None, **kwargs):
+        """Load advance popup lists without model ACL on cashiers."""
+        self._ensure_pos_user()
+        domain = [("active", "=", True)]
+        if company_id:
+            domain.append(("company_id", "=", int(company_id)))
+        discounts = (
+            request.env["pos.advance.discount"]
+            .sudo()
+            .search_read(
+                domain,
+                ["id", "name", "discount_type", "value"],
+                limit=200,
+                order="sequence, id",
+            )
+        )
+        pos_configs = (
+            request.env["pos.config"]
+            .sudo()
+            .search_read(
+                [],
+                ["id", "name", "pricelist_id", "enable_advance_order"],
+                limit=200,
+                order="name, id",
+            )
+        )
+        return {"discounts": discounts, "pos_configs": pos_configs}
+
     @http.route("/pos/create_advance_order", type="jsonrpc", auth="user")
     def create_advance_order(self, data=None, **kwargs):
         """Create POS advance order from Product Screen flow."""
