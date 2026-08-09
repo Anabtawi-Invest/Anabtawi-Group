@@ -43,7 +43,16 @@
                                 <label for="catering_fee_product_id"/>
                                 <field name="catering_fee_product_id"/>
                                 <div class="text-muted">
-                                    منتج رسوم خدمة الضيافة الكترنج (`CATERING_FEE`).
+                                    منتج رسوم الضيافة الكترنج (`CATERING_FEE`).
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-12 o_setting_box" invisible="not enable_fulfillment_schedule">
+                            <div class="o_setting_right_pane">
+                                <label for="allowed_fulfillment_branch_ids"/>
+                                <field name="allowed_fulfillment_branch_ids" widget="many2many_tags"/>
+                                <div class="text-muted">
+                                    فروع استلام التواصي المسموحة لاستكمال الطلبات بين الفروع.
                                 </div>
                             </div>
                         </div>

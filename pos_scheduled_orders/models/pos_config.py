@@ -31,3 +31,11 @@ class PosConfig(models.Model):
         default=lambda self: self.env.ref("pos_scheduled_orders.product_product_catering_fee", raise_if_not_found=False),
         help="Service product automatically added when cashiers add a catering fee.",
     )
+    allowed_fulfillment_branch_ids = fields.Many2many(
+        "pos.config",
+        "pos_config_fulfillment_branch_rel",
+        "config_id",
+        "branch_id",
+        string="Allowed Fulfillment Branches (فروع التواصي المسموحة)",
+        help="Allowed POS branch locations for cross-branch pickup and fulfillment.",
+    )

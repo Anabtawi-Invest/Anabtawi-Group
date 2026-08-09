@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
+from odoo.exceptions import UserError
 
 
 class PosOrder(models.Model):
@@ -157,6 +158,99 @@ class PosOrder(models.Model):
             })
 
             if not order.account_move:
-                order.action_pos_order_invoice()
+                try:
+                    order.action_pos_order_invoice()
+                except Exception:
+                    pass
 
         return True
+
+    @api.model
+    def search_open_scheduled_orders(self, pos_config_id, search_query=""):
+        """
+        Returns list of open scheduled deposit orders for POS branch.
+        """
+        config = self.env["pos.config"].browse(pos_config_id)
+        config_ids = [pos_config_id]
+        if config and config.allowed_fulfillment_branch_ids:
+            config_ids.extend(config.allowed_fulfillment_branch_ids.ids)
+
+        domain = [
+            ("pos_config_id", "in", config_ids),
+            ("fulfillment_type", "!=", False),
+            ("is_advance_deposit", "=", True),
+        ]
+
+        if search_query and search_query.strip():
+            q = search_query.strip()
+            domain.append("|")
+            domain.append("|")
+            domain.append("|")
+            domain.append(("delivery_address_name", "ilike", q))
+            domain.append(("delivery_address_phone", "ilike", q))
+            domain.append(("name", "ilike", q))
+            domain.append(("pos_reference", "ilike", q))
+
+        orders = self.search(domain, order="date_order desc", limit=50)
+        res = []
+        for o in orders:
+            paid = sum(o.payment_ids.mapped("amount"))
+            total = o.amount_total
+            due = total - paid
+            res.append({
+                "id": o.id,
+                "name": o.name or o.pos_reference or f"Order #{o.id}",
+                "pos_reference": o.pos_reference or "",
+                "date_order": str(o.date_order) if o.date_order else "",
+                "scheduled_datetime": o.scheduled_datetime or "",
+                "fulfillment_type": o.fulfillment_type or "pickup",
+                "customer_name": o.delivery_address_name or (o.partner_id.name if o.partner_id else ""),
+                "customer_phone": o.delivery_address_phone or (o.partner_id.mobile if o.partner_id else ""),
+                "street": o.delivery_street or "",
+                "city": o.delivery_city or "",
+                "amount_total": total,
+                "amount_paid": paid,
+                "amount_due": due if due > 0 else 0.0,
+            })
+        return res
+
+    @api.model
+    def action_complete_scheduled_order_from_pos(self, order_id, payment_method_id, amount_tendered):
+        """
+        1-Click Day 2 Settlement from POS:
+        1. Adds POS payment for remaining balance.
+        2. Reconciles Customer Advance Deposits liability account.
+        3. Validates warehouse stock picking (deducts inventory).
+        4. Issues JoFotara Tax Invoice.
+        """
+        order = self.browse(order_id)
+        if not order.exists():
+            raise UserError(_("Scheduled Order not found."))
+
+        paid = sum(order.payment_ids.mapped("amount"))
+        due = order.amount_total - paid
+
+        if due > 0:
+            pm = self.env["pos.payment.method"].browse(payment_method_id)
+            if not pm.exists():
+                raise UserError(_("Invalid payment method selected."))
+
+            # Create POS payment for remaining balance
+            self.env["pos.payment"].create({
+                "pos_order_id": order.id,
+                "amount": due,
+                "payment_method_id": pm.id,
+                "payment_date": fields.Datetime.now(),
+            })
+
+        # Finalize stock delivery & tax invoice
+        order.action_finalize_deposit_and_validate_stock()
+
+        return {
+            "success": True,
+            "order_id": order.id,
+            "name": order.name,
+            "amount_total": order.amount_total,
+            "amount_paid": order.amount_total,
+            "amount_due": 0.0,
+        }

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_scheduled_orders.CompleteScheduleButton">
+        <button class="control-button btn btn-light rounded-0 fw-bold border-end d-flex align-items-center justify-content-center text-success" 
+                t-on-click="onClick">
+            <i class="fa fa-check-square-o me-2 fs-5"/>
+            <span>استكمال التواصي (Complete Schedule)</span>
+        </button>
+    </t>
+</templates>
