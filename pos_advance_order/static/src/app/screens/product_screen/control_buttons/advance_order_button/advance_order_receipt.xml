@@ -62,10 +62,6 @@
                     <span>Original Order Total</span>
                     <span t-esc="formatCurrency(props.receipt.total)"/>
                 </div>
-                <div t-if="!props.receipt.isRefund and props.receipt.pledgeAmount > 0" class="advance-summary-row advance-pledge-row">
-                    <span>Pledge Amount</span>
-                    <span t-esc="formatCurrency(props.receipt.pledgeAmount)"/>
-                </div>
                 <div t-if="!props.receipt.isRefund" class="advance-summary-row advance-deposit-row">
                     <span>Advance Paid (Deposit)</span>
                     <span t-esc="formatCurrency(props.receipt.advanceAmount)"/>

@@ -48,12 +48,6 @@
                                 <span>Total</span>
                                 <span t-esc="o.currency_id.format(o.amount_total)"/>
                             </div>
-                            <t t-if="o.pledge_amount and not o.employee_id">
-                                <div style="display:flex; justify-content:space-between;">
-                                    <span>Pledge Amount</span>
-                                    <span t-esc="o.currency_id.format(o.pledge_amount)"/>
-                                </div>
-                            </t>
                             <div style="display:flex; justify-content:space-between;">
                                 <span>Advance Paid</span>
                                 <span t-esc="o.currency_id.format(o.amount_paid)"/>

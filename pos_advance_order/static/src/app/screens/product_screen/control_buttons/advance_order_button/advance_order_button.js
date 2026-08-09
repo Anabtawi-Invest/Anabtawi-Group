@@ -152,7 +152,6 @@ patch(ControlButtons.prototype, {
 
     _buildAdvanceReceiptData({ result, partner, payload }) {
         const total = toNumber(result?.amount_total, 0);
-        const pledgeAmount = toNumber(result?.pledge_amount, 0);
         const advanceAmount = toNumber(result?.advance_amount, payload.advance_amount || 0);
         const amountTendered = toNumber(
             result?.amount_tendered,
@@ -176,7 +175,6 @@ patch(ControlButtons.prototype, {
             paymentMethod: payload.payment_method_name || payload.payment_method,
             currencyId: this.pos.currency?.id,
             total: total,
-            pledgeAmount: pledgeAmount,
             advanceAmount: advanceAmount,
             amountTendered: amountTendered,
             changeDue: changeDue,

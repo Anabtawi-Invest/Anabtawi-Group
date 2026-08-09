@@ -155,6 +155,12 @@ class PosAdvanceOrder(models.Model):
     )
     advance_pos_order_id = fields.Many2one("pos.order", string="Advance POS Order", readonly=True, copy=False)
     remaining_pos_order_id = fields.Many2one("pos.order", string="Remaining POS Order", readonly=True, copy=False)
+    invoice_id = fields.Many2one(
+        "account.move",
+        string="Customer Invoice",
+        related="remaining_pos_order_id.account_move",
+        readonly=True,
+    )
     pledge_pos_order_id = fields.Many2one("pos.order", string="Pledge POS Order", readonly=True, copy=False)
     refund_advance_pos_order_id = fields.Many2one("pos.order", string="Refund Advance POS Order", readonly=True, copy=False)
     advance_refund_move_id = fields.Many2one(
@@ -298,10 +304,6 @@ class PosAdvanceOrder(models.Model):
                 f"</tr>"
             )
 
-        pledge_html = ""
-        if self.pledge_amount:
-            pledge_html = f"<strong>Pledge Amount:</strong> {currency.symbol} {self.pledge_amount:,.2f}<br/>"
-
         body_html = f"""
             <div style="font-family: Arial, sans-serif; padding: 16px;">
                 <h3 style="margin:0 0 10px 0;">Advance Payment Created</h3>
@@ -311,7 +313,6 @@ class PosAdvanceOrder(models.Model):
                     <strong>Phone:</strong> {partner.phone or "N/A"}<br/>
                     <strong>Paid (Advance):</strong> {currency.symbol} {self.advance_amount:,.2f}<br/>
                     <strong>Invoice Total:</strong> {currency.symbol} {self.amount_total:,.2f}<br/>
-                    {pledge_html}
                     <strong>Remaining:</strong> {currency.symbol} {self.amount_remaining:,.2f}<br/>
                 </p>
 
@@ -389,14 +390,6 @@ class PosAdvanceOrder(models.Model):
                     <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Invoice Total:</strong></td>
                     <td style="padding: 8px; border-bottom: 1px solid #ddd;">{currency.symbol} {self.amount_total:,.2f}</td>
                 </tr>
-                {"".join([
-                    f"""
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Pledge Amount:</strong></td>
-                    <td style="padding: 8px; border-bottom: 1px solid #ddd;">{currency.symbol} {self.pledge_amount:,.2f}</td>
-                </tr>
-                    """ if (self.pledge_amount) else ""
-                ])}
                 <tr>
                     <td style="padding: 8px; border-bottom: 1px solid #ddd;"><strong>Advance Paid:</strong></td>
                     <td style="padding: 8px; border-bottom: 1px solid #ddd;">{currency.symbol} {self.advance_amount:,.2f}</td>
@@ -465,13 +458,9 @@ class PosAdvanceOrder(models.Model):
             f"Advance Payment Created: {self.name}",
             f"Customer: {partner.name}",
             f"Invoice Total: {currency.symbol} {self.amount_total:,.2f}",
-        ]
-        if self.pledge_amount:
-            parts.append(f"Pledge: {currency.symbol} {self.pledge_amount:,.2f}")
-        parts.extend([
             f"Advance Paid: {currency.symbol} {self.advance_amount:,.2f}",
             f"Remaining: {currency.symbol} {self.amount_remaining:,.2f}",
-        ])
+        ]
         notification_body = "\n".join(parts)
 
         message = self.message_post(
@@ -592,64 +581,8 @@ class PosAdvanceOrder(models.Model):
             order.payment_progress = "advance_paid" if advance_ok else "no_payment"
 
     def _sync_pledge_lines(self):
-        """Keep pledge lines in sync with product lines.
-
-        For each product in lines that has_pledge=True:
-        - create/update a pledge line with pledge_qty = total product qty in the order
-        - pledge_amount_unit = product template pledge_amount
-
-        Site Service advance orders (popup checkbox) never carry pledge.
-        """
-        for order in self:
-            if order.site_service:
-                if order.pledge_line_ids:
-                    order.write({"pledge_line_ids": [fields.Command.delete(pl.id) for pl in order.pledge_line_ids]})
-                continue
-
-            # Link pledge lines to the POS order which collected the pledge (remaining payment order)
-            linked_pos_order_id = False
-            if order.pledge_pos_order_id:
-                linked_pos_order_id = order.pledge_pos_order_id.id
-
-            # Aggregate qty by product for pledged products
-            qty_by_product = {}
-            amount_by_product = {}
-            for line in order.line_ids.filtered(lambda l: not l.display_type and l.product_id):
-                tmpl = line.product_id.product_tmpl_id
-                if not getattr(tmpl, "has_pledge", False):
-                    continue
-                qty_by_product[line.product_id] = qty_by_product.get(line.product_id, 0.0) + (line.product_qty or 0.0)
-                amount_by_product[line.product_id] = tmpl.pledge_amount or 0.0
-
-            existing = {pl.product_id: pl for pl in order.pledge_line_ids}
-            commands = []
-
-            # Update/create current pledged products
-            for product, qty in qty_by_product.items():
-                unit_amount = amount_by_product.get(product, 0.0)
-                if product in existing:
-                    pl = existing[product]
-                    commands.append(fields.Command.update(pl.id, {
-                        "pledge_qty": qty,
-                        "pledge_amount_unit": unit_amount,
-                        "pos_order_id": linked_pos_order_id or False,
-                    }))
-                else:
-                    commands.append(fields.Command.create({
-                        "product_id": product.id,
-                        "pledge_qty": qty,
-                        "pledge_amount_unit": unit_amount,
-                        "pos_order_id": linked_pos_order_id or False,
-                        "partner_id": order.partner_id.id,
-                    }))
-
-            # Remove pledge lines for products that are no longer pledged in order lines
-            for product, pl in existing.items():
-                if product not in qty_by_product:
-                    commands.append(fields.Command.delete(pl.id))
-
-            if commands:
-                order.write({"pledge_line_ids": commands})
+        """Pledge lines are created on completion via pos.order (pos_pledge_order), not on deposit."""
+        return
 
     @api.depends("amount_grand_total", "advance_amount", "discount_amount", "state")
     def _compute_payment_amounts(self):
@@ -1099,7 +1032,6 @@ class PosAdvanceOrder(models.Model):
             order.state = "confirmed"
             confirmed |= order
 
-        confirmed._sync_pledge_lines()
         return True
 
     def action_set_to_draft(self):
@@ -1951,8 +1883,40 @@ class PosAdvanceOrder(models.Model):
                 )
 
             order.state = "fully_paid"
+            order._generate_completion_invoice(pos_order)
 
         return True
+
+    def _generate_completion_invoice(self, pos_order):
+        """Create and post the customer invoice when the advance sale is completed."""
+        self.ensure_one()
+        if not pos_order or not pos_order.partner_id:
+            return False
+        pos_order = pos_order.sudo()
+        if pos_order.account_move:
+            return pos_order.account_move
+        pos_order.write({"to_invoice": True})
+        pos_order.action_pos_order_invoice()
+        _logger.info(
+            "[ADV_INVOICE] Created completion invoice advance=%s pos_order=%s invoice=%s",
+            self.name,
+            pos_order.name,
+            pos_order.account_move.id if pos_order.account_move else False,
+        )
+        return pos_order.account_move
+
+    def action_view_invoice(self):
+        self.ensure_one()
+        if not self.invoice_id:
+            raise UserError(_("No invoice has been created for this advance order yet."))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Customer Invoice"),
+            "res_model": "account.move",
+            "view_mode": "form",
+            "res_id": self.invoice_id.id,
+            "target": "current",
+        }
 
     def action_create_remaining_amount(self, pos_payment_method_id=None, pos_config_id=None, amount_tendered=None):
         """Alias for POS button flow."""
@@ -2068,12 +2032,17 @@ class PosAdvanceOrder(models.Model):
             order.ensure_one()
             if order.return_pledge_pos_order_id:
                 raise UserError(_("Pledge return payment is already created."))
-            if not order.pledge_amount or order.pledge_amount <= 0:
-                raise UserError(_("No pledge amount to return."))
 
-            pledge_collection_order = order.pledge_line_ids.filtered(lambda pl: pl.pos_order_id)[:1].pos_order_id
+            pledge_collection_order = order.remaining_pos_order_id
+            if not pledge_collection_order:
+                pledge_collection_order = order.pledge_line_ids.filtered(lambda pl: pl.pos_order_id)[:1].pos_order_id
             if not pledge_collection_order:
                 raise UserError(_("Pledge was not collected yet on a POS order, so it cannot be returned."))
+
+            pledge_lines = pledge_collection_order.advance_pledge_line_ids
+            pledge_amount = sum(pledge_lines.mapped("pledge_subtotal")) or order.pledge_amount or 0.0
+            if float_is_zero(pledge_amount, precision_rounding=order.currency_id.rounding):
+                raise UserError(_("No pledge amount to return."))
 
             pos_config = pledge_collection_order.config_id or pledge_collection_order.session_id.config_id
             if not pos_config.pledge_product_id:
@@ -2085,7 +2054,7 @@ class PosAdvanceOrder(models.Model):
             lines = [{
                 "product_id": pledge_product.id,
                 "qty": -1.0,
-                "price_unit": order.pledge_amount,
+                "price_unit": pledge_amount,
                 "discount": 0.0,
                 "tax_ids": [(6, 0, [])],
                 "product_uom_id": pledge_product.uom_id.id,
@@ -2109,7 +2078,6 @@ class PosAdvanceOrder(models.Model):
                 pm = PaymentMethod.browse(vals["pos_payment_method_id"])
                 vals["payment_method"] = self._payment_method_selection_from_pos_pm(pm)
         orders = super().create(vals_list)
-        orders._sync_pledge_lines()
         return orders
 
     # -------------------------------------------------------------------------
@@ -2328,23 +2296,6 @@ class PosAdvanceOrderLine(models.Model):
         for line in self:
             if line.order_id and line.order_id.state != "draft":
                 raise UserError(_("You can only delete lines on a Draft advance order."))
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        lines = super().create(vals_list)
-        lines.mapped("order_id")._sync_pledge_lines()
-        return lines
-
-    def write(self, vals):
-        res = super().write(vals)
-        self.mapped("order_id")._sync_pledge_lines()
-        return res
-
-    def unlink(self):
-        orders = self.mapped("order_id")
-        res = super().unlink()
-        orders._sync_pledge_lines()
-        return res
 
     @api.readonly
     def action_add_from_catalog(self):
