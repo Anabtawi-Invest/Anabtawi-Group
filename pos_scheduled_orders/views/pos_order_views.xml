@@ -3,7 +3,7 @@
     <record id="view_pos_order_search_scheduled_inherit" model="ir.ui.view">
         <field name="name">pos.order.search.scheduled.inherit</field>
         <field name="model">pos.order</field>
-        <field name="inherit_id" ref="point_of_sale.view_pos_order_search"/>
+        <field name="inherit_id" ref="point_of_sale.view_pos_order_filter"/>
         <field name="arch" type="xml">
             <xpath expr="//search" position="inside">
                 <field name="fulfillment_type"/>
@@ -33,25 +33,26 @@
         <field name="model">pos.order</field>
         <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//sheet" position="inside">
-                <group string="Scheduled Order / Fulfillment Details (تفاصيل التواصي)" 
-                       invisible="not fulfillment_type">
-                    <group>
-                        <field name="fulfillment_type"/>
-                        <field name="scheduled_datetime"/>
-                        <field name="is_advance_deposit"/>
-                        <field name="jofotara_status"/>
+            <xpath expr="//notebook" position="inside">
+                <page string="Scheduled Details (التواصي)" name="scheduled_details">
+                    <group string="Scheduled Order / Fulfillment Details (تفاصيل التواصي)">
+                        <group>
+                            <field name="fulfillment_type"/>
+                            <field name="scheduled_datetime"/>
+                            <field name="is_advance_deposit"/>
+                            <field name="jofotara_status"/>
+                        </group>
+                        <group>
+                            <field name="delivery_address_name"/>
+                            <field name="delivery_address_phone"/>
+                            <field name="delivery_street"/>
+                            <field name="delivery_city"/>
+                            <field name="is_catering"/>
+                            <field name="delivery_fee"/>
+                            <field name="catering_fee"/>
+                        </group>
                     </group>
-                    <group>
-                        <field name="delivery_address_name"/>
-                        <field name="delivery_address_phone"/>
-                        <field name="delivery_street"/>
-                        <field name="delivery_city"/>
-                        <field name="is_catering"/>
-                        <field name="delivery_fee"/>
-                        <field name="catering_fee"/>
-                    </group>
-                </group>
+                </page>
             </xpath>
         </field>
     </record>
