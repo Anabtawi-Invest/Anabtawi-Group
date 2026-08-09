@@ -94,14 +94,38 @@ export async function resolveSiteServiceConfig(pos, orm) {
     return getSiteServiceConfig(pos) || (orm ? await fetchSiteServiceConfigFromServer(orm) : null);
 }
 
-export function computeSiteServiceScoreFromLines(lines, menuConfig) {
+/** Product id → multiple factor from the Site Service configuration. */
+export function getSiteServiceMultiplesMap(menuConfig) {
     const multiplesByProduct = new Map();
-    for (const line of menuConfig.productLines) {
+    for (const line of menuConfig?.productLines || []) {
         const productId = normalizeId(line.product_id);
         if (productId) {
             multiplesByProduct.set(productId, line.multiple || 0);
         }
     }
+    return multiplesByProduct;
+}
+
+/** True when the order contains at least one non-service product listed in Site Service. */
+export function hasListedSiteServiceProducts(lines, menuConfig) {
+    const multiplesByProduct = getSiteServiceMultiplesMap(menuConfig);
+    if (!multiplesByProduct.size) {
+        return false;
+    }
+    for (const line of lines || []) {
+        if (line.is_site_service_auto) {
+            continue;
+        }
+        const productId = normalizeId(line.product_id);
+        if (productId && multiplesByProduct.has(productId)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+export function computeSiteServiceScoreFromLines(lines, menuConfig) {
+    const multiplesByProduct = getSiteServiceMultiplesMap(menuConfig);
     let score = 0;
     for (const line of lines || []) {
         if (line.is_site_service_auto) {
@@ -123,6 +147,9 @@ export function appendSiteServiceLineIfNeeded(lines, pos, menuConfig = null) {
         return { lines: lines || [], added: false, score: 0, menuConfig: null };
     }
     const productLines = (lines || []).filter((line) => !line.is_site_service_auto);
+    if (!hasListedSiteServiceProducts(productLines, config)) {
+        return { lines: productLines, added: false, score: 0, menuConfig: config, skipped: true };
+    }
     const score = computeSiteServiceScoreFromLines(productLines, config);
     if (score >= config.threshold) {
         return { lines: productLines, added: false, score, menuConfig: config };
