@@ -16,6 +16,13 @@ import {
 } from "@pos_advance_order/js/site_service_utils";
 import { printAdvanceOrderReceipt } from "@pos_advance_order/js/advance_order_print";
 
+// Odoo 19 validates ClosePosPopup props strictly; backend adds advance closing details.
+ClosePosPopup.props = [
+    ...ClosePosPopup.props,
+    "advance_deposit_details",
+    "advance_refund_details",
+];
+
 function toNumber(value, fallback = 0) {
     const num = Number(value);
     return Number.isFinite(num) ? num : fallback;
