@@ -13,7 +13,7 @@ class PosOrder(models.Model):
         string="Fulfillment Type (نوع الطلب)",
         copy=False,
     )
-    scheduled_datetime = fields.Datetime(
+    scheduled_datetime = fields.Char(
         string="Scheduled Date & Time (موعد التسليم والملاحظات)",
         copy=False,
     )
@@ -108,12 +108,21 @@ class PosOrder(models.Model):
         vals = super()._prepare_picking_vals(partner_id, picking_type, location_id, location_dest_id)
         if self.fulfillment_type:
             vals["fulfillment_type"] = self.fulfillment_type
-            vals["pickup_delivery_datetime"] = self.scheduled_datetime
+            dt_val = False
+            if self.scheduled_datetime:
+                try:
+                    clean_str = str(self.scheduled_datetime).replace("T", " ").strip()
+                    if len(clean_str) == 16:
+                        clean_str += ":00"
+                    dt_val = fields.Datetime.to_datetime(clean_str)
+                except Exception:
+                    dt_val = False
+            vals["pickup_delivery_datetime"] = dt_val
             vals["delivery_address_id"] = self.delivery_address_id.id if self.delivery_address_id else False
             vals["is_catering"] = self.is_catering
-            if self.scheduled_datetime:
-                vals["scheduled_date"] = self.scheduled_datetime
-                vals["date_deadline"] = self.scheduled_datetime
+            if dt_val:
+                vals["scheduled_date"] = dt_val
+                vals["date_deadline"] = dt_val
         return vals
 
     def _create_order_picking(self):
