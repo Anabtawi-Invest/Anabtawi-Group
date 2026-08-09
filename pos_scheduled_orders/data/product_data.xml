@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Delivery Fee Service Product -->
+        <record id="product_product_delivery_fee" model="product.product">
+            <field name="name">Delivery Fee Service - رسوم خدمة التوصيل</field>
+            <field name="default_code">DELIVERY_FEE</field>
+            <field name="type">service</field>
+            <field name="list_price">0.0</field>
+            <field name="available_in_pos">True</field>
+            <field name="description">Delivery service charge for advance scheduled orders (رسوم توصيل طلبيات تواصي).</field>
+        </record>
+
+        <!-- Catering Fee Service Product -->
+        <record id="product_product_catering_fee" model="product.product">
+            <field name="name">Catering Service Fee - رسوم خدمة الضيافة</field>
+            <field name="default_code">CATERING_FEE</field>
+            <field name="type">service</field>
+            <field name="list_price">0.0</field>
+            <field name="available_in_pos">True</field>
+            <field name="description">Catering service charge for advance scheduled orders (رسوم ضيافة كترنج).</field>
+        </record>
+    </data>
+</odoo>

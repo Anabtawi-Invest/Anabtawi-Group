@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_delivery_document_inherit_scheduled_orders" inherit_id="stock.report_delivery_document">
+        <xpath expr="//div[hasclass('page')]" position="after">
+            <div t-if="o.fulfillment_type" class="card my-3 border-dark" style="border: 2px solid #000; padding: 12px; font-size: 14px; font-family: 'Amiri', 'Segoe UI', Tahoma, sans-serif;" dir="rtl">
+                <div class="row">
+                    <div class="col-12 text-center mb-2" style="border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+                        <h3 class="fw-bold m-0" style="color: #000; text-transform: uppercase;">
+                            نوع طلب التواصي: <t t-esc="o.fulfillment_type == 'pickup' and 'استلام من الفرع (STORE PICKUP)' or 'توصيل منزلي (HOME DELIVERY)'"/>
+                            <t t-if="o.is_catering"> - طلب ضيافة (CATERING)</t>
+                        </h3>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-6 text-end">
+                        <strong>موعد وتاريخ التسليم:</strong>
+                        <span t-esc="o.pickup_delivery_datetime or o.scheduled_date"/>
+                    </div>
+                    <div class="col-6 text-end">
+                        <strong>اسم العميل والهاتف:</strong>
+                        <span t-esc="o.delivery_address_id and o.delivery_address_id.name or o.partner_id and o.partner_id.name"/> - 
+                        <span t-esc="o.delivery_address_id and o.delivery_address_id.mobile or o.partner_id and (o.partner_id.mobile or o.partner_id.phone)"/>
+                    </div>
+                </div>
+                <t t-if="o.fulfillment_type == 'delivery'">
+                    <div class="row mt-2">
+                        <div class="col-12 text-end">
+                            <strong>عنوان التوصيل:</strong>
+                            <span t-esc="o.delivery_address_id and o.delivery_address_id.contact_address or o.partner_id and o.partner_id.contact_address"/>
+                        </div>
+                    </div>
+                </t>
+            </div>
+        </xpath>
+    </template>
+</odoo>

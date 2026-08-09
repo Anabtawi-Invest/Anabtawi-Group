@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_inherit_scheduled_orders" model="ir.ui.view">
+        <field name="name">stock.picking.form.inherit.scheduled.orders</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_validate_fulfillment_picking" 
+                        type="object" 
+                        string="تسليم وتسليم مخزون طلب تواصي" 
+                        class="oe_highlight" 
+                        invisible="state in ('done', 'cancel')"/>
+            </xpath>
+            <xpath expr="//sheet/group" position="inside">
+                <group string="بيانات طلب التواصي وموعد التسليم">
+                    <field name="fulfillment_type"/>
+                    <field name="pickup_delivery_datetime"/>
+                    <field name="delivery_address_id"/>
+                    <field name="is_catering"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
