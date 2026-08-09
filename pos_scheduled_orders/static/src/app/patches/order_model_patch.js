@@ -54,23 +54,20 @@ patch(PosOrder.prototype, {
     },
 
     setFulfillmentData(data) {
-        this.update({
-            fulfillment_type: data.fulfillment_type || null,
-            scheduled_datetime: cleanOdooDatetime(data.scheduled_datetime) || false,
-            is_advance_deposit: data.is_advance_deposit !== undefined ? data.is_advance_deposit : this.is_advance_deposit,
-            jofotara_status: data.jofotara_status || this.jofotara_status,
-            delivery_address_id: data.delivery_address_id || null,
-            delivery_address_name: data.delivery_address_name || "",
-            delivery_address_phone: data.delivery_address_phone || "",
-            delivery_street: data.delivery_street || "",
-            delivery_city: data.delivery_city || "",
-            delivery_building_apt: data.delivery_building_apt || "",
-            delivery_zip: data.delivery_zip || "",
-            is_catering: data.is_catering !== undefined ? data.is_catering : this.is_catering,
-            delivery_fee: data.delivery_fee !== undefined ? data.delivery_fee : this.delivery_fee,
-            catering_fee: data.catering_fee !== undefined ? data.catering_fee : this.catering_fee,
-        });
-        this.trigger?.("change", this);
+        this.fulfillment_type = data.fulfillment_type || null;
+        this.scheduled_datetime = cleanOdooDatetime(data.scheduled_datetime) || false;
+        this.is_advance_deposit = data.is_advance_deposit !== undefined ? data.is_advance_deposit : this.is_advance_deposit;
+        this.jofotara_status = data.jofotara_status || this.jofotara_status;
+        this.delivery_address_id = data.delivery_address_id || null;
+        this.delivery_address_name = data.delivery_address_name || "";
+        this.delivery_address_phone = data.delivery_address_phone || "";
+        this.delivery_street = data.delivery_street || "";
+        this.delivery_city = data.delivery_city || "";
+        this.delivery_building_apt = data.delivery_building_apt || "";
+        this.delivery_zip = data.delivery_zip || "";
+        this.is_catering = data.is_catering !== undefined ? data.is_catering : this.is_catering;
+        this.delivery_fee = data.delivery_fee !== undefined ? data.delivery_fee : this.delivery_fee;
+        this.catering_fee = data.catering_fee !== undefined ? data.catering_fee : this.catering_fee;
     },
 
     export_as_JSON() {
