@@ -129,7 +129,7 @@ class PosOrder(models.Model):
                     picking.action_assign()
                     if picking.state == "assigned":
                         picking.button_validate()
-            order.write({"is_advance_deposit": False, "jofotara_status": "submitted"})
+            order.write({"is_advance_deposit": False, "jofotara_status": "submitted", "state": "done"})
             if not order.account_move:
                 try:
                     order.action_pos_order_invoice()
@@ -138,27 +138,15 @@ class PosOrder(models.Model):
         return True
 
     @api.model
-    def search_open_scheduled_orders(self, pos_config_id=False, search_query=""):
+    def search_open_scheduled_orders(self, pos_config_id=False, search_query="", partner_id=False):
         try:
-            config_ids = []
-            if pos_config_id:
+            domain = [("state", "not in", ["cancel"])]
+
+            if partner_id:
                 try:
-                    cfg_id = int(pos_config_id)
-                    config_ids.append(cfg_id)
-                    config = self.env["pos.config"].browse(cfg_id)
-                    if config and config.allowed_fulfillment_branch_ids:
-                        config_ids.extend(config.allowed_fulfillment_branch_ids.ids)
+                    domain.append(("partner_id", "=", int(partner_id)))
                 except Exception:
                     pass
-
-            domain = [
-                ("state", "not in", ["cancel"]),
-                "|",
-                ("fulfillment_type", "in", ["pickup", "delivery"]),
-                ("is_advance_deposit", "=", True),
-            ]
-            if config_ids:
-                domain.append(("pos_config_id", "in", config_ids))
 
             if search_query and str(search_query).strip():
                 q = str(search_query).strip()
@@ -170,13 +158,13 @@ class PosOrder(models.Model):
                 domain.append(("name", "ilike", q))
                 domain.append(("pos_reference", "ilike", q))
 
-            orders = self.search(domain, order="date_order desc", limit=50)
+            orders = self.search(domain, order="date_order desc", limit=100)
             res = []
             for o in orders:
                 paid = sum(o.payment_ids.mapped("amount"))
                 total = o.amount_total
                 due = total - paid
-                if due > 0.001 or o.is_advance_deposit:
+                if due > 0.001 or o.is_advance_deposit or o.fulfillment_type:
                     res.append({
                         "id": o.id,
                         "name": o.name or o.pos_reference or f"Order #{o.id}",
@@ -184,8 +172,9 @@ class PosOrder(models.Model):
                         "date_order": str(o.date_order) if o.date_order else "",
                         "scheduled_datetime": o.scheduled_datetime or "",
                         "fulfillment_type": o.fulfillment_type or "pickup",
-                        "customer_name": o.delivery_address_name or (o.partner_id.name if o.partner_id else ""),
+                        "customer_name": o.delivery_address_name or (o.partner_id.name if o.partner_id else "عميل سفري"),
                         "customer_phone": o.delivery_address_phone or (o.partner_id.mobile if o.partner_id else ""),
+                        "partner_id": o.partner_id.id if o.partner_id else False,
                         "street": o.delivery_street or "",
                         "city": o.delivery_city or "",
                         "amount_total": total,
@@ -217,7 +206,28 @@ class PosOrder(models.Model):
                 "payment_date": fields.Datetime.now(),
             })
 
-        order.action_finalize_deposit_and_validate_stock()
+        for picking in order.picking_ids:
+            if picking.state not in ["done", "cancel"]:
+                picking.action_assign()
+                if picking.state == "assigned":
+                    picking.button_validate()
+
+        order.write({
+            "is_advance_deposit": False,
+            "jofotara_status": "submitted",
+            "state": "done",
+        })
+
+        account_move = False
+        try:
+            res = order.action_pos_order_invoice()
+            if isinstance(res, dict) and res.get("res_id"):
+                account_move = self.env["account.move"].browse(res["res_id"])
+            elif order.account_move:
+                account_move = order.account_move
+        except Exception:
+            pass
+
         return {
             "success": True,
             "order_id": order.id,
@@ -225,4 +235,6 @@ class PosOrder(models.Model):
             "amount_total": order.amount_total,
             "amount_paid": order.amount_total,
             "amount_due": 0.0,
+            "invoice_id": account_move.id if account_move else False,
+            "invoice_name": account_move.name if account_move else "",
         }

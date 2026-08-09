@@ -13,6 +13,7 @@ export class CompleteScheduleModal extends Component {
     static props = {
         close: Function,
         pos: Object,
+        partnerId: { type: Number, optional: true },
     };
 
     setup() {
@@ -42,7 +43,6 @@ export class CompleteScheduleModal extends Component {
         this.state.loading = true;
         this.state.error_message = "";
         try {
-            // Ensure local completed POS orders are pushed to backend DB first
             if (typeof this.props.pos?.push_orders === "function") {
                 try {
                     await this.props.pos.push_orders();
@@ -55,10 +55,15 @@ export class CompleteScheduleModal extends Component {
             const posConfigId = parseInt(config.id || (Array.isArray(config) ? config[0] : 0) || 0);
             const searchQuery = String(this.state.searchQuery || "");
 
+            // Get selected partner on current POS order or passed via props
+            const currentOrder = this.props.pos?.get_order?.();
+            const partner = currentOrder?.getPartner?.() || currentOrder?.get_partner?.() || currentOrder?.partner;
+            const partnerId = this.props.partnerId || (partner ? partner.id : false);
+
             const res = await this.orm.call(
                 "pos.order",
                 "search_open_scheduled_orders",
-                [posConfigId, searchQuery]
+                [posConfigId, searchQuery, partnerId]
             );
             this.state.orders = res || [];
             if (this.state.orders.length > 0) {
@@ -116,7 +121,7 @@ export class CompleteScheduleModal extends Component {
 
             if (res && res.success) {
                 this.notification.add(
-                    _t("تم استكمال سداد الطلب %s وترحيل المخزون وإصدار الفاتورة الضريبية بنجاح.", res.name),
+                    _t("تم استكمال سداد الطلب %s وترحيل المخزون وإصدار الفاتورة الضريبية الكاملة بنجاح.", res.name),
                     { type: "success" }
                 );
                 this.props.close();
