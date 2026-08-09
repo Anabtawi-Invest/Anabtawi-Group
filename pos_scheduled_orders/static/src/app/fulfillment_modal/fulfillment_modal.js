@@ -14,6 +14,33 @@ function formatToOdooDatetime(val) {
     return str;
 }
 
+function getOrderPartner(order) {
+    if (!order) return null;
+    if (typeof order.getPartner === "function") {
+        const p = order.getPartner();
+        if (p) return p;
+    }
+    if (typeof order.get_partner === "function") {
+        const p = order.get_partner();
+        if (p) return p;
+    }
+    if (order.partner) return order.partner;
+    if (order.customer) return order.customer;
+    if (order.partner_id) return order.partner_id;
+    return null;
+}
+
+function setOrderPartner(order, partner) {
+    if (!order || !partner) return;
+    if (typeof order.setPartner === "function") {
+        order.setPartner(partner);
+    } else if (typeof order.set_partner === "function") {
+        order.set_partner(partner);
+    } else {
+        order.partner = partner;
+    }
+}
+
 export class FulfillmentModal extends Component {
     static template = "pos_scheduled_orders.FulfillmentModal";
     static components = { Dialog };
@@ -27,7 +54,7 @@ export class FulfillmentModal extends Component {
     setup() {
         this.notification = useService("notification");
         const order = this.props.order;
-        const currentPartner = order?.get_partner?.() || order?.partner || null;
+        const currentPartner = getOrderPartner(order);
 
         let initialDatetime = order.scheduled_datetime;
         if (!initialDatetime) {
@@ -88,7 +115,7 @@ export class FulfillmentModal extends Component {
 
     async onClickOpenPartnerPicker() {
         try {
-            const currentPartner = this.state.selectedPartner || this.props.order.get_partner?.();
+            const currentPartner = this.state.selectedPartner || getOrderPartner(this.props.order);
             const partner = await this.props.pos.selectPartner(currentPartner);
             if (partner) {
                 this.selectPartner(partner);
@@ -110,7 +137,7 @@ export class FulfillmentModal extends Component {
         this.state.showPartnerDropdown = false;
 
         // Assign partner to POS order
-        this.props.order.set_partner?.(partner);
+        setOrderPartner(this.props.order, partner);
     }
 
     setTab(tabName) {
@@ -194,9 +221,9 @@ export class FulfillmentModal extends Component {
             return;
         }
 
-        const partner = this.state.selectedPartner || this.props.order.get_partner?.();
+        const partner = this.state.selectedPartner || getOrderPartner(this.props.order);
         if (partner) {
-            this.props.order.set_partner?.(partner);
+            setOrderPartner(this.props.order, partner);
         }
 
         const formattedOdooDatetime = formatToOdooDatetime(this.state.scheduled_datetime);
