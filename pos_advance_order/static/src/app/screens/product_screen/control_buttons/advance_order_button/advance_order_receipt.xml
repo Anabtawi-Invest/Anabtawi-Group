@@ -40,7 +40,12 @@
                 </div>
                 <t t-foreach="props.receipt.lines" t-as="line" t-key="line_index">
                     <div class="advance-receipt-line">
-                        <span class="advance-col-item" t-esc="line.name"/>
+                        <span class="advance-col-item">
+                            <t t-esc="line.name"/>
+                            <t t-if="line.discount">
+                                <br/><small t-esc="'-' + line.discount + '%'"/>
+                            </t>
+                        </span>
                         <span class="advance-col-qty" t-esc="line.qty"/>
                         <span class="advance-col-price" t-esc="formatCurrency(line.subtotal)"/>
                     </div>

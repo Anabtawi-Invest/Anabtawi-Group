@@ -128,6 +128,7 @@ class PosAdvanceOrderController(http.Controller):
                         "product_qty": qty,
                         "price_unit": float(line.get("price_unit") or product.lst_price or 0.0),
                         "discount": float(line.get("discount") or 0.0),
+                        "tax_ids": [(6, 0, product.taxes_id.ids)],
                     },
                 )
             )

@@ -112,6 +112,7 @@ patch(ControlButtons.prototype, {
                     qty: qty,
                     price_unit: priceUnit,
                     discount: discount,
+                    price_reduce: priceUnit * (1 - discount / 100),
                 };
             })
             .filter(Boolean);
@@ -182,6 +183,7 @@ patch(ControlButtons.prototype, {
                     product_id: line.product_id,
                     name: line.product_name || line.full_product_name || "",
                     qty: qty,
+                    discount: discount,
                     subtotal: qty * unitAfterDiscount,
                 };
             }),
