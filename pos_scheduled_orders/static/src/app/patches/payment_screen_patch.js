@@ -1,18 +1,13 @@
 /** @odoo-module **/
 
 import { patch } from "@web/core/utils/patch";
-import { OrderPaymentValidation } from "@point_of_sale/app/screens/payment_screen/payment_lines/payment_lines";
+import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { _t } from "@web/core/l10n/translation";
 
-patch(OrderPaymentValidation.prototype, {
-    async askBeforeValidation() {
-        const ok = await super.askBeforeValidation();
-        if (ok === false) {
-            return false;
-        }
-
-        const order = this.order;
+patch(PaymentScreen.prototype, {
+    async validateOrder(isForceValidate) {
+        const order = this.currentOrder || this.pos?.get_order?.() || this.pos?.selectedOrder;
         const posConfig = this.pos?.config;
 
         if (posConfig?.enable_fulfillment_schedule && order?.fulfillment_type) {
@@ -70,6 +65,6 @@ patch(OrderPaymentValidation.prototype, {
             }
         }
 
-        return true;
+        return await super.validateOrder(...arguments);
     },
 });
