@@ -42,11 +42,19 @@ export class CompleteScheduleModal extends Component {
         this.state.loading = true;
         this.state.error_message = "";
         try {
+            // Ensure local completed POS orders are pushed to backend DB first
+            if (typeof this.props.pos?.push_orders === "function") {
+                try {
+                    await this.props.pos.push_orders();
+                } catch (pushErr) {
+                    console.warn("Notice: push_orders sync:", pushErr);
+                }
+            }
+
             const config = this.props.pos?.config || {};
             const posConfigId = parseInt(config.id || (Array.isArray(config) ? config[0] : 0) || 0);
             const searchQuery = String(this.state.searchQuery || "");
 
-            // Pass positional arguments [posConfigId, searchQuery] for 100% RPC method signature compatibility
             const res = await this.orm.call(
                 "pos.order",
                 "search_open_scheduled_orders",
