@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, time
 
+import pytz
 from babel.dates import format_date as babel_format_date
 
 from odoo import _, fields, models
@@ -9,6 +10,7 @@ from odoo.tools.misc import babel_locale_parse, format_date, get_lang
 
 TYPE_CASH_DELIVERY = 'تسليم نقد'
 TYPE_PETTY_CASH_OUT = 'تعزيز السلفة النثرية'
+DEFAULT_TZ = 'Asia/Amman'
 
 
 class PosCashMovementWizard(models.TransientModel):
@@ -26,6 +28,33 @@ class PosCashMovementWizard(models.TransientModel):
         default=fields.Date.context_today,
     )
 
+    def _user_tz_name(self):
+        """Prefer user timezone; default to Jordan time."""
+        return self.env.user.tz or DEFAULT_TZ
+
+    def _to_user_datetime(self, utc_dt):
+        """Convert UTC datetime from DB to user/Jordan timezone (aware)."""
+        if not utc_dt:
+            return False
+        utc_dt = fields.Datetime.to_datetime(utc_dt)
+        return fields.Datetime.context_timestamp(self.with_context(tz=self._user_tz_name()), utc_dt)
+
+    def _to_user_naive(self, utc_dt):
+        """Local clock time without tzinfo (for Excel write_datetime)."""
+        local_dt = self._to_user_datetime(utc_dt)
+        if not local_dt:
+            return False
+        return local_dt.replace(tzinfo=None)
+
+    def _local_day_bounds_as_utc(self, day_date):
+        """Convert a local calendar day (Jordan/user TZ) to naive UTC bounds for ORM."""
+        tz = pytz.timezone(self._user_tz_name())
+        start_local = tz.localize(datetime.combine(day_date, time.min))
+        end_local = tz.localize(datetime.combine(day_date, time.max))
+        start_utc = start_local.astimezone(pytz.UTC).replace(tzinfo=None)
+        end_utc = end_local.astimezone(pytz.UTC).replace(tzinfo=None)
+        return start_utc, end_utc
+
     def _validate_filters(self):
         self.ensure_one()
         if self.date_from > self.date_to:
@@ -33,15 +62,15 @@ class PosCashMovementWizard(models.TransientModel):
 
     def _get_session_domain(self):
         self.ensure_one()
-        day_start = datetime.combine(self.date_from, time.min)
-        day_end = datetime.combine(self.date_to, time.max)
+        start_utc, _ = self._local_day_bounds_as_utc(self.date_from)
+        _, end_utc = self._local_day_bounds_as_utc(self.date_to)
         return [
-            ('start_at', '>=', fields.Datetime.to_string(day_start)),
-            ('start_at', '<=', fields.Datetime.to_string(day_end)),
+            ('start_at', '>=', fields.Datetime.to_string(start_utc)),
+            ('start_at', '<=', fields.Datetime.to_string(end_utc)),
         ]
 
     def _format_day_header(self, opening_date):
-        """Day name header based on session opening date."""
+        """Day name header based on session opening date (local calendar day)."""
         if not opening_date:
             return ''
         lang = get_lang(self.env)
@@ -54,6 +83,7 @@ class PosCashMovementWizard(models.TransientModel):
         """
         One row per transaction (no sums / no grouping of amounts).
         Filter sessions by start_at; transaction datetime is when the move was done.
+        Datetimes are converted to user/Jordan timezone for display and day grouping.
         """
         self.ensure_one()
         self._validate_filters()
@@ -76,17 +106,19 @@ class PosCashMovementWizard(models.TransientModel):
             session = delivery.session_id
             if not session.start_at:
                 continue
-            opening_day = fields.Datetime.to_datetime(session.start_at).date()
+            opening_local = self._to_user_datetime(session.start_at)
+            opening_day = opening_local.date()
+            txn_local = self._to_user_naive(delivery.create_date)
             lines.append({
                 'opening_day': opening_day,
                 'pos_name': session.config_id.name or '',
-                'transaction_datetime': delivery.create_date,
+                'transaction_datetime': txn_local,
                 'amount': delivery.amount or 0.0,
                 'type': TYPE_CASH_DELIVERY,
                 'sort_key': (
                     opening_day,
                     session.config_id.name or '',
-                    fields.Datetime.to_datetime(delivery.create_date) if delivery.create_date else datetime.min,
+                    txn_local or datetime.min,
                     delivery.id,
                 ),
             })
@@ -95,22 +127,23 @@ class PosCashMovementWizard(models.TransientModel):
         for session in sessions:
             if not session.start_at:
                 continue
-            opening_day = fields.Datetime.to_datetime(session.start_at).date()
+            opening_local = self._to_user_datetime(session.start_at)
+            opening_day = opening_local.date()
             for statement_line in session.statement_line_ids:
                 amount = statement_line.amount or 0.0
                 if amount >= 0:
                     continue
+                txn_local = self._to_user_naive(statement_line.create_date)
                 lines.append({
                     'opening_day': opening_day,
                     'pos_name': session.config_id.name or '',
-                    'transaction_datetime': statement_line.create_date,
+                    'transaction_datetime': txn_local,
                     'amount': abs(amount),
                     'type': TYPE_PETTY_CASH_OUT,
                     'sort_key': (
                         opening_day,
                         session.config_id.name or '',
-                        fields.Datetime.to_datetime(statement_line.create_date)
-                        if statement_line.create_date else datetime.min,
+                        txn_local or datetime.min,
                         statement_line.id,
                     ),
                 })
@@ -207,12 +240,7 @@ class PosCashMovementWizard(models.TransientModel):
                 sheet.write(row, 0, line['pos_name'], text_style)
                 txn_dt = line['transaction_datetime']
                 if txn_dt:
-                    sheet.write_datetime(
-                        row,
-                        1,
-                        fields.Datetime.to_datetime(txn_dt),
-                        datetime_style,
-                    )
+                    sheet.write_datetime(row, 1, txn_dt, datetime_style)
                 else:
                     sheet.write(row, 1, '', text_style)
                 sheet.write_number(row, 2, line['amount'], number_style)
