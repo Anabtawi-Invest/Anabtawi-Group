@@ -3,7 +3,6 @@
     <t t-name="pos_scheduled_orders.FulfillmentModal">
         <Dialog title="'طلبيات تواصي - Scheduled Orders'">
             <div class="pos-fulfillment-modal container-fluid p-2" dir="rtl">
-                <!-- Navigation Tabs in Arabic & English -->
                 <ul class="nav nav-tabs nav-fill mb-3">
                     <li class="nav-item">
                         <button type="button" 
@@ -21,7 +20,6 @@
                     </li>
                 </ul>
 
-                <!-- Red Error Alert Box -->
                 <t t-if="state.error_message">
                     <div class="alert alert-danger fw-bold d-flex align-items-center mb-3" role="alert">
                         <i class="fa fa-exclamation-triangle fs-4 me-2"/>
@@ -29,7 +27,6 @@
                     </div>
                 </t>
 
-                <!-- Customer Database Live Search & Autocomplete -->
                 <div class="card p-3 bg-light border mb-3 position-relative">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <label class="form-label fw-bold text-dark m-0 fs-6">
@@ -54,7 +51,6 @@
                                placeholder="ابحث بالاسم أو رقم الهاتف أو الرقم الضريبي..."/>
                     </div>
 
-                    <!-- Autocomplete Dropdown List -->
                     <t t-if="state.showPartnerDropdown &amp;&amp; filteredPartners.length">
                         <div class="list-group position-absolute w-100 shadow-lg mt-1 z-3" style="top: 100%; right: 0; max-height: 220px; overflow-y: auto;">
                             <t t-foreach="filteredPartners" t-as="p" t-key="p.id">
@@ -71,7 +67,6 @@
                     </t>
                 </div>
 
-                <!-- Common Contact Fields -->
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         <label class="form-label fw-bold">اسم العميل (Customer Name) <span class="text-danger">*</span></label>
@@ -83,7 +78,6 @@
                     </div>
                 </div>
 
-                <!-- Pickup Mode Specific Content -->
                 <t t-if="state.activeTab === 'pickup'">
                     <div class="row g-3 mb-3">
                         <div class="col-12">
@@ -93,7 +87,6 @@
                     </div>
                 </t>
 
-                <!-- Delivery Mode Specific Content -->
                 <t t-if="state.activeTab === 'delivery'">
                     <div class="row g-3 mb-3">
                         <div class="col-12">
@@ -118,7 +111,6 @@
                         </div>
                     </div>
 
-                    <!-- Delivery Fee Charge Section -->
                     <div class="card bg-light p-3 border mb-3">
                         <label class="form-label fw-bold text-primary fs-6">رسوم خدمة التوصيل (Delivery Charge / Fee)</label>
                         <div class="input-group">

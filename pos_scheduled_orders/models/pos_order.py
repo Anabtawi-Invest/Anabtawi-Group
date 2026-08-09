@@ -22,7 +22,6 @@ class PosOrder(models.Model):
         string="Is Advance Deposit (طلب تواصي بعربون)",
         default=False,
         copy=False,
-        help="Flagged True if order is partially paid/deposit taken on Day 1.",
     )
     jofotara_status = fields.Selection(
         selection=[
@@ -32,52 +31,17 @@ class PosOrder(models.Model):
         string="JoFotara Status (حالة جوفوتارا)",
         default="pending",
         copy=False,
-        help="ISTD Jordan compliance status: Pending deposit vs Final submitted invoice.",
     )
-    delivery_address_id = fields.Many2one(
-        "res.partner",
-        string="Delivery Contact Address (عنوان التوصيل)",
-        copy=False,
-    )
-    delivery_address_name = fields.Char(
-        string="Fulfillment Contact Name (اسم العميل)",
-        copy=False,
-    )
-    delivery_address_phone = fields.Char(
-        string="Fulfillment Contact Phone (هاتف العميل)",
-        copy=False,
-    )
-    delivery_street = fields.Char(
-        string="Delivery Street (الشارع)",
-        copy=False,
-    )
-    delivery_city = fields.Char(
-        string="Delivery City (المدينة / المنطقة)",
-        copy=False,
-    )
-    delivery_building_apt = fields.Char(
-        string="Delivery Building / Apt (البناية / الشقة)",
-        copy=False,
-    )
-    delivery_zip = fields.Char(
-        string="Delivery Zip (الرمز البريدي)",
-        copy=False,
-    )
-    is_catering = fields.Boolean(
-        string="Is Catering (طلب ضيافة كترنج)",
-        default=False,
-        copy=False,
-    )
-    delivery_fee = fields.Float(
-        string="Delivery Fee (رسوم التوصيل)",
-        digits=0,
-        default=0.0,
-    )
-    catering_fee = fields.Float(
-        string="Catering Fee (رسوم الضيافة)",
-        digits=0,
-        default=0.0,
-    )
+    delivery_address_id = fields.Many2one("res.partner", string="Delivery Address", copy=False)
+    delivery_address_name = fields.Char(string="Fulfillment Name", copy=False)
+    delivery_address_phone = fields.Char(string="Fulfillment Phone", copy=False)
+    delivery_street = fields.Char(string="Delivery Street", copy=False)
+    delivery_city = fields.Char(string="Delivery City", copy=False)
+    delivery_building_apt = fields.Char(string="Delivery Building / Apt", copy=False)
+    delivery_zip = fields.Char(string="Delivery Zip", copy=False)
+    is_catering = fields.Boolean(string="Is Catering", default=False, copy=False)
+    delivery_fee = fields.Float(string="Delivery Fee", digits=0, default=0.0)
+    catering_fee = fields.Float(string="Catering Fee", digits=0, default=0.0)
 
     @api.model
     def _load_pos_data_fields(self, config):
@@ -85,20 +49,11 @@ class PosOrder(models.Model):
         if not fields_to_load:
             return fields_to_load
         extra_fields = [
-            "fulfillment_type",
-            "scheduled_datetime",
-            "is_advance_deposit",
-            "jofotara_status",
-            "delivery_address_id",
-            "delivery_address_name",
-            "delivery_address_phone",
-            "delivery_street",
-            "delivery_city",
-            "delivery_building_apt",
-            "delivery_zip",
-            "is_catering",
-            "delivery_fee",
-            "catering_fee",
+            "fulfillment_type", "scheduled_datetime", "is_advance_deposit",
+            "jofotara_status", "delivery_address_id", "delivery_address_name",
+            "delivery_address_phone", "delivery_street", "delivery_city",
+            "delivery_building_apt", "delivery_zip", "is_catering",
+            "delivery_fee", "catering_fee",
         ]
         for field in extra_fields:
             if field not in fields_to_load:
@@ -127,11 +82,6 @@ class PosOrder(models.Model):
         return vals
 
     def _create_order_picking(self):
-        """
-        Delayed Stock Movement Guard (طلبيات تواصي):
-        If order is an advance deposit, keep picking in 'waiting' / 'confirmed' state
-        instead of immediately processing or validating stock deductions.
-        """
         super()._create_order_picking()
         for order in self:
             if order.is_advance_deposit:
@@ -140,36 +90,22 @@ class PosOrder(models.Model):
                         picking.write({"state": "waiting"})
 
     def action_finalize_deposit_and_validate_stock(self):
-        """
-        Triggered when remaining balance is fully settled on Day 2:
-        1. Validates stock picking (deducting stock from warehouse on handover day).
-        2. Generates tax invoice & updates JoFotara status to 'submitted'.
-        """
         for order in self:
             for picking in order.picking_ids:
                 if picking.state not in ["done", "cancel"]:
                     picking.action_assign()
                     if picking.state == "assigned":
                         picking.button_validate()
-
-            order.write({
-                "is_advance_deposit": False,
-                "jofotara_status": "submitted",
-            })
-
+            order.write({"is_advance_deposit": False, "jofotara_status": "submitted"})
             if not order.account_move:
                 try:
                     order.action_pos_order_invoice()
                 except Exception:
                     pass
-
         return True
 
     @api.model
     def search_open_scheduled_orders(self, pos_config_id, search_query=""):
-        """
-        Returns list of open scheduled deposit orders for POS branch.
-        """
         config = self.env["pos.config"].browse(pos_config_id)
         config_ids = [pos_config_id]
         if config and config.allowed_fulfillment_branch_ids:
@@ -180,7 +116,6 @@ class PosOrder(models.Model):
             ("fulfillment_type", "!=", False),
             ("is_advance_deposit", "=", True),
         ]
-
         if search_query and search_query.strip():
             q = search_query.strip()
             domain.append("|")
@@ -216,13 +151,6 @@ class PosOrder(models.Model):
 
     @api.model
     def action_complete_scheduled_order_from_pos(self, order_id, payment_method_id, amount_tendered):
-        """
-        1-Click Day 2 Settlement from POS:
-        1. Adds POS payment for remaining balance.
-        2. Reconciles Customer Advance Deposits liability account.
-        3. Validates warehouse stock picking (deducts inventory).
-        4. Issues JoFotara Tax Invoice.
-        """
         order = self.browse(order_id)
         if not order.exists():
             raise UserError(_("Scheduled Order not found."))
@@ -235,7 +163,6 @@ class PosOrder(models.Model):
             if not pm.exists():
                 raise UserError(_("Invalid payment method selected."))
 
-            # Create POS payment for remaining balance
             self.env["pos.payment"].create({
                 "pos_order_id": order.id,
                 "amount": due,
@@ -243,9 +170,7 @@ class PosOrder(models.Model):
                 "payment_date": fields.Datetime.now(),
             })
 
-        # Finalize stock delivery & tax invoice
         order.action_finalize_deposit_and_validate_stock()
-
         return {
             "success": True,
             "order_id": order.id,

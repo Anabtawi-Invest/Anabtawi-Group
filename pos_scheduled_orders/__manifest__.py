@@ -2,7 +2,7 @@
 {
     "name": "Scheduled Orders - طلبيات تواصي",
     "summary": "إدارة طلبيات التواصي والاستلام والتوصيل وتأجيل حركات المخزون والامتثال لضريبة المبيعات جوفوتارا",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "category": "Point of Sale",
     "author": "Anabtawi Group / Antigravity",
     "license": "LGPL-3",
@@ -29,7 +29,6 @@
             "pos_scheduled_orders/static/src/app/fulfillment_modal/fulfillment_modal.xml",
             "pos_scheduled_orders/static/src/app/catering_modal/catering_modal.js",
             "pos_scheduled_orders/static/src/app/catering_modal/catering_modal.xml",
-            "pos_scheduled_orders/static/src/app/complete_schedule_modal/complete_schedule_modal.js",
             "pos_scheduled_orders/static/src/app/complete_schedule_modal/complete_schedule_modal.xml",
             "pos_scheduled_orders/static/src/app/control_buttons/fulfillment_button.js",
             "pos_scheduled_orders/static/src/app/control_buttons/fulfillment_button.xml",

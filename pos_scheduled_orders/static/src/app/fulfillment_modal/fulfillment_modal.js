@@ -136,7 +136,6 @@ export class FulfillmentModal extends Component {
         this.state.searchPartnerQuery = partner.name || "";
         this.state.showPartnerDropdown = false;
 
-        // Assign partner to POS order
         setOrderPartner(this.props.order, partner);
     }
 
