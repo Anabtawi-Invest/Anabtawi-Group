@@ -115,8 +115,11 @@ export class FulfillmentModal extends Component {
 
     async onClickOpenPartnerPicker() {
         try {
-            const currentPartner = this.state.selectedPartner || getOrderPartner(this.props.order);
-            const partner = await this.props.pos.selectPartner(currentPartner);
+            const order = this.props.order;
+            if (typeof this.props.pos?.selectPartner === "function") {
+                await this.props.pos.selectPartner(order);
+            }
+            const partner = getOrderPartner(order);
             if (partner) {
                 this.selectPartner(partner);
             }
