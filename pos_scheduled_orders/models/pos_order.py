@@ -44,6 +44,39 @@ class PosOrder(models.Model):
     catering_fee = fields.Float(string="Catering Fee", digits=0, default=0.0)
 
     @api.model
+    def _order_fields(self, ui_order):
+        order_fields = super()._order_fields(ui_order)
+        if "fulfillment_type" in ui_order:
+            order_fields["fulfillment_type"] = ui_order.get("fulfillment_type")
+        if "scheduled_datetime" in ui_order:
+            order_fields["scheduled_datetime"] = ui_order.get("scheduled_datetime")
+        if "is_advance_deposit" in ui_order:
+            order_fields["is_advance_deposit"] = ui_order.get("is_advance_deposit")
+        if "jofotara_status" in ui_order:
+            order_fields["jofotara_status"] = ui_order.get("jofotara_status")
+        if "delivery_address_id" in ui_order:
+            order_fields["delivery_address_id"] = ui_order.get("delivery_address_id")
+        if "delivery_address_name" in ui_order:
+            order_fields["delivery_address_name"] = ui_order.get("delivery_address_name")
+        if "delivery_address_phone" in ui_order:
+            order_fields["delivery_address_phone"] = ui_order.get("delivery_address_phone")
+        if "delivery_street" in ui_order:
+            order_fields["delivery_street"] = ui_order.get("delivery_street")
+        if "delivery_city" in ui_order:
+            order_fields["delivery_city"] = ui_order.get("delivery_city")
+        if "delivery_building_apt" in ui_order:
+            order_fields["delivery_building_apt"] = ui_order.get("delivery_building_apt")
+        if "delivery_zip" in ui_order:
+            order_fields["delivery_zip"] = ui_order.get("delivery_zip")
+        if "is_catering" in ui_order:
+            order_fields["is_catering"] = ui_order.get("is_catering")
+        if "delivery_fee" in ui_order:
+            order_fields["delivery_fee"] = ui_order.get("delivery_fee")
+        if "catering_fee" in ui_order:
+            order_fields["catering_fee"] = ui_order.get("catering_fee")
+        return order_fields
+
+    @api.model
     def _load_pos_data_fields(self, config):
         fields_to_load = super()._load_pos_data_fields(config)
         if not fields_to_load:
@@ -119,8 +152,10 @@ class PosOrder(models.Model):
                     pass
 
             domain = [
-                ("fulfillment_type", "in", ["pickup", "delivery"]),
                 ("state", "not in", ["cancel"]),
+                "|",
+                ("fulfillment_type", "in", ["pickup", "delivery"]),
+                ("is_advance_deposit", "=", True),
             ]
             if config_ids:
                 domain.append(("pos_config_id", "in", config_ids))
