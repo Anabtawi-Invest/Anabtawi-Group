@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('control-buttons')]" position="inside">
+            <t t-if="pos.config.enable_fulfillment_schedule">
+                <button type="button" 
+                        class="btn btn-success btn-lg lh-lg text-white fw-bold" 
+                        t-on-click="onClickCompleteSchedule">
+                    <i class="fa fa-check-square-o me-2"/>
+                    <span>استكمال التواصي - Day 2</span>
+                </button>
+            </t>
+        </xpath>
+    </t>
+</templates>
