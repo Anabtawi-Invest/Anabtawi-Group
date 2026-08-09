@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_scheduled_orders.FulfillmentModal">
+        <Dialog title="'طلبيات تواصي - Scheduled Orders'">
+            <div class="pos-fulfillment-modal container-fluid p-2" dir="rtl">
+                <!-- Navigation Tabs in Arabic & English -->
+                <ul class="nav nav-tabs nav-fill mb-3">
+                    <li class="nav-item">
+                        <button type="button" 
+                                t-attf-class="nav-link fw-bold py-2 fs-5 {{state.activeTab === 'pickup' ? 'active bg-primary text-white' : 'text-dark'}}" 
+                                t-on-click="() => this.setTab('pickup')">
+                            <i class="fa fa-shopping-bag me-2"/> استلام من الفرع (Store Pickup)
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button type="button" 
+                                t-attf-class="nav-link fw-bold py-2 fs-5 {{state.activeTab === 'delivery' ? 'active bg-danger text-white' : 'text-dark'}}" 
+                                t-on-click="() => this.setTab('delivery')">
+                            <i class="fa fa-truck me-2"/> توصيل منزلي (Home Delivery)
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Red Error Alert Box -->
+                <t t-if="state.error_message">
+                    <div class="alert alert-danger fw-bold d-flex align-items-center mb-3" role="alert">
+                        <i class="fa fa-exclamation-triangle fs-4 me-2"/>
+                        <div><t t-esc="state.error_message"/></div>
+                    </div>
+                </t>
+
+                <!-- Common Contact Fields -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">اسم العميل (Customer Name) <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-lg text-end" t-model="state.customer_name" placeholder="الاسم الكامل"/>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">رقم هاتف العميل (Mobile Number) <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-lg text-end" t-model="state.mobile" placeholder="مثال: 0791234567"/>
+                    </div>
+                </div>
+
+                <!-- Pickup Mode Specific Content -->
+                <t t-if="state.activeTab === 'pickup'">
+                    <div class="row g-3 mb-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold">موعد وتاريخ الاستلام من الفرع (Scheduled Pickup Date &amp; Time) <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control form-control-lg" t-model="state.scheduled_datetime"/>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- Delivery Mode Specific Content -->
+                <t t-if="state.activeTab === 'delivery'">
+                    <div class="row g-3 mb-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold">موعد وتاريخ التوصيل المنزلي (Scheduled Delivery Date &amp; Time) <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control form-control-lg" t-model="state.scheduled_datetime"/>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">اسم الشارع (Street Address) <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control text-end" t-model="state.street" placeholder="الشارع / الطريق الرئيسي"/>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">المدينة / المنطقة (City) <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control text-end" t-model="state.city" placeholder="المدينة أو الحي"/>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">اسم البناية / الشقة (Building / Apt)</label>
+                            <input type="text" class="form-control text-end" t-model="state.building_apt" placeholder="مثال: عمارة 12 شقة 302"/>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">الرمز البريدي (Postal Code)</label>
+                            <input type="text" class="form-control text-end" t-model="state.zip" placeholder="الرمز البريدي"/>
+                        </div>
+                    </div>
+
+                    <!-- Delivery Fee Charge Section -->
+                    <div class="card bg-light p-3 border mb-3">
+                        <label class="form-label fw-bold text-primary fs-6">رسوم خدمة التوصيل (Delivery Charge / Fee)</label>
+                        <div class="input-group">
+                            <button type="button" class="btn btn-outline-primary fw-bold" t-on-click="applyDeliveryFee">
+                                <i class="fa fa-plus-circle me-1"/> تطبيق قيمة الرسوم (DELIVERY_FEE)
+                            </button>
+                            <input type="number" step="0.01" min="0" class="form-control form-control-lg text-start" 
+                                   t-att-value="state.delivery_fee" t-on-change="onDeliveryFeeInput"/>
+                            <span class="input-group-text"><i class="fa fa-money-bill-wave"/></span>
+                        </div>
+                        <small class="text-muted mt-1">يضيف/يحدّث سطر منتج رسوم التوصيل على السلة تلقائياً.</small>
+                    </div>
+                </t>
+            </div>
+
+            <t t-slot="footer">
+                <button type="button" class="btn btn-primary btn-lg fw-bold me-2 px-4" t-on-click="confirm">
+                    <i class="fa fa-check me-1"/> حفظ طلب التواصي (Save Schedule)
+                </button>
+                <button type="button" class="btn btn-secondary btn-lg px-4" t-on-click="cancel">
+                    إلغاء (Cancel)
+                </button>
+            </t>
+        </Dialog>
+    </t>
+</templates>
