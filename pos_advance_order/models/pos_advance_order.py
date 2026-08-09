@@ -1679,8 +1679,8 @@ class PosAdvanceOrder(models.Model):
                     "product_id": l.product_id.id,
                     "qty": l.product_qty,
                     "price_unit": l.price_unit,
-                    "discount": 0.0,
-                    "tax_ids": [(6, 0, l.product_id.taxes_id.ids)],
+                    "discount": l.discount or 0.0,
+                    "tax_ids": [(6, 0, (l.tax_ids or l.product_id.taxes_id).ids)],
                     "product_uom_id": l.product_uom_id.id,
                     "name": l.product_id.display_name,
                 })
@@ -2234,7 +2234,23 @@ class PosAdvanceOrderLine(models.Model):
         readonly=True,
     )
     product_qty = fields.Float(string="Quantity", default=1.0)
-    price_unit = fields.Float(string="Unit Price", digits="Product Price")
+    price_unit = fields.Float(
+        string="List Price",
+        digits="Product Price",
+        help="Unit price before line discount (as in the POS cart).",
+    )
+    discount = fields.Float(
+        string="Discount (%)",
+        digits="Discount",
+        default=0.0,
+        help="Line discount percentage copied from the POS cart when the advance order is created.",
+    )
+    price_reduce = fields.Float(
+        string="Unit Price",
+        compute="_compute_price_reduce",
+        digits="Product Price",
+        help="Unit price after line discount.",
+    )
 
     currency_id = fields.Many2one("res.currency", related="order_id.currency_id", store=True, readonly=True)
     tax_ids = fields.Many2many(
@@ -2255,7 +2271,12 @@ class PosAdvanceOrderLine(models.Model):
         store=True,
     )
 
-    @api.depends("product_qty", "price_unit", "tax_ids")
+    @api.depends("price_unit", "discount")
+    def _compute_price_reduce(self):
+        for line in self:
+            line.price_reduce = (line.price_unit or 0.0) * (1 - (line.discount or 0.0) / 100.0)
+
+    @api.depends("product_qty", "price_unit", "discount", "tax_ids")
     def _compute_price_subtotal(self):
         for line in self:
             if line.display_type:
@@ -2263,7 +2284,7 @@ class PosAdvanceOrderLine(models.Model):
                 line.price_subtotal_incl = 0
             else:
                 qty = line.product_qty or 0.0
-                price = line.price_unit or 0.0
+                price = (line.price_unit or 0.0) * (1 - (line.discount or 0.0) / 100.0)
                 if line.tax_ids:
                     taxes = line.tax_ids.compute_all(
                         price,

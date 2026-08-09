@@ -11,12 +11,6 @@ import { AdvanceOrderFormPopup } from "./advance_order_form_popup";
 import { CompleteAdvanceOrderPopup } from "./complete_advance_order_popup";
 import { RefundAdvanceOrderPopup } from "./refund_advance_order_popup";
 import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
-
-ClosePosPopup.props = [
-    ...ClosePosPopup.props,
-    "advance_deposit_details",
-    "advance_refund_details",
-];
 import {
     appendSiteServiceLineIfNeeded,
 } from "@pos_advance_order/js/site_service_utils";
@@ -107,7 +101,8 @@ patch(ControlButtons.prototype, {
                 const product = line.getProduct?.() || line.product || line.product_id;
                 const productId = product?.id || product;
                 const qty = toNumber(line.getQuantity?.() ?? line.qty ?? 0);
-                const priceUnit = toNumber(line.getUnitPrice?.() ?? line.price_unit ?? 0);
+                const priceUnit = toNumber(line.price_unit ?? 0);
+                const discount = toNumber(line.getDiscount?.() ?? line.discount ?? 0);
                 if (!productId || qty <= 0) {
                     return null;
                 }
@@ -116,6 +111,8 @@ patch(ControlButtons.prototype, {
                     product_name: product?.display_name || product?.name || "",
                     qty: qty,
                     price_unit: priceUnit,
+                    discount: discount,
+                    price_reduce: priceUnit * (1 - discount / 100),
                 };
             })
             .filter(Boolean);
@@ -177,12 +174,19 @@ patch(ControlButtons.prototype, {
             changeDue: changeDue,
             remainingAmount: remainingAmount,
             isRefund: false,
-            lines: (payload.lines || []).map((line) => ({
-                product_id: line.product_id,
-                name: line.product_name || line.full_product_name || "",
-                qty: line.qty,
-                subtotal: toNumber(line.qty, 0) * toNumber(line.price_unit, 0),
-            })),
+            lines: (payload.lines || []).map((line) => {
+                const qty = toNumber(line.qty, 0);
+                const priceUnit = toNumber(line.price_unit, 0);
+                const discount = toNumber(line.discount, 0);
+                const unitAfterDiscount = priceUnit * (1 - discount / 100);
+                return {
+                    product_id: line.product_id,
+                    name: line.product_name || line.full_product_name || "",
+                    qty: qty,
+                    discount: discount,
+                    subtotal: qty * unitAfterDiscount,
+                };
+            }),
         };
     },
 

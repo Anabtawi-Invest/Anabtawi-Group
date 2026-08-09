@@ -186,8 +186,10 @@
                                     <field name="product_id" required="not display_type" invisible="display_type"/>
                                     <field name="product_qty" invisible="display_type"/>
                                     <field name="product_uom_id" invisible="display_type"/>
-                                    <field name="price_unit" invisible="display_type"/>
-                                    <field name="tax_ids" widget="many2many_tags" invisible="display_type"/>
+                                    <field name="price_unit" string="List Price" invisible="display_type" optional="hide"/>
+                                    <field name="discount" invisible="display_type" optional="show"/>
+                                    <field name="price_reduce" invisible="display_type"/>
+                                    <field name="tax_ids" widget="many2many_tags" invisible="display_type" optional="hide"/>
                                     <field name="price_subtotal" invisible="display_type" widget="monetary"/>
                                     <field name="price_subtotal_incl" invisible="display_type" widget="monetary"/>
                                 </list>

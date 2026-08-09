@@ -5,6 +5,7 @@ import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { formatCurrency } from "@web/core/currency";
+import { rpc } from "@web/core/network/rpc";
 import { getSiteServiceConfig, resolveSiteServiceConfig } from "@pos_advance_order/js/site_service_utils";
 
 /** Same filtering idea as PaymentScreen (minimal + pay_later) plus exclusions for advances. */
@@ -140,27 +141,12 @@ export class AdvanceOrderFormPopup extends Component {
 
     async _loadPopupData() {
         const companyId = this.props.companyId || false;
-        const discountDomain = [["active", "=", true]];
-        if (companyId) {
-            discountDomain.push(["company_id", "=", companyId]);
-        }
         try {
-            const [discounts, posConfigs] = await Promise.all([
-                this.orm.searchRead(
-                    "pos.advance.discount",
-                    discountDomain,
-                    ["id", "name", "discount_type", "value"],
-                    { limit: 200 }
-                ),
-                this.orm.searchRead(
-                    "pos.config",
-                    [],
-                    ["id", "name", "pricelist_id", "enable_advance_order"],
-                    { limit: 200 }
-                ),
-            ]);
-            this.state.discounts = discounts || [];
-            this.state.pos_configs = posConfigs || [];
+            const popupData = await rpc("/pos/advance_order_popup_data", {
+                company_id: companyId || false,
+            });
+            this.state.discounts = popupData?.discounts || [];
+            this.state.pos_configs = popupData?.pos_configs || [];
             this.state.from_pos_config_id = this.props.posConfigId || this.state.from_pos_config_id;
             const siteServiceConfig = await resolveSiteServiceConfig(this.props.pos, this.orm);
             this.state.site_service_config = siteServiceConfig;
