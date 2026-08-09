@@ -42,11 +42,16 @@
                         </t>
                     </div>
                     <div class="input-group input-group-lg">
+                        <button type="button" 
+                                class="btn btn-primary fw-bold d-flex align-items-center" 
+                                t-on-click="onClickOpenPartnerPicker" 
+                                title="فتح شاشة العملاء">
+                            <i class="fa fa-address-book fs-4 me-1"/> اختيار عميل
+                        </button>
                         <input type="text" class="form-control text-end" 
                                t-model="state.searchPartnerQuery" 
                                t-on-input="onSearchPartnerInput" 
                                placeholder="ابحث بالاسم أو رقم الهاتف أو الرقم الضريبي..."/>
-                        <span class="input-group-text"><i class="fa fa-address-book"/></span>
                     </div>
 
                     <!-- Autocomplete Dropdown List -->

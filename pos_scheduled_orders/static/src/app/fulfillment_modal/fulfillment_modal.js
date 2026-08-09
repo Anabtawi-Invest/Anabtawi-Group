@@ -86,6 +86,18 @@ export class FulfillmentModal extends Component {
         this.state.showPartnerDropdown = true;
     }
 
+    async onClickOpenPartnerPicker() {
+        try {
+            const currentPartner = this.state.selectedPartner || this.props.order.get_partner?.();
+            const partner = await this.props.pos.selectPartner(currentPartner);
+            if (partner) {
+                this.selectPartner(partner);
+            }
+        } catch (e) {
+            console.error("Error opening partner picker:", e);
+        }
+    }
+
     selectPartner(partner) {
         this.state.selectedPartner = partner;
         this.state.customer_name = partner.name || "";
