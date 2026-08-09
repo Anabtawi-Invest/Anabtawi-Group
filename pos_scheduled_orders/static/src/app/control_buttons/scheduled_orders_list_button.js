@@ -22,6 +22,7 @@ export class ScheduledOrdersListModal extends Component {
         this.state = useState({
             loading: true,
             searchQuery: "",
+            filterType: "all", // "all", "today", "pickup", "delivery"
             orders: [],
             selectedOrderId: null,
             error_message: "",
@@ -55,7 +56,7 @@ export class ScheduledOrdersListModal extends Component {
             const res = await this.orm.call(
                 "pos.order",
                 "search_open_scheduled_orders",
-                [posConfigId, searchQuery, partnerId]
+                [posConfigId, searchQuery, partnerId, this.state.filterType]
             );
             this.state.orders = res || [];
             if (this.state.orders.length > 0 && !this.state.selectedOrderId) {
@@ -68,6 +69,11 @@ export class ScheduledOrdersListModal extends Component {
         } finally {
             this.state.loading = false;
         }
+    }
+
+    setFilterType(type) {
+        this.state.filterType = type;
+        this.loadScheduledOrders();
     }
 
     onSearchInput(ev) {
@@ -88,7 +94,6 @@ export class ScheduledOrdersListModal extends Component {
         if (!order) return;
         this.state.loading = true;
         try {
-            // Find or create customer
             let partner = null;
             if (order.partner_id) {
                 partner = this.props.pos.db.get_partner_by_id(order.partner_id);
@@ -124,7 +129,6 @@ export class ScheduledOrdersListModal extends Component {
 
             this.props.close();
 
-            // Direct transition to PaymentScreen
             if (typeof this.props.pos.showScreen === "function") {
                 this.props.pos.showScreen("PaymentScreen");
             }

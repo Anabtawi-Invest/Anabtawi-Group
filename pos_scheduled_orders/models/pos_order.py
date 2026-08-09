@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+from datetime import date, datetime
 
 
 class PosOrder(models.Model):
@@ -138,7 +139,7 @@ class PosOrder(models.Model):
         return True
 
     @api.model
-    def search_open_scheduled_orders(self, pos_config_id=False, search_query="", partner_id=False):
+    def search_open_scheduled_orders(self, pos_config_id=False, search_query="", partner_id=False, filter_type="all"):
         try:
             domain = [("state", "not in", ["cancel"])]
 
@@ -161,30 +162,45 @@ class PosOrder(models.Model):
                     ("pos_reference", "ilike", q),
                 ])
 
-            # Sort by id desc first so newest created order is ALWAYS #1 at the top
-            orders = self.search(domain, order="id desc, date_order desc", limit=100)
+            today_str = date.today().strftime("%Y-%m-%d")
+
+            orders = self.search(domain, order="id desc, date_order desc", limit=150)
             res = []
             for o in orders:
                 paid = sum(o.payment_ids.mapped("amount"))
                 total = o.amount_total
                 due = total - paid
-                if due > 0.001 or o.is_advance_deposit or o.fulfillment_type:
-                    res.append({
-                        "id": o.id,
-                        "name": o.name or o.pos_reference or f"Order #{o.id}",
-                        "pos_reference": o.pos_reference or "",
-                        "date_order": str(o.date_order) if o.date_order else "",
-                        "scheduled_datetime": o.scheduled_datetime or "",
-                        "fulfillment_type": o.fulfillment_type or "pickup",
-                        "customer_name": o.delivery_address_name or (o.partner_id.name if o.partner_id else "عميل سفري"),
-                        "customer_phone": o.delivery_address_phone or (o.partner_id.mobile if o.partner_id else ""),
-                        "partner_id": o.partner_id.id if o.partner_id else False,
-                        "street": o.delivery_street or "",
-                        "city": o.delivery_city or "",
-                        "amount_total": total,
-                        "amount_paid": paid,
-                        "amount_due": due if due > 0 else 0.0,
-                    })
+                if not (due > 0.001 or o.is_advance_deposit or o.fulfillment_type):
+                    continue
+
+                dt_str = o.scheduled_datetime or (str(o.date_order) if o.date_order else "")
+                is_today = today_str in str(dt_str) or (o.date_order and str(o.date_order)[:10] == today_str)
+
+                if filter_type == "today" and not is_today:
+                    continue
+                elif filter_type == "pickup" and o.fulfillment_type != "pickup":
+                    continue
+                elif filter_type == "delivery" and o.fulfillment_type != "delivery":
+                    continue
+
+                res.append({
+                    "id": o.id,
+                    "name": o.name or o.pos_reference or f"Order #{o.id}",
+                    "pos_reference": o.pos_reference or "",
+                    "date_order": str(o.date_order) if o.date_order else "",
+                    "scheduled_datetime": o.scheduled_datetime or "",
+                    "fulfillment_type": o.fulfillment_type or "pickup",
+                    "customer_name": o.delivery_address_name or (o.partner_id.name if o.partner_id else "عميل سفري"),
+                    "customer_phone": o.delivery_address_phone or (o.partner_id.mobile if o.partner_id else ""),
+                    "partner_id": o.partner_id.id if o.partner_id else False,
+                    "street": o.delivery_street or "",
+                    "city": o.delivery_city or "",
+                    "amount_total": total,
+                    "amount_paid": paid,
+                    "amount_due": due if due > 0 else 0.0,
+                    "is_today": is_today,
+                    "status_label": "تسليم اليوم" if is_today else "طلبيات قادمة",
+                })
             return res
         except Exception as e:
             return []

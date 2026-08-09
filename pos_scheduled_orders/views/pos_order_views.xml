@@ -1,47 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_pos_pos_form_inherit_scheduled_orders" model="ir.ui.view">
-        <field name="name">pos.order.form.inherit.scheduled.orders</field>
+    <record id="view_pos_order_search_scheduled_inherit" model="ir.ui.view">
+        <field name="name">pos.order.search.scheduled.inherit</field>
         <field name="model">pos.order</field>
-        <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+        <field name="inherit_id" ref="point_of_sale.view_pos_order_search"/>
         <field name="arch" type="xml">
-            <xpath expr="//header" position="inside">
-                <button name="action_finalize_deposit_and_validate_stock" 
-                        type="object" 
-                        string="اعتماد السداد وترحيل المخزون (Day 2)" 
-                        class="oe_highlight" 
-                        invisible="not is_advance_deposit"/>
-            </xpath>
-            <xpath expr="//notebook" position="inside">
-                <page string="طلبيات تواصي وجوفوتارا (Scheduled Orders)" name="fulfillment_scheduled_orders_compliance">
-                    <group>
-                        <group string="تفاصيل طلب التواصي">
-                            <field name="fulfillment_type"/>
-                            <field name="scheduled_datetime"/>
-                            <field name="is_catering"/>
-                        </group>
-                        <group string="حالة العربون والامتثال لجوفوتارا">
-                            <field name="is_advance_deposit"/>
-                            <field name="jofotara_status"/>
-                        </group>
-                        <group string="بيانات التواصل مع العميل">
-                            <field name="delivery_address_name"/>
-                            <field name="delivery_address_phone"/>
-                            <field name="delivery_address_id"/>
-                        </group>
-                        <group string="عنوان التوصيل التفصيلي" invisible="fulfillment_type != 'delivery'">
-                            <field name="delivery_street"/>
-                            <field name="delivery_city"/>
-                            <field name="delivery_building_apt"/>
-                            <field name="delivery_zip"/>
-                        </group>
-                        <group string="الرسوم الإضافية">
-                            <field name="delivery_fee"/>
-                            <field name="catering_fee"/>
-                        </group>
-                    </group>
-                </page>
+            <xpath expr="//search" position="inside">
+                <field name="fulfillment_type"/>
+                <field name="scheduled_datetime"/>
+                <field name="delivery_address_name"/>
+                <field name="delivery_address_phone"/>
+
+                <filter string="Scheduled Orders (طلبيات التواصي)" name="scheduled_orders" 
+                        domain="[('fulfillment_type', 'in', ['pickup', 'delivery'])]"/>
+                <filter string="Store Pickups (استلام فرع)" name="pickup_orders" 
+                        domain="[('fulfillment_type', '=', 'pickup')]"/>
+                <filter string="Home Deliveries (توصيل منزلي)" name="delivery_orders" 
+                        domain="[('fulfillment_type', '=', 'delivery')]"/>
+                <filter string="Pending Settlement (معلق لحين السداد)" name="pending_settlement" 
+                        domain="[('is_advance_deposit', '=', True)]"/>
+                <separator/>
+                <group expand="0" string="Group By">
+                    <filter string="Fulfillment Type (نوع الطلب)" name="group_fulfillment_type" context="{'group_by': 'fulfillment_type'}"/>
+                    <filter string="JoFotara Status (حالة جوفوتارا)" name="group_jofotara_status" context="{'group_by': 'jofotara_status'}"/>
+                </group>
             </xpath>
         </field>
     </record>
+
+    <record id="view_pos_pos_form_scheduled_inherit" model="ir.ui.view">
+        <field name="name">pos.order.form.scheduled.inherit</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Scheduled Order / Fulfillment Details (تفاصيل التواصي)" 
+                       invisible="not fulfillment_type">
+                    <group>
+                        <field name="fulfillment_type"/>
+                        <field name="scheduled_datetime"/>
+                        <field name="is_advance_deposit"/>
+                        <field name="jofotara_status"/>
+                    </group>
+                    <group>
+                        <field name="delivery_address_name"/>
+                        <field name="delivery_address_phone"/>
+                        <field name="delivery_street"/>
+                        <field name="delivery_city"/>
+                        <field name="is_catering"/>
+                        <field name="delivery_fee"/>
+                        <field name="catering_fee"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_pos_scheduled_orders_menu" model="ir.actions.act_window">
+        <field name="name">Scheduled Orders - طلبيات التواصي</field>
+        <field name="res_model">pos.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('fulfillment_type', 'in', ['pickup', 'delivery'])]</field>
+        <field name="context">{'search_default_scheduled_orders': 1}</field>
+    </record>
+
+    <menuitem id="menu_pos_scheduled_orders"
+              name="Scheduled Orders (التواصي)"
+              parent="point_of_sale.menu_point_of_sale"
+              action="action_pos_scheduled_orders_menu"
+              sequence="3"/>
 </odoo>
