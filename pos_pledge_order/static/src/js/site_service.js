@@ -1,7 +1,6 @@
 /** @odoo-module */
 
 import { PosStore } from "@point_of_sale/app/services/pos_store";
-import { PosOrder } from "@point_of_sale/app/models/pos_order";
 import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { patch } from "@web/core/utils/patch";
@@ -14,10 +13,6 @@ import {
 
 /** @type {import("@point_of_sale/app/services/pos_store").PosStore | null} */
 let posStoreRef = null;
-
-function resolvePos(order) {
-    return order?._siteServicePos || posStoreRef;
-}
 
 function attachPosToOrder(order, pos) {
     if (order && pos) {
@@ -114,46 +109,10 @@ async function syncSiteServiceLine(pos, order) {
     }
 }
 
-function scheduleSiteServiceSync(order) {
-    if (!order || order._syncingSiteService) {
-        return;
-    }
-    const pos = resolvePos(order);
-    if (!pos) {
-        return;
-    }
-    syncSiteServiceLine(pos, order).catch((error) => {
-        console.error(`[SITE_SERVICE] Unhandled sync error for order id=${order.id}:`, error);
-    });
-}
-
 patch(PosStore.prototype, {
     async setup(...args) {
         await super.setup(...args);
         posStoreRef = this;
-    },
-
-    async addLineToOrder(vals, order, opts = {}, configure = true) {
-        if (order) {
-            attachPosToOrder(order, this);
-        }
-        const result = await super.addLineToOrder(vals, order, opts, configure);
-        if (order && !order._syncingSiteService) {
-            await syncSiteServiceLine(this, order);
-        }
-        return result;
-    },
-
-    async addLineToCurrentOrder(vals, opts = {}, configure = true) {
-        const order = this.getOrder();
-        if (order) {
-            attachPosToOrder(order, this);
-        }
-        const result = await super.addLineToCurrentOrder(vals, opts, configure);
-        if (order && !order._syncingSiteService) {
-            await syncSiteServiceLine(this, order);
-        }
-        return result;
     },
 });
 
@@ -162,25 +121,20 @@ patch(PosOrderline.prototype, {
         super.setup(vals);
         this.is_site_service_auto = vals?.is_site_service_auto || false;
     },
-
-    setQuantity(quantity, keep_price) {
-        const result = super.setQuantity(...arguments);
-        scheduleSiteServiceSync(this.order_id);
-        return result;
-    },
 });
 
-patch(PosOrder.prototype, {
-    removeOrderline(line) {
-        const result = super.removeOrderline(...arguments);
-        if (!this._syncingSiteService) {
-            scheduleSiteServiceSync(this);
-        }
-        return result;
-    },
-});
-
+// Site Service for regular POS sales only at payment time — not while browsing the menu
+// or building lines for an Advance Order (Advance uses its own checkbox flow).
 patch(PaymentScreen.prototype, {
+    onMounted() {
+        super.onMounted(...arguments);
+        const order = this.pos.getOrder();
+        if (order) {
+            attachPosToOrder(order, this.pos);
+            syncSiteServiceLine(this.pos, order);
+        }
+    },
+
     async validateOrder(isForceValidate) {
         const order = this.pos.selectedOrder;
         if (order) {
