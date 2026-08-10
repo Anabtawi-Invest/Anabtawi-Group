@@ -33,7 +33,7 @@ class PosSession(models.Model):
         return orders.filtered(lambda o: not o.is_pledge_generated)
 
     def _get_pledge_return_lines_for_closing(self):
-        """Pledge returns for this session's closing (same POS / same session)."""
+        """Pledge returns counted in this session's closing (same POS / same session)."""
         self.ensure_one()
         end = self.stop_at or fields.Datetime.now()
         PledgeLine = self.env["pos.advance.order.pledge"].sudo()
@@ -43,6 +43,7 @@ class PosSession(models.Model):
             ("return_pos_session_id", "=", self.id),
             ("pos_order_id", "!=", False),
         ])
+        # Legacy rows (before return_pos_session_id): same POS config + return time in session window.
         legacy_same_pos = PledgeLine.search([
             ("state", "=", "returned"),
             ("return_move_id.state", "=", "posted"),
@@ -58,8 +59,8 @@ class PosSession(models.Model):
         """Gross pledge cash effect from journal entries (not pos.payment), split in / out.
 
         - ``cash_in`` / ``by_pm_in``: pledge deposits for orders **in this session** (posted deposit JE).
-        - ``cash_out`` / ``by_pm_out``: pledge **returns** on **this session**, or legacy returns on the
-          **same POS config** within this session's time window.
+        - ``cash_out`` / ``by_pm_out``: pledge **returns** processed on **this session**, or legacy
+          returns on the **same POS config** within this session's time window.
         - ``cash`` / ``by_pm``: net (in − out) for adjusting expected payment totals.
         """
         self.ensure_one()

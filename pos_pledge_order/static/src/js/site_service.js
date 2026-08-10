@@ -8,6 +8,7 @@ import { patch } from "@web/core/utils/patch";
 import {
     computeSiteServiceScoreFromLines,
     getSiteServiceConfig,
+    hasListedSiteServiceProducts,
     normalizeId,
 } from "@pos_advance_order/js/site_service_utils";
 
@@ -67,6 +68,18 @@ async function syncSiteServiceLine(pos, order) {
             order.removeOrderline(line);
         }
         if (!menuConfig) {
+            return;
+        }
+        const orderLines = order.lines || (order.getOrderlines?.() || []);
+        const linesForCheck = orderLines.map((orderLine) => ({
+            product_id: normalizeId(orderLine.getProduct?.() || orderLine.product_id || orderLine.product),
+            qty: orderLine.getQuantity?.() ?? orderLine.qty ?? 0,
+            is_site_service_auto: orderLine.is_site_service_auto,
+        }));
+        if (!hasListedSiteServiceProducts(linesForCheck, menuConfig)) {
+            console.info(
+                "[SITE_SERVICE] No products from Site Service list in order; service line not applied."
+            );
             return;
         }
         const score = computeSiteServiceScore(order, menuConfig);
