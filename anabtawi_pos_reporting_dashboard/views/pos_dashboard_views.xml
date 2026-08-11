@@ -77,12 +77,11 @@
                 <filter string="Pledges (Rahen In)" name="filter_rahen_in" domain="[('report_type', '=', 'rahen_in')]"/>
                 <filter string="Pledge Returns (Rahen Out)" name="filter_rahen_out" domain="[('report_type', '=', 'rahen_out')]"/>
                 <filter string="Advance Deposits" name="filter_advance" domain="[('report_type', '=', 'advance_deposit')]"/>
-                <group expand="0" string="Group By">
-                    <filter string="POS Branch" name="group_config" context="{'group_by': 'config_id'}"/>
-                    <filter string="Report Type" name="group_type" context="{'group_by': 'report_type'}"/>
-                    <filter string="Date" name="group_date" context="{'group_by': 'date'}"/>
-                    <filter string="Payment Method" name="group_payment_method" context="{'group_by': 'payment_method_id'}"/>
-                </group>
+                <separator/>
+                <filter string="POS Branch" name="group_config" context="{'group_by': 'config_id'}"/>
+                <filter string="Report Type" name="group_type" context="{'group_by': 'report_type'}"/>
+                <filter string="Date" name="group_date" context="{'group_by': 'date'}"/>
+                <filter string="Payment Method" name="group_payment_method" context="{'group_by': 'payment_method_id'}"/>
             </search>
         </field>
     </record>
