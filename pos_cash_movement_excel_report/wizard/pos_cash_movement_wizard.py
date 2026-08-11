@@ -114,6 +114,7 @@ class PosCashMovementWizard(models.TransientModel):
                 'pos_name': session.config_id.name or '',
                 'transaction_datetime': txn_local,
                 'amount': delivery.amount or 0.0,
+                'reason': (delivery.reason or '').strip(),
                 'type': TYPE_CASH_DELIVERY,
                 'sort_key': (
                     opening_day,
@@ -139,6 +140,7 @@ class PosCashMovementWizard(models.TransientModel):
                     'pos_name': session.config_id.name or '',
                     'transaction_datetime': txn_local,
                     'amount': abs(amount),
+                    'reason': (statement_line.payment_ref or '').strip(),
                     'type': TYPE_PETTY_CASH_OUT,
                     'sort_key': (
                         opening_day,
@@ -199,19 +201,22 @@ class PosCashMovementWizard(models.TransientModel):
             _('POS Name'),
             _('Date & Time'),
             _('Amount'),
+            _('Reason'),
             _('Type'),
         ]
         sheet.set_column(0, 0, 32)
         sheet.set_column(1, 1, 22)
         sheet.set_column(2, 2, 14)
-        sheet.set_column(3, 3, 28)
+        sheet.set_column(3, 3, 40)
+        sheet.set_column(4, 4, 28)
 
         report_lines = self._get_report_lines()
         row = 0
+        last_col = 4
 
         if not report_lines:
             sheet.merge_range(
-                row, 0, row, 3, self._format_day_header(self.date_from), day_header_style
+                row, 0, row, last_col, self._format_day_header(self.date_from), day_header_style
             )
             sheet.set_row(row, 22)
             row += 1
@@ -228,7 +233,7 @@ class PosCashMovementWizard(models.TransientModel):
 
         for opening_day in sorted(lines_by_day.keys()):
             day_label = self._format_day_header(opening_day)
-            sheet.merge_range(row, 0, row, 3, day_label, day_header_style)
+            sheet.merge_range(row, 0, row, last_col, day_label, day_header_style)
             sheet.set_row(row, 22)
             row += 1
 
@@ -244,7 +249,8 @@ class PosCashMovementWizard(models.TransientModel):
                 else:
                     sheet.write(row, 1, '', text_style)
                 sheet.write_number(row, 2, line['amount'], number_style)
-                sheet.write(row, 3, line['type'], text_style)
+                sheet.write(row, 3, line['reason'] or '', text_style)
+                sheet.write(row, 4, line['type'], text_style)
                 row += 1
 
             # Blank separator between days (no totals)
