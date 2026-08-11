@@ -18,7 +18,8 @@ class PosSiteServiceMenu(models.Model):
     enable_site_service = fields.Boolean(
         string="Site Service",
         default=False,
-        help="When enabled, the cutting service logic is applied at every Point of Sale.",
+        help="When enabled, site service can be selected on Advance Order creation. "
+        "Regular POS sales never add the service product automatically.",
     )
     threshold = fields.Float(
         string="Threshold",
