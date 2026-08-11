@@ -1,6 +1,8 @@
 from collections import defaultdict
 from datetime import datetime, time
 
+import pytz
+
 from odoo import _, fields, models
 
 PAYMENT_METHOD_TALABAT = 142
@@ -15,11 +17,24 @@ class PosDailyOperationsWizard(models.TransientModel):
 
     business_date = fields.Date(string='Business Date', required=True, default=fields.Date.context_today)
 
+    def _get_report_timezone(self):
+        tz_name = (
+            self.env.context.get('tz')
+            or self.env.user.tz
+            or self.env.company.resource_calendar_id.tz
+            or 'UTC'
+        )
+        return pytz.timezone(tz_name)
+
     def _get_day_bounds(self):
+        """Return UTC-naive datetimes for the business date in the user/company timezone."""
         self.ensure_one()
-        day_start = datetime.combine(self.business_date, time.min)
-        day_end = datetime.combine(self.business_date, time.max)
-        return day_start, day_end
+        tz = self._get_report_timezone()
+        day_start_local = tz.localize(datetime.combine(self.business_date, time.min))
+        day_end_local = tz.localize(datetime.combine(self.business_date, time.max))
+        day_start_utc = day_start_local.astimezone(pytz.UTC).replace(tzinfo=None)
+        day_end_utc = day_end_local.astimezone(pytz.UTC).replace(tzinfo=None)
+        return day_start_utc, day_end_utc
 
     def _get_active_configs(self):
         return self.env['pos.config'].search([('active', '=', True)], order='name')
