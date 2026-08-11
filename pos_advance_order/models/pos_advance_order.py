@@ -1565,6 +1565,7 @@ class PosAdvanceOrder(models.Model):
         Accounting: _post_advance_completion_settlement_move (Dr liability / Cr receivable); pledge settlement if any.
         Pass ``pos_config_id`` when calling from POS so completion is enforced on the Picking POS only.
         """
+        summary = None
         for order in self:
             order.ensure_one()
             if pos_config_id:
@@ -1680,8 +1681,63 @@ class PosAdvanceOrder(models.Model):
 
             order.state = "fully_paid"
             order._generate_completion_invoice(pos_order)
+            summary = order._completion_receipt_vals(completion_pm=pm)
 
+        if len(self) == 1 and summary:
+            return summary
         return True
+
+    def _completion_receipt_vals(self, completion_pm=None):
+        """Payload for POS completion receipt (full total, advance, pledge, payments)."""
+        self.ensure_one()
+        advance_pm = self.pos_payment_method_id
+        completion_pm = completion_pm or self.env["pos.payment.method"]
+        total = self.amount_grand_total or self.amount_total or 0.0
+        advance_amount = self.advance_amount or 0.0
+        remaining_paid = max(total - advance_amount, 0.0)
+        lines = []
+        for line in self.line_ids.filtered(lambda l: not l.display_type and l.product_id):
+            is_pledge_line = bool(getattr(line, "is_site_service_pledge_line", False))
+            subtotal = line.price_subtotal_incl if line.price_subtotal_incl else line.price_subtotal
+            name = line.product_id.display_name
+            if is_pledge_line:
+                name = _("%s (Pledge)") % name
+            lines.append(
+                {
+                    "name": name,
+                    "qty": line.product_qty,
+                    "discount": line.discount or 0.0,
+                    "subtotal": subtotal,
+                    "is_pledge_line": is_pledge_line,
+                }
+            )
+        pledge_lines = []
+        for pledge in self.pledge_line_ids.filtered(lambda p: p.state in ("active", "pending")):
+            pledge_lines.append(
+                {
+                    "name": pledge.product_id.display_name,
+                    "qty": pledge.pledge_qty,
+                    "subtotal": pledge.pledge_subtotal,
+                }
+            )
+        return {
+            "id": self.id,
+            "name": self.name,
+            "partner_name": self.partner_id.display_name,
+            "partner_phone": self.partner_id.phone or "",
+            "pos_order_name": self.remaining_pos_order_id.name if self.remaining_pos_order_id else "",
+            "amount_total": total,
+            "advance_amount": advance_amount,
+            "remaining_paid": remaining_paid,
+            "remaining_amount_tendered": self.remaining_amount_tendered or 0.0,
+            "remaining_change_amount": self.remaining_change_amount or 0.0,
+            "pledge_amount": self.pledge_amount or 0.0,
+            "advance_payment_method_name": advance_pm.display_name if advance_pm else "",
+            "payment_method_name": completion_pm.display_name if completion_pm else "",
+            "lines": lines,
+            "pledge_lines": pledge_lines,
+            "state": self.state,
+        }
 
     def _generate_completion_invoice(self, pos_order):
         """Create and post the customer invoice when the advance sale is completed."""

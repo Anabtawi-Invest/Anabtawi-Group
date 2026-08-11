@@ -22,6 +22,9 @@ const RECEIPT_PRINT_STYLES = `
 .advance-order-receipt .advance-summary-row{display:flex;justify-content:space-between;padding:5px 8px;border-bottom:1px solid #ddd}
 .advance-order-receipt .advance-summary-row:last-child{border-bottom:none}
 .advance-order-receipt .advance-pledge-row{background-color:#fff9e6;color:#856404;font-weight:600}
+.advance-order-receipt .advance-receipt-title-completion{color:#198754}
+.advance-order-receipt .advance-pledge-line{background-color:#fffdf5}
+.advance-order-receipt .advance-receipt-note-success{background:#d4edda;border-color:#28a745;color:#155724}
 .advance-order-receipt .advance-deposit-row{background-color:#f3efff}
 .advance-order-receipt .advance-change-row{background-color:#d4edda;color:#155724;font-weight:600}
 .advance-order-receipt .advance-remaining-row{background-color:#6f42c1;color:#fff;font-size:14px;font-weight:700;padding:8px}
@@ -80,7 +83,11 @@ export async function printAdvanceOrderReceipt({
     }
 
     try {
-        const title = receiptData.isRefund ? _t("Advance Refund Receipt") : _t("Advance Order Receipt");
+        const title = receiptData.isCompletion
+            ? _t("Advance Completion Receipt")
+            : receiptData.isRefund
+              ? _t("Advance Refund Receipt")
+              : _t("Advance Order Receipt");
         await printAdvanceOrderReceiptInBrowser(renderer, receiptData, title);
         return { printed: true, method: "browser" };
     } catch (error) {

@@ -308,6 +308,54 @@ patch(ControlButtons.prototype, {
         }
     },
 
+    _buildCompletionReceiptData({ result, popupPayload }) {
+        const total = toNumber(result?.amount_total, 0);
+        const advanceAmount = toNumber(result?.advance_amount, 0);
+        const remainingPaid = toNumber(result?.remaining_paid, Math.max(total - advanceAmount, 0));
+        const amountTendered = toNumber(
+            result?.remaining_amount_tendered,
+            popupPayload.amount_tendered ?? remainingPaid
+        );
+        const changeDue = toNumber(
+            result?.remaining_change_amount,
+            popupPayload.change_amount ?? Math.max(amountTendered - remainingPaid, 0)
+        );
+        const pledgeAmount = toNumber(result?.pledge_amount, 0);
+        return {
+            companyName: this.pos.company?.name || "",
+            posName: this.pos.config?.name || "",
+            reference: result?.name || "",
+            posOrderReference: result?.pos_order_name || "",
+            date: new Date().toLocaleString(),
+            customerName: result?.partner_name || "",
+            customerPhone: result?.partner_phone || "",
+            advancePaymentMethod: result?.advance_payment_method_name || "",
+            paymentMethod: result?.payment_method_name || popupPayload.payment_method_name || "",
+            currencyId: this.pos.currency?.id,
+            total,
+            advanceAmount,
+            remainingPaid,
+            amountTendered,
+            changeDue,
+            pledgeAmount,
+            remainingAmount: 0,
+            isRefund: false,
+            isCompletion: true,
+            lines: (result?.lines || []).map((line) => ({
+                name: line.name || "",
+                qty: toNumber(line.qty, 0),
+                discount: toNumber(line.discount, 0),
+                subtotal: toNumber(line.subtotal, 0),
+                isPledgeLine: !!line.is_pledge_line,
+            })),
+            pledgeLines: (result?.pledge_lines || []).map((line) => ({
+                name: line.name || "",
+                qty: toNumber(line.qty, 0),
+                subtotal: toNumber(line.subtotal, 0),
+            })),
+        };
+    },
+
     async onClickCompleteAdvanceOrder() {
         const popupPayload = await makeAwaitable(this.dialog, CompleteAdvanceOrderPopup, {
             posConfigId: this.pos.config.id,
@@ -317,16 +365,42 @@ patch(ControlButtons.prototype, {
             return;
         }
         try {
-            await this.orm.call(
+            const result = await this.orm.call(
                 "pos.advance.order",
                 "action_create_remaining_amount",
                 [[popupPayload.advance_order_id]],
                 {
                     pos_payment_method_id: popupPayload.payment_method_id,
                     pos_config_id: this.pos.config.id,
+                    amount_tendered: popupPayload.amount_tendered,
                 }
             );
             this.notification.add(_t("Advance order completed successfully."), { type: "success" });
+            try {
+                const receiptPayload =
+                    result && typeof result === "object" && result.name
+                        ? result
+                        : null;
+                if (receiptPayload) {
+                    const printResult = await this._printAdvanceReceipt(
+                        this._buildCompletionReceiptData({ result: receiptPayload, popupPayload })
+                    );
+                    if (!printResult?.printed) {
+                        this.notification.add(
+                            _t("Advance order completed but receipt printing failed."),
+                            { type: "warning" }
+                        );
+                    }
+                }
+            } catch (printError) {
+                const printMessage =
+                    printError?.message === "POPUP_BLOCKED"
+                        ? _t("Please allow pop-ups to print the completion receipt.")
+                        : printError?.body ||
+                          printError?.message ||
+                          _t("Advance order completed but receipt printing failed.");
+                this.notification.add(printMessage, { type: "warning" });
+            }
         } catch (error) {
             const msg = error?.data?.message || error?.message || _t("Failed to complete advance order.");
             this.notification.add(msg, { type: "danger" });

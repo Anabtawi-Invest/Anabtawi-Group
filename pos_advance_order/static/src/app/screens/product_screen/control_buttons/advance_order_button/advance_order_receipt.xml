@@ -6,9 +6,13 @@
             <div class="advance-receipt-header">
                 <div class="fw-bolder fs-5" t-esc="props.receipt.companyName"/>
                 <div class="text-muted" t-esc="props.receipt.posName"/>
-                <div t-if="!props.receipt.isRefund" class="advance-receipt-title">ADVANCE ORDER RECEIPT</div>
-                <div t-if="props.receipt.isRefund" class="advance-receipt-title">ADVANCE REFUND RECEIPT</div>
+                <div t-if="props.receipt.isCompletion" class="advance-receipt-title advance-receipt-title-completion">ADVANCE COMPLETION RECEIPT</div>
+                <div t-elif="props.receipt.isRefund" class="advance-receipt-title">ADVANCE REFUND RECEIPT</div>
+                <div t-else="" class="advance-receipt-title">ADVANCE ORDER RECEIPT</div>
                 <div class="advance-receipt-ref" t-esc="props.receipt.reference"/>
+                <div t-if="props.receipt.isCompletion and props.receipt.posOrderReference" class="text-muted mt-1">
+                    POS: <t t-esc="props.receipt.posOrderReference"/>
+                </div>
             </div>
 
             <!-- Customer & payment info -->
@@ -25,8 +29,20 @@
                     <span>Phone</span>
                     <span t-esc="props.receipt.customerPhone"/>
                 </div>
-                <div class="advance-receipt-meta-row">
+                <div t-if="props.receipt.isCompletion and props.receipt.advancePaymentMethod" class="advance-receipt-meta-row">
+                    <span>Advance Payment</span>
+                    <span t-esc="props.receipt.advancePaymentMethod"/>
+                </div>
+                <div t-if="props.receipt.isCompletion" class="advance-receipt-meta-row">
+                    <span>Completion Payment</span>
+                    <span t-esc="paymentMethodLabel"/>
+                </div>
+                <div t-if="!props.receipt.isCompletion and !props.receipt.isRefund" class="advance-receipt-meta-row">
                     <span>Payment</span>
+                    <span t-esc="paymentMethodLabel"/>
+                </div>
+                <div t-if="props.receipt.isRefund" class="advance-receipt-meta-row">
+                    <span>Refund Payment</span>
                     <span t-esc="paymentMethodLabel"/>
                 </div>
             </div>
@@ -39,7 +55,7 @@
                     <span class="advance-col-price">Amount</span>
                 </div>
                 <t t-foreach="props.receipt.lines" t-as="line" t-key="line_index">
-                    <div class="advance-receipt-line">
+                    <div class="advance-receipt-line" t-att-class="line.isPledgeLine ? 'advance-pledge-line' : ''">
                         <span class="advance-col-item">
                             <t t-esc="line.name"/>
                             <t t-if="line.discount">
@@ -62,15 +78,27 @@
                     <span>Original Order Total</span>
                     <span t-esc="formatCurrency(props.receipt.total)"/>
                 </div>
+                <div t-if="props.receipt.pledgeAmount > 0" class="advance-summary-row advance-pledge-row">
+                    <span>Pledge Total</span>
+                    <span t-esc="formatCurrency(props.receipt.pledgeAmount)"/>
+                </div>
                 <div t-if="!props.receipt.isRefund" class="advance-summary-row advance-deposit-row">
                     <span>Advance Paid (Deposit)</span>
                     <span t-esc="formatCurrency(props.receipt.advanceAmount)"/>
+                </div>
+                <div t-if="props.receipt.isCompletion" class="advance-summary-row">
+                    <span>Remaining Paid</span>
+                    <span t-esc="formatCurrency(props.receipt.remainingPaid)"/>
                 </div>
                 <div t-if="props.receipt.isRefund" class="advance-summary-row">
                     <span>Refunded to Customer</span>
                     <span class="text-danger fw-bolder" t-esc="formatCurrency(props.receipt.advanceAmount)"/>
                 </div>
-                <div t-if="!props.receipt.isRefund" class="advance-summary-row">
+                <div t-if="!props.receipt.isRefund and !props.receipt.isCompletion" class="advance-summary-row">
+                    <span>Amount Tendered</span>
+                    <span t-esc="formatCurrency(props.receipt.amountTendered)"/>
+                </div>
+                <div t-if="props.receipt.isCompletion" class="advance-summary-row">
                     <span>Amount Tendered</span>
                     <span t-esc="formatCurrency(props.receipt.amountTendered)"/>
                 </div>
@@ -78,14 +106,37 @@
                     <span>Change Returned</span>
                     <span t-esc="formatCurrency(props.receipt.changeDue)"/>
                 </div>
-                <div t-if="!props.receipt.isRefund" class="advance-summary-row advance-remaining-row">
+                <div t-if="!props.receipt.isRefund and !props.receipt.isCompletion" class="advance-summary-row advance-remaining-row">
                     <span>Remaining Balance</span>
+                    <span t-esc="formatCurrency(props.receipt.remainingAmount)"/>
+                </div>
+                <div t-if="props.receipt.isCompletion" class="advance-summary-row advance-remaining-row">
+                    <span>Balance Due</span>
                     <span t-esc="formatCurrency(props.receipt.remainingAmount)"/>
                 </div>
             </div>
 
-            <div t-if="!props.receipt.isRefund and props.receipt.remainingAmount > 0" class="advance-receipt-note">
+            <!-- Pledge detail -->
+            <div t-if="props.receipt.isCompletion and props.receipt.pledgeLines and props.receipt.pledgeLines.length" class="advance-receipt-pledge-details">
+                <div class="advance-receipt-lines-header mt-2">
+                    <span class="advance-col-item">Pledge Items</span>
+                    <span class="advance-col-qty">Qty</span>
+                    <span class="advance-col-price">Amount</span>
+                </div>
+                <t t-foreach="props.receipt.pledgeLines" t-as="pledgeLine" t-key="pledgeLine_index">
+                    <div class="advance-receipt-line advance-pledge-line">
+                        <span class="advance-col-item" t-esc="pledgeLine.name"/>
+                        <span class="advance-col-qty" t-esc="pledgeLine.qty"/>
+                        <span class="advance-col-price" t-esc="formatCurrency(pledgeLine.subtotal)"/>
+                    </div>
+                </t>
+            </div>
+
+            <div t-if="!props.receipt.isRefund and !props.receipt.isCompletion and props.receipt.remainingAmount > 0" class="advance-receipt-note">
                 Please pay the remaining balance when picking up your order.
+            </div>
+            <div t-if="props.receipt.isCompletion" class="advance-receipt-note advance-receipt-note-success">
+                Order fully paid. Thank you!
             </div>
 
             <div class="advance-receipt-footer">
