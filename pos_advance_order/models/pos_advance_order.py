@@ -1691,6 +1691,7 @@ class PosAdvanceOrder(models.Model):
 
             if order._pledge_applies() and order.pledge_line_ids:
                 order._activate_site_service_pledges_on_completion(pos_order, session)
+                order.pledge_line_ids._refresh_pledge_unit_amounts()
                 _logger.info(
                     "[PLEDGE] Activated pledge lines on completion advance=%s pos_order=%s lines=%s",
                     order.name,
@@ -1706,6 +1707,47 @@ class PosAdvanceOrder(models.Model):
             return summary
         return True
 
+    def _completion_receipt_pledge_lines(self):
+        """Build pledge rows for the completion receipt using configured pledge amounts."""
+        self.ensure_one()
+        Pledge = self.env["pos.advance.order.pledge"]
+        rounding = self.currency_id.rounding
+        lines = []
+        pledges = self.pledge_line_ids.filtered(lambda p: p.state in ("active", "pending"))
+        if pledges:
+            pledges._refresh_pledge_unit_amounts()
+            for pledge in pledges:
+                qty = pledge.pledge_qty or 0.0
+                unit = Pledge._resolve_pledge_unit_amount(pledge.product_id)
+                subtotal = self.currency_id.round(qty * unit) if unit else (pledge.pledge_subtotal or 0.0)
+                if float_is_zero(subtotal, precision_rounding=rounding):
+                    continue
+                name = pledge.product_id.display_name
+                if pledge.source_product_id:
+                    name = _("%s (Pledge)") % pledge.source_product_id.display_name
+                lines.append({"name": name, "qty": qty, "subtotal": subtotal})
+            return lines
+
+        for adv_line in self.line_ids.filtered(
+            lambda l: not l.display_type and l.product_id and not l.is_site_service_pledge_line
+        ):
+            product = adv_line.product_id
+            mapping = self._get_site_service_pledge_map()
+            pledge_product = mapping.get(product.id)
+            target = pledge_product or (product if product.has_pledge else False)
+            if not target:
+                continue
+            qty = adv_line.product_qty or 0.0
+            unit = Pledge._resolve_pledge_unit_amount(target)
+            subtotal = self.currency_id.round(qty * unit)
+            if float_is_zero(subtotal, precision_rounding=rounding):
+                continue
+            name = product.display_name if pledge_product else target.display_name
+            if pledge_product:
+                name = _("%s (Pledge)") % product.display_name
+            lines.append({"name": name, "qty": qty, "subtotal": subtotal})
+        return lines
+
     def _completion_receipt_vals(self, completion_pm=None):
         """Payload for POS completion receipt (full total, advance, pledge, payments)."""
         self.ensure_one()
@@ -1714,6 +1756,8 @@ class PosAdvanceOrder(models.Model):
         total = self.amount_grand_total or self.amount_total or 0.0
         advance_amount = self.advance_amount or 0.0
         remaining_paid = max(total - advance_amount, 0.0)
+        pledge_lines = self._completion_receipt_pledge_lines()
+        pledge_amount = sum(line["subtotal"] for line in pledge_lines) or (self.pledge_amount or 0.0)
         lines = []
         for line in self.line_ids.filtered(lambda l: not l.display_type and l.product_id):
             is_pledge_line = bool(getattr(line, "is_site_service_pledge_line", False))
@@ -1730,15 +1774,6 @@ class PosAdvanceOrder(models.Model):
                     "is_pledge_line": is_pledge_line,
                 }
             )
-        pledge_lines = []
-        for pledge in self.pledge_line_ids.filtered(lambda p: p.state in ("active", "pending")):
-            pledge_lines.append(
-                {
-                    "name": pledge.product_id.display_name,
-                    "qty": pledge.pledge_qty,
-                    "subtotal": pledge.pledge_subtotal,
-                }
-            )
         return {
             "id": self.id,
             "name": self.name,
@@ -1750,7 +1785,7 @@ class PosAdvanceOrder(models.Model):
             "remaining_paid": remaining_paid,
             "remaining_amount_tendered": self.remaining_amount_tendered or 0.0,
             "remaining_change_amount": self.remaining_change_amount or 0.0,
-            "pledge_amount": self.pledge_amount or 0.0,
+            "pledge_amount": pledge_amount,
             "advance_payment_method_name": advance_pm.display_name if advance_pm else "",
             "payment_method_name": completion_pm.display_name if completion_pm else "",
             "lines": lines,

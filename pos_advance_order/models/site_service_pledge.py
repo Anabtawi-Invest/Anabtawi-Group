@@ -95,7 +95,9 @@ class PosAdvanceOrderSiteServicePledge(models.Model):
                 pledge_product = mapping.get(menu_line.product_id.id)
                 if not pledge_product:
                     continue
-                unit = pledge_product.lst_price
+                unit = self.env["pos.advance.order.pledge"]._resolve_pledge_unit_amount(
+                    pledge_product
+                )
                 existing = Pledge.search(
                     [
                         ("order_id", "=", order.id),

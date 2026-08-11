@@ -148,6 +148,28 @@ class PosAdvanceOrderPledge(models.Model):
         for rec in self:
             rec.pledge_subtotal = (rec.pledge_qty or 0.0) * (rec.pledge_amount_unit or 0.0)
 
+    @api.model
+    def _resolve_pledge_unit_amount(self, product):
+        """Pledge unit amount: product pledge_amount first, then sales price fallback."""
+        if not product:
+            return 0.0
+        tmpl = product.product_tmpl_id
+        if tmpl and getattr(tmpl, "has_pledge", False):
+            amount = float(tmpl.pledge_amount or 0.0)
+            if amount > 0:
+                return amount
+        amount = float(getattr(product, "pledge_amount", 0.0) or 0.0)
+        if amount > 0:
+            return amount
+        return float(product.lst_price or 0.0)
+
+    def _refresh_pledge_unit_amounts(self):
+        """Align stored pledge unit amounts with the product configuration."""
+        for pledge in self:
+            unit = pledge._resolve_pledge_unit_amount(pledge.product_id)
+            if unit and unit != (pledge.pledge_amount_unit or 0.0):
+                pledge.sudo().write({"pledge_amount_unit": unit})
+
     @api.depends(
         "order_id.employee_id",
         "pos_order_id.employee_id",
@@ -331,7 +353,7 @@ class PosAdvanceOrderPledge(models.Model):
         created = self.browse()
         for product_id, qty in qty_by_product.items():
             product = self.env["product.product"].browse(product_id)
-            unit_amount = product.lst_price or 0.0
+            unit_amount = self._resolve_pledge_unit_amount(product)
 
             if advance_order_id:
                 existing = self.sudo().search(

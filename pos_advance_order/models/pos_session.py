@@ -208,7 +208,7 @@ class PosSession(models.Model):
 
         _logger.info(
             "[ADV_TRACE] session=%s(%s) deposit_lookup start=%s end=%s config=%s "
-            "from_messages=%s from_sql=%s journals=%s ref_pattern=%s",
+            "from_messages=%s from_sql=%s ref_pattern=%s",
             self.name,
             self.id,
             start,
