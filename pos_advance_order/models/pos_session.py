@@ -165,7 +165,6 @@ class PosSession(models.Model):
             return from_messages
         end = self.stop_at or fields.Datetime.now()
         session_ref_pattern = f"%[pos_session_id:{self.id}]%"
-        journal_ids = self.payment_method_ids.mapped("journal_id").ids or [0]
         config_id = self.config_id.id
         self.env.cr.execute(
             """
@@ -180,10 +179,7 @@ class PosSession(models.Model):
                     OR (
                         am.create_date >= %s
                         AND am.create_date <= %s
-                        AND (
-                            COALESCE(ao.from_pos_config_id, ao.pos_config_id) = %s
-                            OR am.journal_id = ANY(%s)
-                        )
+                        AND COALESCE(ao.from_pos_config_id, ao.pos_config_id) = %s
                     )
                     OR (
                         ao.create_date >= %s
@@ -198,7 +194,6 @@ class PosSession(models.Model):
                 start,
                 end,
                 config_id,
-                journal_ids,
                 start,
                 end,
                 config_id,
@@ -206,10 +201,14 @@ class PosSession(models.Model):
         )
         from_sql = AdvanceOrder.browse([row[0] for row in self.env.cr.fetchall()])
         deposited = from_messages | from_sql
+        deposited = deposited.filtered(
+            lambda ao: (ao.from_pos_config_id.id if ao.from_pos_config_id else ao.pos_config_id.id)
+            == self.config_id.id
+        )
 
         _logger.info(
             "[ADV_TRACE] session=%s(%s) deposit_lookup start=%s end=%s config=%s "
-            "from_messages=%s from_sql=%s journals=%s ref_pattern=%s",
+            "from_messages=%s from_sql=%s ref_pattern=%s",
             self.name,
             self.id,
             start,
@@ -217,7 +216,6 @@ class PosSession(models.Model):
             config_id,
             from_messages.ids,
             from_sql.ids,
-            journal_ids,
             session_ref_pattern,
         )
 
@@ -252,14 +250,13 @@ class PosSession(models.Model):
             window_count = self.env.cr.fetchone()[0]
             _logger.warning(
                 "[ADV_TRACE] session=%s(%s) NO_DEPOSITS config=%s start=%s end=%s "
-                "window_deposits=%s journals=%s ref_pattern=%s recent_advances=%s",
+                "window_deposits=%s ref_pattern=%s recent_advances=%s",
                 self.name,
                 self.id,
                 config_id,
                 start,
                 end,
                 window_count,
-                journal_ids,
                 session_ref_pattern,
                 recent,
             )
