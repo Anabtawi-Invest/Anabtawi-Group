@@ -267,3 +267,37 @@ class PosAdvanceOrderController(http.Controller):
             "amount_remaining": order.amount_remaining,
             "advance_pos_order_id": order.advance_pos_order_id.id,
         }
+
+    @http.route("/pos/complete_advance_order", type="jsonrpc", auth="user")
+    def complete_advance_order(self, data=None, **kwargs):
+        self._ensure_pos_user()
+        payload = data or kwargs or {}
+        advance_order_id = payload.get("advance_order_id")
+        pos_config_id = payload.get("pos_config_id")
+        payment_method_id = payload.get("payment_method_id")
+        amount_tendered = payload.get("amount_tendered")
+
+        if not advance_order_id:
+            raise ValidationError(_("Advance order is required."))
+        if not pos_config_id:
+            raise ValidationError(_("POS configuration is required."))
+        if not payment_method_id:
+            raise ValidationError(_("Please select a payment method."))
+
+        order = (
+            request.env["pos.advance.order"]
+            .sudo()
+            .browse(int(advance_order_id))
+            .exists()
+        )
+        if not order:
+            raise ValidationError(_("Advance order not found."))
+
+        result = order.action_create_remaining_payment(
+            pos_payment_method_id=int(payment_method_id),
+            pos_config_id=int(pos_config_id),
+            amount_tendered=amount_tendered,
+        )
+        if isinstance(result, dict) and result.get("name"):
+            return result
+        return order.get_completion_receipt_data()

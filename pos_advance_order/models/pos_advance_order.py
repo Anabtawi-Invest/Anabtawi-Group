@@ -615,11 +615,14 @@ class PosAdvanceOrder(models.Model):
             qty_by_product = {}
             amount_by_product = {}
             for line in order.line_ids.filtered(lambda l: not l.display_type and l.product_id):
-                tmpl = line.product_id.product_tmpl_id
-                if not getattr(tmpl, "has_pledge", False):
+                product = line.product_id
+                tmpl = product.product_tmpl_id
+                if not getattr(tmpl, "has_pledge", False) and not getattr(product, "has_pledge", False):
                     continue
-                qty_by_product[line.product_id] = qty_by_product.get(line.product_id, 0.0) + (line.product_qty or 0.0)
-                amount_by_product[line.product_id] = tmpl.pledge_amount or 0.0
+                qty_by_product[product] = qty_by_product.get(product, 0.0) + (line.product_qty or 0.0)
+                amount_by_product[product] = order.env["pos.advance.order.pledge"]._resolve_pledge_unit_amount(
+                    product
+                )
 
             existing = {pl.product_id: pl for pl in order.pledge_line_ids}
             commands = []
@@ -1632,6 +1635,7 @@ class PosAdvanceOrder(models.Model):
         Accounting: _post_advance_completion_settlement_move (Dr liability / Cr receivable); pledge settlement if any.
         Pass ``pos_config_id`` when calling from POS so completion is enforced on the Picking POS only.
         """
+        summary = None
         for order in self:
             order.ensure_one()
             if pos_config_id:
@@ -1950,9 +1954,123 @@ class PosAdvanceOrder(models.Model):
                     has_pledge_on_lines,
                 )
 
-            order.state = "fully_paid"
+            if order.pledge_line_ids:
+                order.pledge_line_ids._refresh_pledge_unit_amounts()
 
+            order.state = "fully_paid"
+            order._generate_completion_invoice(pos_order)
+            summary = order._completion_receipt_vals(completion_pm=pm)
+
+        if len(self) == 1 and summary:
+            return summary
         return True
+
+    def _generate_completion_invoice(self, pos_order):
+        """Create and post the customer invoice when the advance sale is completed."""
+        self.ensure_one()
+        if not pos_order or not pos_order.partner_id:
+            return False
+        pos_order = pos_order.sudo()
+        if pos_order.account_move:
+            return pos_order.account_move
+        pos_order.write({"to_invoice": True})
+        pos_order.action_pos_order_invoice()
+        _logger.info(
+            "[ADV_INVOICE] Created completion invoice advance=%s pos_order=%s invoice=%s",
+            self.name,
+            pos_order.name,
+            pos_order.account_move.id if pos_order.account_move else False,
+        )
+        return pos_order.account_move
+
+    def _completion_receipt_pledge_lines(self):
+        """Build pledge rows for the completion receipt using product pledge amounts."""
+        self.ensure_one()
+        Pledge = self.env["pos.advance.order.pledge"]
+        rounding = self.currency_id.rounding
+        lines = []
+        pledges = self.pledge_line_ids.filtered(lambda p: p.state == "active")
+        if pledges:
+            pledges._refresh_pledge_unit_amounts()
+            for pledge in pledges:
+                qty = pledge.pledge_qty or 0.0
+                unit = Pledge._resolve_pledge_unit_amount(pledge.product_id)
+                subtotal = self.currency_id.round(qty * unit) if unit else (pledge.pledge_subtotal or 0.0)
+                if float_is_zero(subtotal, precision_rounding=rounding):
+                    continue
+                lines.append(
+                    {
+                        "name": pledge.product_id.display_name,
+                        "qty": qty,
+                        "subtotal": subtotal,
+                    }
+                )
+            return lines
+
+        for adv_line in self.line_ids.filtered(
+            lambda l: not l.display_type and l.product_id and l.product_id.has_pledge
+        ):
+            product = adv_line.product_id
+            qty = adv_line.product_qty or 0.0
+            unit = Pledge._resolve_pledge_unit_amount(product)
+            subtotal = self.currency_id.round(qty * unit)
+            if float_is_zero(subtotal, precision_rounding=rounding):
+                continue
+            lines.append(
+                {
+                    "name": product.display_name,
+                    "qty": qty,
+                    "subtotal": subtotal,
+                }
+            )
+        return lines
+
+    def _completion_receipt_vals(self, completion_pm=None):
+        """Payload for POS completion receipt (full total, advance, pledge, payments)."""
+        self.ensure_one()
+        advance_pm = self.pos_payment_method_id
+        completion_pm = completion_pm or self.env["pos.payment.method"]
+        total = self.amount_grand_total or self.amount_total or 0.0
+        advance_amount = self.advance_amount or 0.0
+        remaining_paid = max(total - advance_amount, 0.0)
+        pledge_lines = self._completion_receipt_pledge_lines()
+        pledge_amount = sum(line["subtotal"] for line in pledge_lines) or (self.pledge_amount or 0.0)
+
+        lines = []
+        for line in self.line_ids.filtered(lambda l: not l.display_type and l.product_id):
+            subtotal = line.price_subtotal_incl if line.price_subtotal_incl else line.price_subtotal
+            lines.append(
+                {
+                    "name": line.product_id.display_name,
+                    "qty": line.product_qty,
+                    "discount": line.discount or 0.0,
+                    "subtotal": subtotal,
+                    "is_pledge_line": bool(line.product_id.has_pledge),
+                }
+            )
+
+        return {
+            "id": self.id,
+            "name": self.name,
+            "partner_name": self.partner_id.display_name,
+            "partner_phone": self.partner_id.phone or "",
+            "pos_order_name": self.remaining_pos_order_id.name if self.remaining_pos_order_id else "",
+            "amount_total": total,
+            "advance_amount": advance_amount,
+            "remaining_paid": remaining_paid,
+            "remaining_amount_tendered": self.remaining_amount_tendered or 0.0,
+            "remaining_change_amount": self.remaining_change_amount or 0.0,
+            "pledge_amount": pledge_amount,
+            "advance_payment_method_name": advance_pm.display_name if advance_pm else "",
+            "payment_method_name": completion_pm.display_name if completion_pm else "",
+            "lines": lines,
+            "pledge_lines": pledge_lines,
+            "state": self.state,
+        }
+
+    def get_completion_receipt_data(self):
+        self.ensure_one()
+        return self._completion_receipt_vals()
 
     def action_create_remaining_amount(self, pos_payment_method_id=None, pos_config_id=None, amount_tendered=None):
         """Alias for POS button flow."""
