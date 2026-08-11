@@ -1,6 +1,6 @@
 /** @odoo-module */
 
-const PLEDGE_ORDER_BUILD_TAG = "PLEDGE_ORDER_BUILD_2026_08_11_RETURN_FIX";
+const PLEDGE_ORDER_BUILD_TAG = "PLEDGE_ORDER_BUILD_2026_08_11_MULTI_RETURN";
 console.log("[PLEDGE] Module loading started...", PLEDGE_ORDER_BUILD_TAG);
 
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
@@ -222,24 +222,38 @@ patch(ControlButtons.prototype, {
                 partnerId: partner.id,
             });
 
-            if (!selection || !selection.pledge) {
+            if (!selection || !selection.pledge_ids?.length) {
                 return;
             }
 
-            const selectedPledge = selection.pledge;
-            const paymentMethodId = selection.payment_method_id;
-
-            await this.env.services.orm.call(
+            const result = await this.env.services.orm.call(
                 "pos.advance.order.pledge",
-                "action_return_pledge",
-                [[selectedPledge.id]],
+                "action_return_pledges",
+                [],
                 {
-                    pos_payment_method_id: paymentMethodId,
+                    pledge_ids: selection.pledge_ids,
+                    pos_payment_method_id: selection.payment_method_id,
                     pos_session_id: this.pos.session?.id || false,
                 }
             );
 
-            this.notification.add(_t("Pledge returned successfully."), { type: "success" });
+            const refundCount = result?.count || (result?.refund_order_name ? 1 : 0);
+            const pledgeCount = selection.pledge_ids.length;
+            if (refundCount > 1) {
+                this.notification.add(
+                    _t(
+                        "%s pledge(s) returned in %s refund order(s).",
+                        pledgeCount,
+                        refundCount
+                    ),
+                    { type: "success" }
+                );
+            } else {
+                this.notification.add(
+                    _t("%s pledge(s) returned successfully.", pledgeCount),
+                    { type: "success" }
+                );
+            }
         } catch (error) {
             console.error("[PLEDGE] Error returning pledge:", error);
             this.notification.add(

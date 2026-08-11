@@ -22,12 +22,22 @@
                         <span t-esc="pledgeReturnedCountLabel()"/>
                         <span t-esc="props.pledge_completion_details.returned_count"/>
                     </div>
-                    <div t-if="props.pledge_completion_details.return_cash"
+                    <div t-if="shouldShowPledgeReturnPaymentMethods()"
+                         class="mt-1 pt-1 border-top">
+                        <div class="text-muted small fw-bold mb-1" t-esc="pledgeReturnPaymentMethodLabel()"/>
+                        <t t-foreach="pledgeReturnPaymentMethods()" t-as="pmRow" t-key="pmRow.payment_method_id or pmRow_index">
+                            <div class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                                <span t-esc="pledgeReturnPaymentMethodLineLabel(pmRow)"/>
+                                <span t-esc="env.utils.formatCurrency(pmRow.amount || 0)"/>
+                            </div>
+                        </t>
+                    </div>
+                    <div t-elif="props.pledge_completion_details.return_cash"
                          class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
                         <span t-esc="pledgeReturnCashLabel()"/>
                         <span t-esc="env.utils.formatCurrency(props.pledge_completion_details.return_cash)"/>
                     </div>
-                    <div t-if="props.pledge_completion_details.return_bank"
+                    <div t-if="!shouldShowPledgeReturnPaymentMethods() and props.pledge_completion_details.return_bank"
                          class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
                         <span t-esc="pledgeReturnBankLabel()"/>
                         <span t-esc="env.utils.formatCurrency(props.pledge_completion_details.return_bank)"/>

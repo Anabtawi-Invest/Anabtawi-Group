@@ -469,25 +469,37 @@ class PosAdvanceOrderPledge(models.Model):
             )
         )
 
-    def _create_pledge_refund_pos_order(self, session, payment_method, source_order):
-        """Refund pledge using Odoo standard POS refund linkage to the origin order line."""
+    def _resolve_pledge_source_order(self):
+        """Original completion POS order where this pledge was collected."""
         self.ensure_one()
+        pos_order = self.pos_order_id
         advance = self.order_id
-        source_order = source_order.sudo()
-        source_line = self._find_pledge_source_line(source_order)
-        rounding = source_order.currency_id.rounding
-        remaining = source_line.qty - source_line.refunded_qty
-        refund_qty = self.pledge_qty or remaining
-        if float_compare(refund_qty, remaining, precision_rounding=rounding) > 0:
-            raise UserError(
-                _(
-                    "Cannot refund %(requested)s units; only %(remaining)s remain on the original order line.",
-                    requested=refund_qty,
-                    remaining=remaining,
-                )
+        if not pos_order and advance:
+            linked = self.search(
+                [("order_id", "=", advance.id), ("pos_order_id", "!=", False)],
+                limit=1,
             )
+            pos_order = linked.pos_order_id if linked else advance.remaining_pos_order_id
+        return pos_order
 
+    def _create_pledge_refund_pos_order(self, session, payment_method, source_order):
+        """Refund a single pledge (wrapper around the batch refund helper)."""
+        self.ensure_one()
+        return self._create_pledge_refund_pos_order_for_pledges(
+            self, session, payment_method, source_order
+        )
+
+    @api.model
+    def _create_pledge_refund_pos_order_for_pledges(self, pledges, session, payment_method, source_order):
+        """Create one refund POS order for multiple pledges on the same origin order."""
+        pledges = pledges.filtered(lambda p: p.state == "active")
+        if not pledges:
+            raise UserError(_("No active pledges to return."))
+        source_order = source_order.sudo()
         PosPackOperationLot = self.env["pos.pack.operation.lot"].sudo()
+        rounding = source_order.currency_id.rounding
+
+        advance = pledges.mapped("order_id")[:1]
         refund_vals = source_order._prepare_refund_values(session)
         refund_vals.update({
             "partner_id": source_order.partner_id.id,
@@ -496,11 +508,23 @@ class PosAdvanceOrderPledge(models.Model):
         })
         refund_order = source_order.copy(refund_vals)
 
-        line_vals = source_line._prepare_refund_data(refund_order, PosPackOperationLot)
-        if float_compare(refund_qty, remaining, precision_rounding=rounding) < 0:
-            line_vals["qty"] = -refund_qty
-        refund_line = source_line.copy(line_vals)
-        refund_line._onchange_amount_line_all()
+        for pledge in pledges:
+            source_line = pledge._find_pledge_source_line(source_order)
+            remaining = source_line.qty - source_line.refunded_qty
+            refund_qty = pledge.pledge_qty or remaining
+            if float_compare(refund_qty, remaining, precision_rounding=rounding) > 0:
+                raise UserError(
+                    _(
+                        "Cannot refund %(requested)s units for %(product)s; only %(remaining)s remain on the original order line.",
+                        requested=refund_qty,
+                        product=pledge.product_id.display_name,
+                        remaining=remaining,
+                    )
+                )
+            line_vals = source_line._prepare_refund_data(refund_order, PosPackOperationLot)
+            if float_compare(refund_qty, remaining, precision_rounding=rounding) < 0:
+                line_vals["qty"] = -refund_qty
+            source_line.copy(line_vals)
 
         refund_order.with_context(invoicing=True)._compute_prices()
 
@@ -519,72 +543,102 @@ class PosAdvanceOrderPledge(models.Model):
             refund_order._create_order_picking()
 
         _logger.info(
-            "[PLEDGE] Refund order %s linked to origin %s via line %s -> %s",
+            "[PLEDGE] Refund order %s linked to origin %s for %s pledge line(s)",
             refund_order.name,
             source_order.name,
-            source_line.id,
-            refund_line.id,
+            len(pledges),
         )
         return refund_order
 
-    def action_return_pledge(self, pos_payment_method_id=None, pos_session_id=None):
-        """Return pledge to customer via a refund POS order and selected payment method."""
+    def action_return_pledges(self, pledge_ids=None, pos_payment_method_id=None, pos_session_id=None):
+        """Return one or many pledges; group refunds by origin POS order."""
         ctx = self.env.context
         if pos_payment_method_id is None:
             pos_payment_method_id = ctx.get("pos_payment_method_id")
         if pos_session_id is None:
             pos_session_id = ctx.get("pos_session_id")
 
-        for pledge in self:
-            if pledge.state == "returned":
-                continue
-            if pledge.state != "active":
-                raise UserError(_("Only active pledges can be returned."))
+        pledges = self.browse(pledge_ids).exists() if pledge_ids else self
+        pledges = pledges.filtered(lambda p: p.state != "returned")
+        if not pledges:
+            raise UserError(_("Please select at least one active pledge to return."))
 
-            pos_order = pledge.pos_order_id
-            advance = pledge.order_id
-            if not pos_order and advance:
-                linked = pledge.search(
-                    [("order_id", "=", advance.id), ("pos_order_id", "!=", False)],
-                    limit=1,
-                )
-                pos_order = linked.pos_order_id if linked else advance.remaining_pos_order_id
+        invalid = pledges.filtered(lambda p: p.state != "active")
+        if invalid:
+            raise UserError(_("Only active pledges can be returned."))
 
-            config = (
-                pos_order.config_id
-                if pos_order
-                else (advance.pos_config_id if advance else False)
-            )
-            if not config:
-                raise UserError(_("Cannot resolve POS configuration for this pledge return."))
-
+        groups = {}
+        source_orders = {}
+        for pledge in pledges:
+            pos_order = pledge._resolve_pledge_source_order()
             if not pos_order:
                 raise UserError(
-                    _("Cannot return pledge: original POS order where the pledge was collected was not found.")
+                    _(
+                        "Cannot return pledge for %(product)s: original POS order was not found.",
+                        product=pledge.product_id.display_name,
+                    )
                 )
+            source_orders[pos_order.id] = pos_order
+            groups.setdefault(pos_order.id, self.env["pos.advance.order.pledge"])
+            groups[pos_order.id] |= pledge
 
-            session = pledge._resolve_return_session(pos_order, pos_session_id)
-            return_pm = pledge._resolve_return_payment_method(pos_order, pos_payment_method_id)
-            refund_order = pledge._create_pledge_refund_pos_order(session, return_pm, pos_order)
+        refund_results = []
+        for pos_order_id, group_pledges in groups.items():
+            pos_order = source_orders[pos_order_id]
+            if not pos_order.config_id:
+                raise UserError(_("Cannot resolve POS configuration for this pledge return."))
 
-            pledge.write(
+            session = group_pledges[:1]._resolve_return_session(pos_order, pos_session_id)
+            return_pm = group_pledges[:1]._resolve_return_payment_method(
+                pos_order, pos_payment_method_id
+            )
+            refund_order = self._create_pledge_refund_pos_order_for_pledges(
+                group_pledges, session, return_pm, pos_order
+            )
+            group_pledges.write(
                 {
                     "state": "returned",
                     "return_date": fields.Datetime.now(),
                     "return_payment_method_id": return_pm.id,
                     "return_pos_session_id": session.id,
                     "return_pos_order_id": refund_order.id,
-                    "pos_order_id": pledge.pos_order_id.id or (pos_order.id if pos_order else False),
+                    "pos_order_id": pos_order.id,
+                }
+            )
+            refund_results.append(
+                {
+                    "refund_order_id": refund_order.id,
+                    "refund_order_name": refund_order.name,
+                    "origin_order_name": pos_order.name,
+                    "pledge_ids": group_pledges.ids,
+                    "payment_method_name": return_pm.display_name,
+                    "amount": abs(refund_order.amount_total),
                 }
             )
             _logger.info(
-                "[PLEDGE] Returned pledge line %s via refund order %s pm=%s session=%s",
-                pledge.id,
+                "[PLEDGE] Returned %s pledge(s) via refund order %s pm=%s session=%s origin=%s",
+                len(group_pledges),
                 refund_order.name,
                 return_pm.display_name,
                 session.name,
+                pos_order.name,
             )
-        return True
+
+        if len(refund_results) == 1:
+            return refund_results[0]
+        return {
+            "refund_orders": refund_results,
+            "count": len(refund_results),
+            "pledge_count": len(pledges),
+        }
+
+    def action_return_pledge(self, pos_payment_method_id=None, pos_session_id=None):
+        """Return selected pledge(s) via refund POS order(s) and chosen payment method."""
+        return self.action_return_pledges(
+            pledge_ids=self.ids,
+            pos_payment_method_id=pos_payment_method_id,
+            pos_session_id=pos_session_id,
+        )
 
     def action_cancel(self):
         self.write({"state": "cancelled"})

@@ -34,6 +34,24 @@ patch(ClosePosPopup.prototype, {
         return _t("Bank refunds");
     },
 
+    pledgeReturnPaymentMethodLabel() {
+        return _t("Return payment methods");
+    },
+
+    pledgeReturnPaymentMethodLineLabel(row) {
+        const name = row?.payment_method_name || _t("Unknown");
+        const count = row?.count || 0;
+        return count > 1 ? `${name} (${count})` : name;
+    },
+
+    pledgeReturnPaymentMethods() {
+        return this.props.pledge_completion_details?.return_by_payment_method || [];
+    },
+
+    shouldShowPledgeReturnPaymentMethods() {
+        return this.pledgeReturnPaymentMethods().length > 0;
+    },
+
     shouldShowPledgeClosingSection() {
         const details = this.props.pledge_completion_details;
         if (!details) {

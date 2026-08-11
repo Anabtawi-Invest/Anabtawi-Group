@@ -50,9 +50,28 @@ class ReportPointOfSaleSaleDetails(models.AbstractModel):
                     session.id,
                 )
             if not cur.is_zero(returned):
-                _append_pledge_line(
-                    _("Pledges returned (info) %s") % session.name,
-                    -returned,
-                    session.id,
-                )
+                return_rows = summary.get("return_by_payment_method") or []
+                if return_rows:
+                    for row in return_rows:
+                        pm_name = row.get("payment_method_name") or _("Unknown")
+                        amount = row.get("amount") or 0.0
+                        count = row.get("count") or 0
+                        label = pm_name
+                        if count > 1:
+                            label = _("%(method)s (%(count)s pledges)") % {
+                                "method": pm_name,
+                                "count": count,
+                            }
+                        _append_pledge_line(
+                            _("Pledge return: %(label)s — %(session)s")
+                            % {"label": label, "session": session.name},
+                            -amount,
+                            session.id,
+                        )
+                else:
+                    _append_pledge_line(
+                        _("Pledges returned (info) %s") % session.name,
+                        -returned,
+                        session.id,
+                    )
         return result

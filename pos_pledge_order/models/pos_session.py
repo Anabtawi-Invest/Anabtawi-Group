@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models
+from odoo import api, fields, models, _
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -49,6 +49,7 @@ class PosSession(models.Model):
         returned_total = sum(returned.mapped("pledge_subtotal"))
         cash_returned = 0.0
         bank_returned = 0.0
+        return_by_payment_method = {}
         for pl in returned:
             amt = pl.pledge_subtotal or 0.0
             pm = pl.return_payment_method_id
@@ -56,6 +57,30 @@ class PosSession(models.Model):
                 cash_returned += amt
             else:
                 bank_returned += amt
+            pm_key = pm.id if pm else 0
+            pm_bucket = return_by_payment_method.setdefault(
+                pm_key,
+                {
+                    "payment_method_id": pm.id if pm else False,
+                    "payment_method_name": pm.display_name if pm else _("Unknown"),
+                    "amount": 0.0,
+                    "count": 0,
+                },
+            )
+            pm_bucket["amount"] += amt
+            pm_bucket["count"] += 1
+
+        return_by_payment_method_list = [
+            {
+                **values,
+                "amount": cur.round(values["amount"]),
+            }
+            for values in return_by_payment_method.values()
+            if not cur.is_zero(values["amount"])
+        ]
+        return_by_payment_method_list.sort(
+            key=lambda row: row.get("payment_method_name") or ""
+        )
 
         return {
             "collected_count": len(collected),
@@ -64,6 +89,7 @@ class PosSession(models.Model):
             "returned_total": cur.round(returned_total),
             "return_cash": cur.round(cash_returned),
             "return_bank": cur.round(bank_returned),
+            "return_by_payment_method": return_by_payment_method_list,
         }
 
     def get_closing_control_data(self):
