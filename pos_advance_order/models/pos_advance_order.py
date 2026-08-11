@@ -1739,6 +1739,13 @@ class PosAdvanceOrder(models.Model):
             "state": self.state,
         }
 
+    def get_completion_receipt_data(self):
+        """Return receipt payload for a completed advance order (POS reprint / fallback)."""
+        self.ensure_one()
+        if self.state != "fully_paid":
+            raise UserError(_("Advance order is not completed yet."))
+        return self._completion_receipt_vals()
+
     def _generate_completion_invoice(self, pos_order):
         """Create and post the customer invoice when the advance sale is completed."""
         self.ensure_one()

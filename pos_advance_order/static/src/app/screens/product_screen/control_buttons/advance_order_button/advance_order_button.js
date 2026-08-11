@@ -38,8 +38,8 @@ patch(ControlButtons.prototype, {
         this.renderer = useService("renderer");
     },
 
-    async _printAdvanceReceipt(receiptData) {
-        if (this.props.close) {
+    async _printAdvanceReceipt(receiptData, { closeActionsPopup = true } = {}) {
+        if (closeActionsPopup && this.props.close) {
             this.props.close();
             await new Promise((resolve) => setTimeout(resolve, 200));
         }
@@ -49,6 +49,35 @@ patch(ControlButtons.prototype, {
             receiptData,
             printOptions: this.pos.printOptions,
         });
+    },
+
+    async _fetchCompletionReceiptData(advanceOrderId) {
+        return this.orm.call(
+            "pos.advance.order",
+            "get_completion_receipt_data",
+            [[advanceOrderId]]
+        );
+    },
+
+    async _printCompletionReceipt(receiptResult, popupPayload) {
+        let receiptPayload = receiptResult;
+        if (!receiptPayload || typeof receiptPayload !== "object" || !receiptPayload.name) {
+            receiptPayload = await this._fetchCompletionReceiptData(popupPayload.advance_order_id);
+        }
+        if (!receiptPayload?.name) {
+            this.notification.add(_t("Could not load completion receipt data."), { type: "warning" });
+            return { printed: false };
+        }
+        const printResult = await this._printAdvanceReceipt(
+            this._buildCompletionReceiptData({ result: receiptPayload, popupPayload }),
+            { closeActionsPopup: false }
+        );
+        if (!printResult?.printed) {
+            this.notification.add(_t("Advance order completed but receipt printing failed."), {
+                type: "warning",
+            });
+        }
+        return printResult;
     },
 
     /** Same breakpoints as POS `buttonClass`, but distinct hue for Advance vs default grey controls. */
@@ -365,33 +394,18 @@ patch(ControlButtons.prototype, {
             return;
         }
         try {
-            const result = await this.orm.call(
-                "pos.advance.order",
-                "action_create_remaining_amount",
-                [[popupPayload.advance_order_id]],
-                {
-                    pos_payment_method_id: popupPayload.payment_method_id,
-                    pos_config_id: this.pos.config.id,
-                    amount_tendered: popupPayload.amount_tendered,
-                }
-            );
+            const result = await rpc("/pos/complete_advance_order", {
+                advance_order_id: popupPayload.advance_order_id,
+                payment_method_id: popupPayload.payment_method_id,
+                pos_config_id: this.pos.config.id,
+                amount_tendered: popupPayload.amount_tendered,
+            });
+            if (this.props.close) {
+                this.props.close();
+            }
             this.notification.add(_t("Advance order completed successfully."), { type: "success" });
             try {
-                const receiptPayload =
-                    result && typeof result === "object" && result.name
-                        ? result
-                        : null;
-                if (receiptPayload) {
-                    const printResult = await this._printAdvanceReceipt(
-                        this._buildCompletionReceiptData({ result: receiptPayload, popupPayload })
-                    );
-                    if (!printResult?.printed) {
-                        this.notification.add(
-                            _t("Advance order completed but receipt printing failed."),
-                            { type: "warning" }
-                        );
-                    }
-                }
+                await this._printCompletionReceipt(result, popupPayload);
             } catch (printError) {
                 const printMessage =
                     printError?.message === "POPUP_BLOCKED"
