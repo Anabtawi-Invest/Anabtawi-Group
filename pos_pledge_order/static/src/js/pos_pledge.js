@@ -229,9 +229,8 @@ patch(ControlButtons.prototype, {
             const result = await this.env.services.orm.call(
                 "pos.advance.order.pledge",
                 "action_return_pledges",
-                [],
+                [selection.pledge_ids],
                 {
-                    pledge_ids: selection.pledge_ids,
                     pos_payment_method_id: selection.payment_method_id,
                     pos_session_id: this.pos.session?.id || false,
                 }
