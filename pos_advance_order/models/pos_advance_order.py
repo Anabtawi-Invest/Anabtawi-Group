@@ -115,6 +115,38 @@ class PosAdvanceOrder(models.Model):
         string="Lines",
         copy=True,
     )
+    payment_line_ids = fields.One2many(
+        "pos.advance.order.payment",
+        "order_id",
+        string="Payment Splits",
+        copy=False,
+    )
+    deposit_payment_line_ids = fields.One2many(
+        "pos.advance.order.payment",
+        "order_id",
+        string="Deposit Payments",
+        domain=[("payment_stage", "=", "deposit")],
+        copy=False,
+    )
+    completion_payment_line_ids = fields.One2many(
+        "pos.advance.order.payment",
+        "order_id",
+        string="Completion Payments",
+        domain=[("payment_stage", "=", "completion")],
+        copy=False,
+    )
+    deposit_payment_total = fields.Monetary(
+        string="Deposit Payment Total",
+        currency_field="currency_id",
+        compute="_compute_payment_split_totals",
+        store=True,
+    )
+    completion_payment_total = fields.Monetary(
+        string="Completion Payment Total",
+        currency_field="currency_id",
+        compute="_compute_payment_split_totals",
+        store=True,
+    )
 
     amount_products = fields.Monetary(string="Products Total", currency_field="currency_id", compute="_compute_amounts", store=True)
     pledge_amount = fields.Monetary(string="Pledge Amount", currency_field="currency_id", compute="_compute_amounts", store=True)
@@ -604,6 +636,25 @@ class PosAdvanceOrder(models.Model):
             tendered = order.amount_tendered or 0.0
             advance = order.advance_amount or 0.0
             order.change_amount = max(tendered - advance, 0.0)
+
+    @api.depends(
+        "payment_line_ids.amount",
+        "payment_line_ids.payment_stage",
+    )
+    def _compute_payment_split_totals(self):
+        for order in self:
+            deposit_total = sum(
+                order.payment_line_ids.filtered(
+                    lambda line: line.payment_stage == "deposit"
+                ).mapped("amount")
+            )
+            completion_total = sum(
+                order.payment_line_ids.filtered(
+                    lambda line: line.payment_stage == "completion"
+                ).mapped("amount")
+            )
+            order.deposit_payment_total = deposit_total
+            order.completion_payment_total = completion_total
 
     def _get_open_session(self, config):
         session = self.env["pos.session"].sudo().search(
@@ -1131,6 +1182,94 @@ class PosAdvanceOrder(models.Model):
             return product.property_account_income_id or product.product_tmpl_id.property_account_income_id
         return False
 
+    def _get_liquidity_account_for_payment_method(self, pm):
+        """Outstanding/liquidity account for a POS payment method (deposit move debits)."""
+        self.ensure_one()
+        if not pm or not pm.journal_id:
+            raise UserError(
+                _("Payment method '%s' has no journal configured.") % (pm.display_name if pm else "")
+            )
+        payment_method_line = self._get_inbound_payment_method_line(pm.journal_id)
+        liquidity_account = payment_method_line.payment_account_id
+        if not liquidity_account:
+            raise UserError(
+                _(
+                    "Configure an inbound payment method with a payment account on journal '%s' "
+                    "so the advance deposit can be posted."
+                )
+                % pm.journal_id.display_name
+            )
+        return liquidity_account
+
+    @api.model
+    def _normalize_payment_split_payload(self, payment_lines, pos_config, expected_total):
+        """Validate POS payment split lines and return [(pm, amount), ...]."""
+        PaymentMethod = self.env["pos.payment.method"].sudo()
+        rounding = pos_config.currency_id.rounding
+        if not payment_lines:
+            raise UserError(_("Please add at least one payment method."))
+        splits = []
+        for row in payment_lines:
+            if not isinstance(row, dict):
+                continue
+            pm_id = row.get("payment_method_id")
+            amount = float(row.get("amount") or 0.0)
+            if not pm_id or float_is_zero(amount, precision_rounding=rounding):
+                continue
+            pm = PaymentMethod.browse(int(pm_id))
+            if not pm.exists() or pm not in pos_config.payment_method_ids:
+                raise UserError(_("Selected payment method is not available on this POS."))
+            if pm.type == "pay_later":
+                raise UserError(_("Customer account payments cannot be used for advance payments."))
+            if pm.payment_method_type and pm.payment_method_type != "none":
+                raise UserError(
+                    _("Integrated POS payment methods (terminal / QR) are not supported for advances.")
+                )
+            splits.append((pm, pos_config.currency_id.round(amount)))
+        if not splits:
+            raise UserError(_("Please allocate at least one payment method with an amount."))
+        total = pos_config.currency_id.round(sum(amount for _pm, amount in splits))
+        if float_compare(total, expected_total, precision_rounding=rounding) != 0:
+            raise UserError(
+                _("Payment methods must total %(expected)s (currently %(current)s).")
+                % {"expected": expected_total, "current": total}
+            )
+        return splits
+
+    def _sync_payment_lines(self, payment_lines, stage):
+        """Replace stored payment splits for deposit or completion."""
+        self.ensure_one()
+        Payment = self.env["pos.advance.order.payment"].sudo()
+        existing = self.payment_line_ids.filtered(lambda line: line.payment_stage == stage)
+        if existing:
+            existing.unlink()
+        vals_list = []
+        for pm, amount in payment_lines:
+            vals_list.append(
+                {
+                    "order_id": self.id,
+                    "payment_method_id": pm.id,
+                    "amount": amount,
+                    "payment_stage": stage,
+                }
+            )
+        if vals_list:
+            Payment.create(vals_list)
+
+    def _get_payment_splits_for_stage(self, stage):
+        """Return [(payment_method, amount), ...] for a stage; legacy fallback to pos_payment_method_id."""
+        self.ensure_one()
+        lines = self.payment_line_ids.filtered(
+            lambda line: line.payment_stage == stage and not float_is_zero(
+                line.amount, precision_rounding=self.currency_id.rounding
+            )
+        )
+        if lines:
+            return [(line.payment_method_id, line.amount) for line in lines]
+        if stage == "deposit" and self.pos_payment_method_id and self.advance_amount:
+            return [(self.pos_payment_method_id, self.advance_amount)]
+        return []
+
     def _get_payment_journal(self):
         """Select journal: POS payment method journal first (same as normal POS payments), then From/Picking POS fallback."""
         self.ensure_one()
@@ -1184,27 +1323,50 @@ class PosAdvanceOrder(models.Model):
         if not liability_account:
             raise UserError(_("Please set 'POS Advance Account' on the POS configuration first."))
 
-        journal = self._get_payment_journal()
+        splits = self._get_payment_splits_for_stage("deposit")
+        if not splits:
+            raise UserError(_("No deposit payment methods configured for this advance order."))
+
+        journal = splits[0][0].journal_id
         if not journal:
             raise UserError(_("Please configure a payment journal on the POS first."))
-        payment_method_line = self._get_inbound_payment_method_line(journal)
-        liquidity_account = payment_method_line.payment_account_id
-        if not liquidity_account:
-            raise UserError(
-                _(
-                    "Configure an inbound payment method with a payment account on journal '%s' "
-                    "so the advance deposit can be posted."
-                )
-                % journal.display_name
+
+        move_lines = []
+        for pm, amount in splits:
+            liquidity_account = self._get_liquidity_account_for_payment_method(pm)
+            move_lines.append(
+                Command.create({
+                    "name": _("Advance deposit %s - %s") % (self.name, pm.display_name),
+                    "account_id": liquidity_account.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": amount,
+                    "credit": 0.0,
+                })
             )
-        _logger.info(
-            "[ADV_DEPOSIT] journal=%s liquidity_account=%s method_line=%s",
-            journal.id,
-            liquidity_account.id,
-            payment_method_line.id,
+        if self.change_amount and not float_is_zero(
+            self.change_amount, precision_rounding=self.currency_id.rounding
+        ):
+            change_pm = next((pm for pm, _amt in splits if pm.type == "cash"), splits[0][0])
+            change_liquidity = self._get_liquidity_account_for_payment_method(change_pm)
+            move_lines.append(
+                Command.create({
+                    "name": _("Advance change return %s") % self.name,
+                    "account_id": change_liquidity.id,
+                    "partner_id": self.partner_id.id,
+                    "debit": 0.0,
+                    "credit": self.change_amount,
+                })
+            )
+        move_lines.append(
+            Command.create({
+                "name": _("Advance deposit %s") % self.name,
+                "account_id": liability_account.id,
+                "partner_id": self.partner_id.id,
+                "debit": 0.0,
+                "credit": self.advance_amount,
+            })
         )
 
-        tendered_amount = self.amount_tendered or self.advance_amount
         deposit_session = self.env["pos.session"].sudo().browse(
             self.env.context.get("pos_advance_deposit_session_id") or 0
         ).exists()
@@ -1221,7 +1383,7 @@ class PosAdvanceOrder(models.Model):
             )
         _logger.info(
             "[ADV_TRACE] post_deposit advance=%s ctx_session=%s resolved_session=%s(%s) "
-            "state=%s from_pos=%s journal=%s",
+            "state=%s from_pos=%s journal=%s splits=%s",
             self.name,
             ctx_session_id,
             deposit_session.name if deposit_session else False,
@@ -1229,38 +1391,11 @@ class PosAdvanceOrder(models.Model):
             deposit_session.state if deposit_session else False,
             self.from_pos_config_id.id,
             journal.id,
+            [(pm.id, amt) for pm, amt in splits],
         )
         deposit_ref = _("Advance deposit - %s") % self.name
         if deposit_session:
             deposit_ref = _("%s [pos_session_id:%s]") % (deposit_ref, deposit_session.id)
-        move_lines = [
-            Command.create({
-                "name": _("Advance deposit %s") % self.name,
-                "account_id": liquidity_account.id,
-                "partner_id": self.partner_id.id,
-                "debit": tendered_amount,
-                "credit": 0.0,
-            }),
-        ]
-        if self.change_amount and not float_is_zero(self.change_amount, precision_rounding=self.currency_id.rounding):
-            move_lines.append(
-                Command.create({
-                    "name": _("Advance change return %s") % self.name,
-                    "account_id": liquidity_account.id,
-                    "partner_id": self.partner_id.id,
-                    "debit": 0.0,
-                    "credit": self.change_amount,
-                })
-            )
-        move_lines.append(
-            Command.create({
-                "name": _("Advance deposit %s") % self.name,
-                "account_id": liability_account.id,
-                "partner_id": self.partner_id.id,
-                "debit": 0.0,
-                "credit": self.advance_amount,
-            })
-        )
 
         move = self.env["account.move"].sudo().create({
             "move_type": "entry",
@@ -1279,14 +1414,14 @@ class PosAdvanceOrder(models.Model):
                 "[ADV_TRACE] post_deposit advance=%s NO_SESSION for marker/ref registration",
                 self.name,
             )
-        # Legacy field retained: old flows used liability transfer move; reuse for invoice fallback.
         self.advance_liability_move_id = move.id
         _logger.info(
-            "[ADV_DEPOSIT] Posted deposit move advance=%s move_id=%s session=%s ref=%s",
+            "[ADV_DEPOSIT] Posted deposit move advance=%s move_id=%s session=%s ref=%s splits=%s",
             self.name,
             move.id,
             deposit_session.id if deposit_session else False,
             deposit_ref,
+            [(pm.display_name, amt) for pm, amt in splits],
         )
         return move
 
@@ -1559,7 +1694,13 @@ class PosAdvanceOrder(models.Model):
 
         return True
 
-    def action_create_remaining_payment(self, pos_payment_method_id=None, pos_config_id=None, amount_tendered=None):
+    def action_create_remaining_payment(
+        self,
+        pos_payment_method_id=None,
+        pos_config_id=None,
+        amount_tendered=None,
+        payment_lines=None,
+    ):
         """Create a full POS sale at the full product total; pay remainder in cash/bank and record the advance as its own payment line.
 
         Accounting: _post_advance_completion_settlement_move (Dr liability / Cr receivable); pledge settlement if any.
@@ -1597,7 +1738,6 @@ class PosAdvanceOrder(models.Model):
             pos_config = order.pos_config_id
 
             session = order._get_open_session(pos_config)
-            pm = order._resolve_remaining_payment_method(session, pos_payment_method_id)
             rounding = order.currency_id.rounding
             remaining = order.amount_remaining or 0.0
             advance_part = order.advance_amount or 0.0
@@ -1605,6 +1745,16 @@ class PosAdvanceOrder(models.Model):
             if float_compare(remaining_tendered, remaining, precision_rounding=rounding) < 0:
                 raise UserError(_("Amount tendered cannot be less than remaining amount."))
             remaining_change = max(remaining_tendered - remaining, 0.0)
+
+            if payment_lines:
+                completion_splits = order._normalize_payment_split_payload(
+                    payment_lines, pos_config, remaining
+                )
+            else:
+                pm = order._resolve_remaining_payment_method(session, pos_payment_method_id)
+                completion_splits = [(pm, remaining)]
+
+            order._sync_payment_lines(completion_splits, "completion")
 
             # Full sale total on POS (no negative deposit line); advance appears only as a payment line.
             lines = []
@@ -1629,9 +1779,13 @@ class PosAdvanceOrder(models.Model):
 
             same_session_completion = order._is_advance_deposited_in_session(session)
             deposit_pm = False
-            payouts = [(pm, remaining_tendered)]
+            payouts = [(pm, amount) for pm, amount in completion_splits]
             if not float_is_zero(remaining_change, precision_rounding=rounding):
-                payouts.append((pm, -remaining_change))
+                change_pm = next(
+                    (pm for pm, _amt in completion_splits if pm.type == "cash"),
+                    completion_splits[0][0],
+                )
+                payouts.append((change_pm, -remaining_change))
             if not float_is_zero(advance_part, precision_rounding=rounding):
                 if same_session_completion:
                     deposit_pm = order._get_deposit_payment_method_for_session(session)
@@ -1681,7 +1835,9 @@ class PosAdvanceOrder(models.Model):
 
             order.state = "fully_paid"
             order._generate_completion_invoice(pos_order)
-            summary = order._completion_receipt_vals(completion_pm=pm)
+            summary = order._completion_receipt_vals(
+                completion_pm=completion_splits[0][0] if completion_splits else False
+            )
 
         if len(self) == 1 and summary:
             return summary
@@ -1720,6 +1876,31 @@ class PosAdvanceOrder(models.Model):
                     "subtotal": pledge.pledge_subtotal,
                 }
             )
+        deposit_payments = [
+            {
+                "payment_method_name": line.payment_method_id.display_name,
+                "amount": line.amount,
+            }
+            for line in self.payment_line_ids.filtered(lambda l: l.payment_stage == "deposit")
+        ]
+        if not deposit_payments and advance_pm:
+            deposit_payments = [
+                {"payment_method_name": advance_pm.display_name, "amount": advance_amount}
+            ]
+        completion_payments = [
+            {
+                "payment_method_name": line.payment_method_id.display_name,
+                "amount": line.amount,
+            }
+            for line in self.payment_line_ids.filtered(lambda l: l.payment_stage == "completion")
+        ]
+        if not completion_payments and completion_pm:
+            completion_payments = [
+                {
+                    "payment_method_name": completion_pm.display_name,
+                    "amount": remaining_paid,
+                }
+            ]
         return {
             "id": self.id,
             "name": self.name,
@@ -1736,6 +1917,8 @@ class PosAdvanceOrder(models.Model):
             "payment_method_name": completion_pm.display_name if completion_pm else "",
             "lines": lines,
             "pledge_lines": pledge_lines,
+            "deposit_payment_lines": deposit_payments,
+            "completion_payment_lines": completion_payments,
             "state": self.state,
         }
 
@@ -1777,12 +1960,19 @@ class PosAdvanceOrder(models.Model):
             "target": "current",
         }
 
-    def action_create_remaining_amount(self, pos_payment_method_id=None, pos_config_id=None, amount_tendered=None):
+    def action_create_remaining_amount(
+        self,
+        pos_payment_method_id=None,
+        pos_config_id=None,
+        amount_tendered=None,
+        payment_lines=None,
+    ):
         """Alias for POS button flow."""
         return self.action_create_remaining_payment(
             pos_payment_method_id=pos_payment_method_id,
             pos_config_id=pos_config_id,
             amount_tendered=amount_tendered,
+            payment_lines=payment_lines,
         )
 
     def action_refund_advance_payment(

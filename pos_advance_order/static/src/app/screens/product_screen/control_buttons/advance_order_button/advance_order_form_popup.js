@@ -7,6 +7,13 @@ import { useService } from "@web/core/utils/hooks";
 import { formatCurrency } from "@web/core/currency";
 import { rpc } from "@web/core/network/rpc";
 import { getSiteServiceConfig, resolveSiteServiceConfig } from "@pos_advance_order/js/site_service_utils";
+import {
+    buildPaymentLines,
+    initPaymentAmounts,
+    parsePaymentAmount,
+    validatePaymentLinesTotal,
+    allocatedTotalFmt,
+} from "@pos_advance_order/js/advance_payment_utils";
 
 /** Same filtering idea as PaymentScreen (minimal + pay_later) plus exclusions for advances. */
 export function getAdvanceEligiblePaymentMethods(pos) {
@@ -47,13 +54,11 @@ export class AdvanceOrderFormPopup extends Component {
         this.orm = useService("orm");
         this.notification = useService("notification");
         const paymentMethods = getAdvanceEligiblePaymentMethods(this.props.pos);
-        const defaultPmId = paymentMethods.length ? paymentMethods[0].id : null;
 
         this.state = useState({
             loading: true,
             advance_amount_str: "",
             amount_tendered_str: "",
-            selected_payment_method_id: defaultPmId,
             from_pos_config_id: this.props.posConfigId || null,
             picking_pos_config_id: this.props.posConfigId || null,
             pricelist_name: "",
@@ -61,6 +66,7 @@ export class AdvanceOrderFormPopup extends Component {
             discounts: [],
             pos_configs: [],
             payment_methods: paymentMethods,
+            payment_amounts: initPaymentAmounts(paymentMethods, 0),
             site_service: false,
             site_service_available: false,
             site_service_config: null,
@@ -73,14 +79,28 @@ export class AdvanceOrderFormPopup extends Component {
     }
 
     _parseAmount(value) {
-        const normalized = String(value ?? "")
-            .trim()
-            .replace(",", ".");
-        if (!normalized) {
-            return 0;
+        return parsePaymentAmount(value);
+    }
+
+    get paymentLines() {
+        return buildPaymentLines(this.state.payment_methods, this.state.payment_amounts);
+    }
+
+    allocatedTotalFmt() {
+        return allocatedTotalFmt(
+            this.state.payment_methods,
+            this.state.payment_amounts,
+            this.props.pos?.currency?.id,
+            formatCurrency
+        );
+    }
+
+    paymentAllocationValid() {
+        const advance = this.advanceAmount;
+        if (advance <= 0) {
+            return false;
         }
-        const parsed = parseFloat(normalized);
-        return Number.isFinite(parsed) ? parsed : 0;
+        return !validatePaymentLinesTotal(this.paymentLines, advance);
     }
 
     get advanceAmount() {
@@ -125,18 +145,36 @@ export class AdvanceOrderFormPopup extends Component {
     }
 
     isPaymentSelected(pm) {
-        return pm.id === this.state.selected_payment_method_id;
+        return parsePaymentAmount(this.state.payment_amounts[pm.id]) > 0;
     }
 
     paymentMethodRowClass(pm) {
         const selected = this.isPaymentSelected(pm);
         return (
-            `button paymentmethod btn btn-secondary btn-lg lh-lg d-flex justify-content-between align-items-center flex-fill text-start ${selected ? "border border-3 border-primary" : "opacity-75"}`
+            `paymentmethod d-flex justify-content-between align-items-center flex-fill text-start gap-2 ${selected ? "border border-2 border-primary rounded px-2 py-1" : "opacity-75"}`
         );
     }
 
-    selectPaymentMethod(pm) {
-        this.state.selected_payment_method_id = pm.id;
+    onPaymentAmountInput(pm, ev) {
+        this.state.payment_amounts = {
+            ...this.state.payment_amounts,
+            [pm.id]: ev.target.value,
+        };
+    }
+
+    onPaymentAmountBlur(pm) {
+        const amount = parsePaymentAmount(this.state.payment_amounts[pm.id]);
+        this.state.payment_amounts = {
+            ...this.state.payment_amounts,
+            [pm.id]: amount > 0 ? String(amount) : "0",
+        };
+    }
+
+    _syncPaymentAmountsToAdvance() {
+        const advance = this.advanceAmount;
+        if (advance > 0) {
+            this.state.payment_amounts = initPaymentAmounts(this.state.payment_methods, advance);
+        }
     }
 
     async _loadPopupData() {
@@ -195,6 +233,7 @@ export class AdvanceOrderFormPopup extends Component {
         const advance = this.advanceAmount;
         if (advance > 0) {
             this.state.advance_amount_str = String(advance);
+            this._syncPaymentAmountsToAdvance();
         }
         const tendered = this.amountTendered;
         if (tendered > 0 && tendered < advance) {
@@ -257,8 +296,10 @@ export class AdvanceOrderFormPopup extends Component {
             this.notification.add(_t("Please select Picking POS."), { type: "warning" });
             return;
         }
-        if (!this.state.selected_payment_method_id) {
-            this.notification.add(_t("Please select a payment method."), { type: "warning" });
+        const paymentLines = this.paymentLines;
+        const allocationError = validatePaymentLinesTotal(paymentLines, advance);
+        if (allocationError) {
+            this.notification.add(allocationError, { type: "warning" });
             return;
         }
         const tenderedFinal = tendered >= advance ? tendered : advance;
@@ -273,14 +314,16 @@ export class AdvanceOrderFormPopup extends Component {
             this.notification.add(this.siteServiceUnavailableText, { type: "warning" });
             return;
         }
-        const selectedPm = this.state.payment_methods.find(
-            (pm) => pm.id === this.state.selected_payment_method_id
-        );
+        const primaryPm = paymentLines[0];
         this.props.getPayload({
             advance_amount: advance,
             amount_tendered: tenderedFinal,
-            payment_method_id: this.state.selected_payment_method_id,
-            payment_method_name: selectedPm?.name || "",
+            payment_method_id: primaryPm.payment_method_id,
+            payment_method_name: primaryPm.payment_method_name || "",
+            payment_lines: paymentLines.map((line) => ({
+                payment_method_id: line.payment_method_id,
+                amount: line.amount,
+            })),
             from_pos_config_id: currentFromPosId,
             pos_config_id: this.state.picking_pos_config_id,
             discount_id: this.state.discount_id || false,

@@ -29,15 +29,48 @@
                     <span>Phone</span>
                     <span t-esc="props.receipt.customerPhone"/>
                 </div>
-                <div t-if="props.receipt.isCompletion and props.receipt.advancePaymentMethod" class="advance-receipt-meta-row">
+                <div t-if="props.receipt.isCompletion and hasDepositPaymentLines" class="advance-receipt-meta-block">
+                    <div class="advance-receipt-meta-row fw-bold">
+                        <span>Advance Payment</span>
+                    </div>
+                    <t t-foreach="props.receipt.depositPaymentLines" t-as="payLine" t-key="payLine_index">
+                        <div class="advance-receipt-meta-row ps-2">
+                            <span t-esc="payLine.payment_method_name"/>
+                            <span t-esc="formatPaymentLineAmount(payLine.amount)"/>
+                        </div>
+                    </t>
+                </div>
+                <div t-elif="props.receipt.isCompletion and props.receipt.advancePaymentMethod" class="advance-receipt-meta-row">
                     <span>Advance Payment</span>
                     <span t-esc="props.receipt.advancePaymentMethod"/>
                 </div>
-                <div t-if="props.receipt.isCompletion" class="advance-receipt-meta-row">
+                <div t-if="props.receipt.isCompletion and hasCompletionPaymentLines" class="advance-receipt-meta-block">
+                    <div class="advance-receipt-meta-row fw-bold">
+                        <span>Completion Payment</span>
+                    </div>
+                    <t t-foreach="props.receipt.completionPaymentLines" t-as="payLine" t-key="payLine_index">
+                        <div class="advance-receipt-meta-row ps-2">
+                            <span t-esc="payLine.payment_method_name"/>
+                            <span t-esc="formatPaymentLineAmount(payLine.amount)"/>
+                        </div>
+                    </t>
+                </div>
+                <div t-elif="props.receipt.isCompletion" class="advance-receipt-meta-row">
                     <span>Completion Payment</span>
                     <span t-esc="paymentMethodLabel"/>
                 </div>
-                <div t-if="!props.receipt.isCompletion and !props.receipt.isRefund" class="advance-receipt-meta-row">
+                <div t-if="!props.receipt.isCompletion and !props.receipt.isRefund and hasDepositPaymentLines" class="advance-receipt-meta-block">
+                    <div class="advance-receipt-meta-row fw-bold">
+                        <span>Payment</span>
+                    </div>
+                    <t t-foreach="props.receipt.depositPaymentLines" t-as="payLine" t-key="payLine_index">
+                        <div class="advance-receipt-meta-row ps-2">
+                            <span t-esc="payLine.payment_method_name"/>
+                            <span t-esc="formatPaymentLineAmount(payLine.amount)"/>
+                        </div>
+                    </t>
+                </div>
+                <div t-elif="!props.receipt.isCompletion and !props.receipt.isRefund" class="advance-receipt-meta-row">
                     <span>Payment</span>
                     <span t-esc="paymentMethodLabel"/>
                 </div>
