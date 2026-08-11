@@ -10,9 +10,6 @@
         "point_of_sale",
         "account",
         "web",
-        "pos_advance_order",
-        "pos_pledge_order",
-        "pos_ameen_daily_operation",
     ],
     "data": [
         "security/ir.model.access.csv",

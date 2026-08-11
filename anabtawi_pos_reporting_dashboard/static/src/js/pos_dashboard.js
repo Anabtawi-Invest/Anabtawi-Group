@@ -106,8 +106,21 @@ export class PosReportingDashboard extends Component {
         return ((value / total) * 100).toFixed(1);
     }
 
-    exportExcel() {
-        window.location.href = `/pos_unified_report/xlsx/1?date_from=${this.state.date_from}&date_to=${this.state.date_to}`;
+    async exportExcel() {
+        try {
+            const wizard = await this.orm.create("pos.unified.report.wizard", [
+                {
+                    date_from: this.state.date_from,
+                    date_to: this.state.date_to,
+                    config_ids: this.state.config_ids && this.state.config_ids.length ? [[6, 0, this.state.config_ids]] : [],
+                },
+            ]);
+            if (wizard && wizard.length) {
+                window.location.href = `/pos_unified_report/xlsx/${wizard[0]}`;
+            }
+        } catch (error) {
+            console.error("Failed to export POS report Excel", error);
+        }
     }
 }
 

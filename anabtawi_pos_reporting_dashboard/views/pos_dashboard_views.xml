@@ -67,6 +67,7 @@
         <field name="arch" type="xml">
             <search string="Search POS Operations">
                 <field name="name"/>
+                <field name="date"/>
                 <field name="config_id"/>
                 <field name="session_id"/>
                 <field name="payment_method_id"/>
@@ -79,7 +80,7 @@
                 <group expand="0" string="Group By">
                     <filter string="POS Branch" name="group_config" context="{'group_by': 'config_id'}"/>
                     <filter string="Report Type" name="group_type" context="{'group_by': 'report_type'}"/>
-                    <filter string="Date" name="group_date" context="{'group_by': 'date:day'}"/>
+                    <filter string="Date" name="group_date" context="{'group_by': 'date'}"/>
                     <filter string="Payment Method" name="group_payment_method" context="{'group_by': 'payment_method_id'}"/>
                 </group>
             </search>
