@@ -240,7 +240,7 @@ class PosSession(models.Model):
         move._post()
         return move
 
-    def _create_delivery_line(self, amount, move, is_closing_delivery=False):
+    def _create_delivery_line(self, amount, move, is_closing_delivery=False, reason=False):
         self.ensure_one()
         return self.env["pos.session.delivery.line"].sudo().create(
             {
@@ -248,6 +248,7 @@ class PosSession(models.Model):
                 "amount": amount,
                 "move_id": move.id,
                 "is_closing_delivery": is_closing_delivery,
+                "reason": (reason or "").strip() or False,
             }
         )
 
@@ -359,7 +360,7 @@ class PosSession(models.Model):
         )
         self.message_post(body=message)
 
-    def action_process_delivery_amount(self, amount):
+    def action_process_delivery_amount(self, amount, reason=False):
         """In-session cash delivery (تسليم النقد): affects available POS cash balance."""
         self.ensure_one()
         if not self.env.user.has_group("point_of_sale.group_pos_user"):
@@ -371,9 +372,13 @@ class PosSession(models.Model):
         if self.currency_id.compare_amounts(amount, 0.0) == 0:
             return {"successful": True}
 
+        reason = (reason or "").strip()
+        if not reason:
+            raise ValidationError(_("A reason is required for in-session cash delivery."))
+
         self._validate_delivery_amount(amount)
         move = self._create_delivery_move(amount)
-        self._create_delivery_line(amount, move, is_closing_delivery=False)
+        self._create_delivery_line(amount, move, is_closing_delivery=False, reason=reason)
         self._ensure_delivery_report_line()
         self._post_delivery_success_message(amount, move)
         return {"successful": True}

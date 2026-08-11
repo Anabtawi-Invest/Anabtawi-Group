@@ -138,3 +138,19 @@ msgstr "تمت معالجة مبلغ التوريد بنجاح."
 #. module: pos_delivery_amount
 msgid "Delivery Amount cannot exceed available cash balance."
 msgstr "لا يمكن أن يتجاوز مبلغ التوريد الرصيد النقدي المتاح."
+
+#. module: pos_delivery_amount
+msgid "Amount to be out"
+msgstr "المبلغ المراد إخراجه"
+
+#. module: pos_delivery_amount
+msgid "Reason"
+msgstr "السبب"
+
+#. module: pos_delivery_amount
+msgid "A reason is required for in-session cash delivery."
+msgstr "السبب مطلوب لتسليم النقد أثناء الجلسة."
+
+#. module: pos_delivery_amount
+msgid "A reason is required for cash delivery."
+msgstr "السبب مطلوب لتسليم النقد."

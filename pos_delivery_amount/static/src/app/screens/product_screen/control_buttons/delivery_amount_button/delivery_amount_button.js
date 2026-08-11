@@ -43,15 +43,21 @@ patch(ControlButtons.prototype, {
             return;
         }
 
-        const deliveryAmount = await askDeliveryAmount(this.dialog, {
+        const deliveryResult = await askDeliveryAmount(this.dialog, {
             maxAmount: popupData.max_amount,
             deliveredTotal: popupData.delivered_total,
+            requireReason: true,
         });
-        if (deliveryAmount === undefined) {
+        if (deliveryResult === undefined) {
             return;
         }
 
-        const response = await processDeliveryAmount(this.pos, this.dialog, deliveryAmount);
+        const response = await processDeliveryAmount(
+            this.pos,
+            this.dialog,
+            deliveryResult.amount,
+            deliveryResult.reason
+        );
         if (!response?.successful) {
             return;
         }

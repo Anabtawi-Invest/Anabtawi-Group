@@ -11,6 +11,7 @@
                 <field name="delivery_line_ids" groups="account.group_account_readonly">
                     <list>
                         <field name="amount" widget="monetary"/>
+                        <field name="reason"/>
                         <field name="is_closing_delivery"/>
                         <field name="move_id"/>
                         <field name="user_id"/>
