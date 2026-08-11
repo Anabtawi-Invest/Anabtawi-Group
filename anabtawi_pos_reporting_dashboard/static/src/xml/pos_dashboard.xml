@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="anabtawi_pos_reporting_dashboard.PosReportingDashboard" owl="1">
+        <div class="o_pos_dashboard_wrapper">
+            <!-- Header & Filter Toolbar -->
+            <div class="o_pos_dashboard_header">
+                <div class="o_dashboard_title">
+                    <h2><i class="fa fa-dashboard text-primary"/> POS Executive Dashboard</h2>
+                    <span class="subtitle">Unified real-time branch performance &amp; operations analysis</span>
+                </div>
+                <div class="o_dashboard_filters">
+                    <!-- Quick Date Range Buttons -->
+                    <div class="btn-group btn-group-period" role="group">
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'today'}" t-on-click="() => this.setPeriod('today')">Today</button>
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'yesterday'}" t-on-click="() => this.setPeriod('yesterday')">Yesterday</button>
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'this_week'}" t-on-click="() => this.setPeriod('this_week')">This Week</button>
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'this_month'}" t-on-click="() => this.setPeriod('this_month')">This Month</button>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="date" class="form-control filter_input" t-model="state.date_from"/>
+                        <span class="text-muted">to</span>
+                        <input type="date" class="form-control filter_input" t-model="state.date_to"/>
+                        <button class="btn btn-primary" t-on-click="fetchDashboardData" icon="fa-refresh">
+                            <i class="fa fa-refresh me-1"/> Apply
+                        </button>
+                        <button class="btn btn-success ms-2" t-on-click="exportExcel">
+                            <i class="fa fa-file-excel-o me-1"/> Export Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loader -->
+            <t t-if="state.loading">
+                <div class="text-center p-5">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Loading POS Data...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Calculating POS branch analytics...</p>
+                </div>
+            </t>
+
+            <!-- Main Dashboard Body -->
+            <t t-else="">
+                <!-- KPI Summary Row -->
+                <div class="o_kpi_grid">
+                    <!-- Total Sales -->
+                    <div class="o_kpi_card card-sales">
+                        <div class="kpi_icon"><i class="fa fa-shopping-cart text-primary"/></div>
+                        <div class="kpi_title">Total POS Sales</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_sales)"/></div>
+                        <div class="kpi_subtext">
+                            <span><t t-esc="data.kpis.order_count"/> Total Orders</span>
+                        </div>
+                    </div>
+
+                    <!-- Cash Sales -->
+                    <div class="o_kpi_card card-cash">
+                        <div class="kpi_icon"><i class="fa fa-money text-success"/></div>
+                        <div class="kpi_title">Cash Sales</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.cash_sales)"/></div>
+                        <div class="kpi_subtext">
+                            <span class="badge bg-success badge_sub"><t t-esc="getPercent(data.kpis.cash_sales, data.kpis.total_sales)"/>% of Sales</span>
+                        </div>
+                    </div>
+
+                    <!-- Visa / Card Sales -->
+                    <div class="o_kpi_card card-visa">
+                        <div class="kpi_icon"><i class="fa fa-credit-card text-info"/></div>
+                        <div class="kpi_title">Visa &amp; Card Sales</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.visa_sales)"/></div>
+                        <div class="kpi_subtext">
+                            <span class="badge bg-info badge_sub"><t t-esc="getPercent(data.kpis.visa_sales, data.kpis.total_sales)"/>% of Sales</span>
+                        </div>
+                    </div>
+
+                    <!-- Net Cash Moves (In / Out) -->
+                    <div class="o_kpi_card card-cashmoves">
+                        <div class="kpi_icon"><i class="fa fa-exchange text-warning"/></div>
+                        <div class="kpi_title">Net Cash Moves</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.net_cash_moves)"/></div>
+                        <div class="kpi_subtext">
+                            <span class="text-success"><i class="fa fa-arrow-down"/> In: <t t-esc="formatCurrency(data.kpis.cash_in)"/></span> | 
+                            <span class="text-danger"><i class="fa fa-arrow-up"/> Out: <t t-esc="formatCurrency(data.kpis.cash_out)"/></span>
+                        </div>
+                    </div>
+
+                    <!-- Pledges (Rahen In / Out) -->
+                    <div class="o_kpi_card card-pledges">
+                        <div class="kpi_icon"><i class="fa fa-handshake-o text-danger"/></div>
+                        <div class="kpi_title">Net Pledges (Rahen)</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.net_pledges)"/></div>
+                        <div class="kpi_subtext">
+                            <span>Rec: <t t-esc="formatCurrency(data.kpis.rahen_in)"/></span> | 
+                            <span>Ret: <t t-esc="formatCurrency(data.kpis.rahen_out)"/></span>
+                        </div>
+                    </div>
+
+                    <!-- Advance Payments Deposited -->
+                    <div class="o_kpi_card card-advances">
+                        <div class="kpi_icon"><i class="fa fa-clock-o text-cyan"/></div>
+                        <div class="kpi_title">Advance Deposits</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.advance_deposits)"/></div>
+                        <div class="kpi_subtext">
+                            <span>Customer advance deposits collected</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Channels & Daily Trend Summary -->
+                <div class="row">
+                    <!-- Channel Breakdown Progress Cards -->
+                    <div class="col-lg-5 mb-4">
+                        <div class="o_dashboard_section h-100">
+                            <div class="section_header">
+                                <h4><i class="fa fa-pie-chart text-primary"/> Sales Payment Channels</h4>
+                            </div>
+                            <div class="channel_list mt-3">
+                                <t t-foreach="data.channels" t-as="channel" t-key="channel.name">
+                                    <div class="channel_progress_item">
+                                        <div class="channel_info">
+                                            <span><t t-esc="channel.name"/></span>
+                                            <span><t t-esc="formatCurrency(channel.value)"/> (<t t-esc="getPercent(channel.value, data.kpis.total_sales)"/>%)</span>
+                                        </div>
+                                        <div class="progress">
+                                            <div class="progress-bar" role="progressbar" 
+                                                 t-attf-style="width: {{getPercent(channel.value, data.kpis.total_sales)}}%; background-color: {{channel.color}};"
+                                                 t-att-aria-valuenow="getPercent(channel.value, data.kpis.total_sales)" 
+                                                 aria-valuemin="0" aria-valuemax="100"/>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Executive Metrics Overview -->
+                    <div class="col-lg-7 mb-4">
+                        <div class="o_dashboard_section h-100">
+                            <div class="section_header">
+                                <h4><i class="fa fa-line-chart text-success"/> Executive Operational Highlights</h4>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded bg-light">
+                                        <h6 class="text-muted mb-1">Total Delivery Charges</h6>
+                                        <h4 class="fw-bold text-dark mb-0"><t t-esc="formatCurrency(data.kpis.delivery_amount)"/></h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded bg-light">
+                                        <h6 class="text-muted mb-1">Hospitality &amp; Gift Sales</h6>
+                                        <h4 class="fw-bold text-dark mb-0"><t t-esc="formatCurrency(data.kpis.hospitality_sales)"/></h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded bg-light">
+                                        <h6 class="text-muted mb-1">Total Cash In Drawer Moves</h6>
+                                        <h4 class="fw-bold text-success mb-0">+<t t-esc="formatCurrency(data.kpis.cash_in)"/></h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded bg-light">
+                                        <h6 class="text-muted mb-1">Total Cash Out Drawer Moves</h6>
+                                        <h4 class="fw-bold text-danger mb-0">-<t t-esc="formatCurrency(data.kpis.cash_out)"/></h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Per-Branch Detailed Comparison Grid -->
+                <div class="o_dashboard_section">
+                    <div class="section_header">
+                        <h4><i class="fa fa-building text-info"/> Branch Performance Matrix (<t t-esc="data.branches.length"/> Active Branches)</h4>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table_branch_data align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Branch Name</th>
+                                    <th class="text-end">Total Sales</th>
+                                    <th class="text-end">Cash Sales</th>
+                                    <th class="text-end">Visa / Card</th>
+                                    <th class="text-end">Hospitality</th>
+                                    <th class="text-end">Talabat</th>
+                                    <th class="text-end">Careem</th>
+                                    <th class="text-end">Cash In</th>
+                                    <th class="text-end">Cash Out</th>
+                                    <th class="text-end">Net Cash Moves</th>
+                                    <th class="text-end">Rahen In</th>
+                                    <th class="text-end">Rahen Out</th>
+                                    <th class="text-end">Advance Deposits</th>
+                                    <th class="text-end">Delivery Fees</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="data.branches" t-as="branch" t-key="branch.config_id">
+                                    <tr>
+                                        <td class="branch_title"><t t-esc="branch.branch_name"/></td>
+                                        <td class="val_num fw-bold text-primary"><t t-esc="formatCurrency(branch.sales)"/></td>
+                                        <td class="val_num text-success"><t t-esc="formatCurrency(branch.cash)"/></td>
+                                        <td class="val_num text-info"><t t-esc="formatCurrency(branch.visa)"/></td>
+                                        <td class="val_num"><t t-esc="formatCurrency(branch.hospitality)"/></td>
+                                        <td class="val_num"><t t-esc="formatCurrency(branch.talabat)"/></td>
+                                        <td class="val_num"><t t-esc="formatCurrency(branch.careem)"/></td>
+                                        <td class="val_num text-success">+<t t-esc="formatCurrency(branch.cash_in)"/></td>
+                                        <td class="val_num text-danger">-<t t-esc="formatCurrency(branch.cash_out)"/></td>
+                                        <td class="val_num fw-bold"><t t-esc="formatCurrency(branch.net_cash_moves)"/></td>
+                                        <td class="val_num"><t t-esc="formatCurrency(branch.rahen_in)"/></td>
+                                        <td class="val_num"><t t-esc="formatCurrency(branch.rahen_out)"/></td>
+                                        <td class="val_num"><t t-esc="formatCurrency(branch.advance_deposits)"/></td>
+                                        <td class="val_num"><t t-esc="formatCurrency(branch.delivery_amount)"/></td>
+                                    </tr>
+                                </t>
+                                <!-- Total Row -->
+                                <tr class="row_total">
+                                    <td class="branch_title">TOTALS</td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.sales)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.cash)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.visa)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.hospitality)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.talabat)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.careem)"/></td>
+                                    <td class="val_num">+<t t-esc="formatCurrency(data.global_totals.cash_in)"/></td>
+                                    <td class="val_num">-<t t-esc="formatCurrency(data.global_totals.cash_out)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.net_cash_moves)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.rahen_in)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.rahen_out)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.advance_deposits)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.delivery_amount)"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

@@ -1,0 +1,234 @@
+/* POS Executive Dashboard Styling */
+.o_pos_dashboard_wrapper {
+    background-color: #f4f6f9;
+    min-height: 100vh;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    .o_pos_dashboard_header {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px 24px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+
+        .o_dashboard_title {
+            h2 {
+                margin: 0;
+                font-weight: 700;
+                color: #1e293b;
+                font-size: 1.5rem;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+
+                i {
+                    color: #3b82f6;
+                }
+            }
+
+            span.subtitle {
+                font-size: 0.875rem;
+                color: #64748b;
+            }
+        }
+
+        .o_dashboard_filters {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+
+            .btn-group-period {
+                .btn {
+                    border-radius: 6px;
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                }
+            }
+
+            .filter_input {
+                max-width: 140px;
+                border-radius: 6px;
+            }
+        }
+    }
+
+    /* KPI Grid */
+    .o_kpi_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 18px;
+        margin-bottom: 24px;
+
+        .o_kpi_card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+            border-left: 5px solid #3b82f6;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            overflow: hidden;
+
+            &:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            }
+
+            &.card-sales { border-left-color: #3b82f6; }
+            &.card-cash { border-left-color: #10b981; }
+            &.card-visa { border-left-color: #8b5cf6; }
+            &.card-cashmoves { border-left-color: #f59e0b; }
+            &.card-pledges { border-left-color: #ec4899; }
+            &.card-advances { border-left-color: #06b6d4; }
+
+            .kpi_icon {
+                position: absolute;
+                right: 18px;
+                top: 18px;
+                width: 48px;
+                height: 48px;
+                border-radius: 10px;
+                background: #f1f5f9;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.25rem;
+                color: #475569;
+            }
+
+            .kpi_title {
+                font-size: 0.85rem;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                font-weight: 600;
+                color: #64748b;
+                margin-bottom: 8px;
+            }
+
+            .kpi_value {
+                font-size: 1.75rem;
+                font-weight: 800;
+                color: #0f172a;
+                margin-bottom: 6px;
+                font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            }
+
+            .kpi_subtext {
+                font-size: 0.8rem;
+                color: #94a3b8;
+                display: flex;
+                gap: 8px;
+
+                .badge_sub {
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-weight: 600;
+                    font-size: 0.75rem;
+                }
+            }
+        }
+    }
+
+    /* Section Cards */
+    .o_dashboard_section {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        margin-bottom: 24px;
+
+        .section_header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f1f5f9;
+
+            h4 {
+                margin: 0;
+                font-weight: 700;
+                font-size: 1.15rem;
+                color: #1e293b;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+        }
+    }
+
+    /* Table styling */
+    .table_branch_data {
+        width: 100%;
+        margin-bottom: 0;
+        border-collapse: separate;
+        border-spacing: 0;
+
+        th {
+            background-color: #f8fafc;
+            color: #475569;
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 14px;
+            border-bottom: 2px solid #e2e8f0;
+
+            &.text-end { text-align: right; }
+        }
+
+        td {
+            padding: 14px;
+            vertical-align: middle;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #f1f5f9;
+            color: #334155;
+
+            &.branch_title {
+                font-weight: 700;
+                color: #0f172a;
+            }
+
+            &.val_num {
+                font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                text-align: right;
+            }
+        }
+
+        tr.row_total {
+            td {
+                background-color: #f1f5f9;
+                font-weight: 800;
+                color: #0f172a;
+                border-top: 2px solid #cbd5e1;
+            }
+        }
+    }
+
+    /* Progress bars */
+    .channel_progress_item {
+        margin-bottom: 16px;
+
+        .channel_info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #334155;
+        }
+
+        .progress {
+            height: 10px;
+            border-radius: 6px;
+            background-color: #f1f5f9;
+        }
+    }
+}
