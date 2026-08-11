@@ -1260,7 +1260,7 @@ class PosAdvanceOrder(models.Model):
             )
         _logger.info(
             "[ADV_TRACE] post_deposit advance=%s ctx_session=%s resolved_session=%s(%s) "
-            "state=%s from_pos=%s journal=%s splits=%s",
+            "state=%s from_pos=%s journal=%s pm=%s amount=%s",
             self.name,
             ctx_session_id,
             deposit_session.name if deposit_session else False,
@@ -1268,7 +1268,8 @@ class PosAdvanceOrder(models.Model):
             deposit_session.state if deposit_session else False,
             self.from_pos_config_id.id,
             journal.id,
-            [(pm.id, amt) for pm, amt in splits],
+            pm.id,
+            self.advance_amount,
         )
         deposit_ref = _("Advance deposit - %s") % self.name
         if deposit_session:
@@ -1293,12 +1294,13 @@ class PosAdvanceOrder(models.Model):
             )
         self.advance_liability_move_id = move.id
         _logger.info(
-            "[ADV_DEPOSIT] Posted deposit move advance=%s move_id=%s session=%s ref=%s splits=%s",
+            "[ADV_DEPOSIT] Posted deposit move advance=%s move_id=%s session=%s ref=%s pm=%s amount=%s",
             self.name,
             move.id,
             deposit_session.id if deposit_session else False,
             deposit_ref,
-            [(pm.display_name, amt) for pm, amt in splits],
+            pm.display_name,
+            self.advance_amount,
         )
         return move
 
