@@ -6,13 +6,6 @@ import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { formatCurrency } from "@web/core/currency";
 import { getAdvanceEligiblePaymentMethods } from "./advance_order_form_popup";
-import {
-    buildPaymentLines,
-    initPaymentAmounts,
-    parsePaymentAmount,
-    validatePaymentLinesTotal,
-    allocatedTotalFmt,
-} from "@pos_advance_order/js/advance_payment_utils";
 
 export class CompleteAdvanceOrderPopup extends Component {
     static template = "pos_advance_order.CompleteAdvanceOrderPopup";
@@ -28,6 +21,7 @@ export class CompleteAdvanceOrderPopup extends Component {
         this.orm = useService("orm");
         this.notification = useService("notification");
         const paymentMethods = getAdvanceEligiblePaymentMethods(this.props.pos);
+        const defaultPmId = paymentMethods.length ? paymentMethods[0].id : null;
 
         this.state = useState({
             loading: true,
@@ -36,7 +30,7 @@ export class CompleteAdvanceOrderPopup extends Component {
             amount_tendered: 0,
             advance_orders: [],
             payment_methods: paymentMethods,
-            payment_amounts: initPaymentAmounts(paymentMethods, 0),
+            selected_payment_method_id: defaultPmId,
         });
 
         onMounted(async () => {
@@ -135,36 +129,8 @@ export class CompleteAdvanceOrderPopup extends Component {
         return this._tr("No advance orders found for this Picking POS.", "لا توجد طلبات عربون لنقطة الاستلام هذه.");
     }
 
-    get paymentSplitHint() {
-        return this._tr(
-            "Split the remaining balance across one or more payment methods.",
-            "قسّم المبلغ المتبقي على طريقة دفع أو أكثر."
-        );
-    }
-
-    get allocatedLabel() {
-        return this._tr("Allocated:", "المخصص:");
-    }
-
-    get paymentLines() {
-        return buildPaymentLines(this.state.payment_methods, this.state.payment_amounts);
-    }
-
-    allocatedTotalFmt() {
-        return allocatedTotalFmt(
-            this.state.payment_methods,
-            this.state.payment_amounts,
-            this.props.pos?.currency?.id,
-            formatCurrency
-        );
-    }
-
-    paymentAllocationValid() {
-        const due = this.selectedRemainingAmount;
-        if (due <= 0) {
-            return false;
-        }
-        return !validatePaymentLinesTotal(this.paymentLines, due);
+    get paymentMethodLabel() {
+        return this._tr("Payment method", "طريقة الدفع");
     }
 
     get cancelButtonLabel() {
@@ -191,36 +157,18 @@ export class CompleteAdvanceOrderPopup extends Component {
     }
 
     isPaymentSelected(pm) {
-        return parsePaymentAmount(this.state.payment_amounts[pm.id]) > 0;
+        return pm.id === this.state.selected_payment_method_id;
     }
 
     paymentMethodRowClass(pm) {
         const selected = this.isPaymentSelected(pm);
         return (
-            `paymentmethod d-flex justify-content-between align-items-center flex-fill text-start gap-2 ${selected ? "border border-2 border-primary rounded px-2 py-1" : "opacity-75"}`
+            `button paymentmethod btn btn-secondary btn-lg lh-lg d-flex justify-content-between align-items-center flex-fill text-start ${selected ? "border border-3 border-primary" : "opacity-75"}`
         );
     }
 
-    onPaymentAmountInput(pm, ev) {
-        this.state.payment_amounts = {
-            ...this.state.payment_amounts,
-            [pm.id]: ev.target.value,
-        };
-    }
-
-    onPaymentAmountBlur(pm) {
-        const amount = parsePaymentAmount(this.state.payment_amounts[pm.id]);
-        this.state.payment_amounts = {
-            ...this.state.payment_amounts,
-            [pm.id]: amount > 0 ? String(amount) : "0",
-        };
-    }
-
-    _syncPaymentAmountsToRemaining() {
-        const remaining = this.selectedRemainingAmount;
-        if (remaining > 0) {
-            this.state.payment_amounts = initPaymentAmounts(this.state.payment_methods, remaining);
-        }
+    selectPaymentMethod(pm) {
+        this.state.selected_payment_method_id = pm.id;
     }
 
     async _loadAdvanceOrders() {
@@ -300,9 +248,7 @@ export class CompleteAdvanceOrderPopup extends Component {
     selectOrder(orderId) {
         this.state.selected_order_id = orderId;
         const selected = this.state.advance_orders.find((o) => o.id === orderId);
-        const remaining = Number(selected?.amount_remaining ?? 0);
-        this.state.amount_tendered = remaining;
-        this.state.payment_amounts = initPaymentAmounts(this.state.payment_methods, remaining);
+        this.state.amount_tendered = Number(selected?.amount_remaining ?? 0);
     }
 
     confirm() {
@@ -310,13 +256,8 @@ export class CompleteAdvanceOrderPopup extends Component {
             this.notification.add(this._tr("Please select an advance order.", "يرجى اختيار طلب عربون."), { type: "warning" });
             return;
         }
-        const paymentLines = this.paymentLines;
-        const allocationError = validatePaymentLinesTotal(
-            paymentLines,
-            this.selectedRemainingAmount
-        );
-        if (allocationError) {
-            this.notification.add(allocationError, { type: "warning" });
+        if (!this.state.selected_payment_method_id) {
+            this.notification.add(this._tr("Please select a payment method.", "يرجى اختيار طريقة دفع."), { type: "warning" });
             return;
         }
         if (this.state.amount_tendered < this.selectedRemainingAmount) {
@@ -326,15 +267,13 @@ export class CompleteAdvanceOrderPopup extends Component {
             );
             return;
         }
-        const primaryPm = paymentLines[0];
+        const selectedPm = this.state.payment_methods.find(
+            (pm) => pm.id === this.state.selected_payment_method_id
+        );
         this.props.getPayload({
             advance_order_id: this.state.selected_order_id,
-            payment_method_id: primaryPm.payment_method_id,
-            payment_method_name: primaryPm.payment_method_name || "",
-            payment_lines: paymentLines.map((line) => ({
-                payment_method_id: line.payment_method_id,
-                amount: line.amount,
-            })),
+            payment_method_id: this.state.selected_payment_method_id,
+            payment_method_name: selectedPm?.name || "",
             amount_tendered: this.state.amount_tendered,
             change_amount: this.remainingChangeAmount,
         });

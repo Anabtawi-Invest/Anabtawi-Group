@@ -24,19 +24,6 @@ import {
 } from "@pos_advance_order/js/site_service_utils";
 import { printAdvanceOrderReceipt } from "@pos_advance_order/js/advance_order_print";
 
-function formatPaymentLinesLabel(lines) {
-    if (!lines?.length) {
-        return "";
-    }
-    return lines
-        .map((line) => {
-            const name = line.payment_method_name || line.name || "";
-            const amount = line.amount ?? 0;
-            return name ? `${name}: ${amount}` : String(amount);
-        })
-        .join(", ");
-}
-
 function toNumber(value, fallback = 0) {
     const num = Number(value);
     return Number.isFinite(num) ? num : fallback;
@@ -207,20 +194,6 @@ patch(ControlButtons.prototype, {
             result?.amount_remaining,
             Math.max(total - advanceAmount, 0)
         );
-        const depositPaymentLines =
-            result?.deposit_payment_lines ||
-            (payload.payment_lines || []).map((line) => ({
-                payment_method_name:
-                    line.payment_method_name ||
-                    payload.payment_method_name ||
-                    "",
-                amount: line.amount,
-            }));
-        const paymentMethodLabel =
-            formatPaymentLinesLabel(depositPaymentLines) ||
-            payload.payment_method_name ||
-            payload.payment_method ||
-            "";
         return {
             companyName: this.pos.company?.name || "",
             posName: this.pos.config?.name || "",
@@ -228,8 +201,7 @@ patch(ControlButtons.prototype, {
             date: new Date().toLocaleString(),
             customerName: partner?.name || "",
             customerPhone: partner?.phone || "",
-            paymentMethod: paymentMethodLabel,
-            depositPaymentLines,
+            paymentMethod: payload.payment_method_name || payload.payment_method,
             currencyId: this.pos.currency?.id,
             total: total,
             advanceAmount: advanceAmount,
@@ -326,7 +298,6 @@ patch(ControlButtons.prototype, {
             amount_tendered: amountTendered,
             payment_method_id: popupPayload.payment_method_id,
             payment_method_name: popupPayload.payment_method_name || "",
-            payment_lines: popupPayload.payment_lines || [],
             employee_id: popupPayload.employee_id || false,
             discount_id: popupPayload.discount_id || false,
             site_service: popupPayload.site_service || false,
@@ -379,23 +350,6 @@ patch(ControlButtons.prototype, {
             popupPayload.change_amount ?? Math.max(amountTendered - remainingPaid, 0)
         );
         const pledgeAmount = toNumber(result?.pledge_amount, 0);
-        const completionPaymentLines =
-            result?.completion_payment_lines ||
-            (popupPayload.payment_lines || []).map((line) => ({
-                payment_method_name:
-                    line.payment_method_name || popupPayload.payment_method_name || "",
-                amount: line.amount,
-            }));
-        const depositPaymentLines = result?.deposit_payment_lines || [];
-        const completionPaymentMethodLabel =
-            formatPaymentLinesLabel(completionPaymentLines) ||
-            result?.payment_method_name ||
-            popupPayload.payment_method_name ||
-            "";
-        const advancePaymentMethodLabel =
-            formatPaymentLinesLabel(depositPaymentLines) ||
-            result?.advance_payment_method_name ||
-            "";
         return {
             companyName: this.pos.company?.name || "",
             posName: this.pos.config?.name || "",
@@ -404,10 +358,8 @@ patch(ControlButtons.prototype, {
             date: new Date().toLocaleString(),
             customerName: result?.partner_name || "",
             customerPhone: result?.partner_phone || "",
-            advancePaymentMethod: advancePaymentMethodLabel,
-            paymentMethod: completionPaymentMethodLabel,
-            depositPaymentLines,
-            completionPaymentLines,
+            advancePaymentMethod: result?.advance_payment_method_name || "",
+            paymentMethod: result?.payment_method_name || popupPayload.payment_method_name || "",
             currencyId: this.pos.currency?.id,
             total,
             advanceAmount,
@@ -445,7 +397,6 @@ patch(ControlButtons.prototype, {
             const result = await rpc("/pos/complete_advance_order", {
                 advance_order_id: popupPayload.advance_order_id,
                 payment_method_id: popupPayload.payment_method_id,
-                payment_lines: popupPayload.payment_lines || [],
                 pos_config_id: this.pos.config.id,
                 amount_tendered: popupPayload.amount_tendered,
             });

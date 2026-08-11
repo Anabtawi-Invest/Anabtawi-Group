@@ -48,32 +48,6 @@
                         </div>
 
                         <div style="border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px;">
-                            <t t-set="deposit_payments" t-value="o.payment_line_ids.filtered(lambda l: l.payment_stage == 'deposit')"/>
-                            <t t-set="completion_payments" t-value="o.payment_line_ids.filtered(lambda l: l.payment_stage == 'completion')"/>
-                            <t t-if="deposit_payments">
-                                <div><strong>Deposit Payments</strong></div>
-                                <t t-foreach="deposit_payments" t-as="pay_line">
-                                    <div style="display:flex; justify-content:space-between;">
-                                        <span t-esc="pay_line.payment_method_id.display_name"/>
-                                        <span t-esc="o.currency_id.format(pay_line.amount)"/>
-                                    </div>
-                                </t>
-                            </t>
-                            <t t-elif="o.pos_payment_method_id">
-                                <div style="display:flex; justify-content:space-between;">
-                                    <span>Deposit Payment</span>
-                                    <span t-esc="o.pos_payment_method_id.display_name"/>
-                                </div>
-                            </t>
-                            <t t-if="completion_payments">
-                                <div style="margin-top: 4px;"><strong>Completion Payments</strong></div>
-                                <t t-foreach="completion_payments" t-as="pay_line">
-                                    <div style="display:flex; justify-content:space-between;">
-                                        <span t-esc="pay_line.payment_method_id.display_name"/>
-                                        <span t-esc="o.currency_id.format(pay_line.amount)"/>
-                                    </div>
-                                </t>
-                            </t>
                             <div style="display:flex; justify-content:space-between;">
                                 <span>Total</span>
                                 <span t-esc="o.currency_id.format(o.amount_total)"/>

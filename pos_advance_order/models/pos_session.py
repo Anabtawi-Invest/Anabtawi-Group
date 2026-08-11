@@ -296,32 +296,6 @@ class PosSession(models.Model):
         cash_count = 0
         bank_count = 0
         for order in deposited:
-            deposit_lines = order.payment_line_ids.filtered(lambda l: l.payment_stage == "deposit")
-            if deposit_lines:
-                for line in deposit_lines:
-                    amount = line.amount or 0.0
-                    pm = line.payment_method_id
-                    if currency.is_zero(amount):
-                        continue
-                    is_cash = pm and pm.type == "cash"
-                    pm_key = pm.id if pm else False
-                    pm_bucket = summary["by_payment_method"].setdefault(
-                        pm_key,
-                        {
-                            "amount": 0.0,
-                            "count": 0,
-                            "type": pm.type if pm else ("cash" if is_cash else "bank"),
-                        },
-                    )
-                    pm_bucket["amount"] += amount
-                    pm_bucket["count"] += 1
-                    if is_cash:
-                        cash_total += amount
-                        cash_count += 1
-                    else:
-                        bank_total += amount
-                        bank_count += 1
-                continue
             row = order.read(["advance_amount", "pos_payment_method_id", "payment_method"])[0]
             amount = row.get("advance_amount") or 0.0
             pm_id = (row.get("pos_payment_method_id") or [False])[0]

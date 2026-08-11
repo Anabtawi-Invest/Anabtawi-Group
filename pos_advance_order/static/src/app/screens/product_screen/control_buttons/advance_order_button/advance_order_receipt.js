@@ -28,16 +28,4 @@ export class AdvanceOrderReceipt extends Component {
         }
         return _t("N/A");
     }
-
-    get hasDepositPaymentLines() {
-        return !!(this.data.depositPaymentLines && this.data.depositPaymentLines.length);
-    }
-
-    get hasCompletionPaymentLines() {
-        return !!(this.data.completionPaymentLines && this.data.completionPaymentLines.length);
-    }
-
-    formatPaymentLineAmount(amount) {
-        return this.formatCurrency(amount || 0);
-    }
 }

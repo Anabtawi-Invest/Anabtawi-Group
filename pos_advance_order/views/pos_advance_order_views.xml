@@ -152,12 +152,10 @@
                         <group>
                             <field name="partner_id" required="1" readonly="state != 'draft'"/>
                             <field name="user_id" required="1" readonly="state != 'draft'"/>
-                            <field name="pos_payment_method_id" required="not deposit_payment_line_ids" readonly="state != 'draft' or deposit_payment_line_ids" invisible="deposit_payment_line_ids"/>
+                            <field name="pos_payment_method_id" required="1" readonly="state != 'draft'"/>
                             <field name="payment_method" invisible="1"/>
                             <field name="advance_amount" widget="monetary" readonly="state != 'draft'"/>
                             <field name="amount_tendered" widget="monetary" readonly="state != 'draft'"/>
-                            <field name="deposit_payment_total" widget="monetary" readonly="1" invisible="not deposit_payment_line_ids"/>
-                            <field name="completion_payment_total" widget="monetary" readonly="1" invisible="not completion_payment_line_ids"/>
                             <field name="is_employee_pricelist" readonly="state != 'draft'"/>
                             <field name="employee_pricelist_employee_id" readonly="1" invisible="not employee_pricelist_employee_id"/>
                             <field name="discount_id" readonly="state != 'draft'" />
@@ -203,37 +201,6 @@
                                     <field name="price_subtotal_incl" invisible="display_type" widget="monetary"/>
                                 </list>
                             </field>
-                        </page>
-                        <page string="Payments">
-                            <group string="Deposit Payments" invisible="not deposit_payment_line_ids and not pos_payment_method_id">
-                                <field
-                                    name="deposit_payment_line_ids"
-                                    readonly="1"
-                                    nolabel="1"
-                                    invisible="not deposit_payment_line_ids"
-                                >
-                                    <list string="Deposit Payments">
-                                        <field name="payment_method_id"/>
-                                        <field name="amount" sum="Total"/>
-                                        <field name="currency_id" column_invisible="1"/>
-                                        <field name="payment_stage" column_invisible="1"/>
-                                    </list>
-                                </field>
-                                <group invisible="deposit_payment_line_ids">
-                                    <field name="pos_payment_method_id" readonly="1"/>
-                                    <field name="advance_amount" widget="monetary" readonly="1"/>
-                                </group>
-                            </group>
-                            <group string="Completion Payments" invisible="not completion_payment_line_ids">
-                                <field name="completion_payment_line_ids" readonly="1" nolabel="1">
-                                    <list string="Completion Payments">
-                                        <field name="payment_method_id"/>
-                                        <field name="amount" sum="Total"/>
-                                        <field name="currency_id" column_invisible="1"/>
-                                        <field name="payment_stage" column_invisible="1"/>
-                                    </list>
-                                </field>
-                            </group>
                         </page>
                     </notebook>
 

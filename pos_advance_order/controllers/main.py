@@ -72,7 +72,6 @@ class PosAdvanceOrderController(http.Controller):
         advance_amount = float(payload.get("advance_amount") or 0.0)
         amount_tendered = float(payload.get("amount_tendered") or 0.0)
         payment_method_id = payload.get("payment_method_id")
-        payment_lines = payload.get("payment_lines") or []
         deposit_pos_session_id = payload.get("deposit_pos_session_id")
         employee_id = payload.get("employee_id")
         discount_id = payload.get("discount_id")
@@ -145,20 +144,11 @@ class PosAdvanceOrderController(http.Controller):
         if not from_pos_config.enable_advance_order:
             raise UserError("Advance order is not enabled on this POS.")
 
-        if not payment_lines and not payment_method_id:
+        if not payment_method_id:
             raise ValidationError(_("Please select a payment method."))
 
-        deposit_splits = []
-        AdvanceOrder = request.env["pos.advance.order"].sudo()
-        if payment_lines:
-            deposit_splits = AdvanceOrder._normalize_payment_split_payload(
-                payment_lines, from_pos_config, advance_amount
-            )
-            pm = deposit_splits[0][0]
-        else:
-            pm = request.env["pos.payment.method"].sudo().browse(int(payment_method_id))
-            self._validate_advance_payment_method(pm, from_pos_config)
-            deposit_splits = [(pm, advance_amount)]
+        pm = request.env["pos.payment.method"].sudo().browse(int(payment_method_id))
+        self._validate_advance_payment_method(pm, from_pos_config)
 
         deposit_session = request.env["pos.session"]
         if deposit_pos_session_id:
@@ -244,7 +234,6 @@ class PosAdvanceOrderController(http.Controller):
             create_vals["line_ids"] = line_vals
 
         order = AdvanceOrder.create(create_vals)
-        order._sync_payment_lines(deposit_splits, "deposit")
         if not site_service:
             order._sync_site_service_pledge_records()
         order.with_context(**deposit_ctx).action_confirm()
@@ -270,13 +259,6 @@ class PosAdvanceOrderController(http.Controller):
             order.pledge_line_ids.ids,
         )
 
-        deposit_payments = [
-            {
-                "payment_method_name": line.payment_method_id.display_name,
-                "amount": line.amount,
-            }
-            for line in order.payment_line_ids.filtered(lambda l: l.payment_stage == "deposit")
-        ]
         return {
             "id": order.id,
             "name": order.name,
@@ -288,7 +270,6 @@ class PosAdvanceOrderController(http.Controller):
             "change_amount": order.change_amount,
             "amount_remaining": order.amount_remaining,
             "advance_pos_order_id": order.advance_pos_order_id.id,
-            "deposit_payment_lines": deposit_payments,
         }
 
     @http.route("/pos/complete_advance_order", type="jsonrpc", auth="user")
@@ -300,14 +281,13 @@ class PosAdvanceOrderController(http.Controller):
         advance_order_id = payload.get("advance_order_id")
         pos_config_id = payload.get("pos_config_id")
         payment_method_id = payload.get("payment_method_id")
-        payment_lines = payload.get("payment_lines") or []
         amount_tendered = payload.get("amount_tendered")
 
         if not advance_order_id:
             raise ValidationError(_("Advance order is required."))
         if not pos_config_id:
             raise ValidationError(_("POS configuration is required."))
-        if not payment_lines and not payment_method_id:
+        if not payment_method_id:
             raise ValidationError(_("Please select a payment method."))
 
         order = (
@@ -323,33 +303,24 @@ class PosAdvanceOrderController(http.Controller):
         if not pos_config:
             raise ValidationError(_("Invalid POS configuration."))
 
-        pm = False
-        if payment_method_id:
-            pm = request.env["pos.payment.method"].sudo().browse(int(payment_method_id))
-            if not pm.exists():
-                raise ValidationError(_("Invalid payment method."))
-            if pm not in pos_config.payment_method_ids:
-                raise ValidationError(
-                    _("This payment method is not available on the current Point of Sale.")
-                )
+        pm = request.env["pos.payment.method"].sudo().browse(int(payment_method_id))
+        if not pm.exists():
+            raise ValidationError(_("Invalid payment method."))
+        if pm not in pos_config.payment_method_ids:
+            raise ValidationError(
+                _("This payment method is not available on the current Point of Sale.")
+            )
 
         tendered = float(amount_tendered) if amount_tendered is not None else None
         order.action_create_remaining_payment(
-            pos_payment_method_id=pm.id if pm else None,
+            pos_payment_method_id=pm.id,
             pos_config_id=pos_config.id,
             amount_tendered=tendered,
-            payment_lines=payment_lines or None,
         )
         if order.state != "fully_paid":
             raise UserError(_("Advance order could not be completed."))
 
-        completion_pm = pm
-        if not completion_pm:
-            completion_line = order.payment_line_ids.filtered(
-                lambda l: l.payment_stage == "completion"
-            )[:1]
-            completion_pm = completion_line.payment_method_id if completion_line else False
-        receipt = order._completion_receipt_vals(completion_pm=completion_pm)
+        receipt = order._completion_receipt_vals(completion_pm=pm)
         _logger.info(
             "[ADV_TRACE] complete_advance_order done advance=%s state=%s pos_order=%s",
             order.name,
