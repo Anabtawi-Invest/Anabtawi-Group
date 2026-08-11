@@ -1,6 +1,6 @@
 /** @odoo-module */
 
-const PLEDGE_ORDER_BUILD_TAG = "PLEDGE_ORDER_BUILD_2026_05_10_2155";
+const PLEDGE_ORDER_BUILD_TAG = "PLEDGE_ORDER_BUILD_2026_08_11_RETURN_FIX";
 console.log("[PLEDGE] Module loading started...", PLEDGE_ORDER_BUILD_TAG);
 
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
@@ -9,6 +9,7 @@ import { SelectionPopup } from "@point_of_sale/app/components/popups/selection_p
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { PledgeListPopup } from "@pos_pledge_order/js/pledge_list_popup";
 import { EmployeeSelectionPopup } from "@pos_pledge_order/js/employee_selection_popup";
+import { PartnerList } from "@point_of_sale/app/screens/partner_list/partner_list";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
 import OrderPaymentValidation from "@point_of_sale/app/utils/order_payment_validation";
 import { patch } from "@web/core/utils/patch";
@@ -212,25 +213,13 @@ patch(ControlButtons.prototype, {
 
     async onClickReturnPledge() {
         try {
-            const { PartnerList } = await import(
-                "@point_of_sale/app/screens/partner_list/partner_list"
-            );
             const partner = await makeAwaitable(this.dialog, PartnerList, {});
             if (!partner) {
                 return;
             }
 
-            const selection = await new Promise((resolve) => {
-                this.dialog.add(
-                    PledgeListPopup,
-                    {
-                        partnerId: partner.id,
-                        getPayload: (response) => resolve(response),
-                    },
-                    {
-                        onClose: () => resolve(null),
-                    }
-                );
+            const selection = await makeAwaitable(this.dialog, PledgeListPopup, {
+                partnerId: partner.id,
             });
 
             if (!selection || !selection.pledge) {
