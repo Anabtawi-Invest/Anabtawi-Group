@@ -27,8 +27,24 @@
                         <button class="btn btn-success ms-2" t-on-click="exportExcel">
                             <i class="fa fa-file-excel-o me-1"/> Export Excel
                         </button>
-                    </div>
-                </div>
+            </div>
+
+            <!-- Branch Selector Tabs -->
+            <div class="o_branch_selector_bar mb-4">
+                <ul class="nav nav-pills branch_pills">
+                    <li class="nav-item">
+                        <button type="button" class="nav-link" t-att-class="{'active': isBranchSelected('all')}" t-on-click="() => this.selectBranch('all')">
+                            <i class="fa fa-cubes me-1"/> All Branches
+                        </button>
+                    </li>
+                    <t t-foreach="data.all_branches" t-as="branch_item" t-key="branch_item.id">
+                        <li class="nav-item">
+                            <button type="button" class="nav-link" t-att-class="{'active': isBranchSelected(branch_item.id)}" t-on-click="() => this.selectBranch(branch_item.id)">
+                                <i class="fa fa-building-o me-1"/> <t t-esc="branch_item.name"/>
+                            </button>
+                        </li>
+                    </t>
+                </ul>
             </div>
 
             <!-- Loader -->

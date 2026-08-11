@@ -68,6 +68,45 @@
         }
     }
 
+    /* Branch Selector Pills */
+    .o_branch_selector_bar {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 12px 18px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+
+        .branch_pills {
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 0;
+
+            .nav-item {
+                .nav-link {
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 0.875rem;
+                    color: #475569;
+                    background-color: #f8fafc;
+                    padding: 8px 16px;
+                    border: 1px solid #e2e8f0;
+                    transition: all 0.2s ease;
+
+                    &:hover {
+                        background-color: #e2e8f0;
+                        color: #1e293b;
+                    }
+
+                    &.active {
+                        background-color: #3b82f6;
+                        color: #ffffff;
+                        border-color: #3b82f6;
+                        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+                    }
+                }
+            }
+        }
+    }
+
     /* KPI Grid */
     .o_kpi_grid {
         display: grid;

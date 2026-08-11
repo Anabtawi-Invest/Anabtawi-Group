@@ -24,6 +24,7 @@ export class PosReportingDashboard extends Component {
         this.data = useState({
             kpis: {},
             branches: [],
+            all_branches: [],
             global_totals: {},
             channels: [],
             trends: [],
@@ -57,6 +58,7 @@ export class PosReportingDashboard extends Component {
 
             this.data.kpis = res.kpis || {};
             this.data.branches = res.branches || [];
+            this.data.all_branches = res.all_branches || [];
             this.data.global_totals = res.global_totals || {};
             this.data.channels = res.channels || [];
             this.data.trends = res.trends || [];
@@ -65,6 +67,22 @@ export class PosReportingDashboard extends Component {
         } finally {
             this.state.loading = false;
         }
+    }
+
+    selectBranch(branchId) {
+        if (branchId === "all") {
+            this.state.config_ids = [];
+        } else {
+            this.state.config_ids = [branchId];
+        }
+        this.fetchDashboardData();
+    }
+
+    isBranchSelected(branchId) {
+        if (branchId === "all") {
+            return !this.state.config_ids || this.state.config_ids.length === 0;
+        }
+        return this.state.config_ids && this.state.config_ids.length === 1 && this.state.config_ids[0] === branchId;
     }
 
     setPeriod(period) {

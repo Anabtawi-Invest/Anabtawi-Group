@@ -258,10 +258,14 @@ class PosReportingDashboard(models.TransientModel):
             })
             curr_date += timedelta(days=1)
 
+        all_configs = self.env["pos.config"].search([("active", "=", True)], order="name")
+        all_branches_list = [{"id": cfg.id, "name": cfg.name} for cfg in all_configs]
+
         return {
             "date_from": d_from.strftime("%Y-%m-%d"),
             "date_to": d_to.strftime("%Y-%m-%d"),
             "active_branches_count": len(configs),
+            "all_branches": all_branches_list,
             "kpis": {
                 "total_sales": global_totals["sales"],
                 "cash_sales": global_totals["cash"],
