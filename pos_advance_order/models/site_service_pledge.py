@@ -27,12 +27,7 @@ class PosAdvanceOrderSiteServicePledge(models.Model):
         """menu product id → pledge product record."""
         if "pos.site.service.product.line" not in self.env:
             return {}
-        lines = self.env["pos.site.service.product.line"].sudo().search([
-            ("menu_id.active", "=", True),
-            ("menu_id.enable_site_service", "=", True),
-            ("pledge_product_id", "!=", False),
-        ])
-        return {line.product_id.id: line.pledge_product_id for line in lines if line.product_id}
+        return self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
 
     @api.model
     def _expand_line_vals_with_site_service_pledges(self, line_vals_list, site_service_enabled):

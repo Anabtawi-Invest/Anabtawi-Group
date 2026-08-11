@@ -162,6 +162,38 @@ class PosSiteServiceProductLine(models.Model):
                 raise ValidationError(_("Multiple must be greater than zero."))
 
     @api.model
+    def _get_menu_pledge_product_map(self):
+        """Return {menu_product_id: pledge_product} for active site service lines."""
+        lines = self.sudo().search([
+            ("menu_id.active", "=", True),
+            ("menu_id.enable_site_service", "=", True),
+            ("pledge_product_id", "!=", False),
+        ])
+        return {
+            line.product_id.id: line.pledge_product_id
+            for line in lines
+            if line.product_id and line.pledge_product_id
+        }
+
+    @api.model
+    def resolve_pledge_unit_amount(self, pledge_product):
+        """Pledge unit amount from pledge product configuration (not menu multiple)."""
+        if not pledge_product:
+            return 0.0
+        amount = float(pledge_product.pledge_amount or 0.0)
+        if amount > 0:
+            return amount
+        return float(pledge_product.lst_price or 0.0)
+
+    @api.model
+    def menu_product_has_pledge_mapping(self, menu_product):
+        """True when the menu product has a pledge_product_id in site service config."""
+        if not menu_product:
+            return False
+        product_id = menu_product.id if hasattr(menu_product, "id") else int(menu_product)
+        return product_id in self._get_menu_pledge_product_map()
+
+    @api.model
     def _load_pos_data_search_read(self, data, config):
         try:
             records = super()._load_pos_data_search_read(data, config)

@@ -20,7 +20,6 @@ class ProductTemplate(models.Model):
         # Optional fields coming from extra apps.
         for field_name in (
             "available_in_pos",
-            "has_pledge",
             "branch_allowed",
         ):
             field = cls._fields.get(field_name)

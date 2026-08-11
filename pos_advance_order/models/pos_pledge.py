@@ -150,18 +150,9 @@ class PosAdvanceOrderPledge(models.Model):
 
     @api.model
     def _resolve_pledge_unit_amount(self, product):
-        """Pledge unit amount: product pledge_amount first, then sales price fallback."""
-        if not product:
-            return 0.0
-        tmpl = product.product_tmpl_id
-        if tmpl and getattr(tmpl, "has_pledge", False):
-            amount = float(tmpl.pledge_amount or 0.0)
-            if amount > 0:
-                return amount
-        amount = float(getattr(product, "pledge_amount", 0.0) or 0.0)
-        if amount > 0:
-            return amount
-        return float(product.lst_price or 0.0)
+        """Pledge unit amount from the mapped pledge product (pledge_amount, then lst_price)."""
+        SiteLine = self.env["pos.site.service.product.line"]
+        return SiteLine.resolve_pledge_unit_amount(product)
 
     def _refresh_pledge_unit_amounts(self):
         """Align stored pledge unit amounts with the product configuration."""
@@ -333,17 +324,20 @@ class PosAdvanceOrderPledge(models.Model):
         if not isinstance(pledge_product_ids, list):
             pledge_product_ids = []
 
-        # If frontend didn't send pledge_products, infer from order lines
-        if not pledge_product_ids:
-            pledge_product_ids = list({
-                l.product_id.id
-                for l in pos_order.lines.filtered(lambda l: l.product_id and l.product_id.has_pledge)
-            })
+        mapping = self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
 
         qty_by_product = defaultdict(float)
-        for line in pos_order.lines.filtered(lambda l: l.product_id and l.product_id.id in pledge_product_ids):
-            if line.product_id.has_pledge:
-                qty_by_product[line.product_id.id] += line.qty or 0.0
+        if pledge_product_ids:
+            for line in pos_order.lines.filtered(lambda l: l.product_id):
+                pledge_product = mapping.get(line.product_id.id)
+                if pledge_product and pledge_product.id in pledge_product_ids:
+                    qty_by_product[pledge_product.id] += line.qty or 0.0
+        else:
+            for line in pos_order.lines.filtered(lambda l: l.product_id):
+                pledge_product = mapping.get(line.product_id.id)
+                if pledge_product:
+                    qty_by_product[pledge_product.id] += line.qty or 0.0
+            pledge_product_ids = list(qty_by_product.keys())
 
         if not qty_by_product:
             raise ValidationError(_("No pledge products found to create pledge lines."))

@@ -1726,26 +1726,6 @@ class PosAdvanceOrder(models.Model):
                 if pledge.source_product_id:
                     name = _("%s (Pledge)") % pledge.source_product_id.display_name
                 lines.append({"name": name, "qty": qty, "subtotal": subtotal})
-            return lines
-
-        for adv_line in self.line_ids.filtered(
-            lambda l: not l.display_type and l.product_id and not l.is_site_service_pledge_line
-        ):
-            product = adv_line.product_id
-            mapping = self._get_site_service_pledge_map()
-            pledge_product = mapping.get(product.id)
-            target = pledge_product or (product if product.has_pledge else False)
-            if not target:
-                continue
-            qty = adv_line.product_qty or 0.0
-            unit = Pledge._resolve_pledge_unit_amount(target)
-            subtotal = self.currency_id.round(qty * unit)
-            if float_is_zero(subtotal, precision_rounding=rounding):
-                continue
-            name = product.display_name if pledge_product else target.display_name
-            if pledge_product:
-                name = _("%s (Pledge)") % product.display_name
-            lines.append({"name": name, "qty": qty, "subtotal": subtotal})
         return lines
 
     def _completion_receipt_vals(self, completion_pm=None):

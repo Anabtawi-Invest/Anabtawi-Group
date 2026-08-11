@@ -197,20 +197,9 @@
                 </t>
                 
                 <!-- Only process pledge if NO employee service or delivery product exists -->
-                <t t-if="!hasEmployeeService and !hasDeliveryProduct">
-                    <t t-set="pledgeLines" t-value="[]"/>
-                    <t t-set="totalPledge" t-value="0"/>
-                    
-                    <!-- Loop through order lines to find pledge products -->
-                    <t t-foreach="props.order.lines" t-as="line" t-key="line_index">
-                        <t t-set="product" t-value="line.product_id"/>
-                        <t t-if="product and product.has_pledge">
-                            <t t-set="qty" t-value="line.qty or line.get_quantity and line.get_quantity() or 1"/>
-                            <t t-set="pledgeAmt" t-value="(product.pledge_amount or 0) * qty"/>
-                            <t t-set="totalPledge" t-value="totalPledge + pledgeAmt"/>
-                            <t t-set="void" t-value="pledgeLines.push({'name': product.display_name or product.name, 'amount': pledgeAmt, 'qty': qty})"/>
-                        </t>
-                    </t>
+                <t t-if="!hasEmployeeService and !hasDeliveryProduct and props.order.pledgeData and props.order.pledgeData.pledge_amount > 0">
+                    <t t-set="pledgeLines" t-value="props.order.pledgeData.pledge_line_details || []"/>
+                    <t t-set="totalPledge" t-value="props.order.pledgeData.pledge_amount || 0"/>
                     
                     <!-- Display Pledge Section if there are pledge products -->
                     <t t-if="totalPledge > 0">
@@ -224,13 +213,13 @@
                             <t t-foreach="pledgeLines" t-as="pline" t-key="pline_index">
                                 <tr>
                                     <td style="padding: 3px 0;">
-                                        <t t-esc="pline.name"/>
-                                        <t t-if="pline.qty > 1">
-                                            <span style="color: #666; font-size: 0.9em;"> (x<t t-esc="pline.qty"/>)</span>
+                                        <t t-esc="pline.menu_product_name or pline.product_name"/>
+                                        <t t-if="pline.quantity > 1">
+                                            <span style="color: #666; font-size: 0.9em;"> (x<t t-esc="pline.quantity"/>)</span>
                                         </t>
                                     </td>
                                     <td class="text-end font-monospace" style="padding: 3px 0;">
-                                        <t t-out="formatCurrency(pline.amount)"/>
+                                        <t t-out="formatCurrency(pline.total)"/>
                                     </td>
                                 </tr>
                             </t>
