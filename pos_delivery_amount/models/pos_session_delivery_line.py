@@ -1,4 +1,5 @@
-from odoo import fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class PosSessionDeliveryLine(models.Model):
@@ -31,6 +32,10 @@ class PosSessionDeliveryLine(models.Model):
         readonly=True,
         default=lambda self: self.env.user,
     )
+    reason = fields.Char(
+        string="Reason",
+        help="Mandatory for in-session cash delivery. Not required at session closing.",
+    )
     is_closing_delivery = fields.Boolean(
         string="At Session Closing",
         readonly=True,
@@ -38,3 +43,15 @@ class PosSessionDeliveryLine(models.Model):
         help="Set when delivery is recorded after the closing cash count. "
         "Does not affect POS cash register balance.",
     )
+
+    @api.constrains("reason", "is_closing_delivery", "amount")
+    def _check_reason_for_session_delivery(self):
+        for line in self:
+            if line.is_closing_delivery:
+                continue
+            if line.currency_id.compare_amounts(line.amount or 0.0, 0.0) == 0:
+                continue
+            if not (line.reason or "").strip():
+                raise ValidationError(
+                    _("A reason is required for in-session cash delivery.")
+                )

@@ -26,9 +26,18 @@ export async function fetchClosingDeliveryPopupData(pos) {
     return pos.data.call("pos.session", "get_closing_delivery_popup_data", [pos.session.id]);
 }
 
+/**
+ * @returns {Promise<{amount: number, reason: string}|undefined>}
+ */
 export async function askDeliveryAmount(
     dialog,
-    { maxAmount, deliveredTotal = 0, title = _t("Cash Delivery"), fieldLabel = _t("Delivery Amount") }
+    {
+        maxAmount,
+        deliveredTotal = 0,
+        title = _t("Cash Delivery"),
+        fieldLabel = _t("Amount to be out"),
+        requireReason = false,
+    }
 ) {
     const deliveredLabel = deliveredTotal
         ? _t("Available Cash (already delivered: %s)", deliveredTotal)
@@ -41,13 +50,17 @@ export async function askDeliveryAmount(
             title,
             fieldLabel,
             maxLabel: deliveredLabel,
+            requireReason,
         });
 
         if (result === undefined) {
             return undefined;
         }
 
-        if (result < 0) {
+        const amount = result?.amount;
+        const reason = (result?.reason || "").trim();
+
+        if (amount < 0) {
             await makeAwaitable(dialog, AlertDialog, {
                 title: _t("Cash Delivery"),
                 body: _t("Delivery Amount must be positive or zero."),
@@ -55,7 +68,7 @@ export async function askDeliveryAmount(
             continue;
         }
 
-        if (result > maxAmount) {
+        if (amount > maxAmount) {
             await makeAwaitable(dialog, AlertDialog, {
                 title: _t("Cash Delivery"),
                 body: _t("Delivery Amount cannot exceed available cash balance."),
@@ -63,7 +76,15 @@ export async function askDeliveryAmount(
             continue;
         }
 
-        if (dialog.env?.utils?.isZero?.(result)) {
+        if (requireReason && !reason) {
+            await makeAwaitable(dialog, AlertDialog, {
+                title: _t("Cash Delivery"),
+                body: _t("A reason is required for cash delivery."),
+            });
+            continue;
+        }
+
+        if (dialog.env?.utils?.isZero?.(amount)) {
             const proceed = await ask(dialog, {
                 title: _t("Cash Delivery"),
                 body: _t("Are you sure the Delivery Amount is zero?"),
@@ -75,16 +96,16 @@ export async function askDeliveryAmount(
             }
         }
 
-        return result;
+        return { amount, reason };
     }
 }
 
-export async function processDeliveryAmount(pos, dialog, amount) {
+export async function processDeliveryAmount(pos, dialog, amount, reason) {
     try {
         return await pos.data.call(
             "pos.session",
             "action_process_delivery_amount",
-            [pos.session.id, amount]
+            [pos.session.id, amount, reason]
         );
     } catch (error) {
         if (error instanceof ConnectionLostError) {

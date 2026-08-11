@@ -39,11 +39,12 @@ class TestPosDeliveryAmount(TestPoSCommon):
         session = self.open_new_session(opening_cash=250.0)
         session.update_closing_control_state_session("Session closing with delivery amount")
 
-        result = session.action_process_delivery_amount(150.0)
+        result = session.action_process_delivery_amount(150.0, "Cash handover to supervisor")
         self.assertTrue(result["successful"])
         self.assertEqual(session.delivery_amount, 150.0)
         self.assertEqual(len(session.delivery_line_ids), 1)
         self.assertFalse(session.delivery_line_ids.is_closing_delivery)
+        self.assertEqual(session.delivery_line_ids.reason, "Cash handover to supervisor")
         self.assertTrue(session.delivery_move_id)
         self.assertEqual(session.delivery_move_id.state, "posted")
         self.assertEqual(session.delivery_move_id.journal_id, self.delivery_journal)
@@ -61,22 +62,35 @@ class TestPosDeliveryAmount(TestPoSCommon):
 
     def test_multiple_delivery_amounts_are_accumulated(self):
         session = self.open_new_session(opening_cash=300.0)
-        session.action_process_delivery_amount(100.0)
-        session.action_process_delivery_amount(75.0)
+        session.action_process_delivery_amount(100.0, "First delivery")
+        session.action_process_delivery_amount(75.0, "Second delivery")
         self.assertEqual(session.delivery_amount, 175.0)
         self.assertEqual(len(session.delivery_line_ids), 2)
         self.assertFalse(any(session.delivery_line_ids.mapped("is_closing_delivery")))
+        self.assertEqual(session.delivery_line_ids[0].reason, "First delivery")
+        self.assertEqual(session.delivery_line_ids[1].reason, "Second delivery")
         self.assertTrue(session.delivery_report_line_id)
         self.assertEqual(session.delivery_report_line_id.real_arrived_amount, 175.0)
 
     def test_action_process_delivery_amount_rejects_excess_amount(self):
         session = self.open_new_session(opening_cash=200.0)
-        session.action_process_delivery_amount(120.0)
+        session.action_process_delivery_amount(120.0, "Partial delivery")
 
         with self.assertRaisesRegex(
             ValidationError, "Delivery Amount cannot exceed available cash balance."
         ):
-            session.action_process_delivery_amount(100.0)
+            session.action_process_delivery_amount(100.0, "Excess delivery")
+
+    def test_action_process_delivery_amount_requires_reason(self):
+        session = self.open_new_session(opening_cash=200.0)
+        with self.assertRaisesRegex(
+            ValidationError, "A reason is required for in-session cash delivery."
+        ):
+            session.action_process_delivery_amount(50.0, "")
+        with self.assertRaisesRegex(
+            ValidationError, "A reason is required for in-session cash delivery."
+        ):
+            session.action_process_delivery_amount(50.0)
 
     def test_action_process_delivery_amount_zero_does_not_create_move(self):
         session = self.open_new_session(opening_cash=100.0)
@@ -94,17 +108,17 @@ class TestPosDeliveryAmount(TestPoSCommon):
         session.config_id.delivery_journal_id = False
 
         with self.assertRaises(UserError):
-            session.action_process_delivery_amount(10.0)
+            session.action_process_delivery_amount(10.0, "Configured check")
 
     def test_session_delivery_affects_cash_balance(self):
         session = self.open_new_session(opening_cash=18.0)
-        session.action_process_delivery_amount(4.0)
+        session.action_process_delivery_amount(4.0, "Balance test delivery")
         session.post_closing_cash_details(14.0)
         self.assertEqual(session.cash_register_difference, 0.0)
 
     def test_closing_delivery_does_not_affect_cash_balance(self):
         session = self.open_new_session(opening_cash=18.0)
-        session.action_process_delivery_amount(4.0)
+        session.action_process_delivery_amount(4.0, "Session delivery")
         session.post_closing_cash_details(14.0)
         session.action_process_closing_delivery_amount(2.0)
         self.assertEqual(session.cash_register_balance_end_real, 14.0)
@@ -114,8 +128,10 @@ class TestPosDeliveryAmount(TestPoSCommon):
         session_lines = session.delivery_line_ids.filtered(lambda l: not l.is_closing_delivery)
         self.assertEqual(len(closing_lines), 1)
         self.assertEqual(closing_lines.amount, 2.0)
+        self.assertFalse(closing_lines.reason)
         self.assertEqual(len(session_lines), 1)
         self.assertEqual(session_lines.amount, 4.0)
+        self.assertEqual(session_lines.reason, "Session delivery")
 
     def test_closing_delivery_only_creates_journal_entry(self):
         session = self.open_new_session(opening_cash=18.0)

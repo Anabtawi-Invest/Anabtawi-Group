@@ -45,7 +45,7 @@ class TestPosDeliveryAmountReport(TestPoSCommon):
         session = self.open_new_session(opening_cash=delivery_amount)
         session.post_closing_cash_details(delivery_amount)
         session.update_closing_control_state_session("Close with delivery")
-        session.action_process_delivery_amount(delivery_amount)
+        session.action_process_delivery_amount(delivery_amount, "Report delivery")
         session.write({"state": "closed"})
         return session
 

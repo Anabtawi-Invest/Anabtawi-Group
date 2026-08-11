@@ -58,12 +58,13 @@ patch(ClosePosPopup.prototype, {
         }
 
         if (popupData.configured) {
-            const deliveryAmount = await askDeliveryAmount(this.dialog, {
+            const deliveryResult = await askDeliveryAmount(this.dialog, {
                 maxAmount: popupData.max_amount,
                 deliveredTotal: popupData.delivered_total,
                 title: _t("Closing Delivery Amount"),
+                requireReason: false,
             });
-            if (deliveryAmount === undefined) {
+            if (deliveryResult === undefined) {
                 return;
             }
 
@@ -72,7 +73,7 @@ patch(ClosePosPopup.prototype, {
             const deliveryResponse = await processClosingDeliveryAmount(
                 this.pos,
                 this.dialog,
-                deliveryAmount
+                deliveryResult.amount
             );
             if (deliveryResponse === null) {
                 return;
