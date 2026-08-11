@@ -148,6 +148,12 @@ class PosSiteServiceProductLine(models.Model):
         default=1.0,
         help="Weight factor used in site service score: Quantity × Multiple.",
     )
+    pledge_product_id = fields.Many2one(
+        "product.product",
+        string="Pledge Product",
+        domain=[("available_in_pos", "=", True), ("sale_ok", "=", True)],
+        help="Pledge product added on advance orders when Site Service is not selected.",
+    )
 
     @api.constrains("multiple")
     def _check_multiple_positive(self):
@@ -181,4 +187,4 @@ class PosSiteServiceProductLine(models.Model):
 
     @api.model
     def _load_pos_data_fields(self, config):
-        return ["id", "menu_id", "product_id", "multiple", "active"]
+        return ["id", "menu_id", "product_id", "multiple", "pledge_product_id", "active"]

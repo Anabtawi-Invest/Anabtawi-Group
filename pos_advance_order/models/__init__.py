@@ -8,4 +8,5 @@ from . import pos_session
 from . import product_template
 from . import pos_pledge
 from . import pos_advance_discount
+from . import site_service_pledge
 

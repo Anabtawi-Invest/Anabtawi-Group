@@ -153,6 +153,8 @@ class PosOrder(models.Model):
             return True
         if hasattr(advance, "_pledge_applies") and not advance._pledge_applies():
             return True
+        if advance.pledge_line_ids:
+            return True
         return False
 
     def _get_pledge_closing_debug_info(self):

@@ -211,107 +211,34 @@ patch(ControlButtons.prototype, {
     },
 
     async onClickReturnPledge() {
-        console.log("[PLEDGE] ========================================");
-        console.log("[PLEDGE] Return Pledge button clicked!");
-        console.log("[PLEDGE] makeAwaitable available:", typeof makeAwaitable);
-        console.log("[PLEDGE] SelectionPopup available:", typeof SelectionPopup);
-        console.log("[PLEDGE] this.dialog:", this.dialog);
-        console.log("[PLEDGE] ========================================");
-        
         try {
-            // First, show return type selection
-            console.log("[PLEDGE] Step 1: Showing return type selection popup...");
-            
-            const returnTypeList = [
-                { 
-                    id: 'employee', 
-                    label: _t("Return Employee Pledge"),
-                    item: 'employee' 
-                },
-                { 
-                    id: 'customer', 
-                    label: _t("Return Customer Pledge"),
-                    item: 'customer' 
-                },
-            ];
-            
-            console.log("[PLEDGE] Return type list:", returnTypeList);
-            console.log("[PLEDGE] About to call makeAwaitable...");
-            
-            let returnType;
-            try {
-                console.log("[PLEDGE] Creating return type selection promise...");
-                returnType = await new Promise((resolve) => {
-                    console.log("[PLEDGE] Adding SelectionPopup to dialog...");
-                    this.dialog.add(
-                        SelectionPopup,
-                        {
-                            title: _t("Select Return Type"),
-                            list: returnTypeList,
-                            getPayload: (response) => {
-                                console.log("[PLEDGE] SelectionPopup getPayload called with:", response);
-                                resolve(response);
-                            },
-                        },
-                        {
-                            onClose: () => {
-                                console.log("[PLEDGE] SelectionPopup closed without selection");
-                                resolve(null);
-                            },
-                        }
-                    );
-                    console.log("[PLEDGE] SelectionPopup added to dialog");
-                });
-                console.log("[PLEDGE] Promise resolved, returnType:", returnType);
-            } catch (popupError) {
-                console.error("[PLEDGE] Error in return type selection:", popupError);
-                throw popupError;
-            }
-
-            console.log("[PLEDGE] Return type selection result:", returnType);
-            console.log("[PLEDGE] Return type type:", typeof returnType);
-
-            if (!returnType) {
-                console.log("[PLEDGE] ⚠️ No return type selected, cancelling");
+            const { PartnerList } = await import(
+                "@point_of_sale/app/screens/partner_list/partner_list"
+            );
+            const partner = await makeAwaitable(this.dialog, PartnerList, {});
+            if (!partner) {
                 return;
             }
 
-            console.log("[PLEDGE] ✓ Selected return type:", returnType);
-
-            // Show pledge list popup with search (filtered by return_type)
-            console.log("[PLEDGE] Showing pledge list popup with return_type:", returnType);
             const selection = await new Promise((resolve) => {
                 this.dialog.add(
                     PledgeListPopup,
                     {
-                        returnType: returnType,
-                        getPayload: (response) => {
-                            console.log("[PLEDGE] PledgeListPopup getPayload called with:", response);
-                            resolve(response);
-                        },
+                        partnerId: partner.id,
+                        getPayload: (response) => resolve(response),
                     },
                     {
-                        onClose: () => {
-                            console.log("[PLEDGE] PledgeListPopup closed without selection");
-                            resolve(null);
-                        },
+                        onClose: () => resolve(null),
                     }
                 );
             });
 
             if (!selection || !selection.pledge) {
-                console.log("[PLEDGE] No pledge selected, cancelling");
                 return;
             }
 
             const selectedPledge = selection.pledge;
             const paymentMethodId = selection.payment_method_id;
-
-            console.log("[PLEDGE] Selected pledge:", selectedPledge);
-            console.log("[PLEDGE] Return type:", returnType);
-            console.log("[PLEDGE] Return payment method:", paymentMethodId);
-
-            console.log("[PLEDGE] Calling action_return_pledge for ID:", selectedPledge.id, "Type:", returnType);
 
             await this.env.services.orm.call(
                 "pos.advance.order.pledge",
@@ -320,20 +247,14 @@ patch(ControlButtons.prototype, {
                 {
                     pos_payment_method_id: paymentMethodId,
                     pos_session_id: this.pos.session?.id || false,
-                    context: { return_type: returnType },
                 }
             );
-            console.log("[PLEDGE] action_return_pledge completed successfully");
 
-            this.notification.add(
-                _t("Pledge returned successfully. Reversal entry created."),
-                { type: "success" }
-            );
-
+            this.notification.add(_t("Pledge returned successfully."), { type: "success" });
         } catch (error) {
             console.error("[PLEDGE] Error returning pledge:", error);
             this.notification.add(
-                error.message || _t("Failed to return pledge"),
+                error.message || error.data?.message || _t("Failed to return pledge"),
                 { type: "danger" }
             );
         }

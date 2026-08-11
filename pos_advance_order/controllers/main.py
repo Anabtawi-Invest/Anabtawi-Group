@@ -225,13 +225,16 @@ class PosAdvanceOrderController(http.Controller):
             deposit_ctx,
         )
 
-        AdvanceOrder = (
-            request.env["pos.advance.order"]
-            .sudo()
-            .with_context(**deposit_ctx, allowed_company_ids=company.ids)
-            .with_company(company)
-        )
+        AdvanceOrder = request.env["pos.advance.order"].sudo().with_context(
+            **deposit_ctx, allowed_company_ids=company.ids
+        ).with_company(company)
+        if not site_service:
+            line_vals = AdvanceOrder._expand_line_vals_with_site_service_pledges(line_vals, False)
+            create_vals["line_ids"] = line_vals
+
         order = AdvanceOrder.create(create_vals)
+        if not site_service:
+            order._sync_site_service_pledge_records()
         order.with_context(**deposit_ctx).action_confirm()
 
         if order.advance_amount > 0:

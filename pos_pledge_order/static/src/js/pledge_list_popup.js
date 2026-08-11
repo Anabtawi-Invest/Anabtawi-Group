@@ -14,7 +14,7 @@ export class PledgeListPopup extends Component {
     static props = {
         close: Function,
         getPayload: Function,
-        returnType: { type: String, optional: true }, // 'employee' or 'customer'
+        partnerId: { type: Number, optional: true },
     };
 
     setup() {
@@ -193,16 +193,10 @@ export class PledgeListPopup extends Component {
     // LOAD ACTIVE PLEDGES (FILTERED BY RETURN TYPE)
     // ==================================
     async _loadPledges() {
-        const returnType = this.props.returnType || "customer";
-        console.log("[PLEDGE] Loading active pledges for popup (return_type:", returnType, ")...");
-
         try {
             const domain = [["state", "=", "active"]];
-
-            if (returnType === "employee") {
-                domain.push(["employee_id", "!=", false]);
-            } else {
-                domain.push(["employee_id", "=", false]);
+            if (this.props.partnerId) {
+                domain.push(["partner_id", "=", this.props.partnerId]);
             }
 
             const rows = await this.orm.searchRead(
@@ -282,7 +276,7 @@ export class PledgeListPopup extends Component {
                     return pledge;
                 });
             }
-            console.log("[PLEDGE] Loaded", this.state.pledges.length, "active pledges for return_type:", returnType);
+            console.log("[PLEDGE] Loaded", this.state.pledges.length, "active pledges");
         } catch (error) {
             console.error("[PLEDGE] Error loading pledges:", error);
             this.notification.add(_t("Failed to load pledges"), { type: "danger" });

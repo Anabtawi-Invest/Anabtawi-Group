@@ -26,7 +26,7 @@ class ReportPointOfSaleSaleDetails(models.AbstractModel):
         else:
             sessions = self.env["pos.session"].search([("id", "in", session_ids or [])])
 
-        def _append_pledge_payment(name, total, sess_id):
+        def _append_pledge_line(name, total, sess_id):
             result["payments"].append({
                 "name": name,
                 "session": sess_id,
@@ -39,39 +39,20 @@ class ReportPointOfSaleSaleDetails(models.AbstractModel):
             })
 
         for session in sessions:
-            summary = session._get_pledge_deposit_closing_summary()
+            summary = session._get_pledge_session_summary()
             cur = session.currency_id
-            cash_in = summary.get("cash_in") or 0.0
-            cash_out = summary.get("cash_out") or 0.0
-            if not cur.is_zero(cash_in):
-                _append_pledge_payment(
-                    _("Cash pledge (deposit) %s") % session.name,
-                    cash_in,
+            collected = summary.get("collected_total") or 0.0
+            returned = summary.get("returned_total") or 0.0
+            if not cur.is_zero(collected):
+                _append_pledge_line(
+                    _("Pledges collected (info) %s") % session.name,
+                    collected,
                     session.id,
                 )
-            if not cur.is_zero(cash_out):
-                _append_pledge_payment(
-                    _("Cash pledge (return / cash out) %s") % session.name,
-                    -cash_out,
+            if not cur.is_zero(returned):
+                _append_pledge_line(
+                    _("Pledges returned (info) %s") % session.name,
+                    -returned,
                     session.id,
                 )
-            by_in = summary.get("by_pm_in") or {}
-            by_out = summary.get("by_pm_out") or {}
-            for pm_id in set(by_in) | set(by_out):
-                pin = by_in.get(pm_id, 0.0)
-                pout = by_out.get(pm_id, 0.0)
-                pm = self.env["pos.payment.method"].sudo().browse(pm_id)
-                label = pm.exists() and pm.name or _("Payment method")
-                if not cur.is_zero(pin):
-                    _append_pledge_payment(
-                        _("Pledge deposit (%s) — %s") % (label, session.name),
-                        pin,
-                        session.id,
-                    )
-                if not cur.is_zero(pout):
-                    _append_pledge_payment(
-                        _("Pledge return / cash out (%s) — %s") % (label, session.name),
-                        -pout,
-                        session.id,
-                    )
         return result
