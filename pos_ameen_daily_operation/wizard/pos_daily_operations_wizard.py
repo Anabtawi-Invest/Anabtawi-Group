@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import datetime, time
 import logging
 
+import pytz
 from babel.dates import format_date as babel_format_date
 
 from odoo import _, fields, models
@@ -41,11 +42,24 @@ class PosDailyOperationsWizard(models.TransientModel):
 
     business_date = fields.Date(string='Business Date', required=True, default=fields.Date.context_today)
 
+    def _get_report_timezone(self):
+        tz_name = (
+            self.env.context.get('tz')
+            or self.env.user.tz
+            or self.env.company.resource_calendar_id.tz
+            or 'UTC'
+        )
+        return pytz.timezone(tz_name)
+
     def _get_day_bounds(self):
+        """Return UTC-naive datetimes for the business date in the user/company timezone."""
         self.ensure_one()
-        day_start = datetime.combine(self.business_date, time.min)
-        day_end = datetime.combine(self.business_date, time.max)
-        return day_start, day_end
+        tz = self._get_report_timezone()
+        day_start_local = tz.localize(datetime.combine(self.business_date, time.min))
+        day_end_local = tz.localize(datetime.combine(self.business_date, time.max))
+        day_start_utc = day_start_local.astimezone(pytz.UTC).replace(tzinfo=None)
+        day_end_utc = day_end_local.astimezone(pytz.UTC).replace(tzinfo=None)
+        return day_start_utc, day_end_utc
 
     def _format_date_with_day_name(self, date_value):
         if not date_value:
@@ -62,6 +76,13 @@ class PosDailyOperationsWizard(models.TransientModel):
     def _get_sessions_on_date(self):
         self.ensure_one()
         day_start, day_end = self._get_day_bounds()
+        _logger.info(
+            "Daily Operations session search | business_date=%s | tz=%s | start_at UTC [%s .. %s]",
+            self.business_date,
+            self._get_report_timezone().zone,
+            day_start,
+            day_end,
+        )
         return self.env['pos.session'].search([
             ('start_at', '>=', fields.Datetime.to_string(day_start)),
             ('start_at', '<=', fields.Datetime.to_string(day_end)),
