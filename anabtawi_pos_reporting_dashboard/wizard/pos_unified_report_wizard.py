@@ -9,15 +9,23 @@ class PosUnifiedReportWizard(models.TransientModel):
     _name = "pos.unified.report.wizard"
     _description = "POS Unified Report & Export Wizard"
 
-    date_from = fields.Date(
-        string="Start Date",
+    def _default_date_from(self):
+        today = fields.Date.context_today(self)
+        return datetime.combine(today, time.min)
+
+    def _default_date_to(self):
+        today = fields.Date.context_today(self)
+        return datetime.combine(today, time.max)
+
+    date_from = fields.Datetime(
+        string="Start Date & Time",
         required=True,
-        default=fields.Date.context_today,
+        default=_default_date_from,
     )
-    date_to = fields.Date(
-        string="End Date",
+    date_to = fields.Datetime(
+        string="End Date & Time",
         required=True,
-        default=fields.Date.context_today,
+        default=_default_date_to,
     )
     config_ids = fields.Many2many(
         "pos.config",
@@ -33,8 +41,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             "tag": "pos_reporting_dashboard_main",
             "name": _("POS Executive Dashboard"),
             "params": {
-                "date_from": fields.Date.to_string(self.date_from),
-                "date_to": fields.Date.to_string(self.date_to),
+                "date_from": fields.Datetime.to_string(self.date_from),
+                "date_to": fields.Datetime.to_string(self.date_to),
                 "config_ids": c_ids,
             },
         }
@@ -45,10 +53,8 @@ class PosUnifiedReportWizard(models.TransientModel):
         self.env["pos.unified.report"].search([]).unlink()
 
         # 2. Populate unified report records
-        dt_start = datetime.combine(self.date_from, time.min)
-        dt_end = datetime.combine(self.date_to, time.max)
-        str_start = fields.Datetime.to_string(dt_start)
-        str_end = fields.Datetime.to_string(dt_end)
+        str_start = fields.Datetime.to_string(self.date_from)
+        str_end = fields.Datetime.to_string(self.date_to)
 
         config_domain = [("active", "=", True)]
         if self.config_ids:
@@ -69,7 +75,11 @@ class PosUnifiedReportWizard(models.TransientModel):
 
         if session_ids:
             # POS Payments
-            payments = self.env["pos.payment"].search([("session_id", "in", session_ids)])
+            payments = self.env["pos.payment"].search([
+                ("session_id", "in", session_ids),
+                ("payment_date", ">=", str_start),
+                ("payment_date", "<=", str_end),
+            ])
             for pay in payments:
                 amt = pay.amount or 0.0
                 pm = pay.payment_method_id
@@ -82,7 +92,7 @@ class PosUnifiedReportWizard(models.TransientModel):
 
                 vals_list.append({
                     "name": pay.pos_order_id.name or pay.name or _("POS Payment"),
-                    "date": pay.payment_date.date() if pay.payment_date else self.date_from,
+                    "date": pay.payment_date or self.date_from,
                     "config_id": pay.session_id.config_id.id,
                     "session_id": pay.session_id.id,
                     "payment_method_id": pm.id,
@@ -96,13 +106,16 @@ class PosUnifiedReportWizard(models.TransientModel):
             # Statement Lines (Cash In / Out)
             st_lines = self.env["account.bank.statement.line"].search([
                 ("pos_session_id", "in", session_ids),
+                ("date", ">=", self.date_from.date()),
+                ("date", "<=", self.date_to.date()),
             ])
             for st in st_lines:
                 amt = st.amount or 0.0
                 is_in = amt > 0
+                st_dt = datetime.combine(st.date, time.min) if st.date else self.date_from
                 vals_list.append({
                     "name": st.payment_ref or st.ref or _("Cash Move"),
-                    "date": st.date or self.date_from,
+                    "date": st_dt,
                     "config_id": st.pos_session_id.config_id.id,
                     "session_id": st.pos_session_id.id,
                     "report_type": "cash_in" if is_in else "cash_out",
@@ -114,34 +127,69 @@ class PosUnifiedReportWizard(models.TransientModel):
 
         # Pledges (Rahen In / Out)
         if "pos.advance.order.pledge" in self.env:
-            pledges_adv = self.env["pos.advance.order.pledge"].search([
+            # Rahen In
+            pledges_in = self.env["pos.advance.order.pledge"].search([
+                ("state", "in", ("active", "returned")),
                 "|",
-                "&", ("pos_order_id", "!=", False),
-                     ("pos_order_id.date_order", ">=", str_start),
-                     ("pos_order_id.date_order", "<=", str_end),
-                "&", ("order_id", "!=", False),
-                     ("order_id.create_date", ">=", str_start),
-                     ("order_id.create_date", "<=", str_end),
+                "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
+                "&", ("receive_date", "=", False),
+                     "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
             ])
-            for pledge in pledges_adv:
+            for pledge in pledges_in:
                 cfg_id = False
                 if pledge.pos_order_id:
                     cfg_id = pledge.pos_order_id.config_id.id
                 elif pledge.order_id and hasattr(pledge.order_id, "pos_config_id"):
                     cfg_id = pledge.order_id.pos_config_id.id
+                elif pledge.order_id and hasattr(pledge.order_id, "from_pos_config_id"):
+                    cfg_id = pledge.order_id.from_pos_config_id.id
+
                 if not cfg_id or cfg_id not in active_config_ids:
                     continue
 
-                amt = pledge.pledge_subtotal or getattr(pledge, "pledge_amount", 0.0) or 0.0
-                is_in = pledge.state == "active"
+                amt = pledge.pledge_subtotal or (getattr(pledge, "pledge_qty", 1.0) * getattr(pledge, "pledge_amount_unit", 0.0)) or getattr(pledge, "pledge_amount", 0.0) or 0.0
+                p_date = pledge.receive_date or pledge.create_date or self.date_from
+
                 vals_list.append({
                     "name": pledge.display_name or _("Pledge Record"),
-                    "date": pledge.create_date.date() if pledge.create_date else self.date_from,
+                    "date": p_date,
                     "config_id": cfg_id,
-                    "report_type": "rahen_in" if is_in else "rahen_out",
+                    "report_type": "rahen_in",
                     "amount": amt,
-                    "rahen_in_amount": amt if is_in else 0.0,
-                    "rahen_out_amount": amt if not is_in else 0.0,
+                    "rahen_in_amount": amt,
+                    "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
+                })
+
+            # Rahen Out
+            pledges_out = self.env["pos.advance.order.pledge"].search([
+                ("state", "=", "returned"),
+                "|",
+                "&", ("return_date", ">=", str_start), ("return_date", "<=", str_end),
+                "&", ("return_date", "=", False),
+                     "&", ("write_date", ">=", str_start), ("write_date", "<=", str_end),
+            ])
+            for pledge in pledges_out:
+                cfg_id = False
+                if pledge.pos_order_id:
+                    cfg_id = pledge.pos_order_id.config_id.id
+                elif pledge.order_id and hasattr(pledge.order_id, "pos_config_id"):
+                    cfg_id = pledge.order_id.pos_config_id.id
+                elif pledge.order_id and hasattr(pledge.order_id, "from_pos_config_id"):
+                    cfg_id = pledge.order_id.from_pos_config_id.id
+
+                if not cfg_id or cfg_id not in active_config_ids:
+                    continue
+
+                amt = pledge.pledge_subtotal or (getattr(pledge, "pledge_qty", 1.0) * getattr(pledge, "pledge_amount_unit", 0.0)) or getattr(pledge, "pledge_amount", 0.0) or 0.0
+                p_date = pledge.return_date or pledge.write_date or self.date_to
+
+                vals_list.append({
+                    "name": pledge.display_name or _("Pledge Return Record"),
+                    "date": p_date,
+                    "config_id": cfg_id,
+                    "report_type": "rahen_out",
+                    "amount": amt,
+                    "rahen_out_amount": amt,
                     "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
                 })
 
@@ -153,13 +201,13 @@ class PosUnifiedReportWizard(models.TransientModel):
                 ("state", "not in", ("draft", "cancel")),
             ])
             for adv in adv_orders:
-                cfg_id = adv.pos_config_id.id if adv.pos_config_id else (adv.from_pos_config_id.id if hasattr(adv, "from_pos_config_id") else False)
+                cfg_id = adv.from_pos_config_id.id if adv.from_pos_config_id else (adv.pos_config_id.id if adv.pos_config_id else False)
                 if not cfg_id or cfg_id not in active_config_ids:
                     continue
                 amt = adv.advance_amount or 0.0
                 vals_list.append({
                     "name": adv.name or _("Advance Order"),
-                    "date": adv.create_date.date() if adv.create_date else self.date_from,
+                    "date": adv.create_date or self.date_from,
                     "config_id": cfg_id,
                     "report_type": "advance_deposit",
                     "amount": amt,
@@ -193,8 +241,8 @@ class PosUnifiedReportWizard(models.TransientModel):
         service = self.env["pos.reporting.dashboard"]
         config_ids = self.config_ids.ids if self.config_ids else None
         data = service.get_dashboard_data(
-            date_from=fields.Date.to_string(self.date_from),
-            date_to=fields.Date.to_string(self.date_to),
+            date_from=fields.Datetime.to_string(self.date_from),
+            date_to=fields.Datetime.to_string(self.date_to),
             config_ids=config_ids,
         )
 
@@ -213,18 +261,23 @@ class PosUnifiedReportWizard(models.TransientModel):
             "valign": "vcenter",
         })
         text_fmt = workbook.add_format({"border": 1, "align": "left"})
+        center_fmt = workbook.add_format({"border": 1, "align": "center"})
         total_text_fmt = workbook.add_format({"border": 1, "bold": True, "bg_color": "#E9ECEF"})
         num_fmt = workbook.add_format({"border": 1, "num_format": "#,##0.000", "align": "right"})
         total_num_fmt = workbook.add_format({"border": 1, "bold": True, "num_format": "#,##0.000", "bg_color": "#E9ECEF", "align": "right"})
+        int_fmt = workbook.add_format({"border": 1, "num_format": "#,##0", "align": "right"})
+        total_int_fmt = workbook.add_format({"border": 1, "bold": True, "num_format": "#,##0", "bg_color": "#E9ECEF", "align": "right"})
 
-        # --- Worksheet 1: Executive Summary ---
+        # --- Sheet 1: Executive Summary ---
         sheet1 = workbook.add_worksheet(_("Branch Executive Summary"))
         sheet1.write(0, 0, _("POS Unified Operations Report"), title_fmt)
         sheet1.write(1, 0, _("Period: %s to %s") % (data["date_from"], data["date_to"]), sub_fmt)
 
         headers = [
             _("Branch Name"),
-            _("Total Sales"),
+            _("Total Sales (Gross)"),
+            _("Sales Without Tax"),
+            _("Tax Amount"),
             _("Cash Sales"),
             _("Visa Sales"),
             _("Hospitality"),
@@ -238,13 +291,15 @@ class PosUnifiedReportWizard(models.TransientModel):
             _("Rahen In (Pledge)"),
             _("Rahen Out (Return)"),
             _("Net Pledges"),
-            _("Advance Deposits"),
+            _("Advance Deposits (Origin)"),
+            _("Scheduled Pickup Value"),
+            _("Pending Pickups"),
             _("Delivery Fees"),
         ]
 
-        sheet1.set_column(0, 0, 26)
+        sheet1.set_column(0, 0, 28)
         for col_idx in range(1, len(headers)):
-            sheet1.set_column(col_idx, col_idx, 15)
+            sheet1.set_column(col_idx, col_idx, 16)
 
         start_row = 3
         for col_idx, h in enumerate(headers):
@@ -254,42 +309,251 @@ class PosUnifiedReportWizard(models.TransientModel):
         for b in data["branches"]:
             sheet1.write(curr_row, 0, b["branch_name"], text_fmt)
             sheet1.write_number(curr_row, 1, b["sales"], num_fmt)
-            sheet1.write_number(curr_row, 2, b["cash"], num_fmt)
-            sheet1.write_number(curr_row, 3, b["visa"], num_fmt)
-            sheet1.write_number(curr_row, 4, b["hospitality"], num_fmt)
-            sheet1.write_number(curr_row, 5, b["talabat"], num_fmt)
-            sheet1.write_number(curr_row, 6, b["careem"], num_fmt)
-            sheet1.write_number(curr_row, 7, b["mythings"], num_fmt)
-            sheet1.write_number(curr_row, 8, b["kabseh"], num_fmt)
-            sheet1.write_number(curr_row, 9, b["cash_in"], num_fmt)
-            sheet1.write_number(curr_row, 10, b["cash_out"], num_fmt)
-            sheet1.write_number(curr_row, 11, b["net_cash_moves"], num_fmt)
-            sheet1.write_number(curr_row, 12, b["rahen_in"], num_fmt)
-            sheet1.write_number(curr_row, 13, b["rahen_out"], num_fmt)
-            sheet1.write_number(curr_row, 14, b["net_pledges"], num_fmt)
-            sheet1.write_number(curr_row, 15, b["advance_deposits"], num_fmt)
-            sheet1.write_number(curr_row, 16, b["delivery_amount"], num_fmt)
+            sheet1.write_number(curr_row, 2, b["untaxed_sales"], num_fmt)
+            sheet1.write_number(curr_row, 3, b["tax_amount"], num_fmt)
+            sheet1.write_number(curr_row, 4, b["cash"], num_fmt)
+            sheet1.write_number(curr_row, 5, b["visa"], num_fmt)
+            sheet1.write_number(curr_row, 6, b["hospitality"], num_fmt)
+            sheet1.write_number(curr_row, 7, b["talabat"], num_fmt)
+            sheet1.write_number(curr_row, 8, b["careem"], num_fmt)
+            sheet1.write_number(curr_row, 9, b["mythings"], num_fmt)
+            sheet1.write_number(curr_row, 10, b["kabseh"], num_fmt)
+            sheet1.write_number(curr_row, 11, b["cash_in"], num_fmt)
+            sheet1.write_number(curr_row, 12, b["cash_out"], num_fmt)
+            sheet1.write_number(curr_row, 13, b["net_cash_moves"], num_fmt)
+            sheet1.write_number(curr_row, 14, b["rahen_in"], num_fmt)
+            sheet1.write_number(curr_row, 15, b["rahen_out"], num_fmt)
+            sheet1.write_number(curr_row, 16, b["net_pledges"], num_fmt)
+            sheet1.write_number(curr_row, 17, b["advance_deposits"], num_fmt)
+            sheet1.write_number(curr_row, 18, b.get("advance_pickup_value", 0.0), num_fmt)
+            sheet1.write_number(curr_row, 19, b.get("advance_pending_count", 0), int_fmt)
+            sheet1.write_number(curr_row, 20, b["delivery_amount"], num_fmt)
             curr_row += 1
 
-        # Global Total Row
+        # Global Total Row Sheet 1
         gt = data["global_totals"]
         sheet1.write(curr_row, 0, _("TOTALS"), total_text_fmt)
         sheet1.write_number(curr_row, 1, gt["sales"], total_num_fmt)
-        sheet1.write_number(curr_row, 2, gt["cash"], total_num_fmt)
-        sheet1.write_number(curr_row, 3, gt["visa"], total_num_fmt)
-        sheet1.write_number(curr_row, 4, gt["hospitality"], total_num_fmt)
-        sheet1.write_number(curr_row, 5, gt["talabat"], total_num_fmt)
-        sheet1.write_number(curr_row, 6, gt["careem"], total_num_fmt)
-        sheet1.write_number(curr_row, 7, gt["mythings"], total_num_fmt)
-        sheet1.write_number(curr_row, 8, gt["kabseh"], total_num_fmt)
-        sheet1.write_number(curr_row, 9, gt["cash_in"], total_num_fmt)
-        sheet1.write_number(curr_row, 10, gt["cash_out"], total_num_fmt)
-        sheet1.write_number(curr_row, 11, gt["net_cash_moves"], total_num_fmt)
-        sheet1.write_number(curr_row, 12, gt["rahen_in"], total_num_fmt)
-        sheet1.write_number(curr_row, 13, gt["rahen_out"], total_num_fmt)
-        sheet1.write_number(curr_row, 14, gt["net_pledges"], total_num_fmt)
-        sheet1.write_number(curr_row, 15, gt["advance_deposits"], total_num_fmt)
-        sheet1.write_number(curr_row, 16, gt["delivery_amount"], total_num_fmt)
+        sheet1.write_number(curr_row, 2, gt["untaxed_sales"], total_num_fmt)
+        sheet1.write_number(curr_row, 3, gt["tax_amount"], total_num_fmt)
+        sheet1.write_number(curr_row, 4, gt["cash"], total_num_fmt)
+        sheet1.write_number(curr_row, 5, gt["visa"], total_num_fmt)
+        sheet1.write_number(curr_row, 6, gt["hospitality"], total_num_fmt)
+        sheet1.write_number(curr_row, 7, gt["talabat"], total_num_fmt)
+        sheet1.write_number(curr_row, 8, gt["careem"], total_num_fmt)
+        sheet1.write_number(curr_row, 9, gt["mythings"], total_num_fmt)
+        sheet1.write_number(curr_row, 10, gt["kabseh"], total_num_fmt)
+        sheet1.write_number(curr_row, 11, gt["cash_in"], total_num_fmt)
+        sheet1.write_number(curr_row, 12, gt["cash_out"], total_num_fmt)
+        sheet1.write_number(curr_row, 13, gt["net_cash_moves"], total_num_fmt)
+        sheet1.write_number(curr_row, 14, gt["rahen_in"], total_num_fmt)
+        sheet1.write_number(curr_row, 15, gt["rahen_out"], total_num_fmt)
+        sheet1.write_number(curr_row, 16, gt["net_pledges"], total_num_fmt)
+        sheet1.write_number(curr_row, 17, gt["advance_deposits"], total_num_fmt)
+        sheet1.write_number(curr_row, 18, gt.get("advance_pickup_value", 0.0), total_num_fmt)
+        sheet1.write_number(curr_row, 19, gt.get("advance_pending_count", 0), total_int_fmt)
+        sheet1.write_number(curr_row, 20, gt["delivery_amount"], total_num_fmt)
+
+        str_start = fields.Datetime.to_string(self.date_from)
+        str_end = fields.Datetime.to_string(self.date_to)
+
+        # --- Sheet 2: Advance Orders Detail ---
+        if "pos.advance.order" in self.env:
+            sheet2 = workbook.add_worksheet(_("Advance Orders Detail"))
+            sheet2.write(0, 0, _("POS Advance Orders Audit List"), title_fmt)
+            sheet2.write(1, 0, _("Period: %s to %s") % (data["date_from"], data["date_to"]), sub_fmt)
+
+            adv_headers = [
+                _("Reference"),
+                _("Order Date & Time"),
+                _("Scheduled Pickup Date & Time"),
+                _("Customer"),
+                _("Employee / Staff"),
+                _("Deposit Branch (Origin)"),
+                _("Pickup Branch (Target)"),
+                _("Status"),
+                _("Total Amount"),
+                _("Advance Deposit Paid"),
+                _("Remaining Balance"),
+                _("Pledge Amount"),
+            ]
+
+            sheet2.set_column(0, 0, 20)
+            sheet2.set_column(1, 2, 22)
+            sheet2.set_column(3, 4, 24)
+            sheet2.set_column(5, 6, 24)
+            sheet2.set_column(7, 7, 16)
+            sheet2.set_column(8, 11, 18)
+
+            start_row_adv = 3
+            for col_idx, h in enumerate(adv_headers):
+                sheet2.write(start_row_adv, col_idx, h, header_fmt)
+
+            adv_domain = [
+                ("state", "not in", ("draft", "cancel")),
+                "|",
+                "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+                "&", ("picking_date", ">=", str_start), ("picking_date", "<=", str_end),
+            ]
+            if self.config_ids:
+                c_ids = self.config_ids.ids
+                adv_domain.insert(0, "|")
+                adv_domain.append(("from_pos_config_id", "in", c_ids))
+                adv_domain.append(("pos_config_id", "in", c_ids))
+
+            adv_recs = self.env["pos.advance.order"].search(adv_domain, order="id desc")
+
+            c_row = start_row_adv + 1
+            tot_grand = 0.0
+            tot_dep = 0.0
+            tot_rem = 0.0
+            tot_plg = 0.0
+
+            for a in adv_recs:
+                orig_name = a.from_pos_config_id.name if a.from_pos_config_id else (a.pos_config_id.name if a.pos_config_id else "")
+                pick_name = a.pos_config_id.name if a.pos_config_id else orig_name
+                emp_name = a.employee_id.name if a.employee_id else (a.user_id.name if a.user_id else "")
+                state_label = dict(a._fields["state"].selection).get(a.state, a.state)
+
+                g_amt = a.amount_grand_total or a.amount_total or 0.0
+                d_amt = a.advance_amount or 0.0
+                r_amt = a.amount_remaining or 0.0
+                p_amt = a.pledge_amount or 0.0
+
+                sheet2.write(c_row, 0, a.name or "", text_fmt)
+                sheet2.write(c_row, 1, fields.Datetime.to_string(a.create_date) if a.create_date else "", center_fmt)
+                sheet2.write(c_row, 2, fields.Datetime.to_string(a.picking_date) if a.picking_date else "", center_fmt)
+                sheet2.write(c_row, 3, a.partner_id.name if a.partner_id else "", text_fmt)
+                sheet2.write(c_row, 4, emp_name, text_fmt)
+                sheet2.write(c_row, 5, orig_name, text_fmt)
+                sheet2.write(c_row, 6, pick_name, text_fmt)
+                sheet2.write(c_row, 7, state_label, center_fmt)
+                sheet2.write_number(c_row, 8, g_amt, num_fmt)
+                sheet2.write_number(c_row, 9, d_amt, num_fmt)
+                sheet2.write_number(c_row, 10, r_amt, num_fmt)
+                sheet2.write_number(c_row, 11, p_amt, num_fmt)
+
+                tot_grand += g_amt
+                tot_dep += d_amt
+                tot_rem += r_amt
+                tot_plg += p_amt
+                c_row += 1
+
+            # Total Row Sheet 2
+            sheet2.write(c_row, 0, _("TOTALS"), total_text_fmt)
+            for col in range(1, 8):
+                sheet2.write(c_row, col, "", total_text_fmt)
+            sheet2.write_number(c_row, 8, tot_grand, total_num_fmt)
+            sheet2.write_number(c_row, 9, tot_dep, total_num_fmt)
+            sheet2.write_number(c_row, 10, tot_rem, total_num_fmt)
+            sheet2.write_number(c_row, 11, tot_plg, total_num_fmt)
+
+        # --- Sheet 3: Pledges Detail (Rahen In & Rahen Out) ---
+        if "pos.advance.order.pledge" in self.env:
+            sheet3 = workbook.add_worksheet(_("Pledges Detail (Rahen In & Out)"))
+            sheet3.write(0, 0, _("POS Pledges Audit List (Rahen In / Out)"), title_fmt)
+            sheet3.write(1, 0, _("Period: %s to %s") % (data["date_from"], data["date_to"]), sub_fmt)
+
+            plg_headers = [
+                _("Customer"),
+                _("Order Reference"),
+                _("Pledge Item"),
+                _("Branch Name"),
+                _("Status"),
+                _("Rahen In Amount"),
+                _("Received On (Date & Time)"),
+                _("Rahen Out Amount"),
+                _("Returned On (Date & Time)"),
+            ]
+
+            sheet3.set_column(0, 0, 24)
+            sheet3.set_column(1, 1, 22)
+            sheet3.set_column(2, 2, 28)
+            sheet3.set_column(3, 3, 24)
+            sheet3.set_column(4, 4, 14)
+            sheet3.set_column(5, 5, 18)
+            sheet3.set_column(6, 6, 22)
+            sheet3.set_column(7, 7, 18)
+            sheet3.set_column(8, 8, 22)
+
+            start_row_plg = 3
+            for col_idx, h in enumerate(plg_headers):
+                sheet3.write(start_row_plg, col_idx, h, header_fmt)
+
+            plg_domain = [
+                "|",
+                "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
+                "&", ("return_date", ">=", str_start), ("return_date", "<=", str_end),
+            ]
+            if self.config_ids:
+                c_ids = self.config_ids.ids
+                plg_domain.insert(0, "|")
+                plg_domain.append(("pos_order_id.config_id", "in", c_ids))
+                plg_domain.append(("order_id.pos_config_id", "in", c_ids))
+
+            pledge_recs = self.env["pos.advance.order.pledge"].search(plg_domain, order="id desc")
+
+            p_row = start_row_plg + 1
+            tot_rin = 0.0
+            tot_rout = 0.0
+
+            for p in pledge_recs:
+                cust_name = p.partner_id.name if p.partner_id else ""
+                order_ref = p.pos_order_id.name if p.pos_order_id else (p.order_id.name if p.order_id else "")
+                prod_name = p.product_id.display_name if p.product_id else ""
+
+                cfg = False
+                if p.pos_order_id:
+                    cfg = p.pos_order_id.config_id
+                elif p.order_id and hasattr(p.order_id, "pos_config_id"):
+                    cfg = p.order_id.pos_config_id
+                elif p.order_id and hasattr(p.order_id, "from_pos_config_id"):
+                    cfg = p.order_id.from_pos_config_id
+                branch_name = cfg.name if cfg else ""
+
+                status_label = dict(p._fields["state"].selection).get(p.state, p.state)
+                amt = p.pledge_subtotal or (getattr(p, "pledge_qty", 1.0) * getattr(p, "pledge_amount_unit", 0.0)) or 0.0
+
+                rec_dt_str = fields.Datetime.to_string(p.receive_date) if p.receive_date else (fields.Datetime.to_string(p.create_date) if p.create_date else "")
+                ret_dt_str = fields.Datetime.to_string(p.return_date) if p.return_date else (fields.Datetime.to_string(p.write_date) if (p.state == "returned" and p.write_date) else "")
+
+                # Check if receive_date falls in period
+                in_amt = 0.0
+                if p.receive_date and self.date_from <= p.receive_date <= self.date_to:
+                    in_amt = amt
+                elif not p.receive_date and p.create_date and self.date_from <= p.create_date <= self.date_to:
+                    in_amt = amt
+
+                # Check if return_date falls in period
+                out_amt = 0.0
+                if p.state == "returned":
+                    if p.return_date and self.date_from <= p.return_date <= self.date_to:
+                        out_amt = amt
+                    elif not p.return_date and p.write_date and self.date_from <= p.write_date <= self.date_to:
+                        out_amt = amt
+
+                sheet3.write(p_row, 0, cust_name, text_fmt)
+                sheet3.write(p_row, 1, order_ref, text_fmt)
+                sheet3.write(p_row, 2, prod_name, text_fmt)
+                sheet3.write(p_row, 3, branch_name, text_fmt)
+                sheet3.write(p_row, 4, status_label, center_fmt)
+                sheet3.write_number(p_row, 5, in_amt, num_fmt)
+                sheet3.write(p_row, 6, rec_dt_str if in_amt > 0 else "", center_fmt)
+                sheet3.write_number(p_row, 7, out_amt, num_fmt)
+                sheet3.write(p_row, 8, ret_dt_str if out_amt > 0 else "", center_fmt)
+
+                tot_rin += in_amt
+                tot_rout += out_amt
+                p_row += 1
+
+            # Total Row Sheet 3
+            sheet3.write(p_row, 0, _("TOTALS"), total_text_fmt)
+            for col in range(1, 5):
+                sheet3.write(p_row, col, "", total_text_fmt)
+            sheet3.write_number(p_row, 5, tot_rin, total_num_fmt)
+            sheet3.write(p_row, 6, "", total_text_fmt)
+            sheet3.write_number(p_row, 7, tot_rout, total_num_fmt)
+            sheet3.write(p_row, 8, "", total_text_fmt)
 
         workbook.close()
         return output.getvalue()

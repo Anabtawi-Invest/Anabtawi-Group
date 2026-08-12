@@ -11,17 +11,19 @@ export class PosReportingDashboard extends Component {
         this.orm = useService("orm");
         this.actionService = useService("action");
 
-        const today = new Date().toISOString().split("T")[0];
+        const now = new Date();
 
         this.state = useState({
             period: "today",
-            date_from: today,
-            date_to: today,
+            date_from: this._formatLocalDatetime(now, false),
+            date_to: this._formatLocalDatetime(now, true),
             config_ids: [],
             loading: true,
         });
 
         this.data = useState({
+            date_from: "",
+            date_to: "",
             kpis: {},
             branches: [],
             all_branches: [],
@@ -32,8 +34,8 @@ export class PosReportingDashboard extends Component {
 
         if (this.props.action && this.props.action.params) {
             const p = this.props.action.params;
-            if (p.date_from) this.state.date_from = p.date_from;
-            if (p.date_to) this.state.date_to = p.date_to;
+            if (p.date_from) this.state.date_from = p.date_from.replace(" ", "T").slice(0, 16);
+            if (p.date_to) this.state.date_to = p.date_to.replace(" ", "T").slice(0, 16);
             if (p.config_ids) this.state.config_ids = p.config_ids;
         }
 
@@ -42,20 +44,47 @@ export class PosReportingDashboard extends Component {
         });
     }
 
+    _formatLocalDatetime(dateObj, isEnd = false) {
+        if (!dateObj) return "";
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+        const day = String(dateObj.getDate()).padStart(2, "0");
+        const hours = isEnd ? "23" : "00";
+        const mins = isEnd ? "59" : "00";
+        return `${year}-${month}-${day}T${hours}:${mins}`;
+    }
+
+    _formatDatetimeForRPC(valStr, isEnd = false) {
+        if (!valStr) return "";
+        let s = valStr.replace("T", " ");
+        if (s.length === 10) {
+            return isEnd ? `${s} 23:59:59` : `${s} 00:00:00`;
+        }
+        if (s.length === 16) {
+            return isEnd ? `${s}:59` : `${s}:00`;
+        }
+        return s;
+    }
+
     async fetchDashboardData() {
         this.state.loading = true;
         try {
+            const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
+            const strTo = this._formatDatetimeForRPC(this.state.date_to, true);
+
             const res = await this.orm.call(
                 "pos.reporting.dashboard",
                 "get_dashboard_data",
                 [],
                 {
-                    date_from: this.state.date_from,
-                    date_to: this.state.date_to,
+                    date_from: strFrom,
+                    date_to: strTo,
                     config_ids: this.state.config_ids,
                 }
             );
 
+            this.data.date_from = res.date_from || strFrom;
+            this.data.date_to = res.date_to || strTo;
             this.data.kpis = res.kpis || {};
             this.data.branches = res.branches || [];
             this.data.all_branches = res.all_branches || [];
@@ -106,8 +135,8 @@ export class PosReportingDashboard extends Component {
             toDate = new Date();
         }
 
-        this.state.date_from = fromDate.toISOString().split("T")[0];
-        this.state.date_to = toDate.toISOString().split("T")[0];
+        this.state.date_from = this._formatLocalDatetime(fromDate, false);
+        this.state.date_to = this._formatLocalDatetime(toDate, true);
         this.fetchDashboardData();
     }
 
@@ -126,18 +155,26 @@ export class PosReportingDashboard extends Component {
 
     async exportExcel() {
         try {
+            const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
+            const strTo = this._formatDatetimeForRPC(this.state.date_to, true);
+
             const wizard = await this.orm.create("pos.unified.report.wizard", [
                 {
-                    date_from: this.state.date_from,
-                    date_to: this.state.date_to,
-                    config_ids: this.state.config_ids && this.state.config_ids.length ? [[6, 0, this.state.config_ids]] : [],
+                    date_from: strFrom,
+                    date_to: strTo,
+                    config_ids: [[6, 0, this.state.config_ids]],
                 },
             ]);
-            if (wizard && wizard.length) {
-                window.location.href = `/pos_unified_report/xlsx/${wizard[0]}`;
-            }
+
+            const action = await this.orm.call(
+                "pos.unified.report.wizard",
+                "action_export_xlsx",
+                [wizard[0]]
+            );
+
+            this.actionService.doAction(action);
         } catch (error) {
-            console.error("Failed to export POS report Excel", error);
+            console.error("Failed to export Excel report", error);
         }
     }
 }

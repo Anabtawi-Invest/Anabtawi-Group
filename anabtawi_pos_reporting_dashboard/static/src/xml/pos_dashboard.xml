@@ -6,7 +6,12 @@
             <div class="o_pos_dashboard_header">
                 <div class="o_dashboard_title">
                     <h2><i class="fa fa-dashboard text-primary"/> POS Executive Dashboard</h2>
-                    <span class="subtitle">Unified real-time branch performance &amp; operations analysis</span>
+                    <span class="subtitle">
+                        Unified real-time branch performance &amp; operations analysis 
+                        <t t-if="data.date_from and data.date_to">
+                            (<t t-esc="data.date_from"/> to <t t-esc="data.date_to"/>)
+                        </t>
+                    </span>
                 </div>
                 <div class="o_dashboard_filters">
                     <!-- Quick Date Range Buttons -->
@@ -18,9 +23,9 @@
                     </div>
 
                     <div class="d-flex align-items-center gap-2">
-                        <input type="date" class="form-control filter_input" t-model="state.date_from"/>
+                        <input type="datetime-local" class="form-control filter_input" t-model="state.date_from"/>
                         <span class="text-muted">to</span>
-                        <input type="date" class="form-control filter_input" t-model="state.date_to"/>
+                        <input type="datetime-local" class="form-control filter_input" t-model="state.date_to"/>
                         <button class="btn btn-primary" t-on-click="fetchDashboardData" icon="fa-refresh">
                             <i class="fa fa-refresh me-1"/> Apply
                         </button>
@@ -66,7 +71,7 @@
                     <!-- Total Sales -->
                     <div class="o_kpi_card card-sales">
                         <div class="kpi_icon"><i class="fa fa-shopping-cart text-primary"/></div>
-                        <div class="kpi_title">Total POS Sales</div>
+                        <div class="kpi_title">Total POS Sales (Gross)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_sales)"/></div>
                         <div class="kpi_subtext">
                             <span><t t-esc="data.kpis.order_count"/> Total Orders</span>
@@ -118,10 +123,10 @@
                     <!-- Advance Payments Deposited -->
                     <div class="o_kpi_card card-advances">
                         <div class="kpi_icon"><i class="fa fa-clock-o text-cyan"/></div>
-                        <div class="kpi_title">Advance Deposits</div>
+                        <div class="kpi_title">Advance Deposits (Origin)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.advance_deposits)"/></div>
                         <div class="kpi_subtext">
-                            <span>Customer advance deposits collected</span>
+                            <span><t t-esc="data.kpis.advance_order_count"/> Advance Orders</span>
                         </div>
                     </div>
                 </div>
@@ -162,26 +167,27 @@
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <div class="p-3 border rounded bg-light">
+                                        <h6 class="text-muted mb-1">Sales Without Tax (Net)</h6>
+                                        <h4 class="fw-bold text-success mb-0"><t t-esc="formatCurrency(data.kpis.untaxed_sales)"/></h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded bg-light">
+                                        <h6 class="text-muted mb-1">Total Sales Tax (VAT)</h6>
+                                        <h4 class="fw-bold text-info mb-0"><t t-esc="formatCurrency(data.kpis.tax_amount)"/></h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded bg-light">
+                                        <h6 class="text-muted mb-1">Advance Scheduled Pickup Value</h6>
+                                        <h4 class="fw-bold text-primary mb-0"><t t-esc="formatCurrency(data.kpis.advance_pickup_value)"/></h4>
+                                        <small class="text-muted"><t t-esc="data.kpis.advance_pending_count"/> Pending Pickups</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded bg-light">
                                         <h6 class="text-muted mb-1">Total Delivery Charges</h6>
                                         <h4 class="fw-bold text-dark mb-0"><t t-esc="formatCurrency(data.kpis.delivery_amount)"/></h4>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="p-3 border rounded bg-light">
-                                        <h6 class="text-muted mb-1">Hospitality &amp; Gift Sales</h6>
-                                        <h4 class="fw-bold text-dark mb-0"><t t-esc="formatCurrency(data.kpis.hospitality_sales)"/></h4>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="p-3 border rounded bg-light">
-                                        <h6 class="text-muted mb-1">Total Cash In Drawer Moves</h6>
-                                        <h4 class="fw-bold text-success mb-0">+<t t-esc="formatCurrency(data.kpis.cash_in)"/></h4>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="p-3 border rounded bg-light">
-                                        <h6 class="text-muted mb-1">Total Cash Out Drawer Moves</h6>
-                                        <h4 class="fw-bold text-danger mb-0">-<t t-esc="formatCurrency(data.kpis.cash_out)"/></h4>
                                     </div>
                                 </div>
                             </div>
@@ -201,6 +207,8 @@
                                 <tr>
                                     <th>Branch Name</th>
                                     <th class="text-end">Total Sales</th>
+                                    <th class="text-end">Sales Without Tax</th>
+                                    <th class="text-end">Tax Amount</th>
                                     <th class="text-end">Cash Sales</th>
                                     <th class="text-end">Visa / Card</th>
                                     <th class="text-end">Hospitality</th>
@@ -211,7 +219,9 @@
                                     <th class="text-end">Net Cash Moves</th>
                                     <th class="text-end">Rahen In</th>
                                     <th class="text-end">Rahen Out</th>
-                                    <th class="text-end">Advance Deposits</th>
+                                    <th class="text-end">Advance Deposits (Origin)</th>
+                                    <th class="text-end">Scheduled Pickup Value</th>
+                                    <th class="text-end">Pending Pickups</th>
                                     <th class="text-end">Delivery Fees</th>
                                 </tr>
                             </thead>
@@ -220,6 +230,8 @@
                                     <tr>
                                         <td class="branch_title"><t t-esc="branch.branch_name"/></td>
                                         <td class="val_num fw-bold text-primary"><t t-esc="formatCurrency(branch.sales)"/></td>
+                                        <td class="val_num"><t t-esc="formatCurrency(branch.untaxed_sales)"/></td>
+                                        <td class="val_num"><t t-esc="formatCurrency(branch.tax_amount)"/></td>
                                         <td class="val_num text-success"><t t-esc="formatCurrency(branch.cash)"/></td>
                                         <td class="val_num text-info"><t t-esc="formatCurrency(branch.visa)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.hospitality)"/></td>
@@ -231,6 +243,8 @@
                                         <td class="val_num"><t t-esc="formatCurrency(branch.rahen_in)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.rahen_out)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.advance_deposits)"/></td>
+                                        <td class="val_num text-info"><t t-esc="formatCurrency(branch.advance_pickup_value)"/></td>
+                                        <td class="val_num fw-bold"><t t-esc="branch.advance_pending_count"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.delivery_amount)"/></td>
                                     </tr>
                                 </t>
@@ -238,6 +252,8 @@
                                 <tr class="row_total">
                                     <td class="branch_title">TOTALS</td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.sales)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.untaxed_sales)"/></td>
+                                    <td class="val_num"><t t-esc="formatCurrency(data.global_totals.tax_amount)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.cash)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.visa)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.hospitality)"/></td>
@@ -249,6 +265,8 @@
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.rahen_in)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.rahen_out)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.advance_deposits)"/></td>
+                                    <td class="val_num text-info"><t t-esc="formatCurrency(data.global_totals.advance_pickup_value)"/></td>
+                                    <td class="val_num fw-bold"><t t-esc="data.global_totals.advance_pending_count"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.delivery_amount)"/></td>
                                 </tr>
                             </tbody>
