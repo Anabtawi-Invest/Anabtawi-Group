@@ -69,104 +69,118 @@
                 <!-- KPI Summary Row -->
                 <div class="o_kpi_grid">
                     <!-- Total Sales -->
-                    <div class="o_kpi_card card-sales">
+                    <div class="o_kpi_card card-sales clickable_kpi" t-on-click="() => this.onKpiClick('sales')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-shopping-cart text-primary"/></div>
                         <div class="kpi_title">Total POS Sales (Gross)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_sales)"/></div>
-                        <div class="kpi_subtext">
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <span><t t-esc="data.kpis.order_count"/> Total Orders</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
 
                     <!-- Sales Without Tax -->
-                    <div class="o_kpi_card card-untaxed">
+                    <div class="o_kpi_card card-untaxed clickable_kpi" t-on-click="() => this.onKpiClick('untaxed_sales')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-file-text-o text-success"/></div>
                         <div class="kpi_title">Sales Without Tax (Net)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.untaxed_sales)"/></div>
-                        <div class="kpi_subtext">
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <span class="badge bg-success badge_sub">Net Sales</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
 
                     <!-- Total Sales Tax -->
-                    <div class="o_kpi_card card-tax">
+                    <div class="o_kpi_card card-tax clickable_kpi" t-on-click="() => this.onKpiClick('tax_amount')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-percent text-info"/></div>
                         <div class="kpi_title">Total Sales Tax (VAT)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.tax_amount)"/></div>
-                        <div class="kpi_subtext">
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <span class="badge bg-info badge_sub">VAT Taxes</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
 
                     <!-- Total Discounts -->
-                    <div class="o_kpi_card card-discount">
+                    <div class="o_kpi_card card-discount clickable_kpi" t-on-click="() => this.onKpiClick('discount_amount')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-tag text-warning"/></div>
                         <div class="kpi_title">Total Discounts</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.discount_amount)"/></div>
-                        <div class="kpi_subtext">
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <span class="badge bg-warning text-dark badge_sub">Discounts</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
 
                     <!-- Cash Sales -->
-                    <div class="o_kpi_card card-cash">
+                    <div class="o_kpi_card card-cash clickable_kpi" t-on-click="() => this.onKpiClick('cash_sales')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-money text-success"/></div>
                         <div class="kpi_title">Cash Sales</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.cash_sales)"/></div>
-                        <div class="kpi_subtext">
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <span class="badge bg-success badge_sub"><t t-esc="getPercent(data.kpis.cash_sales, data.kpis.total_sales)"/>% of Sales</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
 
                     <!-- Visa / Card Sales -->
-                    <div class="o_kpi_card card-visa">
+                    <div class="o_kpi_card card-visa clickable_kpi" t-on-click="() => this.onKpiClick('visa_sales')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-credit-card text-info"/></div>
                         <div class="kpi_title">Visa &amp; Card Sales</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.visa_sales)"/></div>
-                        <div class="kpi_subtext">
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <span class="badge bg-info badge_sub"><t t-esc="getPercent(data.kpis.visa_sales, data.kpis.total_sales)"/>% of Sales</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
 
                     <!-- Employee Debt (ذمم موظفين) -->
-                    <div class="o_kpi_card card-employee-debt">
+                    <div class="o_kpi_card card-employee-debt clickable_kpi" t-on-click="() => this.onKpiClick('employee_debt')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-id-card-o text-purple"/></div>
                         <div class="kpi_title">ذمم موظفين (Employee Debt)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.employee_debt)"/></div>
-                        <div class="kpi_subtext">
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <span class="badge bg-purple text-white badge_sub">Employee Receivables</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
 
                     <!-- Net Cash Moves (In / Out) -->
-                    <div class="o_kpi_card card-cashmoves">
+                    <div class="o_kpi_card card-cashmoves clickable_kpi" t-on-click="() => this.onKpiClick('net_cash_moves')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-exchange text-warning"/></div>
                         <div class="kpi_title">Net Cash Moves</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.net_cash_moves)"/></div>
-                        <div class="kpi_subtext">
-                            <span class="text-success"><i class="fa fa-arrow-down"/> In: <t t-esc="formatCurrency(data.kpis.cash_in)"/></span> | 
-                            <span class="text-danger"><i class="fa fa-arrow-up"/> Out: <t t-esc="formatCurrency(data.kpis.cash_out)"/></span>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="text-success"><i class="fa fa-arrow-down"/> In: <t t-esc="formatCurrency(data.kpis.cash_in)"/></span> | 
+                                <span class="text-danger"><i class="fa fa-arrow-up"/> Out: <t t-esc="formatCurrency(data.kpis.cash_out)"/></span>
+                            </div>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
 
                     <!-- Pledges (Rahen In / Out) -->
-                    <div class="o_kpi_card card-pledges">
+                    <div class="o_kpi_card card-pledges clickable_kpi" t-on-click="() => this.onKpiClick('net_pledges')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-handshake-o text-danger"/></div>
                         <div class="kpi_title">Net Pledges (Rahen)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.net_pledges)"/></div>
-                        <div class="kpi_subtext">
-                            <span>Rec: <t t-esc="formatCurrency(data.kpis.rahen_in)"/></span> | 
-                            <span>Ret: <t t-esc="formatCurrency(data.kpis.rahen_out)"/></span>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <div>
+                                <span>Rec: <t t-esc="formatCurrency(data.kpis.rahen_in)"/></span> | 
+                                <span>Ret: <t t-esc="formatCurrency(data.kpis.rahen_out)"/></span>
+                            </div>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
 
                     <!-- Advance Payments Deposited -->
-                    <div class="o_kpi_card card-advances">
+                    <div class="o_kpi_card card-advances clickable_kpi" t-on-click="() => this.onKpiClick('advance_deposits')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-clock-o text-cyan"/></div>
                         <div class="kpi_title">Advance Deposits (Origin)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.advance_deposits)"/></div>
-                        <div class="kpi_subtext">
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <span><t t-esc="data.kpis.advance_order_count"/> Advance Orders</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
                 </div>
@@ -206,25 +220,25 @@
                             </div>
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <div class="p-3 border rounded bg-light">
+                                    <div class="p-3 border rounded bg-light clickable_kpi" t-on-click="() => this.onKpiClick('untaxed_sales')" title="Click to view detailed transactions &amp; export Excel">
                                         <h6 class="text-muted mb-1">Sales Without Tax (Net)</h6>
                                         <h4 class="fw-bold text-success mb-0"><t t-esc="formatCurrency(data.kpis.untaxed_sales)"/></h4>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="p-3 border rounded bg-light">
+                                    <div class="p-3 border rounded bg-light clickable_kpi" t-on-click="() => this.onKpiClick('tax_amount')" title="Click to view detailed transactions &amp; export Excel">
                                         <h6 class="text-muted mb-1">Total Sales Tax (VAT)</h6>
                                         <h4 class="fw-bold text-info mb-0"><t t-esc="formatCurrency(data.kpis.tax_amount)"/></h4>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="p-3 border rounded bg-light">
+                                    <div class="p-3 border rounded bg-light clickable_kpi" t-on-click="() => this.onKpiClick('employee_debt')" title="Click to view detailed transactions &amp; export Excel">
                                         <h6 class="text-muted mb-1">ذمم موظفين (Employee Debt)</h6>
                                         <h4 class="fw-bold text-purple mb-0"><t t-esc="formatCurrency(data.kpis.employee_debt)"/></h4>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="p-3 border rounded bg-light">
+                                    <div class="p-3 border rounded bg-light clickable_kpi" t-on-click="() => this.onKpiClick('discount_amount')" title="Click to view detailed transactions &amp; export Excel">
                                         <h6 class="text-muted mb-1">Total Order Discounts</h6>
                                         <h4 class="fw-bold text-warning mb-0"><t t-esc="formatCurrency(data.kpis.discount_amount)"/></h4>
                                     </div>

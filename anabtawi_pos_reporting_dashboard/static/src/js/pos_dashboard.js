@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
@@ -11,57 +11,56 @@ export class PosReportingDashboard extends Component {
         this.orm = useService("orm");
         this.actionService = useService("action");
 
+        const params = this.props.action?.params || {};
         const now = new Date();
+        const today6am = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrow5am = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+        const initFrom = params.date_from || this._formatLocalDatetimeWithTime(today6am, "06", "00");
+        const initTo = params.date_to || this._formatLocalDatetimeWithTime(tomorrow5am, "05", "00");
+        const initConfigs = params.config_ids || [];
 
         this.state = useState({
             period: "today",
-            date_from: this._formatLocalDatetime(now, false),
-            date_to: this._formatLocalDatetime(now, true),
-            config_ids: [],
+            date_from: initFrom,
+            date_to: initTo,
+            config_ids: initConfigs,
             loading: true,
         });
 
         this.data = useState({
             date_from: "",
             date_to: "",
+            active_branches_count: 0,
+            all_branches: [],
             kpis: {},
             branches: [],
-            all_branches: [],
             global_totals: {},
             channels: [],
             trends: [],
         });
-
-        if (this.props.action && this.props.action.params) {
-            const p = this.props.action.params;
-            if (p.date_from) this.state.date_from = p.date_from.replace(" ", "T").slice(0, 16);
-            if (p.date_to) this.state.date_to = p.date_to.replace(" ", "T").slice(0, 16);
-            if (p.config_ids) this.state.config_ids = p.config_ids;
-        }
 
         onWillStart(async () => {
             await this.fetchDashboardData();
         });
     }
 
-    _formatLocalDatetime(dateObj, isEnd = false) {
+    _formatLocalDatetimeWithTime(dateObj, hourStr = "06", minStr = "00") {
         if (!dateObj) return "";
         const year = dateObj.getFullYear();
         const month = String(dateObj.getMonth() + 1).padStart(2, "0");
         const day = String(dateObj.getDate()).padStart(2, "0");
-        const hours = isEnd ? "23" : "00";
-        const mins = isEnd ? "59" : "00";
-        return `${year}-${month}-${day}T${hours}:${mins}`;
+        return `${year}-${month}-${day}T${hourStr}:${minStr}`;
     }
 
     _formatDatetimeForRPC(valStr, isEnd = false) {
         if (!valStr) return "";
         let s = valStr.replace("T", " ");
         if (s.length === 10) {
-            return isEnd ? `${s} 23:59:59` : `${s} 00:00:00`;
+            return isEnd ? `${s} 05:00:00` : `${s} 06:00:00`;
         }
         if (s.length === 16) {
-            return isEnd ? `${s}:59` : `${s}:00`;
+            return `${s}:00`;
         }
         return s;
     }
@@ -117,26 +116,27 @@ export class PosReportingDashboard extends Component {
     setPeriod(period) {
         this.state.period = period;
         const now = new Date();
-        let fromDate = new Date();
-        let toDate = new Date();
+        let fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        let toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
         if (period === "today") {
-            // default
+            fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
         } else if (period === "yesterday") {
-            fromDate.setDate(now.getDate() - 1);
-            toDate.setDate(now.getDate() - 1);
+            fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+            toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         } else if (period === "this_week") {
             const day = now.getDay();
             const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-            fromDate = new Date(now.setDate(diff));
-            toDate = new Date();
+            fromDate = new Date(now.getFullYear(), now.getMonth(), diff);
+            toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
         } else if (period === "this_month") {
             fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            toDate = new Date();
+            toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
         }
 
-        this.state.date_from = this._formatLocalDatetime(fromDate, false);
-        this.state.date_to = this._formatLocalDatetime(toDate, true);
+        this.state.date_from = this._formatLocalDatetimeWithTime(fromDate, "06", "00");
+        this.state.date_to = this._formatLocalDatetimeWithTime(toDate, "05", "00");
         this.fetchDashboardData();
     }
 
@@ -151,6 +151,31 @@ export class PosReportingDashboard extends Component {
     getPercent(value, total) {
         if (!total || total === 0) return "0.0";
         return ((value / total) * 100).toFixed(1);
+    }
+
+    async onKpiClick(metricType) {
+        try {
+            const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
+            const strTo = this._formatDatetimeForRPC(this.state.date_to, true);
+
+            const action = await this.orm.call(
+                "pos.reporting.dashboard",
+                "open_kpi_drilldown",
+                [],
+                {
+                    metric_type: metricType,
+                    date_from: strFrom,
+                    date_to: strTo,
+                    config_ids: this.state.config_ids,
+                }
+            );
+
+            if (action) {
+                this.actionService.doAction(action);
+            }
+        } catch (error) {
+            console.error("Failed to open KPI drilldown action", error);
+        }
     }
 
     async exportExcel() {
