@@ -49,6 +49,33 @@
         }
     }
 
+    /* Clickable KPI hover cards */
+    .clickable_kpi {
+        cursor: pointer !important;
+        transition: all 0.2s ease-in-out !important;
+
+        &:hover {
+            transform: translateY(-4px) scale(1.01) !important;
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.15) !important;
+        }
+
+        .drill_badge {
+            font-size: 0.72rem;
+            color: #3b82f6;
+            font-weight: 600;
+            background: #eff6ff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            opacity: 0.8;
+            transition: opacity 0.2s ease;
+        }
+
+        &:hover .drill_badge {
+            opacity: 1;
+            background: #dbeafe;
+        }
+    }
+
     /* Top Toolbar & Header */
     .o_pos_dashboard_header {
         display: flex;

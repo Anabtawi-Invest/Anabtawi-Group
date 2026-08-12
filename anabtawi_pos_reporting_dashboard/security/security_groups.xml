@@ -1,15 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data>
-        <record id="module_category_pos_reporting" model="ir.module.category">
-            <field name="name">POS Executive Dashboard &amp; Reports</field>
-            <field name="description">Access control for POS Executive Dashboard, Branch Analytics, and Excel exports.</field>
-            <field name="sequence">25</field>
-        </record>
-
+    <data noupdate="0">
         <record id="group_pos_reporting_dashboard_user" model="res.groups">
             <field name="name">POS Executive Dashboard Access</field>
-            <field name="category_id" ref="module_category_pos_reporting"/>
             <field name="comment">Only users with this permission can view the POS Executive Dashboard and generate unified Excel reports.</field>
         </record>
     </data>

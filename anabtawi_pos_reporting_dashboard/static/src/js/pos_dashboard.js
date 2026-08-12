@@ -153,6 +153,31 @@ export class PosReportingDashboard extends Component {
         return ((value / total) * 100).toFixed(1);
     }
 
+    async onKpiClick(metricType) {
+        try {
+            const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
+            const strTo = this._formatDatetimeForRPC(this.state.date_to, true);
+
+            const action = await this.orm.call(
+                "pos.reporting.dashboard",
+                "open_kpi_drilldown",
+                [],
+                {
+                    metric_type: metricType,
+                    date_from: strFrom,
+                    date_to: strTo,
+                    config_ids: this.state.config_ids,
+                }
+            );
+
+            if (action) {
+                this.actionService.doAction(action);
+            }
+        } catch (error) {
+            console.error("Failed to open KPI drilldown action", error);
+        }
+    }
+
     async exportExcel() {
         try {
             const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
