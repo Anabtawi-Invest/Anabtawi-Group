@@ -71,6 +71,7 @@ class PosReportingDashboard(models.TransientModel):
                 "sales": 0.0,
                 "untaxed_sales": 0.0,
                 "tax_amount": 0.0,
+                "discount_amount": 0.0,
                 "cash": 0.0,
                 "visa": 0.0,
                 "hospitality": 0.0,
@@ -138,7 +139,7 @@ class PosReportingDashboard(models.TransientModel):
             elif pm_id == PAYMENT_METHOD_KABSEH or "kabseh" in pm_name:
                 branch_data[cfg_id]["kabseh"] += amt
 
-        # --- B. Collect POS Orders (Untaxed, Tax, Order Count & Delivery) ---
+        # --- B. Collect POS Orders (Untaxed, Tax, Discounts, Order Count & Delivery) ---
         pos_orders = self.env["pos.order"].sudo().search([
             ("state", "in", ("paid", "done", "invoiced")),
             ("date_order", ">=", str_start),
@@ -156,8 +157,15 @@ class PosReportingDashboard(models.TransientModel):
             if untaxed_amt is None:
                 untaxed_amt = tot_amt - tax_amt
 
+            order_disc = 0.0
+            for line in order.lines:
+                if line.discount:
+                    base = (line.price_unit or 0.0) * (line.qty or 0.0)
+                    order_disc += base * (line.discount / 100.0)
+
             branch_data[cfg_id]["untaxed_sales"] += untaxed_amt
             branch_data[cfg_id]["tax_amount"] += tax_amt
+            branch_data[cfg_id]["discount_amount"] += order_disc
             branch_data[cfg_id]["delivery_amount"] += getattr(order, "delivery_amount", 0.0) or 0.0
             branch_data[cfg_id]["order_count"] += 1
 
@@ -338,6 +346,7 @@ class PosReportingDashboard(models.TransientModel):
                 "total_sales": global_totals["sales"],
                 "untaxed_sales": global_totals["untaxed_sales"],
                 "tax_amount": global_totals["tax_amount"],
+                "discount_amount": global_totals["discount_amount"],
                 "cash_sales": global_totals["cash"],
                 "visa_sales": global_totals["visa"],
                 "hospitality_sales": global_totals["hospitality"],

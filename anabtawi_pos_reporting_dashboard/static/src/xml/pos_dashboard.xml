@@ -78,6 +78,36 @@
                         </div>
                     </div>
 
+                    <!-- Sales Without Tax -->
+                    <div class="o_kpi_card card-untaxed">
+                        <div class="kpi_icon"><i class="fa fa-file-text-o text-success"/></div>
+                        <div class="kpi_title">Sales Without Tax (Net)</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.untaxed_sales)"/></div>
+                        <div class="kpi_subtext">
+                            <span class="badge bg-success badge_sub">Net Sales</span>
+                        </div>
+                    </div>
+
+                    <!-- Total Sales Tax -->
+                    <div class="o_kpi_card card-tax">
+                        <div class="kpi_icon"><i class="fa fa-percent text-info"/></div>
+                        <div class="kpi_title">Total Sales Tax (VAT)</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.tax_amount)"/></div>
+                        <div class="kpi_subtext">
+                            <span class="badge bg-info badge_sub">VAT Taxes</span>
+                        </div>
+                    </div>
+
+                    <!-- Total Discounts -->
+                    <div class="o_kpi_card card-discount">
+                        <div class="kpi_icon"><i class="fa fa-tag text-warning"/></div>
+                        <div class="kpi_title">Total Discounts</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.discount_amount)"/></div>
+                        <div class="kpi_subtext">
+                            <span class="badge bg-warning text-dark badge_sub">Discounts</span>
+                        </div>
+                    </div>
+
                     <!-- Cash Sales -->
                     <div class="o_kpi_card card-cash">
                         <div class="kpi_icon"><i class="fa fa-money text-success"/></div>
@@ -179,15 +209,15 @@
                                 </div>
                                 <div class="col-md-6">
                                     <div class="p-3 border rounded bg-light">
-                                        <h6 class="text-muted mb-1">Advance Scheduled Pickup Value</h6>
-                                        <h4 class="fw-bold text-primary mb-0"><t t-esc="formatCurrency(data.kpis.advance_pickup_value)"/></h4>
-                                        <small class="text-muted"><t t-esc="data.kpis.advance_pending_count"/> Pending Pickups</small>
+                                        <h6 class="text-muted mb-1">Total Order Discounts</h6>
+                                        <h4 class="fw-bold text-warning mb-0"><t t-esc="formatCurrency(data.kpis.discount_amount)"/></h4>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="p-3 border rounded bg-light">
-                                        <h6 class="text-muted mb-1">Total Delivery Charges</h6>
-                                        <h4 class="fw-bold text-dark mb-0"><t t-esc="formatCurrency(data.kpis.delivery_amount)"/></h4>
+                                        <h6 class="text-muted mb-1">Advance Scheduled Pickup Value</h6>
+                                        <h4 class="fw-bold text-primary mb-0"><t t-esc="formatCurrency(data.kpis.advance_pickup_value)"/></h4>
+                                        <small class="text-muted"><t t-esc="data.kpis.advance_pending_count"/> Pending Pickups</small>
                                     </div>
                                 </div>
                             </div>
@@ -209,6 +239,7 @@
                                     <th class="text-end">Total Sales</th>
                                     <th class="text-end">Sales Without Tax</th>
                                     <th class="text-end">Tax Amount</th>
+                                    <th class="text-end">Total Discounts</th>
                                     <th class="text-end">Cash Sales</th>
                                     <th class="text-end">Visa / Card</th>
                                     <th class="text-end">Hospitality</th>
@@ -232,6 +263,7 @@
                                         <td class="val_num fw-bold text-primary"><t t-esc="formatCurrency(branch.sales)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.untaxed_sales)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.tax_amount)"/></td>
+                                        <td class="val_num text-warning"><t t-esc="formatCurrency(branch.discount_amount)"/></td>
                                         <td class="val_num text-success"><t t-esc="formatCurrency(branch.cash)"/></td>
                                         <td class="val_num text-info"><t t-esc="formatCurrency(branch.visa)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.hospitality)"/></td>
@@ -254,6 +286,7 @@
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.sales)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.untaxed_sales)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.tax_amount)"/></td>
+                                    <td class="val_num text-warning"><t t-esc="formatCurrency(data.global_totals.discount_amount)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.cash)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.visa)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.hospitality)"/></td>
