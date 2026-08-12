@@ -4,11 +4,9 @@ import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 import { patch } from "@web/core/utils/patch";
 
 /**
- * Site Service is NOT applied automatically on regular POS sales or at payment.
- *
- * - Direct Payment (with or without pledge mapping): no Site Service line.
- * - Advance Order: Site Service is added only when the cashier enables the
- *   "Site Service" checkbox in the Advance popup (see pos_advance_order).
+ * Site Service is never auto-added on regular POS payment.
+ * It is only applied when the cashier explicitly enables it while creating
+ * an Advance Order (pos_advance_order + site_service_utils.js).
  */
 patch(PosOrderline.prototype, {
     setup(vals) {

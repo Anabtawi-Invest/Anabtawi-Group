@@ -292,8 +292,7 @@ class PosSession(models.Model):
         bank_total = 0.0
         cash_count = 0
         bank_count = 0
-        for order in deposited:
-            row = order.read(["advance_amount", "pos_payment_method_id", "payment_method"])[0]
+        for row in deposited.read(["advance_amount", "pos_payment_method_id", "payment_method"]):
             amount = row.get("advance_amount") or 0.0
             pm_id = (row.get("pos_payment_method_id") or [False])[0]
             pm = self.env["pos.payment.method"].browse(pm_id) if pm_id else self.env["pos.payment.method"]

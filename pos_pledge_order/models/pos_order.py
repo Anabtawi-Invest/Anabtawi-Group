@@ -92,13 +92,11 @@ class PosOrder(models.Model):
         _logger.info("[PLEDGE] _order_fields: employee_id = %s", employee_id)
         return vals
 
-    @api.depends('lines.product_id', 'total_pledge_amount')
+    @api.depends('lines.product_id.has_pledge', 'total_pledge_amount')
     def _compute_has_pledge(self):
-        mapping = self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
         for order in self:
             has_line_pledge = any(
-                line.product_id and line.product_id.id in mapping
-                for line in order.lines
+                line.product_id and line.product_id.has_pledge for line in order.lines
             )
             has_snapshot = (order.total_pledge_amount or 0.0) > 0
             order.has_pledge = has_line_pledge or has_snapshot
@@ -126,29 +124,23 @@ class PosOrder(models.Model):
         except (TypeError, ValueError):
             return 0.0
 
-    def _get_menu_pledge_map(self):
-        return self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
-
     def _compute_pledge_from_lines(self):
-        """Return pledge totals from site service menu → pledge product mapping."""
+        """Return (total_pledge_amount, pledge_product_ids, total_pledge_qty) from pledged order lines."""
         self.ensure_one()
-        mapping = self._get_menu_pledge_map()
-        SiteLine = self.env["pos.site.service.product.line"]
         total_pledge_amount = 0.0
         pledge_product_ids = []
         total_pledge_qty = 0.0
         for line in self.lines.filtered(lambda l: l.product_id):
-            pledge_product = mapping.get(line.product_id.id)
-            if not pledge_product:
+            if not line.product_id.has_pledge:
                 continue
             qty = line.qty or 0.0
-            unit_pledge = SiteLine.resolve_pledge_unit_amount(pledge_product)
+            unit_pledge = line.product_id.pledge_amount or 0.0
             line_pledge = qty * unit_pledge
             if line_pledge <= 0:
                 continue
             total_pledge_amount += line_pledge
             total_pledge_qty += qty
-            pledge_product_ids.append(pledge_product.id)
+            pledge_product_ids.append(line.product_id.id)
         return total_pledge_amount, list(set(pledge_product_ids)), total_pledge_qty
 
     def _is_site_service_pledge_blocked(self):
@@ -160,8 +152,6 @@ class PosOrder(models.Model):
         if getattr(advance, "site_service", False):
             return True
         if hasattr(advance, "_pledge_applies") and not advance._pledge_applies():
-            return True
-        if advance.pledge_line_ids:
             return True
         return False
 
@@ -186,8 +176,7 @@ class PosOrder(models.Model):
             "pledge_totals_qty": pledge_totals[2],
             "pledge_totals_products": pledge_totals[1],
             "has_pledge_product_lines": any(
-                line.product_id.id in self._get_menu_pledge_map()
-                for line in self.lines.filtered(lambda l: l.product_id)
+                line.product_id.has_pledge for line in self.lines.filtered(lambda l: l.product_id)
             ),
         }
 
@@ -278,8 +267,7 @@ class PosOrder(models.Model):
             pids_snap,
         )
         if len(pids_snap) == 1 and qty_snap > 0:
-            pledge_product = self.env["product.product"].browse(pids_snap[0])
-            unit = self.env["pos.site.service.product.line"].resolve_pledge_unit_amount(pledge_product)
+            unit = float(self.env["product.product"].browse(pids_snap[0]).pledge_amount or 0.0)
             if unit > 0:
                 je_amt = cur.round(qty_snap * unit)
                 if je_amt > 0:
@@ -298,8 +286,6 @@ class PosOrder(models.Model):
         with their natural sale price.
         """
         Product = self.env["product.product"].sudo()
-        SiteLine = self.env["pos.site.service.product.line"]
-        mapping = SiteLine._get_menu_pledge_product_map()
         meta = {"total": 0.0, "product_ids": [], "qty": 0.0}
         is_refund = order.get("is_refund") or (order.get("amount_total") or 0) < 0
         if is_refund:
@@ -319,24 +305,38 @@ class PosOrder(models.Model):
             if not pid:
                 continue
             prod = Product.browse(pid)
-            pledge_product = mapping.get(prod.id) if prod.exists() else False
-            if not pledge_product:
-                continue
-            qty = self._pledge_sync_line_qty(vals)
-            unit_pledge = SiteLine.resolve_pledge_unit_amount(pledge_product)
-            line_pledge = currency.round(qty * unit_pledge) if qty > 0 and unit_pledge > 0 else 0.0
-            if line_pledge > 0:
-                meta["total"] += line_pledge
-                meta["qty"] += qty
-                meta["product_ids"].append(pledge_product.id)
-                _logger.info(
-                    "[PLEDGE][TRACE] payload line %s menu_product=%s pledge_product=%s qty=%s pledge_snapshot=%s",
-                    index,
-                    prod.id,
-                    pledge_product.id,
-                    qty,
-                    line_pledge,
-                )
+            if prod.exists() and prod.has_pledge:
+                qty = self._pledge_sync_line_qty(vals)
+                line_pledge = 0.0
+                # Prefer canonical pledge definition first.
+                if qty > 0:
+                    unit_pledge = float(prod.pledge_amount or 0.0)
+                    if unit_pledge > 0:
+                        line_pledge = currency.round(qty * unit_pledge)
+                # Fallback for legacy data where pledge_amount is not configured.
+                if line_pledge <= 0:
+                    for key in ("price_subtotal_incl", "price_subtotal"):
+                        raw = vals.get(key)
+                        if raw is not None:
+                            try:
+                                cand = float(raw)
+                            except (TypeError, ValueError):
+                                cand = 0.0
+                            if cand > 0:
+                                line_pledge = cand
+                                break
+                if line_pledge > 0:
+                    meta["total"] += line_pledge
+                    meta["qty"] += qty
+                    meta["product_ids"].append(pid)
+                    _logger.info(
+                        "[PLEDGE][TRACE] payload line %s keeps pledged product id=%s qty=%s sale_subtotal=%s pledge_snapshot=%s",
+                        index,
+                        pid,
+                        qty,
+                        vals.get("price_subtotal_incl", vals.get("price_subtotal")),
+                        line_pledge,
+                    )
                 continue
 
         if meta["total"] <= 0:
@@ -405,9 +405,7 @@ class PosOrder(models.Model):
             "[PLEDGE][TRACE] _process_order done order=%s lines=%s pledge_lines=%s snapshot_total=%s",
             po.name,
             len(po.lines),
-            len(po.lines.filtered(
-                lambda l: l.product_id and l.product_id.id in self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
-            )),
+            len(po.lines.filtered(lambda l: l.product_id.has_pledge)),
             pledge_meta["total"],
         )
         if pledge_meta["total"] > 0:
@@ -1002,10 +1000,9 @@ class PosOrder(models.Model):
         """
         lines = super()._get_invoice_lines_to_invoice()
         
-        mapping = self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
-        pledge_product_ids = {p.id for p in mapping.values()}
+        # Exclude pledge products
         filtered_lines = lines.filtered(
-            lambda l: l.product_id.id not in pledge_product_ids
+            lambda l: not l.product_id.has_pledge
         )
         
         _logger.info(
@@ -1026,10 +1023,7 @@ class PosOrderLine(models.Model):
         store=True
     )
 
-    @api.depends('product_id')
+    @api.depends('product_id.has_pledge')
     def _compute_pledge_related(self):
-        mapping = self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
         for line in self:
-            line.is_pledge_related = bool(
-                line.product_id and line.product_id.id in mapping
-            )
+            line.is_pledge_related = line.product_id.has_pledge

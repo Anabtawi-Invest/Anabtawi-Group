@@ -22,7 +22,6 @@
                             <field name="line_ids" nolabel="1">
                                 <list editable="bottom">
                                     <field name="product_id"/>
-                                    <field name="pledge_product_id" options="{'no_create': True}"/>
                                     <field name="multiple"/>
                                 </list>
                             </field>

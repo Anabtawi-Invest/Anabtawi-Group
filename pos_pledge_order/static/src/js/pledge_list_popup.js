@@ -14,7 +14,7 @@ export class PledgeListPopup extends Component {
     static props = {
         close: Function,
         getPayload: Function,
-        partnerId: { type: Number, optional: true },
+        returnType: { type: String, optional: true }, // 'employee' or 'customer'
     };
 
     setup() {
@@ -26,7 +26,7 @@ export class PledgeListPopup extends Component {
 
         this.state = useState({
             pledges: [],
-            selectedPledgeIds: [],
+            selectedPledgeId: null,
             search: "",
             selectedPledgeDetails: null,
             payment_methods: paymentMethods,
@@ -37,11 +37,7 @@ export class PledgeListPopup extends Component {
     }
 
     get title() {
-        return _t("Select Pledge(s) to Return");
-    }
-
-    get selectedCountLabel() {
-        return _t("%s pledge(s) selected", this.state.selectedPledgeIds.length);
+        return _t("Select Pledge to Return");
     }
 
     get detailsTitle() {
@@ -64,8 +60,8 @@ export class PledgeListPopup extends Component {
         return _t("Show");
     }
 
-    get unselectLabel() {
-        return _t("Unselect");
+    get selectLabel() {
+        return _t("Select");
     }
 
     get cancelLabel() {
@@ -152,29 +148,14 @@ export class PledgeListPopup extends Component {
         return _t("Showing %s of %s pledges", this.filteredPledges.length, this.state.pledges.length);
     }
 
-    get selectedPledges() {
-        const selected = new Set(this.state.selectedPledgeIds);
-        return this.state.pledges.filter((p) => selected.has(p.id));
-    }
-
-    get hasSelectedPledges() {
-        return this.state.selectedPledgeIds.length > 0;
-    }
-
-    get selectedReturnTotal() {
-        return this.selectedPledges.reduce(
-            (sum, pledge) => sum + Number(pledge.pledge_amount ?? 0),
-            0
-        );
+    get selectedPledge() {
+        return this.state.pledges.find((p) => p.id === this.state.selectedPledgeId) || null;
     }
 
     get selectedReturnAmountFmt() {
         const currencyId = this.pos?.currency?.id;
-        return formatCurrency(this.selectedReturnTotal, currencyId);
-    }
-
-    isPledgeSelected(pledge) {
-        return this.state.selectedPledgeIds.includes(pledge.id);
+        const amount = this.selectedPledge ? Number(this.selectedPledge.pledge_amount ?? 0) : 0;
+        return formatCurrency(amount, currencyId);
     }
 
     paymentMethodIconSrc(pm) {
@@ -200,19 +181,8 @@ export class PledgeListPopup extends Component {
     }
 
     pledgeCardClass(pledge) {
-        const selected = this.isPledgeSelected(pledge);
+        const selected = this.state.selectedPledgeId === pledge.id;
         return selected ? "card mb-2 border border-3 border-primary" : "card mb-2";
-    }
-
-    togglePledgeSelection(pledge) {
-        const ids = [...this.state.selectedPledgeIds];
-        const index = ids.indexOf(pledge.id);
-        if (index >= 0) {
-            ids.splice(index, 1);
-        } else {
-            ids.push(pledge.id);
-        }
-        this.state.selectedPledgeIds = ids;
     }
 
     selectPaymentMethod(pm) {
@@ -223,10 +193,16 @@ export class PledgeListPopup extends Component {
     // LOAD ACTIVE PLEDGES (FILTERED BY RETURN TYPE)
     // ==================================
     async _loadPledges() {
+        const returnType = this.props.returnType || "customer";
+        console.log("[PLEDGE] Loading active pledges for popup (return_type:", returnType, ")...");
+
         try {
             const domain = [["state", "=", "active"]];
-            if (this.props.partnerId) {
-                domain.push(["partner_id", "=", this.props.partnerId]);
+
+            if (returnType === "employee") {
+                domain.push(["employee_id", "!=", false]);
+            } else {
+                domain.push(["employee_id", "=", false]);
             }
 
             const rows = await this.orm.searchRead(
@@ -306,7 +282,7 @@ export class PledgeListPopup extends Component {
                     return pledge;
                 });
             }
-            console.log("[PLEDGE] Loaded", this.state.pledges.length, "active pledges");
+            console.log("[PLEDGE] Loaded", this.state.pledges.length, "active pledges for return_type:", returnType);
         } catch (error) {
             console.error("[PLEDGE] Error loading pledges:", error);
             this.notification.add(_t("Failed to load pledges"), { type: "danger" });
@@ -348,12 +324,13 @@ export class PledgeListPopup extends Component {
     }
 
     highlightPledge(pledge) {
-        this.togglePledgeSelection(pledge);
+        this.state.selectedPledgeId = pledge.id;
     }
 
     confirmReturn() {
-        if (!this.hasSelectedPledges) {
-            this.notification.add(_t("Please select at least one pledge to return."), { type: "warning" });
+        const pledge = this.selectedPledge;
+        if (!pledge) {
+            this.notification.add(_t("Please select a pledge to return."), { type: "warning" });
             return;
         }
         if (!this.state.selected_payment_method_id) {
@@ -364,11 +341,9 @@ export class PledgeListPopup extends Component {
             (pm) => pm.id === this.state.selected_payment_method_id
         );
         this.props.getPayload({
-            pledge_ids: [...this.state.selectedPledgeIds],
-            pledges: this.selectedPledges,
+            pledge,
             payment_method_id: this.state.selected_payment_method_id,
             payment_method_name: selectedPm?.name || "",
-            total_amount: this.selectedReturnTotal,
         });
         this.props.close();
     }

@@ -1,6 +1,6 @@
 /** @odoo-module */
 
-const PLEDGE_ORDER_BUILD_TAG = "PLEDGE_ORDER_BUILD_2026_08_11_MULTI_RETURN";
+const PLEDGE_ORDER_BUILD_TAG = "PLEDGE_ORDER_BUILD_2026_05_10_2155";
 console.log("[PLEDGE] Module loading started...", PLEDGE_ORDER_BUILD_TAG);
 
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
@@ -9,7 +9,6 @@ import { SelectionPopup } from "@point_of_sale/app/components/popups/selection_p
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { PledgeListPopup } from "@pos_pledge_order/js/pledge_list_popup";
 import { EmployeeSelectionPopup } from "@pos_pledge_order/js/employee_selection_popup";
-import { PartnerList } from "@point_of_sale/app/screens/partner_list/partner_list";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
 import OrderPaymentValidation from "@point_of_sale/app/utils/order_payment_validation";
 import { patch } from "@web/core/utils/patch";
@@ -18,15 +17,6 @@ import { useService } from "@web/core/utils/hooks";
 import { usePos } from "@point_of_sale/app/hooks/pos_hook";
 import { ask, makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
-import {
-    computeMappedPledgeDetails,
-    getLineProduct,
-    getPledgeProductForMenuProduct,
-    lineHasPledgeMapping,
-    menuProductHasPledgeMapping,
-    orderHasMappedPledgeProducts,
-    resolvePledgeUnitAmount,
-} from "@pos_pledge_order/js/pledge_mapping_utils";
 
 console.log("[PLEDGE] All imports successful");
 
@@ -69,12 +59,19 @@ function printHtmlReceipt(html, title = 'Receipt') {
     printWindow.document.close();
 }
 
-function orderHasPledgeProducts(order, pos) {
-    const context = pos || (order?.models ? { models: order.models } : null);
-    if (!context) {
+function orderHasPledgeProducts(order) {
+    if (!order) {
         return false;
     }
-    return orderHasMappedPledgeProducts(order, context);
+    const lines = order.getOrderlines ? order.getOrderlines() : order.lines || [];
+    return lines.some((line) => {
+        const product =
+            (line.get_product && line.get_product()) ||
+            (line.getProduct && line.getProduct()) ||
+            line.product_id ||
+            line.product;
+        return product?.has_pledge === true;
+    });
 }
 
 function getOrderPricelistName(order, pos) {
@@ -214,51 +211,129 @@ patch(ControlButtons.prototype, {
     },
 
     async onClickReturnPledge() {
+        console.log("[PLEDGE] ========================================");
+        console.log("[PLEDGE] Return Pledge button clicked!");
+        console.log("[PLEDGE] makeAwaitable available:", typeof makeAwaitable);
+        console.log("[PLEDGE] SelectionPopup available:", typeof SelectionPopup);
+        console.log("[PLEDGE] this.dialog:", this.dialog);
+        console.log("[PLEDGE] ========================================");
+        
         try {
-            const partner = await makeAwaitable(this.dialog, PartnerList, {});
-            if (!partner) {
+            // First, show return type selection
+            console.log("[PLEDGE] Step 1: Showing return type selection popup...");
+            
+            const returnTypeList = [
+                { 
+                    id: 'employee', 
+                    label: _t("Return Employee Pledge"),
+                    item: 'employee' 
+                },
+                { 
+                    id: 'customer', 
+                    label: _t("Return Customer Pledge"),
+                    item: 'customer' 
+                },
+            ];
+            
+            console.log("[PLEDGE] Return type list:", returnTypeList);
+            console.log("[PLEDGE] About to call makeAwaitable...");
+            
+            let returnType;
+            try {
+                console.log("[PLEDGE] Creating return type selection promise...");
+                returnType = await new Promise((resolve) => {
+                    console.log("[PLEDGE] Adding SelectionPopup to dialog...");
+                    this.dialog.add(
+                        SelectionPopup,
+                        {
+                            title: _t("Select Return Type"),
+                            list: returnTypeList,
+                            getPayload: (response) => {
+                                console.log("[PLEDGE] SelectionPopup getPayload called with:", response);
+                                resolve(response);
+                            },
+                        },
+                        {
+                            onClose: () => {
+                                console.log("[PLEDGE] SelectionPopup closed without selection");
+                                resolve(null);
+                            },
+                        }
+                    );
+                    console.log("[PLEDGE] SelectionPopup added to dialog");
+                });
+                console.log("[PLEDGE] Promise resolved, returnType:", returnType);
+            } catch (popupError) {
+                console.error("[PLEDGE] Error in return type selection:", popupError);
+                throw popupError;
+            }
+
+            console.log("[PLEDGE] Return type selection result:", returnType);
+            console.log("[PLEDGE] Return type type:", typeof returnType);
+
+            if (!returnType) {
+                console.log("[PLEDGE] ⚠️ No return type selected, cancelling");
                 return;
             }
 
-            const selection = await makeAwaitable(this.dialog, PledgeListPopup, {
-                partnerId: partner.id,
+            console.log("[PLEDGE] ✓ Selected return type:", returnType);
+
+            // Show pledge list popup with search (filtered by return_type)
+            console.log("[PLEDGE] Showing pledge list popup with return_type:", returnType);
+            const selection = await new Promise((resolve) => {
+                this.dialog.add(
+                    PledgeListPopup,
+                    {
+                        returnType: returnType,
+                        getPayload: (response) => {
+                            console.log("[PLEDGE] PledgeListPopup getPayload called with:", response);
+                            resolve(response);
+                        },
+                    },
+                    {
+                        onClose: () => {
+                            console.log("[PLEDGE] PledgeListPopup closed without selection");
+                            resolve(null);
+                        },
+                    }
+                );
             });
 
-            if (!selection || !selection.pledge_ids?.length) {
+            if (!selection || !selection.pledge) {
+                console.log("[PLEDGE] No pledge selected, cancelling");
                 return;
             }
 
-            const result = await this.env.services.orm.call(
+            const selectedPledge = selection.pledge;
+            const paymentMethodId = selection.payment_method_id;
+
+            console.log("[PLEDGE] Selected pledge:", selectedPledge);
+            console.log("[PLEDGE] Return type:", returnType);
+            console.log("[PLEDGE] Return payment method:", paymentMethodId);
+
+            console.log("[PLEDGE] Calling action_return_pledge for ID:", selectedPledge.id, "Type:", returnType);
+
+            await this.env.services.orm.call(
                 "pos.advance.order.pledge",
-                "action_return_pledges",
-                [selection.pledge_ids],
+                "action_return_pledge",
+                [[selectedPledge.id]],
                 {
-                    pos_payment_method_id: selection.payment_method_id,
+                    pos_payment_method_id: paymentMethodId,
                     pos_session_id: this.pos.session?.id || false,
+                    context: { return_type: returnType },
                 }
             );
+            console.log("[PLEDGE] action_return_pledge completed successfully");
 
-            const refundCount = result?.count || (result?.refund_order_name ? 1 : 0);
-            const pledgeCount = selection.pledge_ids.length;
-            if (refundCount > 1) {
-                this.notification.add(
-                    _t(
-                        "%s pledge(s) returned in %s refund order(s).",
-                        pledgeCount,
-                        refundCount
-                    ),
-                    { type: "success" }
-                );
-            } else {
-                this.notification.add(
-                    _t("%s pledge(s) returned successfully.", pledgeCount),
-                    { type: "success" }
-                );
-            }
+            this.notification.add(
+                _t("Pledge returned successfully. Reversal entry created."),
+                { type: "success" }
+            );
+
         } catch (error) {
             console.error("[PLEDGE] Error returning pledge:", error);
             this.notification.add(
-                error.message || error.data?.message || _t("Failed to return pledge"),
+                error.message || _t("Failed to return pledge"),
                 { type: "danger" }
             );
         }
@@ -346,15 +421,15 @@ patch(PosOrder.prototype, {
             (data.lines || []).length
         );
         lines.forEach((line, idx) => {
-            const product = getLineProduct(line);
+            const product = line.getProduct ? line.getProduct() : (line.product || line.product_id);
             console.warn(
-                "[PLEDGE][TRACE][FRONT] line#%s product=%s id=%s qty=%s unit=%s has_pledge_mapping=%s",
+                "[PLEDGE][TRACE][FRONT] line#%s product=%s id=%s qty=%s unit=%s has_pledge=%s",
                 idx + 1,
                 product?.display_name || product?.name || "unknown",
                 product?.id || "n/a",
                 line.get_quantity ? line.get_quantity() : (line.qty || 0),
                 line.get_unit_price ? line.get_unit_price() : (line.price_unit || 0),
-                menuProductHasPledgeMapping({ models: this.models }, product)
+                product?.has_pledge === true
             );
         });
         return data;
@@ -651,27 +726,52 @@ patch(PaymentScreen.prototype, {
      * The standard "Print Full Receipt" uses default Odoo receipt + QWeb inheritance
      */
     _prepareReceiptData(order) {
+        // Get base receipt data
         const receiptData = order.export_for_printing();
         const lines = order.getOrderlines ? order.getOrderlines() : order.lines || [];
         receiptData.pricelist_name = getOrderPricelistName(order, this.pos);
-        const pledgeInfo = computeMappedPledgeDetails(order, this.pos);
-
+        
+        console.log("[PLEDGE] Preparing receipt data for order");
+        
+        // Add pledge information to each orderline for QWeb template
         receiptData.orderlines.forEach((receiptLine, index) => {
             const orderline = lines[index];
             if (orderline) {
-                const menuProduct = getLineProduct(orderline);
-                const pledgeProduct = getPledgeProductForMenuProduct(this.pos, menuProduct);
-                receiptLine.has_pledge = Boolean(pledgeProduct);
-                receiptLine.pledge_amount = pledgeProduct
-                    ? resolvePledgeUnitAmount(pledgeProduct)
-                    : 0;
-                receiptLine.is_employee_service = menuProduct?.is_employee_service || false;
+                const product = orderline.product || orderline.product_id;
+                // Add pledge properties to receipt line
+                receiptLine.has_pledge = product?.has_pledge || false;
+                receiptLine.pledge_amount = product?.pledge_amount || 0;
+                receiptLine.is_employee_service = product?.is_employee_service || false;
             }
         });
-
-        receiptData.pledgeDetails = pledgeInfo.pledgeDetails;
-        receiptData.totalPledgeAmount = pledgeInfo.totalPledgeAmount;
-        receiptData.hasPledgeProducts = pledgeInfo.hasPledge;
+        
+        // Calculate total pledge amount for the receipt
+        let totalPledgeAmount = 0;
+        const pledgeDetails = [];
+        
+        lines.forEach(line => {
+            const product = line.product || line.product_id;
+            if (product?.has_pledge === true) {
+                const pledgeAmount = product.pledge_amount || 0;
+                const quantity = line.get_quantity ? line.get_quantity() : line.qty;
+                const lineTotal = pledgeAmount * quantity;
+                totalPledgeAmount += lineTotal;
+                
+                pledgeDetails.push({
+                    product_name: product.display_name || product.name,
+                    pledge_amount: pledgeAmount,
+                    quantity: quantity,
+                    total: lineTotal
+                });
+            }
+        });
+        
+        // Add pledge information to receipt data
+        receiptData.pledgeDetails = pledgeDetails;
+        receiptData.totalPledgeAmount = totalPledgeAmount;
+        receiptData.hasPledgeProducts = pledgeDetails.length > 0;
+        
+        console.log("[PLEDGE] Pledge details:", pledgeDetails.length, "items, total:", totalPledgeAmount);
 
         // Create customer orderlines - include ALL products with product prices
         // Virtual pledge lines are automatically excluded (not in order.lines)
@@ -843,31 +943,31 @@ patch(PaymentScreen.prototype, {
 
     _checkPledgeItems(order) {
         if (!order) return false;
-
+        
         const lines = order.getOrderlines ? order.getOrderlines() : order.lines || [];
-        const posContext = this.pos || (order.models ? { models: order.models } : null);
-        return lines.some((line) => {
-            const product = getLineProduct(line);
-            return (
-                (posContext && lineHasPledgeMapping(posContext, line)) ||
-                product?.is_employee_service
-            );
+        return lines.some(line => {
+            const product = line.product || line.product_id;
+            return product?.has_pledge || 
+                   product?.is_employee_service;
         });
     },
 
     _preparePledgeData(order) {
         const lines = order.getOrderlines ? order.getOrderlines() : order.lines || [];
-        const posContext = this.pos || (order.models ? { models: order.models } : null);
-        const pledgeInfo = posContext ? computeMappedPledgeDetails(order, posContext) : {
-            totalPledgeAmount: 0,
-            pledgeDetails: [],
-            pledgeProductIds: [],
-            hasPledge: false,
-        };
-
-        const hasEmployee = lines.some((l) => getLineProduct(l)?.is_employee_service);
-        const hasPledge = pledgeInfo.hasPledge;
-        const hasDelivery = lines.some((l) => getLineProduct(l)?.is_delivery_product);
+        
+        // Detect case type
+        const hasEmployee = lines.some(l => {
+            const product = l.product || l.product_id;
+            return product?.is_employee_service;
+        });
+        const hasPledge = lines.some(l => {
+            const product = l.product || l.product_id;
+            return product?.has_pledge;
+        });
+        const hasDelivery = lines.some(l => {
+            const product = l.product || l.product_id;
+            return product?.is_delivery_product;
+        });
         
         // Determine case type based on what's present
         let caseType = null;
@@ -891,30 +991,73 @@ patch(PaymentScreen.prototype, {
         
         console.log("[PLEDGE] Detected case:", caseType);
         
-        let pledgeAmount = pledgeInfo.totalPledgeAmount;
+        // Calculate amounts
+        let pledgeAmount = 0;
         let employeeAmount = 0;
         let deliveryAmount = 0;
-
-        lines.forEach((line) => {
-            const product = getLineProduct(line);
+        
+        console.log("[PLEDGE] Calculating amounts from", lines.length, "lines");
+        
+        lines.forEach((line, idx) => {
+            const product = line.product || line.product_id;
+            console.log(`[PLEDGE] Line ${idx}:`, {
+                product_name: product?.display_name || product?.name,
+                has_pledge: product?.has_pledge,
+                is_employee_service: product?.is_employee_service,
+                is_delivery_product: product?.is_delivery_product,
+                pledge_amount: product?.pledge_amount,
+            });
+            
+            // Get price - try multiple methods for Odoo 19 compatibility
             let price = 0;
-            if (typeof line.get_price_with_tax === "function") {
+            
+            if (typeof line.get_price_with_tax === 'function') {
                 price = line.get_price_with_tax();
-            } else if (typeof line.getPriceWithTax === "function") {
+                console.log(`[PLEDGE]   -> get_price_with_tax(): ${price}`);
+            } else if (typeof line.getPriceWithTax === 'function') {
                 price = line.getPriceWithTax();
+                console.log(`[PLEDGE]   -> getPriceWithTax(): ${price}`);
+            } else if (typeof line.get_all_prices === 'function') {
+                const prices = line.get_all_prices();
+                price = prices?.priceWithTax || prices?.price_with_tax || 0;
+                console.log(`[PLEDGE]   -> get_all_prices(): ${JSON.stringify(prices)}`);
             } else if (line.price_subtotal_incl !== undefined) {
                 price = line.price_subtotal_incl;
+                console.log(`[PLEDGE]   -> price_subtotal_incl: ${price}`);
+            } else if (line.price_with_tax !== undefined) {
+                price = line.price_with_tax;
+                console.log(`[PLEDGE]   -> price_with_tax: ${price}`);
             } else {
+                // Fallback: calculate manually
                 const qty = line.quantity || line.qty || 0;
                 const unitPrice = line.price_unit || line.price || 0;
                 const discount = line.discount || 0;
                 price = qty * unitPrice * (1 - discount / 100);
+                console.log(`[PLEDGE]   -> Manual calc: ${qty} * ${unitPrice} * (1 - ${discount}/100) = ${price}`);
+                console.log(`[PLEDGE]   -> Note: This is without tax! Line object:`, line);
             }
-            if (product?.is_employee_service) {
+            
+            console.log(`[PLEDGE]   -> Final price for line: ${price}`);
+            
+            if (product?.has_pledge) {
+                const qty = line.get_quantity ? line.get_quantity() : line.qty || 0;
+                const unitPledge = product.pledge_amount || 0;
+                const lineAmount = unitPledge ? unitPledge * qty : price;
+                pledgeAmount += lineAmount;
+                console.log(`[PLEDGE]   -> Adding ${lineAmount} to pledgeAmount (total: ${pledgeAmount})`);
+            } else if (product?.is_employee_service) {
                 employeeAmount += price;
+                console.log(`[PLEDGE]   -> Adding ${price} to employeeAmount (total: ${employeeAmount})`);
             } else if (product?.is_delivery_product) {
                 deliveryAmount += price;
+                console.log(`[PLEDGE]   -> Adding ${price} to deliveryAmount (total: ${deliveryAmount})`);
             }
+        });
+        
+        console.log("[PLEDGE] Final calculated amounts:", {
+            pledgeAmount,
+            employeeAmount,
+            deliveryAmount
         });
         
         // Get partner
@@ -925,7 +1068,16 @@ patch(PaymentScreen.prototype, {
             return null;
         }
         
-        const pledgeProducts = pledgeInfo.pledgeProductIds;
+        // Prepare pledge products data
+        const pledgeProducts = lines
+            .filter(l => {
+                const product = l.product || l.product_id;
+                return product?.has_pledge;
+            })
+            .map(l => {
+                const product = l.product || l.product_id;
+                return product.id;
+            });
         
         const employeeLine = lines.find(l => {
             const product = l.product || l.product_id;
@@ -946,7 +1098,6 @@ patch(PaymentScreen.prototype, {
             employee_amount: employeeAmount,
             delivery_amount: deliveryAmount,
             pledge_products: pledgeProducts,
-            pledge_line_details: pledgeInfo.pledgeDetails,
             employee_product_id: employeeProductId,
             delivery_product_id: deliveryProductId,
         };

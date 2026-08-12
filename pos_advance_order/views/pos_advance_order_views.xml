@@ -87,19 +87,12 @@
                         invisible="state == 'cancel' or not remaining_pos_order_id"
                     />
                     <button
-                        name="action_view_invoice"
-                        type="object"
-                        string="View Invoice"
-                        class="btn-secondary"
-                        invisible="state != 'fully_paid' or not invoice_id"
-                    />
-                    <button
                         name="action_return_pledge"
                         type="object"
                         string="Return Pledge"
                         class="btn-secondary"
                         groups="point_of_sale.group_pos_manager"
-                        invisible="state != 'fully_paid' or not remaining_pos_order_id or return_pledge_pos_order_id"
+                        invisible="state == 'cancel' or pledge_amount &lt;= 0 or return_pledge_pos_order_id"
                     />
                     <button
                         name="action_create_remaining_payment"
@@ -202,6 +195,26 @@
                                 </list>
                             </field>
                         </page>
+                        <page string="Pledges">
+                            <group>
+                                <field name="pledge_count" readonly="1"/>
+                            </group>
+                            <field name="pledge_line_ids" readonly="1">
+                                <list string="Pledges">
+                                    <field name="employee_id" optional="hide"/>
+                                    <field name="product_id"/>
+                                    <field name="state" widget="badge"
+                                        decoration-success="state == 'active'"
+                                        decoration-warning="state == 'returned'"
+                                        decoration-danger="state == 'cancelled'"/>
+                                    <field name="pledge_qty"/>
+                                    <field name="pledge_amount_unit" widget="monetary"/>
+                                    <field name="pledge_subtotal" widget="monetary"/>
+                                    <field name="receive_date" optional="show"/>
+                                    <field name="return_date" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
                     </notebook>
 
                     <group class="oe_subtotal_footer oe_right">
@@ -210,8 +223,9 @@
                         <field name="change_amount" widget="monetary" readonly="1"/>
                         <field name="remaining_amount_tendered" widget="monetary" readonly="1" invisible="remaining_amount_tendered == 0"/>
                         <field name="remaining_change_amount" widget="monetary" readonly="1" invisible="remaining_change_amount == 0"/>
+                        <field name="pledge_amount" widget="monetary" readonly="1" invisible="pledge_amount == 0"/>
+
                         <field name="discount_amount" widget="monetary" readonly="1"/>
-                        <field name="invoice_id" readonly="1" invisible="not invoice_id"/>
 
                         <field name="amount_remaining" widget="monetary" readonly="1"/>
                         <field name="from_pos_config_id" readonly="state != 'draft'"/>
