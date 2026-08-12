@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime, time
 import io
+import logging
 
 from odoo import _, api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class PosUnifiedReportWizard(models.TransientModel):
@@ -33,6 +36,20 @@ class PosUnifiedReportWizard(models.TransientModel):
         help="Leave empty to include all active branches.",
     )
 
+    def _to_datetime(self, val):
+        if not val:
+            return None
+        if isinstance(val, datetime):
+            return val
+        val_str = str(val).strip().replace("T", " ")
+        try:
+            return datetime.strptime(val_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            try:
+                return fields.Datetime.from_string(val_str)
+            except Exception:
+                return None
+
     def action_open_dashboard(self):
         self.ensure_one()
         c_ids = self.config_ids.ids if self.config_ids else []
@@ -49,93 +66,77 @@ class PosUnifiedReportWizard(models.TransientModel):
 
     def action_open_pivot(self):
         self.ensure_one()
-        # 1. Clear previous transient report records
-        self.env["pos.unified.report"].search([]).unlink()
+        dt_start = self._to_datetime(self.date_from) or datetime.combine(fields.Date.context_today(self), time.min)
+        dt_end = self._to_datetime(self.date_to) or datetime.combine(fields.Date.context_today(self), time.max)
+        str_start = fields.Datetime.to_string(dt_start)
+        str_end = fields.Datetime.to_string(dt_end)
 
-        # 2. Populate unified report records
-        str_start = fields.Datetime.to_string(self.date_from)
-        str_end = fields.Datetime.to_string(self.date_to)
+        # Clear previous transient report records
+        self.env["pos.unified.report"].sudo().search([]).unlink()
 
         config_domain = [("active", "=", True)]
         if self.config_ids:
             config_domain.append(("id", "in", self.config_ids.ids))
-        configs = self.env["pos.config"].search(config_domain)
+        configs = self.env["pos.config"].sudo().search(config_domain)
         active_config_ids = set(configs.ids)
-
-        session_domain = [
-            ("config_id", "in", list(active_config_ids)),
-            "|",
-            "&", ("start_at", ">=", str_start), ("start_at", "<=", str_end),
-            "&", ("stop_at", ">=", str_start), ("stop_at", "<=", str_end),
-        ]
-        sessions = self.env["pos.session"].search(session_domain)
-        session_ids = sessions.ids
 
         vals_list = []
 
-        if session_ids:
-            # POS Payments
-            payments = self.env["pos.payment"].search([
-                ("session_id", "in", session_ids),
-                ("payment_date", ">=", str_start),
-                ("payment_date", "<=", str_end),
-            ])
-            for pay in payments:
-                amt = pay.amount or 0.0
-                pm = pay.payment_method_id
-                daily_type = getattr(pm, "daily_ops_report_type", "")
-                pm_type = getattr(pm, "type", "")
-                pm_name = (pm.name or "").lower()
+        # POS Payments
+        payments = self.env["pos.payment"].sudo().search([
+            ("session_id.config_id", "in", list(active_config_ids)),
+            ("payment_date", ">=", str_start),
+            ("payment_date", "<=", str_end),
+        ])
+        for pay in payments:
+            amt = pay.amount or 0.0
+            pm = pay.payment_method_id
+            daily_type = getattr(pm, "daily_ops_report_type", "")
+            pm_type = getattr(pm, "type", "")
+            pm_name = (pm.name or "").lower()
 
-                is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
-                is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
+            is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
+            is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
 
-                vals_list.append({
-                    "name": pay.pos_order_id.name or pay.name or _("POS Payment"),
-                    "date": pay.payment_date or self.date_from,
-                    "config_id": pay.session_id.config_id.id,
-                    "session_id": pay.session_id.id,
-                    "payment_method_id": pm.id,
-                    "report_type": "pos_sales",
-                    "amount": amt,
-                    "cash_amount": amt if is_cash else 0.0,
-                    "visa_amount": amt if is_visa else 0.0,
-                    "partner_id": pay.pos_order_id.partner_id.id if pay.pos_order_id else False,
-                })
+            vals_list.append({
+                "name": pay.pos_order_id.name or pay.name or _("POS Payment"),
+                "date": pay.payment_date or self.date_from,
+                "config_id": pay.session_id.config_id.id,
+                "session_id": pay.session_id.id,
+                "payment_method_id": pm.id,
+                "report_type": "pos_sales",
+                "amount": amt,
+                "cash_amount": amt if is_cash else 0.0,
+                "visa_amount": amt if is_visa else 0.0,
+                "partner_id": pay.pos_order_id.partner_id.id if pay.pos_order_id else False,
+            })
 
-            # Statement Lines (Cash In / Out)
-            st_lines = self.env["account.bank.statement.line"].search([
-                ("pos_session_id", "in", session_ids),
-                ("date", ">=", self.date_from.date()),
-                ("date", "<=", self.date_to.date()),
-            ])
-            for st in st_lines:
-                amt = st.amount or 0.0
-                is_in = amt > 0
-                st_dt = datetime.combine(st.date, time.min) if st.date else self.date_from
-                vals_list.append({
-                    "name": st.payment_ref or st.ref or _("Cash Move"),
-                    "date": st_dt,
-                    "config_id": st.pos_session_id.config_id.id,
-                    "session_id": st.pos_session_id.id,
-                    "report_type": "cash_in" if is_in else "cash_out",
-                    "amount": abs(amt),
-                    "cash_in_amount": amt if is_in else 0.0,
-                    "cash_out_amount": abs(amt) if not is_in else 0.0,
-                    "partner_id": st.partner_id.id,
-                })
+        # Statement Lines (Cash In / Out)
+        st_lines = self.env["account.bank.statement.line"].sudo().search([
+            ("pos_session_id.config_id", "in", list(active_config_ids)),
+            ("date", ">=", dt_start.date()),
+            ("date", "<=", dt_end.date()),
+        ])
+        for st in st_lines:
+            amt = st.amount or 0.0
+            is_in = amt > 0
+            st_dt = datetime.combine(st.date, time.min) if st.date else self.date_from
+            vals_list.append({
+                "name": st.payment_ref or st.ref or _("Cash Move"),
+                "date": st_dt,
+                "config_id": st.pos_session_id.config_id.id,
+                "session_id": st.pos_session_id.id,
+                "report_type": "cash_in" if is_in else "cash_out",
+                "amount": abs(amt),
+                "cash_in_amount": amt if is_in else 0.0,
+                "cash_out_amount": abs(amt) if not is_in else 0.0,
+                "partner_id": st.partner_id.id,
+            })
 
         # Pledges (Rahen In / Out)
         if "pos.advance.order.pledge" in self.env:
-            # Rahen In
-            pledges_in = self.env["pos.advance.order.pledge"].search([
-                ("state", "in", ("active", "returned")),
-                "|",
-                "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
-                "&", ("receive_date", "=", False),
-                     "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
-            ])
-            for pledge in pledges_in:
+            pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([])
+            for pledge in pledge_recs:
                 cfg_id = False
                 if pledge.pos_order_id:
                     cfg_id = pledge.pos_order_id.config_id.id
@@ -148,75 +149,57 @@ class PosUnifiedReportWizard(models.TransientModel):
                     continue
 
                 amt = pledge.pledge_subtotal or (getattr(pledge, "pledge_qty", 1.0) * getattr(pledge, "pledge_amount_unit", 0.0)) or getattr(pledge, "pledge_amount", 0.0) or 0.0
-                p_date = pledge.receive_date or pledge.create_date or self.date_from
 
-                vals_list.append({
-                    "name": pledge.display_name or _("Pledge Record"),
-                    "date": p_date,
-                    "config_id": cfg_id,
-                    "report_type": "rahen_in",
-                    "amount": amt,
-                    "rahen_in_amount": amt,
-                    "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
-                })
+                rec_dt = self._to_datetime(pledge.receive_date) or self._to_datetime(pledge.create_date)
+                ret_dt = self._to_datetime(pledge.return_date) or (self._to_datetime(pledge.write_date) if pledge.state == "returned" else None)
 
-            # Rahen Out
-            pledges_out = self.env["pos.advance.order.pledge"].search([
-                ("state", "=", "returned"),
-                "|",
-                "&", ("return_date", ">=", str_start), ("return_date", "<=", str_end),
-                "&", ("return_date", "=", False),
-                     "&", ("write_date", ">=", str_start), ("write_date", "<=", str_end),
-            ])
-            for pledge in pledges_out:
-                cfg_id = False
-                if pledge.pos_order_id:
-                    cfg_id = pledge.pos_order_id.config_id.id
-                elif pledge.order_id and hasattr(pledge.order_id, "pos_config_id"):
-                    cfg_id = pledge.order_id.pos_config_id.id
-                elif pledge.order_id and hasattr(pledge.order_id, "from_pos_config_id"):
-                    cfg_id = pledge.order_id.from_pos_config_id.id
+                if rec_dt and dt_start <= rec_dt <= dt_end:
+                    vals_list.append({
+                        "name": pledge.display_name or _("Pledge Record"),
+                        "date": rec_dt,
+                        "config_id": cfg_id,
+                        "report_type": "rahen_in",
+                        "amount": amt,
+                        "rahen_in_amount": amt,
+                        "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
+                    })
 
-                if not cfg_id or cfg_id not in active_config_ids:
-                    continue
-
-                amt = pledge.pledge_subtotal or (getattr(pledge, "pledge_qty", 1.0) * getattr(pledge, "pledge_amount_unit", 0.0)) or getattr(pledge, "pledge_amount", 0.0) or 0.0
-                p_date = pledge.return_date or pledge.write_date or self.date_to
-
-                vals_list.append({
-                    "name": pledge.display_name or _("Pledge Return Record"),
-                    "date": p_date,
-                    "config_id": cfg_id,
-                    "report_type": "rahen_out",
-                    "amount": amt,
-                    "rahen_out_amount": amt,
-                    "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
-                })
+                if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
+                    vals_list.append({
+                        "name": pledge.display_name or _("Pledge Return Record"),
+                        "date": ret_dt,
+                        "config_id": cfg_id,
+                        "report_type": "rahen_out",
+                        "amount": amt,
+                        "rahen_out_amount": amt,
+                        "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
+                    })
 
         # Advance Orders
         if "pos.advance.order" in self.env:
-            adv_orders = self.env["pos.advance.order"].search([
-                ("create_date", ">=", str_start),
-                ("create_date", "<=", str_end),
+            adv_orders = self.env["pos.advance.order"].sudo().search([
                 ("state", "not in", ("draft", "cancel")),
             ])
             for adv in adv_orders:
                 cfg_id = adv.from_pos_config_id.id if adv.from_pos_config_id else (adv.pos_config_id.id if adv.pos_config_id else False)
                 if not cfg_id or cfg_id not in active_config_ids:
                     continue
-                amt = adv.advance_amount or 0.0
-                vals_list.append({
-                    "name": adv.name or _("Advance Order"),
-                    "date": adv.create_date or self.date_from,
-                    "config_id": cfg_id,
-                    "report_type": "advance_deposit",
-                    "amount": amt,
-                    "advance_amount": amt,
-                    "partner_id": adv.partner_id.id if hasattr(adv, "partner_id") else False,
-                })
+
+                c_dt = self._to_datetime(adv.create_date)
+                if c_dt and dt_start <= c_dt <= dt_end:
+                    amt = adv.advance_amount or 0.0
+                    vals_list.append({
+                        "name": adv.name or _("Advance Order"),
+                        "date": c_dt,
+                        "config_id": cfg_id,
+                        "report_type": "advance_deposit",
+                        "amount": amt,
+                        "advance_amount": amt,
+                        "partner_id": adv.partner_id.id if hasattr(adv, "partner_id") else False,
+                    })
 
         if vals_list:
-            self.env["pos.unified.report"].create(vals_list)
+            self.env["pos.unified.report"].sudo().create(vals_list)
 
         return {
             "name": _("Unified POS Operations Analysis"),
@@ -238,11 +221,16 @@ class PosUnifiedReportWizard(models.TransientModel):
         self.ensure_one()
         import xlsxwriter
 
+        dt_start = self._to_datetime(self.date_from) or datetime.combine(fields.Date.context_today(self), time.min)
+        dt_end = self._to_datetime(self.date_to) or datetime.combine(fields.Date.context_today(self), time.max)
+        str_start = fields.Datetime.to_string(dt_start)
+        str_end = fields.Datetime.to_string(dt_end)
+
         service = self.env["pos.reporting.dashboard"]
         config_ids = self.config_ids.ids if self.config_ids else None
         data = service.get_dashboard_data(
-            date_from=fields.Datetime.to_string(self.date_from),
-            date_to=fields.Datetime.to_string(self.date_to),
+            date_from=str_start,
+            date_to=str_end,
             config_ids=config_ids,
         )
 
@@ -354,8 +342,8 @@ class PosUnifiedReportWizard(models.TransientModel):
         sheet1.write_number(curr_row, 19, gt.get("advance_pending_count", 0), total_int_fmt)
         sheet1.write_number(curr_row, 20, gt["delivery_amount"], total_num_fmt)
 
-        str_start = fields.Datetime.to_string(self.date_from)
-        str_end = fields.Datetime.to_string(self.date_to)
+        # Target branch config IDs set
+        target_config_ids = set(self.config_ids.ids) if self.config_ids else None
 
         # --- Sheet 2: Advance Orders Detail ---
         if "pos.advance.order" in self.env:
@@ -389,19 +377,7 @@ class PosUnifiedReportWizard(models.TransientModel):
             for col_idx, h in enumerate(adv_headers):
                 sheet2.write(start_row_adv, col_idx, h, header_fmt)
 
-            adv_domain = [
-                ("state", "not in", ("draft", "cancel")),
-                "|",
-                "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
-                "&", ("picking_date", ">=", str_start), ("picking_date", "<=", str_end),
-            ]
-            if self.config_ids:
-                c_ids = self.config_ids.ids
-                adv_domain.insert(0, "|")
-                adv_domain.append(("from_pos_config_id", "in", c_ids))
-                adv_domain.append(("pos_config_id", "in", c_ids))
-
-            adv_recs = self.env["pos.advance.order"].search(adv_domain, order="id desc")
+            adv_recs = self.env["pos.advance.order"].sudo().search([("state", "not in", ("draft", "cancel"))], order="id desc")
 
             c_row = start_row_adv + 1
             tot_grand = 0.0
@@ -410,6 +386,22 @@ class PosUnifiedReportWizard(models.TransientModel):
             tot_plg = 0.0
 
             for a in adv_recs:
+                orig_cfg_id = a.from_pos_config_id.id if a.from_pos_config_id else (a.pos_config_id.id if a.pos_config_id else False)
+                pick_cfg_id = a.pos_config_id.id if a.pos_config_id else orig_cfg_id
+
+                if target_config_ids:
+                    if (orig_cfg_id not in target_config_ids) and (pick_cfg_id not in target_config_ids):
+                        continue
+
+                c_dt = self._to_datetime(a.create_date)
+                p_dt = self._to_datetime(a.picking_date)
+
+                c_in_range = c_dt and (dt_start <= c_dt <= dt_end)
+                p_in_range = p_dt and (dt_start <= p_dt <= dt_end)
+
+                if not (c_in_range or p_in_range):
+                    continue
+
                 orig_name = a.from_pos_config_id.name if a.from_pos_config_id else (a.pos_config_id.name if a.pos_config_id else "")
                 pick_name = a.pos_config_id.name if a.pos_config_id else orig_name
                 emp_name = a.employee_id.name if a.employee_id else (a.user_id.name if a.user_id else "")
@@ -421,8 +413,8 @@ class PosUnifiedReportWizard(models.TransientModel):
                 p_amt = a.pledge_amount or 0.0
 
                 sheet2.write(c_row, 0, a.name or "", text_fmt)
-                sheet2.write(c_row, 1, fields.Datetime.to_string(a.create_date) if a.create_date else "", center_fmt)
-                sheet2.write(c_row, 2, fields.Datetime.to_string(a.picking_date) if a.picking_date else "", center_fmt)
+                sheet2.write(c_row, 1, fields.Datetime.to_string(c_dt) if c_dt else "", center_fmt)
+                sheet2.write(c_row, 2, fields.Datetime.to_string(p_dt) if p_dt else "", center_fmt)
                 sheet2.write(c_row, 3, a.partner_id.name if a.partner_id else "", text_fmt)
                 sheet2.write(c_row, 4, emp_name, text_fmt)
                 sheet2.write(c_row, 5, orig_name, text_fmt)
@@ -480,28 +472,13 @@ class PosUnifiedReportWizard(models.TransientModel):
             for col_idx, h in enumerate(plg_headers):
                 sheet3.write(start_row_plg, col_idx, h, header_fmt)
 
-            plg_domain = [
-                "|",
-                "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
-                "&", ("return_date", ">=", str_start), ("return_date", "<=", str_end),
-            ]
-            if self.config_ids:
-                c_ids = self.config_ids.ids
-                plg_domain.insert(0, "|")
-                plg_domain.append(("pos_order_id.config_id", "in", c_ids))
-                plg_domain.append(("order_id.pos_config_id", "in", c_ids))
-
-            pledge_recs = self.env["pos.advance.order.pledge"].search(plg_domain, order="id desc")
+            pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([], order="id desc")
 
             p_row = start_row_plg + 1
             tot_rin = 0.0
             tot_rout = 0.0
 
             for p in pledge_recs:
-                cust_name = p.partner_id.name if p.partner_id else ""
-                order_ref = p.pos_order_id.name if p.pos_order_id else (p.order_id.name if p.order_id else "")
-                prod_name = p.product_id.display_name if p.product_id else ""
-
                 cfg = False
                 if p.pos_order_id:
                     cfg = p.pos_order_id.config_id
@@ -509,28 +486,33 @@ class PosUnifiedReportWizard(models.TransientModel):
                     cfg = p.order_id.pos_config_id
                 elif p.order_id and hasattr(p.order_id, "from_pos_config_id"):
                     cfg = p.order_id.from_pos_config_id
-                branch_name = cfg.name if cfg else ""
 
+                if target_config_ids and cfg and (cfg.id not in target_config_ids):
+                    continue
+
+                branch_name = cfg.name if cfg else ""
+                cust_name = p.partner_id.name if p.partner_id else ""
+                order_ref = p.pos_order_id.name if p.pos_order_id else (p.order_id.name if p.order_id else "")
+                prod_name = p.product_id.display_name if p.product_id else ""
                 status_label = dict(p._fields["state"].selection).get(p.state, p.state)
                 amt = p.pledge_subtotal or (getattr(p, "pledge_qty", 1.0) * getattr(p, "pledge_amount_unit", 0.0)) or 0.0
 
-                rec_dt_str = fields.Datetime.to_string(p.receive_date) if p.receive_date else (fields.Datetime.to_string(p.create_date) if p.create_date else "")
-                ret_dt_str = fields.Datetime.to_string(p.return_date) if p.return_date else (fields.Datetime.to_string(p.write_date) if (p.state == "returned" and p.write_date) else "")
+                rec_dt = self._to_datetime(p.receive_date) or self._to_datetime(p.create_date)
+                ret_dt = self._to_datetime(p.return_date) or (self._to_datetime(p.write_date) if p.state == "returned" else None)
 
-                # Check if receive_date falls in period
                 in_amt = 0.0
-                if p.receive_date and self.date_from <= p.receive_date <= self.date_to:
-                    in_amt = amt
-                elif not p.receive_date and p.create_date and self.date_from <= p.create_date <= self.date_to:
+                if rec_dt and (dt_start <= rec_dt <= dt_end):
                     in_amt = amt
 
-                # Check if return_date falls in period
                 out_amt = 0.0
-                if p.state == "returned":
-                    if p.return_date and self.date_from <= p.return_date <= self.date_to:
-                        out_amt = amt
-                    elif not p.return_date and p.write_date and self.date_from <= p.write_date <= self.date_to:
-                        out_amt = amt
+                if p.state == "returned" and ret_dt and (dt_start <= ret_dt <= dt_end):
+                    out_amt = amt
+
+                if in_amt == 0.0 and out_amt == 0.0:
+                    continue
+
+                rec_dt_str = fields.Datetime.to_string(rec_dt) if in_amt > 0 else ""
+                ret_dt_str = fields.Datetime.to_string(ret_dt) if out_amt > 0 else ""
 
                 sheet3.write(p_row, 0, cust_name, text_fmt)
                 sheet3.write(p_row, 1, order_ref, text_fmt)
@@ -538,9 +520,9 @@ class PosUnifiedReportWizard(models.TransientModel):
                 sheet3.write(p_row, 3, branch_name, text_fmt)
                 sheet3.write(p_row, 4, status_label, center_fmt)
                 sheet3.write_number(p_row, 5, in_amt, num_fmt)
-                sheet3.write(p_row, 6, rec_dt_str if in_amt > 0 else "", center_fmt)
+                sheet3.write(p_row, 6, rec_dt_str, center_fmt)
                 sheet3.write_number(p_row, 7, out_amt, num_fmt)
-                sheet3.write(p_row, 8, ret_dt_str if out_amt > 0 else "", center_fmt)
+                sheet3.write(p_row, 8, ret_dt_str, center_fmt)
 
                 tot_rin += in_amt
                 tot_rout += out_amt
