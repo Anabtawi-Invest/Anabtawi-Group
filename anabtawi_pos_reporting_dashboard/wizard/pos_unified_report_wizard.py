@@ -96,8 +96,18 @@ class PosUnifiedReportWizard(models.TransientModel):
             pm_type = getattr(pm, "type", "")
             pm_name = (pm.name or "").lower()
 
-            is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
-            is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
+            is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
+            is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
+
+            if is_emp:
+                is_cash = False
+                is_visa = False
+            elif is_hosp:
+                is_cash = False
+                is_visa = False
+            else:
+                is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
+                is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
 
             vals_list.append({
                 "name": pay.pos_order_id.name or pay.name or _("POS Payment"),
@@ -109,6 +119,7 @@ class PosUnifiedReportWizard(models.TransientModel):
                 "amount": amt,
                 "cash_amount": amt if is_cash else 0.0,
                 "visa_amount": amt if is_visa else 0.0,
+                "employee_debt_amount": amt if is_emp else 0.0,
                 "partner_id": pay.pos_order_id.partner_id.id if pay.pos_order_id else False,
             })
 
@@ -270,7 +281,7 @@ class PosUnifiedReportWizard(models.TransientModel):
             _("Total Discounts"),
             _("Cash Sales"),
             _("Visa Sales"),
-            _("ذمم موظفين (Employee Debt)"),
+            _("Debt Sales (مبيعات الذمم)"),
             _("Hospitality"),
             _("Talabat"),
             _("Careem"),
