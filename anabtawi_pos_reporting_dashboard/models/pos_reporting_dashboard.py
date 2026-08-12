@@ -49,23 +49,13 @@ class PosReportingDashboard(models.TransientModel):
         str_start = fields.Datetime.to_string(dt_start)
         str_end = fields.Datetime.to_string(dt_end)
 
-        # 2. Identify Target Branches (pos.config)
+        # 2. Identify Target Branches (sudo to bypass multi-company rule restrictions)
         config_domain = [("active", "=", True)]
         if config_ids and isinstance(config_ids, (list, tuple)) and len(config_ids) > 0:
             config_domain.append(("id", "in", config_ids))
 
-        configs = self.env["pos.config"].search(config_domain, order="name")
+        configs = self.env["pos.config"].sudo().search(config_domain, order="name")
         active_config_ids = set(configs.ids)
-
-        # 3. Gather Relevant POS Sessions
-        session_domain = [
-            ("config_id", "in", list(active_config_ids)),
-            "|",
-            "&", ("start_at", ">=", str_start), ("start_at", "<=", str_end),
-            "&", ("stop_at", ">=", str_start), ("stop_at", "<=", str_end),
-        ]
-        sessions = self.env["pos.session"].search(session_domain)
-        session_ids = sessions.ids
 
         # Structure per-branch data repository
         def _empty_branch_dict():
@@ -99,76 +89,70 @@ class PosReportingDashboard(models.TransientModel):
 
         branch_data = defaultdict(_empty_branch_dict)
 
-        # --- A. Collect POS Payments, Sales, Untaxed & Tax ---
-        if session_ids:
-            payments = self.env["pos.payment"].search([
-                ("session_id", "in", session_ids),
-                ("payment_date", ">=", str_start),
-                ("payment_date", "<=", str_end),
-            ])
-            for pay in payments:
-                cfg_id = pay.session_id.config_id.id
-                amt = pay.amount or 0.0
-                branch_data[cfg_id]["sales"] += amt
+        # --- A. Collect POS Payments & Channel Breakdown ---
+        payments = self.env["pos.payment"].sudo().search([
+            ("session_id.config_id", "in", list(active_config_ids)),
+            ("payment_date", ">=", str_start),
+            ("payment_date", "<=", str_end),
+        ])
+        for pay in payments:
+            cfg_id = pay.session_id.config_id.id
+            amt = pay.amount or 0.0
+            branch_data[cfg_id]["sales"] += amt
 
-                pm = pay.payment_method_id
-                pm_id = pm.id
-                pm_type = getattr(pm, "type", "")
-                daily_type = getattr(pm, "daily_ops_report_type", "")
-                pm_name = (pm.name or "").lower()
+            pm = pay.payment_method_id
+            pm_id = pm.id
+            pm_type = getattr(pm, "type", "")
+            daily_type = getattr(pm, "daily_ops_report_type", "")
+            pm_name = (pm.name or "").lower()
 
-                # Payment Classification
-                if daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name:
-                    branch_data[cfg_id]["cash"] += amt
-                elif daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name:
-                    branch_data[cfg_id]["visa"] += amt
-                elif daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name:
-                    branch_data[cfg_id]["hospitality"] += amt
-                else:
-                    branch_data[cfg_id]["other_sales"] += amt
+            # Payment Classification
+            if daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name:
+                branch_data[cfg_id]["cash"] += amt
+            elif daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name:
+                branch_data[cfg_id]["visa"] += amt
+            elif daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name:
+                branch_data[cfg_id]["hospitality"] += amt
+            else:
+                branch_data[cfg_id]["other_sales"] += amt
 
-                # Delivery Apps Specifics
-                if pm_id == PAYMENT_METHOD_TALABAT or "talabat" in pm_name:
-                    branch_data[cfg_id]["talabat"] += amt
-                elif pm_id == PAYMENT_METHOD_CAREEM or "careem" in pm_name:
-                    branch_data[cfg_id]["careem"] += amt
-                elif pm_id == PAYMENT_METHOD_MYTHINGS or "mythings" in pm_name:
-                    branch_data[cfg_id]["mythings"] += amt
-                elif pm_id == PAYMENT_METHOD_KABSEH or "kabseh" in pm_name:
-                    branch_data[cfg_id]["kabseh"] += amt
+            # Delivery Apps Specifics
+            if pm_id == PAYMENT_METHOD_TALABAT or "talabat" in pm_name:
+                branch_data[cfg_id]["talabat"] += amt
+            elif pm_id == PAYMENT_METHOD_CAREEM or "careem" in pm_name:
+                branch_data[cfg_id]["careem"] += amt
+            elif pm_id == PAYMENT_METHOD_MYTHINGS or "mythings" in pm_name:
+                branch_data[cfg_id]["mythings"] += amt
+            elif pm_id == PAYMENT_METHOD_KABSEH or "kabseh" in pm_name:
+                branch_data[cfg_id]["kabseh"] += amt
 
-            # Order untaxed and tax amounts
-            pos_orders = self.env["pos.order"].search([
-                ("session_id", "in", session_ids),
-                ("state", "in", ("paid", "done", "invoiced")),
-                ("date_order", ">=", str_start),
-                ("date_order", "<=", str_end),
-            ])
-            for order in pos_orders:
-                cfg_id = order.config_id.id
-                branch_data[cfg_id]["untaxed_sales"] += order.amount_untaxed or 0.0
-                branch_data[cfg_id]["tax_amount"] += order.amount_tax or 0.0
+        # --- B. Collect POS Orders (Untaxed, Tax, Order Count & Delivery) ---
+        pos_orders = self.env["pos.order"].sudo().search([
+            ("config_id", "in", list(active_config_ids)),
+            ("state", "in", ("paid", "done", "invoiced")),
+            ("date_order", ">=", str_start),
+            ("date_order", "<=", str_end),
+        ])
+        for order in pos_orders:
+            cfg_id = order.config_id.id
+            branch_data[cfg_id]["untaxed_sales"] += order.amount_untaxed or 0.0
+            branch_data[cfg_id]["tax_amount"] += order.amount_tax or 0.0
+            branch_data[cfg_id]["delivery_amount"] += getattr(order, "delivery_amount", 0.0) or 0.0
+            branch_data[cfg_id]["order_count"] += 1
 
-            # Order count & delivery amounts
-            for sess in sessions:
-                cfg_id = sess.config_id.id
-                branch_data[cfg_id]["delivery_amount"] += getattr(sess, "delivery_amount", 0.0) or 0.0
-                branch_data[cfg_id]["order_count"] += len(sess.order_ids)
-
-        # --- B. Collect Cash In & Cash Out Moves (Statement Lines) ---
-        if session_ids:
-            st_lines = self.env["account.bank.statement.line"].search([
-                ("pos_session_id", "in", session_ids),
-                ("date", ">=", dt_start.date()),
-                ("date", "<=", dt_end.date()),
-            ])
-            for st in st_lines:
-                cfg_id = st.pos_session_id.config_id.id
-                amt = st.amount or 0.0
-                if amt > 0:
-                    branch_data[cfg_id]["cash_in"] += amt
-                else:
-                    branch_data[cfg_id]["cash_out"] += abs(amt)
+        # --- C. Collect Cash In & Cash Out Moves (Statement Lines) ---
+        st_lines = self.env["account.bank.statement.line"].sudo().search([
+            ("pos_session_id.config_id", "in", list(active_config_ids)),
+            ("date", ">=", dt_start.date()),
+            ("date", "<=", dt_end.date()),
+        ])
+        for st in st_lines:
+            cfg_id = st.pos_session_id.config_id.id
+            amt = st.amount or 0.0
+            if amt > 0:
+                branch_data[cfg_id]["cash_in"] += amt
+            else:
+                branch_data[cfg_id]["cash_out"] += abs(amt)
 
         # Compute net cash moves
         for cfg_id in active_config_ids:
@@ -176,11 +160,11 @@ class PosReportingDashboard(models.TransientModel):
                 branch_data[cfg_id]["cash_in"] - branch_data[cfg_id]["cash_out"]
             )
 
-        # --- C. Collect Pledges (Rahen In & Rahen Out) ---
+        # --- D. Collect Pledges (Rahen In & Rahen Out) ---
         # 1. pos.advance.order.pledge
         if "pos.advance.order.pledge" in self.env:
             # Rahen In (Received On timestamp in range)
-            pledges_in = self.env["pos.advance.order.pledge"].search([
+            pledges_in = self.env["pos.advance.order.pledge"].sudo().search([
                 ("state", "in", ("active", "returned")),
                 "|",
                 "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
@@ -208,7 +192,7 @@ class PosReportingDashboard(models.TransientModel):
                 branch_data[cfg_id]["rahen_in"] += amt
 
             # Rahen Out (Returned On timestamp in range)
-            pledges_out = self.env["pos.advance.order.pledge"].search([
+            pledges_out = self.env["pos.advance.order.pledge"].sudo().search([
                 ("state", "=", "returned"),
                 "|",
                 "&", ("return_date", ">=", str_start), ("return_date", "<=", str_end),
@@ -237,7 +221,7 @@ class PosReportingDashboard(models.TransientModel):
 
         # 2. pos.pledge (Standard pledge model fallback)
         if "pos.pledge" in self.env:
-            pledges_std_in = self.env["pos.pledge"].search([
+            pledges_std_in = self.env["pos.pledge"].sudo().search([
                 ("create_date", ">=", str_start),
                 ("create_date", "<=", str_end),
                 ("state", "in", ("active", "returned")),
@@ -248,7 +232,7 @@ class PosReportingDashboard(models.TransientModel):
                     continue
                 branch_data[cfg_id]["rahen_in"] += pledge.pledge_amount or 0.0
 
-            pledges_std_out = self.env["pos.pledge"].search([
+            pledges_std_out = self.env["pos.pledge"].sudo().search([
                 ("state", "=", "returned"),
                 "|",
                 "&", ("return_date", ">=", str_start), ("return_date", "<=", str_end),
@@ -267,9 +251,9 @@ class PosReportingDashboard(models.TransientModel):
                 branch_data[cfg_id]["rahen_in"] - branch_data[cfg_id]["rahen_out"]
             )
 
-        # --- D. Collect Advance Orders & Deposits ---
+        # --- E. Collect Advance Orders & Deposits ---
         if "pos.advance.order" in self.env:
-            adv_orders = self.env["pos.advance.order"].search([
+            adv_orders = self.env["pos.advance.order"].sudo().search([
                 ("state", "not in", ("draft", "cancel")),
                 "|",
                 "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
@@ -296,7 +280,7 @@ class PosReportingDashboard(models.TransientModel):
                         if adv.state in ("confirmed", "advance_paid"):
                             branch_data[pick_cfg_id]["advance_pending_count"] += 1
 
-        # --- E. Format Per-Branch Rows & Calculate Global Totals ---
+        # --- F. Format Per-Branch Rows & Calculate Global Totals ---
         branch_rows = []
         global_totals = _empty_branch_dict()
 
@@ -312,7 +296,7 @@ class PosReportingDashboard(models.TransientModel):
             for key in global_totals.keys():
                 global_totals[key] += vals[key]
 
-        # --- F. Build Channel Distribution & Daily Trends ---
+        # --- G. Build Channel Distribution & Daily Trends ---
         channels = [
             {"name": _("Cash Sales"), "value": global_totals["cash"], "color": "#28a745"},
             {"name": _("Visa / Card"), "value": global_totals["visa"], "color": "#007bff"},
@@ -332,7 +316,7 @@ class PosReportingDashboard(models.TransientModel):
             day_str_start = fields.Datetime.to_string(datetime.combine(curr_date, time.min))
             day_str_end = fields.Datetime.to_string(datetime.combine(curr_date, time.max))
 
-            day_payments = self.env["pos.payment"].search([
+            day_payments = self.env["pos.payment"].sudo().search([
                 ("session_id.config_id", "in", list(active_config_ids)),
                 ("payment_date", ">=", day_str_start),
                 ("payment_date", "<=", day_str_end),
@@ -356,7 +340,8 @@ class PosReportingDashboard(models.TransientModel):
             })
             curr_date += timedelta(days=1)
 
-        all_configs = self.env["pos.config"].search([("active", "=", True)], order="name")
+        # All branches list for tab navigation (sudo to ensure all active configs return)
+        all_configs = self.env["pos.config"].sudo().search([("active", "=", True)], order="name")
         all_branches_list = [{"id": cfg.id, "name": cfg.name} for cfg in all_configs]
 
         return {
