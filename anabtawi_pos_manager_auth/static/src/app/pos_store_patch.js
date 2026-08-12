@@ -18,10 +18,10 @@ async function promptAndValidateManagerAuth(posStore, actionTitle = _t("Manager 
         return true;
     }
 
+    // NumberPopup in Odoo 19 accepts: title, subtitle, startingValue, isValid, feedback, getPayload
     const payload = await makeAwaitable(dialogService, NumberPopup, {
         title: actionTitle,
         subtitle: _t("Scan Manager Barcode or Enter Manager PIN"),
-        isPassword: true,
     });
 
     if (payload === undefined || payload === null || payload === false || payload === "") {
