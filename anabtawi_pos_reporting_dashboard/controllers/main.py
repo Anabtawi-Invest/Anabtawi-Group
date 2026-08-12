@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import http
+from odoo import fields, http
 from odoo.http import request
 
 
@@ -16,7 +16,9 @@ class PosReportingDashboardController(http.Controller):
             return request.not_found()
 
         content = wizard._generate_xlsx_content()
-        filename = f"POS_Unified_Operations_Report_{wizard.date_from}_{wizard.date_to}.xlsx"
+        df_str = fields.Datetime.to_string(wizard.date_from).replace(" ", "_").replace(":", "-") if wizard.date_from else "start"
+        dt_str = fields.Datetime.to_string(wizard.date_to).replace(" ", "_").replace(":", "-") if wizard.date_to else "end"
+        filename = f"POS_Unified_Operations_Report_{df_str}_{dt_str}.xlsx"
 
         return request.make_response(
             content,

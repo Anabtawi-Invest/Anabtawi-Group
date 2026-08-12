@@ -7,7 +7,7 @@ class PosUnifiedReport(models.TransientModel):
     _description = "Unified POS Operations Analysis Report"
 
     name = fields.Char(string="Reference / Description", required=True)
-    date = fields.Date(string="Date", required=True, index=True)
+    date = fields.Datetime(string="Date & Time", required=True, index=True)
     config_id = fields.Many2one("pos.config", string="POS Branch", required=True, index=True)
     session_id = fields.Many2one("pos.session", string="Session")
     payment_method_id = fields.Many2one("pos.payment.method", string="Payment Method")
