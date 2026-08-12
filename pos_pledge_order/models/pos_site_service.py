@@ -18,8 +18,8 @@ class PosSiteServiceMenu(models.Model):
     enable_site_service = fields.Boolean(
         string="Site Service",
         default=False,
-        help="When enabled, site service can be selected on Advance Order creation. "
-        "Regular POS sales never add the service product automatically.",
+        help="When enabled, Site Service can be selected on Advance Order popup. "
+        "It is not added automatically on regular POS payment.",
     )
     threshold = fields.Float(
         string="Threshold",
@@ -149,12 +149,50 @@ class PosSiteServiceProductLine(models.Model):
         default=1.0,
         help="Weight factor used in site service score: Quantity × Multiple.",
     )
+    pledge_product_id = fields.Many2one(
+        "product.product",
+        string="Pledge Product",
+        domain=[("available_in_pos", "=", True), ("sale_ok", "=", True)],
+        help="Pledge product added on advance orders when Site Service is not selected.",
+    )
 
     @api.constrains("multiple")
     def _check_multiple_positive(self):
         for line in self:
             if line.multiple <= 0:
                 raise ValidationError(_("Multiple must be greater than zero."))
+
+    @api.model
+    def _get_menu_pledge_product_map(self):
+        """Return {menu_product_id: pledge_product} for active site service lines."""
+        lines = self.sudo().search([
+            ("menu_id.active", "=", True),
+            ("menu_id.enable_site_service", "=", True),
+            ("pledge_product_id", "!=", False),
+        ])
+        return {
+            line.product_id.id: line.pledge_product_id
+            for line in lines
+            if line.product_id and line.pledge_product_id
+        }
+
+    @api.model
+    def resolve_pledge_unit_amount(self, pledge_product):
+        """Pledge unit amount from pledge product configuration (not menu multiple)."""
+        if not pledge_product:
+            return 0.0
+        amount = float(pledge_product.pledge_amount or 0.0)
+        if amount > 0:
+            return amount
+        return float(pledge_product.lst_price or 0.0)
+
+    @api.model
+    def menu_product_has_pledge_mapping(self, menu_product):
+        """True when the menu product has a pledge_product_id in site service config."""
+        if not menu_product:
+            return False
+        product_id = menu_product.id if hasattr(menu_product, "id") else int(menu_product)
+        return product_id in self._get_menu_pledge_product_map()
 
     @api.model
     def _load_pos_data_search_read(self, data, config):
@@ -182,4 +220,4 @@ class PosSiteServiceProductLine(models.Model):
 
     @api.model
     def _load_pos_data_fields(self, config):
-        return ["id", "menu_id", "product_id", "multiple", "active"]
+        return ["id", "menu_id", "product_id", "multiple", "pledge_product_id", "active"]
