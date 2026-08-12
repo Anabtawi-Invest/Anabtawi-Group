@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="res_config_settings_view_form_pos_manager_auth" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.inherit.pos.manager.auth</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//app[@name='point_of_sale']" position="inside">
+                    <block title="Manager Security &amp; Authorization Controls" id="pos_manager_auth_section">
+                        <setting help="Require Manager Barcode scan or PIN before permitting POS order refunds.">
+                            <field name="pos_require_manager_for_refund"/>
+                        </setting>
+                        <setting help="Require Manager Barcode scan or PIN before deleting or canceling an active POS order.">
+                            <field name="pos_require_manager_for_cancel"/>
+                        </setting>
+                        <setting help="Require Manager Barcode scan or PIN before changing unit price or applying manual discounts.">
+                            <field name="pos_require_manager_for_discount"/>
+                        </setting>
+                        <setting help="Require Manager Barcode scan or PIN before executing Cash In or Cash Out moves.">
+                            <field name="pos_require_manager_for_cash_move"/>
+                        </setting>
+                    </block>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>
