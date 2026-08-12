@@ -74,6 +74,7 @@ class PosReportingDashboard(models.TransientModel):
                 "discount_amount": 0.0,
                 "cash": 0.0,
                 "visa": 0.0,
+                "employee_debt": 0.0,
                 "hospitality": 0.0,
                 "talabat": 0.0,
                 "careem": 0.0,
@@ -119,8 +120,10 @@ class PosReportingDashboard(models.TransientModel):
             daily_type = getattr(pm, "daily_ops_report_type", "")
             pm_name = (pm.name or "").lower()
 
-            # Payment Classification
-            if daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name:
+            # Payment Classification (Cash, Visa, Employee Debt, Hospitality, etc.)
+            if "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt":
+                branch_data[cfg_id]["employee_debt"] += amt
+            elif daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name:
                 branch_data[cfg_id]["cash"] += amt
             elif daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name:
                 branch_data[cfg_id]["visa"] += amt
@@ -290,10 +293,11 @@ class PosReportingDashboard(models.TransientModel):
         channels = [
             {"name": _("Cash Sales"), "value": global_totals["cash"], "color": "#28a745"},
             {"name": _("Visa / Card"), "value": global_totals["visa"], "color": "#007bff"},
+            {"name": _("ذمم موظفين (Employee Debt)"), "value": global_totals["employee_debt"], "color": "#6f42c1"},
             {"name": _("Hospitality"), "value": global_totals["hospitality"], "color": "#ffc107"},
             {"name": _("Talabat"), "value": global_totals["talabat"], "color": "#fd7e14"},
             {"name": _("Careem"), "value": global_totals["careem"], "color": "#20c997"},
-            {"name": _("Mythings"), "value": global_totals["mythings"], "color": "#6f42c1"},
+            {"name": _("Mythings"), "value": global_totals["mythings"], "color": "#17a2b8"},
             {"name": _("Kabseh"), "value": global_totals["kabseh"], "color": "#e83e8c"},
             {"name": _("Other Channels"), "value": global_totals["other_sales"], "color": "#6c757d"},
         ]
@@ -349,6 +353,7 @@ class PosReportingDashboard(models.TransientModel):
                 "discount_amount": global_totals["discount_amount"],
                 "cash_sales": global_totals["cash"],
                 "visa_sales": global_totals["visa"],
+                "employee_debt": global_totals["employee_debt"],
                 "hospitality_sales": global_totals["hospitality"],
                 "cash_in": global_totals["cash_in"],
                 "cash_out": global_totals["cash_out"],

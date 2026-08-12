@@ -128,6 +128,16 @@
                         </div>
                     </div>
 
+                    <!-- Employee Debt (ذمم موظفين) -->
+                    <div class="o_kpi_card card-employee-debt">
+                        <div class="kpi_icon"><i class="fa fa-id-card-o text-purple"/></div>
+                        <div class="kpi_title">ذمم موظفين (Employee Debt)</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.employee_debt)"/></div>
+                        <div class="kpi_subtext">
+                            <span class="badge bg-purple text-white badge_sub">Employee Receivables</span>
+                        </div>
+                    </div>
+
                     <!-- Net Cash Moves (In / Out) -->
                     <div class="o_kpi_card card-cashmoves">
                         <div class="kpi_icon"><i class="fa fa-exchange text-warning"/></div>
@@ -209,15 +219,14 @@
                                 </div>
                                 <div class="col-md-6">
                                     <div class="p-3 border rounded bg-light">
-                                        <h6 class="text-muted mb-1">Total Order Discounts</h6>
-                                        <h4 class="fw-bold text-warning mb-0"><t t-esc="formatCurrency(data.kpis.discount_amount)"/></h4>
+                                        <h6 class="text-muted mb-1">ذمم موظفين (Employee Debt)</h6>
+                                        <h4 class="fw-bold text-purple mb-0"><t t-esc="formatCurrency(data.kpis.employee_debt)"/></h4>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="p-3 border rounded bg-light">
-                                        <h6 class="text-muted mb-1">Advance Scheduled Pickup Value</h6>
-                                        <h4 class="fw-bold text-primary mb-0"><t t-esc="formatCurrency(data.kpis.advance_pickup_value)"/></h4>
-                                        <small class="text-muted"><t t-esc="data.kpis.advance_pending_count"/> Pending Pickups</small>
+                                        <h6 class="text-muted mb-1">Total Order Discounts</h6>
+                                        <h4 class="fw-bold text-warning mb-0"><t t-esc="formatCurrency(data.kpis.discount_amount)"/></h4>
                                     </div>
                                 </div>
                             </div>
@@ -242,6 +251,7 @@
                                     <th class="text-end">Total Discounts</th>
                                     <th class="text-end">Cash Sales</th>
                                     <th class="text-end">Visa / Card</th>
+                                    <th class="text-end">ذمم موظفين</th>
                                     <th class="text-end">Hospitality</th>
                                     <th class="text-end">Talabat</th>
                                     <th class="text-end">Careem</th>
@@ -266,6 +276,7 @@
                                         <td class="val_num text-warning"><t t-esc="formatCurrency(branch.discount_amount)"/></td>
                                         <td class="val_num text-success"><t t-esc="formatCurrency(branch.cash)"/></td>
                                         <td class="val_num text-info"><t t-esc="formatCurrency(branch.visa)"/></td>
+                                        <td class="val_num text-purple"><t t-esc="formatCurrency(branch.employee_debt)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.hospitality)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.talabat)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.careem)"/></td>
@@ -289,6 +300,7 @@
                                     <td class="val_num text-warning"><t t-esc="formatCurrency(data.global_totals.discount_amount)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.cash)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.visa)"/></td>
+                                    <td class="val_num text-purple"><t t-esc="formatCurrency(data.global_totals.employee_debt)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.hospitality)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.talabat)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.careem)"/></td>

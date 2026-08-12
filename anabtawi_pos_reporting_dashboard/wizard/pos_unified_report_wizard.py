@@ -269,6 +269,7 @@ class PosUnifiedReportWizard(models.TransientModel):
             _("Total Discounts"),
             _("Cash Sales"),
             _("Visa Sales"),
+            _("ذمم موظفين (Employee Debt)"),
             _("Hospitality"),
             _("Talabat"),
             _("Careem"),
@@ -303,21 +304,22 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet1.write_number(curr_row, 4, b.get("discount_amount", 0.0), num_fmt)
             sheet1.write_number(curr_row, 5, b["cash"], num_fmt)
             sheet1.write_number(curr_row, 6, b["visa"], num_fmt)
-            sheet1.write_number(curr_row, 7, b["hospitality"], num_fmt)
-            sheet1.write_number(curr_row, 8, b["talabat"], num_fmt)
-            sheet1.write_number(curr_row, 9, b["careem"], num_fmt)
-            sheet1.write_number(curr_row, 10, b["mythings"], num_fmt)
-            sheet1.write_number(curr_row, 11, b["kabseh"], num_fmt)
-            sheet1.write_number(curr_row, 12, b["cash_in"], num_fmt)
-            sheet1.write_number(curr_row, 13, b["cash_out"], num_fmt)
-            sheet1.write_number(curr_row, 14, b["net_cash_moves"], num_fmt)
-            sheet1.write_number(curr_row, 15, b["rahen_in"], num_fmt)
-            sheet1.write_number(curr_row, 16, b["rahen_out"], num_fmt)
-            sheet1.write_number(curr_row, 17, b["net_pledges"], num_fmt)
-            sheet1.write_number(curr_row, 18, b["advance_deposits"], num_fmt)
-            sheet1.write_number(curr_row, 19, b.get("advance_pickup_value", 0.0), num_fmt)
-            sheet1.write_number(curr_row, 20, b.get("advance_pending_count", 0), int_fmt)
-            sheet1.write_number(curr_row, 21, b["delivery_amount"], num_fmt)
+            sheet1.write_number(curr_row, 7, b.get("employee_debt", 0.0), num_fmt)
+            sheet1.write_number(curr_row, 8, b["hospitality"], num_fmt)
+            sheet1.write_number(curr_row, 9, b["talabat"], num_fmt)
+            sheet1.write_number(curr_row, 10, b["careem"], num_fmt)
+            sheet1.write_number(curr_row, 11, b["mythings"], num_fmt)
+            sheet1.write_number(curr_row, 12, b["kabseh"], num_fmt)
+            sheet1.write_number(curr_row, 13, b["cash_in"], num_fmt)
+            sheet1.write_number(curr_row, 14, b["cash_out"], num_fmt)
+            sheet1.write_number(curr_row, 15, b["net_cash_moves"], num_fmt)
+            sheet1.write_number(curr_row, 16, b["rahen_in"], num_fmt)
+            sheet1.write_number(curr_row, 17, b["rahen_out"], num_fmt)
+            sheet1.write_number(curr_row, 18, b["net_pledges"], num_fmt)
+            sheet1.write_number(curr_row, 19, b["advance_deposits"], num_fmt)
+            sheet1.write_number(curr_row, 20, b.get("advance_pickup_value", 0.0), num_fmt)
+            sheet1.write_number(curr_row, 21, b.get("advance_pending_count", 0), int_fmt)
+            sheet1.write_number(curr_row, 22, b["delivery_amount"], num_fmt)
             curr_row += 1
 
         # Global Total Row Sheet 1
@@ -329,21 +331,22 @@ class PosUnifiedReportWizard(models.TransientModel):
         sheet1.write_number(curr_row, 4, gt.get("discount_amount", 0.0), total_num_fmt)
         sheet1.write_number(curr_row, 5, gt["cash"], total_num_fmt)
         sheet1.write_number(curr_row, 6, gt["visa"], total_num_fmt)
-        sheet1.write_number(curr_row, 7, gt["hospitality"], total_num_fmt)
-        sheet1.write_number(curr_row, 8, gt["talabat"], total_num_fmt)
-        sheet1.write_number(curr_row, 9, gt["careem"], total_num_fmt)
-        sheet1.write_number(curr_row, 10, gt["mythings"], total_num_fmt)
-        sheet1.write_number(curr_row, 11, gt["kabseh"], total_num_fmt)
-        sheet1.write_number(curr_row, 12, gt["cash_in"], total_num_fmt)
-        sheet1.write_number(curr_row, 13, gt["cash_out"], total_num_fmt)
-        sheet1.write_number(curr_row, 14, gt["net_cash_moves"], total_num_fmt)
-        sheet1.write_number(curr_row, 15, gt["rahen_in"], total_num_fmt)
-        sheet1.write_number(curr_row, 16, gt["rahen_out"], total_num_fmt)
-        sheet1.write_number(curr_row, 17, gt["net_pledges"], total_num_fmt)
-        sheet1.write_number(curr_row, 18, gt["advance_deposits"], total_num_fmt)
-        sheet1.write_number(curr_row, 19, gt.get("advance_pickup_value", 0.0), total_num_fmt)
-        sheet1.write_number(curr_row, 20, gt.get("advance_pending_count", 0), total_int_fmt)
-        sheet1.write_number(curr_row, 21, gt["delivery_amount"], total_num_fmt)
+        sheet1.write_number(curr_row, 7, gt.get("employee_debt", 0.0), total_num_fmt)
+        sheet1.write_number(curr_row, 8, gt["hospitality"], total_num_fmt)
+        sheet1.write_number(curr_row, 9, gt["talabat"], total_num_fmt)
+        sheet1.write_number(curr_row, 10, gt["careem"], total_num_fmt)
+        sheet1.write_number(curr_row, 11, gt["mythings"], total_num_fmt)
+        sheet1.write_number(curr_row, 12, gt["kabseh"], total_num_fmt)
+        sheet1.write_number(curr_row, 13, gt["cash_in"], total_num_fmt)
+        sheet1.write_number(curr_row, 14, gt["cash_out"], total_num_fmt)
+        sheet1.write_number(curr_row, 15, gt["net_cash_moves"], total_num_fmt)
+        sheet1.write_number(curr_row, 16, gt["rahen_in"], total_num_fmt)
+        sheet1.write_number(curr_row, 17, gt["rahen_out"], total_num_fmt)
+        sheet1.write_number(curr_row, 18, gt["net_pledges"], total_num_fmt)
+        sheet1.write_number(curr_row, 19, gt["advance_deposits"], total_num_fmt)
+        sheet1.write_number(curr_row, 20, gt.get("advance_pickup_value", 0.0), total_num_fmt)
+        sheet1.write_number(curr_row, 21, gt.get("advance_pending_count", 0), total_int_fmt)
+        sheet1.write_number(curr_row, 22, gt["delivery_amount"], total_num_fmt)
 
         # Target branch config IDs set
         target_config_ids = set(self.config_ids.ids) if self.config_ids else None
