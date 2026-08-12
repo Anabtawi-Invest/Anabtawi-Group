@@ -33,34 +33,26 @@ class PosSession(models.Model):
         return orders.filtered(lambda o: not o.is_pledge_generated)
 
     def _get_pledge_return_lines_for_closing(self):
-        """Pledge returns counted in this session's closing (same POS / same session)."""
+        """Pledge returns counted in this session's closing.
+
+        Only lines with ``return_pos_session_id = this session`` (what the Pledges
+        list shows when filtering by Return POS Session). Do **not** fall back to
+        "same POS + return move date in window": that pulled many untagged returns
+        into cash_out and inflated closing (e.g. 422 instead of 31).
+        """
         self.ensure_one()
-        end = self.stop_at or fields.Datetime.now()
-        PledgeLine = self.env["pos.advance.order.pledge"].sudo()
-        on_this_session = PledgeLine.search([
+        return self.env["pos.advance.order.pledge"].sudo().search([
             ("state", "=", "returned"),
             ("return_move_id.state", "=", "posted"),
             ("return_pos_session_id", "=", self.id),
             ("pos_order_id", "!=", False),
         ])
-        # Legacy rows (before return_pos_session_id): same POS config + return time in session window.
-        legacy_same_pos = PledgeLine.search([
-            ("state", "=", "returned"),
-            ("return_move_id.state", "=", "posted"),
-            ("return_pos_session_id", "=", False),
-            ("return_move_id.create_date", ">=", self.start_at),
-            ("return_move_id.create_date", "<=", end),
-            ("pos_order_id", "!=", False),
-            ("pos_order_id.config_id", "=", self.config_id.id),
-        ])
-        return on_this_session | legacy_same_pos
 
     def _get_pledge_deposit_closing_summary(self):
         """Gross pledge cash effect from journal entries (not pos.payment), split in / out.
 
         - ``cash_in`` / ``by_pm_in``: pledge deposits for orders **in this session** (posted deposit JE).
-        - ``cash_out`` / ``by_pm_out``: pledge **returns** processed on **this session**, or legacy
-          returns on the **same POS config** within this session's time window.
+        - ``cash_out`` / ``by_pm_out``: pledge **returns** with ``return_pos_session_id`` = this session.
         - ``cash`` / ``by_pm``: net (in − out) for adjusting expected payment totals.
         """
         self.ensure_one()
@@ -137,18 +129,19 @@ class PosSession(models.Model):
             len(returned_here),
             returned_here.ids,
         )
-        seen_orders = set()
         for pl in returned_here:
             order = pl.pos_order_id
-            if not order or order.id in seen_orders:
+            if not order:
                 continue
-            if not order._include_in_pledge_closing_summary():
+            if hasattr(order, "_include_in_pledge_closing_summary") and not order._include_in_pledge_closing_summary():
                 continue
-            seen_orders.add(order.id)
-            move = order.sudo().pledge_deposit_move_id
-            if not move or move.state != "posted":
-                continue
-            amt = order._get_pledge_closing_amount()
+            # Use the returned pledge line amount (not the whole origin order pledge).
+            amt = abs(pl.pledge_subtotal or 0.0)
+            if cur.is_zero(amt):
+                # Fallback for legacy rows without stored subtotal.
+                qty = pl.pledge_qty or 0.0
+                unit = pl.pledge_amount_unit or 0.0
+                amt = abs(qty * unit)
             if cur.is_zero(amt):
                 continue
             return_pm = pl.return_payment_method_id
@@ -172,8 +165,11 @@ class PosSession(models.Model):
                         pl.id,
                     )
                 continue
+            move = order.sudo().pledge_deposit_move_id
             return_move = pl.return_move_id
             split_move = return_move if return_move and return_move.state == "posted" else move
+            if not split_move:
+                continue
             for part in self._iter_pledge_journal_payment_split(amt, split_move):
                 if part[0] == "cash":
                     cash_out += part[1]
