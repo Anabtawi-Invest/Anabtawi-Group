@@ -99,12 +99,16 @@ class PosReportingDashboard(models.TransientModel):
 
         # --- A. Collect POS Payments & Channel Breakdown ---
         payments = self.env["pos.payment"].sudo().search([
-            ("session_id.config_id", "in", list(active_config_ids)),
-            ("payment_date", ">=", str_start),
-            ("payment_date", "<=", str_end),
+            "|",
+            "&", ("payment_date", ">=", str_start), ("payment_date", "<=", str_end),
+            "&", ("payment_date", "=", False),
+                 "&", ("pos_order_id.date_order", ">=", str_start), ("pos_order_id.date_order", "<=", str_end),
         ])
         for pay in payments:
-            cfg_id = pay.session_id.config_id.id
+            cfg = pay.session_id.config_id if pay.session_id else (pay.pos_order_id.config_id if pay.pos_order_id else False)
+            if not cfg or (active_config_ids and cfg.id not in active_config_ids):
+                continue
+            cfg_id = cfg.id
             amt = pay.amount or 0.0
             branch_data[cfg_id]["sales"] += amt
 
@@ -136,26 +140,37 @@ class PosReportingDashboard(models.TransientModel):
 
         # --- B. Collect POS Orders (Untaxed, Tax, Order Count & Delivery) ---
         pos_orders = self.env["pos.order"].sudo().search([
-            ("config_id", "in", list(active_config_ids)),
             ("state", "in", ("paid", "done", "invoiced")),
             ("date_order", ">=", str_start),
             ("date_order", "<=", str_end),
         ])
         for order in pos_orders:
-            cfg_id = order.config_id.id
-            branch_data[cfg_id]["untaxed_sales"] += order.amount_untaxed or 0.0
-            branch_data[cfg_id]["tax_amount"] += order.amount_tax or 0.0
+            cfg = order.config_id
+            if not cfg or (active_config_ids and cfg.id not in active_config_ids):
+                continue
+            cfg_id = cfg.id
+
+            tax_amt = getattr(order, "amount_tax", 0.0) or 0.0
+            tot_amt = getattr(order, "amount_total", 0.0) or 0.0
+            untaxed_amt = getattr(order, "amount_untaxed", None)
+            if untaxed_amt is None:
+                untaxed_amt = tot_amt - tax_amt
+
+            branch_data[cfg_id]["untaxed_sales"] += untaxed_amt
+            branch_data[cfg_id]["tax_amount"] += tax_amt
             branch_data[cfg_id]["delivery_amount"] += getattr(order, "delivery_amount", 0.0) or 0.0
             branch_data[cfg_id]["order_count"] += 1
 
         # --- C. Collect Cash In & Cash Out Moves (Statement Lines) ---
         st_lines = self.env["account.bank.statement.line"].sudo().search([
-            ("pos_session_id.config_id", "in", list(active_config_ids)),
             ("date", ">=", dt_start.date()),
             ("date", "<=", dt_end.date()),
         ])
         for st in st_lines:
-            cfg_id = st.pos_session_id.config_id.id
+            cfg = st.pos_session_id.config_id if st.pos_session_id else False
+            if not cfg or (active_config_ids and cfg.id not in active_config_ids):
+                continue
+            cfg_id = cfg.id
             amt = st.amount or 0.0
             if amt > 0:
                 branch_data[cfg_id]["cash_in"] += amt
@@ -169,7 +184,6 @@ class PosReportingDashboard(models.TransientModel):
             )
 
         # --- D. Collect Pledges (Rahen In & Rahen Out) ---
-        # 1. pos.advance.order.pledge
         if "pos.advance.order.pledge" in self.env:
             pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([])
             for pledge in pledge_recs:
@@ -181,7 +195,7 @@ class PosReportingDashboard(models.TransientModel):
                 elif pledge.order_id and hasattr(pledge.order_id, "from_pos_config_id"):
                     cfg_id = pledge.order_id.from_pos_config_id.id
 
-                if not cfg_id or cfg_id not in active_config_ids:
+                if not cfg_id or (active_config_ids and cfg_id not in active_config_ids):
                     continue
 
                 amt = (
@@ -205,7 +219,7 @@ class PosReportingDashboard(models.TransientModel):
             pledges_std = self.env["pos.pledge"].sudo().search([])
             for pledge in pledges_std:
                 cfg_id = pledge.pos_config_id.id if pledge.pos_config_id else (pledge.pos_order_id.config_id.id if pledge.pos_order_id else False)
-                if not cfg_id or cfg_id not in active_config_ids:
+                if not cfg_id or (active_config_ids and cfg_id not in active_config_ids):
                     continue
 
                 amt = pledge.pledge_amount or 0.0
@@ -236,13 +250,13 @@ class PosReportingDashboard(models.TransientModel):
                 rem_amt = adv.amount_remaining or 0.0
 
                 if adv.create_date and dt_start <= adv.create_date <= dt_end:
-                    if orig_cfg_id and orig_cfg_id in active_config_ids:
+                    if orig_cfg_id and (not active_config_ids or orig_cfg_id in active_config_ids):
                         branch_data[orig_cfg_id]["advance_deposits"] += dep_amt
                         branch_data[orig_cfg_id]["advance_order_count"] += 1
                         branch_data[orig_cfg_id]["advance_order_total"] += tot_amt
 
                 if adv.picking_date and dt_start <= adv.picking_date <= dt_end:
-                    if pick_cfg_id and pick_cfg_id in active_config_ids:
+                    if pick_cfg_id and (not active_config_ids or pick_cfg_id in active_config_ids):
                         branch_data[pick_cfg_id]["advance_pickup_value"] += tot_amt
                         branch_data[pick_cfg_id]["advance_remaining_amount"] += rem_amt
                         if adv.state in ("confirmed", "advance_paid"):
@@ -285,17 +299,20 @@ class PosReportingDashboard(models.TransientModel):
             day_str_end = fields.Datetime.to_string(datetime.combine(curr_date, time.max))
 
             day_payments = self.env["pos.payment"].sudo().search([
-                ("session_id.config_id", "in", list(active_config_ids)),
                 ("payment_date", ">=", day_str_start),
                 ("payment_date", "<=", day_str_end),
             ])
 
-            day_total = sum(p.amount or 0.0 for p in day_payments)
+            day_total = sum(
+                p.amount or 0.0 for p in day_payments
+                if (not active_config_ids or (p.session_id.config_id.id in active_config_ids if p.session_id else p.pos_order_id.config_id.id in active_config_ids))
+            )
             day_cash = sum(
                 p.amount or 0.0 for p in day_payments
-                if (getattr(p.payment_method_id, "daily_ops_report_type", "") == "cash" or
-                    getattr(p.payment_method_id, "type", "") == "cash" or
-                    "cash" in (p.payment_method_id.name or "").lower())
+                if (not active_config_ids or (p.session_id.config_id.id in active_config_ids if p.session_id else p.pos_order_id.config_id.id in active_config_ids))
+                and (getattr(p.payment_method_id, "daily_ops_report_type", "") == "cash" or
+                     getattr(p.payment_method_id, "type", "") == "cash" or
+                     "cash" in (p.payment_method_id.name or "").lower())
             )
             day_visa = day_total - day_cash
 

@@ -158,13 +158,15 @@ export class PosReportingDashboard extends Component {
             const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
             const strTo = this._formatDatetimeForRPC(this.state.date_to, true);
 
-            const wizard = await this.orm.create("pos.unified.report.wizard", [
-                {
-                    date_from: strFrom,
-                    date_to: strTo,
-                    config_ids: [[6, 0, this.state.config_ids]],
-                },
-            ]);
+            const wizardVals = {
+                date_from: strFrom,
+                date_to: strTo,
+            };
+            if (this.state.config_ids && this.state.config_ids.length > 0) {
+                wizardVals.config_ids = [[6, 0, this.state.config_ids]];
+            }
+
+            const wizard = await this.orm.create("pos.unified.report.wizard", [wizardVals]);
 
             const action = await this.orm.call(
                 "pos.unified.report.wizard",
