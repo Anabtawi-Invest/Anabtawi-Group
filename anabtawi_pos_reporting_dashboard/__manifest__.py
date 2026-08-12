@@ -14,6 +14,7 @@
         "pos_ameen_daily_operation",
     ],
     "data": [
+        "security/security_groups.xml",
         "security/ir.model.access.csv",
         "wizard/pos_unified_report_wizard_views.xml",
         "views/pos_dashboard_views.xml",

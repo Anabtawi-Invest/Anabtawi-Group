@@ -15,13 +15,19 @@ class PosReportingDashboard(models.TransientModel):
     _description = "POS Executive Reporting & Dashboard Service"
 
     def _parse_datetime_bounds(self, date_from, date_to):
-        """Parse datetime parameters supporting both Date (YYYY-MM-DD) and Datetime (YYYY-MM-DD HH:MM:SS)."""
+        """
+        Parse datetime parameters supporting both Date (YYYY-MM-DD) and Datetime (YYYY-MM-DD HH:MM:SS).
+        Follows operational store shift logic: default start time is 06:00 AM on start day, end time is 05:00 AM on next day.
+        """
         today = fields.Date.context_today(self)
 
         def _to_dt(val, is_end=False):
             if not val:
                 d = today
-                return datetime.combine(d, time.max if is_end else time.min)
+                if is_end:
+                    tomorrow = d + timedelta(days=1)
+                    return datetime.combine(tomorrow, time(5, 0, 0))
+                return datetime.combine(d, time(6, 0, 0))
             if isinstance(val, datetime):
                 return val
             val_str = str(val).strip().replace("T", " ")
@@ -31,16 +37,22 @@ class PosReportingDashboard(models.TransientModel):
                 pass
             try:
                 dt_part = datetime.strptime(val_str, "%Y-%m-%d %H:%M")
-                return dt_part.replace(second=59 if is_end else 0)
+                return dt_part
             except Exception:
                 pass
             try:
                 d = fields.Date.from_string(val_str[:10])
                 if d:
-                    return datetime.combine(d, time.max if is_end else time.min)
+                    if is_end:
+                        tomorrow = d + timedelta(days=1)
+                        return datetime.combine(tomorrow, time(5, 0, 0))
+                    return datetime.combine(d, time(6, 0, 0))
             except Exception:
                 pass
-            return datetime.combine(today, time.max if is_end else time.min)
+            if is_end:
+                tomorrow = today + timedelta(days=1)
+                return datetime.combine(tomorrow, time(5, 0, 0))
+            return datetime.combine(today, time(6, 0, 0))
 
         dt_start = _to_dt(date_from, is_end=False)
         dt_end = _to_dt(date_to, is_end=True)
@@ -175,13 +187,18 @@ class PosReportingDashboard(models.TransientModel):
         # --- C. Collect Cash In & Cash Out Moves (Statement Lines) ---
         st_lines = self.env["account.bank.statement.line"].sudo().search([
             ("date", ">=", dt_start.date()),
-            ("date", "<=", dt_end.date()),
+            ("date", "<=", dt_end.date() + timedelta(days=1)),
         ])
         for st in st_lines:
             cfg = st.pos_session_id.config_id if st.pos_session_id else False
             if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                 continue
             cfg_id = cfg.id
+
+            st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else False)
+            if st_dt and not (dt_start <= st_dt <= dt_end):
+                continue
+
             amt = st.amount or 0.0
             if amt > 0:
                 branch_data[cfg_id]["cash_in"] += amt
@@ -307,8 +324,8 @@ class PosReportingDashboard(models.TransientModel):
         trend_days = []
         curr_date = dt_start.date()
         while curr_date <= dt_end.date():
-            day_str_start = fields.Datetime.to_string(datetime.combine(curr_date, time.min))
-            day_str_end = fields.Datetime.to_string(datetime.combine(curr_date, time.max))
+            day_str_start = fields.Datetime.to_string(datetime.combine(curr_date, time(6, 0, 0)))
+            day_str_end = fields.Datetime.to_string(datetime.combine(curr_date + timedelta(days=1), time(5, 0, 0)))
 
             day_payments = self.env["pos.payment"].sudo().search([
                 ("payment_date", ">=", day_str_start),

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 import io
 import logging
 
@@ -14,11 +14,12 @@ class PosUnifiedReportWizard(models.TransientModel):
 
     def _default_date_from(self):
         today = fields.Date.context_today(self)
-        return datetime.combine(today, time.min)
+        return datetime.combine(today, time(6, 0, 0))
 
     def _default_date_to(self):
         today = fields.Date.context_today(self)
-        return datetime.combine(today, time.max)
+        tomorrow = today + timedelta(days=1)
+        return datetime.combine(tomorrow, time(5, 0, 0))
 
     date_from = fields.Datetime(
         string="Start Date & Time",
@@ -120,7 +121,7 @@ class PosUnifiedReportWizard(models.TransientModel):
         for st in st_lines:
             amt = st.amount or 0.0
             is_in = amt > 0
-            st_dt = datetime.combine(st.date, time.min) if st.date else self.date_from
+            st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else self.date_from)
             vals_list.append({
                 "name": st.payment_ref or st.ref or _("Cash Move"),
                 "date": st_dt,
@@ -259,7 +260,7 @@ class PosUnifiedReportWizard(models.TransientModel):
         # --- Sheet 1: Executive Summary ---
         sheet1 = workbook.add_worksheet(_("Branch Executive Summary"))
         sheet1.write(0, 0, _("POS Unified Operations Report"), title_fmt)
-        sheet1.write(1, 0, _("Period: %s to %s") % (data["date_from"], data["date_to"]), sub_fmt)
+        sheet1.write(1, 0, _("Period: %s to %s") % (str_start, str_end), sub_fmt)
 
         headers = [
             _("Branch Name"),
@@ -355,7 +356,7 @@ class PosUnifiedReportWizard(models.TransientModel):
         if "pos.advance.order" in self.env:
             sheet2 = workbook.add_worksheet(_("Advance Orders Detail"))
             sheet2.write(0, 0, _("POS Advance Orders Audit List"), title_fmt)
-            sheet2.write(1, 0, _("Period: %s to %s") % (data["date_from"], data["date_to"]), sub_fmt)
+            sheet2.write(1, 0, _("Period: %s to %s") % (str_start, str_end), sub_fmt)
 
             adv_headers = [
                 _("Reference"),
@@ -450,7 +451,7 @@ class PosUnifiedReportWizard(models.TransientModel):
         if "pos.advance.order.pledge" in self.env:
             sheet3 = workbook.add_worksheet(_("Pledges Detail (Rahen In & Out)"))
             sheet3.write(0, 0, _("POS Pledges Audit List (Rahen In / Out)"), title_fmt)
-            sheet3.write(1, 0, _("Period: %s to %s") % (data["date_from"], data["date_to"]), sub_fmt)
+            sheet3.write(1, 0, _("Period: %s to %s") % (str_start, str_end), sub_fmt)
 
             plg_headers = [
                 _("Customer"),
@@ -542,6 +543,80 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet3.write(p_row, 6, "", total_text_fmt)
             sheet3.write_number(p_row, 7, tot_rout, total_num_fmt)
             sheet3.write(p_row, 8, "", total_text_fmt)
+
+        # --- Sheet 4: Cash Movements Detail (Cash In & Cash Out) ---
+        sheet4 = workbook.add_worksheet(_("Cash Movements Detail"))
+        sheet4.write(0, 0, _("POS Cash In & Cash Out Audit List"), title_fmt)
+        sheet4.write(1, 0, _("Period: %s to %s") % (str_start, str_end), sub_fmt)
+
+        cash_headers = [
+            _("Branch Name"),
+            _("Move Type"),
+            _("Reference / Description"),
+            _("Exact Move Date & Time"),
+            _("Amount"),
+            _("Cashier / User"),
+            _("Session Reference"),
+        ]
+
+        sheet4.set_column(0, 0, 24)
+        sheet4.set_column(1, 1, 16)
+        sheet4.set_column(2, 2, 32)
+        sheet4.set_column(3, 3, 22)
+        sheet4.set_column(4, 4, 18)
+        sheet4.set_column(5, 6, 24)
+
+        start_row_cash = 3
+        for col_idx, h in enumerate(cash_headers):
+            sheet4.write(start_row_cash, col_idx, h, header_fmt)
+
+        st_lines = self.env["account.bank.statement.line"].sudo().search([
+            ("date", ">=", dt_start.date()),
+            ("date", "<=", dt_end.date()),
+        ], order="id desc")
+
+        m_row = start_row_cash + 1
+        tot_cin = 0.0
+        tot_cout = 0.0
+
+        for st in st_lines:
+            cfg = st.pos_session_id.config_id if st.pos_session_id else False
+            if target_config_ids and cfg and (cfg.id not in target_config_ids):
+                continue
+
+            branch_name = cfg.name if cfg else ""
+            amt = st.amount or 0.0
+            move_type = _("Cash In") if amt > 0 else _("Cash Out")
+
+            st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else self.date_from)
+            st_dt_str = fields.Datetime.to_string(st_dt) if st_dt else ""
+
+            user_name = st.create_uid.name if st.create_uid else ""
+            session_ref = st.pos_session_id.name if st.pos_session_id else ""
+            ref_desc = st.payment_ref or st.ref or st.name or ""
+
+            sheet4.write(m_row, 0, branch_name, text_fmt)
+            sheet4.write(m_row, 1, move_type, center_fmt)
+            sheet4.write(m_row, 2, ref_desc, text_fmt)
+            sheet4.write(m_row, 3, st_dt_str, center_fmt)
+            sheet4.write_number(m_row, 4, abs(amt), num_fmt)
+            sheet4.write(m_row, 5, user_name, text_fmt)
+            sheet4.write(m_row, 6, session_ref, text_fmt)
+
+            if amt > 0:
+                tot_cin += amt
+            else:
+                tot_cout += abs(amt)
+            m_row += 1
+
+        # Total Row Sheet 4
+        sheet4.write(m_row, 0, _("TOTALS"), total_text_fmt)
+        sheet4.write(m_row, 1, _("Net: %s") % fields.Float.round(tot_cin - tot_cout, precision_digits=3), total_text_fmt)
+        for col in range(2, 4):
+            sheet4.write(m_row, col, "", total_text_fmt)
+        sheet4.write_number(m_row, 4, tot_cin - tot_cout, total_num_fmt)
+        sheet4.write(m_row, 5, "", total_text_fmt)
+        sheet4.write(m_row, 6, "", total_text_fmt)
 
         workbook.close()
         return output.getvalue()
