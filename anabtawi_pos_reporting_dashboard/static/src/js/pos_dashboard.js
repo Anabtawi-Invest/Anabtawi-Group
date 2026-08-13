@@ -26,6 +26,8 @@ export class PosReportingDashboard extends Component {
             date_to: initTo,
             config_ids: initConfigs,
             loading: true,
+            sortKey: "sales",
+            sortOrder: "desc",
         });
 
         this.data = useState({
@@ -97,6 +99,40 @@ export class PosReportingDashboard extends Component {
         }
     }
 
+    get sortedBranches() {
+        const branches = [...(this.data.branches || [])];
+        const key = this.state.sortKey;
+        const isAsc = this.state.sortOrder === "asc";
+
+        if (!key) return branches;
+
+        branches.sort((a, b) => {
+            let valA = a[key];
+            let valB = b[key];
+
+            if (typeof valA === "string") {
+                valA = (valA || "").toLowerCase();
+                valB = (valB || "").toLowerCase();
+                return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            }
+
+            valA = Number(valA) || 0;
+            valB = Number(valB) || 0;
+            return isAsc ? valA - valB : valB - valA;
+        });
+
+        return branches;
+    }
+
+    sortBy(key) {
+        if (this.state.sortKey === key) {
+            this.state.sortOrder = this.state.sortOrder === "asc" ? "desc" : "asc";
+        } else {
+            this.state.sortKey = key;
+            this.state.sortOrder = key === "branch_name" ? "asc" : "desc";
+        }
+    }
+
     selectBranch(branchId) {
         if (branchId === "all") {
             this.state.config_ids = [];
@@ -145,6 +181,14 @@ export class PosReportingDashboard extends Component {
         return Number(amount).toLocaleString("en-US", {
             minimumFractionDigits: 3,
             maximumFractionDigits: 3,
+        });
+    }
+
+    formatDecimal(amount, decimals = 2) {
+        if (amount === undefined || amount === null) return "0.00";
+        return Number(amount).toLocaleString("en-US", {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
         });
     }
 

@@ -63,11 +63,16 @@ class PosReportingDashboard(models.TransientModel):
         """
         Fetch executive dashboard metrics for specified datetime range and branch configs.
         Strictly filters branches to match the active selected company/companies context.
+        Includes Average Orders Per Minute (OPM) calculations.
         """
         # 1. Parse Datetime Bounds (with exact hour/minute/second precision)
         dt_start, dt_end = self._parse_datetime_bounds(date_from, date_to)
         str_start = fields.Datetime.to_string(dt_start)
         str_end = fields.Datetime.to_string(dt_end)
+
+        # Operational duration in minutes
+        total_seconds = max((dt_end - dt_start).total_seconds(), 60.0)
+        total_minutes = max(total_seconds / 60.0, 1.0)
 
         # 2. Identify Target Branches (filtered by active selected companies)
         config_domain = [
@@ -110,6 +115,7 @@ class PosReportingDashboard(models.TransientModel):
                 "advance_pending_count": 0,
                 "delivery_amount": 0.0,
                 "order_count": 0,
+                "orders_per_min": 0.0,
             }
 
         branch_data = defaultdict(_empty_branch_dict)
@@ -211,10 +217,13 @@ class PosReportingDashboard(models.TransientModel):
             else:
                 branch_data[cfg_id]["cash_out"] += abs(amt)
 
-        # Compute net cash moves
+        # Compute net cash moves & Orders / Min per branch
         for cfg_id in active_config_ids:
             branch_data[cfg_id]["net_cash_moves"] = (
                 branch_data[cfg_id]["cash_in"] - branch_data[cfg_id]["cash_out"]
+            )
+            branch_data[cfg_id]["orders_per_min"] = round(
+                branch_data[cfg_id]["order_count"] / total_minutes, 2
             )
 
         # --- D. Collect Pledges (Rahen In & Rahen Out) ---
@@ -312,6 +321,9 @@ class PosReportingDashboard(models.TransientModel):
             for key in global_totals.keys():
                 global_totals[key] += vals[key]
 
+        # Calculate Global Orders / Min
+        global_totals["orders_per_min"] = round(global_totals["order_count"] / total_minutes, 2)
+
         # --- G. Build Channel Distribution & Daily Trends ---
         channels = [
             {"name": _("Cash Sales"), "value": global_totals["cash"], "color": "#28a745"},
@@ -395,6 +407,7 @@ class PosReportingDashboard(models.TransientModel):
                 "advance_pending_count": global_totals["advance_pending_count"],
                 "delivery_amount": global_totals["delivery_amount"],
                 "order_count": global_totals["order_count"],
+                "orders_per_min": global_totals["orders_per_min"],
             },
             "branches": branch_rows,
             "global_totals": global_totals,
@@ -406,7 +419,6 @@ class PosReportingDashboard(models.TransientModel):
     def open_kpi_drilldown(self, metric_type, date_from=None, date_to=None, config_ids=None):
         """
         Populate transient records in pos.unified.report for metric_type and return drill-down action with Excel export capability.
-        Mutually excludes Debt Sales (مبيعات الذمم) from Visa / Card amounts.
         """
         dt_start, dt_end = self._parse_datetime_bounds(date_from, date_to)
         str_start = fields.Datetime.to_string(dt_start)
