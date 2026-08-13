@@ -63,11 +63,16 @@ class PosReportingDashboard(models.TransientModel):
         """
         Fetch executive dashboard metrics for specified datetime range and branch configs.
         Strictly filters branches to match the active selected company/companies context.
+        Includes Average Orders Per Minute (OPM) calculations.
         """
         # 1. Parse Datetime Bounds (with exact hour/minute/second precision)
         dt_start, dt_end = self._parse_datetime_bounds(date_from, date_to)
         str_start = fields.Datetime.to_string(dt_start)
         str_end = fields.Datetime.to_string(dt_end)
+
+        # Operational duration in minutes
+        total_seconds = max((dt_end - dt_start).total_seconds(), 60.0)
+        total_minutes = max(total_seconds / 60.0, 1.0)
 
         # 2. Identify Target Branches (filtered by active selected companies)
         config_domain = [
@@ -110,6 +115,7 @@ class PosReportingDashboard(models.TransientModel):
                 "advance_pending_count": 0,
                 "delivery_amount": 0.0,
                 "order_count": 0,
+                "orders_per_min": 0.0,
             }
 
         branch_data = defaultdict(_empty_branch_dict)
@@ -135,15 +141,18 @@ class PosReportingDashboard(models.TransientModel):
             daily_type = getattr(pm, "daily_ops_report_type", "")
             pm_name = (pm.name or "").lower()
 
-            # Payment Classification (Cash, Visa, Employee Debt, Hospitality, etc.)
-            if "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt":
+            is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
+            is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
+
+            # Mutually Exclusive Payment Classification
+            if is_emp:
                 branch_data[cfg_id]["employee_debt"] += amt
+            elif is_hosp:
+                branch_data[cfg_id]["hospitality"] += amt
             elif daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name:
                 branch_data[cfg_id]["cash"] += amt
             elif daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name:
                 branch_data[cfg_id]["visa"] += amt
-            elif daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name:
-                branch_data[cfg_id]["hospitality"] += amt
             else:
                 branch_data[cfg_id]["other_sales"] += amt
 
@@ -208,10 +217,13 @@ class PosReportingDashboard(models.TransientModel):
             else:
                 branch_data[cfg_id]["cash_out"] += abs(amt)
 
-        # Compute net cash moves
+        # Compute net cash moves & Orders / Min per branch
         for cfg_id in active_config_ids:
             branch_data[cfg_id]["net_cash_moves"] = (
                 branch_data[cfg_id]["cash_in"] - branch_data[cfg_id]["cash_out"]
+            )
+            branch_data[cfg_id]["orders_per_min"] = round(
+                branch_data[cfg_id]["order_count"] / total_minutes, 2
             )
 
         # --- D. Collect Pledges (Rahen In & Rahen Out) ---
@@ -309,11 +321,14 @@ class PosReportingDashboard(models.TransientModel):
             for key in global_totals.keys():
                 global_totals[key] += vals[key]
 
+        # Calculate Global Orders / Min
+        global_totals["orders_per_min"] = round(global_totals["order_count"] / total_minutes, 2)
+
         # --- G. Build Channel Distribution & Daily Trends ---
         channels = [
             {"name": _("Cash Sales"), "value": global_totals["cash"], "color": "#28a745"},
             {"name": _("Visa / Card"), "value": global_totals["visa"], "color": "#007bff"},
-            {"name": _("ذمم موظفين (Employee Debt)"), "value": global_totals["employee_debt"], "color": "#6f42c1"},
+            {"name": _("Debt Sales (مبيعات الذمم)"), "value": global_totals["employee_debt"], "color": "#6f42c1"},
             {"name": _("Hospitality"), "value": global_totals["hospitality"], "color": "#ffc107"},
             {"name": _("Talabat"), "value": global_totals["talabat"], "color": "#fd7e14"},
             {"name": _("Careem"), "value": global_totals["careem"], "color": "#20c997"},
@@ -392,6 +407,7 @@ class PosReportingDashboard(models.TransientModel):
                 "advance_pending_count": global_totals["advance_pending_count"],
                 "delivery_amount": global_totals["delivery_amount"],
                 "order_count": global_totals["order_count"],
+                "orders_per_min": global_totals["orders_per_min"],
             },
             "branches": branch_rows,
             "global_totals": global_totals,
@@ -441,17 +457,26 @@ class PosReportingDashboard(models.TransientModel):
                 pm_name = (pm.name or "").lower()
 
                 is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
-                is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
-                is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
+                is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
+
+                if is_emp:
+                    is_cash = False
+                    is_visa = False
+                elif is_hosp:
+                    is_cash = False
+                    is_visa = False
+                else:
+                    is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
+                    is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
 
                 include = False
                 if metric_type == "sales":
                     include = True
                 elif metric_type == "employee_debt" and is_emp:
                     include = True
-                elif metric_type == "cash_sales" and is_cash and not is_emp:
+                elif metric_type == "cash_sales" and is_cash:
                     include = True
-                elif metric_type == "visa_sales" and is_visa and not is_emp:
+                elif metric_type == "visa_sales" and is_visa:
                     include = True
 
                 if include:
@@ -623,7 +648,7 @@ class PosReportingDashboard(models.TransientModel):
             "discount_amount": _("Order Discount Transactions"),
             "cash_sales": _("Cash Sales Transactions"),
             "visa_sales": _("Visa & Card Sales Transactions"),
-            "employee_debt": _("ذمم موظفين (Employee Debt) Transactions"),
+            "employee_debt": _("Debt Sales (مبيعات الذمم) Transactions"),
             "net_cash_moves": _("Cash Moves (In / Out) Transactions"),
             "net_pledges": _("Pledges (Rahen In / Out) Transactions"),
             "advance_deposits": _("Advance Order Deposit Transactions"),

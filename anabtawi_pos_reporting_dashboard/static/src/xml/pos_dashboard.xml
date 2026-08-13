@@ -79,6 +79,17 @@
                         </div>
                     </div>
 
+                    <!-- Average Orders Per Minute -->
+                    <div class="o_kpi_card card-opm">
+                        <div class="kpi_icon"><i class="fa fa-tachometer text-warning"/></div>
+                        <div class="kpi_title">Average Orders / Min</div>
+                        <div class="kpi_value"><t t-esc="formatDecimal(data.kpis.orders_per_min, 2)"/> <span class="fs-6 fw-normal text-muted">Orders/Min</span></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-warning text-dark badge_sub">Average Speed</span>
+                            <span class="text-muted fw-bold"><t t-esc="data.kpis.order_count"/> Orders</span>
+                        </div>
+                    </div>
+
                     <!-- Sales Without Tax -->
                     <div class="o_kpi_card card-untaxed clickable_kpi" t-on-click="() => this.onKpiClick('untaxed_sales')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-file-text-o text-success"/></div>
@@ -134,13 +145,13 @@
                         </div>
                     </div>
 
-                    <!-- Employee Debt (ذمم موظفين) -->
+                    <!-- Debt Sales (مبيعات الذمم) -->
                     <div class="o_kpi_card card-employee-debt clickable_kpi" t-on-click="() => this.onKpiClick('employee_debt')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-id-card-o text-purple"/></div>
-                        <div class="kpi_title">ذمم موظفين (Employee Debt)</div>
+                        <div class="kpi_title">Debt Sales (مبيعات الذمم)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.employee_debt)"/></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <span class="badge bg-purple text-white badge_sub">Employee Receivables</span>
+                            <span class="badge bg-purple text-white badge_sub">Debt Sales</span>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
@@ -233,7 +244,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <div class="p-3 border rounded bg-light clickable_kpi" t-on-click="() => this.onKpiClick('employee_debt')" title="Click to view detailed transactions &amp; export Excel">
-                                        <h6 class="text-muted mb-1">ذمم موظفين (Employee Debt)</h6>
+                                        <h6 class="text-muted mb-1">Debt Sales (مبيعات الذمم)</h6>
                                         <h4 class="fw-bold text-purple mb-0"><t t-esc="formatCurrency(data.kpis.employee_debt)"/></h4>
                                     </div>
                                 </div>
@@ -250,41 +261,149 @@
 
                 <!-- Per-Branch Detailed Comparison Grid -->
                 <div class="o_dashboard_section">
-                    <div class="section_header">
+                    <div class="section_header d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h4><i class="fa fa-building text-info"/> Branch Performance Matrix (<t t-esc="data.branches.length"/> Active Branches)</h4>
+                        <span class="text-muted small"><i class="fa fa-info-circle me-1"/>Click any column header to sort high-to-low or low-to-high</span>
                     </div>
 
                     <div class="table-responsive">
                         <table class="table table_branch_data align-middle">
                             <thead>
                                 <tr>
-                                    <th>Branch Name</th>
-                                    <th class="text-end">Total Sales</th>
-                                    <th class="text-end">Sales Without Tax</th>
-                                    <th class="text-end">Tax Amount</th>
-                                    <th class="text-end">Total Discounts</th>
-                                    <th class="text-end">Cash Sales</th>
-                                    <th class="text-end">Visa / Card</th>
-                                    <th class="text-end">ذمم موظفين</th>
-                                    <th class="text-end">Hospitality</th>
-                                    <th class="text-end">Talabat</th>
-                                    <th class="text-end">Careem</th>
-                                    <th class="text-end">Cash In</th>
-                                    <th class="text-end">Cash Out</th>
-                                    <th class="text-end">Net Cash Moves</th>
-                                    <th class="text-end">Rahen In</th>
-                                    <th class="text-end">Rahen Out</th>
-                                    <th class="text-end">Advance Deposits (Origin)</th>
-                                    <th class="text-end">Scheduled Pickup Value</th>
-                                    <th class="text-end">Pending Pickups</th>
-                                    <th class="text-end">Delivery Fees</th>
+                                    <th class="sortable_th" t-on-click="() => this.sortBy('branch_name')">
+                                        Branch Name
+                                        <i class="fa fa-sort-alpha-asc text-primary ms-1" t-if="state.sortKey === 'branch_name' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort-alpha-desc text-primary ms-1" t-if="state.sortKey === 'branch_name' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'branch_name'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('sales')">
+                                        Total Sales
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'sales' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'sales' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'sales'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('orders_per_min')">
+                                        Orders / Min
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'orders_per_min' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'orders_per_min' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'orders_per_min'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('untaxed_sales')">
+                                        Sales Without Tax
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'untaxed_sales' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'untaxed_sales' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'untaxed_sales'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('tax_amount')">
+                                        Tax Amount
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'tax_amount' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'tax_amount' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'tax_amount'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('discount_amount')">
+                                        Total Discounts
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'discount_amount' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'discount_amount' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'discount_amount'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('cash')">
+                                        Cash Sales
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'cash' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'cash' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'cash'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('visa')">
+                                        Visa / Card
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'visa' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'visa' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'visa'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('employee_debt')">
+                                        Debt Sales (مبيعات الذمم)
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'employee_debt' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'employee_debt' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'employee_debt'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('hospitality')">
+                                        Hospitality
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'hospitality' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'hospitality' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'hospitality'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('talabat')">
+                                        Talabat
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'talabat' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'talabat' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'talabat'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('careem')">
+                                        Careem
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'careem' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'careem' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'careem'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('cash_in')">
+                                        Cash In
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'cash_in' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'cash_in' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'cash_in'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('cash_out')">
+                                        Cash Out
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'cash_out' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'cash_out' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'cash_out'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('net_cash_moves')">
+                                        Net Cash Moves
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'net_cash_moves' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'net_cash_moves' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'net_cash_moves'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('rahen_in')">
+                                        Rahen In
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'rahen_in' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'rahen_in' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'rahen_in'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('rahen_out')">
+                                        Rahen Out
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'rahen_out' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'rahen_out' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'rahen_out'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('advance_deposits')">
+                                        Advance Deposits (Origin)
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'advance_deposits' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'advance_deposits' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'advance_deposits'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('advance_pickup_value')">
+                                        Scheduled Pickup Value
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'advance_pickup_value' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'advance_pickup_value' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'advance_pickup_value'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('advance_pending_count')">
+                                        Pending Pickups
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'advance_pending_count' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'advance_pending_count' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'advance_pending_count'"/>
+                                    </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('delivery_amount')">
+                                        Delivery Fees
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'delivery_amount' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'delivery_amount' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'delivery_amount'"/>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <t t-foreach="data.branches" t-as="branch" t-key="branch.config_id">
+                                <t t-foreach="sortedBranches" t-as="branch" t-key="branch.config_id">
                                     <tr>
                                         <td class="branch_title"><t t-esc="branch.branch_name"/></td>
                                         <td class="val_num fw-bold text-primary"><t t-esc="formatCurrency(branch.sales)"/></td>
+                                        <td class="val_num fw-bold text-warning"><t t-esc="formatDecimal(branch.orders_per_min, 2)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.untaxed_sales)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.tax_amount)"/></td>
                                         <td class="val_num text-warning"><t t-esc="formatCurrency(branch.discount_amount)"/></td>
@@ -309,6 +428,7 @@
                                 <tr class="row_total">
                                     <td class="branch_title">TOTALS</td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.sales)"/></td>
+                                    <td class="val_num text-warning"><t t-esc="formatDecimal(data.global_totals.orders_per_min, 2)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.untaxed_sales)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.tax_amount)"/></td>
                                     <td class="val_num text-warning"><t t-esc="formatCurrency(data.global_totals.discount_amount)"/></td>

@@ -17,7 +17,7 @@
                 <field name="amount" type="measure"/>
                 <field name="cash_amount" type="measure"/>
                 <field name="visa_amount" type="measure"/>
-                <field name="employee_debt_amount" type="measure"/>
+                <field name="employee_debt_amount" string="Debt Sales" type="measure"/>
                 <field name="cash_in_amount" type="measure"/>
                 <field name="cash_out_amount" type="measure"/>
                 <field name="rahen_in_amount" type="measure"/>
@@ -56,7 +56,7 @@
                 <field name="payment_method_id"/>
                 <field name="cash_amount" sum="Total Cash"/>
                 <field name="visa_amount" sum="Total Visa"/>
-                <field name="employee_debt_amount" sum="Total Employee Debt"/>
+                <field name="employee_debt_amount" string="Debt Sales (مبيعات الذمم)" sum="Total Debt Sales"/>
                 <field name="cash_in_amount" sum="Total Cash In"/>
                 <field name="cash_out_amount" sum="Total Cash Out"/>
                 <field name="rahen_in_amount" sum="Total Rahen In"/>
