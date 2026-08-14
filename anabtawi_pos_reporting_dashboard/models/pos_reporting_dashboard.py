@@ -481,18 +481,33 @@ class PosReportingDashboard(models.TransientModel):
 
                 if include:
                     amt = pay.amount or 0.0
+                    po = pay.pos_order_id
+                    tax_amt = getattr(po, "amount_tax", 0.0) or 0.0 if po else 0.0
+                    tot_amt = getattr(po, "amount_total", 0.0) or 0.0 if po else amt
+                    untaxed_amt = getattr(po, "amount_untaxed", None) if po else None
+                    if untaxed_amt is None:
+                        untaxed_amt = tot_amt - tax_amt
+                    order_disc = sum(
+                        (l.price_unit or 0.0) * (l.qty or 0.0) * (l.discount / 100.0)
+                        for l in po.lines if l.discount
+                    ) if po else 0.0
+
                     vals_list.append({
-                        "name": pay.pos_order_id.name or pay.name or _("POS Payment"),
-                        "date": pay.payment_date or pay.pos_order_id.date_order or dt_start,
+                        "name": po.name if po else (pay.name or _("POS Payment")),
+                        "date": pay.payment_date or (po.date_order if po else dt_start),
                         "config_id": cfg.id,
                         "session_id": pay.session_id.id if pay.session_id else False,
                         "payment_method_id": pm.id,
+                        "pos_order_id": po.id if po else False,
                         "report_type": "pos_sales",
                         "amount": amt,
+                        "untaxed_amount": untaxed_amt,
+                        "tax_amount": tax_amt,
+                        "discount_amount": order_disc,
                         "employee_debt_amount": amt if is_emp else 0.0,
                         "cash_amount": amt if is_cash else 0.0,
                         "visa_amount": amt if is_visa else 0.0,
-                        "partner_id": pay.pos_order_id.partner_id.id if pay.pos_order_id else False,
+                        "partner_id": po.partner_id.id if po else False,
                         "company_id": cfg.company_id.id,
                     })
 
@@ -532,8 +547,12 @@ class PosReportingDashboard(models.TransientModel):
                         "date": order.date_order,
                         "config_id": cfg.id,
                         "session_id": order.session_id.id if order.session_id else False,
+                        "pos_order_id": order.id,
                         "report_type": "pos_sales",
-                        "amount": amt,
+                        "amount": tot_amt,
+                        "untaxed_amount": untaxed_amt,
+                        "tax_amount": tax_amt,
+                        "discount_amount": order_disc,
                         "partner_id": order.partner_id.id if order.partner_id else False,
                         "company_id": cfg.company_id.id,
                     })
