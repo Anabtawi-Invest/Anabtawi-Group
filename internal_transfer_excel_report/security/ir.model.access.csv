@@ -1,3 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_internal_transfer_wizard,access_internal_transfer_wizard,model_internal_transfer_report_wizard,base.group_user,1,1,1,1
-access_factory_plan_category_option,access_factory_plan_category_option,model_factory_plan_category_option,base.group_user,1,0,0,0

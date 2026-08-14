@@ -1,4 +1,0 @@
-from . import hr_attendance
-from . import hr_attendance_overtime
-from . import hr_employee
-from . import res_config_settings

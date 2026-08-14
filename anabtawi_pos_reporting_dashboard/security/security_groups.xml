@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<odoo>
-    <data noupdate="0">
-        <record id="group_pos_reporting_dashboard_user" model="res.groups">
-            <field name="name">POS Executive Dashboard Access</field>
-            <field name="comment">Only users with this permission can view the POS Executive Dashboard and generate unified Excel reports.</field>
-        </record>
-    </data>
-</odoo>

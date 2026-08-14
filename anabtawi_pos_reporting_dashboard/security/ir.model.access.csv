@@ -1,4 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_pos_reporting_dashboard_user,pos.reporting.dashboard.user,model_pos_reporting_dashboard,anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user,1,1,1,1
-access_pos_unified_report_user,pos.unified.report.user,model_pos_unified_report,anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user,1,1,1,1
-access_pos_unified_report_wizard_user,pos.unified.report.wizard.user,model_pos_unified_report_wizard,anabtawi_pos_reporting_dashboard.group_pos_reporting_dashboard_user,1,1,1,1

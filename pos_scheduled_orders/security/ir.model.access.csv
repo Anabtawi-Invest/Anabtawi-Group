@@ -1,4 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_pos_scheduled_orders_config,pos.config.scheduled.orders,point_of_sale.model_pos_config,point_of_sale.group_pos_user,1,1,1,1
-access_pos_scheduled_orders_order,pos.order.scheduled.orders,point_of_sale.model_pos_order,point_of_sale.group_pos_user,1,1,1,1
-access_pos_scheduled_orders_picking,stock.picking.scheduled.orders,stock.model_stock_picking,stock.group_stock_user,1,1,1,1

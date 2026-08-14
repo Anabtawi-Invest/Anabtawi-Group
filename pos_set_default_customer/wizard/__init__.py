@@ -1,1 +1,0 @@
-from . import confirm_set_default_customer_wizard
