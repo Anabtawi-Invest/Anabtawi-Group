@@ -16,6 +16,13 @@ class ProductTemplate(models.Model):
         default=0.0,
         help="Deposit amount when this product is used as a Site Service pledge product.",
     )
+    # Kept so leftover/old product form views still load. Pledge is driven by
+    # Site Service menu mapping, not this flag.
+    has_pledge = fields.Boolean(
+        string="Has Pledge",
+        default=False,
+        help="Deprecated. Pledge products are mapped on the Site Service menu, not this checkbox.",
+    )
 
     is_employee_service = fields.Boolean(
         string="Is Employee Service",
@@ -39,5 +46,6 @@ class ProductProduct(models.Model):
 
     pledge_amount = fields.Monetary(related="product_tmpl_id.pledge_amount", store=True, readonly=False)
     pledge_currency_id = fields.Many2one(related="product_tmpl_id.pledge_currency_id", store=True, readonly=True)
+    has_pledge = fields.Boolean(related="product_tmpl_id.has_pledge", store=True, readonly=False)
     is_employee_service = fields.Boolean(related="product_tmpl_id.is_employee_service", store=True, readonly=False)
     is_delivery_product = fields.Boolean(related="product_tmpl_id.is_delivery_product", store=True, readonly=False)
