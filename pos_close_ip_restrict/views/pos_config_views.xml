@@ -7,9 +7,23 @@
         <field name="arch" type="xml">
             <xpath expr="//setting[@id='other_devices']" position="after">
                 <setting
+                    id="close_allowed_devices"
+                    string="Allowed Close Devices"
+                    help="Register the shop POS computer or tablet. A cashier phone is a different device even on the same WiFi. Leave empty to skip this check.">
+                    <field name="close_allowed_device_ids" nolabel="1">
+                        <list editable="bottom">
+                            <field name="name"/>
+                            <field name="device_token" column_invisible="1"/>
+                        </list>
+                    </field>
+                    <div class="text-muted mt-1">
+                        Open this POS as a manager and choose "Allow this device to close".
+                    </div>
+                </setting>
+                <setting
                     id="close_allowed_ips"
                     string="Allowed Close IPs"
-                    help="Devices that may close this POS session. Leave empty to allow any device. One IP per line, commas allowed. CIDR networks are supported.">
+                    help="Optional. On Odoo.sh this is the public internet IP, not the local PC IP. Devices on the same WiFi share it, so it will not block a cashier phone in the shop.">
                     <div class="content-group">
                         <div class="row mb-2">
                             <div class="col-lg-4 o_light_label">
@@ -21,7 +35,7 @@
                         </div>
                         <field
                             name="close_allowed_ips"
-                            placeholder="192.168.1.10&#10;192.168.1.11&#10;10.0.0.0/24"
+                            placeholder="176.29.250.80"
                             nolabel="1"/>
                     </div>
                 </setting>

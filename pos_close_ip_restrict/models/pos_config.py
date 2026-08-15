@@ -2,7 +2,7 @@ import ipaddress
 import re
 
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.http import request
 
 
@@ -15,11 +15,20 @@ class PosConfig(models.Model):
     close_allowed_ips = fields.Text(
         string="Allowed Close IPs",
         help=(
-            "IPs allowed to close this Point of Sale. One IP per line, or comma-separated. "
-            "CIDR networks are supported (e.g. 192.168.1.0/24). "
-            "Leave empty to allow closing from any device. "
-            "If Odoo is hosted in the cloud, devices on the same shop network often share "
-            "one public IP."
+            "Optional extra filter. On Odoo.sh, all devices on the same WiFi usually share "
+            "one public IP, so this cannot block a cashier's phone in the shop. "
+            "Use Allowed Close Devices for that. Leave empty to skip the IP check."
+        ),
+    )
+    close_allowed_device_ids = fields.One2many(
+        "pos.close.allowed.device",
+        "config_id",
+        string="Allowed Close Devices",
+        help=(
+            "POS computers or tablets that may close this session. "
+            "Open the POS on that device as a manager and choose "
+            "'Allow this device to close'. A phone is a different device "
+            "even on the same network. Leave empty to skip the device check."
         ),
     )
     current_client_ip = fields.Char(
@@ -112,3 +121,62 @@ class PosConfig(models.Model):
             ip=client_ip,
         )
         return False, client_ip, message
+
+    def _get_close_device_token(self):
+        token = self.env.context.get("close_device_token")
+        if token in (None, False):
+            return ""
+        return str(token).strip()
+
+    def _check_close_device(self):
+        """Return ``(allowed, token, message)``. Empty device list means no restriction."""
+        self.ensure_one()
+        devices = self.close_allowed_device_ids
+        token = self._get_close_device_token()
+        if not devices:
+            return True, token, ""
+        if token and token in set(devices.mapped("device_token")):
+            return True, token, ""
+        return (
+            False,
+            token,
+            _("You cannot close this register from this device."),
+        )
+
+    def _check_close_allowed(self):
+        """Return ``(allowed, client_ip, device_token, message)``."""
+        self.ensure_one()
+        ip_allowed, client_ip, ip_message = self._check_close_ip()
+        if not ip_allowed:
+            return False, client_ip, self._get_close_device_token(), ip_message
+        device_allowed, token, device_message = self._check_close_device()
+        if not device_allowed:
+            return False, client_ip, token, device_message
+        return True, client_ip, token, ""
+
+    def register_close_device(self, device_token, name=False):
+        self.ensure_one()
+        if not self.env.user.has_group("point_of_sale.group_pos_manager"):
+            raise AccessError(_("Only a POS manager can allow a device to close the register."))
+        token = (device_token or "").strip()
+        if not token:
+            raise UserError(_("Missing device token."))
+        existing = self.close_allowed_device_ids.filtered(lambda d: d.device_token == token)
+        if existing:
+            return {
+                "created": False,
+                "id": existing[0].id,
+                "name": existing[0].name,
+            }
+        device_name = (name or "").strip() or _("POS Device")
+        device_name = _("%(name)s (%(code)s)", name=device_name, code=token[:8])
+        device = self.env["pos.close.allowed.device"].sudo().create({
+            "config_id": self.id,
+            "device_token": token,
+            "name": device_name,
+        })
+        return {
+            "created": True,
+            "id": device.id,
+            "name": device.name,
+        }

@@ -7,7 +7,7 @@ class PosSession(models.Model):
 
     def _close_ip_block_response(self):
         self.ensure_one()
-        allowed, _client_ip, message = self.config_id._check_close_ip()
+        allowed, _client_ip, _token, message = self.config_id._check_close_allowed()
         if allowed:
             return False
         return {
@@ -19,13 +19,13 @@ class PosSession(models.Model):
 
     def _raise_if_close_ip_forbidden(self):
         for session in self:
-            allowed, _client_ip, message = session.config_id._check_close_ip()
+            allowed, _client_ip, _token, message = session.config_id._check_close_allowed()
             if not allowed:
                 raise UserError(message)
 
     def check_close_allowed_ip(self):
         self.ensure_one()
-        allowed, client_ip, message = self.config_id._check_close_ip()
+        allowed, client_ip, _token, message = self.config_id._check_close_allowed()
         return {
             "allowed": allowed,
             "ip": client_ip or "",
