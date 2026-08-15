@@ -109,6 +109,8 @@ class PosReportingDashboard(models.TransientModel):
                 "rahen_out": 0.0,
                 "net_pledges": 0.0,
                 "advance_deposits": 0.0,
+                "advance_deposits_cash": 0.0,
+                "advance_deposits_visa": 0.0,
                 "advance_order_count": 0,
                 "advance_order_total": 0.0,
                 "advance_pickup_value": 0.0,
@@ -340,6 +342,16 @@ class PosReportingDashboard(models.TransientModel):
                 if adv.create_date and dt_start <= adv.create_date <= dt_end:
                     if orig_cfg_id and (not active_config_ids or orig_cfg_id in active_config_ids):
                         branch_data[orig_cfg_id]["advance_deposits"] += dep_amt
+                        pm = adv.pos_payment_method_id if hasattr(adv, "pos_payment_method_id") and adv.pos_payment_method_id else False
+                        pm_name = (pm.name or "").lower() if pm else ""
+                        pm_type = getattr(pm, "type", "") if pm else ""
+                        daily_type = getattr(pm, "daily_ops_report_type", "") if pm else ""
+
+                        if daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name:
+                            branch_data[orig_cfg_id]["advance_deposits_cash"] += dep_amt
+                        else:
+                            branch_data[orig_cfg_id]["advance_deposits_visa"] += dep_amt
+
                         branch_data[orig_cfg_id]["advance_order_count"] += 1
                         branch_data[orig_cfg_id]["advance_order_total"] += tot_amt
 
@@ -455,6 +467,8 @@ class PosReportingDashboard(models.TransientModel):
                 "rahen_out": global_totals["rahen_out"],
                 "net_pledges": global_totals["net_pledges"],
                 "advance_deposits": global_totals["advance_deposits"],
+                "advance_deposits_cash": global_totals["advance_deposits_cash"],
+                "advance_deposits_visa": global_totals["advance_deposits_visa"],
                 "advance_order_count": global_totals["advance_order_count"],
                 "advance_order_total": global_totals["advance_order_total"],
                 "advance_pickup_value": global_totals["advance_pickup_value"],
@@ -827,7 +841,11 @@ class PosReportingDashboard(models.TransientModel):
                         dt_end_val = dt_end.replace(tzinfo=None) if hasattr(dt_end, 'replace') and getattr(dt_end, 'tzinfo', None) else dt_end
 
                         if dt_start_val <= c_dt_val <= dt_end_val:
-                            amt = adv.advance_amount or 0.0
+                            dep_amt = adv.advance_amount or 0.0
+                            tot_amt = adv.amount_grand_total or adv.amount_total or 0.0
+                            pledge_amt = adv.pledge_amount or 0.0
+                            rem_amt = adv.amount_remaining or 0.0
+
                             po = adv.pos_order_id if hasattr(adv, "pos_order_id") and adv.pos_order_id else False
                             sess = po.session_id if po else False
                             end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
@@ -841,8 +859,10 @@ class PosReportingDashboard(models.TransientModel):
                                 "payment_method_id": adv_pm_id,
                                 "pos_order_id": po.id if po else False,
                                 "report_type": "advance_deposit",
-                                "amount": amt,
-                                "advance_amount": amt,
+                                "amount": tot_amt,
+                                "advance_amount": dep_amt,
+                                "rahen_in_amount": pledge_amt,
+                                "advance_remaining_amount": rem_amt,
                                 "ending_balance": end_bal,
                                 "partner_id": adv.partner_id.id if hasattr(adv, "partner_id") and adv.partner_id else False,
                                 "company_id": cfg.company_id.id,

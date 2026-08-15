@@ -201,7 +201,11 @@
                         <div class="kpi_title">Advance Deposits (Origin)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.advance_deposits)"/></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <span><t t-esc="data.kpis.advance_order_count"/> Advance Orders</span>
+                            <div>
+                                <span><t t-esc="data.kpis.advance_order_count"/> Orders</span> | 
+                                <span class="text-success">Cash: <t t-esc="formatCurrency(data.kpis.advance_deposits_cash)"/></span> | 
+                                <span class="text-info">Visa: <t t-esc="formatCurrency(data.kpis.advance_deposits_visa)"/></span>
+                            </div>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
