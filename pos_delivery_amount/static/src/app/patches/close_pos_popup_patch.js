@@ -7,6 +7,7 @@ import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popu
 import {
     askDeliveryAmount,
     fetchClosingDeliveryPopupData,
+    printDeliveryAmountReceipt,
     processClosingDeliveryAmount,
 } from "@pos_delivery_amount/app/utils/delivery_amount_flow";
 
@@ -81,6 +82,7 @@ patch(ClosePosPopup.prototype, {
             if (!deliveryResponse?.successful) {
                 return this.handleClosingError(deliveryResponse);
             }
+            await printDeliveryAmountReceipt(this.pos, deliveryResponse.receipt, { isClosing: true });
         }
 
         try {

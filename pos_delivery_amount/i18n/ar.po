@@ -154,3 +154,11 @@ msgstr "السبب مطلوب لتسليم النقد أثناء الجلسة."
 #. module: pos_delivery_amount
 msgid "A reason is required for cash delivery."
 msgstr "السبب مطلوب لتسليم النقد."
+
+#. module: pos_delivery_amount
+msgid "AMOUNT"
+msgstr "المبلغ"
+
+#. module: pos_delivery_amount
+msgid "CASHIER"
+msgstr "أمين الصندوق"

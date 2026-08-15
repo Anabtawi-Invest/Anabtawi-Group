@@ -2,6 +2,7 @@ import logging
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.tools.misc import format_datetime, formatLang
 
 _logger = logging.getLogger(__name__)
 
@@ -341,6 +342,25 @@ class PosSession(models.Model):
         data["default_cash_details"] = dc
         return data
 
+    def _get_delivery_cashier_name(self):
+        """Prefer the POS employee cashier (PIN login) over the Odoo user."""
+        self.ensure_one()
+        employee = self.employee_id if "employee_id" in self._fields else False
+        if employee:
+            return employee.name or ""
+        return self.env.user.name or ""
+
+    def _prepare_delivery_receipt_data(self, amount, move):
+        self.ensure_one()
+        return {
+            "company_name": self.company_id.name or "",
+            "pos_name": self.config_id.name or "",
+            "cashier": self._get_delivery_cashier_name(),
+            "amount": amount,
+            "formatted_amount": formatLang(self.env, amount, currency_obj=self.currency_id),
+            "date": format_datetime(self.env, fields.Datetime.now()),
+        }
+
     def _post_delivery_success_message(self, amount, move):
         self.ensure_one()
         timestamp = fields.Datetime.context_timestamp(self, fields.Datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
@@ -381,7 +401,10 @@ class PosSession(models.Model):
         self._create_delivery_line(amount, move, is_closing_delivery=False, reason=reason)
         self._ensure_delivery_report_line()
         self._post_delivery_success_message(amount, move)
-        return {"successful": True}
+        return {
+            "successful": True,
+            "receipt": self._prepare_delivery_receipt_data(amount, move),
+        }
 
     def action_process_closing_delivery_amount(self, amount):
         """Closing delivery after cash count: journal entry only, no cash register impact."""
@@ -400,4 +423,7 @@ class PosSession(models.Model):
         self._create_delivery_line(amount, move, is_closing_delivery=True)
         self._ensure_delivery_report_line()
         self._post_delivery_success_message(amount, move)
-        return {"successful": True}
+        return {
+            "successful": True,
+            "receipt": self._prepare_delivery_receipt_data(amount, move),
+        }

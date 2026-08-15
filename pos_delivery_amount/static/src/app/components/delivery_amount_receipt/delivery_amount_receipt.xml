@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_delivery_amount.DeliveryAmountReceipt">
+        <div class="pos-receipt">
+            <div class="pos-receipt-center-align fw-bolder" t-esc="props.companyName"/>
+            <div class="pos-receipt-center-align" t-esc="props.posName"/>
+            <div class="pos-receipt-order-data text-center">
+                <div t-esc="props.date"/>
+            </div>
+            <div class="pos-receipt-center-align pt-3 fw-bolder" t-esc="props.title"/>
+            <div class="pt-3">
+                <t t-esc="labels.amount"/>
+                <span class="pos-receipt-right-align" t-esc="props.formattedAmount"/>
+            </div>
+            <div t-if="props.cashier">
+                <t t-esc="labels.cashier"/>
+                <span class="pos-receipt-right-align" t-esc="props.cashier"/>
+            </div>
+        </div>
+    </t>
+</templates>

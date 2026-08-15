@@ -6,6 +6,7 @@ import { ControlButtons } from "@point_of_sale/app/screens/product_screen/contro
 import {
     askDeliveryAmount,
     fetchDeliveryAmountPopupData,
+    printDeliveryAmountReceipt,
     processDeliveryAmount,
 } from "@pos_delivery_amount/app/utils/delivery_amount_flow";
 
@@ -62,6 +63,7 @@ patch(ControlButtons.prototype, {
             return;
         }
 
+        await printDeliveryAmountReceipt(this.pos, response.receipt);
         this.notification.add(_t("Delivery Amount processed successfully."), { type: "success" });
     },
 });

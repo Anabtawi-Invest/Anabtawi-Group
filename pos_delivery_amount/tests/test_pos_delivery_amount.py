@@ -60,6 +60,17 @@ class TestPosDeliveryAmount(TestPoSCommon):
         self.assertEqual(debit_line.debit, 150.0)
         self.assertEqual(credit_line.credit, 150.0)
 
+        receipt = result.get("receipt") or {}
+        self.assertEqual(receipt.get("pos_name"), session.config_id.name)
+        self.assertEqual(receipt.get("company_name"), session.company_id.name)
+        self.assertEqual(receipt.get("amount"), 150.0)
+        self.assertTrue(receipt.get("formatted_amount"))
+        self.assertTrue(receipt.get("cashier"))
+        self.assertNotIn("reason", receipt)
+        self.assertNotIn("move_name", receipt)
+        self.assertNotIn("session_name", receipt)
+        self.assertNotEqual(receipt.get("pos_name"), session.name)
+
     def test_multiple_delivery_amounts_are_accumulated(self):
         session = self.open_new_session(opening_cash=300.0)
         session.action_process_delivery_amount(100.0, "First delivery")
@@ -98,6 +109,7 @@ class TestPosDeliveryAmount(TestPoSCommon):
 
         result = session.action_process_delivery_amount(0.0)
         self.assertTrue(result["successful"])
+        self.assertFalse(result.get("receipt"))
         self.assertEqual(session.delivery_amount, 0.0)
         self.assertFalse(session.delivery_line_ids)
         self.assertFalse(session.delivery_move_id)
@@ -142,3 +154,15 @@ class TestPosDeliveryAmount(TestPoSCommon):
         self.assertEqual(session.cash_register_difference, difference_before)
         self.assertTrue(session.delivery_line_ids.is_closing_delivery)
         self.assertTrue(session.delivery_move_id)
+
+    def test_closing_delivery_receipt_uses_pos_name_without_reason(self):
+        session = self.open_new_session(opening_cash=50.0)
+        session.post_closing_cash_details(50.0)
+        result = session.action_process_closing_delivery_amount(10.0)
+        self.assertTrue(result["successful"])
+        receipt = result.get("receipt") or {}
+        self.assertEqual(receipt.get("pos_name"), session.config_id.name)
+        self.assertEqual(receipt.get("amount"), 10.0)
+        self.assertTrue(receipt.get("formatted_amount"))
+        self.assertNotIn("reason", receipt)
+        self.assertNotIn("move_name", receipt)
