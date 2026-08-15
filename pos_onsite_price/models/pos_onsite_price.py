@@ -1,13 +1,38 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
 from odoo.tools import float_compare
+
+_logger = logging.getLogger(__name__)
+
+
+class PosOnsitePosLoadMixin(models.AbstractModel):
+    _name = "pos.onsite.pos.load.mixin"
+    _description = "Force full POS load of on-site price records"
+
+    def _last_server_date_to_load(self):
+        # These tables are small. Incremental IndexedDB sync skipped records
+        # created before the models were registered, so always send a full load.
+        return False
+
+    @api.model
+    def _load_pos_data_search_read(self, data, config):
+        records = super(PosOnsitePosLoadMixin, self.sudo())._load_pos_data_search_read(data, config)
+        _logger.info(
+            "[ONSITE] Loaded %s for POS config id=%s count=%s",
+            self._name,
+            getattr(config, "id", config),
+            len(records or []),
+        )
+        return records
 
 
 class PosOnsitePriceMenu(models.Model):
     _name = "pos.onsite.price.menu"
     _description = "POS On-Site Price Menu"
-    _inherit = ["pos.load.mixin"]
+    _inherit = ["pos.load.mixin", "pos.onsite.pos.load.mixin"]
     _order = "id"
 
     name = fields.Char(string="Name", related="pos_config_id.name", store=True, readonly=True)
@@ -56,7 +81,7 @@ class PosOnsitePriceMenu(models.Model):
 class PosOnsitePriceRange(models.Model):
     _name = "pos.onsite.price.range"
     _description = "POS On-Site Price Range"
-    _inherit = ["pos.load.mixin"]
+    _inherit = ["pos.load.mixin", "pos.onsite.pos.load.mixin"]
     _order = "is_on_site desc, min_qty, id"
 
     menu_id = fields.Many2one(
@@ -131,7 +156,7 @@ class PosOnsitePriceRange(models.Model):
 class PosOnsitePriceProduct(models.Model):
     _name = "pos.onsite.price.product"
     _description = "POS On-Site Price Product"
-    _inherit = ["pos.load.mixin"]
+    _inherit = ["pos.load.mixin", "pos.onsite.pos.load.mixin"]
     _order = "id"
 
     menu_id = fields.Many2one(

@@ -263,6 +263,49 @@ function storeOnsiteAnswer(order, isOnSite, config) {
     }
 }
 
+async function fetchOnsiteConfigFromServer(pos) {
+    const orm = pos?.data?.orm || pos?.env?.services?.orm;
+    const configId = pos?.config?.id;
+    if (!orm || !configId) {
+        logOnsite("server fallback skipped", { hasOrm: Boolean(orm), configId });
+        return null;
+    }
+    try {
+        const menus = await orm.searchRead(
+            "pos.onsite.price.menu",
+            [["pos_config_id", "=", configId]],
+            ["id", "name", "pos_config_id"],
+            { limit: 1 }
+        );
+        logOnsite("server fallback menus", { configId, menus });
+        if (!menus.length) {
+            return null;
+        }
+        const menu = menus[0];
+        const [ranges, products] = await Promise.all([
+            orm.searchRead(
+                "pos.onsite.price.range",
+                [["menu_id", "=", menu.id]],
+                ["id", "menu_id", "name", "is_on_site", "min_qty", "max_qty", "price_per_kilo"]
+            ),
+            orm.searchRead(
+                "pos.onsite.price.product",
+                [["menu_id", "=", menu.id]],
+                ["id", "menu_id", "product_id", "multiple"]
+            ),
+        ]);
+        logOnsite("server fallback lines", {
+            rangeCount: ranges.length,
+            productCount: products.length,
+            products,
+        });
+        return { menu, ranges, products, fromServer: true };
+    } catch (error) {
+        logOnsite("server fallback failed", { message: error?.data?.message || error?.message || String(error) });
+        return null;
+    }
+}
+
 export async function promptAndApplyOnsitePricing({
     pos,
     dialog,
@@ -271,8 +314,8 @@ export async function promptAndApplyOnsitePricing({
     source = "unknown",
 }) {
     const order = pos.getOrder?.() || pos.get_order?.();
-    const config = getOnsiteConfig(pos);
-    const skipReason = getSkipReason(order, config, pos);
+    let config = getOnsiteConfig(pos);
+    let skipReason = getSkipReason(order, config, pos);
     logOnsite(`${source}: check`, {
         skipReason,
         willPrompt: !skipReason,
@@ -281,6 +324,26 @@ export async function promptAndApplyOnsitePricing({
         uiState: order?.uiState?.onsitePricing || null,
         hasDialog: Boolean(dialog),
     });
+    if (
+        skipReason === "no_onsite_menu_for_this_pos" ||
+        skipReason === "products_tab_empty"
+    ) {
+        const fetched = await fetchOnsiteConfigFromServer(pos);
+        if (fetched) {
+            config = fetched;
+            skipReason = getSkipReason(order, config, pos);
+            logOnsite(`${source}: check after server fallback`, {
+                skipReason,
+                willPrompt: !skipReason,
+                fromServer: true,
+                matchedProducts: (config.products || []).map((line) => ({
+                    productId: normalizeId(line.product_id),
+                    multiple: line.multiple,
+                })),
+                cartProducts: describeOrderProducts(order, config),
+            });
+        }
+    }
     if (skipReason) {
         return { skipped: true, reason: skipReason };
     }
