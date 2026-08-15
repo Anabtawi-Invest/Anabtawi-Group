@@ -446,6 +446,7 @@ class PosReportingDashboard(models.TransientModel):
                 "&", ("payment_date", "=", False),
                      "&", ("pos_order_id.date_order", ">=", str_start), ("pos_order_id.date_order", "<=", str_end),
             ])
+            grouped_payments = {}
             for pay in payments:
                 cfg = pay.session_id.config_id if pay.session_id else (pay.pos_order_id.config_id if pay.pos_order_id else False)
                 if not cfg or cfg.id not in active_config_ids:
@@ -480,36 +481,70 @@ class PosReportingDashboard(models.TransientModel):
                     include = True
 
                 if include:
-                    amt = pay.amount or 0.0
                     po = pay.pos_order_id
-                    tax_amt = getattr(po, "amount_tax", 0.0) or 0.0 if po else 0.0
-                    tot_amt = getattr(po, "amount_total", 0.0) or 0.0 if po else amt
-                    untaxed_amt = getattr(po, "amount_untaxed", None) if po else None
-                    if untaxed_amt is None:
-                        untaxed_amt = tot_amt - tax_amt
-                    order_disc = sum(
-                        (l.price_unit or 0.0) * (l.qty or 0.0) * (l.discount / 100.0)
-                        for l in po.lines if l.discount
-                    ) if po else 0.0
+                    key = (po.id if po else False, pm.id if pm else False, cfg.id, pay.session_id.id if pay.session_id else False)
+                    pay_dt = pay.payment_date or (po.date_order if po else dt_start)
+                    amt = pay.amount or 0.0
 
-                    vals_list.append({
-                        "name": po.name if po else (pay.name or _("POS Payment")),
-                        "date": pay.payment_date or (po.date_order if po else dt_start),
-                        "config_id": cfg.id,
-                        "session_id": pay.session_id.id if pay.session_id else False,
-                        "payment_method_id": pm.id,
-                        "pos_order_id": po.id if po else False,
-                        "report_type": "pos_sales",
-                        "amount": amt,
-                        "untaxed_amount": untaxed_amt,
-                        "tax_amount": tax_amt,
-                        "discount_amount": order_disc,
-                        "employee_debt_amount": amt if is_emp else 0.0,
-                        "cash_amount": amt if is_cash else 0.0,
-                        "visa_amount": amt if is_visa else 0.0,
-                        "partner_id": po.partner_id.id if po else False,
-                        "company_id": cfg.company_id.id,
-                    })
+                    if key not in grouped_payments:
+                        grouped_payments[key] = {
+                            "po": po,
+                            "pm": pm,
+                            "cfg": cfg,
+                            "session_id": pay.session_id.id if pay.session_id else False,
+                            "net_amount": amt,
+                            "date": pay_dt,
+                            "is_emp": is_emp,
+                            "is_cash": is_cash,
+                            "is_visa": is_visa,
+                        }
+                    else:
+                        grouped_payments[key]["net_amount"] += amt
+                        if pay_dt and (not grouped_payments[key]["date"] or pay_dt > grouped_payments[key]["date"]):
+                            grouped_payments[key]["date"] = pay_dt
+
+            for grp in grouped_payments.values():
+                amt = grp["net_amount"]
+                po = grp["po"]
+                pm = grp["pm"]
+                cfg = grp["cfg"]
+
+                if po and po.amount_total:
+                    ratio = amt / po.amount_total
+                else:
+                    ratio = 1.0
+
+                tax_amt = ((getattr(po, "amount_tax", 0.0) or 0.0) * ratio) if po else 0.0
+                tot_amt = ((getattr(po, "amount_total", 0.0) or 0.0) * ratio) if po else amt
+                untaxed_amt = getattr(po, "amount_untaxed", None) if po else None
+                if untaxed_amt is None:
+                    untaxed_amt = tot_amt - tax_amt
+                else:
+                    untaxed_amt = untaxed_amt * ratio
+
+                order_disc = (sum(
+                    (l.price_unit or 0.0) * (l.qty or 0.0) * (l.discount / 100.0)
+                    for l in po.lines if l.discount
+                ) * ratio) if po else 0.0
+
+                vals_list.append({
+                    "name": po.name if po else _("POS Payment"),
+                    "date": grp["date"] or dt_start,
+                    "config_id": cfg.id,
+                    "session_id": grp["session_id"],
+                    "payment_method_id": pm.id if pm else False,
+                    "pos_order_id": po.id if po else False,
+                    "report_type": "pos_sales",
+                    "amount": amt,
+                    "untaxed_amount": untaxed_amt,
+                    "tax_amount": tax_amt,
+                    "discount_amount": order_disc,
+                    "employee_debt_amount": amt if grp["is_emp"] else 0.0,
+                    "cash_amount": amt if grp["is_cash"] else 0.0,
+                    "visa_amount": amt if grp["is_visa"] else 0.0,
+                    "partner_id": po.partner_id.id if po else False,
+                    "company_id": cfg.company_id.id,
+                })
 
         elif metric_type in ("untaxed_sales", "tax_amount", "discount_amount"):
             pos_orders = self.env["pos.order"].sudo().search([
