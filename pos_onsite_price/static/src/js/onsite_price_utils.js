@@ -153,19 +153,46 @@ export function menuHasOnsiteProducts(config) {
     return Boolean(config?.products?.length);
 }
 
+export function getOnsiteUiState(order) {
+    if (!order) {
+        return null;
+    }
+    if (!order.uiState) {
+        order.uiState = {};
+    }
+    if (!order.uiState.onsitePricing) {
+        order.uiState.onsitePricing = {
+            applied: false,
+            isOnSite: false,
+            signature: "",
+        };
+    }
+    return order.uiState.onsitePricing;
+}
+
+export function isOrderOnSite(order) {
+    return Boolean(order?.uiState?.onsitePricing?.isOnSite || order?.is_onsite_order);
+}
+
 export function shouldPromptOnsitePricing(order, config) {
     if (!order || !menuHasOnsiteProducts(config) || !orderHasOnsiteProducts(order, config)) {
         return false;
     }
+    const state = getOnsiteUiState(order);
     const signature = getOnsiteOrderSignature(order, config);
-    return !(order.onsite_pricing_applied && order.onsite_pricing_signature === signature);
+    return !(state?.applied && state?.signature === signature);
 }
 
 function storeOnsiteAnswer(order, isOnSite, config) {
-    order.onsite_pricing_applied = true;
-    order.onsite_pricing_is_on_site = isOnSite;
-    order.is_onsite_order = isOnSite;
-    order.onsite_pricing_signature = getOnsiteOrderSignature(order, config);
+    const state = getOnsiteUiState(order);
+    if (state) {
+        state.applied = true;
+        state.isOnSite = isOnSite;
+        state.signature = getOnsiteOrderSignature(order, config);
+    }
+    if (order?.model?.fields?.is_onsite_order) {
+        order.is_onsite_order = isOnSite;
+    }
 }
 
 export async function promptAndApplyOnsitePricing({

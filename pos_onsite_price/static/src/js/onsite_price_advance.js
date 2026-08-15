@@ -4,7 +4,7 @@ import { patch } from "@web/core/utils/patch";
 import { _t } from "@web/core/l10n/translation";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { AdvanceOrderFormPopup } from "@pos_advance_order/app/screens/product_screen/control_buttons/advance_order_button/advance_order_form_popup";
-import { promptAndApplyOnsitePricing } from "@pos_onsite_price/js/onsite_price_utils";
+import { promptAndApplyOnsitePricing, isOrderOnSite } from "@pos_onsite_price/js/onsite_price_utils";
 
 patch(ControlButtons.prototype, {
     async onClickAdvanceOrder() {
@@ -29,7 +29,7 @@ patch(AdvanceOrderFormPopup.prototype, {
 
     confirm() {
         const order = this.props.pos.getOrder?.() || this.props.pos.get_order?.();
-        const isOnSite = Boolean(order?.onsite_pricing_is_on_site || order?.is_onsite_order);
+        const isOnSite = isOrderOnSite(order);
         this.state.site_service = isOnSite;
         if (isOnSite) {
             this.state.site_service_available = true;
