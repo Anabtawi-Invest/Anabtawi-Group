@@ -14,6 +14,10 @@ class PosOrder(models.Model):
     @api.model
     def _load_pos_data_fields(self, config):
         fields_list = super()._load_pos_data_fields(config)
+        # Core pos.order returns [] meaning "load all fields". Keep that so
+        # inherited fields (e.g. sh_pos_order_analytic_account) stay available.
+        if not fields_list:
+            return fields_list
         if "is_onsite_order" not in fields_list:
             fields_list.append("is_onsite_order")
         return fields_list

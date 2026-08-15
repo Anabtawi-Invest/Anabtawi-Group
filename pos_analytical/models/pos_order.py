@@ -12,6 +12,15 @@ class PosOrderInherit (models.Model):
         'account.analytic.account', string="Analytic Account")
 
     @api.model
+    def _load_pos_data_fields(self, config):
+        fields_list = super()._load_pos_data_fields(config)
+        if not fields_list:
+            return fields_list
+        if "sh_pos_order_analytic_account" not in fields_list:
+            fields_list.append("sh_pos_order_analytic_account")
+        return fields_list
+
+    @api.model
     def _order_fields(self, ui_order):
         """
         Overrides the base method to include the analytic account from the UI order.
