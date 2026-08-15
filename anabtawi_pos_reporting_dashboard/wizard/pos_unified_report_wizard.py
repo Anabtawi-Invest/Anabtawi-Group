@@ -197,27 +197,38 @@ class PosUnifiedReportWizard(models.TransientModel):
                     "company_id": sess.config_id.company_id.id,
                 })
 
-        # Statement Lines (Cash In / Out)
-        st_lines = self.env["account.bank.statement.line"].sudo().search([
-            ("pos_session_id.config_id", "in", list(active_config_ids)),
-            ("date", ">=", dt_start.date()),
-            ("date", "<=", dt_end.date()),
+        # Statement Lines (Cash In / Out for Sessions Started on Start Date)
+        start_day = dt_start.date()
+        target_sessions = self.env["pos.session"].sudo().search([
+            ("config_id", "in", list(active_config_ids)),
+            "|",
+            "&", ("start_at", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
+                 ("start_at", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
+            "&", ("create_date", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
+                 ("create_date", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
         ])
-        for st in st_lines:
-            amt = st.amount or 0.0
-            is_in = amt > 0
-            st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else self.date_from)
-            vals_list.append({
-                "name": st.payment_ref or st.ref or _("Cash Move"),
-                "date": st_dt,
-                "config_id": st.pos_session_id.config_id.id,
-                "session_id": st.pos_session_id.id,
-                "report_type": "cash_in" if is_in else "cash_out",
-                "amount": abs(amt),
-                "cash_in_amount": amt if is_in else 0.0,
-                "cash_out_amount": abs(amt) if not is_in else 0.0,
-                "partner_id": st.partner_id.id,
-            })
+        target_session_ids = set(target_sessions.ids)
+
+        if target_session_ids:
+            st_lines = self.env["account.bank.statement.line"].sudo().search([
+                ("pos_session_id", "in", list(target_session_ids)),
+            ])
+            for st in st_lines:
+                amt = st.amount or 0.0
+                is_in = amt > 0
+                st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else self.date_from)
+                vals_list.append({
+                    "name": st.payment_ref or st.ref or _("Cash Move"),
+                    "date": st_dt,
+                    "config_id": st.pos_session_id.config_id.id,
+                    "session_id": st.pos_session_id.id,
+                    "report_type": "cash_in" if is_in else "cash_out",
+                    "amount": abs(amt),
+                    "cash_in_amount": amt if is_in else 0.0,
+                    "cash_out_amount": abs(amt) if not is_in else 0.0,
+                    "partner_id": st.partner_id.id if st.partner_id else False,
+                    "company_id": st.pos_session_id.config_id.company_id.id,
+                })
 
         # Pledges (Rahen In / Out)
         if "pos.advance.order.pledge" in self.env:
@@ -664,10 +675,18 @@ class PosUnifiedReportWizard(models.TransientModel):
         for col_idx, h in enumerate(cash_headers):
             sheet4.write(start_row_cash, col_idx, h, header_fmt)
 
+        start_day = dt_start.date()
+        target_sessions_sheet4 = self.env["pos.session"].sudo().search([
+            "|",
+            "&", ("start_at", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
+                 ("start_at", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
+            "&", ("create_date", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
+                 ("create_date", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
+        ])
+        target_session_ids_sheet4 = set(target_sessions_sheet4.ids)
         st_lines = self.env["account.bank.statement.line"].sudo().search([
-            ("date", ">=", dt_start.date()),
-            ("date", "<=", dt_end.date()),
-        ], order="id desc")
+            ("pos_session_id", "in", list(target_session_ids_sheet4)),
+        ], order="id desc") if target_session_ids_sheet4 else self.env["account.bank.statement.line"]
 
         m_row = start_row_cash + 1
         tot_cin = 0.0

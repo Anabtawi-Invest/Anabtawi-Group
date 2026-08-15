@@ -207,26 +207,33 @@ class PosReportingDashboard(models.TransientModel):
             del_amt = getattr(sess, "delivery_amount", 0.0) or 0.0
             branch_data[cfg_id]["delivery_amount"] += del_amt
 
-        # --- C. Collect Cash In & Cash Out Moves (Statement Lines) ---
-        st_lines = self.env["account.bank.statement.line"].sudo().search([
-            ("date", ">=", dt_start.date()),
-            ("date", "<=", dt_end.date() + timedelta(days=1)),
+        # --- C. Collect Cash In & Cash Out Moves (Statement Lines for Sessions Started on Start Date) ---
+        start_day = dt_start.date()
+        target_sessions = self.env["pos.session"].sudo().search([
+            ("config_id", "in", list(active_config_ids)),
+            "|",
+            "&", ("start_at", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
+                 ("start_at", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
+            "&", ("create_date", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
+                 ("create_date", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
         ])
-        for st in st_lines:
-            cfg = st.pos_session_id.config_id if st.pos_session_id else False
-            if not cfg or (active_config_ids and cfg.id not in active_config_ids):
-                continue
-            cfg_id = cfg.id
+        target_session_ids = set(target_sessions.ids)
 
-            st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else False)
-            if st_dt and not (dt_start <= st_dt <= dt_end):
-                continue
+        if target_session_ids:
+            st_lines = self.env["account.bank.statement.line"].sudo().search([
+                ("pos_session_id", "in", list(target_session_ids)),
+            ])
+            for st in st_lines:
+                cfg = st.pos_session_id.config_id if st.pos_session_id else False
+                if not cfg or (active_config_ids and cfg.id not in active_config_ids):
+                    continue
+                cfg_id = cfg.id
 
-            amt = st.amount or 0.0
-            if amt > 0:
-                branch_data[cfg_id]["cash_in"] += amt
-            else:
-                branch_data[cfg_id]["cash_out"] += abs(amt)
+                amt = st.amount or 0.0
+                if amt > 0:
+                    branch_data[cfg_id]["cash_in"] += amt
+                else:
+                    branch_data[cfg_id]["cash_out"] += abs(amt)
 
         # --- D. Collect Pledges (Rahen In & Rahen Out) ---
         if "pos.advance.order.pledge" in self.env:
@@ -307,18 +314,10 @@ class PosReportingDashboard(models.TransientModel):
                         if adv.state in ("confirmed", "advance_paid"):
                             branch_data[pick_cfg_id]["advance_pending_count"] += 1
 
-        # --- F. Compute Total Cash In, Total Cash Out & Net Cash Moves per Branch ---
+        # --- F. Compute Net Cash Moves & Orders / Min per Branch ---
         for cfg_id in active_config_ids:
             b_vals = branch_data[cfg_id]
-            manual_cin = b_vals["cash_in"]
-            manual_cout = b_vals["cash_out"]
-
-            total_cin = b_vals["cash"] + b_vals["rahen_in"] + b_vals["advance_deposits"] + manual_cin
-            total_cout = manual_cout + b_vals["rahen_out"]
-
-            b_vals["cash_in"] = total_cin
-            b_vals["cash_out"] = total_cout
-            b_vals["net_cash_moves"] = total_cin - total_cout
+            b_vals["net_cash_moves"] = b_vals["cash_in"] - b_vals["cash_out"]
             b_vals["orders_per_min"] = round(
                 b_vals["order_count"] / total_minutes, 2
             )
@@ -640,36 +639,44 @@ class PosReportingDashboard(models.TransientModel):
                     })
 
         elif metric_type == "net_cash_moves":
-            st_lines = self.env["account.bank.statement.line"].sudo().search([
-                ("date", ">=", dt_start.date()),
-                ("date", "<=", dt_end.date() + timedelta(days=1)),
+            start_day = dt_start.date()
+            target_sessions = self.env["pos.session"].sudo().search([
+                ("config_id", "in", list(active_config_ids)),
+                "|",
+                "&", ("start_at", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
+                     ("start_at", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
+                "&", ("create_date", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
+                     ("create_date", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
             ])
-            for st in st_lines:
-                cfg = st.pos_session_id.config_id if st.pos_session_id else False
-                if not cfg or cfg.id not in active_config_ids:
-                    continue
+            target_session_ids = set(target_sessions.ids)
 
-                st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else False)
-                if st_dt and not (dt_start <= st_dt <= dt_end):
-                    continue
+            if target_session_ids:
+                st_lines = self.env["account.bank.statement.line"].sudo().search([
+                    ("pos_session_id", "in", list(target_session_ids)),
+                ])
+                for st in st_lines:
+                    cfg = st.pos_session_id.config_id if st.pos_session_id else False
+                    if not cfg or cfg.id not in active_config_ids:
+                        continue
 
-                amt = st.amount or 0.0
-                is_in = amt > 0
-                sess = st.pos_session_id
-                end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
-                vals_list.append({
-                    "name": st.payment_ref or st.ref or st.name or _("Cash Move"),
-                    "date": st_dt or str_start,
-                    "config_id": cfg.id,
-                    "session_id": sess.id if sess else False,
-                    "report_type": "cash_in" if is_in else "cash_out",
-                    "amount": abs(amt),
-                    "cash_in_amount": amt if is_in else 0.0,
-                    "cash_out_amount": abs(amt) if not is_in else 0.0,
-                    "ending_balance": end_bal,
-                    "partner_id": st.partner_id.id if st.partner_id else False,
-                    "company_id": cfg.company_id.id,
-                })
+                    st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else False)
+                    amt = st.amount or 0.0
+                    is_in = amt > 0
+                    sess = st.pos_session_id
+                    end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
+                    vals_list.append({
+                        "name": st.payment_ref or st.ref or st.name or _("Cash Move"),
+                        "date": st_dt or str_start,
+                        "config_id": cfg.id,
+                        "session_id": sess.id if sess else False,
+                        "report_type": "cash_in" if is_in else "cash_out",
+                        "amount": abs(amt),
+                        "cash_in_amount": amt if is_in else 0.0,
+                        "cash_out_amount": abs(amt) if not is_in else 0.0,
+                        "ending_balance": end_bal,
+                        "partner_id": st.partner_id.id if st.partner_id else False,
+                        "company_id": cfg.company_id.id,
+                    })
 
         elif metric_type == "net_pledges":
             if "pos.advance.order.pledge" in self.env:
