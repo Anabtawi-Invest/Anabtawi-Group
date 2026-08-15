@@ -194,6 +194,17 @@
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
+
+                    <!-- Delivery Amount -->
+                    <div class="o_kpi_card card-delivery clickable_kpi" t-on-click="() => this.onKpiClick('delivery_amount')" title="Click to view detailed transactions &amp; export Excel">
+                        <div class="kpi_icon"><i class="fa fa-truck text-primary"/></div>
+                        <div class="kpi_title">Delivery Amount</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.delivery_amount)"/></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-primary text-white badge_sub">Session Delivery</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Channels & Daily Trend Summary -->

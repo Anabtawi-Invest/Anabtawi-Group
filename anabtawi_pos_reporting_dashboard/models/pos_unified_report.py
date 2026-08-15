@@ -37,6 +37,7 @@ class PosUnifiedReport(models.TransientModel):
     rahen_out_amount = fields.Float(string="Rahen Out Amount", digits=(16, 3))
     advance_amount = fields.Float(string="Advance Deposit Amount", digits=(16, 3))
     delivery_amount = fields.Float(string="Delivery Amount", digits=(16, 3))
+    ending_balance = fields.Float(string="Ending Balance", digits=(16, 3))
     partner_id = fields.Many2one("res.partner", string="Customer")
     company_id = fields.Many2one("res.company", string="Company", default=lambda self: self.env.company)
 

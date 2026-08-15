@@ -101,27 +101,101 @@ class PosUnifiedReportWizard(models.TransientModel):
 
             if is_emp:
                 is_cash = False
-                is_visa = False
-            elif is_hosp:
+            key = (pay.pos_order_id.id, pay.payment_method_id.id)
+            if key not in grouped_payments:
+                pm = pay.payment_method_id
+                pm_name = (pm.name or "").lower()
+                daily_type = getattr(pm, "daily_ops_report_type", "")
+                pm_type = getattr(pm, "type", "")
+                is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
+                is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
                 is_cash = False
                 is_visa = False
+                if not is_emp and not is_hosp:
+                    is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
+                    is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
+
+                grouped_payments[key] = {
+                    "net_amount": 0.0,
+                    "po": pay.pos_order_id,
+                    "pm": pm,
+                    "cfg": pay.session_id.config_id,
+                    "session_id": pay.session_id.id,
+                    "date": pay.payment_date,
+                    "is_emp": is_emp,
+                    "is_cash": is_cash,
+                    "is_visa": is_visa,
+                }
+            grouped_payments[key]["net_amount"] += (pay.amount or 0.0)
+
+        for grp in grouped_payments.values():
+            amt = grp["net_amount"]
+            po = grp["po"]
+            pm = grp["pm"]
+            cfg = grp["cfg"]
+            sess = self.env["pos.session"].sudo().browse(grp["session_id"]) if grp.get("session_id") else (po.session_id if po else False)
+            end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
+
+            if po and po.amount_total:
+                ratio = amt / po.amount_total
             else:
-                is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
-                is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
+                ratio = 1.0
+
+            tax_amt = ((getattr(po, "amount_tax", 0.0) or 0.0) * ratio) if po else 0.0
+            tot_amt = ((getattr(po, "amount_total", 0.0) or 0.0) * ratio) if po else amt
+            untaxed_amt = getattr(po, "amount_untaxed", None) if po else None
+            if untaxed_amt is None:
+                untaxed_amt = tot_amt - tax_amt
+            else:
+                untaxed_amt = untaxed_amt * ratio
+
+            order_disc = (sum(
+                (l.price_unit or 0.0) * (l.qty or 0.0) * (l.discount / 100.0)
+                for l in po.lines if l.discount
+            ) * ratio) if po else 0.0
 
             vals_list.append({
-                "name": pay.pos_order_id.name or pay.name or _("POS Payment"),
-                "date": pay.payment_date or self.date_from,
-                "config_id": pay.session_id.config_id.id,
-                "session_id": pay.session_id.id,
-                "payment_method_id": pm.id,
+                "name": po.name if po else _("POS Payment"),
+                "date": grp["date"] or self.date_from,
+                "config_id": cfg.id,
+                "session_id": grp["session_id"],
+                "payment_method_id": pm.id if pm else False,
+                "pos_order_id": po.id if po else False,
                 "report_type": "pos_sales",
                 "amount": amt,
-                "cash_amount": amt if is_cash else 0.0,
-                "visa_amount": amt if is_visa else 0.0,
-                "employee_debt_amount": amt if is_emp else 0.0,
-                "partner_id": pay.pos_order_id.partner_id.id if pay.pos_order_id else False,
+                "untaxed_amount": untaxed_amt,
+                "tax_amount": tax_amt,
+                "discount_amount": order_disc,
+                "cash_amount": amt if grp["is_cash"] else 0.0,
+                "visa_amount": amt if grp["is_visa"] else 0.0,
+                "employee_debt_amount": amt if grp["is_emp"] else 0.0,
+                "ending_balance": end_bal,
+                "partner_id": po.partner_id.id if po else False,
+                "company_id": cfg.company_id.id,
             })
+
+        # Session Delivery Amounts
+        sessions = self.env["pos.session"].sudo().search([
+            ("config_id", "in", list(active_config_ids)),
+            "|",
+            "&", ("start_at", ">=", str_start), ("start_at", "<=", str_end),
+            "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+        ])
+        for sess in sessions:
+            del_amt = getattr(sess, "delivery_amount", 0.0) or 0.0
+            if del_amt != 0.0:
+                end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0
+                vals_list.append({
+                    "name": _("Session Delivery Amount: %s") % sess.name,
+                    "date": sess.start_at or sess.create_date or self.date_from,
+                    "config_id": sess.config_id.id,
+                    "session_id": sess.id,
+                    "report_type": "pos_sales",
+                    "amount": del_amt,
+                    "delivery_amount": del_amt,
+                    "ending_balance": end_bal,
+                    "company_id": sess.config_id.company_id.id,
+                })
 
         # Statement Lines (Cash In / Out)
         st_lines = self.env["account.bank.statement.line"].sudo().search([

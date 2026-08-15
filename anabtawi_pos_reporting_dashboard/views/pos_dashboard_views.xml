@@ -24,6 +24,7 @@
                 <field name="rahen_out_amount" type="measure"/>
                 <field name="advance_amount" type="measure"/>
                 <field name="delivery_amount" type="measure"/>
+                <field name="ending_balance" type="measure"/>
             </pivot>
         </field>
     </record>
@@ -67,6 +68,8 @@
                 <field name="rahen_in_amount" sum="Total Rahen In" optional="hide"/>
                 <field name="rahen_out_amount" sum="Total Rahen Out" optional="hide"/>
                 <field name="advance_amount" sum="Total Advance" optional="hide"/>
+                <field name="delivery_amount" string="Delivery Amount" sum="Total Delivery" optional="show"/>
+                <field name="ending_balance" string="Ending Balance" sum="Total Ending Balance" optional="show"/>
                 <field name="amount" string="Full Amount" sum="Total Amount"/>
             </list>
         </field>

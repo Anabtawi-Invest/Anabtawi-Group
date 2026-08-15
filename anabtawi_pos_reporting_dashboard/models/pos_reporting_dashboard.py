@@ -193,8 +193,19 @@ class PosReportingDashboard(models.TransientModel):
             branch_data[cfg_id]["untaxed_sales"] += untaxed_amt
             branch_data[cfg_id]["tax_amount"] += tax_amt
             branch_data[cfg_id]["discount_amount"] += order_disc
-            branch_data[cfg_id]["delivery_amount"] += getattr(order, "delivery_amount", 0.0) or 0.0
             branch_data[cfg_id]["order_count"] += 1
+
+        # --- B2. Collect Delivery Amount & Ending Balance per POS Session ---
+        sessions = self.env["pos.session"].sudo().search([
+            ("config_id", "in", list(active_config_ids)),
+            "|",
+            "&", ("start_at", ">=", str_start), ("start_at", "<=", str_end),
+            "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+        ])
+        for sess in sessions:
+            cfg_id = sess.config_id.id
+            del_amt = getattr(sess, "delivery_amount", 0.0) or 0.0
+            branch_data[cfg_id]["delivery_amount"] += del_amt
 
         # --- C. Collect Cash In & Cash Out Moves (Statement Lines) ---
         st_lines = self.env["account.bank.statement.line"].sudo().search([
@@ -508,6 +519,8 @@ class PosReportingDashboard(models.TransientModel):
                 po = grp["po"]
                 pm = grp["pm"]
                 cfg = grp["cfg"]
+                sess = self.env["pos.session"].sudo().browse(grp["session_id"]) if grp.get("session_id") else (po.session_id if po else False)
+                end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
 
                 if po and po.amount_total:
                     ratio = amt / po.amount_total
@@ -542,9 +555,33 @@ class PosReportingDashboard(models.TransientModel):
                     "employee_debt_amount": amt if grp["is_emp"] else 0.0,
                     "cash_amount": amt if grp["is_cash"] else 0.0,
                     "visa_amount": amt if grp["is_visa"] else 0.0,
+                    "ending_balance": end_bal,
                     "partner_id": po.partner_id.id if po else False,
                     "company_id": cfg.company_id.id,
                 })
+
+        elif metric_type == "delivery_amount":
+            sessions = self.env["pos.session"].sudo().search([
+                ("config_id", "in", list(active_config_ids)),
+                "|",
+                "&", ("start_at", ">=", str_start), ("start_at", "<=", str_end),
+                "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+            ])
+            for sess in sessions:
+                del_amt = getattr(sess, "delivery_amount", 0.0) or 0.0
+                if del_amt != 0.0:
+                    end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0
+                    vals_list.append({
+                        "name": _("Session Delivery Amount: %s") % sess.name,
+                        "date": sess.start_at or sess.create_date or str_start,
+                        "config_id": sess.config_id.id,
+                        "session_id": sess.id,
+                        "report_type": "pos_sales",
+                        "amount": del_amt,
+                        "delivery_amount": del_amt,
+                        "ending_balance": end_bal,
+                        "company_id": sess.config_id.company_id.id,
+                    })
 
         elif metric_type in ("untaxed_sales", "tax_amount", "discount_amount"):
             pos_orders = self.env["pos.order"].sudo().search([
@@ -577,13 +614,20 @@ class PosReportingDashboard(models.TransientModel):
                     amt = order_disc
 
                 if amt != 0.0:
+                    sess = order.session_id
+                    end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
                     vals_list.append({
                         "name": order.name or _("POS Order"),
                         "date": order.date_order,
                         "config_id": cfg.id,
                         "session_id": order.session_id.id if order.session_id else False,
+                        "pos_order_id": order.id,
                         "report_type": "pos_sales",
-                        "amount": amt,
+                        "amount": tot_amt,
+                        "untaxed_amount": untaxed_amt,
+                        "tax_amount": tax_amt,
+                        "discount_amount": order_disc,
+                        "ending_balance": end_bal,
                         "partner_id": order.partner_id.id if order.partner_id else False,
                         "company_id": cfg.company_id.id,
                     })
@@ -604,15 +648,18 @@ class PosReportingDashboard(models.TransientModel):
 
                 amt = st.amount or 0.0
                 is_in = amt > 0
+                sess = st.pos_session_id
+                end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
                 vals_list.append({
                     "name": st.payment_ref or st.ref or st.name or _("Cash Move"),
                     "date": st_dt or str_start,
                     "config_id": cfg.id,
-                    "session_id": st.pos_session_id.id if st.pos_session_id else False,
+                    "session_id": sess.id if sess else False,
                     "report_type": "cash_in" if is_in else "cash_out",
                     "amount": abs(amt),
                     "cash_in_amount": amt if is_in else 0.0,
                     "cash_out_amount": abs(amt) if not is_in else 0.0,
+                    "ending_balance": end_bal,
                     "partner_id": st.partner_id.id if st.partner_id else False,
                     "company_id": cfg.company_id.id,
                 })
@@ -621,39 +668,49 @@ class PosReportingDashboard(models.TransientModel):
             if "pos.advance.order.pledge" in self.env:
                 pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([])
                 for pledge in pledge_recs:
-                    cfg = pledge.pos_order_id.config_id if pledge.pos_order_id else (
-                        pledge.order_id.pos_config_id if (pledge.order_id and hasattr(pledge.order_id, "pos_config_id")) else (
-                            pledge.order_id.from_pos_config_id if (pledge.order_id and hasattr(pledge.order_id, "from_pos_config_id")) else False
+                    po = pledge.pos_order_id if hasattr(pledge, "pos_order_id") and pledge.pos_order_id else False
+                    cfg = po.config_id if po else (
+                        pledge.order_id.pos_config_id if (hasattr(pledge, "order_id") and pledge.order_id and hasattr(pledge.order_id, "pos_config_id")) else (
+                            pledge.order_id.from_pos_config_id if (hasattr(pledge, "order_id") and pledge.order_id and hasattr(pledge.order_id, "from_pos_config_id")) else False
                         )
                     )
                     if not cfg or cfg.id not in active_config_ids:
                         continue
 
-                    amt = pledge.pledge_subtotal or (getattr(pledge, "pledge_qty", 1.0) * getattr(pledge, "pledge_amount_unit", 0.0)) or 0.0
+                    amt = pledge.pledge_subtotal or (getattr(pledge, "pledge_qty", 1.0) * getattr(pledge, "pledge_amount_unit", 0.0)) or getattr(pledge, "pledge_amount", 0.0) or 0.0
                     rec_dt = pledge.receive_date or pledge.create_date
                     ret_dt = pledge.return_date or (pledge.write_date if pledge.state == "returned" else None)
 
+                    sess = po.session_id if po else False
+                    end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
+
                     if rec_dt and dt_start <= rec_dt <= dt_end:
                         vals_list.append({
-                            "name": _("Pledge Received: %s") % (pledge.display_name or pledge.product_id.name),
+                            "name": _("Pledge Received: %s") % (pledge.display_name or (pledge.product_id.name if hasattr(pledge, "product_id") and pledge.product_id else _("Pledge"))),
                             "date": rec_dt,
                             "config_id": cfg.id,
+                            "session_id": sess.id if sess else False,
+                            "pos_order_id": po.id if po else False,
                             "report_type": "rahen_in",
                             "amount": amt,
                             "rahen_in_amount": amt,
-                            "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
+                            "ending_balance": end_bal,
+                            "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") and pledge.partner_id else False,
                             "company_id": cfg.company_id.id,
                         })
 
                     if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
                         vals_list.append({
-                            "name": _("Pledge Returned: %s") % (pledge.display_name or pledge.product_id.name),
+                            "name": _("Pledge Returned: %s") % (pledge.display_name or (pledge.product_id.name if hasattr(pledge, "product_id") and pledge.product_id else _("Pledge"))),
                             "date": ret_dt,
                             "config_id": cfg.id,
+                            "session_id": sess.id if sess else False,
+                            "pos_order_id": po.id if po else False,
                             "report_type": "rahen_out",
                             "amount": amt,
                             "rahen_out_amount": amt,
-                            "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
+                            "ending_balance": end_bal,
+                            "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") and pledge.partner_id else False,
                             "company_id": cfg.company_id.id,
                         })
 
@@ -666,18 +723,30 @@ class PosReportingDashboard(models.TransientModel):
                         continue
 
                     c_dt = adv.create_date
-                    if c_dt and dt_start <= c_dt <= dt_end:
-                        amt = adv.advance_amount or 0.0
-                        vals_list.append({
-                            "name": adv.name or _("Advance Order Deposit"),
-                            "date": c_dt,
-                            "config_id": cfg.id,
-                            "report_type": "advance_deposit",
-                            "amount": amt,
-                            "advance_amount": amt,
-                            "partner_id": adv.partner_id.id if hasattr(adv, "partner_id") else False,
-                            "company_id": cfg.company_id.id,
-                        })
+                    if c_dt:
+                        c_dt_val = c_dt.replace(tzinfo=None) if hasattr(c_dt, 'replace') and getattr(c_dt, 'tzinfo', None) else c_dt
+                        dt_start_val = dt_start.replace(tzinfo=None) if hasattr(dt_start, 'replace') and getattr(dt_start, 'tzinfo', None) else dt_start
+                        dt_end_val = dt_end.replace(tzinfo=None) if hasattr(dt_end, 'replace') and getattr(dt_end, 'tzinfo', None) else dt_end
+
+                        if dt_start_val <= c_dt_val <= dt_end_val:
+                            amt = adv.advance_amount or 0.0
+                            po = adv.pos_order_id if hasattr(adv, "pos_order_id") and adv.pos_order_id else False
+                            sess = po.session_id if po else False
+                            end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
+
+                            vals_list.append({
+                                "name": adv.name or _("Advance Order Deposit"),
+                                "date": c_dt,
+                                "config_id": cfg.id,
+                                "session_id": sess.id if sess else False,
+                                "pos_order_id": po.id if po else False,
+                                "report_type": "advance_deposit",
+                                "amount": amt,
+                                "advance_amount": amt,
+                                "ending_balance": end_bal,
+                                "partner_id": adv.partner_id.id if hasattr(adv, "partner_id") and adv.partner_id else False,
+                                "company_id": cfg.company_id.id,
+                            })
 
         if vals_list:
             self.env["pos.unified.report"].sudo().create(vals_list)
@@ -702,6 +771,7 @@ class PosReportingDashboard(models.TransientModel):
             "net_cash_moves": _("Cash Moves (In / Out) Transactions"),
             "net_pledges": _("Pledges (Rahen In / Out) Transactions"),
             "advance_deposits": _("Advance Order Deposit Transactions"),
+            "delivery_amount": _("Session Delivery Amount Transactions"),
         }
         title = metric_titles.get(metric_type, _("Metric Drill-Down Transactions"))
 
