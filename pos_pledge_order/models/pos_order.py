@@ -3,6 +3,7 @@ from odoo import models, api, fields, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.fields import Command
 from odoo.tools import float_compare, float_repr
+import json
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -82,13 +83,42 @@ class PosOrder(models.Model):
     )
 
     @api.model
+    def _coerce_many2one_id(self, value):
+        """POS UI sometimes sends a record dict instead of an integer ID."""
+        if isinstance(value, dict):
+            record_id = value.get("id")
+            return record_id if isinstance(record_id, int) else False
+        if isinstance(value, (list, tuple)) and value:
+            first = value[0]
+            if isinstance(first, int):
+                return first
+            if isinstance(first, dict):
+                record_id = first.get("id")
+                return record_id if isinstance(record_id, int) else False
+        return value
+
+    @api.model
+    def _sanitize_pos_ui_order(self, order):
+        """Prevent psycopg2 'can't adapt type dict' on pos.order create from UI sync."""
+        if not isinstance(order, dict):
+            return order
+        for field_name, field in self._fields.items():
+            if field_name not in order:
+                continue
+            value = order[field_name]
+            if field.type == "many2one" and isinstance(value, (dict, list, tuple)):
+                order[field_name] = self._coerce_many2one_id(value)
+            elif field.type == "char" and isinstance(value, (dict, list)):
+                order[field_name] = json.dumps(value)
+        return order
+
+    @api.model
     def _order_fields(self, ui_order):
         """Read employee_id from UI order"""
         vals = super()._order_fields(ui_order)
-        # Get employee_id from UI order
-        employee_id = ui_order.get('employee_id', False)
+        employee_id = self._coerce_many2one_id(ui_order.get("employee_id", False))
         if employee_id:
-            vals['employee_id'] = employee_id
+            vals["employee_id"] = employee_id
         _logger.info("[PLEDGE] _order_fields: employee_id = %s", employee_id)
         return vals
 
@@ -375,8 +405,9 @@ class PosOrder(models.Model):
             "payment_ids": order.get("payment_ids") or [],
             "is_refund": order.get("is_refund", False),
         }
-        if order.get("partner_id"):
-            vals_for_new["partner_id"] = order["partner_id"]
+        partner_id = self._coerce_many2one_id(order.get("partner_id"))
+        if partner_id:
+            vals_for_new["partner_id"] = partner_id
         stub = self.new(vals_for_new)
         stub._compute_prices()
         order["amount_tax"] = stub.amount_tax
@@ -387,6 +418,7 @@ class PosOrder(models.Model):
 
     @api.model
     def _process_order(self, order, existing_order):
+        self._sanitize_pos_ui_order(order)
         pledge_meta = self._pledge_strip_ui_order(order)
         pos_order = self
         if pledge_meta["total"] > 0:

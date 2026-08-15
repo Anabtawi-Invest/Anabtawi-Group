@@ -325,23 +325,23 @@ console.log("[PLEDGE] ControlButtons patch applied");
 patch(PosOrder.prototype, {
     setup(vals) {
         super.setup(vals);
-        // Initialize employee fields
-        this.employee_id = vals?.employee_id || null;
-        this.employee_name = vals?.employee_name || null;
+        // Do not overwrite employee_id: pos_hr stores the PIN cashier as a record.
+        this.employee_name = vals?.employee_name || this.employee_id?.name || null;
     },
 
     serializeForORM(opts = {}) {
         const data = super.serializeForORM(opts);
-        // Only send employee_id to backend (employee_name is not a field in pos.order model)
-        if (this.employee_id) {
-            data.employee_id = this.employee_id;
+        // POS many2one records serialize as objects; Postgres needs an integer ID.
+        const employee = this.employee_id;
+        if (employee) {
+            data.employee_id = employee.id ?? employee;
         }
         const lines = this.getOrderlines ? this.getOrderlines() : this.lines || [];
         console.warn(
             "[PLEDGE][TRACE][FRONT] serializeForORM build=%s order=%s employee_id=%s lines=%s payload_lines=%s",
             PLEDGE_ORDER_BUILD_TAG,
             this.name || this.uid || "n/a",
-            this.employee_id || "none",
+            data.employee_id || "none",
             lines.length,
             (data.lines || []).length
         );
