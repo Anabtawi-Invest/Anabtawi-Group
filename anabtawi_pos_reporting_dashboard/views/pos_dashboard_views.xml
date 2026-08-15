@@ -50,7 +50,8 @@
                 </header>
                 <field name="date"/>
                 <field name="config_id"/>
-                <field name="session_id"/>
+                <field name="session_id" widget="many2one"/>
+                <button name="action_open_pos_session" string="Open Session" type="object" icon="fa-external-link" invisible="not session_id"/>
                 <field name="pos_order_id" string="Order Reference" widget="many2one"/>
                 <button name="action_open_pos_order" string="Open Order" type="object" icon="fa-arrow-circle-right" invisible="not pos_order_id"/>
                 <field name="name"/>

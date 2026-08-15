@@ -402,7 +402,7 @@
                                         <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'advance_pending_count'"/>
                                     </th>
                                     <th class="text-end sortable_th" t-on-click="() => this.sortBy('delivery_amount')">
-                                        Delivery Fees
+                                        Delivery Amount
                                         <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'delivery_amount' &amp;&amp; state.sortOrder === 'desc'"/>
                                         <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'delivery_amount' &amp;&amp; state.sortOrder === 'asc'"/>
                                         <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'delivery_amount'"/>

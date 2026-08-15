@@ -369,9 +369,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             _("Rahen Out (Return)"),
             _("Net Pledges"),
             _("Advance Deposits (Origin)"),
-            _("Scheduled Pickup Value"),
             _("Pending Pickups"),
-            _("Delivery Fees"),
+            _("Delivery Amount"),
         ]
 
         sheet1.set_column(0, 0, 28)
@@ -405,9 +404,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet1.write_number(curr_row, 18, b["rahen_out"], num_fmt)
             sheet1.write_number(curr_row, 19, b["net_pledges"], num_fmt)
             sheet1.write_number(curr_row, 20, b["advance_deposits"], num_fmt)
-            sheet1.write_number(curr_row, 21, b.get("advance_pickup_value", 0.0), num_fmt)
-            sheet1.write_number(curr_row, 22, b.get("advance_pending_count", 0), int_fmt)
-            sheet1.write_number(curr_row, 23, b["delivery_amount"], num_fmt)
+            sheet1.write_number(curr_row, 21, b.get("advance_pending_count", 0), int_fmt)
+            sheet1.write_number(curr_row, 22, b["delivery_amount"], num_fmt)
             curr_row += 1
 
         # Global Total Row Sheet 1
@@ -433,9 +431,8 @@ class PosUnifiedReportWizard(models.TransientModel):
         sheet1.write_number(curr_row, 18, gt["rahen_out"], total_num_fmt)
         sheet1.write_number(curr_row, 19, gt["net_pledges"], total_num_fmt)
         sheet1.write_number(curr_row, 20, gt["advance_deposits"], total_num_fmt)
-        sheet1.write_number(curr_row, 21, gt.get("advance_pickup_value", 0.0), total_num_fmt)
-        sheet1.write_number(curr_row, 22, gt.get("advance_pending_count", 0), total_int_fmt)
-        sheet1.write_number(curr_row, 23, gt["delivery_amount"], total_num_fmt)
+        sheet1.write_number(curr_row, 21, gt.get("advance_pending_count", 0), total_int_fmt)
+        sheet1.write_number(curr_row, 22, gt["delivery_amount"], total_num_fmt)
 
         # Target branch config IDs set
         target_config_ids = set(self.config_ids.ids) if self.config_ids else None
@@ -454,6 +451,7 @@ class PosUnifiedReportWizard(models.TransientModel):
                 _("Employee / Staff"),
                 _("Deposit Branch (Origin)"),
                 _("Pickup Branch (Target)"),
+                _("Payment Method"),
                 _("Status"),
                 _("Total Amount"),
                 _("Advance Deposit Paid"),
@@ -465,8 +463,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet2.set_column(1, 2, 22)
             sheet2.set_column(3, 4, 24)
             sheet2.set_column(5, 6, 24)
-            sheet2.set_column(7, 7, 16)
-            sheet2.set_column(8, 11, 18)
+            sheet2.set_column(7, 8, 18)
+            sheet2.set_column(9, 12, 18)
 
             start_row_adv = 3
             for col_idx, h in enumerate(adv_headers):
@@ -502,6 +500,13 @@ class PosUnifiedReportWizard(models.TransientModel):
                 emp_name = a.employee_id.name if a.employee_id else (a.user_id.name if a.user_id else "")
                 state_label = dict(a._fields["state"].selection).get(a.state, a.state)
 
+                pm_name = ""
+                if hasattr(a, "pos_payment_method_id") and a.pos_payment_method_id:
+                    pm_name = a.pos_payment_method_id.name
+                elif hasattr(a, "payment_method") and a.payment_method:
+                    pm_sel = dict(a._fields["payment_method"].selection) if hasattr(a._fields["payment_method"], "selection") else {}
+                    pm_name = pm_sel.get(a.payment_method, str(a.payment_method).capitalize())
+
                 g_amt = a.amount_grand_total or a.amount_total or 0.0
                 d_amt = a.advance_amount or 0.0
                 r_amt = a.amount_remaining or 0.0
@@ -514,11 +519,12 @@ class PosUnifiedReportWizard(models.TransientModel):
                 sheet2.write(c_row, 4, emp_name, text_fmt)
                 sheet2.write(c_row, 5, orig_name, text_fmt)
                 sheet2.write(c_row, 6, pick_name, text_fmt)
-                sheet2.write(c_row, 7, state_label, center_fmt)
-                sheet2.write_number(c_row, 8, g_amt, num_fmt)
-                sheet2.write_number(c_row, 9, d_amt, num_fmt)
-                sheet2.write_number(c_row, 10, r_amt, num_fmt)
-                sheet2.write_number(c_row, 11, p_amt, num_fmt)
+                sheet2.write(c_row, 7, pm_name, center_fmt)
+                sheet2.write(c_row, 8, state_label, center_fmt)
+                sheet2.write_number(c_row, 9, g_amt, num_fmt)
+                sheet2.write_number(c_row, 10, d_amt, num_fmt)
+                sheet2.write_number(c_row, 11, r_amt, num_fmt)
+                sheet2.write_number(c_row, 12, p_amt, num_fmt)
 
                 tot_grand += g_amt
                 tot_dep += d_amt
@@ -528,12 +534,12 @@ class PosUnifiedReportWizard(models.TransientModel):
 
             # Total Row Sheet 2
             sheet2.write(c_row, 0, _("TOTALS"), total_text_fmt)
-            for col in range(1, 8):
+            for col in range(1, 9):
                 sheet2.write(c_row, col, "", total_text_fmt)
-            sheet2.write_number(c_row, 8, tot_grand, total_num_fmt)
-            sheet2.write_number(c_row, 9, tot_dep, total_num_fmt)
-            sheet2.write_number(c_row, 10, tot_rem, total_num_fmt)
-            sheet2.write_number(c_row, 11, tot_plg, total_num_fmt)
+            sheet2.write_number(c_row, 9, tot_grand, total_num_fmt)
+            sheet2.write_number(c_row, 10, tot_dep, total_num_fmt)
+            sheet2.write_number(c_row, 11, tot_rem, total_num_fmt)
+            sheet2.write_number(c_row, 12, tot_plg, total_num_fmt)
 
         # --- Sheet 3: Pledges Detail (Rahen In & Rahen Out) ---
         if "pos.advance.order.pledge" in self.env:

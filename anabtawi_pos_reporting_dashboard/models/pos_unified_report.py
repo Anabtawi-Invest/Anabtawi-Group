@@ -41,6 +41,19 @@ class PosUnifiedReport(models.TransientModel):
     partner_id = fields.Many2one("res.partner", string="Customer")
     company_id = fields.Many2one("res.company", string="Company", default=lambda self: self.env.company)
 
+    def action_open_pos_session(self):
+        self.ensure_one()
+        if self.session_id:
+            return {
+                "name": _("POS Session Details"),
+                "type": "ir.actions.act_window",
+                "res_model": "pos.session",
+                "res_id": self.session_id.id,
+                "view_mode": "form",
+                "target": "current",
+            }
+        return False
+
     def action_open_pos_order(self):
         self.ensure_one()
         if self.pos_order_id:

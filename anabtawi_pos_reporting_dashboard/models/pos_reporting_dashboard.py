@@ -228,15 +228,6 @@ class PosReportingDashboard(models.TransientModel):
             else:
                 branch_data[cfg_id]["cash_out"] += abs(amt)
 
-        # Compute net cash moves & Orders / Min per branch
-        for cfg_id in active_config_ids:
-            branch_data[cfg_id]["net_cash_moves"] = (
-                branch_data[cfg_id]["cash_in"] - branch_data[cfg_id]["cash_out"]
-            )
-            branch_data[cfg_id]["orders_per_min"] = round(
-                branch_data[cfg_id]["order_count"] / total_minutes, 2
-            )
-
         # --- D. Collect Pledges (Rahen In & Rahen Out) ---
         if "pos.advance.order.pledge" in self.env:
             pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([])
@@ -316,7 +307,23 @@ class PosReportingDashboard(models.TransientModel):
                         if adv.state in ("confirmed", "advance_paid"):
                             branch_data[pick_cfg_id]["advance_pending_count"] += 1
 
-        # --- F. Format Per-Branch Rows & Calculate Global Totals ---
+        # --- F. Compute Total Cash In, Total Cash Out & Net Cash Moves per Branch ---
+        for cfg_id in active_config_ids:
+            b_vals = branch_data[cfg_id]
+            manual_cin = b_vals["cash_in"]
+            manual_cout = b_vals["cash_out"]
+
+            total_cin = b_vals["cash"] + b_vals["rahen_in"] + b_vals["advance_deposits"] + manual_cin
+            total_cout = manual_cout + b_vals["rahen_out"]
+
+            b_vals["cash_in"] = total_cin
+            b_vals["cash_out"] = total_cout
+            b_vals["net_cash_moves"] = total_cin - total_cout
+            b_vals["orders_per_min"] = round(
+                b_vals["order_count"] / total_minutes, 2
+            )
+
+        # --- G. Format Per-Branch Rows & Calculate Global Totals ---
         branch_rows = []
         global_totals = _empty_branch_dict()
 
