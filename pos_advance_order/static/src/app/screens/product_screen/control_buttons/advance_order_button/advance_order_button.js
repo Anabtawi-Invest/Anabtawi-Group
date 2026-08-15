@@ -11,6 +11,10 @@ import { AdvanceOrderFormPopup } from "./advance_order_form_popup";
 import { CompleteAdvanceOrderPopup } from "./complete_advance_order_popup";
 import { RefundAdvanceOrderPopup } from "./refund_advance_order_popup";
 import { ClosePosPopup } from "@point_of_sale/app/components/popups/closing_popup/closing_popup";
+import {
+    appendSiteServiceLineIfNeeded,
+} from "@pos_advance_order/js/site_service_utils";
+import { printAdvanceOrderReceipt } from "@pos_advance_order/js/advance_order_print";
 
 // Odoo 19 validates ClosePosPopup props strictly; backend adds advance closing details.
 ClosePosPopup.props = [
@@ -18,11 +22,6 @@ ClosePosPopup.props = [
     "advance_deposit_details",
     "advance_refund_details",
 ];
-
-import {
-    appendSiteServiceLineIfNeeded,
-} from "@pos_advance_order/js/site_service_utils";
-import { printAdvanceOrderReceipt } from "@pos_advance_order/js/advance_order_print";
 
 function toNumber(value, fallback = 0) {
     const num = Number(value);
@@ -38,8 +37,8 @@ patch(ControlButtons.prototype, {
         this.renderer = useService("renderer");
     },
 
-    async _printAdvanceReceipt(receiptData, { closeActionsPopup = true } = {}) {
-        if (closeActionsPopup && this.props.close) {
+    async _printAdvanceReceipt(receiptData) {
+        if (this.props.close) {
             this.props.close();
             await new Promise((resolve) => setTimeout(resolve, 200));
         }
@@ -49,35 +48,6 @@ patch(ControlButtons.prototype, {
             receiptData,
             printOptions: this.pos.printOptions,
         });
-    },
-
-    async _fetchCompletionReceiptData(advanceOrderId) {
-        return this.orm.call(
-            "pos.advance.order",
-            "get_completion_receipt_data",
-            [[advanceOrderId]]
-        );
-    },
-
-    async _printCompletionReceipt(receiptResult, popupPayload) {
-        let receiptPayload = receiptResult;
-        if (!receiptPayload || typeof receiptPayload !== "object" || !receiptPayload.name) {
-            receiptPayload = await this._fetchCompletionReceiptData(popupPayload.advance_order_id);
-        }
-        if (!receiptPayload?.name) {
-            this.notification.add(_t("Could not load completion receipt data."), { type: "warning" });
-            return { printed: false };
-        }
-        const printResult = await this._printAdvanceReceipt(
-            this._buildCompletionReceiptData({ result: receiptPayload, popupPayload }),
-            { closeActionsPopup: false }
-        );
-        if (!printResult?.printed) {
-            this.notification.add(_t("Advance order completed but receipt printing failed."), {
-                type: "warning",
-            });
-        }
-        return printResult;
     },
 
     /** Same breakpoints as POS `buttonClass`, but distinct hue for Advance vs default grey controls. */
@@ -181,6 +151,7 @@ patch(ControlButtons.prototype, {
 
     _buildAdvanceReceiptData({ result, partner, payload }) {
         const total = toNumber(result?.amount_total, 0);
+        const pledgeAmount = toNumber(result?.pledge_amount, 0);
         const advanceAmount = toNumber(result?.advance_amount, payload.advance_amount || 0);
         const amountTendered = toNumber(
             result?.amount_tendered,
@@ -204,6 +175,7 @@ patch(ControlButtons.prototype, {
             paymentMethod: payload.payment_method_name || payload.payment_method,
             currencyId: this.pos.currency?.id,
             total: total,
+            pledgeAmount: pledgeAmount,
             advanceAmount: advanceAmount,
             amountTendered: amountTendered,
             changeDue: changeDue,
@@ -396,16 +368,25 @@ patch(ControlButtons.prototype, {
         try {
             const result = await rpc("/pos/complete_advance_order", {
                 advance_order_id: popupPayload.advance_order_id,
-                payment_method_id: popupPayload.payment_method_id,
                 pos_config_id: this.pos.config.id,
+                payment_method_id: popupPayload.payment_method_id,
                 amount_tendered: popupPayload.amount_tendered,
             });
-            if (this.props.close) {
-                this.props.close();
-            }
             this.notification.add(_t("Advance order completed successfully."), { type: "success" });
             try {
-                await this._printCompletionReceipt(result, popupPayload);
+                const receiptPayload =
+                    result && typeof result === "object" && result.name ? result : null;
+                if (receiptPayload) {
+                    const printResult = await this._printAdvanceReceipt(
+                        this._buildCompletionReceiptData({ result: receiptPayload, popupPayload })
+                    );
+                    if (!printResult?.printed) {
+                        this.notification.add(
+                            _t("Advance order completed but receipt printing failed."),
+                            { type: "warning" }
+                        );
+                    }
+                }
             } catch (printError) {
                 const printMessage =
                     printError?.message === "POPUP_BLOCKED"
