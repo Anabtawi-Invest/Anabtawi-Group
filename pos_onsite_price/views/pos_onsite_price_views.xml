@@ -62,6 +62,13 @@
         name="On-Site Prices"
         parent="point_of_sale.menu_point_root"
         action="action_pos_onsite_price_menu"
-        sequence="56"
-        groups="point_of_sale.group_pos_manager"/>
+        sequence="54"
+        groups="point_of_sale.group_pos_user,point_of_sale.group_pos_manager"/>
+    <menuitem
+        id="menu_pos_onsite_price_config"
+        name="On-Site Prices"
+        parent="point_of_sale.menu_point_config_product"
+        action="action_pos_onsite_price_menu"
+        sequence="50"
+        groups="point_of_sale.group_pos_user,point_of_sale.group_pos_manager"/>
 </odoo>
