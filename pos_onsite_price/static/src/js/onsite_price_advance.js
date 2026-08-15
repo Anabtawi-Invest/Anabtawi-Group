@@ -4,16 +4,21 @@ import { patch } from "@web/core/utils/patch";
 import { _t } from "@web/core/l10n/translation";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { AdvanceOrderFormPopup } from "@pos_advance_order/app/screens/product_screen/control_buttons/advance_order_button/advance_order_form_popup";
-import { promptAndApplyOnsitePricing, isOrderOnSite } from "@pos_onsite_price/js/onsite_price_utils";
+import { promptAndApplyOnsitePricing, isOrderOnSite, logOnsite } from "@pos_onsite_price/js/onsite_price_utils";
+
+logOnsite("advance patch loaded");
 
 patch(ControlButtons.prototype, {
     async onClickAdvanceOrder() {
+        logOnsite("Advance Order clicked");
         const result = await promptAndApplyOnsitePricing({
             pos: this.pos,
             dialog: this.dialog,
             notification: this.notification,
             stayMessage: _t("On-site prices applied. Continue with the advance order."),
+            source: "advance",
         });
+        logOnsite("Advance Order after prompt", result);
         if (result?.cancelled || result?.error) {
             return;
         }

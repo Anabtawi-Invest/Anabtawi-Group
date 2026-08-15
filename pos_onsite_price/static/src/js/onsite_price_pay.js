@@ -12,6 +12,7 @@ patch(PosStore.prototype, {
             dialog: this.dialog || this.env?.services?.dialog,
             notification: this.notification || this.env?.services?.notification,
             stayMessage: _t("Prices updated. Press Payment again to continue."),
+            source: "pay",
         });
         if (result?.cancelled || result?.error) {
             return;
@@ -28,6 +29,7 @@ patch(PosStore.prototype, {
             dialog: this.dialog || this.env?.services?.dialog,
             notification: this.notification || this.env?.services?.notification,
             stayMessage: _t("Prices updated. Press Payment again to continue."),
+            source: "pay_fast",
         });
         if (result?.cancelled || result?.error) {
             return;

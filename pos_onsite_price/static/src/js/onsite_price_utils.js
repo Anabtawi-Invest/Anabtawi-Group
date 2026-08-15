@@ -60,6 +60,74 @@ export function getOnsiteLineProductId(line) {
     return normalizeId(product?.id || product);
 }
 
+const LOG_PREFIX = "[ONSITE]";
+
+export function logOnsite(step, details = {}) {
+    console.warn(LOG_PREFIX, step, details);
+}
+
+function describeConfig(pos, config) {
+    const menuModel = pos?.models?.["pos.onsite.price.menu"];
+    const rangeModel = pos?.models?.["pos.onsite.price.range"];
+    const productModel = pos?.models?.["pos.onsite.price.product"];
+    return {
+        posConfigId: pos?.config?.id,
+        posConfigName: pos?.config?.name,
+        hasMenuModel: Boolean(menuModel),
+        hasRangeModel: Boolean(rangeModel),
+        hasProductModel: Boolean(productModel),
+        menuCount: menuModel?.getAll?.()?.length || 0,
+        rangeCount: rangeModel?.getAll?.()?.length || 0,
+        productCount: productModel?.getAll?.()?.length || 0,
+        matchedMenuId: config?.menu ? normalizeId(config.menu.id) : null,
+        matchedProducts: (config?.products || []).map((line) => ({
+            id: normalizeId(line.id),
+            productId: normalizeId(line.product_id),
+            productName: line.product_id?.display_name || line.product_id?.name || "",
+            multiple: line.multiple,
+        })),
+    };
+}
+
+function describeOrderProducts(order, config) {
+    const configuredIds = (config?.products || [])
+        .map((line) => normalizeId(line.product_id))
+        .filter(Boolean);
+    return getOnsiteProductLines(order).map((line) => {
+        const productId = getOnsiteLineProductId(line);
+        return {
+            productId,
+            name: line.getProduct?.()?.display_name || line.full_product_name || "",
+            qty: toNumber(line.getQuantity?.() ?? line.qty ?? 0),
+            listedInMenu: configuredIds.includes(productId),
+        };
+    });
+}
+
+export function getSkipReason(order, config, pos) {
+    if (!order) {
+        return "no_active_order";
+    }
+    if (!pos?.models?.["pos.onsite.price.menu"]) {
+        return "onsite_models_not_loaded_in_pos";
+    }
+    if (!config) {
+        return "no_onsite_menu_for_this_pos";
+    }
+    if (!menuHasOnsiteProducts(config)) {
+        return "products_tab_empty";
+    }
+    if (!orderHasOnsiteProducts(order, config)) {
+        return "cart_has_no_listed_product";
+    }
+    const state = getOnsiteUiState(order);
+    const signature = getOnsiteOrderSignature(order, config);
+    if (state?.applied && state?.signature === signature) {
+        return "already_answered_for_this_cart";
+    }
+    return null;
+}
+
 export function orderHasOnsiteProducts(order, config) {
     if (!config?.products?.length) {
         return false;
@@ -200,13 +268,25 @@ export async function promptAndApplyOnsitePricing({
     dialog,
     notification,
     stayMessage,
+    source = "unknown",
 }) {
     const order = pos.getOrder?.() || pos.get_order?.();
     const config = getOnsiteConfig(pos);
-    if (!shouldPromptOnsitePricing(order, config)) {
-        return { skipped: true };
+    const skipReason = getSkipReason(order, config, pos);
+    logOnsite(`${source}: check`, {
+        skipReason,
+        willPrompt: !skipReason,
+        ...describeConfig(pos, config),
+        cartProducts: describeOrderProducts(order, config),
+        uiState: order?.uiState?.onsitePricing || null,
+        hasDialog: Boolean(dialog),
+    });
+    if (skipReason) {
+        return { skipped: true, reason: skipReason };
     }
+    logOnsite(`${source}: opening Yes/No popup`);
     const payload = await makeAwaitable(dialog, OnSitePricePopup, { pos });
+    logOnsite(`${source}: popup result`, payload);
     if (!payload || typeof payload.isOnSite !== "boolean") {
         return { cancelled: true };
     }
@@ -214,12 +294,18 @@ export async function promptAndApplyOnsitePricing({
     if (config && orderHasOnsiteProducts(order, config)) {
         const result = applyOnsitePricesToOrder(order, payload.isOnSite, config);
         if (!result.ok) {
+            logOnsite(`${source}: price error`, result);
             notification.add(result.error, { type: "danger" });
             return { error: true };
         }
         changes = result.changes || [];
     }
     storeOnsiteAnswer(order, payload.isOnSite, config);
+    logOnsite(`${source}: stored answer`, {
+        isOnSite: payload.isOnSite,
+        changes,
+        uiState: order?.uiState?.onsitePricing || null,
+    });
     if (changes.length) {
         notification.add(
             stayMessage || _t("On-site prices applied. Check the new prices."),
