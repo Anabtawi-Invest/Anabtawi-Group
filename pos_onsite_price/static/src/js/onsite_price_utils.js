@@ -92,23 +92,14 @@ export function getOnsiteOrderSignature(order, config) {
 }
 
 export function findOnsiteRange(ranges, isOnSite, effectiveQty) {
-    const matching = (ranges || [])
-        .filter((rng) => {
-            if (Boolean(rng.is_on_site) !== Boolean(isOnSite)) {
-                return false;
-            }
-            const minQty = toNumber(rng.min_qty);
-            const maxQty = toNumber(rng.max_qty);
-            return effectiveQty >= minQty && effectiveQty <= maxQty;
-        })
-        .sort((a, b) => {
-            const minDiff = toNumber(a.min_qty) - toNumber(b.min_qty);
-            if (minDiff) {
-                return minDiff;
-            }
-            return toNumber(a.id) - toNumber(b.id);
-        });
-    return matching[0];
+    return (ranges || []).find((rng) => {
+        if (Boolean(rng.is_on_site) !== Boolean(isOnSite)) {
+            return false;
+        }
+        const minQty = toNumber(rng.min_qty);
+        const maxQty = toNumber(rng.max_qty);
+        return effectiveQty >= minQty && effectiveQty <= maxQty;
+    });
 }
 
 export function applyOnsitePricesToOrder(order, isOnSite, config) {

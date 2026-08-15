@@ -109,10 +109,9 @@ class PosOnsitePriceRange(models.Model):
                 ]
             )
             for other in siblings:
-                # Touching at a boundary (5-10 and 10-15) is allowed; interior overlap is not.
                 overlap = (
-                    float_compare(rng.min_qty, other.max_qty, precision_digits=4) < 0
-                    and float_compare(other.min_qty, rng.max_qty, precision_digits=4) < 0
+                    float_compare(rng.min_qty, other.max_qty, precision_digits=4) <= 0
+                    and float_compare(other.min_qty, rng.max_qty, precision_digits=4) <= 0
                 )
                 if overlap:
                     raise ValidationError(
