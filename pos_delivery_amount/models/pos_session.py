@@ -342,12 +342,20 @@ class PosSession(models.Model):
         data["default_cash_details"] = dc
         return data
 
+    def _get_delivery_cashier_name(self):
+        """Prefer the POS employee cashier (PIN login) over the Odoo user."""
+        self.ensure_one()
+        employee = self.employee_id if "employee_id" in self._fields else False
+        if employee:
+            return employee.name or ""
+        return self.env.user.name or ""
+
     def _prepare_delivery_receipt_data(self, amount, move):
         self.ensure_one()
         return {
             "company_name": self.company_id.name or "",
             "pos_name": self.config_id.name or "",
-            "cashier": self.env.user.name or "",
+            "cashier": self._get_delivery_cashier_name(),
             "amount": amount,
             "formatted_amount": formatLang(self.env, amount, currency_obj=self.currency_id),
             "date": format_datetime(self.env, fields.Datetime.now()),

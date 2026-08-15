@@ -140,6 +140,18 @@ export async function processClosingDeliveryAmount(pos, dialog, amount) {
 }
 
 /**
+ * Name of the cashier currently logged into the POS.
+ * With "Log in with Employees", this is the employee who entered their PIN.
+ */
+export function getDeliveryCashierName(pos) {
+    const cashier = pos?.getCashier?.();
+    if (cashier?.name) {
+        return cashier.name;
+    }
+    return pos?.user?.name || "";
+}
+
+/**
  * Print a cash delivery receipt via the POS printer (browser fallback).
  * Does not include session name or reason. Failures do not block the flow.
  */
@@ -157,7 +169,7 @@ export async function printDeliveryAmountReceipt(pos, receipt, { isClosing = fal
                 title: isClosing ? _t("Closing Delivery Amount") : _t("Cash Delivery"),
                 companyName: receipt.company_name || "",
                 posName: receipt.pos_name || "",
-                cashier: receipt.cashier || "",
+                cashier: getDeliveryCashierName(pos) || receipt.cashier || "",
                 formattedAmount: receipt.formatted_amount || "",
                 date: receipt.date || "",
                 moveName: receipt.move_name || "",
