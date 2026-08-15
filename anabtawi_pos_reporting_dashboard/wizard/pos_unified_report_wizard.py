@@ -143,16 +143,13 @@ class PosUnifiedReportWizard(models.TransientModel):
 
             tax_amt = ((getattr(po, "amount_tax", 0.0) or 0.0) * ratio) if po else 0.0
             tot_amt = ((getattr(po, "amount_total", 0.0) or 0.0) * ratio) if po else amt
-            untaxed_amt = getattr(po, "amount_untaxed", None) if po else None
-            if untaxed_amt is None:
-                untaxed_amt = tot_amt - tax_amt
-            else:
-                untaxed_amt = untaxed_amt * ratio
+            untaxed_amt = tot_amt - tax_amt
 
-            order_disc = (sum(
+            has_valid_disc_pm = grp["is_cash"] or grp["is_visa"] or grp["is_emp"]
+            order_disc = ((sum(
                 (l.price_unit or 0.0) * (l.qty or 0.0) * (l.discount / 100.0)
                 for l in po.lines if l.discount
-            ) * ratio) if po else 0.0
+            ) * ratio) if (po and has_valid_disc_pm) else 0.0)
 
             vals_list.append({
                 "name": po.name if po else _("POS Payment"),

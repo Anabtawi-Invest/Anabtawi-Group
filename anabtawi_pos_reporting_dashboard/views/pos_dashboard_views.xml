@@ -56,16 +56,16 @@
                 <button name="action_open_pos_order" string="Open Order" type="object" icon="fa-arrow-circle-right" invisible="not pos_order_id"/>
                 <field name="name"/>
                 <field name="partner_id"/>
-                <field name="report_type"/>
+                <field name="report_type" string="Operation Type" widget="badge" decoration-success="report_type in ('pos_sales', 'cash_in', 'rahen_in', 'advance_deposit')" decoration-danger="report_type in ('cash_out', 'rahen_out')" decoration-info="report_type == 'pos_sales'"/>
                 <field name="payment_method_id"/>
-                <field name="untaxed_amount" string="Amount w/o Tax" sum="Total Untaxed"/>
-                <field name="tax_amount" string="Tax Amount" sum="Total Tax"/>
-                <field name="discount_amount" string="Discount Amount" sum="Total Discount"/>
+                <field name="cash_in_amount" string="Cash In" sum="Total Cash In" optional="show"/>
+                <field name="cash_out_amount" string="Cash Out" sum="Total Cash Out" optional="show"/>
+                <field name="untaxed_amount" string="Amount w/o Tax" sum="Total Untaxed" optional="show"/>
+                <field name="tax_amount" string="Tax Amount" sum="Total Tax" optional="show"/>
+                <field name="discount_amount" string="Discount Amount" sum="Total Discount" optional="show"/>
                 <field name="cash_amount" sum="Total Cash" optional="hide"/>
                 <field name="visa_amount" sum="Total Visa" optional="hide"/>
                 <field name="employee_debt_amount" string="Debt Sales (مبيعات الذمم)" sum="Total Debt Sales" optional="hide"/>
-                <field name="cash_in_amount" sum="Total Cash In" optional="hide"/>
-                <field name="cash_out_amount" sum="Total Cash Out" optional="hide"/>
                 <field name="rahen_in_amount" sum="Total Rahen In" optional="hide"/>
                 <field name="rahen_out_amount" sum="Total Rahen Out" optional="hide"/>
                 <field name="advance_amount" sum="Total Advance" optional="hide"/>

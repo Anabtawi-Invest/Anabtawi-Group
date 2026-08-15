@@ -100,6 +100,7 @@ class PosReportingDashboard(models.TransientModel):
                 "careem": 0.0,
                 "mythings": 0.0,
                 "kabseh": 0.0,
+                "delivery_apps": 0.0,
                 "other_sales": 0.0,
                 "cash_in": 0.0,
                 "cash_out": 0.0,
@@ -141,11 +142,24 @@ class PosReportingDashboard(models.TransientModel):
             daily_type = getattr(pm, "daily_ops_report_type", "")
             pm_name = (pm.name or "").lower()
 
+            is_delivery_app = pm_id in (PAYMENT_METHOD_TALABAT, PAYMENT_METHOD_CAREEM, PAYMENT_METHOD_MYTHINGS, PAYMENT_METHOD_KABSEH) or any(
+                app in pm_name for app in ("talabat", "careem", "mythings", "kabseh")
+            )
             is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
             is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
 
             # Mutually Exclusive Payment Classification
-            if is_emp:
+            if is_delivery_app:
+                branch_data[cfg_id]["delivery_apps"] += amt
+                if pm_id == PAYMENT_METHOD_TALABAT or "talabat" in pm_name:
+                    branch_data[cfg_id]["talabat"] += amt
+                elif pm_id == PAYMENT_METHOD_CAREEM or "careem" in pm_name:
+                    branch_data[cfg_id]["careem"] += amt
+                elif pm_id == PAYMENT_METHOD_MYTHINGS or "mythings" in pm_name:
+                    branch_data[cfg_id]["mythings"] += amt
+                elif pm_id == PAYMENT_METHOD_KABSEH or "kabseh" in pm_name:
+                    branch_data[cfg_id]["kabseh"] += amt
+            elif is_emp:
                 branch_data[cfg_id]["employee_debt"] += amt
             elif is_hosp:
                 branch_data[cfg_id]["hospitality"] += amt
@@ -156,22 +170,19 @@ class PosReportingDashboard(models.TransientModel):
             else:
                 branch_data[cfg_id]["other_sales"] += amt
 
-            # Delivery Apps Specifics
-            if pm_id == PAYMENT_METHOD_TALABAT or "talabat" in pm_name:
-                branch_data[cfg_id]["talabat"] += amt
-            elif pm_id == PAYMENT_METHOD_CAREEM or "careem" in pm_name:
-                branch_data[cfg_id]["careem"] += amt
-            elif pm_id == PAYMENT_METHOD_MYTHINGS or "mythings" in pm_name:
-                branch_data[cfg_id]["mythings"] += amt
-            elif pm_id == PAYMENT_METHOD_KABSEH or "kabseh" in pm_name:
-                branch_data[cfg_id]["kabseh"] += amt
-
         # --- B. Collect POS Orders (Untaxed, Tax, Discounts, Order Count & Delivery) ---
-        pos_orders = self.env["pos.order"].sudo().search([
+        payment_order_ids = set(pay.pos_order_id.id for pay in payments if pay.pos_order_id)
+        domain = [
+            ("state", "in", ("paid", "done", "invoiced")),
+            "|",
+            ("id", "in", list(payment_order_ids)),
+            "&", ("date_order", ">=", str_start), ("date_order", "<=", str_end),
+        ] if payment_order_ids else [
             ("state", "in", ("paid", "done", "invoiced")),
             ("date_order", ">=", str_start),
             ("date_order", "<=", str_end),
-        ])
+        ]
+        pos_orders = self.env["pos.order"].sudo().search(domain)
         for order in pos_orders:
             cfg = order.config_id
             if not cfg or (active_config_ids and cfg.id not in active_config_ids):
@@ -190,9 +201,34 @@ class PosReportingDashboard(models.TransientModel):
                     base = (line.price_unit or 0.0) * (line.qty or 0.0)
                     order_disc += base * (line.discount / 100.0)
 
+            # Check if order discount applies (Only Cash, Visa/Card, and Employee Debt orders; excluding Delivery Apps & Hospitality)
+            has_valid_disc_pm = False
+            for pay in order.payment_ids:
+                pm = pay.payment_method_id
+                if not pm:
+                    continue
+                pm_id = pm.id
+                pm_name = (pm.name or "").lower()
+                pm_type = getattr(pm, "type", "")
+                daily_type = getattr(pm, "daily_ops_report_type", "")
+
+                is_delivery_app = pm_id in (PAYMENT_METHOD_TALABAT, PAYMENT_METHOD_CAREEM, PAYMENT_METHOD_MYTHINGS, PAYMENT_METHOD_KABSEH) or any(
+                    app in pm_name for app in ("talabat", "careem", "mythings", "kabseh")
+                )
+                is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
+
+                is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
+                is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
+                is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
+
+                if (is_cash or is_visa or is_emp) and not (is_delivery_app or is_hosp):
+                    has_valid_disc_pm = True
+                    break
+
             branch_data[cfg_id]["untaxed_sales"] += untaxed_amt
             branch_data[cfg_id]["tax_amount"] += tax_amt
-            branch_data[cfg_id]["discount_amount"] += order_disc
+            if has_valid_disc_pm:
+                branch_data[cfg_id]["discount_amount"] += order_disc
             branch_data[cfg_id]["order_count"] += 1
 
         # --- B2. Collect Delivery Amount & Ending Balance per POS Session ---
@@ -314,9 +350,10 @@ class PosReportingDashboard(models.TransientModel):
                         if adv.state in ("confirmed", "advance_paid"):
                             branch_data[pick_cfg_id]["advance_pending_count"] += 1
 
-        # --- F. Compute Net Cash Moves & Orders / Min per Branch ---
+        # --- F. Compute Net Cash Moves, Untaxed Sales & Orders / Min per Branch ---
         for cfg_id in active_config_ids:
             b_vals = branch_data[cfg_id]
+            b_vals["untaxed_sales"] = b_vals["sales"] - b_vals["tax_amount"]
             b_vals["net_cash_moves"] = b_vals["cash_in"] - b_vals["cash_out"]
             b_vals["orders_per_min"] = round(
                 b_vals["order_count"] / total_minutes, 2
@@ -409,6 +446,7 @@ class PosReportingDashboard(models.TransientModel):
                 "cash_sales": global_totals["cash"],
                 "visa_sales": global_totals["visa"],
                 "employee_debt": global_totals["employee_debt"],
+                "delivery_apps": global_totals["delivery_apps"],
                 "hospitality_sales": global_totals["hospitality"],
                 "cash_in": global_totals["cash_in"],
                 "cash_out": global_totals["cash_out"],
@@ -474,10 +512,17 @@ class PosReportingDashboard(models.TransientModel):
                 pm_type = getattr(pm, "type", "")
                 pm_name = (pm.name or "").lower()
 
+                is_delivery_app = pm.id in (PAYMENT_METHOD_TALABAT, PAYMENT_METHOD_CAREEM, PAYMENT_METHOD_MYTHINGS, PAYMENT_METHOD_KABSEH) or any(
+                    app in pm_name for app in ("talabat", "careem", "mythings", "kabseh")
+                )
                 is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
                 is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
 
-                if is_emp:
+                if is_delivery_app:
+                    is_cash = False
+                    is_visa = False
+                    is_emp = False
+                elif is_emp:
                     is_cash = False
                     is_visa = False
                 elif is_hosp:
@@ -495,6 +540,8 @@ class PosReportingDashboard(models.TransientModel):
                 elif metric_type == "cash_sales" and is_cash:
                     include = True
                 elif metric_type == "visa_sales" and is_visa:
+                    include = True
+                elif metric_type == "delivery_apps" and is_delivery_app:
                     include = True
 
                 if include:
@@ -590,11 +637,24 @@ class PosReportingDashboard(models.TransientModel):
                     })
 
         elif metric_type in ("untaxed_sales", "tax_amount", "discount_amount"):
-            pos_orders = self.env["pos.order"].sudo().search([
+            payments = self.env["pos.payment"].sudo().search([
+                "|",
+                "&", ("payment_date", ">=", str_start), ("payment_date", "<=", str_end),
+                "&", ("payment_date", "=", False),
+                     "&", ("pos_order_id.date_order", ">=", str_start), ("pos_order_id.date_order", "<=", str_end),
+            ])
+            payment_order_ids = set(pay.pos_order_id.id for pay in payments if pay.pos_order_id)
+            domain = [
+                ("state", "in", ("paid", "done", "invoiced")),
+                "|",
+                ("id", "in", list(payment_order_ids)),
+                "&", ("date_order", ">=", str_start), ("date_order", "<=", str_end),
+            ] if payment_order_ids else [
                 ("state", "in", ("paid", "done", "invoiced")),
                 ("date_order", ">=", str_start),
                 ("date_order", "<=", str_end),
-            ])
+            ]
+            pos_orders = self.env["pos.order"].sudo().search(domain)
             for order in pos_orders:
                 cfg = order.config_id
                 if not cfg or cfg.id not in active_config_ids:
@@ -617,16 +677,40 @@ class PosReportingDashboard(models.TransientModel):
                 elif metric_type == "tax_amount":
                     amt = tax_amt
                 elif metric_type == "discount_amount":
-                    amt = order_disc
+                    has_valid_disc_pm = False
+                    for pay in order.payment_ids:
+                        pm = pay.payment_method_id
+                        if not pm:
+                            continue
+                        pm_id = pm.id
+                        pm_name = (pm.name or "").lower()
+                        pm_type = getattr(pm, "type", "")
+                        daily_type = getattr(pm, "daily_ops_report_type", "")
+
+                        is_delivery_app = pm_id in (PAYMENT_METHOD_TALABAT, PAYMENT_METHOD_CAREEM, PAYMENT_METHOD_MYTHINGS, PAYMENT_METHOD_KABSEH) or any(
+                            app in pm_name for app in ("talabat", "careem", "mythings", "kabseh")
+                        )
+                        is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
+
+                        is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
+                        is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
+                        is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
+
+                        if (is_cash or is_visa or is_emp) and not (is_delivery_app or is_hosp):
+                            has_valid_disc_pm = True
+                            break
+                    amt = order_disc if has_valid_disc_pm else 0.0
 
                 if amt != 0.0:
                     sess = order.session_id
                     end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
+                    order_pm_id = order.payment_ids[0].payment_method_id.id if order.payment_ids and order.payment_ids[0].payment_method_id else False
                     vals_list.append({
                         "name": order.name or _("POS Order"),
                         "date": order.date_order,
                         "config_id": cfg.id,
                         "session_id": order.session_id.id if order.session_id else False,
+                        "payment_method_id": order_pm_id,
                         "pos_order_id": order.id,
                         "report_type": "pos_sales",
                         "amount": tot_amt,
@@ -748,11 +832,13 @@ class PosReportingDashboard(models.TransientModel):
                             sess = po.session_id if po else False
                             end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
 
+                            adv_pm_id = adv.pos_payment_method_id.id if hasattr(adv, "pos_payment_method_id") and adv.pos_payment_method_id else False
                             vals_list.append({
                                 "name": adv.name or _("Advance Order Deposit"),
                                 "date": c_dt,
                                 "config_id": cfg.id,
                                 "session_id": sess.id if sess else False,
+                                "payment_method_id": adv_pm_id,
                                 "pos_order_id": po.id if po else False,
                                 "report_type": "advance_deposit",
                                 "amount": amt,

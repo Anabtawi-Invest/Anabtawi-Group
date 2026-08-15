@@ -145,6 +145,17 @@
                         </div>
                     </div>
 
+                    <!-- Delivery Apps Sales -->
+                    <div class="o_kpi_card card-delivery-apps clickable_kpi" t-on-click="() => this.onKpiClick('delivery_apps')" title="Click to view detailed transactions &amp; export Excel">
+                        <div class="kpi_icon"><i class="fa fa-motorcycle text-indigo"/></div>
+                        <div class="kpi_title">Delivery Apps Sales</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.delivery_apps)"/></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-indigo text-white badge_sub"><t t-esc="getPercent(data.kpis.delivery_apps, data.kpis.total_sales)"/>% of Sales</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
+
                     <!-- Debt Sales (مبيعات الذمم) -->
                     <div class="o_kpi_card card-employee-debt clickable_kpi" t-on-click="() => this.onKpiClick('employee_debt')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-id-card-o text-purple"/></div>
