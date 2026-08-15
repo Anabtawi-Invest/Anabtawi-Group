@@ -66,7 +66,7 @@ class PosOnsitePriceRange(models.Model):
         ondelete="cascade",
         index=True,
     )
-    name = fields.Char(string="Name", required=True)
+    name = fields.Char(compute="_compute_name", store=True)
     is_on_site = fields.Boolean(
         string="On Site",
         default=True,
@@ -81,6 +81,12 @@ class PosOnsitePriceRange(models.Model):
         default=0.0,
     )
     currency_id = fields.Many2one(related="menu_id.currency_id", store=True, readonly=True)
+
+    @api.depends("min_qty", "max_qty", "is_on_site")
+    def _compute_name(self):
+        for rng in self:
+            label = _("On Site") if rng.is_on_site else _("Not On Site")
+            rng.name = "%s: %s - %s" % (label, rng.min_qty or 0.0, rng.max_qty or 0.0)
 
     @api.constrains("min_qty", "max_qty", "price_per_kilo")
     def _check_range_values(self):
@@ -103,9 +109,10 @@ class PosOnsitePriceRange(models.Model):
                 ]
             )
             for other in siblings:
+                # Touching at a boundary (5-10 and 10-15) is allowed; interior overlap is not.
                 overlap = (
-                    float_compare(rng.min_qty, other.max_qty, precision_digits=4) <= 0
-                    and float_compare(other.min_qty, rng.max_qty, precision_digits=4) <= 0
+                    float_compare(rng.min_qty, other.max_qty, precision_digits=4) < 0
+                    and float_compare(other.min_qty, rng.max_qty, precision_digits=4) < 0
                 )
                 if overlap:
                     raise ValidationError(
