@@ -64,6 +64,7 @@ export class AdvanceOrderFormPopup extends Component {
             site_service: false,
             site_service_available: false,
             site_service_config: null,
+            hideSiteServiceCheckbox: false,
         });
 
         onMounted(async () => {

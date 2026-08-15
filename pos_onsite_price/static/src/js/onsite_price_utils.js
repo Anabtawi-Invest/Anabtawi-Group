@@ -42,9 +42,6 @@ export function getOnsiteConfig(pos) {
     const products = (pos.models?.["pos.onsite.price.product"]?.getAll?.() || []).filter(
         (line) => normalizeId(line.menu_id) === menuId
     );
-    if (!products.length) {
-        return null;
-    }
     return { menu, ranges, products };
 }
 
@@ -152,15 +149,31 @@ export function applyOnsitePricesToOrder(order, isOnSite, config) {
     return { ok: true, changes };
 }
 
+export function menuHasOnsiteProducts(config) {
+    return Boolean(config?.products?.length);
+}
+
 export function shouldPromptOnsitePricing(order, config) {
-    if (!order || !config || !orderHasOnsiteProducts(order, config)) {
+    if (!order || !menuHasOnsiteProducts(config) || !orderHasOnsiteProducts(order, config)) {
         return false;
     }
     const signature = getOnsiteOrderSignature(order, config);
     return !(order.onsite_pricing_applied && order.onsite_pricing_signature === signature);
 }
 
-export async function promptAndApplyOnsitePricing({ pos, dialog, notification, stayMessage }) {
+function storeOnsiteAnswer(order, isOnSite, config) {
+    order.onsite_pricing_applied = true;
+    order.onsite_pricing_is_on_site = isOnSite;
+    order.is_onsite_order = isOnSite;
+    order.onsite_pricing_signature = getOnsiteOrderSignature(order, config);
+}
+
+export async function promptAndApplyOnsitePricing({
+    pos,
+    dialog,
+    notification,
+    stayMessage,
+}) {
     const order = pos.getOrder?.() || pos.get_order?.();
     const config = getOnsiteConfig(pos);
     if (!shouldPromptOnsitePricing(order, config)) {
@@ -170,19 +183,22 @@ export async function promptAndApplyOnsitePricing({ pos, dialog, notification, s
     if (!payload || typeof payload.isOnSite !== "boolean") {
         return { cancelled: true };
     }
-    const result = applyOnsitePricesToOrder(order, payload.isOnSite, config);
-    if (!result.ok) {
-        notification.add(result.error, { type: "danger" });
-        return { error: true };
+    let changes = [];
+    if (config && orderHasOnsiteProducts(order, config)) {
+        const result = applyOnsitePricesToOrder(order, payload.isOnSite, config);
+        if (!result.ok) {
+            notification.add(result.error, { type: "danger" });
+            return { error: true };
+        }
+        changes = result.changes || [];
     }
-    order.onsite_pricing_applied = true;
-    order.onsite_pricing_is_on_site = payload.isOnSite;
-    order.onsite_pricing_signature = getOnsiteOrderSignature(order, config);
-    if (result.changes.length) {
+    storeOnsiteAnswer(order, payload.isOnSite, config);
+    if (changes.length) {
         notification.add(
             stayMessage || _t("On-site prices applied. Check the new prices."),
             { type: "success" }
         );
+        return { applied: true, isOnSite: payload.isOnSite, changes };
     }
-    return { applied: true, isOnSite: payload.isOnSite, changes: result.changes };
+    return { answered: true, applied: false, isOnSite: payload.isOnSite, changes };
 }
