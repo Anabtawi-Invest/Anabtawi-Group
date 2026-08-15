@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="pos_config_view_form_close_ip_restrict" model="ir.ui.view">
+        <field name="name">pos.config.form.close.ip.restrict</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//setting[@id='other_devices']" position="after">
+                <setting
+                    id="close_allowed_ips"
+                    string="Allowed Close IPs"
+                    help="Devices that may close this POS session. Leave empty to allow any device. One IP per line, commas allowed. CIDR networks are supported.">
+                    <div class="content-group">
+                        <div class="row mb-2">
+                            <div class="col-lg-4 o_light_label">
+                                <label for="current_client_ip" string="Your Current IP"/>
+                            </div>
+                            <div class="col-lg-8">
+                                <field name="current_client_ip" readonly="1" class="oe_inline"/>
+                            </div>
+                        </div>
+                        <field
+                            name="close_allowed_ips"
+                            placeholder="192.168.1.10&#10;192.168.1.11&#10;10.0.0.0/24"
+                            nolabel="1"/>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>
