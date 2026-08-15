@@ -22,7 +22,12 @@ class PosUnifiedReport(models.TransientModel):
         ("rahen_out", "Pledge Returned (Rahen Out)"),
     ], string="Report Type", required=True, index=True)
 
+    pos_order_id = fields.Many2one("pos.order", string="POS Order", index=True)
+
     amount = fields.Float(string="Amount", digits=(16, 3))
+    untaxed_amount = fields.Float(string="Amount w/o Tax", digits=(16, 3))
+    tax_amount = fields.Float(string="Tax Amount", digits=(16, 3))
+    discount_amount = fields.Float(string="Discount Amount", digits=(16, 3))
     cash_amount = fields.Float(string="Cash Amount", digits=(16, 3))
     visa_amount = fields.Float(string="Visa / Card Amount", digits=(16, 3))
     employee_debt_amount = fields.Float(string="Employee Debt Amount", digits=(16, 3))
@@ -34,6 +39,19 @@ class PosUnifiedReport(models.TransientModel):
     delivery_amount = fields.Float(string="Delivery Amount", digits=(16, 3))
     partner_id = fields.Many2one("res.partner", string="Customer")
     company_id = fields.Many2one("res.company", string="Company", default=lambda self: self.env.company)
+
+    def action_open_pos_order(self):
+        self.ensure_one()
+        if self.pos_order_id:
+            return {
+                "name": _("POS Order Details"),
+                "type": "ir.actions.act_window",
+                "res_model": "pos.order",
+                "res_id": self.pos_order_id.id,
+                "view_mode": "form",
+                "target": "current",
+            }
+        return False
 
     def action_export_excel(self):
         wiz_id = self.env.context.get("active_wizard_id")
