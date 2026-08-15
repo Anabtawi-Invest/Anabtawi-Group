@@ -335,7 +335,7 @@ class PosReportingDashboard(models.TransientModel):
                 orig_cfg_id = adv.from_pos_config_id.id if adv.from_pos_config_id else (adv.pos_config_id.id if adv.pos_config_id else False)
                 pick_cfg_id = adv.pos_config_id.id if adv.pos_config_id else orig_cfg_id
 
-                dep_amt = adv.advance_amount or 0.0
+                dep_amt = adv.advance_amount or adv.amount_paid or 0.0
                 tot_amt = adv.amount_grand_total or adv.amount_total or 0.0
                 rem_amt = adv.amount_remaining or 0.0
 
@@ -841,7 +841,7 @@ class PosReportingDashboard(models.TransientModel):
                         dt_end_val = dt_end.replace(tzinfo=None) if hasattr(dt_end, 'replace') and getattr(dt_end, 'tzinfo', None) else dt_end
 
                         if dt_start_val <= c_dt_val <= dt_end_val:
-                            dep_amt = adv.advance_amount or 0.0
+                            dep_amt = adv.advance_amount or adv.amount_paid or 0.0
                             tot_amt = adv.amount_grand_total or adv.amount_total or 0.0
                             pledge_amt = adv.pledge_amount or 0.0
                             rem_amt = adv.amount_remaining or 0.0
@@ -859,7 +859,7 @@ class PosReportingDashboard(models.TransientModel):
                                 "payment_method_id": adv_pm_id,
                                 "pos_order_id": po.id if po else False,
                                 "report_type": "advance_deposit",
-                                "amount": tot_amt,
+                                "amount": dep_amt,
                                 "advance_amount": dep_amt,
                                 "rahen_in_amount": pledge_amt,
                                 "advance_remaining_amount": rem_amt,
