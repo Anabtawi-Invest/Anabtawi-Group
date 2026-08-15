@@ -5,6 +5,7 @@ import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { ConnectionLostError, RPCError } from "@web/core/network/rpc";
 import { ask, makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { DeliveryAmountPopup } from "@pos_delivery_amount/app/components/delivery_amount_popup/delivery_amount_popup";
+import { DeliveryAmountReceipt } from "@pos_delivery_amount/app/components/delivery_amount_receipt/delivery_amount_receipt";
 
 export function extractDeliveryAmountErrorMessage(error) {
     if (error instanceof RPCError) {
@@ -135,5 +136,37 @@ export async function processClosingDeliveryAmount(pos, dialog, amount) {
             body: extractDeliveryAmountErrorMessage(error),
         });
         return null;
+    }
+}
+
+/**
+ * Print a cash delivery receipt via the POS printer (browser fallback).
+ * Does not include session name or reason. Failures do not block the flow.
+ */
+export async function printDeliveryAmountReceipt(pos, receipt, { isClosing = false } = {}) {
+    if (!receipt || !pos?.printer) {
+        return false;
+    }
+    if (pos.currency?.isZero?.(receipt.amount ?? 0)) {
+        return false;
+    }
+    try {
+        const result = await pos.printer.print(
+            DeliveryAmountReceipt,
+            {
+                title: isClosing ? _t("Closing Delivery Amount") : _t("Cash Delivery"),
+                companyName: receipt.company_name || "",
+                posName: receipt.pos_name || "",
+                cashier: receipt.cashier || "",
+                formattedAmount: receipt.formatted_amount || "",
+                date: receipt.date || "",
+                moveName: receipt.move_name || "",
+            },
+            pos.printOptions || { webPrintFallback: true }
+        );
+        return Boolean(result);
+    } catch (error) {
+        console.warn("[pos_delivery_amount] Could not print delivery receipt.", error);
+        return false;
     }
 }
