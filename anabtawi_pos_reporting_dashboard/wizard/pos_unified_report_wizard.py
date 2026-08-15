@@ -89,13 +89,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             ("payment_date", ">=", str_start),
             ("payment_date", "<=", str_end),
         ])
-        grouped_payments = {}
         for pay in payments:
-            po = pay.pos_order_id
-            cfg = pay.session_id.config_id if pay.session_id else (po.config_id if po else False)
-            if not cfg:
-                continue
-
+            amt = pay.amount or 0.0
             pm = pay.payment_method_id
             daily_type = getattr(pm, "daily_ops_report_type", "")
             pm_type = getattr(pm, "type", "")
@@ -114,68 +109,18 @@ class PosUnifiedReportWizard(models.TransientModel):
                 is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
                 is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
 
-            key = (po.id if po else False, pm.id if pm else False, cfg.id, pay.session_id.id if pay.session_id else False)
-            pay_dt = pay.payment_date or (po.date_order if po else self.date_from)
-            amt = pay.amount or 0.0
-
-            if key not in grouped_payments:
-                grouped_payments[key] = {
-                    "po": po,
-                    "pm": pm,
-                    "cfg": cfg,
-                    "session_id": pay.session_id.id if pay.session_id else False,
-                    "net_amount": amt,
-                    "date": pay_dt,
-                    "is_emp": is_emp,
-                    "is_cash": is_cash,
-                    "is_visa": is_visa,
-                }
-            else:
-                grouped_payments[key]["net_amount"] += amt
-                if pay_dt and (not grouped_payments[key]["date"] or pay_dt > grouped_payments[key]["date"]):
-                    grouped_payments[key]["date"] = pay_dt
-
-        for grp in grouped_payments.values():
-            amt = grp["net_amount"]
-            po = grp["po"]
-            pm = grp["pm"]
-            cfg = grp["cfg"]
-
-            if po and po.amount_total:
-                ratio = amt / po.amount_total
-            else:
-                ratio = 1.0
-
-            tax_amt = ((getattr(po, "amount_tax", 0.0) or 0.0) * ratio) if po else 0.0
-            tot_amt = ((getattr(po, "amount_total", 0.0) or 0.0) * ratio) if po else amt
-            untaxed_amt = getattr(po, "amount_untaxed", None) if po else None
-            if untaxed_amt is None:
-                untaxed_amt = tot_amt - tax_amt
-            else:
-                untaxed_amt = untaxed_amt * ratio
-
-            order_disc = (sum(
-                (l.price_unit or 0.0) * (l.qty or 0.0) * (l.discount / 100.0)
-                for l in po.lines if l.discount
-            ) * ratio) if po else 0.0
-
             vals_list.append({
-                "name": po.name if po else _("POS Payment"),
-                "date": grp["date"] or self.date_from,
-                "config_id": cfg.id,
-                "session_id": grp["session_id"],
-                "payment_method_id": pm.id if pm else False,
-                "pos_order_id": po.id if po else False,
+                "name": pay.pos_order_id.name or pay.name or _("POS Payment"),
+                "date": pay.payment_date or self.date_from,
+                "config_id": pay.session_id.config_id.id,
+                "session_id": pay.session_id.id,
+                "payment_method_id": pm.id,
                 "report_type": "pos_sales",
                 "amount": amt,
-                "untaxed_amount": untaxed_amt,
-                "tax_amount": tax_amt,
-                "discount_amount": order_disc,
-                "cash_amount": amt if grp["is_cash"] else 0.0,
-                "visa_amount": amt if grp["is_visa"] else 0.0,
-                "employee_debt_amount": amt if grp["is_emp"] else 0.0,
-                "partner_id": po.partner_id.id if po else False,
-                "company_id": cfg.company_id.id,
+                "cash_amount": amt if is_cash else 0.0,
+                "visa_amount": amt if is_visa else 0.0,
+                "employee_debt_amount": amt if is_emp else 0.0,
+                "partner_id": pay.pos_order_id.partner_id.id if pay.pos_order_id else False,
             })
 
         # Statement Lines (Cash In / Out)
