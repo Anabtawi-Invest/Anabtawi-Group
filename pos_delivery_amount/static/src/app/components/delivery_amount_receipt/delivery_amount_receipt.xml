@@ -16,10 +16,6 @@
                 <t t-esc="labels.cashier"/>
                 <span class="pos-receipt-right-align" t-esc="props.cashier"/>
             </div>
-            <div t-if="props.moveName">
-                <t t-esc="labels.journal"/>
-                <span class="pos-receipt-right-align" t-esc="props.moveName"/>
-            </div>
         </div>
     </t>
 </templates>

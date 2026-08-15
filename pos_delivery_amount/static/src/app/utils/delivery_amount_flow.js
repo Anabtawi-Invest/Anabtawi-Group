@@ -172,7 +172,6 @@ export async function printDeliveryAmountReceipt(pos, receipt, { isClosing = fal
                 cashier: getDeliveryCashierName(pos) || receipt.cashier || "",
                 formattedAmount: receipt.formatted_amount || "",
                 date: receipt.date || "",
-                moveName: receipt.move_name || "",
             },
             pos.printOptions || { webPrintFallback: true }
         );

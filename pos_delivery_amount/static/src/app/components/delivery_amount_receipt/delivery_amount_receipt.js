@@ -12,14 +12,12 @@ export class DeliveryAmountReceipt extends Component {
         cashier: { type: String, optional: true },
         formattedAmount: String,
         date: String,
-        moveName: { type: String, optional: true },
     };
 
     get labels() {
         return {
             amount: _t("AMOUNT"),
             cashier: _t("CASHIER"),
-            journal: _t("JOURNAL"),
         };
     }
 }

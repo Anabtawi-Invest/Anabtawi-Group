@@ -359,7 +359,6 @@ class PosSession(models.Model):
             "amount": amount,
             "formatted_amount": formatLang(self.env, amount, currency_obj=self.currency_id),
             "date": format_datetime(self.env, fields.Datetime.now()),
-            "move_name": move.name if move else "",
         }
 
     def _post_delivery_success_message(self, amount, move):

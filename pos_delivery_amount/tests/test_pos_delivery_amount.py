@@ -65,9 +65,9 @@ class TestPosDeliveryAmount(TestPoSCommon):
         self.assertEqual(receipt.get("company_name"), session.company_id.name)
         self.assertEqual(receipt.get("amount"), 150.0)
         self.assertTrue(receipt.get("formatted_amount"))
-        self.assertTrue(receipt.get("move_name"))
         self.assertTrue(receipt.get("cashier"))
         self.assertNotIn("reason", receipt)
+        self.assertNotIn("move_name", receipt)
         self.assertNotIn("session_name", receipt)
         self.assertNotEqual(receipt.get("pos_name"), session.name)
 
@@ -164,5 +164,5 @@ class TestPosDeliveryAmount(TestPoSCommon):
         self.assertEqual(receipt.get("pos_name"), session.config_id.name)
         self.assertEqual(receipt.get("amount"), 10.0)
         self.assertTrue(receipt.get("formatted_amount"))
-        self.assertTrue(receipt.get("move_name"))
         self.assertNotIn("reason", receipt)
+        self.assertNotIn("move_name", receipt)
