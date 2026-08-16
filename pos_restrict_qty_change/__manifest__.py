@@ -1,7 +1,7 @@
 {
     "name": "POS Restrict Quantity Change",
     "summary": "Restrict POS quantity changes per product and user group",
-    "version": "19.0.1.0.1",
+    "version": "19.0.1.0.3",
     "category": "Point of Sale",
     "author": "Anabtawi Group",
     "license": "LGPL-3",
