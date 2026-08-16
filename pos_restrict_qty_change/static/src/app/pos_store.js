@@ -5,6 +5,8 @@ import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { _t } from "@web/core/l10n/translation";
 
+const SCALE_BARCODE_TYPES = new Set(["weight", "quantity", "price"]);
+
 function recordFlag(record, name) {
     if (!record) {
         return undefined;
@@ -50,6 +52,9 @@ patch(PosStore.prototype, {
     },
 
     isPosQtyChangeRestricted(line, order = this.getOrder()) {
+        if (this._ignorePosQtyRestriction) {
+            return false;
+        }
         if (!this.isCashierRestrictedFromQtyChange()) {
             return false;
         }
@@ -68,6 +73,20 @@ patch(PosStore.prototype, {
             title: _t("Access Denied"),
             body: _t("You are not allowed to change the quantity of this product."),
         });
+    },
+
+    async addLineToOrder(vals, order, opts = {}, configure = true) {
+        const codeType = opts?.code?.type;
+        const isScaleBarcode = codeType && SCALE_BARCODE_TYPES.has(codeType);
+        if (!isScaleBarcode) {
+            return super.addLineToOrder(vals, order, opts, configure);
+        }
+        this._ignorePosQtyRestriction = true;
+        try {
+            return await super.addLineToOrder(vals, order, opts, configure);
+        } finally {
+            this._ignorePosQtyRestriction = false;
+        }
     },
 
     tryMergeOrderline(order, line, merge, selectedOrderline) {
