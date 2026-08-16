@@ -282,6 +282,7 @@ class PosUnifiedReportWizard(models.TransientModel):
                 c_dt = self._to_datetime(adv.create_date)
                 if c_dt and dt_start <= c_dt <= dt_end:
                     amt = adv.advance_amount or 0.0
+                    rem_amt = adv.amount_remaining or 0.0
                     vals_list.append({
                         "name": adv.name or _("Advance Order"),
                         "date": c_dt,
@@ -289,6 +290,7 @@ class PosUnifiedReportWizard(models.TransientModel):
                         "report_type": "advance_deposit",
                         "amount": amt,
                         "advance_amount": amt,
+                        "advance_remaining_amount": rem_amt,
                         "partner_id": adv.partner_id.id if hasattr(adv, "partner_id") else False,
                     })
 

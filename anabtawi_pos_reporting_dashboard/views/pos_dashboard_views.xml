@@ -23,6 +23,7 @@
                 <field name="rahen_in_amount" type="measure"/>
                 <field name="rahen_out_amount" type="measure"/>
                 <field name="advance_amount" type="measure"/>
+                <field name="advance_remaining_amount" type="measure"/>
                 <field name="delivery_amount" type="measure"/>
                 <field name="ending_balance" type="measure"/>
             </pivot>

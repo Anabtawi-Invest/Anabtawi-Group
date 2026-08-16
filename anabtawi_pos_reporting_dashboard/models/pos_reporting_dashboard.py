@@ -331,6 +331,9 @@ class PosReportingDashboard(models.TransientModel):
         # --- E. Collect Advance Orders & Deposits ---
         if "pos.advance.order" in self.env:
             adv_orders = self.env["pos.advance.order"].sudo().search([("state", "not in", ("draft", "cancel"))])
+            dt_start_val = dt_start.replace(tzinfo=None) if hasattr(dt_start, 'replace') and getattr(dt_start, 'tzinfo', None) else dt_start
+            dt_end_val = dt_end.replace(tzinfo=None) if hasattr(dt_end, 'replace') and getattr(dt_end, 'tzinfo', None) else dt_end
+
             for adv in adv_orders:
                 orig_cfg_id = adv.from_pos_config_id.id if adv.from_pos_config_id else (adv.pos_config_id.id if adv.pos_config_id else False)
                 pick_cfg_id = adv.pos_config_id.id if adv.pos_config_id else orig_cfg_id
@@ -339,28 +342,34 @@ class PosReportingDashboard(models.TransientModel):
                 tot_amt = adv.amount_grand_total or adv.amount_total or 0.0
                 rem_amt = adv.amount_remaining or 0.0
 
-                if adv.create_date and dt_start <= adv.create_date <= dt_end:
-                    if orig_cfg_id and (not active_config_ids or orig_cfg_id in active_config_ids):
-                        branch_data[orig_cfg_id]["advance_deposits"] += dep_amt
-                        pm = adv.pos_payment_method_id if hasattr(adv, "pos_payment_method_id") and adv.pos_payment_method_id else False
-                        pm_name = (pm.name or "").lower() if pm else ""
-                        pm_type = getattr(pm, "type", "") if pm else ""
-                        daily_type = getattr(pm, "daily_ops_report_type", "") if pm else ""
+                c_dt = adv.create_date
+                if c_dt:
+                    c_dt_val = c_dt.replace(tzinfo=None) if hasattr(c_dt, 'replace') and getattr(c_dt, 'tzinfo', None) else c_dt
+                    if dt_start_val <= c_dt_val <= dt_end_val:
+                        if orig_cfg_id and (not active_config_ids or orig_cfg_id in active_config_ids):
+                            branch_data[orig_cfg_id]["advance_deposits"] += dep_amt
+                            pm = adv.pos_payment_method_id if hasattr(adv, "pos_payment_method_id") and adv.pos_payment_method_id else False
+                            pm_name = (pm.name or "").lower() if pm else ""
+                            pm_type = getattr(pm, "type", "") if pm else ""
+                            daily_type = getattr(pm, "daily_ops_report_type", "") if pm else ""
 
-                        if daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name:
-                            branch_data[orig_cfg_id]["advance_deposits_cash"] += dep_amt
-                        else:
-                            branch_data[orig_cfg_id]["advance_deposits_visa"] += dep_amt
+                            if daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name:
+                                branch_data[orig_cfg_id]["advance_deposits_cash"] += dep_amt
+                            else:
+                                branch_data[orig_cfg_id]["advance_deposits_visa"] += dep_amt
 
-                        branch_data[orig_cfg_id]["advance_order_count"] += 1
-                        branch_data[orig_cfg_id]["advance_order_total"] += tot_amt
+                            branch_data[orig_cfg_id]["advance_order_count"] += 1
+                            branch_data[orig_cfg_id]["advance_order_total"] += tot_amt
 
-                if adv.picking_date and dt_start <= adv.picking_date <= dt_end:
-                    if pick_cfg_id and (not active_config_ids or pick_cfg_id in active_config_ids):
-                        branch_data[pick_cfg_id]["advance_pickup_value"] += tot_amt
-                        branch_data[pick_cfg_id]["advance_remaining_amount"] += rem_amt
-                        if adv.state in ("confirmed", "advance_paid"):
-                            branch_data[pick_cfg_id]["advance_pending_count"] += 1
+                p_dt = adv.picking_date
+                if p_dt:
+                    p_dt_val = p_dt.replace(tzinfo=None) if hasattr(p_dt, 'replace') and getattr(p_dt, 'tzinfo', None) else p_dt
+                    if dt_start_val <= p_dt_val <= dt_end_val:
+                        if pick_cfg_id and (not active_config_ids or pick_cfg_id in active_config_ids):
+                            branch_data[pick_cfg_id]["advance_pickup_value"] += tot_amt
+                            branch_data[pick_cfg_id]["advance_remaining_amount"] += rem_amt
+                            if adv.state in ("confirmed", "advance_paid"):
+                                branch_data[pick_cfg_id]["advance_pending_count"] += 1
 
         # --- F. Compute Net Cash Moves, Untaxed Sales & Orders / Min per Branch ---
         for cfg_id in active_config_ids:
