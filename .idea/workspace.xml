@@ -4,7 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c37e08a5-e5fc-407b-89fb-94a1e206392d" name="Changes" comment="" />
+    <list default="true" id="ff91cf09-53c1-432b-a3ac-e17dadc05f42" name="Changes" comment="[ADD] Restrict Change Product Qty in Pos Frontend">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos_restrict_qty_change/__manifest__.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos_restrict_qty_change/__manifest__.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -13,10 +16,10 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 7
-}]]></component>
-  <component name="ProjectId" id="3HLmq7SFNAx0rBhSxDYerorCmuE" />
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 8
+}</component>
+  <component name="ProjectId" id="3Ho0Zb5bAeZnjJQGrowXVWKk3Xt" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -26,9 +29,15 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "StagingisStaging"
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "C:/Users/anb/Anabtawi-Group"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\anb\Anabtawi-Group" />
+    </key>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -38,12 +47,43 @@
   </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
-      <changelist id="c37e08a5-e5fc-407b-89fb-94a1e206392d" name="Changes" comment="" />
-      <created>1785655919278</created>
+      <changelist id="ff91cf09-53c1-432b-a3ac-e17dadc05f42" name="Changes" comment="" />
+      <created>1786798438981</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
-      <updated>1785655919278</updated>
+      <updated>1786798438981</updated>
     </task>
+    <task id="LOCAL؜-٠٠٠٠١" summary="[ADD] Restrict Change Product Qty">
+      <option name="closed" value="true" />
+      <created>1786800007487</created>
+      <option name="number" value="٠٠٠٠١" />
+      <option name="presentableId" value="LOCAL؜-٠٠٠٠١" />
+      <option name="project" value="LOCAL؜" />
+      <updated>1786800007487</updated>
+    </task>
+    <task id="LOCAL؜-٠٠٠٠٢" summary="[MOD] Restrict Change Product Qty">
+      <option name="closed" value="true" />
+      <created>1786800638073</created>
+      <option name="number" value="٠٠٠٠٢" />
+      <option name="presentableId" value="LOCAL؜-٠٠٠٠٢" />
+      <option name="project" value="LOCAL؜" />
+      <updated>1786800638073</updated>
+    </task>
+    <task id="LOCAL؜-٠٠٠٠٣" summary="[ADD] Restrict Change Product Qty in Pos Frontend">
+      <option name="closed" value="true" />
+      <created>1786861689076</created>
+      <option name="number" value="٠٠٠٠٣" />
+      <option name="presentableId" value="LOCAL؜-٠٠٠٠٣" />
+      <option name="project" value="LOCAL؜" />
+      <updated>1786861689076</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="[ADD] Restrict Change Product Qty" />
+    <MESSAGE value="[MOD] Restrict Change Product Qty" />
+    <MESSAGE value="[ADD] Restrict Change Product Qty in Pos Frontend" />
+    <option name="LAST_COMMIT_MESSAGE" value="[ADD] Restrict Change Product Qty in Pos Frontend" />
   </component>
 </project>
