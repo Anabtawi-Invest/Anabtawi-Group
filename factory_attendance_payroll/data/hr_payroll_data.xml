@@ -13,7 +13,7 @@
 # Informational calculation rule: monetary amount is 0.0 JOD so it does not alter basic pay
 result = 0.0
         </field>
-        <field name="struct_id" ref="hr_payroll.default_structure"/>
+        <field name="struct_id" search="[('name', '=', 'Jordan: Employee THE ONE')]"/>
     </record>
 
     <!-- Net Remaining Overtime (Allowance) -->
@@ -31,12 +31,14 @@ result = net_var &gt; 0.0
         <field name="amount_select">code</field>
         <field name="amount_python_compute">
 net_ot_hours = payslip.attendance_net_reconciled if payslip else 0.0
-wage = contract.wage if (contract and contract.wage) else (employee.wage if (employee and employee.wage) else 0.0)
+contract_obj = payslip.contract_id if (payslip and payslip.contract_id) else None
+employee_obj = payslip.employee_id if (payslip and payslip.employee_id) else None
+wage = contract_obj.wage if (contract_obj and contract_obj.wage) else (employee_obj.wage if (employee_obj and hasattr(employee_obj, 'wage') and employee_obj.wage) else 0.0)
 hourly_rate = wage / 240.0
 ot_multiplier = 1.25
 result = net_ot_hours * hourly_rate * ot_multiplier
         </field>
-        <field name="struct_id" ref="hr_payroll.default_structure"/>
+        <field name="struct_id" search="[('name', '=', 'Jordan: Employee THE ONE')]"/>
     </record>
 
     <!-- Net Undertime Shortfall (Deduction) -->
@@ -55,10 +57,12 @@ result = net_var &lt; 0.0
         <field name="amount_python_compute">
 net_var = payslip.attendance_net_reconciled if payslip else 0.0
 deficit_hours = abs(net_var)
-wage = contract.wage if (contract and contract.wage) else (employee.wage if (employee and employee.wage) else 0.0)
+contract_obj = payslip.contract_id if (payslip and payslip.contract_id) else None
+employee_obj = payslip.employee_id if (payslip and payslip.employee_id) else None
+wage = contract_obj.wage if (contract_obj and contract_obj.wage) else (employee_obj.wage if (employee_obj and hasattr(employee_obj, 'wage') and employee_obj.wage) else 0.0)
 hourly_rate = wage / 240.0
 result = -(deficit_hours * hourly_rate)
         </field>
-        <field name="struct_id" ref="hr_payroll.default_structure"/>
+        <field name="struct_id" search="[('name', '=', 'Jordan: Employee THE ONE')]"/>
     </record>
 </odoo>
