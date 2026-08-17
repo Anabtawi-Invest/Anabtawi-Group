@@ -26,6 +26,15 @@ patch(OrderSummary.prototype, {
         this.pos.numpadMode = "quantity";
     },
 
+    /**
+     * Scale / product barcodes arrive as many rapid keyboard keys.
+     * Those must not be treated as manual quantity edits.
+     */
+    _isBatchedBarcodeInput() {
+        const events = this.numberBuffer?.eventsBuffer;
+        return Array.isArray(events) && events.length > 2;
+    },
+
     async updateSelectedOrderline({ buffer, key }) {
         const order = this.pos.getOrder();
         const selectedLine = order?.getSelectedOrderline?.();
@@ -34,6 +43,10 @@ patch(OrderSummary.prototype, {
             this.pos.numpadMode === "quantity" &&
             this.pos.isPosQtyChangeRestricted(selectedLine, order)
         ) {
+            // Let the barcode service handle scale/product scans.
+            if (this._isBatchedBarcodeInput()) {
+                return;
+            }
             // Always allow deleting a wrongly added line.
             if (isDeleteKey(key) || isRemoveOrZeroQty(buffer)) {
                 this._removeRestrictedOrderline(selectedLine);
@@ -54,6 +67,9 @@ patch(OrderSummary.prototype, {
             this.pos.numpadMode === "quantity" &&
             this.pos.isPosQtyChangeRestricted(selectedLine, order)
         ) {
+            if (this._isBatchedBarcodeInput()) {
+                return;
+            }
             if (isRemoveOrZeroQty(val)) {
                 this._removeRestrictedOrderline(selectedLine);
                 return;
