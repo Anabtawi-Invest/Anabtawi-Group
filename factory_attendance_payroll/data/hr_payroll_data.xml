@@ -58,4 +58,14 @@ result = -(deficit_hours * hourly_rate)
         </field>
         <field name="struct_id" ref="hr_payroll.default_structure"/>
     </record>
+
+    <!-- Server Action: Generate Test Attendances for Selected Employee -->
+    <record id="action_generate_test_attendances" model="ir.actions.server">
+        <field name="name">Generate Test Attendances (Aug 2026)</field>
+        <field name="model_id" ref="hr.model_hr_employee"/>
+        <field name="binding_model_id" ref="hr.model_hr_employee"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_generate_test_attendances()</field>
+    </record>
 </odoo>
