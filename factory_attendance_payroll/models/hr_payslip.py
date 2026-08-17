@@ -41,10 +41,27 @@ class HrPayslip(models.Model):
         self._compute_attendance_reconciliation_fields()
         return super().compute_sheet()
 
+    def action_payslip_done(self):
+        res = super().action_payslip_done()
+        for payslip in self:
+            if payslip.attendance_net_reconciled > 0:
+                # Bank net overtime hours to hr.attendance.overtime if available
+                if 'hr.attendance.overtime' in self.env:
+                    self.env['hr.attendance.overtime'].sudo().create({
+                        'employee_id': payslip.employee_id.id,
+                        'date': payslip.date_to,
+                        'duration': payslip.attendance_net_reconciled,
+                    })
+        return res
+
     def _get_reconciled_attendance_variance(self):
         """
-        Calculates daily OT (>8h) and daily Undertime (<8h) with an auto 1h break deduction
-        for shifts >= 6 hours, then offsets undertime directly against overtime.
+        Factory 7-Day Rolling Operational Cycle with 45-min Overtime Threshold:
+        - Evaluates daily worked hours with 1h break deduction (shifts >= 6h).
+        - Overtime is ONLY counted if daily excess is >= 45 minutes (0.75 hours).
+        - Any 6 worked days in a rolling 7-day cycle are standard workdays (8h target).
+        - The 7th day in a cycle is a Rest Day: if worked >= 45 mins, all net hours count as Overtime.
+        - Offsets total undertime against total overtime.
         """
         self.ensure_one()
         
@@ -63,9 +80,16 @@ class HrPayslip(models.Model):
         total_ot = 0.0
         total_undertime = 0.0
         standard_target = 8.0
+        min_ot_threshold = 0.75  # 45 minutes
 
-        # 3. Apply break rule and compute daily deviation
-        for att_date, raw_hrs in daily_hours.items():
+        # Sort dates chronologically
+        sorted_dates = sorted(daily_hours.keys())
+        work_day_count = 0
+
+        for att_date in sorted_dates:
+            raw_hrs = daily_hours[att_date]
+
+            # Apply 1h break deduction rule
             if raw_hrs >= 6.0:
                 net_hrs = max(0.0, raw_hrs - 1.0)
             elif raw_hrs > 4.0:
@@ -73,16 +97,28 @@ class HrPayslip(models.Model):
             else:
                 net_hrs = raw_hrs
 
-            if net_hrs > standard_target:
-                total_ot += (net_hrs - standard_target)
-            elif net_hrs < standard_target:
-                total_undertime += (standard_target - net_hrs)
+            work_day_count += 1
 
-        # 4. Direct Reconciliation: Deduct undertime from overtime pool
+            # Every 7th day in rolling cycle is treated as Rest Day
+            if work_day_count % 7 == 0:
+                # Rest Day: If worked >= 45 mins, all net hours count as Overtime
+                if net_hrs >= min_ot_threshold:
+                    total_ot += net_hrs
+            else:
+                # Regular Work Day (8.0h target)
+                if net_hrs > standard_target:
+                    ot_excess = net_hrs - standard_target
+                    # Overtime considered ONLY if daily excess is >= 45 mins (0.75h)
+                    if ot_excess >= min_ot_threshold:
+                        total_ot += ot_excess
+                elif net_hrs < standard_target:
+                    total_undertime += (standard_target - net_hrs)
+
+        # Direct Reconciliation: Net Overtime minus Undertime
         net_variance = total_ot - total_undertime
 
         return {
             'total_ot': total_ot,
             'total_undertime': total_undertime,
-            'net_variance': net_variance  # >0 = Remaining OT, <0 = Excess Undertime
+            'net_variance': net_variance
         }
