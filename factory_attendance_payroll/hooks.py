@@ -9,33 +9,23 @@ def post_init_hook(env):
         rules = env['hr.salary.rule'].search([('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME'])])
         rules.write({'struct_id': structure.id})
 
-    # 2. Get or create Employee 1: Test 1 (+5:00 Net OT)
-    emp1 = env['hr.employee'].sudo().search([('work_email', '=', 'test1@example.com')], limit=1)
+    # 2. Search for Employee 1: Test 1 (+5:00 Net OT)
+    emp1 = env.ref('factory_attendance_payroll.test1_employee', raise_if_not_found=False)
     if not emp1:
-        emp1 = env['hr.employee'].sudo().create({
-            'name': 'Test 1',
-            'job_title': 'Factory Operator Test 1',
-            'work_email': 'test1@example.com',
-        })
-    else:
-        emp1.sudo().write({'name': 'Test 1'})
+        emp1 = env['hr.employee'].sudo().search([('work_email', '=', 'test1@example.com')], limit=1)
 
-    # 3. Get or create Employee 2: Test 2 (-2:00 Net Undertime)
-    emp2 = env['hr.employee'].sudo().search([('work_email', '=', 'test2@example.com')], limit=1)
+    # 3. Search for Employee 2: Test 2 (-2:00 Net Undertime)
+    emp2 = env.ref('factory_attendance_payroll.test2_employee', raise_if_not_found=False)
     if not emp2:
-        emp2 = env['hr.employee'].sudo().create({
-            'name': 'Test 2',
-            'job_title': 'Factory Operator Test 2',
-            'work_email': 'test2@example.com',
-        })
-    else:
-        emp2.sudo().write({'name': 'Test 2'})
+        emp2 = env['hr.employee'].sudo().search([('work_email', '=', 'test2@example.com')], limit=1)
 
-    # 4. Create July 2026 attendances for Test 1 if none exist (NO DELETION)
+    if not emp1 or not emp2:
+        return
+
+    # 4. Create July 2026 attendances for Test 1 if none exist
     existing_att_1 = env['hr.attendance'].sudo().search_count([('employee_id', '=', emp1.id)])
     if existing_att_1 == 0:
         emp1_attendances = []
-        # 10 Overtime Days (July 1 - 10) -> +1.5h OT each = 15:00 Gross OT
         for day in range(1, 11):
             d_str = f"2026-07-{day:02d}"
             emp1_attendances.append({
@@ -43,7 +33,6 @@ def post_init_hook(env):
                 'check_in': f"{d_str} 08:00:00",
                 'check_out': f"{d_str} 18:30:00",
             })
-        # 5 Short Days (July 13 - 17) -> -2.0h UT each = 10:00 Gross UT
         for day in range(13, 18):
             d_str = f"2026-07-{day:02d}"
             emp1_attendances.append({
@@ -51,7 +40,6 @@ def post_init_hook(env):
                 'check_in': f"{d_str} 10:00:00",
                 'check_out': f"{d_str} 17:00:00",
             })
-        # Standard Days
         for day in list(range(20, 25)) + list(range(27, 32)):
             d_str = f"2026-07-{day:02d}"
             emp1_attendances.append({
@@ -63,11 +51,10 @@ def post_init_hook(env):
         for vals in emp1_attendances:
             env['hr.attendance'].sudo().create(vals)
 
-    # 5. Create July 2026 attendances for Test 2 if none exist (NO DELETION)
+    # 5. Create July 2026 attendances for Test 2 if none exist
     existing_att_2 = env['hr.attendance'].sudo().search_count([('employee_id', '=', emp2.id)])
     if existing_att_2 == 0:
         emp2_attendances = []
-        # 4 Overtime Days (July 1 - 4) -> +1.0h OT each = 04:00 Gross OT
         for day in range(1, 5):
             d_str = f"2026-07-{day:02d}"
             emp2_attendances.append({
@@ -75,7 +62,6 @@ def post_init_hook(env):
                 'check_in': f"{d_str} 08:00:00",
                 'check_out': f"{d_str} 18:00:00",
             })
-        # 3 Short Days (July 6 - 8) -> -2.0h UT each = 06:00 Gross UT
         for day in range(6, 9):
             d_str = f"2026-07-{day:02d}"
             emp2_attendances.append({
@@ -83,7 +69,6 @@ def post_init_hook(env):
                 'check_in': f"{d_str} 10:00:00",
                 'check_out': f"{d_str} 17:00:00",
             })
-        # Standard Days
         std_days = [9, 10] + list(range(13, 18)) + list(range(20, 25)) + list(range(27, 32))
         for day in std_days:
             d_str = f"2026-07-{day:02d}"
