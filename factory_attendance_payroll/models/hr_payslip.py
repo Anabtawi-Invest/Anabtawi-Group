@@ -1,9 +1,41 @@
 import datetime
 from collections import defaultdict
-from odoo import models, api
+from odoo import models, fields, api
 
 class HrPayslip(models.Model):
     _inherit = 'hr.payslip'
+
+    attendance_gross_overtime = fields.Float(
+        string="Gross Overtime Hours",
+        compute="_compute_attendance_reconciliation_fields",
+        store=True,
+        help="Total overtime hours accumulated from attendance before reconciliation."
+    )
+    attendance_gross_undertime = fields.Float(
+        string="Gross Late / Undertime Hours",
+        compute="_compute_attendance_reconciliation_fields",
+        store=True,
+        help="Total late/undertime hours accumulated from attendance before reconciliation."
+    )
+    attendance_net_reconciled = fields.Float(
+        string="Net Reconciled Hours",
+        compute="_compute_attendance_reconciliation_fields",
+        store=True,
+        help="Net reconciled hours (Overtime minus Undertime) used for payslip allowance/deduction."
+    )
+
+    @api.depends('employee_id', 'date_from', 'date_to')
+    def _compute_attendance_reconciliation_fields(self):
+        for payslip in self:
+            if payslip.employee_id and payslip.date_from and payslip.date_to:
+                res = payslip._get_reconciled_attendance_variance()
+                payslip.attendance_gross_overtime = res.get('total_ot', 0.0)
+                payslip.attendance_gross_undertime = res.get('total_undertime', 0.0)
+                payslip.attendance_net_reconciled = res.get('net_variance', 0.0)
+            else:
+                payslip.attendance_gross_overtime = 0.0
+                payslip.attendance_gross_undertime = 0.0
+                payslip.attendance_net_reconciled = 0.0
 
     def _get_reconciled_attendance_variance(self):
         """
@@ -13,7 +45,7 @@ class HrPayslip(models.Model):
         self.ensure_one()
         
         # 1. Fetch attendance records in payslip date window
-        attendances = self.env['hr.attendance'].search([
+        attendances = self.env['hr.attendance'].sudo().search([
             ('employee_id', '=', self.employee_id.id),
             ('check_in', '>=', datetime.datetime.combine(self.date_from, datetime.time.min)),
             ('check_in', '<=', datetime.datetime.combine(self.date_to, datetime.time.max))

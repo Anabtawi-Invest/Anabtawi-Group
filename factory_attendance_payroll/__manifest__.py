@@ -12,6 +12,7 @@
     'data': [
         'data/hr_payroll_data.xml',
         'data/test_attendance_data.xml',
+        'views/hr_payslip_views.xml',
     ],
     'installable': True,
     'application': False,
