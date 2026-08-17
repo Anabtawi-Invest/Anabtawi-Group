@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Base Reconciled Calculation Rule (Hidden) -->
+    <record id="rule_reconciled_attendance_hours" model="hr.salary.rule">
+        <field name="name">Attendance Reconciled Hours Variance</field>
+        <field name="code">ATT_RECON_VAR</field>
+        <field name="category_id" ref="hr_payroll.BASIC"/>
+        <field name="sequence">50</field>
+        <field name="appears_on_payslip" eval="False"/>
+        <field name="condition_select">none</field>
+        <field name="amount_select">code</field>
+        <field name="amount_python_compute">
+res = payslip._get_reconciled_attendance_variance()
+result = res['net_variance']
+        </field>
+        <field name="struct_id" ref="hr_payroll.default_structure"/>
+    </record>
+
+    <!-- Net Remaining Overtime (Allowance) -->
+    <record id="rule_net_overtime_allowance" model="hr.salary.rule">
+        <field name="name">Net Reconciled Overtime</field>
+        <field name="code">OT_NET</field>
+        <field name="category_id" ref="hr_payroll.ALW"/>
+        <field name="sequence">60</field>
+        <field name="appears_on_payslip" eval="True"/>
+        <field name="condition_select">python</field>
+        <field name="condition_python">
+var = result_rules.get('ATT_RECON_VAR', {}).get('total', 0.0)
+result = var &gt; 0.0
+        </field>
+        <field name="amount_select">code</field>
+        <field name="amount_python_compute">
+net_ot_hours = result_rules.get('ATT_RECON_VAR', {}).get('total', 0.0)
+hourly_rate = contract.wage / 208.0
+ot_multiplier = 1.25  # 125% rate
+result = net_ot_hours * hourly_rate * ot_multiplier
+        </field>
+        <field name="struct_id" ref="hr_payroll.default_structure"/>
+    </record>
+
+    <!-- Net Undertime Shortfall (Deduction) -->
+    <record id="rule_net_undertime_deduction" model="hr.salary.rule">
+        <field name="name">Excess Undertime Deduction</field>
+        <field name="code">DED_UNDERTIME</field>
+        <field name="category_id" ref="hr_payroll.DED"/>
+        <field name="sequence">70</field>
+        <field name="appears_on_payslip" eval="True"/>
+        <field name="condition_select">python</field>
+        <field name="condition_python">
+var = result_rules.get('ATT_RECON_VAR', {}).get('total', 0.0)
+result = var &lt; 0.0
+        </field>
+        <field name="amount_select">code</field>
+        <field name="amount_python_compute">
+deficit_hours = abs(result_rules.get('ATT_RECON_VAR', {}).get('total', 0.0))
+hourly_rate = contract.wage / 208.0
+result = -(deficit_hours * hourly_rate)
+        </field>
+        <field name="struct_id" ref="hr_payroll.default_structure"/>
+    </record>
+</odoo>

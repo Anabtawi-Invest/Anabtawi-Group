@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <!-- Demo Employee for Testing -->
+        <record id="demo_factory_employee" model="hr.employee">
+            <field name="name">Factory Worker Test Employee</field>
+            <field name="job_title">Factory Technician</field>
+            <field name="work_email">factory.test@example.com</field>
+        </record>
+
+        <!-- Full Month Attendance Records (August 2026) -->
+        <!-- Week 1 -->
+        <!-- Aug 1 (Sat / Day 1): 10h shift (08:00 - 18:00) -> Net 9.0h (+1.0h OT) -->
+        <record id="att_demo_2026_08_01" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-01 08:00:00</field>
+            <field name="check_out">2026-08-01 18:00:00</field>
+        </record>
+
+        <!-- Aug 2 (Sun / Day 2): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_02" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-02 08:00:00</field>
+            <field name="check_out">2026-08-02 17:00:00</field>
+        </record>
+
+        <!-- Aug 3 (Mon / Day 3): 7h shift (08:00 - 15:00) -> Net 6.0h (-2.0h Undertime) -->
+        <record id="att_demo_2026_08_03" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-03 08:00:00</field>
+            <field name="check_out">2026-08-03 15:00:00</field>
+        </record>
+
+        <!-- Aug 4 (Tue / Day 4): 10h shift (08:00 - 18:00) -> Net 9.0h (+1.0h OT) -->
+        <record id="att_demo_2026_08_04" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-04 08:00:00</field>
+            <field name="check_out">2026-08-04 18:00:00</field>
+        </record>
+
+        <!-- Aug 5 (Wed / Day 5): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_05" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-05 08:00:00</field>
+            <field name="check_out">2026-08-05 17:00:00</field>
+        </record>
+
+        <!-- Aug 6 (Thu / Day 6): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_06" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-06 08:00:00</field>
+            <field name="check_out">2026-08-06 17:00:00</field>
+        </record>
+
+        <!-- Aug 7 (Fri / Day 7): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_07" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-07 08:00:00</field>
+            <field name="check_out">2026-08-07 17:00:00</field>
+        </record>
+
+        <!-- Week 2 -->
+        <!-- Aug 8 (Sat / Day 8): 11h shift (08:00 - 19:00) -> Net 10.0h (+2.0h OT) -->
+        <record id="att_demo_2026_08_08" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-08 08:00:00</field>
+            <field name="check_out">2026-08-08 19:00:00</field>
+        </record>
+
+        <!-- Aug 9 (Sun / Day 9): 8h shift (08:00 - 16:00) -> Net 7.0h (-1.0h Undertime) -->
+        <record id="att_demo_2026_08_09" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-09 08:00:00</field>
+            <field name="check_out">2026-08-09 16:00:00</field>
+        </record>
+
+        <!-- Aug 10 (Mon / Day 10): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_10" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-10 08:00:00</field>
+            <field name="check_out">2026-08-10 17:00:00</field>
+        </record>
+
+        <!-- Aug 11 (Tue / Day 11): 10h shift (08:00 - 18:00) -> Net 9.0h (+1.0h OT) -->
+        <record id="att_demo_2026_08_11" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-11 08:00:00</field>
+            <field name="check_out">2026-08-11 18:00:00</field>
+        </record>
+
+        <!-- Aug 12 (Wed / Day 12): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_12" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-12 08:00:00</field>
+            <field name="check_out">2026-08-12 17:00:00</field>
+        </record>
+
+        <!-- Aug 13 (Thu / Day 13): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_13" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-13 08:00:00</field>
+            <field name="check_out">2026-08-13 17:00:00</field>
+        </record>
+
+        <!-- Aug 14 (Fri / Day 14): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_14" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-14 08:00:00</field>
+            <field name="check_out">2026-08-14 17:00:00</field>
+        </record>
+
+        <!-- Week 3 -->
+        <!-- Aug 15 (Sat / Day 15): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_15" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-15 08:00:00</field>
+            <field name="check_out">2026-08-15 17:00:00</field>
+        </record>
+
+        <!-- Aug 16 (Sun / Day 16): 10.5h shift (08:00 - 18:30) -> Net 9.5h (+1.5h OT) -->
+        <record id="att_demo_2026_08_16" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-16 08:00:00</field>
+            <field name="check_out">2026-08-16 18:30:00</field>
+        </record>
+
+        <!-- Aug 17 (Mon / Day 17): 7.5h shift (08:00 - 15:30) -> Net 6.5h (-1.5h Undertime) -->
+        <record id="att_demo_2026_08_17" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-17 08:00:00</field>
+            <field name="check_out">2026-08-17 15:30:00</field>
+        </record>
+
+        <!-- Aug 18 (Tue / Day 18): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_18" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-18 08:00:00</field>
+            <field name="check_out">2026-08-18 17:00:00</field>
+        </record>
+
+        <!-- Aug 19 (Wed / Day 19): 10h shift (08:00 - 18:00) -> Net 9.0h (+1.0h OT) -->
+        <record id="att_demo_2026_08_19" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-19 08:00:00</field>
+            <field name="check_out">2026-08-19 18:00:00</field>
+        </record>
+
+        <!-- Aug 20 (Thu / Day 20): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_20" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-20 08:00:00</field>
+            <field name="check_out">2026-08-20 17:00:00</field>
+        </record>
+
+        <!-- Aug 21 (Fri / Day 21): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_21" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-21 08:00:00</field>
+            <field name="check_out">2026-08-21 17:00:00</field>
+        </record>
+
+        <!-- Week 4 -->
+        <!-- Aug 22 (Sat / Day 22): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_22" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-22 08:00:00</field>
+            <field name="check_out">2026-08-22 17:00:00</field>
+        </record>
+
+        <!-- Aug 23 (Sun / Day 23): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_23" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-23 08:00:00</field>
+            <field name="check_out">2026-08-23 17:00:00</field>
+        </record>
+
+        <!-- Aug 24 (Mon / Day 24): 10h shift (08:00 - 18:00) -> Net 9.0h (+1.0h OT) -->
+        <record id="att_demo_2026_08_24" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-24 08:00:00</field>
+            <field name="check_out">2026-08-24 18:00:00</field>
+        </record>
+
+        <!-- Aug 25 (Tue / Day 25): 8h shift (08:00 - 16:00) -> Net 7.0h (-1.0h Undertime) -->
+        <record id="att_demo_2026_08_25" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-25 08:00:00</field>
+            <field name="check_out">2026-08-25 16:00:00</field>
+        </record>
+
+        <!-- Aug 26 (Wed / Day 26): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_26" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-26 08:00:00</field>
+            <field name="check_out">2026-08-26 17:00:00</field>
+        </record>
+
+        <!-- Aug 27 (Thu / Day 27): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_27" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-27 08:00:00</field>
+            <field name="check_out">2026-08-27 17:00:00</field>
+        </record>
+
+        <!-- Aug 28 (Fri / Day 28): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_28" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-28 08:00:00</field>
+            <field name="check_out">2026-08-28 17:00:00</field>
+        </record>
+
+        <!-- Aug 29 (Sat / Day 29): 10h shift (08:00 - 18:00) -> Net 9.0h (+1.0h OT) -->
+        <record id="att_demo_2026_08_29" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-29 08:00:00</field>
+            <field name="check_out">2026-08-29 18:00:00</field>
+        </record>
+
+        <!-- Aug 30 (Sun / Day 30): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_30" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-30 08:00:00</field>
+            <field name="check_out">2026-08-30 17:00:00</field>
+        </record>
+
+        <!-- Aug 31 (Mon / Day 31): 9h shift (08:00 - 17:00) -> Net 8.0h (0.0h variance) -->
+        <record id="att_demo_2026_08_31" model="hr.attendance">
+            <field name="employee_id" ref="demo_factory_employee"/>
+            <field name="check_in">2026-08-31 08:00:00</field>
+            <field name="check_out">2026-08-31 17:00:00</field>
+        </record>
+    </data>
+</odoo>
