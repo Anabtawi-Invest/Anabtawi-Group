@@ -11,7 +11,6 @@
     ],
     'data': [
         'data/hr_payroll_data.xml',
-        'data/test_attendance_data.xml',
         'views/hr_payslip_views.xml',
     ],
     'post_init_hook': 'post_init_hook',
