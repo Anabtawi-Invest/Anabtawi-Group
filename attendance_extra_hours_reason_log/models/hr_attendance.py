@@ -171,17 +171,25 @@ class HrAttendance(models.Model):
                             else False
                         ),
                         "line_tz": employee_tz_name,
-                        "approval_request_ids": line.approval_request_ids.ids,
-                        "approval_requests": [
-                            {
-                                "id": req.id,
-                                "status": req.request_status,
-                                "quantity": req.quantity,
-                                "preauthorization": req.overtime_preauthorization,
-                                "consumed": req.overtime_authorization_consumed,
-                            }
-                            for req in line.approval_request_ids
-                        ],
+                        "approval_request_ids": (
+                            line.approval_request_ids.ids
+                            if "approval_request_ids" in line._fields
+                            else []
+                        ),
+                        "approval_requests": (
+                            [
+                                {
+                                    "id": req.id,
+                                    "status": req.request_status,
+                                    "quantity": req.quantity,
+                                    "preauthorization": getattr(req, "overtime_preauthorization", False),
+                                    "consumed": getattr(req, "overtime_authorization_consumed", False),
+                                }
+                                for req in line.approval_request_ids
+                            ]
+                            if "approval_request_ids" in line._fields
+                            else []
+                        ),
                         "rules": [
                             {
                                 "id": rule.id,
