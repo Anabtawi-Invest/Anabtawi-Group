@@ -11,9 +11,7 @@
     ],
     'data': [
         'data/hr_payroll_data.xml',
-    ],
-    'demo': [
-        'demo/demo_attendance.xml',
+        'data/test_attendance_data.xml',
     ],
     'installable': True,
     'application': False,
