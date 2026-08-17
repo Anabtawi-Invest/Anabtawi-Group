@@ -10,14 +10,14 @@ def post_init_hook(env):
         rules.write({'struct_id': structure.id})
 
     # 2. Search for Employee 1: Factory Test 1 (+5:00 Net OT)
-    emp1 = env.ref('factory_attendance_payroll.test1_employee', raise_if_not_found=False)
+    emp1 = env.ref('factory_attendance_payroll.test_factory_employee', raise_if_not_found=False)
     if not emp1:
         emp1 = env['hr.employee'].sudo().search([('work_email', '=', 'factorytest1@example.com')], limit=1)
     if emp1:
         emp1.sudo().write({'name': 'Factory Test 1'})
 
     # 3. Search for Employee 2: Factory Test 2 (-2:00 Net Undertime)
-    emp2 = env.ref('factory_attendance_payroll.test2_employee', raise_if_not_found=False)
+    emp2 = env.ref('factory_attendance_payroll.test_undertime_employee', raise_if_not_found=False)
     if not emp2:
         emp2 = env['hr.employee'].sudo().search([('work_email', '=', 'factorytest2@example.com')], limit=1)
     if emp2:
