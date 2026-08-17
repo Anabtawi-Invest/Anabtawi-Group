@@ -8,6 +8,21 @@ from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
+# Complete list of Work Entry Type Codes (Display Codes & Payroll Codes) that represent
+# Leaves, Holidays, Excused Time Off, and Special Allowances that must NOT generate lateness.
+EXCUSED_LEAVE_WORK_ENTRY_CODES = [
+    # Display Codes from Excel
+    "GTO", "CTO", "HW", "STO", "PTO", "SIK", "ANU", "PHD", "BFV", "HIL",
+    "FWS", "DIE", "MRD", "NPO", "PID", "HAJ", "MAM", "LDO", "TRV", "MKA", "BRK", "UNP",
+    # Payroll Codes from Excel
+    "LEAVE100", "LEAVE105", "WORK110", "LEAVE110", "LEAVE120", "SICKLEAVE0",
+    "An_le", "un_paid",
+    # General / standard leave codes
+    "LEAVE", "SICK", "VAC", "ANNUAL", "UNPAID", "HOLIDAY",
+]
+
+ABSENT_WORK_ENTRY_CODES = ["ABS", "ABSENT"]
+
 
 class HrEmployee(models.Model):
     _inherit = "hr.employee"
@@ -51,24 +66,6 @@ class HrEmployee(models.Model):
     @api.model
     def _lat_float_is_zero(self, value, precision=1e-6):
         return abs(value) <= precision
-
-    @api.model
-    def _lat_truncate_to_minute(self, dt):
-        """Drop seconds so LAT matches clock times shown in the UI."""
-        if not dt:
-            return dt
-        return dt.replace(second=0, microsecond=0)
-
-    @api.model
-    def _lat_diff_whole_minutes(self, later, earlier):
-        """Whole minutes between datetimes; ignores sub-minute noise."""
-        if not later or not earlier:
-            return 0
-        later = self._lat_truncate_to_minute(later)
-        earlier = self._lat_truncate_to_minute(earlier)
-        if later <= earlier:
-            return 0
-        return int((later - earlier).total_seconds()) // 60
 
     def _lat_get_work_entry_type(self):
         self.ensure_one()
@@ -114,6 +111,68 @@ class HrEmployee(models.Model):
             next_day_local.astimezone(pytz.utc).replace(tzinfo=None),
         )
 
+    def _lat_get_work_entry_source_on_day(self, target_date):
+        self.ensure_one()
+        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
+        if version and version.work_entry_source:
+            return (version.work_entry_source or "").strip()
+        if "planning.slot" in self.env and self.resource_id:
+            slots_count = self.env["planning.slot"].sudo().search_count([
+                ("resource_id", "=", self.resource_id.id),
+            ])
+            if slots_count > 0:
+                return "planning"
+        return "calendar"
+
+    def _lat_has_approved_leave_on_day(self, target_date, day_start_utc, day_end_utc):
+        self.ensure_one()
+        # 1. Check hr.leave records with approved/validated state
+        if "hr.leave" in self.env:
+            leaves_count = self.env["hr.leave"].sudo().search_count([
+                ("employee_id", "=", self.id),
+                ("state", "in", ["validate", "validate1"]),
+                ("date_from", "<", fields.Datetime.to_string(day_end_utc)),
+                ("date_to", ">", fields.Datetime.to_string(day_start_utc)),
+            ])
+            if leaves_count > 0:
+                return True
+
+        # 2. Check hr.work.entry for all approved leave & time off types from Excel
+        work_entries = self.env["hr.work.entry"].sudo().search([
+            ("employee_id", "=", self.id),
+            ("date", "=", target_date),
+            ("state", "!=", "cancelled"),
+        ])
+        for we in work_entries:
+            type_obj = we.work_entry_type_id
+            if not type_obj:
+                continue
+            if type_obj.is_leave:
+                return True
+            code = (type_obj.code or "").strip()
+            display_code = (getattr(type_obj, "display_code", False) or "").strip()
+            if code in EXCUSED_LEAVE_WORK_ENTRY_CODES or display_code in EXCUSED_LEAVE_WORK_ENTRY_CODES:
+                return True
+
+        return False
+
+    def _lat_has_absent_on_day(self, target_date):
+        self.ensure_one()
+        work_entries = self.env["hr.work.entry"].sudo().search([
+            ("employee_id", "=", self.id),
+            ("date", "=", target_date),
+            ("state", "!=", "cancelled"),
+        ])
+        for we in work_entries:
+            type_obj = we.work_entry_type_id
+            if not type_obj:
+                continue
+            code = (type_obj.code or "").strip()
+            display_code = (getattr(type_obj, "display_code", False) or "").strip()
+            if code in ABSENT_WORK_ENTRY_CODES or display_code in ABSENT_WORK_ENTRY_CODES:
+                return True
+        return False
+
     def _lat_get_calendar_intervals_on_day(self, target_date, day_start, day_end):
         self.ensure_one()
         version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
@@ -123,7 +182,7 @@ class HrEmployee(models.Model):
             or self.company_id.resource_calendar_id
         )
         if not calendar:
-            return 0.0
+            return []
 
         start_aware = pytz.utc.localize(day_start)
         end_aware = pytz.utc.localize(day_end)
@@ -222,22 +281,24 @@ class HrEmployee(models.Model):
             )
             return
 
+        employee_tz = self._lat_get_timezone()
         day_bounds = {day: self._lat_get_day_utc_bounds(day) for day in target_days}
-        utc_start = min(start for start, _end in day_bounds.values())
-        utc_end = max(end for _start, end in day_bounds.values())
+        min_day_start = min(start for start, _end in day_bounds.values())
+        max_day_end = max(end for _start, end in day_bounds.values())
 
-        slots = self.env["planning.slot"].sudo().search([
+        # Fetch planning slots within range (extended by 24h for overnight shifts)
+        all_slots = self.env["planning.slot"].sudo().search([
             ("resource_id", "=", self.resource_id.id),
             ("state", "in", ["draft", "published"]),
-            ("start_datetime", "<", utc_end),
-            ("end_datetime", ">", utc_start),
+            ("start_datetime", "<", max_day_end + timedelta(hours=24)),
+            ("end_datetime", ">", min_day_start - timedelta(hours=24)),
         ]) if self.resource_id else self.env["planning.slot"]
 
-        attendances = self.env["hr.attendance"].sudo().search([
+        # Fetch attendances within range (extended by 24h for overnight attendances)
+        all_attendances = self.env["hr.attendance"].sudo().search([
             ("employee_id", "=", self.id),
-            ("check_out", "!=", False),
-            ("check_in", "<", utc_end),
-            ("check_out", ">", utc_start),
+            ("check_in", "<", max_day_end + timedelta(hours=24)),
+            ("check_in", ">=", min_day_start - timedelta(hours=24)),
         ])
 
         existing_lat_entries = self.env["hr.work.entry"].sudo().search([
@@ -250,8 +311,8 @@ class HrEmployee(models.Model):
             "[LAT] employee_sources employee_id=%s employee=%s slots=%s attendances=%s existing_lat_entries=%s",
             self.id,
             self.display_name,
-            len(slots),
-            len(attendances),
+            len(all_slots),
+            len(all_attendances),
             existing_lat_entries.ids,
         )
         entries_by_day = defaultdict(lambda: self.env["hr.work.entry"])
@@ -259,107 +320,179 @@ class HrEmployee(models.Model):
             entries_by_day[entry.date] |= entry
 
         grace_hours = self._lat_grace_hours()
+
         for day in target_days:
             day_start, day_end = day_bounds[day]
-            planning_intervals = []
-            planned_source = "planning"
-            for slot in slots:
-                overlap_start = max(slot.start_datetime, day_start)
-                overlap_end = min(slot.end_datetime, day_end)
-                if overlap_end > overlap_start:
-                    planning_intervals.append((overlap_start, overlap_end))
+            existing_day_entries = entries_by_day.get(day, self.env["hr.work.entry"])
 
-            if not planning_intervals:
+            # 1. Check if day is an Approved Leave / Time Off (All excused codes from Excel)
+            if self._lat_has_approved_leave_on_day(day, day_start, day_end):
+                _logger.info(
+                    "[LAT] day_eval employee_id=%s date=%s skipped=approved_leave_or_excused_work_entry",
+                    self.id,
+                    day,
+                )
+                self._lat_sync_work_entry_for_day(
+                    target_date=day,
+                    late_hours=0.0,
+                    should_have_lat=False,
+                    lat_type=lat_type,
+                    existing_entries=existing_day_entries,
+                )
+                continue
+
+            # 2. Check if day is marked as Absent (ABS / ABSENT)
+            if self._lat_has_absent_on_day(day):
+                _logger.info(
+                    "[LAT] day_eval employee_id=%s date=%s skipped=marked_as_absent",
+                    self.id,
+                    day,
+                )
+                self._lat_sync_work_entry_for_day(
+                    target_date=day,
+                    late_hours=0.0,
+                    should_have_lat=False,
+                    lat_type=lat_type,
+                    existing_entries=existing_day_entries,
+                )
+                continue
+
+            work_entry_source = self._lat_get_work_entry_source_on_day(day)
+            total_lateness_hours = 0.0
+            has_attended_shift = False
+
+            if work_entry_source == "planning":
+                # Find all planning slots starting on this date in employee local timezone
+                day_slots = []
+                for slot in all_slots:
+                    slot_start_local = pytz.utc.localize(slot.start_datetime).astimezone(employee_tz)
+                    if slot_start_local.date() == day:
+                        day_slots.append(slot)
+
+                if not day_slots:
+                    # Unscheduled Day / Day Off: DO NOT fallback to calendar!
+                    _logger.info(
+                        "[LAT] day_eval employee_id=%s date=%s skipped=unscheduled_planning_day_off",
+                        self.id,
+                        day,
+                    )
+                    self._lat_sync_work_entry_for_day(
+                        target_date=day,
+                        late_hours=0.0,
+                        should_have_lat=False,
+                        lat_type=lat_type,
+                        existing_entries=existing_day_entries,
+                    )
+                    continue
+
+                for slot in day_slots:
+                    shift_start = slot.start_datetime
+                    shift_end = slot.end_datetime
+
+                    # Match attendances for this specific shift window
+                    # Window: from 4 hours before shift start up to shift end
+                    shift_attendances = all_attendances.filtered(
+                        lambda att: att.check_in and att.check_in >= (shift_start - timedelta(hours=4)) and att.check_in <= shift_end
+                    )
+
+                    if not shift_attendances:
+                        # Employee did not attend the scheduled shift -> Absence, not Lateness
+                        _logger.info(
+                            "[LAT] shift_eval employee_id=%s date=%s slot_id=%s no_attendance_found=absence",
+                            self.id,
+                            day,
+                            slot.id,
+                        )
+                        continue
+
+                    att_start = min(att.check_in for att in shift_attendances)
+                    closed_attendances = shift_attendances.filtered(
+                        lambda att: att.check_out and att.check_out > att.check_in
+                    )
+                    att_end = max(att.check_out for att in closed_attendances) if closed_attendances else False
+
+                    has_attended_shift = True
+
+                    # 1. Late arrival (Check-in lateness)
+                    late_in = 0.0
+                    if att_start > shift_start:
+                        late_in = (att_start - shift_start).total_seconds() / 3600.0
+
+                    # 2. Early departure (Check-out lateness across whole shift, including overnight)
+                    early_out = 0.0
+                    if att_end and att_end < shift_end:
+                        early_out = (shift_end - att_end).total_seconds() / 3600.0
+
+                    shift_lateness = late_in + early_out
+                    total_lateness_hours += shift_lateness
+                    _logger.info(
+                        "[LAT] shift_eval employee_id=%s date=%s slot_id=%s shift_start=%s shift_end=%s att_start=%s att_end=%s late_in=%.4f early_out=%.4f shift_lateness=%.4f",
+                        self.id,
+                        day,
+                        slot.id,
+                        shift_start,
+                        shift_end,
+                        att_start,
+                        att_end,
+                        late_in,
+                        early_out,
+                        shift_lateness,
+                    )
+
+                should_have_lat = has_attended_shift and (total_lateness_hours > grace_hours)
+
+            else:
+                # Working Schedule (Calendar) Fallback for non-planning employees
                 calendar_intervals = self._lat_get_calendar_intervals_on_day(day, day_start, day_end)
-                if calendar_intervals:
-                    planning_intervals = calendar_intervals
-                    planned_source = "calendar_fallback"
+                if not calendar_intervals:
+                    # Non-working day in calendar (Weekend / Day Off)
+                    should_have_lat = False
                 else:
-                    planned_source = "none"
+                    cal_start = min(start for start, end in calendar_intervals)
+                    cal_end = max(end for start, end in calendar_intervals)
 
-            planned_hours = 0.0
-            planned_start = False
-            planned_end = False
-            for interval_start, interval_end in planning_intervals:
-                planned_hours += (interval_end - interval_start).total_seconds() / 3600.0
-                if not planned_start or interval_start < planned_start:
-                    planned_start = interval_start
-                if not planned_end or interval_end > planned_end:
-                    planned_end = interval_end
+                    day_attendances = all_attendances.filtered(
+                        lambda att: att.check_in and att.check_in >= (day_start - timedelta(hours=2)) and att.check_in < day_end
+                    )
 
-            attendance_start = False
-            attendance_end = False
-            for attendance in attendances:
-                if not attendance.check_in or not attendance.check_out:
-                    continue
-                if attendance.check_out <= attendance.check_in:
-                    continue
-                overlap_start = max(attendance.check_in, day_start)
-                overlap_end = min(attendance.check_out, day_end)
-                if overlap_end > overlap_start:
-                    current_start = overlap_start
-                    if not attendance_start or current_start < attendance_start:
-                        attendance_start = current_start
-                    if not attendance_end or overlap_end > attendance_end:
-                        attendance_end = overlap_end
+                    if not day_attendances:
+                        should_have_lat = False
+                    else:
+                        att_start = min(att.check_in for att in day_attendances)
+                        closed_attendances = day_attendances.filtered(
+                            lambda att: att.check_out and att.check_out > att.check_in
+                        )
+                        att_end = max(att.check_out for att in closed_attendances) if closed_attendances else False
 
-            late_check_in_minutes = self._lat_diff_whole_minutes(attendance_start, planned_start)
-            early_check_out_minutes = self._lat_diff_whole_minutes(planned_end, attendance_end)
-            lateness_minutes = late_check_in_minutes + early_check_out_minutes
-            lateness_hours = lateness_minutes / 60.0
-            late_check_in_hours = late_check_in_minutes / 60.0
-            early_check_out_hours = early_check_out_minutes / 60.0
-            should_have_lat = (
-                bool(planned_start and planned_end and attendance_start and attendance_end)
-                and lateness_hours > grace_hours
-            )
+                        late_in = 0.0
+                        if att_start > cal_start:
+                            late_in = (att_start - cal_start).total_seconds() / 3600.0
+
+                        early_out = 0.0
+                        if att_end and att_end < cal_end:
+                            early_out = (cal_end - att_end).total_seconds() / 3600.0
+
+                        total_lateness_hours = late_in + early_out
+                        should_have_lat = bool(att_start) and (total_lateness_hours > grace_hours)
+
             _logger.info(
-                "[LAT] day_eval employee_id=%s employee=%s date=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s planned_hours=%.4f late_check_in=%.4f early_check_out=%.4f lateness=%.4f grace=%.4f should_have_lat=%s existing_entries=%s",
-                self.id,
-                self.display_name,
-                day,
-                planned_start,
-                planned_end,
-                attendance_start,
-                attendance_end,
-                planned_hours,
-                late_check_in_hours,
-                early_check_out_hours,
-                lateness_hours,
-                grace_hours,
-                should_have_lat,
-                entries_by_day.get(day, self.env["hr.work.entry"]).ids,
-            )
-            _logger.warning(
-                "[LAT TRACE2] employee=%s(%s) date=%s source=%s planned_start=%s planned_end=%s attendance_start=%s attendance_end=%s late_in=%.4f early_out=%.4f total=%.4f grace=%.4f apply=%s",
-                self.display_name,
+                "[LAT] day_summary employee_id=%s date=%s source=%s total_lateness=%.4f grace=%.4f should_have_lat=%s",
                 self.id,
                 day,
-                planned_source,
-                planned_start,
-                planned_end,
-                attendance_start,
-                attendance_end,
-                late_check_in_hours,
-                early_check_out_hours,
-                lateness_hours,
+                work_entry_source,
+                total_lateness_hours,
                 grace_hours,
                 should_have_lat,
             )
-            _logger.info(
-                "[LAT] day_plan_source employee_id=%s employee=%s date=%s source=%s",
-                self.id,
-                self.display_name,
-                day,
-                planned_source,
-            )
+
             self._lat_sync_work_entry_for_day(
                 target_date=day,
-                late_hours=lateness_hours,
+                late_hours=total_lateness_hours if should_have_lat else 0.0,
                 should_have_lat=should_have_lat,
                 lat_type=lat_type,
-                existing_entries=entries_by_day.get(day, self.env["hr.work.entry"]),
+                existing_entries=existing_day_entries,
             )
+
         _logger.info(
             "[LAT] employee_recompute_done employee_id=%s employee=%s",
             self.id,
@@ -369,9 +502,9 @@ class HrEmployee(models.Model):
     def _lat_sync_work_entry_for_day(self, target_date, late_hours, should_have_lat, lat_type, existing_entries):
         self.ensure_one()
         existing_entries = existing_entries.sorted("id")
-        if not should_have_lat:
+        if not should_have_lat or late_hours <= 0.0:
             _logger.info(
-                "[LAT] sync_action employee_id=%s employee=%s date=%s action=remove reason=no_lateness_above_grace existing_entries=%s",
+                "[LAT] sync_action employee_id=%s employee=%s date=%s action=remove reason=not_applicable existing_entries=%s",
                 self.id,
                 self.display_name,
                 target_date,
@@ -380,18 +513,7 @@ class HrEmployee(models.Model):
             self._lat_remove_entries(existing_entries)
             return
 
-        duration = min(late_hours, 24.0)
-        if duration <= 0.0:
-            _logger.info(
-                "[LAT] sync_action employee_id=%s employee=%s date=%s action=remove reason=non_positive_duration existing_entries=%s",
-                self.id,
-                self.display_name,
-                target_date,
-                existing_entries.ids,
-            )
-            self._lat_remove_entries(existing_entries)
-            return
-
+        duration = min(round(late_hours, 4), 24.0)
         editable_entries = existing_entries.filtered(lambda entry: entry.state != "validated")
         if editable_entries:
             keeper = editable_entries[0]
