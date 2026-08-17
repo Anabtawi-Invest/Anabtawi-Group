@@ -9,20 +9,24 @@ def post_init_hook(env):
         rules = env['hr.salary.rule'].search([('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME'])])
         rules.write({'struct_id': structure.id})
 
-    # 2. Search for Employee 1: Test 1 (+5:00 Net OT)
+    # 2. Search for Employee 1: Factory Test 1 (+5:00 Net OT)
     emp1 = env.ref('factory_attendance_payroll.test1_employee', raise_if_not_found=False)
     if not emp1:
-        emp1 = env['hr.employee'].sudo().search([('work_email', '=', 'test1@example.com')], limit=1)
+        emp1 = env['hr.employee'].sudo().search([('work_email', '=', 'factorytest1@example.com')], limit=1)
+    if emp1:
+        emp1.sudo().write({'name': 'Factory Test 1'})
 
-    # 3. Search for Employee 2: Test 2 (-2:00 Net Undertime)
+    # 3. Search for Employee 2: Factory Test 2 (-2:00 Net Undertime)
     emp2 = env.ref('factory_attendance_payroll.test2_employee', raise_if_not_found=False)
     if not emp2:
-        emp2 = env['hr.employee'].sudo().search([('work_email', '=', 'test2@example.com')], limit=1)
+        emp2 = env['hr.employee'].sudo().search([('work_email', '=', 'factorytest2@example.com')], limit=1)
+    if emp2:
+        emp2.sudo().write({'name': 'Factory Test 2'})
 
     if not emp1 or not emp2:
         return
 
-    # 4. Create July 2026 attendances for Test 1 if none exist
+    # 4. Create July 2026 attendances for Factory Test 1 if none exist
     existing_att_1 = env['hr.attendance'].sudo().search_count([('employee_id', '=', emp1.id)])
     if existing_att_1 == 0:
         emp1_attendances = []
@@ -51,7 +55,7 @@ def post_init_hook(env):
         for vals in emp1_attendances:
             env['hr.attendance'].sudo().create(vals)
 
-    # 5. Create July 2026 attendances for Test 2 if none exist
+    # 5. Create July 2026 attendances for Factory Test 2 if none exist
     existing_att_2 = env['hr.attendance'].sudo().search_count([('employee_id', '=', emp2.id)])
     if existing_att_2 == 0:
         emp2_attendances = []

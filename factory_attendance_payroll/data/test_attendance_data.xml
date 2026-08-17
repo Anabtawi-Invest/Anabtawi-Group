@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
-        <!-- EMPLOYEE 1: Test 1 (+5:00 Net OT) -->
+        <!-- EMPLOYEE 1: Factory Test 1 (+5:00 Net OT) -->
         <record id="test1_employee" model="hr.employee">
-            <field name="name">Test 1</field>
+            <field name="name">Factory Test 1</field>
             <field name="job_title">Factory Operator Test 1</field>
-            <field name="work_email">test1@example.com</field>
+            <field name="work_email">factorytest1@example.com</field>
         </record>
 
-        <!-- EMPLOYEE 2: Test 2 (-2:00 Net Undertime) -->
+        <!-- EMPLOYEE 2: Factory Test 2 (-2:00 Net Undertime) -->
         <record id="test2_employee" model="hr.employee">
-            <field name="name">Test 2</field>
+            <field name="name">Factory Test 2</field>
             <field name="job_title">Factory Operator Test 2</field>
-            <field name="work_email">test2@example.com</field>
+            <field name="work_email">factorytest2@example.com</field>
         </record>
     </data>
 </odoo>
