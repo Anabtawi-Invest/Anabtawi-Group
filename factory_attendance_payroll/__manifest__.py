@@ -6,6 +6,7 @@
     'author': 'Custom Solutions',
     'license': 'OPL-1',
     'depends': [
+        'hr_contract',
         'hr_payroll',
         'hr_attendance',
     ],
