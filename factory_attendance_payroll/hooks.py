@@ -9,31 +9,35 @@ def post_init_hook(env):
         rules = env['hr.salary.rule'].search([('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME'])])
         rules.write({'struct_id': structure.id})
 
-    # 2. Get or create Employee 1 (+5:00 Net OT)
-    emp1 = env['hr.employee'].sudo().search([('work_email', '=', 'factory.test@example.com')], limit=1)
+    # 2. Get or create Employee 1: Test 1 (+5:00 Net OT)
+    emp1 = env['hr.employee'].sudo().search([('work_email', '=', 'test1@example.com')], limit=1)
     if not emp1:
         emp1 = env['hr.employee'].sudo().create({
-            'name': 'Factory Worker Test Employee',
-            'job_title': 'Factory Technician',
-            'work_email': 'factory.test@example.com',
+            'name': 'Test 1',
+            'job_title': 'Factory Operator Test 1',
+            'work_email': 'test1@example.com',
         })
+    else:
+        emp1.sudo().write({'name': 'Test 1'})
 
-    # 3. Get or create Employee 2 (-2:00 Net Undertime)
-    emp2 = env['hr.employee'].sudo().search([('work_email', '=', 'factory.undertime@example.com')], limit=1)
+    # 3. Get or create Employee 2: Test 2 (-2:00 Net Undertime)
+    emp2 = env['hr.employee'].sudo().search([('work_email', '=', 'test2@example.com')], limit=1)
     if not emp2:
         emp2 = env['hr.employee'].sudo().create({
-            'name': 'Factory Worker Undertime Employee',
-            'job_title': 'Factory Operator',
-            'work_email': 'factory.undertime@example.com',
+            'name': 'Test 2',
+            'job_title': 'Factory Operator Test 2',
+            'work_email': 'test2@example.com',
         })
+    else:
+        emp2.sudo().write({'name': 'Test 2'})
 
-    # 4. Clean old attendance and overtime records for both test employees
+    # 4. Clean old attendance and overtime records for Test 1 and Test 2
     test_emp_ids = [emp1.id, emp2.id]
     env['hr.attendance'].sudo().search([('employee_id', 'in', test_emp_ids)]).unlink()
     if 'hr.attendance.overtime.line' in env:
         env['hr.attendance.overtime.line'].sudo().search([('employee_id', 'in', test_emp_ids)]).unlink()
 
-    # 5. Populate fresh July 2026 attendances for Employee 1 (+5:00 Net OT)
+    # 5. Populate fresh July 2026 attendances for Test 1 (+5:00 Net OT)
     emp1_attendances = []
     # 10 Overtime Days (July 1 - 10) -> +1.5h OT each = 15:00 Gross OT
     for day in range(1, 11):
@@ -63,7 +67,7 @@ def post_init_hook(env):
     for vals in emp1_attendances:
         env['hr.attendance'].sudo().create(vals)
 
-    # 6. Populate fresh July 2026 attendances for Employee 2 (-2:00 Net Undertime)
+    # 6. Populate fresh July 2026 attendances for Test 2 (-2:00 Net Undertime)
     emp2_attendances = []
     # 4 Overtime Days (July 1 - 4) -> +1.0h OT each = 04:00 Gross OT
     for day in range(1, 5):
