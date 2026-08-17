@@ -39,20 +39,50 @@ class HrPayslip(models.Model):
 
     def compute_sheet(self):
         self._compute_attendance_reconciliation_fields()
-        return super().compute_sheet()
+        res = super().compute_sheet()
+        self._sync_net_overtime_to_extra_hours_balance()
+        return res
 
     def action_payslip_done(self):
         res = super().action_payslip_done()
-        for payslip in self:
-            if payslip.attendance_net_reconciled > 0:
-                # Bank net overtime hours to hr.attendance.overtime if available
-                if 'hr.attendance.overtime' in self.env:
-                    self.env['hr.attendance.overtime'].sudo().create({
-                        'employee_id': payslip.employee_id.id,
-                        'date': payslip.date_to,
-                        'duration': payslip.attendance_net_reconciled,
-                    })
+        self._sync_net_overtime_to_extra_hours_balance()
         return res
+
+    def _sync_net_overtime_to_extra_hours_balance(self):
+        """
+        Bank net overtime hours to hr.attendance.overtime.line so that
+        anabtawi_payroll_overtime displays it in Extra Hours Balance (Other Info tab).
+        """
+        if 'hr.attendance.overtime.line' not in self.env:
+            return
+
+        OvertimeLine = self.env['hr.attendance.overtime.line'].sudo()
+        for payslip in self:
+            if payslip.employee_id and payslip.attendance_net_reconciled > 0:
+                net_ot = payslip.attendance_net_reconciled
+                existing_line = OvertimeLine.search([
+                    ('employee_id', '=', payslip.employee_id.id),
+                    ('date', '=', payslip.date_to),
+                    ('compensable_as_leave', '=', True),
+                ], limit=1)
+
+                vals = {
+                    'employee_id': payslip.employee_id.id,
+                    'date': payslip.date_to,
+                    'duration': net_ot,
+                    'manual_duration': net_ot,
+                    'compensable_as_leave': True,
+                    'status': 'approved',
+                }
+
+                if existing_line:
+                    existing_line.write(vals)
+                else:
+                    OvertimeLine.create(vals)
+
+                # Recompute employee_extra_hours_balance on payslip if method exists
+                if hasattr(payslip, '_compute_employee_extra_hours_balance'):
+                    payslip._compute_employee_extra_hours_balance()
 
     def _get_reconciled_attendance_variance(self):
         """
