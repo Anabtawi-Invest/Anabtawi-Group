@@ -41,13 +41,31 @@ class HrEnhancementAttendanceCardWizard(models.TransientModel):
     _name = 'hr.enhancement.attendance.card.wizard'
     _description = 'Attendance Cards Report Wizard'
 
+    employee_ids = fields.Many2many(
+        'hr.employee',
+        string='Employees',
+    )
     employee_id = fields.Many2one(
         'hr.employee',
-        required=True,
         string='Employee',
+        compute='_compute_employee_id',
+        inverse='_inverse_employee_id',
+        store=False,
     )
     date_from = fields.Date(required=True)
     date_to = fields.Date(required=True)
+
+    @api.depends('employee_ids')
+    def _compute_employee_id(self):
+        for wiz in self:
+            wiz.employee_id = wiz.employee_ids[:1] if wiz.employee_ids else False
+
+    def _inverse_employee_id(self):
+        for wiz in self:
+            if wiz.employee_id:
+                wiz.employee_ids = [(6, 0, [wiz.employee_id.id])]
+            else:
+                wiz.employee_ids = [(6, 0, [])]
 
     @api.constrains('date_from', 'date_to')
     def _check_dates(self):
@@ -59,6 +77,14 @@ class HrEnhancementAttendanceCardWizard(models.TransientModel):
         self.ensure_one()
         return self.env.ref('hr_enhancement.action_report_attendance_card').report_action(self)
 
+    def _get_employees(self):
+        self.ensure_one()
+        if self.employee_ids:
+            return self.employee_ids
+        if self.employee_id:
+            return self.employee_id
+        return self.env['hr.employee'].search([])
+
     @staticmethod
     def _float_hours_to_time_str(hours):
         if not hours:
@@ -68,13 +94,12 @@ class HrEnhancementAttendanceCardWizard(models.TransientModel):
         mins, secs = divmod(remainder, 60)
         return '%d:%02d:%02d' % (hs, mins, secs)
 
-    def _weekday_name(self, d: date):
+    def _weekday_name(self, d: date, emp=None):
         self.ensure_one()
-        lc = (
-            (self.employee_id.user_id.partner_id.lang if self.employee_id.user_id else False)
-            or self.env.user.lang
-            or 'en_US'
-        )
+        user_lang = False
+        if emp and emp.user_id:
+            user_lang = emp.user_id.partner_id.lang
+        lc = user_lang or self.env.user.lang or 'en_US'
         lc_babel = lc.replace('-', '_')
         if Locale is None:
             return d.strftime('%A')
@@ -120,9 +145,8 @@ class HrEnhancementAttendanceCardWizard(models.TransientModel):
             overlap_seconds += int((seg_to - seg_from).total_seconds())
         return overlap_seconds / 3600
 
-    def _get_report_lines(self):
+    def _get_report_lines(self, emp):
         self.ensure_one()
-        emp = self.employee_id
 
         attendance_by_date = defaultdict(lambda: self.env['hr.attendance'])
         records = (
@@ -142,7 +166,7 @@ class HrEnhancementAttendanceCardWizard(models.TransientModel):
             is_work_day = self._calendar_is_work_day(emp, cur)
             leave_h = self._leave_hours_for_day(emp, cur)
 
-            weekday = self._weekday_name(cur)
+            weekday = self._weekday_name(cur, emp=emp)
 
             if not atts:
                 vacation_text = ''
@@ -184,6 +208,20 @@ class HrEnhancementAttendanceCardWizard(models.TransientModel):
             cur += timedelta(days=1)
 
         return lines
+
+    def _get_report_data_per_employee(self):
+        self.ensure_one()
+        employees = self._get_employees()
+        res = []
+        for emp in employees:
+            lines = self._get_report_lines(emp)
+            res.append({
+                'employee': emp,
+                'company': emp.company_id or self.env.company,
+                'report_lines': lines,
+                'rowspan': len(lines) or 1,
+            })
+        return res
 
     def _pdf_header_note(self):
         """Extra header line when not using the standard contract legend (see QWeb/XML)."""
@@ -227,8 +265,7 @@ class ReportHrEnhancementAttendanceCard(models.AbstractModel):
         wiz = wizard[:1]
         if not wiz:
             return {}
-        company = wiz.employee_id.company_id or self.env.company
-        lines = wiz._get_report_lines()
+        employees_data = wiz._get_report_data_per_employee()
         period_from_fmt = wiz.date_from.strftime('%d/%m/%Y')
         period_to_fmt = wiz.date_to.strftime('%d/%m/%Y')
         subtitle = _('From %(df)s To %(dt)s') % {'df': period_from_fmt, 'dt': period_to_fmt}
@@ -239,14 +276,11 @@ class ReportHrEnhancementAttendanceCard(models.AbstractModel):
             'doc_ids': docids,
             'doc_model': 'hr.enhancement.attendance.card.wizard',
             'docs': wizard,
-            'company': company,
-            'employee': wiz.employee_id,
+            'employees_data': employees_data,
             'period_from': wiz.date_from,
             'period_to': wiz.date_to,
             'period_from_fmt': period_from_fmt,
             'period_to_fmt': period_to_fmt,
-            'report_lines': lines,
-            'rowspan': len(lines) or 1,
             'image_data_uri': image_data_uri,
             'title': _('Attendance Cards'),
             'lbl_from': _('From'),

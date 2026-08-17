@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
             <form string="Attendance Cards">
                 <group>
-                    <field name="employee_id"/>
+                    <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select employees (leave empty for all employees)"/>
                     <field name="date_from"/>
                     <field name="date_to"/>
                 </group>
