@@ -37,6 +37,10 @@ class HrPayslip(models.Model):
                 payslip.attendance_gross_undertime = 0.0
                 payslip.attendance_net_reconciled = 0.0
 
+    def compute_sheet(self):
+        self._compute_attendance_reconciliation_fields()
+        return super().compute_sheet()
+
     def _get_reconciled_attendance_variance(self):
         """
         Calculates daily OT (>8h) and daily Undertime (<8h) with an auto 1h break deduction
