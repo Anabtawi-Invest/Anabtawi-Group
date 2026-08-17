@@ -8,14 +8,6 @@
             <field name="work_email">factory.test@example.com</field>
         </record>
 
-        <!-- Employee Contract (500 JOD Wage) -->
-        <record id="contract_factory_employee" model="hr.contract">
-            <field name="name">Factory Worker Contract - 500 JOD</field>
-            <field name="employee_id" ref="test_factory_employee"/>
-            <field name="wage">500.0</field>
-            <field name="date_start">2026-01-01</field>
-            <field name="state">open</field>
-        </record>
 
         <!-- Full Month Attendance Records for July 2026 (31 Days) -->
         <!-- Week 1: July 1 - July 5 -->
