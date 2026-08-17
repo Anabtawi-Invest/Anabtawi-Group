@@ -45,8 +45,27 @@ class HrEnhancementAttendanceCardWizard(models.TransientModel):
         'hr.employee',
         string='Employees',
     )
+    employee_id = fields.Many2one(
+        'hr.employee',
+        string='Employee',
+        compute='_compute_employee_id',
+        inverse='_inverse_employee_id',
+        store=False,
+    )
     date_from = fields.Date(required=True)
     date_to = fields.Date(required=True)
+
+    @api.depends('employee_ids')
+    def _compute_employee_id(self):
+        for wiz in self:
+            wiz.employee_id = wiz.employee_ids[:1] if wiz.employee_ids else False
+
+    def _inverse_employee_id(self):
+        for wiz in self:
+            if wiz.employee_id:
+                wiz.employee_ids = [(6, 0, [wiz.employee_id.id])]
+            else:
+                wiz.employee_ids = [(6, 0, [])]
 
     @api.constrains('date_from', 'date_to')
     def _check_dates(self):
@@ -62,6 +81,8 @@ class HrEnhancementAttendanceCardWizard(models.TransientModel):
         self.ensure_one()
         if self.employee_ids:
             return self.employee_ids
+        if self.employee_id:
+            return self.employee_id
         return self.env['hr.employee'].search([])
 
     @staticmethod
