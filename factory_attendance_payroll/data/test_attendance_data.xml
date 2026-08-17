@@ -2,7 +2,7 @@
 <odoo>
     <data noupdate="0">
         <!-- ======================================================= -->
-        <!-- EMPLOYEE 1: Factory Worker Test Employee (Net Overtime)  -->
+        <!-- EMPLOYEE 1: Factory Worker Test Employee (+5:00 Net OT)  -->
         <!-- ======================================================= -->
         <record id="test_factory_employee" model="hr.employee">
             <field name="name">Factory Worker Test Employee</field>
@@ -10,166 +10,140 @@
             <field name="work_email">factory.test@example.com</field>
         </record>
 
-        <!-- Full Month Attendance Records for Employee 1 (July 2026) -->
-        <record id="att_july_2026_01" model="hr.attendance">
+        <!-- Employee 1 Attendances (July 2026): 15:00 Gross OT - 10:00 Gross UT = +05:00 Net OT -->
+        <!-- 10 Overtime Days (+1.5h each = 15:00 Gross OT) -->
+        <record id="att_e1_july_01" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-01 08:00:00</field>
-            <field name="check_out">2026-07-01 18:00:00</field>
+            <field name="check_out">2026-07-01 18:30:00</field>
         </record>
-        <record id="att_july_2026_02" model="hr.attendance">
+        <record id="att_e1_july_02" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-02 08:00:00</field>
-            <field name="check_out">2026-07-02 17:00:00</field>
+            <field name="check_out">2026-07-02 18:30:00</field>
         </record>
-        <record id="att_july_2026_03" model="hr.attendance">
+        <record id="att_e1_july_03" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-03 08:00:00</field>
-            <field name="check_out">2026-07-03 17:00:00</field>
+            <field name="check_out">2026-07-03 18:30:00</field>
         </record>
-        <record id="att_july_2026_04" model="hr.attendance">
+        <record id="att_e1_july_04" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-04 08:00:00</field>
-            <field name="check_out">2026-07-04 18:00:00</field>
+            <field name="check_out">2026-07-04 18:30:00</field>
         </record>
-        <record id="att_july_2026_05" model="hr.attendance">
+        <record id="att_e1_july_05" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-05 08:00:00</field>
-            <field name="check_out">2026-07-05 17:00:00</field>
+            <field name="check_out">2026-07-05 18:30:00</field>
         </record>
-        <record id="att_july_2026_06" model="hr.attendance">
+        <record id="att_e1_july_06" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-06 09:30:00</field>
-            <field name="check_out">2026-07-06 17:00:00</field>
+            <field name="check_in">2026-07-06 08:00:00</field>
+            <field name="check_out">2026-07-06 18:30:00</field>
         </record>
-        <record id="att_july_2026_07" model="hr.attendance">
+        <record id="att_e1_july_07" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-07 08:00:00</field>
-            <field name="check_out">2026-07-07 19:00:00</field>
+            <field name="check_out">2026-07-07 18:30:00</field>
         </record>
-        <record id="att_july_2026_08" model="hr.attendance">
+        <record id="att_e1_july_08" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-08 08:00:00</field>
-            <field name="check_out">2026-07-08 17:00:00</field>
+            <field name="check_out">2026-07-08 18:30:00</field>
         </record>
-        <record id="att_july_2026_09" model="hr.attendance">
+        <record id="att_e1_july_09" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-09 08:00:00</field>
-            <field name="check_out">2026-07-09 16:00:00</field>
+            <field name="check_out">2026-07-09 18:30:00</field>
         </record>
-        <record id="att_july_2026_10" model="hr.attendance">
+        <record id="att_e1_july_10" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-10 08:00:00</field>
-            <field name="check_out">2026-07-10 17:00:00</field>
+            <field name="check_out">2026-07-10 18:30:00</field>
         </record>
-        <record id="att_july_2026_11" model="hr.attendance">
-            <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-11 08:00:00</field>
-            <field name="check_out">2026-07-11 17:00:00</field>
-        </record>
-        <record id="att_july_2026_12" model="hr.attendance">
-            <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-12 08:00:00</field>
-            <field name="check_out">2026-07-12 17:00:00</field>
-        </record>
-        <record id="att_july_2026_13" model="hr.attendance">
+
+        <!-- 5 Short Days (-2.0h each = 10:00 Gross Undertime) -->
+        <record id="att_e1_july_13" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-13 10:00:00</field>
             <field name="check_out">2026-07-13 17:00:00</field>
         </record>
-        <record id="att_july_2026_14" model="hr.attendance">
+        <record id="att_e1_july_14" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-14 08:00:00</field>
-            <field name="check_out">2026-07-14 18:00:00</field>
+            <field name="check_in">2026-07-14 10:00:00</field>
+            <field name="check_out">2026-07-14 17:00:00</field>
         </record>
-        <record id="att_july_2026_15" model="hr.attendance">
+        <record id="att_e1_july_15" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-15 08:00:00</field>
+            <field name="check_in">2026-07-15 10:00:00</field>
             <field name="check_out">2026-07-15 17:00:00</field>
         </record>
-        <record id="att_july_2026_16" model="hr.attendance">
+        <record id="att_e1_july_16" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-16 08:00:00</field>
-            <field name="check_out">2026-07-16 18:30:00</field>
+            <field name="check_in">2026-07-16 10:00:00</field>
+            <field name="check_out">2026-07-16 17:00:00</field>
         </record>
-        <record id="att_july_2026_17" model="hr.attendance">
+        <record id="att_e1_july_17" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-17 08:00:00</field>
+            <field name="check_in">2026-07-17 10:00:00</field>
             <field name="check_out">2026-07-17 17:00:00</field>
         </record>
-        <record id="att_july_2026_18" model="hr.attendance">
+
+        <!-- Standard Shifts for remaining days -->
+        <record id="att_e1_july_20" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-18 08:00:00</field>
-            <field name="check_out">2026-07-18 17:00:00</field>
-        </record>
-        <record id="att_july_2026_19" model="hr.attendance">
-            <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-19 08:00:00</field>
-            <field name="check_out">2026-07-19 17:00:00</field>
-        </record>
-        <record id="att_july_2026_20" model="hr.attendance">
-            <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-20 09:00:00</field>
+            <field name="check_in">2026-07-20 08:00:00</field>
             <field name="check_out">2026-07-20 17:00:00</field>
         </record>
-        <record id="att_july_2026_21" model="hr.attendance">
+        <record id="att_e1_july_21" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-21 08:00:00</field>
-            <field name="check_out">2026-07-21 18:00:00</field>
+            <field name="check_out">2026-07-21 17:00:00</field>
         </record>
-        <record id="att_july_2026_22" model="hr.attendance">
+        <record id="att_e1_july_22" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-22 08:00:00</field>
             <field name="check_out">2026-07-22 17:00:00</field>
         </record>
-        <record id="att_july_2026_23" model="hr.attendance">
+        <record id="att_e1_july_23" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-23 08:00:00</field>
             <field name="check_out">2026-07-23 17:00:00</field>
         </record>
-        <record id="att_july_2026_24" model="hr.attendance">
+        <record id="att_e1_july_24" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-24 08:00:00</field>
             <field name="check_out">2026-07-24 17:00:00</field>
         </record>
-        <record id="att_july_2026_25" model="hr.attendance">
-            <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-25 08:00:00</field>
-            <field name="check_out">2026-07-25 18:00:00</field>
-        </record>
-        <record id="att_july_2026_26" model="hr.attendance">
-            <field name="employee_id" ref="test_factory_employee"/>
-            <field name="check_in">2026-07-26 08:00:00</field>
-            <field name="check_out">2026-07-26 17:00:00</field>
-        </record>
-        <record id="att_july_2026_27" model="hr.attendance">
+        <record id="att_e1_july_27" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-27 08:00:00</field>
-            <field name="check_out">2026-07-27 15:30:00</field>
+            <field name="check_out">2026-07-27 17:00:00</field>
         </record>
-        <record id="att_july_2026_28" model="hr.attendance">
+        <record id="att_e1_july_28" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-28 08:00:00</field>
             <field name="check_out">2026-07-28 17:00:00</field>
         </record>
-        <record id="att_july_2026_29" model="hr.attendance">
+        <record id="att_e1_july_29" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-29 08:00:00</field>
-            <field name="check_out">2026-07-29 18:30:00</field>
+            <field name="check_out">2026-07-29 17:00:00</field>
         </record>
-        <record id="att_july_2026_30" model="hr.attendance">
+        <record id="att_e1_july_30" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-30 08:00:00</field>
             <field name="check_out">2026-07-30 17:00:00</field>
         </record>
-        <record id="att_july_2026_31" model="hr.attendance">
+        <record id="att_e1_july_31" model="hr.attendance">
             <field name="employee_id" ref="test_factory_employee"/>
             <field name="check_in">2026-07-31 08:00:00</field>
             <field name="check_out">2026-07-31 17:00:00</field>
         </record>
 
-
         <!-- ======================================================= -->
-        <!-- EMPLOYEE 2: Factory Worker Undertime Employee (Deduction) -->
+        <!-- EMPLOYEE 2: Factory Worker Undertime Employee (-2:00 Net)-->
         <!-- ======================================================= -->
         <record id="test_undertime_employee" model="hr.employee">
             <field name="name">Factory Worker Undertime Employee</field>
@@ -177,158 +151,128 @@
             <field name="work_email">factory.undertime@example.com</field>
         </record>
 
-        <!-- Full Month Attendance Records for Employee 2 (July 2026 - Net -15h Undertime) -->
-        <record id="att_undertime_july_01" model="hr.attendance">
+        <!-- Employee 2 Attendances (July 2026): 04:00 Gross OT - 06:00 Gross UT = -02:00 Net UT -->
+        <!-- 4 Overtime Days (+1.0h each = 04:00 Gross OT) -->
+        <record id="att_e2_july_01" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-01 08:00:00</field>
-            <field name="check_out">2026-07-01 18:00:00</field> <!-- +1h OT -->
+            <field name="check_out">2026-07-01 18:00:00</field>
         </record>
-        <record id="att_undertime_july_02" model="hr.attendance">
+        <record id="att_e2_july_02" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-02 08:00:00</field>
-            <field name="check_out">2026-07-02 15:00:00</field> <!-- -2h Undertime -->
+            <field name="check_out">2026-07-02 18:00:00</field>
         </record>
-        <record id="att_undertime_july_03" model="hr.attendance">
+        <record id="att_e2_july_03" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-03 08:00:00</field>
-            <field name="check_out">2026-07-03 17:00:00</field>
+            <field name="check_out">2026-07-03 18:00:00</field>
         </record>
-        <record id="att_undertime_july_04" model="hr.attendance">
+        <record id="att_e2_july_04" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-04 08:00:00</field>
-            <field name="check_out">2026-07-04 18:00:00</field> <!-- +1h OT -->
+            <field name="check_out">2026-07-04 18:00:00</field>
         </record>
-        <record id="att_undertime_july_05" model="hr.attendance">
+
+        <!-- 3 Short Days (-2.0h each = 06:00 Gross Undertime) -->
+        <record id="att_e2_july_06" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-05 08:00:00</field>
-            <field name="check_out">2026-07-05 17:00:00</field>
+            <field name="check_in">2026-07-06 10:00:00</field>
+            <field name="check_out">2026-07-06 17:00:00</field>
         </record>
-        <record id="att_undertime_july_06" model="hr.attendance">
+        <record id="att_e2_july_07" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-06 09:30:00</field>
-            <field name="check_out">2026-07-06 17:00:00</field> <!-- -1.5h Undertime -->
-        </record>
-        <record id="att_undertime_july_07" model="hr.attendance">
-            <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-07 08:00:00</field>
+            <field name="check_in">2026-07-07 10:00:00</field>
             <field name="check_out">2026-07-07 17:00:00</field>
         </record>
-        <record id="att_undertime_july_08" model="hr.attendance">
+        <record id="att_e2_july_08" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-08 08:00:00</field>
+            <field name="check_in">2026-07-08 10:00:00</field>
             <field name="check_out">2026-07-08 17:00:00</field>
         </record>
-        <record id="att_undertime_july_09" model="hr.attendance">
+
+        <!-- Standard Shifts for remaining days -->
+        <record id="att_e2_july_09" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-09 08:00:00</field>
-            <field name="check_out">2026-07-09 14:30:00</field> <!-- -2.5h Undertime -->
+            <field name="check_out">2026-07-09 17:00:00</field>
         </record>
-        <record id="att_undertime_july_10" model="hr.attendance">
+        <record id="att_e2_july_10" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-10 08:00:00</field>
             <field name="check_out">2026-07-10 17:00:00</field>
         </record>
-        <record id="att_undertime_july_11" model="hr.attendance">
+        <record id="att_e2_july_13" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-11 08:00:00</field>
-            <field name="check_out">2026-07-11 17:00:00</field>
+            <field name="check_in">2026-07-13 08:00:00</field>
+            <field name="check_out">2026-07-13 17:00:00</field>
         </record>
-        <record id="att_undertime_july_12" model="hr.attendance">
-            <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-12 08:00:00</field>
-            <field name="check_out">2026-07-12 17:00:00</field>
-        </record>
-        <record id="att_undertime_july_13" model="hr.attendance">
-            <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-13 10:00:00</field>
-            <field name="check_out">2026-07-13 17:00:00</field> <!-- -2h Undertime -->
-        </record>
-        <record id="att_undertime_july_14" model="hr.attendance">
+        <record id="att_e2_july_14" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-14 08:00:00</field>
             <field name="check_out">2026-07-14 17:00:00</field>
         </record>
-        <record id="att_undertime_july_15" model="hr.attendance">
+        <record id="att_e2_july_15" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-15 08:00:00</field>
             <field name="check_out">2026-07-15 17:00:00</field>
         </record>
-        <record id="att_undertime_july_16" model="hr.attendance">
+        <record id="att_e2_july_16" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-16 09:30:00</field>
-            <field name="check_out">2026-07-16 17:00:00</field> <!-- -1.5h Undertime -->
+            <field name="check_in">2026-07-16 08:00:00</field>
+            <field name="check_out">2026-07-16 17:00:00</field>
         </record>
-        <record id="att_undertime_july_17" model="hr.attendance">
+        <record id="att_e2_july_17" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-17 08:00:00</field>
             <field name="check_out">2026-07-17 17:00:00</field>
         </record>
-        <record id="att_undertime_july_18" model="hr.attendance">
+        <record id="att_e2_july_20" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-18 08:00:00</field>
-            <field name="check_out">2026-07-18 17:00:00</field>
+            <field name="check_in">2026-07-20 08:00:00</field>
+            <field name="check_out">2026-07-20 17:00:00</field>
         </record>
-        <record id="att_undertime_july_19" model="hr.attendance">
-            <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-19 08:00:00</field>
-            <field name="check_out">2026-07-19 17:00:00</field>
-        </record>
-        <record id="att_undertime_july_20" model="hr.attendance">
-            <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-20 10:00:00</field>
-            <field name="check_out">2026-07-20 17:00:00</field> <!-- -2h Undertime -->
-        </record>
-        <record id="att_undertime_july_21" model="hr.attendance">
+        <record id="att_e2_july_21" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-21 08:00:00</field>
             <field name="check_out">2026-07-21 17:00:00</field>
         </record>
-        <record id="att_undertime_july_22" model="hr.attendance">
+        <record id="att_e2_july_22" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-22 08:00:00</field>
             <field name="check_out">2026-07-22 17:00:00</field>
         </record>
-        <record id="att_undertime_july_23" model="hr.attendance">
+        <record id="att_e2_july_23" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-23 10:00:00</field>
-            <field name="check_out">2026-07-23 17:00:00</field> <!-- -2h Undertime -->
+            <field name="check_in">2026-07-23 08:00:00</field>
+            <field name="check_out">2026-07-23 17:00:00</field>
         </record>
-        <record id="att_undertime_july_24" model="hr.attendance">
+        <record id="att_e2_july_24" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-24 08:00:00</field>
             <field name="check_out">2026-07-24 17:00:00</field>
         </record>
-        <record id="att_undertime_july_25" model="hr.attendance">
-            <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-25 08:00:00</field>
-            <field name="check_out">2026-07-25 17:00:00</field>
-        </record>
-        <record id="att_undertime_july_26" model="hr.attendance">
-            <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-26 08:00:00</field>
-            <field name="check_out">2026-07-26 17:00:00</field>
-        </record>
-        <record id="att_undertime_july_27" model="hr.attendance">
+        <record id="att_e2_july_27" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-27 08:00:00</field>
-            <field name="check_out">2026-07-27 15:30:00</field> <!-- -1.5h Undertime -->
+            <field name="check_out">2026-07-27 17:00:00</field>
         </record>
-        <record id="att_undertime_july_28" model="hr.attendance">
+        <record id="att_e2_july_28" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-28 08:00:00</field>
             <field name="check_out">2026-07-28 17:00:00</field>
         </record>
-        <record id="att_undertime_july_29" model="hr.attendance">
+        <record id="att_e2_july_29" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-29 08:00:00</field>
             <field name="check_out">2026-07-29 17:00:00</field>
         </record>
-        <record id="att_undertime_july_30" model="hr.attendance">
+        <record id="att_e2_july_30" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
-            <field name="check_in">2026-07-30 10:00:00</field>
-            <field name="check_out">2026-07-30 17:00:00</field> <!-- -2h Undertime -->
+            <field name="check_in">2026-07-30 08:00:00</field>
+            <field name="check_out">2026-07-30 17:00:00</field>
         </record>
-        <record id="att_undertime_july_31" model="hr.attendance">
+        <record id="att_e2_july_31" model="hr.attendance">
             <field name="employee_id" ref="test_undertime_employee"/>
             <field name="check_in">2026-07-31 08:00:00</field>
             <field name="check_out">2026-07-31 17:00:00</field>

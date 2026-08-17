@@ -58,8 +58,8 @@ class HrPayslip(models.Model):
 
         OvertimeLine = self.env['hr.attendance.overtime.line'].sudo()
         for payslip in self:
-            if payslip.employee_id and payslip.attendance_net_reconciled > 0:
-                net_ot = payslip.attendance_net_reconciled
+            if payslip.employee_id:
+                net_ot = max(0.0, payslip.attendance_net_reconciled)
                 existing_line = OvertimeLine.search([
                     ('employee_id', '=', payslip.employee_id.id),
                     ('date', '=', payslip.date_to),
@@ -75,10 +75,14 @@ class HrPayslip(models.Model):
                     'status': 'approved',
                 }
 
-                if existing_line:
-                    existing_line.write(vals)
+                if net_ot > 0:
+                    if existing_line:
+                        existing_line.write(vals)
+                    else:
+                        OvertimeLine.create(vals)
                 else:
-                    OvertimeLine.create(vals)
+                    if existing_line:
+                        existing_line.write({'duration': 0.0, 'manual_duration': 0.0})
 
                 # Recompute employee_extra_hours_balance on payslip if method exists
                 if hasattr(payslip, '_compute_employee_extra_hours_balance'):
