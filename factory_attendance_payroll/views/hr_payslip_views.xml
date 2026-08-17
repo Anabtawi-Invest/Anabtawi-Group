@@ -11,8 +11,11 @@
                         <field name="attendance_gross_overtime" widget="float_time" readonly="1"/>
                         <field name="attendance_gross_undertime" widget="float_time" readonly="1"/>
                     </group>
-                    <group string="Net Reconciled Result">
+                    <group string="Net Result &amp; 3-Tier Settlement">
                         <field name="attendance_net_reconciled" widget="float_time" readonly="1"/>
+                        <field name="undertime_covered_by_extra_hours" widget="float_time" readonly="1"/>
+                        <field name="undertime_covered_by_annual_leave" widget="float_time" readonly="1"/>
+                        <field name="undertime_cash_deduction_hours" widget="float_time" readonly="1"/>
                     </group>
                 </group>
             </xpath>
