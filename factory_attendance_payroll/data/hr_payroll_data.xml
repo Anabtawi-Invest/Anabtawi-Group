@@ -13,7 +13,7 @@
 # Informational calculation rule: monetary amount is 0.0 JOD so it does not alter basic pay
 result = 0.0
         </field>
-        <field name="struct_id" search="[('name', '=', 'Jordan: Employee THE ONE')]"/>
+        <field name="struct_id" search="[]"/>
     </record>
 
     <!-- Net Remaining Overtime (Banked to Extra Hours - 0 JOD Salary Payout) -->
@@ -34,7 +34,7 @@ result = net_var &gt; 0.01
 # HR can pay banked extra hours anytime via Salary Inputs
 result = 0.0
         </field>
-        <field name="struct_id" search="[('name', '=', 'Jordan: Employee THE ONE')]"/>
+        <field name="struct_id" search="[]"/>
     </record>
 
     <!-- Net Undertime Shortfall - Tier 3 Cash Deduction -->
@@ -60,6 +60,6 @@ else:
     hourly_rate = w / 240.0
     result = -(deficit_hours * hourly_rate)
         </field>
-        <field name="struct_id" search="[('name', '=', 'Jordan: Employee THE ONE')]"/>
+        <field name="struct_id" search="[]"/>
     </record>
 </odoo>

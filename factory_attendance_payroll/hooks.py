@@ -21,22 +21,19 @@ def post_init_hook(env):
     """
     Post-Init Hook:
     Binds attendance reconciliation rules (ATT_RECON_VAR, OT_NET, DED_UNDERTIME)
-    dynamically to all Jordan payroll structures in production.
+    dynamically to ALL Payroll Structures in the database, allowing HR to choose any structure ID!
     """
     try:
-        structures = env['hr.payroll.structure'].search([('name', 'ilike', 'Jordan')])
-        if not structures:
-            structures = env['hr.payroll.structure'].search([])
-            
-        rules = env['hr.salary.rule'].search([('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME'])])
+        structures = env['hr.payroll.structure'].sudo().search([])
+        rules = env['hr.salary.rule'].sudo().search([('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME'])])
         
         for structure in structures:
             for rule in rules:
-                existing = env['hr.salary.rule'].search([
+                existing = env['hr.salary.rule'].sudo().search([
                     ('code', '=', rule.code),
                     ('struct_id', '=', structure.id)
                 ], limit=1)
                 if not existing:
-                    rule.write({'struct_id': structure.id})
+                    rule.sudo().copy({'struct_id': structure.id})
     except Exception:
         pass
