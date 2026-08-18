@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Base Reconciled Calculation Rule (Hidden Informational Rule) -->
+    <record id="rule_reconciled_attendance_hours" model="hr.salary.rule">
+        <field name="name">Attendance Reconciled Hours Variance</field>
+        <field name="code">ATT_RECON_VAR</field>
+        <field name="category_id" ref="hr_payroll.BASIC"/>
+        <field name="sequence">50</field>
+        <field name="appears_on_payslip" eval="False"/>
+        <field name="condition_select">none</field>
+        <field name="amount_select">code</field>
+        <field name="amount_python_compute">
+# Informational calculation rule: monetary amount is 0.0 JOD so it does not alter basic pay
+result = 0.0
+        </field>
+        <field name="struct_id" search="[('name', '=', 'Jordan: Employee THE ONE')]"/>
+    </record>
+
+    <!-- Net Remaining Overtime (Banked to Extra Hours - 0 JOD Salary Payout) -->
+    <record id="rule_net_overtime_allowance" model="hr.salary.rule">
+        <field name="name">Net Reconciled Overtime</field>
+        <field name="code">OT_NET</field>
+        <field name="category_id" ref="hr_payroll.ALW"/>
+        <field name="sequence">60</field>
+        <field name="appears_on_payslip" eval="True"/>
+        <field name="condition_select">python</field>
+        <field name="condition_python">
+net_var = payslip.attendance_net_reconciled if payslip else 0.0
+result = net_var &gt; 0.0
+        </field>
+        <field name="amount_select">code</field>
+        <field name="amount_python_compute">
+# Overtime is banked to Extra Hours, NOT paid on monthly cash salary (0.0 JOD)
+# HR can pay banked extra hours anytime via Salary Inputs
+result = 0.0
+        </field>
+        <field name="struct_id" search="[('name', '=', 'Jordan: Employee THE ONE')]"/>
+    </record>
+
+    <!-- Net Undertime Shortfall - Tier 3 Cash Deduction -->
+    <record id="rule_net_undertime_deduction" model="hr.salary.rule">
+        <field name="name">Excess Undertime Deduction</field>
+        <field name="code">DED_UNDERTIME</field>
+        <field name="category_id" ref="hr_payroll.DED"/>
+        <field name="sequence">70</field>
+        <field name="appears_on_payslip" eval="True"/>
+        <field name="condition_select">python</field>
+        <field name="condition_python">
+cash_hrs = payslip.undertime_cash_deduction_hours if payslip else 0.0
+result = cash_hrs &gt; 0.0
+        </field>
+        <field name="amount_select">code</field>
+        <field name="amount_python_compute">
+deficit_hours = payslip.undertime_cash_deduction_hours if payslip else 0.0
+contract_obj = payslip.contract_id if (payslip and payslip.contract_id) else None
+employee_obj = payslip.employee_id if (payslip and payslip.employee_id) else None
+wage = contract_obj.wage if (contract_obj and contract_obj.wage) else (employee_obj.wage if (employee_obj and hasattr(employee_obj, 'wage') and employee_obj.wage) else 0.0)
+hourly_rate = wage / 240.0
+result = -(deficit_hours * hourly_rate)
+        </field>
+        <field name="struct_id" search="[('name', '=', 'Jordan: Employee THE ONE')]"/>
+    </record>
+</odoo>
