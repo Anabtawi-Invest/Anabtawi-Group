@@ -242,7 +242,7 @@ class HrPayslip(models.Model):
                     OvertimeLine.create(vals)
 
             # Step 2: Annual Leave Deduction for Lateness
-            if payslip.lateness_covered_by_annual_leave > 0 and payslip.state == 'done':
+            if payslip.lateness_covered_by_annual_leave > 0:
                 leave_types = self.env['hr.leave.type'].sudo().search([
                     '|', '|',
                     ('name', '=', 'Annual Leave'),
@@ -257,15 +257,31 @@ class HrPayslip(models.Model):
                         ('holiday_status_id', '=', leave_type.id),
                     ], limit=1)
                     if not existing_leave:
-                        self.env['hr.leave'].sudo().create({
+                        hours_to_deduct = payslip.lateness_covered_by_annual_leave
+                        days_to_deduct = round(hours_to_deduct / 8.0, 2)
+                        leave_vals = {
                             'name': 'Monthly Lateness Settlement via Annual Leave',
                             'employee_id': payslip.employee_id.id,
                             'holiday_status_id': leave_type.id,
                             'request_date_from': payslip.date_to,
                             'request_date_to': payslip.date_to,
-                            'number_of_hours': payslip.lateness_covered_by_annual_leave,
-                            'state': 'validate',
-                        })
+                            'number_of_hours': hours_to_deduct,
+                            'number_of_days': days_to_deduct,
+                        }
+                        new_leave = self.env['hr.leave'].sudo().create(leave_vals)
+                        # Execute Odoo's native leave validation workflow to trigger allocation deduction
+                        if hasattr(new_leave, 'action_validate'):
+                            try:
+                                new_leave.action_validate()
+                            except Exception:
+                                new_leave.sudo().write({'state': 'validate'})
+                        elif hasattr(new_leave, 'action_approve'):
+                            try:
+                                new_leave.action_approve()
+                            except Exception:
+                                new_leave.sudo().write({'state': 'validate'})
+                        else:
+                            new_leave.sudo().write({'state': 'validate'})
 
             # Recompute Extra Hours Balance display field if present
             if hasattr(payslip, '_compute_employee_extra_hours_balance'):
