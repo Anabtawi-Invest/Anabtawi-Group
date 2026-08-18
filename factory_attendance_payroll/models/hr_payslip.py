@@ -124,37 +124,63 @@ class HrPayslip(models.Model):
         Automatic Flexible Rest Day Conversion:
         Converts 'Absent' (A) work entries on unworked rest days to 'Rest Day' (ARS)
         so that off days in a flexible 6-day work week display cleanly as Rest Day.
+        Dynamic field resolution ensures compatibility with all Odoo 19 hr.work.entry schemas.
         """
         for payslip in self:
-            if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
-                continue
+            try:
+                if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
+                    continue
 
-            attendances = self.env['hr.attendance'].sudo().search([
-                ('employee_id', '=', payslip.employee_id.id),
-                ('check_in', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
-                ('check_in', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
-            ])
-            worked_dates = set(att.check_in.date() for att in attendances)
-
-            if 'hr.work.entry' in self.env:
-                work_entries = self.env['hr.work.entry'].sudo().search([
+                attendances = self.env['hr.attendance'].sudo().search([
                     ('employee_id', '=', payslip.employee_id.id),
-                    ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
-                    ('date_stop', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
+                    ('check_in', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                    ('check_in', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
                 ])
+                worked_dates = set(att.check_in.date() for att in attendances)
 
-                rest_type = self.env['hr.work.entry.type'].sudo().search([
-                    '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
-                ], limit=1)
+                if 'hr.work.entry' in self.env:
+                    WorkEntry = self.env['hr.work.entry'].sudo()
+                    we_fields = WorkEntry._fields
 
-                if rest_type:
-                    for we in work_entries:
-                        we_date = we.date_start.date()
-                        if we_date not in worked_dates:
-                            code = we.work_entry_type_id.code or ''
-                            name = (we.work_entry_type_id.name or '').lower()
-                            if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'A'] or 'absent' in name:
-                                we.sudo().write({'work_entry_type_id': rest_type.id})
+                    start_field = None
+                    for candidate in ['date_start', 'date_from', 'start_datetime', 'date']:
+                        if candidate in we_fields:
+                            start_field = candidate
+                            break
+
+                    stop_field = None
+                    for candidate in ['date_stop', 'date_to', 'end_datetime', 'date']:
+                        if candidate in we_fields:
+                            stop_field = candidate
+                            break
+
+                    if not start_field or not stop_field:
+                        continue
+
+                    domain = [
+                        ('employee_id', '=', payslip.employee_id.id),
+                        (start_field, '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                        (stop_field, '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
+                    ]
+                    work_entries = WorkEntry.search(domain)
+
+                    rest_type = self.env['hr.work.entry.type'].sudo().search([
+                        '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
+                    ], limit=1)
+
+                    if rest_type:
+                        for we in work_entries:
+                            start_val = getattr(we, start_field, None)
+                            if not start_val:
+                                continue
+                            we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
+                            if we_date and we_date not in worked_dates:
+                                code = we.work_entry_type_id.code or ''
+                                name = (we.work_entry_type_id.name or '').lower()
+                                if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'A'] or 'absent' in name:
+                                    we.sudo().write({'work_entry_type_id': rest_type.id})
+            except Exception:
+                pass
 
     def _sync_reconciliation_settlements(self):
         """
