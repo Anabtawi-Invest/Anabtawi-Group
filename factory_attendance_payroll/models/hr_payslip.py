@@ -69,30 +69,34 @@ class HrPayslip(models.Model):
                 payslip._convert_flexible_rest_days_to_ars()
 
                 res = payslip._get_reconciled_attendance_variance()
-                gross_ot = res.get('total_ot', 0.0)
-                gross_ut = res.get('total_undertime', 0.0)
+                gross_ot = round(res.get('total_ot', 0.0), 2)
+                gross_ut = round(res.get('total_undertime', 0.0), 2)
 
                 payslip.attendance_gross_overtime = gross_ot
                 payslip.attendance_gross_undertime = gross_ut
-                payslip.attendance_net_reconciled = gross_ot - gross_ut
+                payslip.attendance_net_reconciled = round(gross_ot - gross_ut, 2)
 
                 # Get previous banked extra hours balance
-                prev_extra_hours = payslip._get_previous_extra_hours_balance()
-                total_extra_avail = prev_extra_hours + gross_ot
+                prev_extra_hours = round(payslip._get_previous_extra_hours_balance(), 2)
+                total_extra_avail = round(prev_extra_hours + gross_ot, 2)
                 payslip.total_extra_hours_available = total_extra_avail
 
                 lateness = gross_ut
 
                 # STEP 1: Deduct lateness from Total Available Extra Hours (Banked + New OT)
-                covered_extra = min(lateness, total_extra_avail)
-                rem_lateness = lateness - covered_extra
+                covered_extra = round(min(lateness, total_extra_avail), 2)
+                rem_lateness = round(lateness - covered_extra, 2)
 
                 # STEP 2: Deduct remaining lateness from Annual Leave
                 covered_leave = 0.0
-                if rem_lateness > 0.0:
-                    annual_leave_avail = payslip._get_available_annual_leave_hours()
-                    covered_leave = min(rem_lateness, annual_leave_avail)
-                    rem_lateness = rem_lateness - covered_leave
+                if rem_lateness > 0.01:
+                    annual_leave_avail = round(payslip._get_available_annual_leave_hours(), 2)
+                    covered_leave = round(min(rem_lateness, annual_leave_avail), 2)
+                    rem_lateness = round(rem_lateness - covered_leave, 2)
+
+                # Guard against floating-point micro fractions (< 0.01h)
+                if rem_lateness < 0.01:
+                    rem_lateness = 0.0
 
                 # STEP 3: Remaining lateness goes to Monthly Cash Salary Deduction
                 payslip.lateness_covered_by_extra_hours = covered_extra
