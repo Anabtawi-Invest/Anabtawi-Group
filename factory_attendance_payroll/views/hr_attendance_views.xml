@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Inherit Attendance Form View to display Net Worked Hours, Break, and Daily Variance -->
+    <!-- Inherit Attendance Form View to hide misleading native overtime_hours and display accurate factory metrics -->
     <record id="hr_attendance_view_form_inherit_factory_metrics" model="ir.ui.view">
         <field name="name">hr.attendance.form.inherit.factory.metrics</field>
         <field name="model">hr.attendance</field>
         <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='overtime_hours']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
             <xpath expr="//field[@name='worked_hours']" position="after">
                 <field name="attendance_break_hours" widget="float_time" readonly="1"/>
                 <field name="net_worked_hours" widget="float_time" readonly="1"/>
