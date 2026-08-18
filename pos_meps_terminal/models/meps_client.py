@@ -45,6 +45,35 @@ _PRINTER_FIELD_ORDER = (
     "ReceiptNote",
     "ReferenceNumber",
 )
+_LOG_BODY_LIMIT = 8000
+_REDACT_TAGS = frozenset({"MerchantSecureKey"})
+
+
+def _clip_log(text):
+    text = text or ""
+    if len(text) <= _LOG_BODY_LIMIT:
+        return text
+    return "%s\n... [truncated, %s chars total]" % (text[:_LOG_BODY_LIMIT], len(text))
+
+
+def _xml_for_log(xml):
+    """Pretty-print SOAP XML for logs, with MerchantSecureKey redacted."""
+    if xml is None:
+        return "(empty)"
+    if isinstance(xml, (bytes, bytearray)):
+        if not xml:
+            return "(empty)"
+        try:
+            root = etree.fromstring(xml)
+        except etree.XMLSyntaxError:
+            return _clip_log(xml.decode("utf-8", errors="replace"))
+    else:
+        root = xml
+    clone = etree.fromstring(etree.tostring(root))
+    for el in clone.iter():
+        if etree.QName(el).localname in _REDACT_TAGS and el.text:
+            el.text = "***REDACTED***"
+    return _clip_log(etree.tostring(clone, pretty_print=True, encoding="unicode"))
 
 
 def _dc(tag):
@@ -157,17 +186,37 @@ def call_meps(env, operation, request_element):
         "SOAPAction": f"{NS_TEM}IEcrComInterface/{operation}",
     }
 
+    _logger.info(
+        "MEPS %s request: url=%s timeout=%ss SOAPAction=%s\n%s",
+        operation,
+        url,
+        timeout,
+        headers["SOAPAction"],
+        _xml_for_log(envelope),
+    )
+
     try:
         response = requests.post(url, data=payload, headers=headers, timeout=timeout)
     except requests.exceptions.Timeout:
-        _logger.warning("MEPS %s: timed out waiting for terminal response", operation)
+        _logger.warning(
+            "MEPS %s: timed out waiting for terminal response (no response body from %s)",
+            operation,
+            url,
+        )
         raise UserError(_("Timed out waiting for the MEPS terminal to respond."))
     except requests.exceptions.RequestException as exc:
-        _logger.exception("MEPS %s: request failed", operation)
+        _logger.exception("MEPS %s: request failed url=%s", operation, url)
         raise UserError(_("Could not reach the MEPS payment gateway: %s") % exc)
 
+    _logger.info(
+        "MEPS %s response: url=%s HTTP %s\n%s",
+        operation,
+        url,
+        response.status_code,
+        _xml_for_log(response.content),
+    )
+
     if response.status_code != 200:
-        _logger.error("MEPS %s: HTTP %s: %s", operation, response.status_code, response.text[:2000])
         raise UserError(_("MEPS gateway returned HTTP %s.") % response.status_code)
 
     return _parse_result(response.content, operation)
@@ -192,7 +241,14 @@ def _call_meps_mock_inprocess(env, url, operation, request_element, timeout):
 
     scenario = normalize_scenario((parse_qs(urlparse(url).query).get("scenario") or ["success"])[0])
     amount = amount_from_body(etree.tostring(request_element))
-    _logger.info("MEPS in-process mock: op=%s scenario=%s amount=%s", operation, scenario, amount)
+    _logger.info(
+        "MEPS in-process mock request: op=%s scenario=%s amount=%s url=%s\n%s",
+        operation,
+        scenario,
+        amount,
+        url,
+        _xml_for_log(request_element),
+    )
 
     status, _ctype, payload, sleep_s = build_mock_response(
         scenario, operation, amount, timeout_sleep=min(timeout + 2, 15)
@@ -200,7 +256,17 @@ def _call_meps_mock_inprocess(env, url, operation, request_element, timeout):
     if sleep_s:
         import time
         time.sleep(sleep_s)
+        _logger.warning(
+            "MEPS in-process mock: timed out waiting for terminal response (no response body from %s)",
+            url,
+        )
         raise UserError(_("Timed out waiting for the MEPS terminal to respond."))
+    _logger.info(
+        "MEPS in-process mock response: op=%s HTTP %s\n%s",
+        operation,
+        status,
+        _xml_for_log(payload),
+    )
     if status != 200:
         raise UserError(_("MEPS gateway returned HTTP %s.") % status)
     return _parse_result(payload, operation)
