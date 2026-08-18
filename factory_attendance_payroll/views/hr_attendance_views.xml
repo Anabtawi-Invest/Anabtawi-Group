@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Inherit Attendance Form View to display Net Worked Hours, Break, and Daily Variance -->
+    <record id="hr_attendance_view_form_inherit_factory_metrics" model="ir.ui.view">
+        <field name="name">hr.attendance.form.inherit.factory.metrics</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='worked_hours']" position="after">
+                <field name="attendance_break_hours" widget="float_time" readonly="1"/>
+                <field name="net_worked_hours" widget="float_time" readonly="1"/>
+                <field name="daily_variance_hours" widget="float_time" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Inherit Attendance Tree/List View to display Net Worked Hours and Daily Variance in HR List -->
+    <record id="view_attendance_tree_inherit_factory_metrics" model="ir.ui.view">
+        <field name="name">hr.attendance.tree.inherit.factory.metrics</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.view_attendance_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='worked_hours']" position="after">
+                <field name="net_worked_hours" widget="float_time" optional="show"/>
+                <field name="daily_variance_hours" widget="float_time" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

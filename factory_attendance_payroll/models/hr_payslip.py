@@ -279,12 +279,11 @@ class HrPayslip(models.Model):
 
     def _get_reconciled_attendance_variance(self):
         """
-        Factory 7-Day Rolling Operational Cycle with Planning Shifts & 45-min Overtime Threshold:
-        - Evaluates daily worked hours with 1h break deduction (shifts >= 6h).
-        - Planning Slots / Working Schedule integration: target hours are evaluated against planned shift.
+        Factory 7-Day Rolling Operational Cycle with Multi-Location Break Deductions:
+        - Factory / Branches: 1.0h break for shifts >= 6.0h.
+        - Head Office: 0.5h break for shifts >= 6.0h.
+        - Planning Slots / Working Schedule integration.
         - Overtime is ONLY counted if daily excess is >= 45 minutes (0.75 hours).
-        - Any 6 worked days in a rolling 7-day cycle are standard workdays.
-        - The 7th day in a cycle is a Rest Day: if worked >= 45 mins, all net hours count as Overtime.
         """
         self.ensure_one()
 
@@ -311,7 +310,8 @@ class HrPayslip(models.Model):
             for slot in slots:
                 s_date = slot.start_datetime.date()
                 s_hrs = (slot.end_datetime - slot.start_datetime).total_seconds() / 3600.0
-                planning_slots_by_date[s_date] = max(0.0, s_hrs - 1.0) if s_hrs >= 6.0 else s_hrs
+                break_hrs = self.employee_id._get_lunch_break_duration()
+                planning_slots_by_date[s_date] = max(0.0, s_hrs - break_hrs) if s_hrs >= 6.0 else s_hrs
 
         total_ot = 0.0
         total_undertime = 0.0
@@ -321,14 +321,16 @@ class HrPayslip(models.Model):
         sorted_dates = sorted(daily_hours.keys())
         work_day_count = 0
 
+        break_hrs = self.employee_id._get_lunch_break_duration() if self.employee_id else 1.0
+
         for att_date in sorted_dates:
             raw_hrs = daily_hours[att_date]
 
-            # Apply 1h break deduction rule
+            # Apply break deduction rule according to employee location
             if raw_hrs >= 6.0:
-                net_hrs = max(0.0, raw_hrs - 1.0)
+                net_hrs = max(0.0, raw_hrs - break_hrs)
             elif raw_hrs > 4.0:
-                net_hrs = raw_hrs - 0.5
+                net_hrs = max(0.0, raw_hrs - (break_hrs / 2.0))
             else:
                 net_hrs = raw_hrs
 
