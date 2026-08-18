@@ -52,14 +52,7 @@ result = cash_hrs &gt; 0.0
         <field name="amount_select">code</field>
         <field name="amount_python_compute">
 deficit_hours = payslip.undertime_cash_deduction_hours if payslip else 0.0
-w = 0.0
-if 'contract' in locals() and contract:
-    w = getattr(contract, 'wage', 0.0)
-elif 'employee' in locals() and employee:
-    w = getattr(employee, 'wage', 0.0)
-elif payslip and payslip.employee_id:
-    w = getattr(payslip.employee_id, 'wage', 0.0)
-
+w = contract.wage if contract else (employee.wage if employee else (payslip.employee_id.wage if (payslip and payslip.employee_id) else 0.0))
 hourly_rate = w / 240.0
 result = -(deficit_hours * hourly_rate)
         </field>
