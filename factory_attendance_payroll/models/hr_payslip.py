@@ -306,11 +306,12 @@ class HrPayslip(models.Model):
 
     def _get_reconciled_attendance_variance(self):
         """
-        Factory 7-Day Rolling Operational Cycle with Multi-Location Break Deductions & 15-Min Lateness Grace Period:
-        - Factory / Branches: 1.0h break for shifts >= 6.0h.
-        - Head Office: 0.5h break for shifts >= 6.0h.
-        - Overtime Threshold: Daily excess >= 45 minutes (0.75h).
-        - Lateness Grace Period: Daily shortfalls <= 15 minutes (0.25h) are forgiven (0.0 undertime).
+        Factory Flexible 6-Day Work Week & Monthly Rest Day Quota Reconciliation:
+        - Ratio: 6 Working Days to 1 Rest Day.
+        - Employees can stack/accumulate rest days freely (e.g. work 12 days straight, take 2 rest days off; work 26 days straight, take last 4 rest days off).
+        - Multi-Location Break Deductions: Factory/Branch 1.0h break, Head Office 0.5h break for shifts >= 6.0h.
+        - Overtime Threshold: Daily shift excess >= 45 minutes (0.75h).
+        - Lateness Grace Period: Daily shift shortfalls <= 15 minutes (0.25h) are forgiven.
         """
         self.ensure_one()
 
@@ -326,34 +327,22 @@ class HrPayslip(models.Model):
         for att in attendances:
             daily_hours[att.check_in.date()] += att.worked_hours
 
-        # 3. Planning Slots integration (Target is ALWAYS 8.0 Net Working Hours)
-        planning_slots_by_date = {}
-        if 'planning.slot' in self.env:
-            slots = self.env['planning.slot'].sudo().search([
-                ('employee_id', '=', self.employee_id.id),
-                ('start_datetime', '>=', datetime.datetime.combine(self.date_from, datetime.time.min)),
-                ('end_datetime', '<=', datetime.datetime.combine(self.date_to, datetime.time.max))
-            ])
-            for slot in slots:
-                s_date = slot.start_datetime.date()
-                s_hrs = (slot.end_datetime - slot.start_datetime).total_seconds() / 3600.0
-                break_hrs = self.employee_id._get_lunch_break_duration()
-                planning_slots_by_date[s_date] = max(8.0, s_hrs - break_hrs) if s_hrs >= 9.0 else 8.0
+        # 3. Calculate Monthly Quota based on total days in payslip window
+        total_days_in_month = (self.date_to - self.date_from).days + 1
+        allowed_rest_days = total_days_in_month // 7
+        target_work_days = total_days_in_month - allowed_rest_days
 
-        total_ot = 0.0
-        total_undertime = 0.0
+        break_hrs = self.employee_id._get_lunch_break_duration() if self.employee_id else 1.0
         min_ot_threshold = 0.75         # 45 minutes Overtime threshold
         min_lateness_threshold = 0.25   # 15 minutes Lateness Grace Period
 
-        # Sort dates chronologically
-        sorted_dates = sorted(daily_hours.keys())
-        work_day_count = 0
+        total_ot = 0.0
+        total_undertime = 0.0
 
-        break_hrs = self.employee_id._get_lunch_break_duration() if self.employee_id else 1.0
+        # Evaluate Daily Shift Variances for worked days
+        worked_days_count = len(daily_hours)
 
-        for att_date in sorted_dates:
-            raw_hrs = daily_hours[att_date]
-
+        for att_date, raw_hrs in daily_hours.items():
             # Apply break deduction rule according to employee location
             if raw_hrs >= 6.0:
                 net_hrs = max(0.0, raw_hrs - break_hrs)
@@ -362,31 +351,28 @@ class HrPayslip(models.Model):
             else:
                 net_hrs = raw_hrs
 
-            # Determine planned shift target for this date (Target is ALWAYS 8.0 Net Working Hours)
-            if att_date in planning_slots_by_date:
-                standard_target = planning_slots_by_date[att_date]
-            else:
-                standard_target = 8.0
+            standard_target = 8.0  # Net Working Hours target per shift
 
-            work_day_count += 1
+            if net_hrs > standard_target:
+                ot_excess = net_hrs - standard_target
+                if ot_excess >= min_ot_threshold:
+                    total_ot += ot_excess
+            elif net_hrs < standard_target:
+                shortfall = standard_target - net_hrs
+                if shortfall > min_lateness_threshold:
+                    total_undertime += shortfall
 
-            # Every 7th day in rolling cycle is treated as Rest Day
-            if work_day_count % 7 == 0:
-                # Rest Day: If worked >= 45 mins, all net hours count as Overtime
-                if net_hrs >= min_ot_threshold:
-                    total_ot += net_hrs
-            else:
-                # Regular Work Day
-                if net_hrs > standard_target:
-                    ot_excess = net_hrs - standard_target
-                    # Overtime considered ONLY if daily excess is >= 45 mins (0.75h)
-                    if ot_excess >= min_ot_threshold:
-                        total_ot += ot_excess
-                elif net_hrs < standard_target:
-                    shortfall = standard_target - net_hrs
-                    # 15-minute grace period: shortfalls <= 0.25h (15 mins) are forgiven
-                    if shortfall > min_lateness_threshold:
-                        total_undertime += shortfall
+        # 4. Monthly Rest Day Quota Reconciliation
+        if worked_days_count > target_work_days:
+            # Employee worked extra days beyond monthly target -> Extra worked days count as Overtime!
+            extra_worked_days = worked_days_count - target_work_days
+            total_ot += (extra_worked_days * 8.0)
+        else:
+            unworked_days = total_days_in_month - worked_days_count
+            if unworked_days > allowed_rest_days:
+                # Employee took more off days than their rest day quota -> Excess unworked days count as Undertime
+                excess_unworked_days = unworked_days - allowed_rest_days
+                total_undertime += (excess_unworked_days * 8.0)
 
         return {
             'total_ot': total_ot,
