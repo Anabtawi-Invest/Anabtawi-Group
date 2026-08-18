@@ -1,9 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
-        <!-- ======================================================= -->
-        <!-- EMPLOYEE 1: Factory Employee Overtime (Wage 500 JOD, +5:00 Net OT) -->
-        <!-- ======================================================= -->
+        <!-- Preserve legacy XML IDs to prevent Odoo module upgrader orphan record deletion -->
+        <record id="test_factory_employee" model="hr.employee">
+            <field name="name">Factory Employee Overtime</field>
+            <field name="job_title">Factory Technician</field>
+            <field name="work_email">factory.ot@example.com</field>
+            <field name="wage">500.0</field>
+        </record>
+
+        <record id="test_undertime_employee" model="hr.employee">
+            <field name="name">Factory Employee Undertime</field>
+            <field name="job_title">Factory Operator</field>
+            <field name="work_email">factory.ut@example.com</field>
+            <field name="wage">500.0</field>
+        </record>
+
+        <record id="factory_test_1_employee" model="hr.employee">
+            <field name="name">Factory Employee Overtime</field>
+            <field name="job_title">Factory Technician</field>
+            <field name="work_email">factory.ot@example.com</field>
+            <field name="wage">500.0</field>
+        </record>
+
+        <record id="factory_test_2_employee" model="hr.employee">
+            <field name="name">Factory Employee Undertime</field>
+            <field name="job_title">Factory Operator</field>
+            <field name="work_email">factory.ut@example.com</field>
+            <field name="wage">500.0</field>
+        </record>
+
+        <!-- EMPLOYEE 1: Factory Employee Overtime (+5:00 Net OT, Wage 500 JOD) -->
         <record id="factory_emp_ot" model="hr.employee">
             <field name="name">Factory Employee Overtime</field>
             <field name="job_title">Factory Technician</field>
@@ -12,7 +39,6 @@
         </record>
 
         <!-- July 2026 Attendances for Employee 1 (Net +5:00 OT) -->
-        <!-- 10 Overtime Days (+1.5h OT each = 15:00 Gross OT) -->
         <record id="att_ot_01" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-01 08:00:00</field><field name="check_out">2026-07-01 18:30:00</field></record>
         <record id="att_ot_02" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-02 08:00:00</field><field name="check_out">2026-07-02 18:30:00</field></record>
         <record id="att_ot_03" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-03 08:00:00</field><field name="check_out">2026-07-03 18:30:00</field></record>
@@ -23,13 +49,11 @@
         <record id="att_ot_08" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-08 08:00:00</field><field name="check_out">2026-07-08 18:30:00</field></record>
         <record id="att_ot_09" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-09 08:00:00</field><field name="check_out">2026-07-09 18:30:00</field></record>
         <record id="att_ot_10" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-10 08:00:00</field><field name="check_out">2026-07-10 18:30:00</field></record>
-        <!-- 5 Short Days (-2.0h UT each = 10:00 Gross UT) -->
         <record id="att_ot_13" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-13 10:00:00</field><field name="check_out">2026-07-13 17:00:00</field></record>
         <record id="att_ot_14" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-14 10:00:00</field><field name="check_out">2026-07-14 17:00:00</field></record>
         <record id="att_ot_15" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-15 10:00:00</field><field name="check_out">2026-07-15 17:00:00</field></record>
         <record id="att_ot_16" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-16 10:00:00</field><field name="check_out">2026-07-16 17:00:00</field></record>
         <record id="att_ot_17" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-17 10:00:00</field><field name="check_out">2026-07-17 17:00:00</field></record>
-        <!-- Standard Days -->
         <record id="att_ot_20" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-20 08:00:00</field><field name="check_out">2026-07-20 17:00:00</field></record>
         <record id="att_ot_21" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-21 08:00:00</field><field name="check_out">2026-07-21 17:00:00</field></record>
         <record id="att_ot_22" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-22 08:00:00</field><field name="check_out">2026-07-22 17:00:00</field></record>
@@ -41,10 +65,7 @@
         <record id="att_ot_30" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-30 08:00:00</field><field name="check_out">2026-07-30 17:00:00</field></record>
         <record id="att_ot_31" model="hr.attendance"><field name="employee_id" ref="factory_emp_ot"/><field name="check_in">2026-07-31 08:00:00</field><field name="check_out">2026-07-31 17:00:00</field></record>
 
-
-        <!-- ======================================================= -->
-        <!-- EMPLOYEE 2: Factory Employee Undertime (Wage 500 JOD, -2:00 Net UT) -->
-        <!-- ======================================================= -->
+        <!-- EMPLOYEE 2: Factory Employee Undertime (-2:00 Net UT, Wage 500 JOD) -->
         <record id="factory_emp_ut" model="hr.employee">
             <field name="name">Factory Employee Undertime</field>
             <field name="job_title">Factory Operator</field>
@@ -53,16 +74,13 @@
         </record>
 
         <!-- July 2026 Attendances for Employee 2 (Net -2:00 UT) -->
-        <!-- 4 Overtime Days (+1.0h OT each = 04:00 Gross OT) -->
         <record id="att_ut_01" model="hr.attendance"><field name="employee_id" ref="factory_emp_ut"/><field name="check_in">2026-07-01 08:00:00</field><field name="check_out">2026-07-01 18:00:00</field></record>
         <record id="att_ut_02" model="hr.attendance"><field name="employee_id" ref="factory_emp_ut"/><field name="check_in">2026-07-02 08:00:00</field><field name="check_out">2026-07-02 18:00:00</field></record>
         <record id="att_ut_03" model="hr.attendance"><field name="employee_id" ref="factory_emp_ut"/><field name="check_in">2026-07-03 08:00:00</field><field name="check_out">2026-07-03 18:00:00</field></record>
         <record id="att_ut_04" model="hr.attendance"><field name="employee_id" ref="factory_emp_ut"/><field name="check_in">2026-07-04 08:00:00</field><field name="check_out">2026-07-04 18:00:00</field></record>
-        <!-- 3 Short Days (-2.0h UT each = 06:00 Gross UT) -->
         <record id="att_ut_06" model="hr.attendance"><field name="employee_id" ref="factory_emp_ut"/><field name="check_in">2026-07-06 10:00:00</field><field name="check_out">2026-07-06 17:00:00</field></record>
         <record id="att_ut_07" model="hr.attendance"><field name="employee_id" ref="factory_emp_ut"/><field name="check_in">2026-07-07 10:00:00</field><field name="check_out">2026-07-07 17:00:00</field></record>
         <record id="att_ut_08" model="hr.attendance"><field name="employee_id" ref="factory_emp_ut"/><field name="check_in">2026-07-08 10:00:00</field><field name="check_out">2026-07-08 17:00:00</field></record>
-        <!-- Standard Days -->
         <record id="att_ut_09" model="hr.attendance"><field name="employee_id" ref="factory_emp_ut"/><field name="check_in">2026-07-09 08:00:00</field><field name="check_out">2026-07-09 17:00:00</field></record>
         <record id="att_ut_10" model="hr.attendance"><field name="employee_id" ref="factory_emp_ut"/><field name="check_in">2026-07-10 08:00:00</field><field name="check_out">2026-07-10 17:00:00</field></record>
         <record id="att_ut_13" model="hr.attendance"><field name="employee_id" ref="factory_emp_ut"/><field name="check_in">2026-07-13 08:00:00</field><field name="check_out">2026-07-13 17:00:00</field></record>

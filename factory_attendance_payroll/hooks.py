@@ -9,15 +9,14 @@ def post_init_hook(env):
         rules = env['hr.salary.rule'].search([('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME'])])
         rules.write({'struct_id': structure.id})
 
-    # 2. Ensure Wage = 500 JOD for demo employees
-    demo_emp1 = env.ref('factory_attendance_payroll.factory_emp_ot', raise_if_not_found=False)
-    if not demo_emp1:
-        demo_emp1 = env['hr.employee'].sudo().search([('work_email', '=', 'factory.ot@example.com')], limit=1)
-    if demo_emp1:
-        demo_emp1.sudo().write({'wage': 500.0, 'name': 'Factory Employee Overtime'})
+    # 2. Safely ensure wage=500 on all overtime demo employee refs
+    for ref_xml_id in ['factory_emp_ot', 'test_factory_employee', 'factory_test_1_employee']:
+        emp = env.ref(f'factory_attendance_payroll.{ref_xml_id}', raise_if_not_found=False)
+        if emp:
+            emp.sudo().write({'wage': 500.0, 'name': 'Factory Employee Overtime'})
 
-    demo_emp2 = env.ref('factory_attendance_payroll.factory_emp_ut', raise_if_not_found=False)
-    if not demo_emp2:
-        demo_emp2 = env['hr.employee'].sudo().search([('work_email', '=', 'factory.ut@example.com')], limit=1)
-    if demo_emp2:
-        demo_emp2.sudo().write({'wage': 500.0, 'name': 'Factory Employee Undertime'})
+    # 3. Safely ensure wage=500 on all undertime demo employee refs
+    for ref_xml_id in ['factory_emp_ut', 'test_undertime_employee', 'factory_test_2_employee']:
+        emp = env.ref(f'factory_attendance_payroll.{ref_xml_id}', raise_if_not_found=False)
+        if emp:
+            emp.sudo().write({'wage': 500.0, 'name': 'Factory Employee Undertime'})
