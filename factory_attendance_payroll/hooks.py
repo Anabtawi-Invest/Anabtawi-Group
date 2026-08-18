@@ -3,8 +3,8 @@ from odoo import api, SUPERUSER_ID
 def post_init_hook(env):
     """
     Production Post-Init Hook:
-    1. Binds attendance reconciliation rules (ATT_RECON_VAR, OT_NET, DED_UNDERTIME)
-       dynamically to all Jordan payroll structures in production.
+    Binds attendance reconciliation rules (ATT_RECON_VAR, OT_NET, DED_UNDERTIME)
+    dynamically to all Jordan payroll structures in production.
     """
     structures = env['hr.payroll.structure'].search([('name', 'ilike', 'Jordan')])
     if not structures:
