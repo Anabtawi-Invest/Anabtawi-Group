@@ -123,12 +123,12 @@ class HrPayslip(models.Model):
         self._sync_reconciliation_settlements()
         return res
 
-    def _get_worked_day_lines(self, domain=None, check_out_of_contract=True):
+    def _get_worked_day_lines(self, *args, **kwargs):
         """
         Harmonizes Odoo's native Worked Days tab lines with our Reconciliation Engine:
         Ensures Extra Hours / Overtime line matches the net remaining extra hours after Step 1 lateness settlement.
         """
-        res = super()._get_worked_day_lines(domain=domain, check_out_of_contract=check_out_of_contract)
+        res = super()._get_worked_day_lines(*args, **kwargs)
         for payslip in self:
             if payslip.employee_id and payslip.date_from and payslip.date_to:
                 net_extra_hrs = round(payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours, 2)
