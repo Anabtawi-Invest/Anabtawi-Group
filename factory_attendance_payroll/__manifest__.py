@@ -15,6 +15,7 @@
         'views/hr_employee_views.xml',
         'views/hr_attendance_views.xml',
     ],
+    'pre_init_hook': 'pre_init_hook',
     'post_init_hook': 'post_init_hook',
     'installable': True,
     'application': False,
