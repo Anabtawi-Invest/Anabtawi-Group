@@ -243,9 +243,13 @@ class HrPayslip(models.Model):
 
             # Step 2: Annual Leave Deduction for Lateness
             if payslip.lateness_covered_by_annual_leave > 0 and payslip.state == 'done':
-                leave_type = self.env['hr.leave.type'].sudo().search([
-                    ('name', 'ilike', 'Annual')
-                ], limit=1)
+                leave_types = self.env['hr.leave.type'].sudo().search([
+                    '|', '|',
+                    ('name', '=', 'Annual Leave'),
+                    ('name', 'ilike', 'Annual'),
+                    ('name', 'ilike', 'Paid')
+                ])
+                leave_type = leave_types[0] if leave_types else None
                 if leave_type:
                     existing_leave = self.env['hr.leave'].sudo().search([
                         ('employee_id', '=', payslip.employee_id.id),
@@ -285,24 +289,56 @@ class HrPayslip(models.Model):
         return 0.0
 
     def _get_available_annual_leave_hours(self):
+        """
+        Gets available annual leave balance in hours for the employee:
+        - Exact match for 'Annual Leave'.
+        - Converts allocations stored in Days to Hours (1 Day = 8.0 Hours).
+        """
         self.ensure_one()
         if not self.employee_id:
             return 0.0
+
+        leave_types = self.env['hr.leave.type'].sudo().search([
+            '|', '|', '|', '|',
+            ('name', '=', 'Annual Leave'),
+            ('name', 'ilike', 'Annual'),
+            ('name', 'ilike', 'Paid'),
+            ('name', 'ilike', 'سنوي'),
+            ('name', 'ilike', 'إجازة')
+        ])
+        if not leave_types:
+            leave_types = self.env['hr.leave.type'].sudo().search([])
+
+        total_allocated_hours = 0.0
+        total_taken_hours = 0.0
+
         allocations = self.env['hr.leave.allocation'].sudo().search([
             ('employee_id', '=', self.employee_id.id),
             ('state', '=', 'validate'),
-            ('holiday_status_id.name', 'ilike', 'Annual'),
+            ('holiday_status_id', 'in', leave_types.ids)
         ])
-        total_allocated = sum(allocations.mapped('number_of_hours_display')) if allocations else 0.0
+
+        for alloc in allocations:
+            if hasattr(alloc, 'number_of_hours_display') and alloc.number_of_hours_display:
+                total_allocated_hours += alloc.number_of_hours_display
+            elif hasattr(alloc, 'number_of_days') and alloc.number_of_days:
+                total_allocated_hours += (alloc.number_of_days * 8.0)
+            elif hasattr(alloc, 'number_of_days_display') and alloc.number_of_days_display:
+                total_allocated_hours += (alloc.number_of_days_display * 8.0)
 
         leaves = self.env['hr.leave'].sudo().search([
             ('employee_id', '=', self.employee_id.id),
             ('state', '=', 'validate'),
-            ('holiday_status_id.name', 'ilike', 'Annual'),
+            ('holiday_status_id', 'in', leave_types.ids)
         ])
-        total_taken = sum(leaves.mapped('number_of_hours')) if leaves else 0.0
 
-        return max(0.0, total_allocated - total_taken)
+        for lve in leaves:
+            if hasattr(lve, 'number_of_hours') and lve.number_of_hours:
+                total_taken_hours += lve.number_of_hours
+            elif hasattr(lve, 'number_of_days') and lve.number_of_days:
+                total_taken_hours += (lve.number_of_days * 8.0)
+
+        return max(0.0, total_allocated_hours - total_taken_hours)
 
     def _get_reconciled_attendance_variance(self):
         """
