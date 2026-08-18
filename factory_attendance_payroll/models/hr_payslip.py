@@ -124,7 +124,7 @@ class HrPayslip(models.Model):
         Automatic Flexible Rest Day Conversion:
         Converts 'Absent' (A) work entries on unworked rest days to 'Rest Day' (ARS)
         so that off days in a flexible 6-day work week display cleanly as Rest Day.
-        Dynamic field resolution ensures compatibility with all Odoo 19 hr.work.entry schemas.
+        Safely handles validated work entries without raising Invalid Operation errors.
         """
         for payslip in self:
             try:
@@ -178,6 +178,8 @@ class HrPayslip(models.Model):
                                 code = we.work_entry_type_id.code or ''
                                 name = (we.work_entry_type_id.name or '').lower()
                                 if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'A'] or 'absent' in name:
+                                    if hasattr(we, 'state') and we.state == 'validated':
+                                        we.sudo().write({'state': 'draft'})
                                     we.sudo().write({'work_entry_type_id': rest_type.id})
             except Exception:
                 pass
