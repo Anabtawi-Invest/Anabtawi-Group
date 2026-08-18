@@ -45,6 +45,13 @@ _PRINTER_FIELD_ORDER = (
     "ReceiptNote",
     "ReferenceNumber",
 )
+# WSDL EcrPrinter: these are xs:int. Empty tags (<PrinterWidth/>) make MEPS return
+# SOAP Fault "value '' cannot be parsed as the type 'Int32'".
+_PRINTER_INT_DEFAULTS = {
+    "EnablePrintPosReceipt": "0",
+    "EnablePrintReceiptNote": "0",
+    "PrinterWidth": "32",
+}
 _LOG_BODY_LIMIT = 8000
 _REDACT_TAGS = frozenset({"MerchantSecureKey"})
 
@@ -81,9 +88,10 @@ def _dc(tag):
 
 
 def _sub(parent, tag, value):
+    if value is None or value == "":
+        return None
     el = etree.SubElement(parent, _dc(tag))
-    if value is not None and value != "":
-        el.text = str(value)
+    el.text = str(value)
     return el
 
 
@@ -95,7 +103,10 @@ def _build_config(values):
 
 
 def _build_printer(values):
-    values = values or {}
+    values = dict(values or {})
+    for key, default in _PRINTER_INT_DEFAULTS.items():
+        if not values.get(key):
+            values[key] = default
     printer = etree.Element(_dc("Printer"))
     for key in _PRINTER_FIELD_ORDER:
         _sub(printer, key, values.get(key))
