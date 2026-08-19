@@ -269,29 +269,23 @@ class HrPayslip(models.Model):
                             'holiday_status_id': leave_type.id,
                             'request_date_from': payslip.date_to,
                             'request_date_to': payslip.date_to,
-                            'number_of_hours': hours_to_deduct,
                             'number_of_days': days_to_deduct,
-                            'number_of_days_display': days_to_deduct,
                         }
+                        if 'number_of_hours' in self.env['hr.leave']._fields:
+                            leave_vals['number_of_hours'] = hours_to_deduct
+
                         new_leave = self.env['hr.leave'].sudo().create(leave_vals)
-                        new_leave.sudo().write({
-                            'number_of_days': days_to_deduct,
-                            'number_of_days_display': days_to_deduct,
-                            'number_of_hours': hours_to_deduct,
-                            'state': 'validate'
-                        })
+                        new_leave.sudo().write({'state': 'validate'})
                         if hasattr(new_leave, '_create_resource_calendar_leaves'):
                             try:
                                 new_leave._create_resource_calendar_leaves()
                             except Exception:
                                 pass
                     else:
-                        existing_leave.sudo().write({
-                            'number_of_days': days_to_deduct,
-                            'number_of_days_display': days_to_deduct,
-                            'number_of_hours': hours_to_deduct,
-                            'state': 'validate'
-                        })
+                        update_vals = {'number_of_days': days_to_deduct, 'state': 'validate'}
+                        if 'number_of_hours' in self.env['hr.leave']._fields:
+                            update_vals['number_of_hours'] = hours_to_deduct
+                        existing_leave.sudo().write(update_vals)
 
             # Recompute Extra Hours Balance display field if present
             if hasattr(payslip, '_compute_employee_extra_hours_balance'):
