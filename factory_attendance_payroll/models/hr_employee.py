@@ -1,26 +1,5 @@
 from odoo import models, fields, api
 
-class IrModelData(models.Model):
-    _inherit = 'ir.model.data'
-
-    def _register_hook(self):
-        """
-        Runs when models are loaded into registry during module upgrade.
-        Neutralizes all legacy XML tracking records for factory_attendance_payroll by setting noupdate=True,
-        permanently preventing Odoo module upgrader from attempting to delete orphan records on staging databases.
-        """
-        res = super()._register_hook()
-        try:
-            legacy_data = self.sudo().search([
-                ('module', '=', 'factory_attendance_payroll'),
-                ('noupdate', '=', False)
-            ])
-            if legacy_data:
-                legacy_data.write({'noupdate': True})
-        except Exception:
-            pass
-        return res
-
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 

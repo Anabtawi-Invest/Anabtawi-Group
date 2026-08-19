@@ -65,9 +65,6 @@ class HrPayslip(models.Model):
     def _compute_attendance_reconciliation_fields(self):
         for payslip in self:
             if payslip.employee_id and payslip.date_from and payslip.date_to:
-                # Convert flexible rest days from Absent (A) to Rest Day (ARS)
-                payslip._convert_flexible_rest_days_to_ars()
-
                 res = payslip._get_reconciled_attendance_variance()
                 gross_ot = round(res.get('total_ot', 0.0), 2)
                 gross_ut = round(res.get('total_undertime', 0.0), 2)
@@ -148,9 +145,16 @@ class HrPayslip(models.Model):
         """
         Automatic Flexible Rest Day Conversion:
         Converts 'Absent' (A) work entries on unworked rest days to 'Rest Day' (ARS)
-        so that off days in a flexible 6-day work week display cleanly as Rest Day.
+        up to the monthly rest day quota (e.g. max 4 days per 30-day month).
+        Any excess unworked days above the quota remain as ABSENT.
         Safely handles validated work entries without raising Invalid Operation errors.
         """
+        rest_type = False
+        if 'hr.work.entry' in self.env:
+            rest_type = self.env['hr.work.entry.type'].sudo().search([
+                '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
+            ], limit=1)
+
         for payslip in self:
             try:
                 if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
@@ -162,8 +166,12 @@ class HrPayslip(models.Model):
                     ('check_in', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
                 ])
                 worked_dates = set(att.check_in.date() for att in attendances)
+                worked_days_count = len(worked_dates)
 
-                if 'hr.work.entry' in self.env:
+                # Method 2: Earn 1 Rest Day for every 6 Worked Days
+                allowed_rest_days = worked_days_count // 6
+
+                if rest_type and 'hr.work.entry' in self.env:
                     WorkEntry = self.env['hr.work.entry'].sudo()
                     we_fields = WorkEntry._fields
 
@@ -187,25 +195,23 @@ class HrPayslip(models.Model):
                         (start_field, '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
                         (stop_field, '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
                     ]
-                    work_entries = WorkEntry.search(domain)
+                    work_entries = WorkEntry.search(domain).sorted(start_field)
 
-                    rest_type = self.env['hr.work.entry.type'].sudo().search([
-                        '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
-                    ], limit=1)
-
-                    if rest_type:
-                        for we in work_entries:
-                            start_val = getattr(we, start_field, None)
-                            if not start_val:
-                                continue
-                            we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
-                            if we_date and we_date not in worked_dates:
-                                code = we.work_entry_type_id.code or ''
-                                name = (we.work_entry_type_id.name or '').lower()
-                                if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'A'] or 'absent' in name:
+                    converted_count = 0
+                    for we in work_entries:
+                        start_val = getattr(we, start_field, None)
+                        if not start_val:
+                            continue
+                        we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
+                        if we_date and we_date not in worked_dates:
+                            code = we.work_entry_type_id.code or ''
+                            name = (we.work_entry_type_id.name or '').lower()
+                            if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'A'] or 'absent' in name:
+                                if converted_count < allowed_rest_days:
                                     if hasattr(we, 'state') and we.state == 'validated':
                                         we.sudo().write({'state': 'draft'})
                                     we.sudo().write({'work_entry_type_id': rest_type.id})
+                                    converted_count += 1
             except Exception:
                 pass
 
@@ -385,8 +391,7 @@ class HrPayslip(models.Model):
 
         # 3. Calculate Monthly Quota based on total days in payslip window
         total_days_in_month = (self.date_to - self.date_from).days + 1
-        allowed_rest_days = total_days_in_month // 7
-        target_work_days = total_days_in_month - allowed_rest_days
+        target_work_days = total_days_in_month - (total_days_in_month // 7)
 
         break_hrs = self.employee_id._get_lunch_break_duration() if self.employee_id else 1.0
         min_ot_threshold = 0.75         # 45 minutes Overtime threshold
@@ -397,6 +402,9 @@ class HrPayslip(models.Model):
 
         # Evaluate Daily Shift Variances for worked days
         worked_days_count = len(daily_hours)
+
+        # Method 2: Earn 1 Rest Day for every 6 Worked Days
+        allowed_rest_days = worked_days_count // 6
 
         for att_date, raw_hrs in daily_hours.items():
             # Apply break deduction rule according to employee location
@@ -418,7 +426,7 @@ class HrPayslip(models.Model):
                 if shortfall > min_lateness_threshold:
                     total_undertime += shortfall
 
-        # 4. Monthly Rest Day Quota Reconciliation
+        # 4. Monthly Rest Day Quota Reconciliation (Method 2 Ratio)
         if worked_days_count > target_work_days:
             # Employee worked extra days beyond monthly target -> Extra worked days count as Overtime!
             extra_worked_days = worked_days_count - target_work_days
@@ -426,7 +434,7 @@ class HrPayslip(models.Model):
         else:
             unworked_days = total_days_in_month - worked_days_count
             if unworked_days > allowed_rest_days:
-                # Employee took more off days than their rest day quota -> Excess unworked days count as Undertime
+                # Employee took more off days than earned rest day quota -> Excess unworked days count as Undertime
                 excess_unworked_days = unworked_days - allowed_rest_days
                 total_undertime += (excess_unworked_days * 8.0)
 
