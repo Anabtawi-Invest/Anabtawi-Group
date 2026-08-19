@@ -145,17 +145,6 @@
                         </div>
                     </div>
 
-                    <!-- Delivery Apps Sales -->
-                    <div class="o_kpi_card card-delivery-apps clickable_kpi" t-on-click="() => this.onKpiClick('delivery_apps')" title="Click to view detailed transactions &amp; export Excel">
-                        <div class="kpi_icon"><i class="fa fa-motorcycle text-indigo"/></div>
-                        <div class="kpi_title">Delivery Apps Sales</div>
-                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.delivery_apps)"/></div>
-                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <span class="badge bg-indigo text-white badge_sub"><t t-esc="getPercent(data.kpis.delivery_apps, data.kpis.total_sales)"/>% of Sales</span>
-                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
-                        </div>
-                    </div>
-
                     <!-- Debt Sales (مبيعات الذمم) -->
                     <div class="o_kpi_card card-employee-debt clickable_kpi" t-on-click="() => this.onKpiClick('employee_debt')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-id-card-o text-purple"/></div>
@@ -201,22 +190,7 @@
                         <div class="kpi_title">Advance Deposits (Origin)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.advance_deposits)"/></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <div>
-                                <span><t t-esc="data.kpis.advance_order_count"/> Orders</span> | 
-                                <span class="text-success">Cash: <t t-esc="formatCurrency(data.kpis.advance_deposits_cash)"/></span> | 
-                                <span class="text-info">Visa: <t t-esc="formatCurrency(data.kpis.advance_deposits_visa)"/></span>
-                            </div>
-                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
-                        </div>
-                    </div>
-
-                    <!-- Delivery Amount -->
-                    <div class="o_kpi_card card-delivery clickable_kpi" t-on-click="() => this.onKpiClick('delivery_amount')" title="Click to view detailed transactions &amp; export Excel">
-                        <div class="kpi_icon"><i class="fa fa-truck text-primary"/></div>
-                        <div class="kpi_title">Delivery Amount</div>
-                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.delivery_amount)"/></div>
-                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <span class="badge bg-primary text-white badge_sub">Session Delivery</span>
+                            <span><t t-esc="data.kpis.advance_order_count"/> Advance Orders</span>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
@@ -417,7 +391,7 @@
                                         <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'advance_pending_count'"/>
                                     </th>
                                     <th class="text-end sortable_th" t-on-click="() => this.sortBy('delivery_amount')">
-                                        Delivery Amount
+                                        Delivery Fees
                                         <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'delivery_amount' &amp;&amp; state.sortOrder === 'desc'"/>
                                         <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'delivery_amount' &amp;&amp; state.sortOrder === 'asc'"/>
                                         <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'delivery_amount'"/>

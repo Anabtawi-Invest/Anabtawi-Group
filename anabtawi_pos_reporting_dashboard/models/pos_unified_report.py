@@ -36,24 +36,9 @@ class PosUnifiedReport(models.TransientModel):
     rahen_in_amount = fields.Float(string="Rahen In Amount", digits=(16, 3))
     rahen_out_amount = fields.Float(string="Rahen Out Amount", digits=(16, 3))
     advance_amount = fields.Float(string="Advance Deposit Amount", digits=(16, 3))
-    advance_remaining_amount = fields.Float(string="Advance Remaining Amount", digits=(16, 3))
     delivery_amount = fields.Float(string="Delivery Amount", digits=(16, 3))
-    ending_balance = fields.Float(string="Ending Balance", digits=(16, 3))
     partner_id = fields.Many2one("res.partner", string="Customer")
     company_id = fields.Many2one("res.company", string="Company", default=lambda self: self.env.company)
-
-    def action_open_pos_session(self):
-        self.ensure_one()
-        if self.session_id:
-            return {
-                "name": _("POS Session Details"),
-                "type": "ir.actions.act_window",
-                "res_model": "pos.session",
-                "res_id": self.session_id.id,
-                "view_mode": "form",
-                "target": "current",
-            }
-        return False
 
     def action_open_pos_order(self):
         self.ensure_one()

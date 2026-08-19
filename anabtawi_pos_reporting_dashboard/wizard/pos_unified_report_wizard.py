@@ -72,8 +72,8 @@ class PosUnifiedReportWizard(models.TransientModel):
         str_start = fields.Datetime.to_string(dt_start)
         str_end = fields.Datetime.to_string(dt_end)
 
-        # Clear previous transient report records
-        self.env["pos.unified.report"].sudo().search([]).unlink()
+        # Clear previous transient report records for current user
+        self.env["pos.unified.report"].sudo().search([("create_uid", "=", self.env.user.id)]).unlink()
 
         config_domain = [("active", "=", True)]
         if self.config_ids:
@@ -101,131 +101,49 @@ class PosUnifiedReportWizard(models.TransientModel):
 
             if is_emp:
                 is_cash = False
-            key = (pay.pos_order_id.id, pay.payment_method_id.id)
-            if key not in grouped_payments:
-                pm = pay.payment_method_id
-                pm_name = (pm.name or "").lower()
-                daily_type = getattr(pm, "daily_ops_report_type", "")
-                pm_type = getattr(pm, "type", "")
-                is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
-                is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
+                is_visa = False
+            elif is_hosp:
                 is_cash = False
                 is_visa = False
-                if not is_emp and not is_hosp:
-                    is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
-                    is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
-
-                grouped_payments[key] = {
-                    "net_amount": 0.0,
-                    "po": pay.pos_order_id,
-                    "pm": pm,
-                    "cfg": pay.session_id.config_id,
-                    "session_id": pay.session_id.id,
-                    "date": pay.payment_date,
-                    "is_emp": is_emp,
-                    "is_cash": is_cash,
-                    "is_visa": is_visa,
-                }
-            grouped_payments[key]["net_amount"] += (pay.amount or 0.0)
-
-        for grp in grouped_payments.values():
-            amt = grp["net_amount"]
-            po = grp["po"]
-            pm = grp["pm"]
-            cfg = grp["cfg"]
-            sess = self.env["pos.session"].sudo().browse(grp["session_id"]) if grp.get("session_id") else (po.session_id if po else False)
-            end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0 if sess else 0.0
-
-            if po and po.amount_total:
-                ratio = amt / po.amount_total
             else:
-                ratio = 1.0
-
-            tax_amt = ((getattr(po, "amount_tax", 0.0) or 0.0) * ratio) if po else 0.0
-            tot_amt = ((getattr(po, "amount_total", 0.0) or 0.0) * ratio) if po else amt
-            untaxed_amt = tot_amt - tax_amt
-
-            has_valid_disc_pm = grp["is_cash"] or grp["is_visa"] or grp["is_emp"]
-            order_disc = ((sum(
-                (l.price_unit or 0.0) * (l.qty or 0.0) * (l.discount / 100.0)
-                for l in po.lines if l.discount
-            ) * ratio) if (po and has_valid_disc_pm) else 0.0)
+                is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
+                is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
 
             vals_list.append({
-                "name": po.name if po else _("POS Payment"),
-                "date": grp["date"] or self.date_from,
-                "config_id": cfg.id,
-                "session_id": grp["session_id"],
-                "payment_method_id": pm.id if pm else False,
-                "pos_order_id": po.id if po else False,
+                "name": pay.pos_order_id.name or pay.name or _("POS Payment"),
+                "date": pay.payment_date or self.date_from,
+                "config_id": pay.session_id.config_id.id,
+                "session_id": pay.session_id.id,
+                "payment_method_id": pm.id,
                 "report_type": "pos_sales",
                 "amount": amt,
-                "untaxed_amount": untaxed_amt,
-                "tax_amount": tax_amt,
-                "discount_amount": order_disc,
-                "cash_amount": amt if grp["is_cash"] else 0.0,
-                "visa_amount": amt if grp["is_visa"] else 0.0,
-                "employee_debt_amount": amt if grp["is_emp"] else 0.0,
-                "ending_balance": end_bal,
-                "partner_id": po.partner_id.id if po else False,
-                "company_id": cfg.company_id.id,
+                "cash_amount": amt if is_cash else 0.0,
+                "visa_amount": amt if is_visa else 0.0,
+                "employee_debt_amount": amt if is_emp else 0.0,
+                "partner_id": pay.pos_order_id.partner_id.id if pay.pos_order_id else False,
             })
 
-        # Session Delivery Amounts
-        sessions = self.env["pos.session"].sudo().search([
-            ("config_id", "in", list(active_config_ids)),
-            "|",
-            "&", ("start_at", ">=", str_start), ("start_at", "<=", str_end),
-            "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+        # Statement Lines (Cash In / Out)
+        st_lines = self.env["account.bank.statement.line"].sudo().search([
+            ("pos_session_id.config_id", "in", list(active_config_ids)),
+            ("date", ">=", dt_start.date()),
+            ("date", "<=", dt_end.date()),
         ])
-        for sess in sessions:
-            del_amt = getattr(sess, "delivery_amount", 0.0) or 0.0
-            if del_amt != 0.0:
-                end_bal = getattr(sess, "cash_register_balance_end_real", 0.0) or 0.0
-                vals_list.append({
-                    "name": _("Session Delivery Amount: %s") % sess.name,
-                    "date": sess.start_at or sess.create_date or self.date_from,
-                    "config_id": sess.config_id.id,
-                    "session_id": sess.id,
-                    "report_type": "pos_sales",
-                    "amount": del_amt,
-                    "delivery_amount": del_amt,
-                    "ending_balance": end_bal,
-                    "company_id": sess.config_id.company_id.id,
-                })
-
-        # Statement Lines (Cash In / Out for Sessions Started on Start Date)
-        start_day = dt_start.date()
-        target_sessions = self.env["pos.session"].sudo().search([
-            ("config_id", "in", list(active_config_ids)),
-            "|",
-            "&", ("start_at", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
-                 ("start_at", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
-            "&", ("create_date", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
-                 ("create_date", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
-        ])
-        target_session_ids = set(target_sessions.ids)
-
-        if target_session_ids:
-            st_lines = self.env["account.bank.statement.line"].sudo().search([
-                ("pos_session_id", "in", list(target_session_ids)),
-            ])
-            for st in st_lines:
-                amt = st.amount or 0.0
-                is_in = amt > 0
-                st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else self.date_from)
-                vals_list.append({
-                    "name": st.payment_ref or st.ref or _("Cash Move"),
-                    "date": st_dt,
-                    "config_id": st.pos_session_id.config_id.id,
-                    "session_id": st.pos_session_id.id,
-                    "report_type": "cash_in" if is_in else "cash_out",
-                    "amount": abs(amt),
-                    "cash_in_amount": amt if is_in else 0.0,
-                    "cash_out_amount": abs(amt) if not is_in else 0.0,
-                    "partner_id": st.partner_id.id if st.partner_id else False,
-                    "company_id": st.pos_session_id.config_id.company_id.id,
-                })
+        for st in st_lines:
+            amt = st.amount or 0.0
+            is_in = amt > 0
+            st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else self.date_from)
+            vals_list.append({
+                "name": st.payment_ref or st.ref or _("Cash Move"),
+                "date": st_dt,
+                "config_id": st.pos_session_id.config_id.id,
+                "session_id": st.pos_session_id.id,
+                "report_type": "cash_in" if is_in else "cash_out",
+                "amount": abs(amt),
+                "cash_in_amount": amt if is_in else 0.0,
+                "cash_out_amount": abs(amt) if not is_in else 0.0,
+                "partner_id": st.partner_id.id,
+            })
 
         # Pledges (Rahen In / Out)
         if "pos.advance.order.pledge" in self.env:
@@ -282,7 +200,6 @@ class PosUnifiedReportWizard(models.TransientModel):
                 c_dt = self._to_datetime(adv.create_date)
                 if c_dt and dt_start <= c_dt <= dt_end:
                     amt = adv.advance_amount or 0.0
-                    rem_amt = adv.amount_remaining or 0.0
                     vals_list.append({
                         "name": adv.name or _("Advance Order"),
                         "date": c_dt,
@@ -290,7 +207,6 @@ class PosUnifiedReportWizard(models.TransientModel):
                         "report_type": "advance_deposit",
                         "amount": amt,
                         "advance_amount": amt,
-                        "advance_remaining_amount": rem_amt,
                         "partner_id": adv.partner_id.id if hasattr(adv, "partner_id") else False,
                     })
 
@@ -379,8 +295,9 @@ class PosUnifiedReportWizard(models.TransientModel):
             _("Rahen Out (Return)"),
             _("Net Pledges"),
             _("Advance Deposits (Origin)"),
+            _("Scheduled Pickup Value"),
             _("Pending Pickups"),
-            _("Delivery Amount"),
+            _("Delivery Fees"),
         ]
 
         sheet1.set_column(0, 0, 28)
@@ -414,8 +331,9 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet1.write_number(curr_row, 18, b["rahen_out"], num_fmt)
             sheet1.write_number(curr_row, 19, b["net_pledges"], num_fmt)
             sheet1.write_number(curr_row, 20, b["advance_deposits"], num_fmt)
-            sheet1.write_number(curr_row, 21, b.get("advance_pending_count", 0), int_fmt)
-            sheet1.write_number(curr_row, 22, b["delivery_amount"], num_fmt)
+            sheet1.write_number(curr_row, 21, b.get("advance_pickup_value", 0.0), num_fmt)
+            sheet1.write_number(curr_row, 22, b.get("advance_pending_count", 0), int_fmt)
+            sheet1.write_number(curr_row, 23, b["delivery_amount"], num_fmt)
             curr_row += 1
 
         # Global Total Row Sheet 1
@@ -441,8 +359,9 @@ class PosUnifiedReportWizard(models.TransientModel):
         sheet1.write_number(curr_row, 18, gt["rahen_out"], total_num_fmt)
         sheet1.write_number(curr_row, 19, gt["net_pledges"], total_num_fmt)
         sheet1.write_number(curr_row, 20, gt["advance_deposits"], total_num_fmt)
-        sheet1.write_number(curr_row, 21, gt.get("advance_pending_count", 0), total_int_fmt)
-        sheet1.write_number(curr_row, 22, gt["delivery_amount"], total_num_fmt)
+        sheet1.write_number(curr_row, 21, gt.get("advance_pickup_value", 0.0), total_num_fmt)
+        sheet1.write_number(curr_row, 22, gt.get("advance_pending_count", 0), total_int_fmt)
+        sheet1.write_number(curr_row, 23, gt["delivery_amount"], total_num_fmt)
 
         # Target branch config IDs set
         target_config_ids = set(self.config_ids.ids) if self.config_ids else None
@@ -461,7 +380,6 @@ class PosUnifiedReportWizard(models.TransientModel):
                 _("Employee / Staff"),
                 _("Deposit Branch (Origin)"),
                 _("Pickup Branch (Target)"),
-                _("Payment Method"),
                 _("Status"),
                 _("Total Amount"),
                 _("Advance Deposit Paid"),
@@ -473,8 +391,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet2.set_column(1, 2, 22)
             sheet2.set_column(3, 4, 24)
             sheet2.set_column(5, 6, 24)
-            sheet2.set_column(7, 8, 18)
-            sheet2.set_column(9, 12, 18)
+            sheet2.set_column(7, 7, 16)
+            sheet2.set_column(8, 11, 18)
 
             start_row_adv = 3
             for col_idx, h in enumerate(adv_headers):
@@ -510,13 +428,6 @@ class PosUnifiedReportWizard(models.TransientModel):
                 emp_name = a.employee_id.name if a.employee_id else (a.user_id.name if a.user_id else "")
                 state_label = dict(a._fields["state"].selection).get(a.state, a.state)
 
-                pm_name = ""
-                if hasattr(a, "pos_payment_method_id") and a.pos_payment_method_id:
-                    pm_name = a.pos_payment_method_id.name
-                elif hasattr(a, "payment_method") and a.payment_method:
-                    pm_sel = dict(a._fields["payment_method"].selection) if hasattr(a._fields["payment_method"], "selection") else {}
-                    pm_name = pm_sel.get(a.payment_method, str(a.payment_method).capitalize())
-
                 g_amt = a.amount_grand_total or a.amount_total or 0.0
                 d_amt = a.advance_amount or 0.0
                 r_amt = a.amount_remaining or 0.0
@@ -529,12 +440,11 @@ class PosUnifiedReportWizard(models.TransientModel):
                 sheet2.write(c_row, 4, emp_name, text_fmt)
                 sheet2.write(c_row, 5, orig_name, text_fmt)
                 sheet2.write(c_row, 6, pick_name, text_fmt)
-                sheet2.write(c_row, 7, pm_name, center_fmt)
-                sheet2.write(c_row, 8, state_label, center_fmt)
-                sheet2.write_number(c_row, 9, g_amt, num_fmt)
-                sheet2.write_number(c_row, 10, d_amt, num_fmt)
-                sheet2.write_number(c_row, 11, r_amt, num_fmt)
-                sheet2.write_number(c_row, 12, p_amt, num_fmt)
+                sheet2.write(c_row, 7, state_label, center_fmt)
+                sheet2.write_number(c_row, 8, g_amt, num_fmt)
+                sheet2.write_number(c_row, 9, d_amt, num_fmt)
+                sheet2.write_number(c_row, 10, r_amt, num_fmt)
+                sheet2.write_number(c_row, 11, p_amt, num_fmt)
 
                 tot_grand += g_amt
                 tot_dep += d_amt
@@ -544,12 +454,12 @@ class PosUnifiedReportWizard(models.TransientModel):
 
             # Total Row Sheet 2
             sheet2.write(c_row, 0, _("TOTALS"), total_text_fmt)
-            for col in range(1, 9):
+            for col in range(1, 8):
                 sheet2.write(c_row, col, "", total_text_fmt)
-            sheet2.write_number(c_row, 9, tot_grand, total_num_fmt)
-            sheet2.write_number(c_row, 10, tot_dep, total_num_fmt)
-            sheet2.write_number(c_row, 11, tot_rem, total_num_fmt)
-            sheet2.write_number(c_row, 12, tot_plg, total_num_fmt)
+            sheet2.write_number(c_row, 8, tot_grand, total_num_fmt)
+            sheet2.write_number(c_row, 9, tot_dep, total_num_fmt)
+            sheet2.write_number(c_row, 10, tot_rem, total_num_fmt)
+            sheet2.write_number(c_row, 11, tot_plg, total_num_fmt)
 
         # --- Sheet 3: Pledges Detail (Rahen In & Rahen Out) ---
         if "pos.advance.order.pledge" in self.env:
@@ -674,18 +584,10 @@ class PosUnifiedReportWizard(models.TransientModel):
         for col_idx, h in enumerate(cash_headers):
             sheet4.write(start_row_cash, col_idx, h, header_fmt)
 
-        start_day = dt_start.date()
-        target_sessions_sheet4 = self.env["pos.session"].sudo().search([
-            "|",
-            "&", ("start_at", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
-                 ("start_at", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
-            "&", ("create_date", ">=", fields.Datetime.to_string(datetime.combine(start_day, time.min))),
-                 ("create_date", "<=", fields.Datetime.to_string(datetime.combine(start_day, time.max))),
-        ])
-        target_session_ids_sheet4 = set(target_sessions_sheet4.ids)
         st_lines = self.env["account.bank.statement.line"].sudo().search([
-            ("pos_session_id", "in", list(target_session_ids_sheet4)),
-        ], order="id desc") if target_session_ids_sheet4 else self.env["account.bank.statement.line"]
+            ("date", ">=", dt_start.date()),
+            ("date", "<=", dt_end.date()),
+        ], order="id desc")
 
         m_row = start_row_cash + 1
         tot_cin = 0.0
