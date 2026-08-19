@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
+import logging
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 
 from odoo import _, api, fields, models
 
-PAYMENT_METHOD_TALABAT = 142
-PAYMENT_METHOD_CAREEM = 143
-PAYMENT_METHOD_MYTHINGS = 144
-PAYMENT_METHOD_KABSEH = 145
+_logger = logging.getLogger(__name__)
 
 
 class PosReportingDashboard(models.TransientModel):
@@ -16,8 +14,8 @@ class PosReportingDashboard(models.TransientModel):
 
     def _parse_datetime_bounds(self, date_from, date_to):
         """
-        Parse datetime parameters supporting both Date (YYYY-MM-DD) and Datetime (YYYY-MM-DD HH:MM:SS).
-        Follows operational store shift logic: default start time is 06:00 AM on start day, end time is 05:00 AM on next day.
+        Parse date/datetime parameters into exact store shift datetime bounds.
+        Default shift window: 06:00 AM on start day to 05:00 AM on following day.
         """
         today = fields.Date.context_today(self)
 
@@ -30,16 +28,13 @@ class PosReportingDashboard(models.TransientModel):
                 return datetime.combine(d, time(6, 0, 0))
             if isinstance(val, datetime):
                 return val
+
             val_str = str(val).strip().replace("T", " ")
-            try:
-                return datetime.strptime(val_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
-            except Exception:
-                pass
-            try:
-                dt_part = datetime.strptime(val_str, "%Y-%m-%d %H:%M")
-                return dt_part
-            except Exception:
-                pass
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+                try:
+                    return datetime.strptime(val_str.split(".")[0], fmt)
+                except Exception:
+                    pass
             try:
                 d = fields.Date.from_string(val_str[:10])
                 if d:
@@ -49,6 +44,7 @@ class PosReportingDashboard(models.TransientModel):
                     return datetime.combine(d, time(6, 0, 0))
             except Exception:
                 pass
+
             if is_end:
                 tomorrow = today + timedelta(days=1)
                 return datetime.combine(tomorrow, time(5, 0, 0))
@@ -61,20 +57,18 @@ class PosReportingDashboard(models.TransientModel):
     @api.model
     def get_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
         """
-        Fetch executive dashboard metrics for specified datetime range and branch configs.
-        Strictly filters branches to match the active selected company/companies context.
-        Includes Average Orders Per Minute (OPM) calculations.
+        Fetch executive POS metrics across branch configurations for active multi-company context.
+        Includes channel breakdowns, cash moves, pledges, advance orders, and orders per minute (OPM).
         """
-        # 1. Parse Datetime Bounds (with exact hour/minute/second precision)
         dt_start, dt_end = self._parse_datetime_bounds(date_from, date_to)
         str_start = fields.Datetime.to_string(dt_start)
         str_end = fields.Datetime.to_string(dt_end)
 
-        # Operational duration in minutes
+        # Operational duration in minutes for OPM calculations
         total_seconds = max((dt_end - dt_start).total_seconds(), 60.0)
         total_minutes = max(total_seconds / 60.0, 1.0)
 
-        # 2. Identify Target Branches (filtered by active selected companies)
+        # Identify target POS configurations filtered by active companies
         config_domain = [
             ("active", "=", True),
             ("company_id", "in", self.env.companies.ids),
@@ -85,7 +79,6 @@ class PosReportingDashboard(models.TransientModel):
         configs = self.env["pos.config"].sudo().search(config_domain, order="name")
         active_config_ids = set(configs.ids)
 
-        # Structure per-branch data repository
         def _empty_branch_dict():
             return {
                 "sales": 0.0,
@@ -127,24 +120,25 @@ class PosReportingDashboard(models.TransientModel):
             "&", ("payment_date", "=", False),
                  "&", ("pos_order_id.date_order", ">=", str_start), ("pos_order_id.date_order", "<=", str_end),
         ])
+
         for pay in payments:
             cfg = pay.session_id.config_id if pay.session_id else (pay.pos_order_id.config_id if pay.pos_order_id else False)
             if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                 continue
+
             cfg_id = cfg.id
             amt = pay.amount or 0.0
             branch_data[cfg_id]["sales"] += amt
 
             pm = pay.payment_method_id
-            pm_id = pm.id
-            pm_type = getattr(pm, "type", "")
             daily_type = getattr(pm, "daily_ops_report_type", "")
+            pm_type = getattr(pm, "type", "")
             pm_name = (pm.name or "").lower()
 
             is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
             is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
 
-            # Mutually Exclusive Payment Classification
+            # Payment Classification
             if is_emp:
                 branch_data[cfg_id]["employee_debt"] += amt
             elif is_hosp:
@@ -156,17 +150,17 @@ class PosReportingDashboard(models.TransientModel):
             else:
                 branch_data[cfg_id]["other_sales"] += amt
 
-            # Delivery Apps Specifics
-            if pm_id == PAYMENT_METHOD_TALABAT or "talabat" in pm_name:
+            # Delivery Partner Channels
+            if "talabat" in pm_name:
                 branch_data[cfg_id]["talabat"] += amt
-            elif pm_id == PAYMENT_METHOD_CAREEM or "careem" in pm_name:
+            elif "careem" in pm_name:
                 branch_data[cfg_id]["careem"] += amt
-            elif pm_id == PAYMENT_METHOD_MYTHINGS or "mythings" in pm_name:
+            elif "mythings" in pm_name:
                 branch_data[cfg_id]["mythings"] += amt
-            elif pm_id == PAYMENT_METHOD_KABSEH or "kabseh" in pm_name:
+            elif "kabseh" in pm_name:
                 branch_data[cfg_id]["kabseh"] += amt
 
-        # --- B. Collect POS Orders (Untaxed, Tax, Discounts, Order Count & Delivery) ---
+        # --- B. Collect POS Orders ---
         pos_orders = self.env["pos.order"].sudo().search([
             ("state", "in", ("paid", "done", "invoiced")),
             ("date_order", ">=", str_start),
@@ -184,11 +178,10 @@ class PosReportingDashboard(models.TransientModel):
             if untaxed_amt is None:
                 untaxed_amt = tot_amt - tax_amt
 
-            order_disc = 0.0
-            for line in order.lines:
-                if line.discount:
-                    base = (line.price_unit or 0.0) * (line.qty or 0.0)
-                    order_disc += base * (line.discount / 100.0)
+            order_disc = sum(
+                (line.price_unit or 0.0) * (line.qty or 0.0) * (line.discount / 100.0)
+                for line in order.lines if line.discount
+            )
 
             branch_data[cfg_id]["untaxed_sales"] += untaxed_amt
             branch_data[cfg_id]["tax_amount"] += tax_amt
@@ -196,7 +189,7 @@ class PosReportingDashboard(models.TransientModel):
             branch_data[cfg_id]["delivery_amount"] += getattr(order, "delivery_amount", 0.0) or 0.0
             branch_data[cfg_id]["order_count"] += 1
 
-        # --- C. Collect Cash In & Cash Out Moves (Statement Lines) ---
+        # --- C. Collect Cash In / Out Moves ---
         st_lines = self.env["account.bank.statement.line"].sudo().search([
             ("date", ">=", dt_start.date()),
             ("date", "<=", dt_end.date() + timedelta(days=1)),
@@ -217,7 +210,6 @@ class PosReportingDashboard(models.TransientModel):
             else:
                 branch_data[cfg_id]["cash_out"] += abs(amt)
 
-        # Compute net cash moves & Orders / Min per branch
         for cfg_id in active_config_ids:
             branch_data[cfg_id]["net_cash_moves"] = (
                 branch_data[cfg_id]["cash_in"] - branch_data[cfg_id]["cash_out"]
@@ -226,9 +218,13 @@ class PosReportingDashboard(models.TransientModel):
                 branch_data[cfg_id]["order_count"] / total_minutes, 2
             )
 
-        # --- D. Collect Pledges (Rahen In & Rahen Out) ---
+        # --- D. Collect Pledges (Filtered by Date Range) ---
         if "pos.advance.order.pledge" in self.env:
-            pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([])
+            pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([
+                "|",
+                "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
+                "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+            ])
             for pledge in pledge_recs:
                 cfg_id = False
                 if pledge.pos_order_id:
@@ -257,9 +253,11 @@ class PosReportingDashboard(models.TransientModel):
                 if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
                     branch_data[cfg_id]["rahen_out"] += amt
 
-        # 2. pos.pledge (Standard pledge model fallback)
         if "pos.pledge" in self.env:
-            pledges_std = self.env["pos.pledge"].sudo().search([])
+            pledges_std = self.env["pos.pledge"].sudo().search([
+                ("create_date", ">=", str_start),
+                ("create_date", "<=", str_end),
+            ])
             for pledge in pledges_std:
                 cfg_id = pledge.pos_config_id.id if pledge.pos_config_id else (pledge.pos_order_id.config_id.id if pledge.pos_order_id else False)
                 if not cfg_id or (active_config_ids and cfg_id not in active_config_ids):
@@ -275,15 +273,19 @@ class PosReportingDashboard(models.TransientModel):
                 if pledge.state == "returned" and r_dt and dt_start <= r_dt <= dt_end:
                     branch_data[cfg_id]["rahen_out"] += amt
 
-        # Compute net pledges
         for cfg_id in active_config_ids:
             branch_data[cfg_id]["net_pledges"] = (
                 branch_data[cfg_id]["rahen_in"] - branch_data[cfg_id]["rahen_out"]
             )
 
-        # --- E. Collect Advance Orders & Deposits ---
+        # --- E. Collect Advance Orders ---
         if "pos.advance.order" in self.env:
-            adv_orders = self.env["pos.advance.order"].sudo().search([("state", "not in", ("draft", "cancel"))])
+            adv_orders = self.env["pos.advance.order"].sudo().search([
+                ("state", "not in", ("draft", "cancel")),
+                "|",
+                "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+                "&", ("picking_date", ">=", str_start), ("picking_date", "<=", str_end),
+            ])
             for adv in adv_orders:
                 orig_cfg_id = adv.from_pos_config_id.id if adv.from_pos_config_id else (adv.pos_config_id.id if adv.pos_config_id else False)
                 pick_cfg_id = adv.pos_config_id.id if adv.pos_config_id else orig_cfg_id
@@ -305,23 +307,18 @@ class PosReportingDashboard(models.TransientModel):
                         if adv.state in ("confirmed", "advance_paid"):
                             branch_data[pick_cfg_id]["advance_pending_count"] += 1
 
-        # --- F. Format Per-Branch Rows & Calculate Global Totals ---
+        # --- F. Build Rows & Global Totals ---
         branch_rows = []
         global_totals = _empty_branch_dict()
 
         for config in configs:
             vals = branch_data[config.id]
-            row = {
-                "config_id": config.id,
-                "branch_name": config.name,
-                **vals,
-            }
+            row = {"config_id": config.id, "branch_name": config.name, **vals}
             branch_rows.append(row)
 
             for key in global_totals.keys():
                 global_totals[key] += vals[key]
 
-        # Calculate Global Orders / Min
         global_totals["orders_per_min"] = round(global_totals["order_count"] / total_minutes, 2)
 
         # --- G. Build Channel Distribution & Daily Trends ---
@@ -338,13 +335,8 @@ class PosReportingDashboard(models.TransientModel):
         ]
         channels_filtered = [c for c in channels if c["value"] > 0]
 
-        # Daily Trend calculation (Batched bulk query across date window)
-        all_trend_payments = self.env["pos.payment"].sudo().search([
-            "|",
-            "&", ("payment_date", ">=", str_start), ("payment_date", "<=", str_end),
-            "&", ("payment_date", "=", False),
-                 "&", ("pos_order_id.date_order", ">=", str_start), ("pos_order_id.date_order", "<=", str_end),
-        ])
+        # Batched daily trend evaluation
+        all_trend_payments = payments
 
         trend_days = []
         curr_date = dt_start.date()
@@ -386,7 +378,6 @@ class PosReportingDashboard(models.TransientModel):
             })
             curr_date += timedelta(days=1)
 
-        # All branches list for tab navigation (filtered by active selected companies)
         all_configs = self.env["pos.config"].sudo().search([
             ("active", "=", True),
             ("company_id", "in", self.env.companies.ids),
@@ -432,7 +423,8 @@ class PosReportingDashboard(models.TransientModel):
     @api.model
     def open_kpi_drilldown(self, metric_type, date_from=None, date_to=None, config_ids=None):
         """
-        Populate transient records in pos.unified.report for metric_type and return drill-down action with Excel export capability.
+        Populate transient records in pos.unified.report for metric_type and return drill-down action.
+        Scoped to the active user to prevent concurrent transient data collisions.
         """
         dt_start, dt_end = self._parse_datetime_bounds(date_from, date_to)
         str_start = fields.Datetime.to_string(dt_start)
@@ -473,10 +465,7 @@ class PosReportingDashboard(models.TransientModel):
                 is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
                 is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
 
-                if is_emp:
-                    is_cash = False
-                    is_visa = False
-                elif is_hosp:
+                if is_emp or is_hosp:
                     is_cash = False
                     is_visa = False
                 else:
@@ -602,7 +591,11 @@ class PosReportingDashboard(models.TransientModel):
 
         elif metric_type == "net_pledges":
             if "pos.advance.order.pledge" in self.env:
-                pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([])
+                pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([
+                    "|",
+                    "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
+                    "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+                ])
                 for pledge in pledge_recs:
                     cfg = pledge.pos_order_id.config_id if pledge.pos_order_id else (
                         pledge.order_id.pos_config_id if (pledge.order_id and hasattr(pledge.order_id, "pos_config_id")) else (
@@ -642,7 +635,11 @@ class PosReportingDashboard(models.TransientModel):
 
         elif metric_type == "advance_deposits":
             if "pos.advance.order" in self.env:
-                adv_orders = self.env["pos.advance.order"].sudo().search([("state", "not in", ("draft", "cancel"))])
+                adv_orders = self.env["pos.advance.order"].sudo().search([
+                    ("state", "not in", ("draft", "cancel")),
+                    ("create_date", ">=", str_start),
+                    ("create_date", "<=", str_end),
+                ])
                 for adv in adv_orders:
                     cfg = adv.from_pos_config_id if adv.from_pos_config_id else adv.pos_config_id
                     if not cfg or cfg.id not in active_config_ids:
@@ -665,11 +662,7 @@ class PosReportingDashboard(models.TransientModel):
         if vals_list:
             self.env["pos.unified.report"].sudo().create(vals_list)
 
-        # Create transient wizard for Excel export header button
-        wizard_vals = {
-            "date_from": dt_start,
-            "date_to": dt_end,
-        }
+        wizard_vals = {"date_from": dt_start, "date_to": dt_end}
         if config_ids:
             wizard_vals["config_ids"] = [(6, 0, list(config_ids))]
         wiz = self.env["pos.unified.report.wizard"].sudo().create(wizard_vals)
@@ -703,3 +696,4 @@ class PosReportingDashboard(models.TransientModel):
                 "metric_type": metric_type,
             },
         }
+

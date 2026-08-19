@@ -147,7 +147,11 @@ class PosUnifiedReportWizard(models.TransientModel):
 
         # Pledges (Rahen In / Out)
         if "pos.advance.order.pledge" in self.env:
-            pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([])
+            pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([
+                "|",
+                "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
+                "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+            ])
             for pledge in pledge_recs:
                 cfg_id = False
                 if pledge.pos_order_id:
@@ -191,6 +195,9 @@ class PosUnifiedReportWizard(models.TransientModel):
         if "pos.advance.order" in self.env:
             adv_orders = self.env["pos.advance.order"].sudo().search([
                 ("state", "not in", ("draft", "cancel")),
+                "|",
+                "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+                "&", ("picking_date", ">=", str_start), ("picking_date", "<=", str_end),
             ])
             for adv in adv_orders:
                 cfg_id = adv.from_pos_config_id.id if adv.from_pos_config_id else (adv.pos_config_id.id if adv.pos_config_id else False)
