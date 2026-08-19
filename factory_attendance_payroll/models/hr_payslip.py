@@ -300,12 +300,17 @@ class HrPayslip(models.Model):
             month_str = self.date_to.strftime('%B %Y') if self.date_to else ''
             full_name = f"{leave_desc} - {month_str}"
 
+            dt_start = datetime.datetime.combine(self.date_to, datetime.time(8, 0, 0))
+            dt_stop = datetime.datetime.combine(self.date_to, datetime.time(17, 0, 0))
+
             leave_vals = {
                 'name': full_name,
                 'employee_id': self.employee_id.id,
                 'holiday_status_id': leave_type.id,
                 'request_date_from': self.date_to,
                 'request_date_to': self.date_to,
+                'date_from': dt_start,
+                'date_to': dt_stop,
                 'number_of_days': days,
             }
             if 'number_of_hours' in Leave._fields:
@@ -313,17 +318,33 @@ class HrPayslip(models.Model):
             if 'number_of_hours_display' in Leave._fields:
                 leave_vals['number_of_hours_display'] = hours
 
-            if existing_leave:
-                existing_leave.write(leave_vals)
-                existing_leave.write({'state': 'validate'})
-            else:
-                new_leave = Leave.create(leave_vals)
-                new_leave.write({'state': 'validate'})
-                if hasattr(new_leave, '_create_resource_calendar_leaves'):
-                    try:
-                        new_leave._create_resource_calendar_leaves()
-                    except Exception:
-                        pass
+            ctx_leave = Leave.with_context(
+                employee_id=self.employee_id.id,
+                mail_create_nolog=True,
+                mail_notrack=True,
+                tracking_disable=True,
+            )
+
+            try:
+                if existing_leave:
+                    existing_leave.with_context(
+                        employee_id=self.employee_id.id,
+                        mail_create_nolog=True,
+                        mail_notrack=True,
+                        tracking_disable=True,
+                    ).write(leave_vals)
+                    if existing_leave.state != 'validate':
+                        existing_leave.sudo().write({'state': 'validate'})
+                else:
+                    new_leave = ctx_leave.create(leave_vals)
+                    new_leave.sudo().write({'state': 'validate'})
+                    if hasattr(new_leave, '_create_resource_calendar_leaves'):
+                        try:
+                            new_leave._create_resource_calendar_leaves()
+                        except Exception:
+                            pass
+            except Exception as e:
+                pass
         else:
             if existing_leave:
                 existing_leave.unlink()
