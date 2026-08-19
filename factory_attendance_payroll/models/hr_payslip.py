@@ -144,9 +144,8 @@ class HrPayslip(models.Model):
     def _convert_flexible_rest_days_to_ars(self):
         """
         Automatic Flexible Rest Day Conversion:
-        Converts 'Absent' (A) work entries on unworked rest days to 'Rest Day' (ARS)
-        up to the monthly rest day quota (e.g. max 4 days per 30-day month).
-        Any excess unworked days above the quota remain as ABSENT.
+        Converts 'Absent' (ABS / ABSENT) work entries on unworked rest days to 'Rest Day' (ARS)
+        up to the earned rest day quota (Method 2: 1 Rest Day earned per 6 Worked Days).
         Safely handles validated work entries without raising Invalid Operation errors.
         """
         rest_type = False
@@ -166,10 +165,6 @@ class HrPayslip(models.Model):
                     ('check_in', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
                 ])
                 worked_dates = set(att.check_in.date() for att in attendances)
-                worked_days_count = len(worked_dates)
-
-                # Method 2: Earn 1 Rest Day for every 6 Worked Days
-                allowed_rest_days = worked_days_count // 6
 
                 if rest_type and 'hr.work.entry' in self.env:
                     WorkEntry = self.env['hr.work.entry'].sudo()
@@ -197,16 +192,30 @@ class HrPayslip(models.Model):
                     ]
                     work_entries = WorkEntry.search(domain).sorted(start_field)
 
+                    for we in work_entries:
+                        code = (we.work_entry_type_id.code or '').strip()
+                        name = (we.work_entry_type_id.name or '').lower()
+                        if not we.work_entry_type_id.is_leave and code not in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] and 'absent' not in name:
+                            start_val = getattr(we, start_field, None)
+                            if start_val:
+                                we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
+                                if we_date:
+                                    worked_dates.add(we_date)
+
+                    # Method 2: Earn 1 Rest Day for every 6 Worked Days
+                    worked_days_count = len(worked_dates)
+                    allowed_rest_days = worked_days_count // 6
+
                     converted_count = 0
                     for we in work_entries:
                         start_val = getattr(we, start_field, None)
                         if not start_val:
                             continue
                         we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
-                        if we_date and we_date not in worked_dates:
-                            code = we.work_entry_type_id.code or ''
+                        if we_date:
+                            code = (we.work_entry_type_id.code or '').strip()
                             name = (we.work_entry_type_id.name or '').lower()
-                            if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'A'] or 'absent' in name:
+                            if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in name:
                                 if converted_count < allowed_rest_days:
                                     if hasattr(we, 'state') and we.state == 'validated':
                                         we.sudo().write({'state': 'draft'})
