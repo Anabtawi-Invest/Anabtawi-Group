@@ -1,6 +1,6 @@
 {
     "name": "Ameen Packing List",
-    "version": "19.0.1.0.0",
+    "version": "19.0.2.0.0",
     "category": "Accounting",
     "summary": "Packing List PDF + XLSX export from Action menu",
     "depends": ["account", "sale", "stock", "product", "web"],
