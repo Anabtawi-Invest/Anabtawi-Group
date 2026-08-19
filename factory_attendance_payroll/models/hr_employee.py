@@ -152,6 +152,14 @@ class HrEmployee(models.Model):
             months.append((curr, m_end))
             curr = m_end + timedelta(days=1)
 
+        _logger.info(
+            "Factory Absent Automation: evaluating %s employees across %s monthly interval(s) from %s to %s",
+            len(self),
+            len(months),
+            date_from,
+            date_to,
+        )
+
         for m_from, m_to in months:
             for employee in self:
                 employee._apply_monthly_absence_for_month(m_from, m_to)
@@ -184,12 +192,15 @@ class HrEmployee(models.Model):
         current = month_from
         while current <= eval_to:
             work_entry_source = self._get_work_entry_source_on_day(current)
+            # Manager & Office Working Schedule Exemption:
+            # If contract work entry source is 'calendar', skip absence generation.
             if work_entry_source == "calendar":
                 current += timedelta(days=1)
                 continue
 
             expected_hours = self._get_expected_hours_on_day(current)
             if expected_hours <= 0:
+                # Non-working day (standard calendar weekend or rest day)
                 current += timedelta(days=1)
                 continue
 
@@ -198,7 +209,7 @@ class HrEmployee(models.Model):
                 current += timedelta(days=1)
                 continue
 
-            # Check if employee has approved Time Off / Leave or Public Holiday
+            # Check if employee has approved Time Off / Leave (Silver color in UI)
             if self._has_approved_leave_on_day(current):
                 current += timedelta(days=1)
                 continue
@@ -207,7 +218,9 @@ class HrEmployee(models.Model):
             candidate_unpunched_days.append((current, expected_hours))
             current += timedelta(days=1)
 
-        # 4-Day Monthly Grace Threshold Rule
+        # 4-Day Monthly Grace Threshold Rule:
+        # If total unpunched days <= 4: All days are forgiven (0 absent entries created).
+        # If total unpunched days > 4: First 4 days are forgiven; Days from index 4 onwards (5th day+) get ABSENT.
         allowed_grace_days = 4
 
         # Clean up / remove any unvalidated ABSENT work entries on the forgiven days (first 4 days)
@@ -241,6 +254,13 @@ class HrEmployee(models.Model):
             editable_work_entries = existing_work_entries.filtered(lambda we: we.state != "validated")
             if editable_work_entries:
                 editable_work_entries.write({"work_entry_type_id": absent_type.id})
+                _logger.info(
+                    "Factory Absent Automation: updated %s work entries to ABSENT for employee=%s(%s) date=%s",
+                    len(editable_work_entries),
+                    self.name,
+                    self.id,
+                    target_date,
+                )
             return
 
         if work_entry_model.search_count([
@@ -267,10 +287,17 @@ class HrEmployee(models.Model):
             "work_entry_type_id": absent_type.id,
             "company_id": self.company_id.id,
         })
+        _logger.info(
+            "Factory Absent Automation: created ABSENT work entry for employee=%s(%s) date=%s duration=%s",
+            self.name,
+            self.id,
+            target_date,
+            dur,
+        )
 
     def _has_approved_leave_on_day(self, target_date):
         """
-        Checks whether the employee has an approved Time Off / Leave or Public Holiday on target_date:
+        Checks whether the employee has an approved Time Off / Leave (Silver color in UI) on target_date:
         1. Approved hr.leave in states ['validate', 'validate1'].
         2. Existing leave work entry in hr.work.entry (is_leave=True or excused leave code).
         3. Resource calendar global leaves / public holidays.
