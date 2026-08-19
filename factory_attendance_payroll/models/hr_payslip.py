@@ -110,6 +110,11 @@ class HrPayslip(models.Model):
 
     def compute_sheet(self):
         self._convert_flexible_rest_days_to_ars()
+        for payslip in self:
+            if payslip.state == 'draft':
+                worked_days_vals = payslip._get_worked_day_lines()
+                payslip.worked_days_line_ids.unlink()
+                payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
         self._compute_attendance_reconciliation_fields()
         res = super().compute_sheet()
         self._sync_reconciliation_settlements()
