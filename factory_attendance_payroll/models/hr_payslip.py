@@ -65,6 +65,9 @@ class HrPayslip(models.Model):
     def _compute_attendance_reconciliation_fields(self):
         for payslip in self:
             if payslip.employee_id and payslip.date_from and payslip.date_to:
+                # Convert flexible rest days from Absent to Rest Day (ARS)
+                payslip._convert_flexible_rest_days_to_ars()
+
                 res = payslip._get_reconciled_attendance_variance()
                 gross_ot = round(res.get('total_ot', 0.0), 2)
                 gross_ut = round(res.get('total_undertime', 0.0), 2)
@@ -109,16 +112,55 @@ class HrPayslip(models.Model):
                 payslip.undertime_cash_deduction_hours = 0.0
 
     def compute_sheet(self):
+        for payslip in self:
+            if payslip.employee_id and payslip.date_from and payslip.date_to:
+                if hasattr(payslip.employee_id, '_create_absent_work_entries_for_period'):
+                    payslip.employee_id._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
+
         self._convert_flexible_rest_days_to_ars()
+
+        # Force refresh worked_days_line_ids so the payslip Worked Days tab instantly updates
         for payslip in self:
             if payslip.state == 'draft':
                 worked_days_vals = payslip._get_worked_day_lines()
                 payslip.worked_days_line_ids.unlink()
                 payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
+
         self._compute_attendance_reconciliation_fields()
         res = super().compute_sheet()
         self._sync_reconciliation_settlements()
         return res
+
+    def action_payslip_draft(self):
+        self._reset_reconciliation_settlements()
+        return super().action_payslip_draft()
+
+    def action_payslip_cancel(self):
+        self._reset_reconciliation_settlements()
+        return super().action_payslip_cancel()
+
+    def _reset_reconciliation_settlements(self):
+        for payslip in self:
+            if not payslip.employee_id:
+                continue
+            # Refuse and unlink generated lateness leaves to restore annual leave allocation balance
+            if 'hr.leave' in self.env:
+                gen_leaves = self.env['hr.leave'].sudo().search([
+                    ('employee_id', '=', payslip.employee_id.id),
+                    ('request_date_from', '<=', payslip.date_to),
+                    ('request_date_to', '>=', payslip.date_from),
+                    ('name', 'ilike', 'Lateness Settlement')
+                ])
+                for lve in gen_leaves:
+                    if lve.state in ('confirm', 'validate1', 'validate', 'draft') and hasattr(lve, 'action_refuse'):
+                        try:
+                            lve.action_refuse()
+                        except Exception:
+                            pass
+                    try:
+                        lve.unlink()
+                    except Exception:
+                        pass
 
     def action_payslip_done(self):
         res = super().action_payslip_done()
@@ -384,7 +426,6 @@ class HrPayslip(models.Model):
         """
         Factory Flexible 6-Day Work Week & Monthly Rest Day Quota Reconciliation:
         - Ratio: 6 Working Days to 1 Rest Day.
-        - Employees can stack/accumulate rest days freely (e.g. work 12 days straight, take 2 rest days off; work 26 days straight, take last 4 rest days off).
         - Multi-Location Break Deductions: Factory/Branch 1.0h break, Head Office 0.5h break for shifts >= 6.0h.
         - Overtime Threshold: Daily shift excess >= 45 minutes (0.75h).
         - Lateness Grace Period: Daily shift shortfalls <= 15 minutes (0.25h) are forgiven.
