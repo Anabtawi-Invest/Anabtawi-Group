@@ -72,8 +72,8 @@ class PosUnifiedReportWizard(models.TransientModel):
         str_start = fields.Datetime.to_string(dt_start)
         str_end = fields.Datetime.to_string(dt_end)
 
-        # Clear previous transient report records
-        self.env["pos.unified.report"].sudo().search([]).unlink()
+        # Clear previous transient report records for current user
+        self.env["pos.unified.report"].sudo().search([("create_uid", "=", self.env.user.id)]).unlink()
 
         config_domain = [("active", "=", True)]
         if self.config_ids:

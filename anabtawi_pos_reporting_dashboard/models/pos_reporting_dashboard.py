@@ -338,29 +338,43 @@ class PosReportingDashboard(models.TransientModel):
         ]
         channels_filtered = [c for c in channels if c["value"] > 0]
 
-        # Daily Trend calculation (group by day)
+        # Daily Trend calculation (Batched bulk query across date window)
+        all_trend_payments = self.env["pos.payment"].sudo().search([
+            "|",
+            "&", ("payment_date", ">=", str_start), ("payment_date", "<=", str_end),
+            "&", ("payment_date", "=", False),
+                 "&", ("pos_order_id.date_order", ">=", str_start), ("pos_order_id.date_order", "<=", str_end),
+        ])
+
         trend_days = []
         curr_date = dt_start.date()
         while curr_date <= dt_end.date():
-            day_str_start = fields.Datetime.to_string(datetime.combine(curr_date, time(6, 0, 0)))
-            day_str_end = fields.Datetime.to_string(datetime.combine(curr_date + timedelta(days=1), time(5, 0, 0)))
+            day_dt_start = datetime.combine(curr_date, time(6, 0, 0))
+            day_dt_end = datetime.combine(curr_date + timedelta(days=1), time(5, 0, 0))
 
-            day_payments = self.env["pos.payment"].sudo().search([
-                ("payment_date", ">=", day_str_start),
-                ("payment_date", "<=", day_str_end),
-            ])
+            day_total = 0.0
+            day_cash = 0.0
 
-            day_total = sum(
-                p.amount or 0.0 for p in day_payments
-                if (not active_config_ids or (p.session_id.config_id.id in active_config_ids if p.session_id else p.pos_order_id.config_id.id in active_config_ids))
-            )
-            day_cash = sum(
-                p.amount or 0.0 for p in day_payments
-                if (not active_config_ids or (p.session_id.config_id.id in active_config_ids if p.session_id else p.pos_order_id.config_id.id in active_config_ids))
-                and (getattr(p.payment_method_id, "daily_ops_report_type", "") == "cash" or
-                     getattr(p.payment_method_id, "type", "") == "cash" or
-                     "cash" in (p.payment_method_id.name or "").lower())
-            )
+            for p in all_trend_payments:
+                cfg = p.session_id.config_id if p.session_id else (p.pos_order_id.config_id if p.pos_order_id else False)
+                if active_config_ids and (not cfg or cfg.id not in active_config_ids):
+                    continue
+
+                p_date = p.payment_date or (p.pos_order_id.date_order if p.pos_order_id else False)
+                if not p_date or not (day_dt_start <= p_date <= day_dt_end):
+                    continue
+
+                amt = p.amount or 0.0
+                day_total += amt
+
+                pm = p.payment_method_id
+                daily_type = getattr(pm, "daily_ops_report_type", "")
+                pm_type = getattr(pm, "type", "")
+                pm_name = (pm.name or "").lower()
+
+                if daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name:
+                    day_cash += amt
+
             day_visa = day_total - day_cash
 
             trend_days.append({
@@ -434,8 +448,8 @@ class PosReportingDashboard(models.TransientModel):
         configs = self.env["pos.config"].sudo().search(config_domain)
         active_config_ids = set(configs.ids)
 
-        # Clear previous transient drill-down records
-        self.env["pos.unified.report"].sudo().search([]).unlink()
+        # Clear previous transient drill-down records for current user
+        self.env["pos.unified.report"].sudo().search([("create_uid", "=", self.env.user.id)]).unlink()
 
         vals_list = []
 
