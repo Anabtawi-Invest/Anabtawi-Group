@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_unified_report_wizard_form" model="ir.ui.view">
+        <field name="name">pos.unified.report.wizard.form</field>
+        <field name="model">pos.unified.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Unified POS Operations Report &amp; Dashboard">
+                <group>
+                    <group string="Date Period">
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                    </group>
+                    <group string="Branch Filtering">
+                        <field name="config_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_open_dashboard" string="Open Interactive Dashboard" type="object" class="btn-primary" icon="fa-dashboard"/>
+                    <button name="action_open_pivot" string="Analyze Pivot View" type="object" class="btn-secondary" icon="fa-table"/>
+                    <button name="action_export_xlsx" string="Export Excel Report (.xlsx)" type="object" class="btn-success" icon="fa-file-excel-o"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pos_unified_report_wizard" model="ir.actions.act_window">
+        <field name="name">Unified POS Operations Report</field>
+        <field name="res_model">pos.unified.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
