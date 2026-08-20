@@ -725,9 +725,9 @@ class HrPayslip(models.Model):
         Creating Extra Hours allocations with overtime_deductible cancels the
         overtime credit on the dashboard — so we only maintain overtime lines.
 
-        Target available hours =
-            total_extra_hours_available - lateness_covered_by_extra_hours
-        (e.g. 10:30 when previous 08:00 + monthly OT 02:30 and no Step-1 lateness).
+        Target on Time Off card after sync ≈ previous overtime lines + monthly net OT
+        (e.g. 08:00 already in lines + 02:30 monthly = 10:30).
+        We must NOT write 10:30 on the payslip line — that double-counts the previous 08:00.
         """
         # IMPORTANT: do NOT use `if not self.env['model']` — empty recordsets are falsy in Odoo!
         has_overtime_line_model = 'hr.attendance.overtime.line' in self.env
@@ -767,21 +767,31 @@ class HrPayslip(models.Model):
                 continue
 
             employee = payslip.employee_id
-            target_hours = round(
+            # Payslip "Total Extra Hours Available" = previous OT bank + monthly OT.
+            # Previous bank is ALREADY stored in other overtime lines.
+            # This payslip must only write the MONTHLY credit on date_to (not the full 10:30).
+            monthly_net = round(
+                (payslip.attendance_gross_overtime or 0.0)
+                - (payslip.lateness_covered_by_extra_hours or 0.0),
+                2,
+            )
+            target_total = round(
                 (payslip.total_extra_hours_available or 0.0)
                 - (payslip.lateness_covered_by_extra_hours or 0.0),
                 2,
             )
             _logger.info(
                 "Factory ExtraHours DEBUG payslip=%s emp=%s(%s) "
-                "total_extra=%s step1_lateness=%s gross_ot=%s TARGET=%s is_reconciled=%s",
+                "total_extra=%s step1_lateness=%s gross_ot=%s "
+                "monthly_net_to_write=%s target_total_on_card=%s is_reconciled=%s",
                 payslip.id,
                 employee.name,
                 employee.id,
                 payslip.total_extra_hours_available,
                 payslip.lateness_covered_by_extra_hours,
                 payslip.attendance_gross_overtime,
-                target_hours,
+                monthly_net,
+                target_total,
                 payslip.is_reconciled,
             )
 
@@ -887,91 +897,81 @@ class HrPayslip(models.Model):
 
             reconciliation_lines = all_ot_lines.filtered(lambda l: l.date == payslip.date_to)
             existing_line = reconciliation_lines[:1]
-            old_line_hours = 0.0
-            if existing_line:
-                old_line_hours = existing_line.manual_duration or existing_line.duration or 0.0
+            other_lines = all_ot_lines - reconciliation_lines
+            other_sum = round(sum(
+                (l.manual_duration if l.manual_duration is not None else l.duration) or 0.0
+                for l in other_lines
+                if l.status == 'approved'
+            ), 2)
 
-            current_available = 0.0
-            if hasattr(employee, '_get_deductible_employee_overtime'):
-                ot_map = employee._get_deductible_employee_overtime()
-                current_available = ot_map.get(employee, 0.0) or 0.0
-                _logger.info(
-                    "Factory ExtraHours DEBUG deductible_map keys=%s current_available=%s",
-                    [(k.id if hasattr(k, 'id') else k, v) for k, v in ot_map.items()],
-                    current_available,
-                )
-            else:
-                other_lines = OvertimeLine.search([
-                    ('employee_id', '=', employee.id),
-                    ('compensable_as_leave', '=', True),
-                    ('status', '=', 'approved'),
-                    ('id', 'not in', reconciliation_lines.ids),
-                ])
-                current_available = sum(other_lines.mapped('manual_duration') or other_lines.mapped('duration')) + old_line_hours
-                _logger.info("Factory ExtraHours DEBUG fallback current_available=%s", current_available)
-
-            base_without_line = round(current_available - old_line_hours, 2)
-            line_hours = round(target_hours - base_without_line, 2)
+            # Only credit this month's net OT on the payslip end date.
+            # Example: other_sum=8.0 + monthly_net=2.5 => card shows 10:30
+            line_hours = monthly_net
+            expected_after = round(other_sum + line_hours, 2)
             _logger.info(
-                "Factory ExtraHours DEBUG calc emp=%s old_line=%s base_without=%s line_hours_needed=%s target=%s",
+                "Factory ExtraHours DEBUG calc emp=%s other_sum=%s "
+                "line_hours(monthly_net)=%s expected_card≈%s payslip_target_total=%s",
                 employee.id,
-                old_line_hours,
-                base_without_line,
+                other_sum,
                 line_hours,
-                target_hours,
+                expected_after,
+                target_total,
             )
 
             if abs(line_hours) < 0.01:
                 if reconciliation_lines:
                     reconciliation_lines.unlink()
-                    _logger.info("Factory ExtraHours DEBUG removed reconciliation lines (line_hours~0)")
-                final_avail = 0.0
-                if hasattr(employee, '_get_deductible_employee_overtime'):
-                    final_avail = employee._get_deductible_employee_overtime().get(employee, 0.0) or 0.0
-                _logger.info("Factory ExtraHours DEBUG AFTER(no write) available=%s expected=%s", final_avail, target_hours)
-                continue
-
-            vals = {
-                'employee_id': employee.id,
-                'date': payslip.date_to,
-                'duration': line_hours,
-                'manual_duration': line_hours,
-                'compensable_as_leave': True,
-                'status': 'approved',
-            }
-            try:
-                if existing_line:
-                    existing_line.write(vals)
-                    (reconciliation_lines - existing_line).unlink()
-                    _logger.info(
-                        "Factory ExtraHours DEBUG UPDATED OT line id=%s vals=%s",
-                        existing_line.id,
+                    _logger.info("Factory ExtraHours DEBUG removed reconciliation lines (monthly_net~0)")
+            else:
+                vals = {
+                    'employee_id': employee.id,
+                    'date': payslip.date_to,
+                    'duration': line_hours,
+                    'manual_duration': line_hours,
+                    'compensable_as_leave': True,
+                    'status': 'approved',
+                }
+                try:
+                    if existing_line:
+                        existing_line.write(vals)
+                        (reconciliation_lines - existing_line).unlink()
+                        _logger.info(
+                            "Factory ExtraHours DEBUG UPDATED OT line id=%s vals=%s",
+                            existing_line.id,
+                            vals,
+                        )
+                    else:
+                        new_line = OvertimeLine.create(vals)
+                        _logger.info(
+                            "Factory ExtraHours DEBUG CREATED OT line id=%s vals=%s",
+                            new_line.id,
+                            vals,
+                        )
+                except Exception:
+                    _logger.exception(
+                        "Factory ExtraHours DEBUG FAILED writing OT line emp=%s vals=%s",
+                        employee.id,
                         vals,
                     )
-                else:
-                    new_line = OvertimeLine.create(vals)
-                    _logger.info(
-                        "Factory ExtraHours DEBUG CREATED OT line id=%s vals=%s",
-                        new_line.id,
-                        vals,
-                    )
-            except Exception:
-                _logger.exception(
-                    "Factory ExtraHours DEBUG FAILED writing OT line emp=%s vals=%s",
-                    employee.id,
-                    vals,
-                )
-                continue
+                    continue
 
+            self.env.flush_all()
+            employee.invalidate_recordset()
             final_avail = 0.0
             if hasattr(employee, '_get_deductible_employee_overtime'):
-                final_avail = employee._get_deductible_employee_overtime().get(employee, 0.0) or 0.0
+                ot_map = employee._get_deductible_employee_overtime()
+                for emp_key, hours in ot_map.items():
+                    if getattr(emp_key, 'id', None) == employee.id:
+                        final_avail = hours or 0.0
+                        break
             _logger.info(
-                "Factory ExtraHours DEBUG AFTER sync emp=%s available=%s expected_target=%s MATCH=%s",
+                "Factory ExtraHours DEBUG AFTER sync emp=%s available=%s "
+                "expected_from_lines≈%s payslip_target_total=%s MATCH_total=%s",
                 employee.id,
                 final_avail,
-                target_hours,
-                abs(final_avail - target_hours) < 0.01,
+                expected_after,
+                target_total,
+                abs((final_avail or 0.0) - target_total) < 0.05,
             )
 
     def _sync_reconciliation_settlements(self):
