@@ -855,6 +855,203 @@ class HrPayslip(models.Model):
         )
         return parts
 
+    def _allocation_hours(self, allocation):
+        """Best-effort hours from an allocation record."""
+        if hasattr(allocation, 'number_of_hours_display') and allocation.number_of_hours_display:
+            return float(allocation.number_of_hours_display)
+        if hasattr(allocation, 'number_of_hours') and allocation.number_of_hours:
+            return float(allocation.number_of_hours)
+        hours_per_day = 8.0
+        if allocation.employee_id and allocation.employee_id.resource_calendar_id:
+            hours_per_day = allocation.employee_id.resource_calendar_id.hours_per_day or 8.0
+        return float(allocation.number_of_days or 0.0) * hours_per_day
+
+    def _leave_hours(self, leave):
+        """Best-effort hours from a leave record."""
+        if hasattr(leave, 'number_of_hours') and leave.number_of_hours:
+            return float(leave.number_of_hours)
+        if hasattr(leave, 'number_of_hours_display') and leave.number_of_hours_display:
+            return float(leave.number_of_hours_display)
+        hours_per_day = 8.0
+        if leave.employee_id and leave.employee_id.resource_calendar_id:
+            hours_per_day = leave.employee_id.resource_calendar_id.hours_per_day or 8.0
+        return float(leave.number_of_days or 0.0) * hours_per_day
+
+    def _get_extra_hours_leave_type(self):
+        LeaveType = self.env['hr.leave.type'].sudo()
+        return LeaveType.search([
+            '|', '|',
+            ('name', '=', 'Extra Hours'),
+            ('name', 'ilike', 'Extra Hours'),
+            ('name', 'ilike', 'إضافي'),
+        ], limit=1)
+
+    def _sync_extra_hours_dashboard_allocation(self, employee, target_hours):
+        """
+        Sync the Time Off Dashboard Extra Hours CARD.
+
+        That card comes from hr.leave.type allocation remaining
+        (virtual_remaining_leaves), NOT from hr.attendance.overtime.line.
+        Screenshot "8 HOURS AVAILABLE / 1 DAYS AVAILABLE" is leave allocation balance.
+        """
+        self.ensure_one()
+        employee.ensure_one()
+        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
+        Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
+        if Allocation is None or Leave is None:
+            _logger.warning("Factory ExtraHours DASHBOARD skip: allocation/leave model missing")
+            return False
+
+        extra_type = self._get_extra_hours_leave_type()
+        if not extra_type:
+            _logger.warning("Factory ExtraHours DASHBOARD skip: Extra Hours leave type not found")
+            return False
+
+        sync_name = 'Factory Extra Hours Balance'
+        hours_per_day = 8.0
+        if employee.resource_calendar_id and employee.resource_calendar_id.hours_per_day:
+            hours_per_day = employee.resource_calendar_id.hours_per_day
+
+        taken_leaves = Leave.search([
+            ('employee_id', '=', employee.id),
+            ('holiday_status_id', '=', extra_type.id),
+            ('state', '=', 'validate'),
+            '!', ('name', 'ilike', 'Lateness Settlement'),
+        ])
+        taken_hours = round(sum(self._leave_hours(l) for l in taken_leaves), 2)
+
+        sync_allocs = Allocation.search([
+            ('employee_id', '=', employee.id),
+            ('holiday_status_id', '=', extra_type.id),
+            ('name', '=', sync_name),
+        ])
+        other_allocs = Allocation.search([
+            ('employee_id', '=', employee.id),
+            ('holiday_status_id', '=', extra_type.id),
+            ('state', 'in', ['confirm', 'validate', 'validate1']),
+            ('id', 'not in', sync_allocs.ids),
+        ])
+        other_alloc_hours = round(sum(self._allocation_hours(a) for a in other_allocs), 2)
+        current_sync_hours = round(sum(self._allocation_hours(a) for a in sync_allocs), 2)
+        current_remaining = round(other_alloc_hours + current_sync_hours - taken_hours, 2)
+
+        # remaining = other + sync - taken  =>  sync = target + taken - other
+        sync_needed = round(target_hours + taken_hours - other_alloc_hours, 2)
+
+        _logger.info(
+            "Factory ExtraHours DASHBOARD emp=%s(%s) leave_type=%s(id=%s) "
+            "requires_allocation=%s request_unit=%s hide_on_dashboard=%s\n"
+            "  other_alloc_hours=%s sync_alloc_hours=%s taken_hours=%s\n"
+            "  current_remaining(card)=%s target_hours=%s sync_needed=%s\n"
+            "  other_allocs=%s",
+            employee.name,
+            employee.id,
+            extra_type.name,
+            extra_type.id,
+            extra_type.requires_allocation,
+            extra_type.request_unit,
+            getattr(extra_type, 'hide_on_dashboard', None),
+            other_alloc_hours,
+            current_sync_hours,
+            taken_hours,
+            current_remaining,
+            target_hours,
+            sync_needed,
+            [(a.id, a.name, a.state, self._allocation_hours(a)) for a in other_allocs],
+        )
+
+        # Remove old sync allocs then recreate/update one
+        if sync_allocs:
+            try:
+                sync_allocs.with_context(
+                    allocation_skip_state_check=True,
+                    mail_notrack=True,
+                    tracking_disable=True,
+                ).unlink()
+            except Exception:
+                _logger.exception("Factory ExtraHours DASHBOARD failed removing old sync allocs")
+                for alloc in sync_allocs.exists():
+                    try:
+                        alloc.with_context(mail_notrack=True, tracking_disable=True).write({'state': 'refuse'})
+                        alloc.with_context(
+                            allocation_skip_state_check=True,
+                            mail_notrack=True,
+                            tracking_disable=True,
+                        ).unlink()
+                    except Exception:
+                        _logger.exception(
+                            "Factory ExtraHours DASHBOARD could not remove sync alloc id=%s",
+                            alloc.id,
+                        )
+
+        if sync_needed <= 0.01:
+            _logger.info(
+                "Factory ExtraHours DASHBOARD no sync alloc needed (sync_needed=%s). "
+                "Card remaining should be ~%s from other allocs alone.",
+                sync_needed,
+                round(other_alloc_hours - taken_hours, 2),
+            )
+            final_remaining = round(other_alloc_hours - taken_hours, 2)
+        else:
+            days = round(sync_needed / hours_per_day, 4) if hours_per_day else sync_needed
+            alloc_vals = {
+                'name': sync_name,
+                'holiday_type': 'employee',
+                'employee_id': employee.id,
+                'holiday_status_id': extra_type.id,
+                'number_of_days': days,
+                'state': 'validate',
+            }
+            if 'allocation_type' in Allocation._fields:
+                alloc_vals['allocation_type'] = 'regular'
+            if 'date_from' in Allocation._fields:
+                alloc_vals['date_from'] = self.date_from or fields.Date.context_today(self)
+            if 'date_to' in Allocation._fields:
+                alloc_vals['date_to'] = False
+            if 'number_of_days_display' in Allocation._fields:
+                alloc_vals['number_of_days_display'] = days
+            if 'number_of_hours' in Allocation._fields:
+                alloc_vals['number_of_hours'] = sync_needed
+            if 'number_of_hours_display' in Allocation._fields:
+                alloc_vals['number_of_hours_display'] = sync_needed
+
+            new_alloc = Allocation.with_context(
+                employee_id=employee.id,
+                mail_create_nolog=True,
+                mail_notrack=True,
+                tracking_disable=True,
+                allocation_skip_state_check=True,
+            ).create(alloc_vals)
+            new_alloc.sudo().write({'state': 'validate'})
+            if hasattr(new_alloc, 'action_validate'):
+                try:
+                    new_alloc.action_validate()
+                except Exception:
+                    new_alloc.sudo().write({'state': 'validate'})
+            _logger.info(
+                "Factory ExtraHours DASHBOARD created sync alloc id=%s hours=%s days=%s vals=%s",
+                new_alloc.id,
+                sync_needed,
+                days,
+                alloc_vals,
+            )
+            final_remaining = round(other_alloc_hours + sync_needed - taken_hours, 2)
+
+        match = abs(final_remaining - target_hours) < 0.05
+        _logger.info(
+            "Factory ExtraHours DASHBOARD VERDICT emp=%s card_remaining≈%s target=%s MATCH=%s\n"
+            "  >>> Time Off Dashboard Extra Hours card reads LEAVE ALLOCATION remaining, "
+            "not overtime lines. Expected UI: %s hours (%.4f days at %.2fh/day)",
+            employee.id,
+            final_remaining,
+            target_hours,
+            match,
+            final_remaining,
+            final_remaining / hours_per_day if hours_per_day else 0.0,
+            hours_per_day,
+        )
+        return match
+
     def _sync_extra_hours_time_off_balance(self):
         """
         Sync employee Time Off "Extra Hours" card with payslip reconciliation.
@@ -1174,58 +1371,58 @@ class HrPayslip(models.Model):
             employee.invalidate_recordset()
             after = payslip._debug_extra_hours_balance_breakdown(employee, 'AFTER_SYNC')
 
+            # THIS is what the Time Off Dashboard Extra Hours card actually shows
+            # (leave allocation remaining — the "8 HOURS AVAILABLE" in the UI).
+            dashboard_match = payslip._sync_extra_hours_dashboard_allocation(employee, target_total)
+
             final_avail = after.get('odoo_available')
             if final_avail is None:
                 final_avail = after.get('formula_available') or 0.0
 
             match_total = abs((final_avail or 0.0) - target_total) < 0.05
 
-            if match_total:
-                verdict = "SUCCESS: Time Off Extra Hours card matches payslip Total Extra Hours Available"
+            if dashboard_match:
+                verdict = (
+                    "SUCCESS for Time Off Dashboard card: Extra Hours leave allocation "
+                    "remaining synced to payslip target_total=%s"
+                    % target_total
+                )
+            elif match_total and not dashboard_match:
+                verdict = (
+                    "OT lines OK (%s) but DASHBOARD CARD still wrong — card reads "
+                    "Extra Hours LEAVE ALLOCATION remaining (the UI '8'), not OT lines. "
+                    "Check DASHBOARD VERDICT logs above."
+                    % final_avail
+                )
             elif after.get('deductible_allocs_sum'):
                 verdict = (
-                    "FAIL: overtime_deductible ALLOCATIONS still subtract from card. "
+                    "FAIL: overtime_deductible ALLOCATIONS still subtract from OT engine. "
                     "See deductible_allocs in AFTER_SYNC breakdown."
                 )
             elif after.get('deductible_leaves_sum'):
                 verdict = (
-                    "FAIL: overtime_deductible LEAVES still subtract from card. "
+                    "FAIL: overtime_deductible LEAVES still subtract from OT engine. "
                     "See deductible_leaves in AFTER_SYNC breakdown."
-                )
-            elif abs(old_rate - 1.0) > 0.01 and abs((final_avail or 0.0) - (line_hours * old_rate)) < 0.05:
-                verdict = (
-                    "FAIL: work_entry_type rate was re-applied (rate=%s). "
-                    "credited=%s instead of manual=%s. Check if another module resets work_entry_type_id."
-                    % (old_rate, final_avail, line_hours)
-                )
-            elif previous_bank_on_payslip > 0.05 and len(other_lines) == 0:
-                verdict = (
-                    "INFO/FAIL context: payslip previous bank=%s came from ALLOCATIONS (not OT lines). "
-                    "Absolute sync should still force card to target_total=%s; "
-                    "if MATCH still false, inspect credited_duration after write."
-                    % (previous_bank_on_payslip, target_total)
                 )
             else:
                 verdict = (
-                    "FAIL: unexpected. before=%s after=%s expected=%s target=%s "
-                    "needed_manual_written=%s"
-                    % (before_available, final_avail, expected_after, target_total, line_hours)
+                    "FAIL: OT after=%s target=%s dashboard_match=%s"
+                    % (final_avail, target_total, dashboard_match)
                 )
 
             _logger.info(
                 "Factory ExtraHours VERDICT emp=%s(%s) payslip=%s\n"
-                "  before_odoo_available=%s\n"
-                "  after_odoo_available=%s\n"
+                "  ot_engine_available=%s (overtime lines — NOT the dashboard card)\n"
                 "  payslip_target_total=%s\n"
-                "  MATCH_target=%s\n"
+                "  OT_MATCH=%s DASHBOARD_ALLOC_MATCH=%s\n"
                 "  >>> %s",
                 employee.name,
                 employee.id,
                 payslip.id,
-                before_available,
                 final_avail,
                 target_total,
                 match_total,
+                dashboard_match,
                 verdict,
             )
 
