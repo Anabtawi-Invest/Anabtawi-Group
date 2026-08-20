@@ -64,6 +64,26 @@ class HrEmployee(models.Model):
         help="Lunch/Break duration in hours subtracted from attendance shifts (e.g. 1.0 = 60 min, 0.75 = 45 min, 0.5 = 30 min)."
     )
 
+    # Legacy view compatibility aliases
+    lunch_break_rule = fields.Selection([
+        ('factory', 'Factory / Branches (1.0h Break)'),
+        ('office', 'Head Office (0.5h Break)'),
+        ('custom', 'Custom Break Duration')
+    ], string="Lunch Break Deduction Policy", compute="_compute_legacy_lunch_break_rule", store=False)
+
+    custom_lunch_break_hours = fields.Float(
+        related="break_duration_hours",
+        string="Custom Lunch Break (Hours)",
+        store=False
+    )
+
+    def _compute_legacy_lunch_break_rule(self):
+        for emp in self:
+            if emp.employee_work_station == 'headoffice':
+                emp.lunch_break_rule = 'office'
+            else:
+                emp.lunch_break_rule = 'factory'
+
     @api.onchange('employee_work_station')
     def _onchange_employee_work_station(self):
         for emp in self:
