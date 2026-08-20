@@ -263,6 +263,110 @@ class HrPayslip(models.Model):
             payslip.lateness_covered_by_paid_time_off = covered_paid_time_off
             payslip.undertime_cash_deduction_hours = rem_lateness
 
+    def compute_sheet(self):
+        # 1. Run full reconciliation ONLY for payslips that have not been reconciled yet
+        unreconciled_slips = self.filtered(lambda s: not s.is_reconciled)
+        if unreconciled_slips:
+            for payslip in unreconciled_slips:
+                if payslip.employee_id and payslip.date_from and payslip.date_to:
+                    if hasattr(payslip.employee_id, '_create_absent_work_entries_for_period'):
+                        payslip.employee_id._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
+
+            unreconciled_slips._convert_flexible_rest_days_to_ars()
+
+            # Force refresh worked_days_line_ids so the payslip Worked Days tab instantly updates
+            for payslip in unreconciled_slips:
+                if payslip.state == 'draft':
+                    worked_days_vals = payslip._get_worked_day_lines()
+                    payslip.worked_days_line_ids.unlink()
+                    payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
+
+            unreconciled_slips._compute_attendance_reconciliation_fields()
+            unreconciled_slips._sync_reconciliation_settlements()
+            unreconciled_slips.write({'is_reconciled': True})
+
+        # 2. Always compute salary rules so newly added salary inputs/adjustments are calculated!
+        res = super().compute_sheet()
+        return res
+
+    def action_payslip_done(self):
+        res = super().action_payslip_done()
+        self._sync_reconciliation_settlements()
+        return res
+
+    def action_payslip_draft(self):
+        self._revert_reconciliation_settlements()
+        return super().action_payslip_draft()
+
+    def action_payslip_cancel(self):
+        res = super().action_payslip_cancel()
+        self._revert_reconciliation_settlements()
+        return res
+
+    def action_cancel(self):
+        res = super().action_cancel() if hasattr(super(), 'action_cancel') else True
+        self._revert_reconciliation_settlements()
+        return res
+
+    def unlink(self):
+        self._revert_reconciliation_settlements()
+        return super().unlink()
+
+    def write(self, vals):
+        res = super().write(vals)
+        if vals.get('state') == 'cancel':
+            self._revert_reconciliation_settlements()
+        return res
+
+    def _get_worked_day_lines(self, *args, **kwargs):
+        """
+        Harmonizes Odoo's native Worked Days tab lines with our Reconciliation Engine:
+        1. Break Deduction: Deducts 1.0h (Factory/Branch) or 0.5h (Head Office) lunch break per shift from the Attendance line.
+        2. Overtime: Ensures Extra Hours / Overtime matches net remaining extra hours after Step 1 lateness settlement.
+        """
+        res = super()._get_worked_day_lines(*args, **kwargs)
+        for payslip in self:
+            if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
+                continue
+
+            emp = payslip.employee_id
+            break_hrs = emp._get_lunch_break_duration() if emp else 1.0
+            w = emp.wage if emp else 0.0
+            hourly_rate = w / 240.0
+
+            # Count worked shifts in this period
+            attendances = self.env['hr.attendance'].sudo().search([
+                ('employee_id', '=', emp.id),
+                ('check_in', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                ('check_in', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
+            ])
+            worked_shifts_count = len(set(att.check_in.date() for att in attendances))
+
+            net_extra_hrs = round(payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours, 2)
+
+            for line in res:
+                code = (line.get('code') or '').strip()
+                work_entry_type = self.env['hr.work.entry.type'].browse(line.get('work_entry_type_id')) if line.get('work_entry_type_id') else None
+                we_name = (work_entry_type.name or '').lower() if work_entry_type else ''
+
+                # Attendance Line Break Deduction: Net Paid Working Hours = Raw Hours - (Shifts * Break)
+                if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
+                    raw_hours = line.get('number_of_hours', 0.0)
+                    total_break_deduction = worked_shifts_count * break_hrs
+                    if raw_hours > total_break_deduction and total_break_deduction > 0:
+                        net_work_hours = round(raw_hours - total_break_deduction, 2)
+                        line['number_of_hours'] = net_work_hours
+                        line['number_of_days'] = round(net_work_hours / 8.0, 2)
+                        line['amount'] = round(net_work_hours * hourly_rate, 3)
+
+                # Overtime Line
+                elif code in ['OVERTIME', 'EXTRA', 'OUT'] or 'overtime' in we_name or 'extra' in we_name:
+                    line['number_of_hours'] = max(0.0, net_extra_hrs)
+                    line['number_of_days'] = round(max(0.0, net_extra_hrs) / 8.0, 2)
+                    line['amount'] = round(max(0.0, net_extra_hrs) * hourly_rate, 3)
+
+        return res
+
     def _convert_flexible_rest_days_to_ars(self):
         """
         Automatic Flexible Rest Day Conversion (Batch Optimized for 500+ employees):
