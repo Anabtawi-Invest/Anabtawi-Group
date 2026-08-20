@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from odoo import models, fields, api
 
 class HrAttendance(models.Model):
@@ -59,55 +60,53 @@ class HrAttendance(models.Model):
             elif excess < -min_lateness_threshold:
                 attendance.daily_variance_hours = excess
             else:
-                # Up to 15 mins lateness/shortfall is forgiven (0.0 variance)
                 attendance.daily_variance_hours = 0.0
 
     @api.depends('worked_hours', 'employee_id')
     def _compute_overtime_hours(self):
+        """High-performance in-memory calculation (0 DB queries per row)."""
         for attendance in self:
-            try:
-                is_validated = False
-                if 'hr.work.entry' in self.env and attendance.check_in and attendance.employee_id:
-                    WorkEntry = self.env['hr.work.entry'].sudo()
-                    we_fields = WorkEntry._fields
-                    start_field = 'date_start' if 'date_start' in we_fields else ('date_from' if 'date_from' in we_fields else None)
-                    stop_field = 'date_stop' if 'date_stop' in we_fields else ('date_to' if 'date_to' in we_fields else None)
-                    if start_field and stop_field:
-                        we = WorkEntry.search([
-                            ('employee_id', '=', attendance.employee_id.id),
-                            (start_field, '<=', attendance.check_in),
-                            (stop_field, '>=', attendance.check_in),
-                            ('state', '=', 'validated')
-                        ], limit=1)
-                        if we:
-                            is_validated = True
+            if not attendance.employee_id or not attendance.worked_hours:
+                attendance.overtime_hours = 0.0
+                continue
 
-                if is_validated:
-                    continue
-
-                raw_hrs = attendance.worked_hours or 0.0
-                break_hrs = attendance.employee_id._get_lunch_break_duration() if attendance.employee_id else 1.0
-                net_hrs = max(0.0, raw_hrs - break_hrs) if raw_hrs >= 6.0 else raw_hrs
-                excess = net_hrs - 8.0
-                if excess >= 0.75:
-                    attendance.overtime_hours = excess
-                else:
-                    attendance.overtime_hours = 0.0
-            except Exception:
-                pass
+            raw_hrs = attendance.worked_hours or 0.0
+            break_hrs = attendance.employee_id._get_lunch_break_duration()
+            net_hrs = max(0.0, raw_hrs - break_hrs) if raw_hrs >= 6.0 else raw_hrs
+            excess = net_hrs - 8.0
+            attendance.overtime_hours = excess if excess >= 0.75 else 0.0
 
     def _update_overtime(self, attendance_domain=None):
         """
-        Overrides native Odoo overtime generator to force native extra hours tables
-        (hr.attendance.overtime / hr.attendance.overtime.line) to evaluate Net Worked Hours
-        after lunch break deduction.
+        Batch-optimized overtime generator: Pre-fetches all overtime lines
+        in 1 bulk query instead of N individual database searches.
         """
         res = super()._update_overtime(attendance_domain=attendance_domain)
-        for att in self:
-            try:
-                if not att.employee_id or not att.worked_hours or not att.check_in:
-                    continue
+        valid_atts = self.filtered(lambda a: a.employee_id and a.worked_hours and a.check_in)
+        if not valid_atts:
+            return res
 
+        emp_ids = valid_atts.mapped('employee_id').ids
+        att_dates = list(set(a.check_in.date() for a in valid_atts))
+
+        ot_by_key = {}
+        if 'hr.attendance.overtime' in self.env:
+            ot_recs = self.env['hr.attendance.overtime'].sudo().search([
+                ('employee_id', 'in', emp_ids),
+                ('date', 'in', att_dates)
+            ])
+            ot_by_key = {(r.employee_id.id, r.date): r for r in ot_recs}
+
+        ot_lines_by_key = {}
+        if 'hr.attendance.overtime.line' in self.env:
+            ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
+                ('employee_id', 'in', emp_ids),
+                ('date', 'in', att_dates)
+            ])
+            ot_lines_by_key = {(l.employee_id.id, l.date): l for l in ot_lines}
+
+        for att in valid_atts:
+            try:
                 raw_hrs = att.worked_hours
                 break_hrs = att.employee_id._get_lunch_break_duration()
 
@@ -118,36 +117,23 @@ class HrAttendance(models.Model):
                 else:
                     net_hrs = raw_hrs
 
-                standard_target = 8.0
-                excess = net_hrs - standard_target
-                min_ot_threshold = 0.75  # 45 minutes
+                excess = net_hrs - 8.0
+                min_ot_threshold = 0.75
 
                 att_date = att.check_in.date()
+                key = (att.employee_id.id, att_date)
+
+                ot_rec = ot_by_key.get(key)
+                ot_line = ot_lines_by_key.get(key)
 
                 if excess < min_ot_threshold:
-                    if 'hr.attendance.overtime' in self.env:
-                        ot_recs = self.env['hr.attendance.overtime'].sudo().search([
-                            ('employee_id', '=', att.employee_id.id),
-                            ('date', '=', att_date)
-                        ])
-                        if ot_recs:
-                            ot_recs.sudo().write({'duration': 0.0})
-
-                    if 'hr.attendance.overtime.line' in self.env:
-                        ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
-                            ('employee_id', '=', att.employee_id.id),
-                            ('date', '=', att_date)
-                        ])
-                        if ot_lines:
-                            ot_lines.sudo().write({'duration': 0.0, 'manual_duration': 0.0})
+                    if ot_rec:
+                        ot_rec.sudo().write({'duration': 0.0})
+                    if ot_line:
+                        ot_line.sudo().write({'duration': 0.0, 'manual_duration': 0.0})
                 else:
-                    if 'hr.attendance.overtime' in self.env:
-                        ot_recs = self.env['hr.attendance.overtime'].sudo().search([
-                            ('employee_id', '=', att.employee_id.id),
-                            ('date', '=', att_date)
-                        ])
-                        if ot_recs:
-                            ot_recs.sudo().write({'duration': excess})
+                    if ot_rec:
+                        ot_rec.sudo().write({'duration': excess})
             except Exception:
                 pass
         return res
