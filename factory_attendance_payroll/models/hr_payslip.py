@@ -321,8 +321,11 @@ class HrPayslip(models.Model):
     def _get_worked_day_lines(self, *args, **kwargs):
         """
         Harmonizes Odoo's native Worked Days tab lines with our Reconciliation Engine:
-        1. Break Deduction: Deducts 1.0h (Factory/Branch) or 0.5h (Head Office) lunch break per shift from the Attendance line.
-        2. Overtime: Ensures Extra Hours / Overtime matches net remaining extra hours after Step 1 lateness settlement.
+        1. Break Deduction: Deducts lunch break per shift from the Attendance line.
+        2. Overtime: Matches net remaining extra hours after Step 1 lateness settlement.
+        3. Absent / Lateness Cash Deduction: ONLY includes cash deduction for Step 3 remaining lateness (undertime_cash_deduction_hours).
+           If lateness was settled via Annual Leave (Step 2), NO cash deduction is made from salary!
+        4. Excludes settlement leave entries from the Worked Days table.
         """
         res = super()._get_worked_day_lines(*args, **kwargs)
         for payslip in self:
@@ -343,13 +346,20 @@ class HrPayslip(models.Model):
             worked_shifts_count = len(set(att.check_in.date() for att in attendances))
 
             net_extra_hrs = round(payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours, 2)
+            rem_cash_deduction_hrs = round(payslip.undertime_cash_deduction_hours, 2)
 
+            filtered_lines = []
             for line in res:
                 code = (line.get('code') or '').strip()
                 work_entry_type = self.env['hr.work.entry.type'].browse(line.get('work_entry_type_id')) if line.get('work_entry_type_id') else None
                 we_name = (work_entry_type.name or '').lower() if work_entry_type else ''
+                line_name = (line.get('name') or '').lower()
 
-                # Attendance Line Break Deduction: Net Paid Working Hours = Raw Hours - (Shifts * Break)
+                # Filter out settlement leaves so they don't appear as fake vacations
+                if 'settlement' in line_name or 'lateness coverage' in line_name or 'monthly lateness' in line_name:
+                    continue
+
+                # 1. Attendance Line Break Deduction: Net Paid Working Hours = Raw Hours - (Shifts * Break)
                 if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
                     raw_hours = line.get('number_of_hours', 0.0)
                     total_break_deduction = worked_shifts_count * break_hrs
@@ -358,12 +368,28 @@ class HrPayslip(models.Model):
                         line['number_of_hours'] = net_work_hours
                         line['number_of_days'] = round(net_work_hours / 8.0, 2)
                         line['amount'] = round(net_work_hours * hourly_rate, 3)
+                    filtered_lines.append(line)
 
-                # Overtime Line
+                # 2. Overtime Line
                 elif code in ['OVERTIME', 'EXTRA', 'OUT'] or 'overtime' in we_name or 'extra' in we_name:
-                    line['number_of_hours'] = max(0.0, net_extra_hrs)
-                    line['number_of_days'] = round(max(0.0, net_extra_hrs) / 8.0, 2)
-                    line['amount'] = round(max(0.0, net_extra_hrs) * hourly_rate, 3)
+                    if net_extra_hrs > 0.01:
+                        line['number_of_hours'] = net_extra_hrs
+                        line['number_of_days'] = round(net_extra_hrs / 8.0, 2)
+                        line['amount'] = round(net_extra_hrs * hourly_rate, 3)
+                        filtered_lines.append(line)
+
+                # 3. Absent / Unpaid Deduction Line: ONLY include if Step 3 Cash Deduction > 0!
+                elif code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in we_name:
+                    if rem_cash_deduction_hrs > 0.01:
+                        line['number_of_hours'] = rem_cash_deduction_hrs
+                        line['number_of_days'] = round(rem_cash_deduction_hrs / 8.0, 2)
+                        line['amount'] = round(rem_cash_deduction_hrs * hourly_rate, 3)
+                        filtered_lines.append(line)
+
+                else:
+                    filtered_lines.append(line)
+
+            res = filtered_lines
 
         return res
 
@@ -580,11 +606,12 @@ class HrPayslip(models.Model):
                 else:
                     new_leave = ctx_leave.create(leave_vals)
                     new_leave.sudo().write({'state': 'validate'})
-                    if hasattr(new_leave, '_create_resource_calendar_leaves'):
-                        try:
-                            new_leave._create_resource_calendar_leaves()
-                        except Exception:
-                            pass
+                    if 'hr.work.entry' in self.env:
+                        we_model = self.env['hr.work.entry'].sudo()
+                        if 'leave_id' in we_model._fields:
+                            generated_we = we_model.search([('leave_id', '=', new_leave.id)])
+                            if generated_we:
+                                generated_we.unlink()
             except Exception as e:
                 pass
         else:
