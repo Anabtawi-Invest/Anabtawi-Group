@@ -132,8 +132,18 @@ class HrPayslip(models.Model):
     def compute_sheet(self):
         for payslip in self:
             if payslip.employee_id and payslip.date_from and payslip.date_to:
-                payslip.employee_id._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
+                if hasattr(payslip.employee_id, '_create_absent_work_entries_for_period'):
+                    payslip.employee_id._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
+
         self._convert_flexible_rest_days_to_ars()
+
+        # Force refresh worked_days_line_ids so the payslip Worked Days tab instantly updates
+        for payslip in self:
+            if payslip.state == 'draft':
+                worked_days_vals = payslip._get_worked_day_lines()
+                payslip.worked_days_line_ids.unlink()
+                payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
+
         self._compute_attendance_reconciliation_fields()
         res = super().compute_sheet()
         self._sync_reconciliation_settlements()
@@ -143,6 +153,10 @@ class HrPayslip(models.Model):
         res = super().action_payslip_done()
         self._sync_reconciliation_settlements()
         return res
+
+    def action_payslip_draft(self):
+        self._revert_reconciliation_settlements()
+        return super().action_payslip_draft()
 
     def action_payslip_cancel(self):
         res = super().action_payslip_cancel()
@@ -188,10 +202,16 @@ class HrPayslip(models.Model):
     def _convert_flexible_rest_days_to_ars(self):
         """
         Automatic Flexible Rest Day Conversion:
-        Converts 'Absent' (A) work entries on unworked rest days to 'Rest Day' (ARS)
-        so that off days in a flexible 6-day work week display cleanly as Rest Day.
+        Converts 'Absent' (ABS / ABSENT) work entries on unworked rest days to 'Rest Day' (ARS)
+        up to the earned rest day quota (Method 2: 1 Rest Day earned per 6 Worked Days).
         Safely handles validated work entries without raising Invalid Operation errors.
         """
+        rest_type = False
+        if 'hr.work.entry' in self.env:
+            rest_type = self.env['hr.work.entry.type'].sudo().search([
+                '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
+            ], limit=1)
+
         for payslip in self:
             try:
                 if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
@@ -204,7 +224,7 @@ class HrPayslip(models.Model):
                 ])
                 worked_dates = set(att.check_in.date() for att in attendances)
 
-                if 'hr.work.entry' in self.env:
+                if rest_type and 'hr.work.entry' in self.env:
                     WorkEntry = self.env['hr.work.entry'].sudo()
                     we_fields = WorkEntry._fields
 
@@ -228,25 +248,37 @@ class HrPayslip(models.Model):
                         (start_field, '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
                         (stop_field, '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
                     ]
-                    work_entries = WorkEntry.search(domain)
+                    work_entries = WorkEntry.search(domain).sorted(start_field)
 
-                    rest_type = self.env['hr.work.entry.type'].sudo().search([
-                        '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
-                    ], limit=1)
-
-                    if rest_type:
-                        for we in work_entries:
+                    for we in work_entries:
+                        code = (we.work_entry_type_id.code or '').strip()
+                        name = (we.work_entry_type_id.name or '').lower()
+                        if not we.work_entry_type_id.is_leave and code not in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] and 'absent' not in name:
                             start_val = getattr(we, start_field, None)
-                            if not start_val:
-                                continue
-                            we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
-                            if we_date and we_date not in worked_dates:
-                                code = we.work_entry_type_id.code or ''
-                                name = (we.work_entry_type_id.name or '').lower()
-                                if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'A'] or 'absent' in name:
+                            if start_val:
+                                we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
+                                if we_date:
+                                    worked_dates.add(we_date)
+
+                    # Method 2: Earn 1 Rest Day for every 6 Worked Days
+                    worked_days_count = len(worked_dates)
+                    allowed_rest_days = worked_days_count // 6
+
+                    converted_count = 0
+                    for we in work_entries:
+                        start_val = getattr(we, start_field, None)
+                        if not start_val:
+                            continue
+                        we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
+                        if we_date:
+                            code = (we.work_entry_type_id.code or '').strip()
+                            name = (we.work_entry_type_id.name or '').lower()
+                            if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in name:
+                                if converted_count < allowed_rest_days:
                                     if hasattr(we, 'state') and we.state == 'validated':
                                         we.sudo().write({'state': 'draft'})
                                     we.sudo().write({'work_entry_type_id': rest_type.id})
+                                    converted_count += 1
             except Exception:
                 pass
 
@@ -296,7 +328,7 @@ class HrPayslip(models.Model):
         ], limit=1)
 
         if hours > 0.01:
-            days = round(hours / 8.0, 2)
+            days = round(hours / 8.0, 4)
             month_str = self.date_to.strftime('%B %Y') if self.date_to else ''
             full_name = f"{leave_desc} - {month_str}"
 
@@ -312,7 +344,10 @@ class HrPayslip(models.Model):
                 'date_from': dt_start,
                 'date_to': dt_stop,
                 'number_of_days': days,
+                'state': 'validate',
             }
+            if 'number_of_days_display' in Leave._fields:
+                leave_vals['number_of_days_display'] = days
             if 'number_of_hours' in Leave._fields:
                 leave_vals['number_of_hours'] = hours
             if 'number_of_hours_display' in Leave._fields:
@@ -323,6 +358,7 @@ class HrPayslip(models.Model):
                 mail_create_nolog=True,
                 mail_notrack=True,
                 tracking_disable=True,
+                leave_skip_state_check=True,
             )
 
             try:
@@ -332,6 +368,7 @@ class HrPayslip(models.Model):
                         mail_create_nolog=True,
                         mail_notrack=True,
                         tracking_disable=True,
+                        leave_skip_state_check=True,
                     ).write(leave_vals)
                     if existing_leave.state != 'validate':
                         existing_leave.sudo().write({'state': 'validate'})
@@ -556,8 +593,7 @@ class HrPayslip(models.Model):
 
         # 3. Calculate Monthly Quota based on total days in payslip window
         total_days_in_month = (self.date_to - self.date_from).days + 1
-        allowed_rest_days = total_days_in_month // 7
-        target_work_days = total_days_in_month - allowed_rest_days
+        target_work_days = total_days_in_month - (total_days_in_month // 7)
 
         break_hrs = self.employee_id._get_lunch_break_duration() if self.employee_id else 1.0
         min_ot_threshold = 0.75         # 45 minutes Overtime threshold
@@ -568,6 +604,9 @@ class HrPayslip(models.Model):
 
         # Evaluate Daily Shift Variances for worked days
         worked_days_count = len(daily_hours)
+
+        # Method 2: Earn 1 Rest Day for every 6 Worked Days
+        allowed_rest_days = worked_days_count // 6
 
         for att_date, raw_hrs in daily_hours.items():
             # Apply break deduction rule according to employee location
