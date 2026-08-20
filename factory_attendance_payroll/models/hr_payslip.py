@@ -75,12 +75,6 @@ class HrPayslip(models.Model):
         copy=False,
         help="Tracks whether attendance reconciliation and leave settlements have already been applied for this payslip."
     )
-    extra_hours_allocated_days = fields.Float(
-        string="Extra Hours Added to Allocation",
-        default=0.0,
-        copy=False,
-        help="Tracks duration in days added directly to employee's Extra Hours allocation by this payslip."
-    )
 
     @api.depends('employee_id', 'date_from', 'date_to')
     def _compute_attendance_reconciliation_fields(self):
@@ -145,8 +139,8 @@ class HrPayslip(models.Model):
                 ('holiday_status_id', 'in', target_type_ids)
             ])
             for alloc in allocations:
-                # Exclude monthly reconciliation allocations for the current batch so prior balance is isolated
-                if 'Extra Hours Reconciliation' in (alloc.name or '') or 'Monthly Overtime Earned' in (alloc.name or ''):
+                # Exclude monthly overtime allocations for the current batch so prior balance is isolated
+                if 'Monthly Overtime Earned' in (alloc.name or ''):
                     continue
                 hrs = 0.0
                 if hasattr(alloc, 'number_of_days') and alloc.number_of_days:
@@ -249,8 +243,7 @@ class HrPayslip(models.Model):
             payslip.attendance_gross_undertime = gross_ut
             payslip.attendance_net_reconciled = round(gross_ot - gross_ut, 2)
 
-            current_slip_allocated_hours = (payslip.extra_hours_allocated_days or 0.0) * 8.0
-            prior_alloc_extra = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in extra_type_ids) - current_slip_allocated_hours)
+            prior_alloc_extra = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in extra_type_ids))
             prior_ot_line_extra = round(banked_extra_by_emp.get(emp_id, 0.0), 2)
             prev_extra_hours = max(prior_alloc_extra, prior_ot_line_extra)
 
@@ -286,24 +279,30 @@ class HrPayslip(models.Model):
             payslip.undertime_cash_deduction_hours = rem_lateness
 
     def compute_sheet(self):
-        # 1. Run full reconciliation for payslips being computed
-        for payslip in self:
-            if payslip.employee_id and payslip.date_from and payslip.date_to:
-                if hasattr(payslip.employee_id, '_create_absent_work_entries_for_period'):
-                    payslip.employee_id._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
+        # 1. Run full reconciliation ONLY for payslips that have not been reconciled yet
+        unreconciled_slips = self.filtered(lambda s: not s.is_reconciled)
+        if unreconciled_slips:
+            for payslip in unreconciled_slips:
+                if payslip.employee_id and payslip.date_from and payslip.date_to:
+                    if hasattr(payslip.employee_id, '_create_absent_work_entries_for_period'):
+                        payslip.employee_id._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
 
-        self._convert_flexible_rest_days_to_ars()
+            unreconciled_slips._convert_flexible_rest_days_to_ars()
 
-        # Force refresh worked_days_line_ids so the payslip Worked Days tab instantly updates
-        for payslip in self:
-            if payslip.state == 'draft':
-                worked_days_vals = payslip._get_worked_day_lines()
-                payslip.worked_days_line_ids.unlink()
-                payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
+            # Force refresh worked_days_line_ids so the payslip Worked Days tab instantly updates
+            for payslip in unreconciled_slips:
+                if payslip.state == 'draft':
+                    worked_days_vals = payslip._get_worked_day_lines()
+                    payslip.worked_days_line_ids.unlink()
+                    payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
 
-        self._compute_attendance_reconciliation_fields()
-        self._sync_reconciliation_settlements()
-        self.write({'is_reconciled': True})
+            unreconciled_slips._compute_attendance_reconciliation_fields()
+            unreconciled_slips._sync_reconciliation_settlements()
+            unreconciled_slips.write({'is_reconciled': True})
+        else:
+            # Re-compute totals and refresh Extra Hours Time Off card on every Compute Sheet
+            self._compute_attendance_reconciliation_fields()
+            self._sync_extra_hours_time_off_balance()
 
         # 2. Always compute salary rules so newly added salary inputs/adjustments are calculated!
         res = super().compute_sheet()
@@ -528,37 +527,19 @@ class HrPayslip(models.Model):
         LeaveType = self.env['hr.leave.type'].sudo()
 
         if leave_type_name == 'Extra Hours':
-            emp_alloc = self.env['hr.leave.allocation'].sudo().search([
-                ('employee_id', '=', self.employee_id.id),
-                ('holiday_status_id.name', 'ilike', 'Extra'),
-                ('state', '=', 'validate'),
-            ], limit=1)
-            if emp_alloc:
-                leave_type = emp_alloc.holiday_status_id
-            else:
-                leave_types = LeaveType.search([
-                    '|', '|',
-                    ('name', '=', 'Extra Hours'),
-                    ('name', 'ilike', 'Extra Hours'),
-                    ('name', 'ilike', 'إضافي')
-                ])
-                leave_type = leave_types[0] if leave_types else None
+            leave_types = LeaveType.search([
+                '|', '|',
+                ('name', '=', 'Extra Hours'),
+                ('name', 'ilike', 'Extra Hours'),
+                ('name', 'ilike', 'إضافي')
+            ])
         elif leave_type_name == 'Annual Leave':
-            emp_alloc = self.env['hr.leave.allocation'].sudo().search([
-                ('employee_id', '=', self.employee_id.id),
-                ('holiday_status_id.name', 'ilike', 'Annual'),
-                ('state', '=', 'validate'),
-            ], limit=1)
-            if emp_alloc:
-                leave_type = emp_alloc.holiday_status_id
-            else:
-                leave_types = LeaveType.search([
-                    '|', '|',
-                    ('name', '=', 'Annual Leave'),
-                    ('name', 'ilike', 'Annual Leave'),
-                    ('name', 'ilike', 'سنوي')
-                ])
-                leave_type = leave_types[0] if leave_types else None
+            leave_types = LeaveType.search([
+                '|', '|',
+                ('name', '=', 'Annual Leave'),
+                ('name', 'ilike', 'Annual Leave'),
+                ('name', 'ilike', 'سنوي')
+            ])
         elif leave_type_name == 'Paid Time Off':
             leave_types = LeaveType.search([
                 '|', '|',
@@ -566,11 +547,10 @@ class HrPayslip(models.Model):
                 ('name', 'ilike', 'Paid Time Off'),
                 ('name', 'ilike', 'مدفوع')
             ])
-            leave_type = leave_types[0] if leave_types else None
         else:
             leave_types = LeaveType.search([('name', '=', leave_type_name)])
-            leave_type = leave_types[0] if leave_types else None
 
+        leave_type = leave_types[0] if leave_types else None
         if not leave_type:
             return
 
@@ -727,144 +707,136 @@ class HrPayslip(models.Model):
             except Exception:
                 pass
 
-    def _sync_reconciliation_settlements(self):
+    def _sync_extra_hours_time_off_balance(self):
         """
-        1. Credit Extra Hours Allocation balance with monthly overtime earned.
-        2. Deduct Step 1 Extra Hours via approved hr.leave records (reduces Extra Hours allocation balance).
-        3. Deduct Step 2a Annual Leave via approved hr.leave records (reduces Annual Leave balance).
-        4. Deduct Step 2b Paid Time Off via approved hr.leave record (reduces Paid Time Off balance).
-        5. Sync Extra Hours Attendance Overtime Line.
+        Sync employee Time Off "Extra Hours" card with payslip reconciliation.
+
+        Odoo 19 reads Extra Hours from hr.attendance.overtime.line
+        (compensable_as_leave + approved), NOT from leave allocations.
+        Creating Extra Hours allocations with overtime_deductible cancels the
+        overtime credit on the dashboard — so we only maintain overtime lines.
+
+        Target available hours =
+            total_extra_hours_available - lateness_covered_by_extra_hours
+        (e.g. 10:30 when previous 08:00 + monthly OT 02:30 and no Step-1 lateness).
         """
-        LeaveType = self.env['hr.leave.type'].sudo() if 'hr.leave.type' in self.env else None
-        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
         OvertimeLine = self.env['hr.attendance.overtime.line'].sudo() if 'hr.attendance.overtime.line' in self.env else None
+        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
+        Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
+        LeaveType = self.env['hr.leave.type'].sudo() if 'hr.leave.type' in self.env else None
+
+        if not OvertimeLine:
+            return
 
         for payslip in self:
             if not payslip.employee_id or not payslip.date_to:
                 continue
 
-            month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
-            alloc_name = f"Monthly Overtime Earned - {month_str}"
-
-            # 1. Create or Update Monthly Extra Hours Reconciliation Allocation
-            if Allocation and LeaveType:
-                emp_alloc = Allocation.search([
-                    ('employee_id', '=', payslip.employee_id.id),
-                    ('holiday_status_id.name', 'ilike', 'Extra'),
-                    ('state', '=', 'validate'),
-                ], limit=1)
-                if emp_alloc:
-                    extra_type = emp_alloc.holiday_status_id
-                else:
-                    extra_types = LeaveType.search([
-                        '|', '|',
-                        ('name', '=', 'Extra Hours'),
-                        ('name', 'ilike', 'Extra Hours'),
-                        ('name', 'ilike', 'إضافي')
-                    ])
-                    extra_type = extra_types[0] if extra_types else None
-
-                if extra_type:
-                    alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
-                    existing_alloc = Allocation.search([
-                        ('employee_id', '=', payslip.employee_id.id),
-                        ('holiday_status_id', '=', extra_type.id),
-                        ('name', '=', alloc_name),
-                    ], limit=1)
-
-                    net_ot_hours = max(0.0, payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours)
-                    if net_ot_hours > 0.01:
-                        ot_days = round(net_ot_hours / 8.0, 4)
-                        alloc_vals = {
-                            'name': alloc_name,
-                            'holiday_type': 'employee',
-                            'employee_id': payslip.employee_id.id,
-                            'holiday_status_id': extra_type.id,
-                            'number_of_days': ot_days,
-                            'state': 'validate',
-                        }
-                        if 'allocation_type' in Allocation._fields:
-                            alloc_vals['allocation_type'] = 'regular'
-                        if 'date_from' in Allocation._fields:
-                            alloc_vals['date_from'] = payslip.date_from
-                        if 'date_to' in Allocation._fields:
-                            alloc_vals['date_to'] = False
-                        if 'number_of_days_display' in Allocation._fields:
-                            alloc_vals['number_of_days_display'] = ot_days
-                        if 'number_of_hours' in Allocation._fields:
-                            alloc_vals['number_of_hours'] = net_ot_hours
-                        if 'number_of_hours_display' in Allocation._fields:
-                            alloc_vals['number_of_hours_display'] = net_ot_hours
-
-                        if existing_alloc:
-                            existing_alloc.write(alloc_vals)
-                            if existing_alloc.state != 'validate':
-                                existing_alloc.sudo().write({'state': 'validate'})
-                            if hasattr(existing_alloc, 'action_validate'):
-                                try:
-                                    existing_alloc.action_validate()
-                                except Exception:
-                                    pass
-                        else:
-                            new_alloc = Allocation.with_context(
-                                employee_id=payslip.employee_id.id,
-                                mail_create_nolog=True,
-                                mail_notrack=True,
-                                tracking_disable=True,
-                                allocation_skip_state_check=True,
-                            ).create(alloc_vals)
-                            new_alloc.sudo().write({'state': 'validate'})
-                            if hasattr(new_alloc, 'action_validate'):
-                                try:
-                                    new_alloc.action_validate()
-                                except Exception:
-                                    pass
-                    else:
-                        if existing_alloc:
-                            existing_alloc.unlink()
-
-            # 2. Step 1: Extra Hours Time Off Deduction
-            payslip._create_or_update_settlement_leave(
-                'Extra Hours',
-                payslip.lateness_covered_by_extra_hours,
-                'Lateness Settlement via Extra Hours'
+            employee = payslip.employee_id
+            target_hours = round(
+                (payslip.total_extra_hours_available or 0.0)
+                - (payslip.lateness_covered_by_extra_hours or 0.0),
+                2,
             )
 
-            # 3. Step 2a: Annual Leave Time Off Deduction
+            # Remove legacy Extra Hours allocations that cancel overtime on the dashboard
+            if Allocation:
+                month_str = payslip.date_to.strftime('%B %Y')
+                alloc_name = f"Monthly Overtime Earned - {month_str}"
+                legacy_allocs = Allocation.search([
+                    ('employee_id', '=', employee.id),
+                    ('name', '=', alloc_name),
+                ])
+                if legacy_allocs:
+                    legacy_allocs.unlink()
+
+            # Extra Hours lateness is applied on the overtime line only (avoid double deduction)
+            if Leave and LeaveType:
+                extra_types = LeaveType.search([
+                    '|', '|',
+                    ('name', '=', 'Extra Hours'),
+                    ('name', 'ilike', 'Extra Hours'),
+                    ('name', 'ilike', 'إضافي'),
+                ])
+                if extra_types:
+                    extra_settlements = Leave.search([
+                        ('employee_id', '=', employee.id),
+                        ('holiday_status_id', 'in', extra_types.ids),
+                        ('request_date_from', '>=', payslip.date_from),
+                        ('request_date_to', '<=', payslip.date_to),
+                        ('name', 'ilike', 'Lateness Settlement'),
+                    ])
+                    if extra_settlements:
+                        extra_settlements.unlink()
+
+            reconciliation_lines = OvertimeLine.search([
+                ('employee_id', '=', employee.id),
+                ('date', '=', payslip.date_to),
+                ('compensable_as_leave', '=', True),
+            ])
+            existing_line = reconciliation_lines[:1]
+            old_line_hours = 0.0
+            if existing_line:
+                old_line_hours = existing_line.manual_duration or existing_line.duration or 0.0
+
+            current_available = 0.0
+            if hasattr(employee, '_get_deductible_employee_overtime'):
+                current_available = employee._get_deductible_employee_overtime().get(employee, 0.0) or 0.0
+            else:
+                other_lines = OvertimeLine.search([
+                    ('employee_id', '=', employee.id),
+                    ('compensable_as_leave', '=', True),
+                    ('status', '=', 'approved'),
+                    ('id', 'not in', reconciliation_lines.ids),
+                ])
+                current_available = sum(other_lines.mapped('manual_duration') or other_lines.mapped('duration')) + old_line_hours
+
+            base_without_line = round(current_available - old_line_hours, 2)
+            line_hours = round(target_hours - base_without_line, 2)
+
+            if abs(line_hours) < 0.01:
+                if reconciliation_lines:
+                    reconciliation_lines.unlink()
+                continue
+
+            vals = {
+                'employee_id': employee.id,
+                'date': payslip.date_to,
+                'duration': line_hours,
+                'manual_duration': line_hours,
+                'compensable_as_leave': True,
+                'status': 'approved',
+            }
+            if existing_line:
+                existing_line.write(vals)
+                (reconciliation_lines - existing_line).unlink()
+            else:
+                OvertimeLine.create(vals)
+
+    def _sync_reconciliation_settlements(self):
+        """
+        1. Sync Extra Hours Time Off card via attendance overtime lines.
+        2. Deduct Step 2a Annual Leave via approved hr.leave records.
+        3. Deduct Step 2b Paid Time Off via approved hr.leave records.
+        """
+        for payslip in self:
+            if not payslip.employee_id or not payslip.date_to:
+                continue
+
+            # Extra Hours dashboard (Odoo 19): overtime lines only
+            payslip._sync_extra_hours_time_off_balance()
+
+            # Annual Leave / PTO lateness settlement (real leave balances)
             payslip._create_or_update_settlement_leave(
                 'Annual Leave',
                 payslip.lateness_covered_by_annual_leave,
                 'Lateness Settlement via Annual Leave'
             )
-
-            # 4. Step 2b: Paid Time Off Time Off Deduction
             payslip._create_or_update_settlement_leave(
                 'Paid Time Off',
                 payslip.lateness_covered_by_paid_time_off,
                 'Lateness Settlement via Paid Time Off'
             )
-
-            # 5. Sync Extra Hours Attendance Overtime Line
-            net_extra_hours_change = payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours
-            if OvertimeLine and net_extra_hours_change != 0.0:
-                existing_line = OvertimeLine.search([
-                    ('employee_id', '=', payslip.employee_id.id),
-                    ('date', '=', payslip.date_to),
-                    ('compensable_as_leave', '=', True),
-                ], limit=1)
-
-                vals = {
-                    'employee_id': payslip.employee_id.id,
-                    'date': payslip.date_to,
-                    'duration': net_extra_hours_change,
-                    'manual_duration': net_extra_hours_change,
-                    'compensable_as_leave': True,
-                    'status': 'approved',
-                }
-                if existing_line:
-                    existing_line.write(vals)
-                else:
-                    OvertimeLine.create(vals)
 
     def _revert_reconciliation_settlements(self):
         """
@@ -895,10 +867,10 @@ class HrPayslip(models.Model):
                 if settlement_leaves:
                     settlement_leaves.unlink()
 
-            # 2. Revert Monthly Extra Hours Reconciliation Allocation
+            # 2. Revert Monthly Overtime Allocation if created for this payslip month
             if Allocation:
                 month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
-                alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
+                alloc_name = f"Monthly Overtime Earned - {month_str}"
                 ot_allocs = Allocation.search([
                     ('employee_id', '=', payslip.employee_id.id),
                     ('name', '=', alloc_name),
