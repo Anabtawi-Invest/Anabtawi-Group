@@ -286,26 +286,24 @@ class HrPayslip(models.Model):
             payslip.undertime_cash_deduction_hours = rem_lateness
 
     def compute_sheet(self):
-        # 1. Run full reconciliation ONLY for payslips that have not been reconciled yet
-        unreconciled_slips = self.filtered(lambda s: not s.is_reconciled)
-        if unreconciled_slips:
-            for payslip in unreconciled_slips:
-                if payslip.employee_id and payslip.date_from and payslip.date_to:
-                    if hasattr(payslip.employee_id, '_create_absent_work_entries_for_period'):
-                        payslip.employee_id._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
+        # 1. Run full reconciliation for payslips being computed
+        for payslip in self:
+            if payslip.employee_id and payslip.date_from and payslip.date_to:
+                if hasattr(payslip.employee_id, '_create_absent_work_entries_for_period'):
+                    payslip.employee_id._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
 
-            unreconciled_slips._convert_flexible_rest_days_to_ars()
+        self._convert_flexible_rest_days_to_ars()
 
-            # Force refresh worked_days_line_ids so the payslip Worked Days tab instantly updates
-            for payslip in unreconciled_slips:
-                if payslip.state == 'draft':
-                    worked_days_vals = payslip._get_worked_day_lines()
-                    payslip.worked_days_line_ids.unlink()
-                    payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
+        # Force refresh worked_days_line_ids so the payslip Worked Days tab instantly updates
+        for payslip in self:
+            if payslip.state == 'draft':
+                worked_days_vals = payslip._get_worked_day_lines()
+                payslip.worked_days_line_ids.unlink()
+                payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
 
-            unreconciled_slips._compute_attendance_reconciliation_fields()
-            unreconciled_slips._sync_reconciliation_settlements()
-            unreconciled_slips.write({'is_reconciled': True})
+        self._compute_attendance_reconciliation_fields()
+        self._sync_reconciliation_settlements()
+        self.write({'is_reconciled': True})
 
         # 2. Always compute salary rules so newly added salary inputs/adjustments are calculated!
         res = super().compute_sheet()
