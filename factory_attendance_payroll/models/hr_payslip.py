@@ -785,27 +785,17 @@ class HrPayslip(models.Model):
                 payslip.is_reconciled,
             )
 
-            # Remove Extra Hours allocations that cancel overtime on the dashboard
-            # (any name: Monthly Overtime Earned / Extra Hours Reconciliation / etc.)
-            if Allocation is not None and LeaveType is not None:
-                extra_types = LeaveType.search([
+            # Remove ONLY reconciliation-created Extra Hours allocations that cancel OT on the dashboard.
+            # Validated allocations cannot be unlinked unless allocation_skip_state_check is set.
+            if Allocation is not None:
+                all_extra_allocs = Allocation.search([
+                    ('employee_id', '=', employee.id),
                     '|', '|', '|',
-                    ('name', '=', 'Extra Hours'),
-                    ('name', 'ilike', 'Extra Hours'),
-                    ('name', 'ilike', 'إضافي'),
-                    ('overtime_deductible', '=', True),
-                ]) if 'overtime_deductible' in LeaveType._fields else LeaveType.search([
-                    '|', '|',
-                    ('name', '=', 'Extra Hours'),
-                    ('name', 'ilike', 'Extra Hours'),
-                    ('name', 'ilike', 'إضافي'),
+                    ('name', 'ilike', 'Monthly Overtime Earned'),
+                    ('name', 'ilike', 'Extra Hours Reconciliation'),
+                    ('name', 'ilike', 'Lateness Settlement'),
+                    ('name', 'ilike', 'Factory Extra Hours'),
                 ])
-                alloc_domain = [('employee_id', '=', employee.id)]
-                if extra_types:
-                    alloc_domain.append(('holiday_status_id', 'in', extra_types.ids))
-                else:
-                    alloc_domain.extend(['|', ('name', 'ilike', 'Overtime Earned'), ('name', 'ilike', 'Extra Hours Reconciliation')])
-                all_extra_allocs = Allocation.search(alloc_domain)
                 _logger.info(
                     "Factory ExtraHours DEBUG allocations before cleanup emp=%s count=%s details=%s",
                     employee.id,
@@ -823,8 +813,41 @@ class HrPayslip(models.Model):
                     ],
                 )
                 if all_extra_allocs:
-                    all_extra_allocs.unlink()
-                    _logger.info("Factory ExtraHours DEBUG unlinked %s Extra Hours allocations", len(all_extra_allocs))
+                    try:
+                        all_extra_allocs.with_context(
+                            allocation_skip_state_check=True,
+                            mail_notrack=True,
+                            tracking_disable=True,
+                        ).unlink()
+                        _logger.info(
+                            "Factory ExtraHours DEBUG unlinked %s Extra Hours allocations",
+                            len(all_extra_allocs),
+                        )
+                    except Exception:
+                        _logger.exception(
+                            "Factory ExtraHours DEBUG failed unlinking allocations emp=%s ids=%s — trying refuse then unlink",
+                            employee.id,
+                            all_extra_allocs.ids,
+                        )
+                        for alloc in all_extra_allocs.exists():
+                            try:
+                                if alloc.state in ('validate', 'validate1', 'confirm'):
+                                    alloc.with_context(
+                                        mail_notrack=True,
+                                        tracking_disable=True,
+                                    ).write({'state': 'refuse'})
+                                alloc.with_context(
+                                    allocation_skip_state_check=True,
+                                    mail_notrack=True,
+                                    tracking_disable=True,
+                                ).unlink()
+                            except Exception:
+                                _logger.exception(
+                                    "Factory ExtraHours DEBUG could not remove allocation id=%s name=%s state=%s",
+                                    alloc.id,
+                                    alloc.name,
+                                    alloc.state,
+                                )
 
             # Extra Hours lateness is applied on the overtime line only (avoid double deduction)
             if Leave is not None and LeaveType is not None:
@@ -1005,16 +1028,22 @@ class HrPayslip(models.Model):
                 if settlement_leaves:
                     settlement_leaves.unlink()
 
-            # 2. Revert Monthly Overtime Allocation if created for this payslip month
+            # 2. Revert Monthly Overtime / Extra Hours Reconciliation allocations for this payslip
             if Allocation is not None:
                 month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
-                alloc_name = f"Monthly Overtime Earned - {month_str}"
                 ot_allocs = Allocation.search([
                     ('employee_id', '=', payslip.employee_id.id),
-                    ('name', '=', alloc_name),
+                    '|', '|',
+                    ('name', '=', f"Monthly Overtime Earned - {month_str}"),
+                    ('name', 'ilike', f"Extra Hours Reconciliation: {month_str}"),
+                    ('name', 'ilike', 'Factory Extra Hours'),
                 ])
                 if ot_allocs:
-                    ot_allocs.unlink()
+                    ot_allocs.with_context(
+                        allocation_skip_state_check=True,
+                        mail_notrack=True,
+                        tracking_disable=True,
+                    ).unlink()
 
             # 3. Revert Overtime line if created for this payslip date_to
             if OvertimeLine is not None:
