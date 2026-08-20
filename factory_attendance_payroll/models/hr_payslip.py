@@ -472,7 +472,7 @@ class HrPayslip(models.Model):
                     if not we.work_entry_type_id.is_leave and code not in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] and 'absent' not in name:
                         start_val = getattr(we, start_field, None)
                         if start_val:
-                            we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
+                            we_date = start_val.date() if isinstance(start_val, datetime.datetime) else (start_val if isinstance(start_val, datetime.date) else None)
                             if we_date:
                                 slip_worked_dates.add(we_date)
 
@@ -484,7 +484,7 @@ class HrPayslip(models.Model):
                     start_val = getattr(we, start_field, None)
                     if not start_val:
                         continue
-                    we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
+                    we_date = start_val.date() if isinstance(start_val, datetime.datetime) else (start_val if isinstance(start_val, datetime.date) else None)
                     if we_date:
                         code = (we.work_entry_type_id.code or '').strip()
                         name = (we.work_entry_type_id.name or '').lower()
@@ -573,7 +573,7 @@ class HrPayslip(models.Model):
                 absent_entries = WorkEntry.search(domain).sorted(start_field)
                 for we in absent_entries:
                     start_val = getattr(we, start_field, None)
-                    d = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
+                    d = start_val.date() if isinstance(start_val, datetime.datetime) else (start_val if isinstance(start_val, datetime.date) else None)
                     if d and d not in absent_dates:
                         absent_dates.append(d)
 
