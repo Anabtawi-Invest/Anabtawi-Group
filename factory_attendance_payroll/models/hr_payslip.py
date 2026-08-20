@@ -231,7 +231,18 @@ class HrPayslip(models.Model):
             payslip.attendance_gross_undertime = gross_ut
             payslip.attendance_net_reconciled = round(gross_ot - gross_ut, 2)
 
-            prev_extra_hours = round(banked_extra_by_emp.get(emp_id, 0.0), 2)
+            # Read banked Extra Hours balance (using employee_extra_hours_balance if present)
+            prev_extra_hours = 0.0
+            if hasattr(payslip, '_get_employee_extra_hours_balance'):
+                try:
+                    prev_extra_hours = round(payslip._get_employee_extra_hours_balance(), 2)
+                except Exception:
+                    prev_extra_hours = round(banked_extra_by_emp.get(emp_id, 0.0), 2)
+            elif hasattr(payslip, 'employee_extra_hours_balance') and payslip.employee_extra_hours_balance:
+                prev_extra_hours = round(payslip.employee_extra_hours_balance, 2)
+            else:
+                prev_extra_hours = round(banked_extra_by_emp.get(emp_id, 0.0), 2)
+
             total_extra_avail = round(prev_extra_hours + gross_ot, 2)
             payslip.total_extra_hours_available = total_extra_avail
 
