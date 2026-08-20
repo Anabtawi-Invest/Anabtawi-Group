@@ -220,7 +220,8 @@ class HrPayslip(models.Model):
                 if net_hrs > standard_target:
                     ot_excess = net_hrs - standard_target
                     if ot_excess >= min_ot_threshold:
-                        total_ot += ot_excess
+                        # 125% Overtime multiplier (1h overtime = 1.25h extra hours)
+                        total_ot += (ot_excess * 1.25)
                 elif net_hrs < standard_target:
                     shortfall = standard_target - net_hrs
                     if shortfall > min_lateness_threshold:
@@ -228,7 +229,7 @@ class HrPayslip(models.Model):
 
             if worked_days_count > target_work_days:
                 extra_worked_days = worked_days_count - target_work_days
-                total_ot += (extra_worked_days * 8.0)
+                total_ot += (extra_worked_days * 8.0 * 1.25)
             else:
                 unworked_days = total_days_in_month - worked_days_count
                 if unworked_days > allowed_rest_days:
@@ -751,7 +752,7 @@ class HrPayslip(models.Model):
                         if 'date_from' in Allocation._fields:
                             alloc_vals['date_from'] = payslip.date_from
                         if 'date_to' in Allocation._fields:
-                            alloc_vals['date_to'] = payslip.date_to
+                            alloc_vals['date_to'] = False
                         if 'number_of_days_display' in Allocation._fields:
                             alloc_vals['number_of_days_display'] = ot_days
                         if 'number_of_hours' in Allocation._fields:
