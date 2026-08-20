@@ -120,14 +120,16 @@ class HrPayslip(models.Model):
             for line in ot_lines:
                 banked_extra_by_emp[line.employee_id.id] += line.duration
 
-        # Bulk Pre-fetch 3: Leave allocations & taken leaves
+        # Bulk Pre-fetch 3: Leave allocations & taken leaves (Extra Hours, Annual Leave, Paid Time Off)
         LeaveType = self.env['hr.leave.type'].sudo()
+        extra_types = LeaveType.search(['|', '|', ('name', '=', 'Extra Hours'), ('name', 'ilike', 'Extra Hours'), ('name', 'ilike', 'إضافي')])
         annual_types = LeaveType.search(['|', '|', ('name', '=', 'Annual Leave'), ('name', 'ilike', 'Annual Leave'), ('name', 'ilike', 'سنوي')])
         pto_types = LeaveType.search(['|', '|', ('name', '=', 'Paid Time Off'), ('name', 'ilike', 'Paid Time Off'), ('name', 'ilike', 'مدفوع')])
 
+        extra_type_ids = set(extra_types.ids)
         annual_type_ids = set(annual_types.ids)
         pto_type_ids = set(pto_types.ids)
-        target_type_ids = list(annual_type_ids | pto_type_ids)
+        target_type_ids = list(extra_type_ids | annual_type_ids | pto_type_ids)
 
         alloc_hours_by_emp_type = defaultdict(float)
         if target_type_ids:
@@ -137,6 +139,9 @@ class HrPayslip(models.Model):
                 ('holiday_status_id', 'in', target_type_ids)
             ])
             for alloc in allocations:
+                # Exclude monthly overtime allocations for the current batch so prior balance is isolated
+                if 'Monthly Overtime Earned' in (alloc.name or ''):
+                    continue
                 hrs = 0.0
                 if hasattr(alloc, 'number_of_hours_display') and alloc.number_of_hours_display:
                     hrs = alloc.number_of_hours_display
@@ -150,7 +155,7 @@ class HrPayslip(models.Model):
                 ('employee_id', 'in', emp_ids),
                 ('state', '=', 'validate'),
                 ('holiday_status_id', 'in', target_type_ids),
-                '!', ('name', 'ilike', 'Monthly Lateness Settlement')
+                '!', ('name', 'ilike', 'Lateness Settlement')
             ])
             for lve in taken_leaves:
                 hrs = 0.0
@@ -231,7 +236,10 @@ class HrPayslip(models.Model):
             payslip.attendance_gross_undertime = gross_ut
             payslip.attendance_net_reconciled = round(gross_ot - gross_ut, 2)
 
-            prev_extra_hours = round(banked_extra_by_emp.get(emp_id, 0.0), 2)
+            prior_alloc_extra = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in extra_type_ids))
+            prior_ot_line_extra = round(banked_extra_by_emp.get(emp_id, 0.0), 2)
+            prev_extra_hours = max(prior_alloc_extra, prior_ot_line_extra)
+
             total_extra_avail = round(prev_extra_hours + gross_ot, 2)
             payslip.total_extra_hours_available = total_extra_avail
 
