@@ -960,31 +960,18 @@ class HrPayslip(models.Model):
             [(a.id, a.name, a.state, self._allocation_hours(a)) for a in other_allocs],
         )
 
-        # Remove old sync allocs then recreate/update one
-        if sync_allocs:
-            try:
-                sync_allocs.with_context(
-                    allocation_skip_state_check=True,
-                    mail_notrack=True,
-                    tracking_disable=True,
-                ).unlink()
-            except Exception:
-                _logger.exception("Factory ExtraHours DASHBOARD failed removing old sync allocs")
-                for alloc in sync_allocs.exists():
-                    try:
-                        alloc.with_context(mail_notrack=True, tracking_disable=True).write({'state': 'refuse'})
-                        alloc.with_context(
-                            allocation_skip_state_check=True,
-                            mail_notrack=True,
-                            tracking_disable=True,
-                        ).unlink()
-                    except Exception:
-                        _logger.exception(
-                            "Factory ExtraHours DASHBOARD could not remove sync alloc id=%s",
-                            alloc.id,
-                        )
-
+        # Prefer updating an existing sync allocation (avoid create-state errors).
+        # Odoo forbids create(..., state='validate') — must create as 'confirm' then validate.
         if sync_needed <= 0.01:
+            if sync_allocs:
+                try:
+                    sync_allocs.with_context(
+                        allocation_skip_state_check=True,
+                        mail_notrack=True,
+                        tracking_disable=True,
+                    ).unlink()
+                except Exception:
+                    _logger.exception("Factory ExtraHours DASHBOARD failed removing sync allocs when sync_needed~0")
             _logger.info(
                 "Factory ExtraHours DASHBOARD no sync alloc needed (sync_needed=%s). "
                 "Card remaining should be ~%s from other allocs alone.",
@@ -994,47 +981,108 @@ class HrPayslip(models.Model):
             final_remaining = round(other_alloc_hours - taken_hours, 2)
         else:
             days = round(sync_needed / hours_per_day, 4) if hours_per_day else sync_needed
-            alloc_vals = {
-                'name': sync_name,
-                'holiday_type': 'employee',
-                'employee_id': employee.id,
-                'holiday_status_id': extra_type.id,
+            hour_vals = {
                 'number_of_days': days,
-                'state': 'validate',
             }
-            if 'allocation_type' in Allocation._fields:
-                alloc_vals['allocation_type'] = 'regular'
-            if 'date_from' in Allocation._fields:
-                alloc_vals['date_from'] = self.date_from or fields.Date.context_today(self)
-            if 'date_to' in Allocation._fields:
-                alloc_vals['date_to'] = False
             if 'number_of_days_display' in Allocation._fields:
-                alloc_vals['number_of_days_display'] = days
+                hour_vals['number_of_days_display'] = days
             if 'number_of_hours' in Allocation._fields:
-                alloc_vals['number_of_hours'] = sync_needed
+                hour_vals['number_of_hours'] = sync_needed
             if 'number_of_hours_display' in Allocation._fields:
-                alloc_vals['number_of_hours_display'] = sync_needed
+                hour_vals['number_of_hours_display'] = sync_needed
 
-            new_alloc = Allocation.with_context(
-                employee_id=employee.id,
-                mail_create_nolog=True,
-                mail_notrack=True,
-                tracking_disable=True,
-                allocation_skip_state_check=True,
-            ).create(alloc_vals)
-            new_alloc.sudo().write({'state': 'validate'})
-            if hasattr(new_alloc, 'action_validate'):
+            target_alloc = sync_allocs[:1]
+            if target_alloc:
                 try:
-                    new_alloc.action_validate()
+                    target_alloc.with_context(
+                        mail_notrack=True,
+                        tracking_disable=True,
+                        leave_skip_state_check=True,
+                    ).write(hour_vals)
+                    if target_alloc.state != 'validate':
+                        target_alloc.sudo()._action_validate()
+                    (sync_allocs - target_alloc).with_context(
+                        allocation_skip_state_check=True,
+                        mail_notrack=True,
+                        tracking_disable=True,
+                    ).unlink()
+                    _logger.info(
+                        "Factory ExtraHours DASHBOARD updated sync alloc id=%s hours=%s days=%s",
+                        target_alloc.id,
+                        sync_needed,
+                        days,
+                    )
                 except Exception:
+                    _logger.exception(
+                        "Factory ExtraHours DASHBOARD update failed for alloc id=%s — will recreate",
+                        target_alloc.id,
+                    )
+                    target_alloc = Allocation.browse()
+            else:
+                target_alloc = Allocation.browse()
+
+            if not target_alloc:
+                # Clean any leftover sync allocs then create as confirm → validate
+                if sync_allocs:
+                    try:
+                        sync_allocs.with_context(
+                            allocation_skip_state_check=True,
+                            mail_notrack=True,
+                            tracking_disable=True,
+                        ).unlink()
+                    except Exception:
+                        for alloc in sync_allocs.exists():
+                            try:
+                                alloc.with_context(mail_notrack=True, tracking_disable=True).write({'state': 'refuse'})
+                                alloc.with_context(
+                                    allocation_skip_state_check=True,
+                                    mail_notrack=True,
+                                    tracking_disable=True,
+                                ).unlink()
+                            except Exception:
+                                _logger.exception(
+                                    "Factory ExtraHours DASHBOARD could not remove sync alloc id=%s",
+                                    alloc.id,
+                                )
+
+                alloc_vals = {
+                    'name': sync_name,
+                    'holiday_type': 'employee',
+                    'employee_id': employee.id,
+                    'holiday_status_id': extra_type.id,
+                    'number_of_days': days,
+                    # DO NOT pass state='validate' — Odoo raises "Incorrect state for new allocation"
+                }
+                if 'allocation_type' in Allocation._fields:
+                    alloc_vals['allocation_type'] = 'regular'
+                if 'date_from' in Allocation._fields:
+                    alloc_vals['date_from'] = self.date_from or fields.Date.context_today(self)
+                if 'date_to' in Allocation._fields:
+                    alloc_vals['date_to'] = False
+                alloc_vals.update({k: v for k, v in hour_vals.items() if k != 'number_of_days'})
+
+                new_alloc = Allocation.with_context(
+                    employee_id=employee.id,
+                    mail_create_nolog=True,
+                    mail_notrack=True,
+                    tracking_disable=True,
+                    mail_create_nosubscribe=True,
+                ).create(alloc_vals)
+                try:
+                    new_alloc.sudo()._action_validate()
+                except Exception:
+                    _logger.exception(
+                        "Factory ExtraHours DASHBOARD _action_validate failed; forcing state=validate"
+                    )
                     new_alloc.sudo().write({'state': 'validate'})
-            _logger.info(
-                "Factory ExtraHours DASHBOARD created sync alloc id=%s hours=%s days=%s vals=%s",
-                new_alloc.id,
-                sync_needed,
-                days,
-                alloc_vals,
-            )
+                _logger.info(
+                    "Factory ExtraHours DASHBOARD created+validated sync alloc id=%s hours=%s days=%s state=%s",
+                    new_alloc.id,
+                    sync_needed,
+                    days,
+                    new_alloc.state,
+                )
+
             final_remaining = round(other_alloc_hours + sync_needed - taken_hours, 2)
 
         match = abs(final_remaining - target_hours) < 0.05
@@ -1373,7 +1421,15 @@ class HrPayslip(models.Model):
 
             # THIS is what the Time Off Dashboard Extra Hours card actually shows
             # (leave allocation remaining — the "8 HOURS AVAILABLE" in the UI).
-            dashboard_match = payslip._sync_extra_hours_dashboard_allocation(employee, target_total)
+            try:
+                dashboard_match = payslip._sync_extra_hours_dashboard_allocation(employee, target_total)
+            except Exception:
+                dashboard_match = False
+                _logger.exception(
+                    "Factory ExtraHours DASHBOARD sync raised for emp=%s target=%s",
+                    employee.id,
+                    target_total,
+                )
 
             final_avail = after.get('odoo_available')
             if final_avail is None:
