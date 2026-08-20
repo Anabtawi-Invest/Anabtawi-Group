@@ -5,14 +5,9 @@
         <field name="model">hr.employee</field>
         <field name="inherit_id" ref="hr.view_employee_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//notebook" position="inside">
-                <page string="Attendance &amp; Break Rules" name="attendance_break_rules">
-                    <group>
-                        <group string="Lunch Break Configuration">
-                            <field name="lunch_break_rule" widget="radio"/>
-                        </group>
-                    </group>
-                </page>
+            <xpath expr="//page[@name='payroll_information']//field[@name='structure_type_id']" position="after">
+                <field name="employee_work_station"/>
+                <field name="break_duration_hours"/>
             </xpath>
         </field>
     </record>

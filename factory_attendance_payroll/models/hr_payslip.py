@@ -511,7 +511,6 @@ class HrPayslip(models.Model):
         existing_leave = Leave.search([
             ('employee_id', '=', self.employee_id.id),
             ('holiday_status_id', '=', leave_type.id),
-            ('request_date_from', '=', self.date_to),
             ('request_date_to', '=', self.date_to),
             ('name', 'ilike', leave_desc),
         ], limit=1)
@@ -521,14 +520,18 @@ class HrPayslip(models.Model):
             month_str = self.date_to.strftime('%B %Y') if self.date_to else ''
             full_name = f"{leave_desc} - {month_str}"
 
-            dt_start = datetime.datetime.combine(self.date_to, datetime.time(8, 0, 0))
+            # Fix 1: Multi-Day Date Span so Odoo registers the exact number of days (e.g. 2 days)
+            num_days_span = max(1, int(round(days)))
+            start_date = self.date_to - datetime.timedelta(days=num_days_span - 1)
+
+            dt_start = datetime.datetime.combine(start_date, datetime.time(8, 0, 0))
             dt_stop = datetime.datetime.combine(self.date_to, datetime.time(17, 0, 0))
 
             leave_vals = {
                 'name': full_name,
                 'employee_id': self.employee_id.id,
                 'holiday_status_id': leave_type.id,
-                'request_date_from': self.date_to,
+                'request_date_from': start_date,
                 'request_date_to': self.date_to,
                 'date_from': dt_start,
                 'date_to': dt_stop,
@@ -541,6 +544,19 @@ class HrPayslip(models.Model):
                 leave_vals['number_of_hours'] = hours
             if 'number_of_hours_display' in Leave._fields:
                 leave_vals['number_of_hours_display'] = hours
+
+            # Fix 2: Explicitly link to the employee's active validated allocation
+            alloc = self.env['hr.leave.allocation'].sudo().search([
+                ('employee_id', '=', self.employee_id.id),
+                ('holiday_status_id', '=', leave_type.id),
+                ('state', '=', 'validate'),
+            ], order='date_to desc, id desc', limit=1)
+
+            if alloc:
+                if 'holiday_allocation_id' in Leave._fields:
+                    leave_vals['holiday_allocation_id'] = alloc.id
+                elif 'allocation_id' in Leave._fields:
+                    leave_vals['allocation_id'] = alloc.id
 
             ctx_leave = Leave.with_context(
                 employee_id=self.employee_id.id,
@@ -649,7 +665,6 @@ class HrPayslip(models.Model):
             # 1. Unlink/remove all settlement leaves created for this payslip's month-end date
             settlement_leaves = Leave.search([
                 ('employee_id', '=', payslip.employee_id.id),
-                ('request_date_from', '=', payslip.date_to),
                 ('request_date_to', '=', payslip.date_to),
                 ('name', 'ilike', 'Monthly Lateness Settlement'),
             ])

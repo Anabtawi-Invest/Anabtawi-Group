@@ -50,39 +50,39 @@ class IrModelData(models.Model):
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
-    lunch_break_rule = fields.Selection([
-        ('factory', 'Factory / Branches (1.0h Break)'),
-        ('office', 'Head Office (0.5h Break)'),
-        ('custom', 'Custom Break Duration')
-    ], string="Lunch Break Deduction Policy", compute="_compute_lunch_break_rule", store=False)
+    employee_work_station = fields.Selection([
+        ('headoffice', 'Headoffice'),
+        ('retail', 'Retail'),
+        ('factory', 'Factory')
+    ], string="Employee Work Station", default='factory', tracking=True,
+       help="Work station of the employee. Automatically sets the default lunch break duration.")
 
-    custom_lunch_break_hours = fields.Float(
-        string="Custom Lunch Break (Hours)",
+    break_duration_hours = fields.Float(
+        string="Break Duration (Hours)",
         default=1.0,
-        help="Custom lunch break duration in hours if 'Custom Break Duration' is selected."
+        tracking=True,
+        help="Lunch/Break duration in hours subtracted from attendance shifts (e.g. 1.0 = 60 min, 0.75 = 45 min, 0.5 = 30 min)."
     )
 
-    @api.depends('department_id')
-    def _compute_lunch_break_rule(self):
+    @api.onchange('employee_work_station')
+    def _onchange_employee_work_station(self):
         for emp in self:
-            dept_name = (emp.department_id.name or '').lower() if emp.department_id else ''
-            if 'head' in dept_name or 'office' in dept_name or 'hq' in dept_name or 'administration' in dept_name:
-                emp.lunch_break_rule = 'office'
-            else:
-                emp.lunch_break_rule = 'factory'
+            if emp.employee_work_station == 'headoffice':
+                emp.break_duration_hours = 0.5
+            elif emp.employee_work_station in ['retail', 'factory']:
+                emp.break_duration_hours = 1.0
 
     def _get_lunch_break_duration(self):
         """
-        Returns the lunch break duration in hours for this employee based on location/department:
-        - Factory / Branches: 1.0 hour (60 mins)
-        - Head Office: 0.5 hour (30 mins)
-        - Custom: custom_lunch_break_hours
+        Returns the lunch break duration in hours for this employee:
+        - Uses the configured break_duration_hours if set (>= 0.0)
+        - Otherwise defaults based on employee_work_station (Headoffice: 0.5h, Retail/Factory: 1.0h)
         """
         self.ensure_one()
-        if self.lunch_break_rule == 'office':
+        if self.break_duration_hours is not None and self.break_duration_hours >= 0.0:
+            return self.break_duration_hours
+        elif self.employee_work_station == 'headoffice':
             return 0.5
-        elif self.lunch_break_rule == 'custom':
-            return max(0.0, self.custom_lunch_break_hours)
         else:
             return 1.0
 
