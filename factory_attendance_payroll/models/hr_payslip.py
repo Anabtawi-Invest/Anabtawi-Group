@@ -523,19 +523,37 @@ class HrPayslip(models.Model):
         LeaveType = self.env['hr.leave.type'].sudo()
 
         if leave_type_name == 'Extra Hours':
-            leave_types = LeaveType.search([
-                '|', '|',
-                ('name', '=', 'Extra Hours'),
-                ('name', 'ilike', 'Extra Hours'),
-                ('name', 'ilike', 'إضافي')
-            ])
+            emp_alloc = self.env['hr.leave.allocation'].sudo().search([
+                ('employee_id', '=', self.employee_id.id),
+                ('holiday_status_id.name', 'ilike', 'Extra'),
+                ('state', '=', 'validate'),
+            ], limit=1)
+            if emp_alloc:
+                leave_type = emp_alloc.holiday_status_id
+            else:
+                leave_types = LeaveType.search([
+                    '|', '|',
+                    ('name', '=', 'Extra Hours'),
+                    ('name', 'ilike', 'Extra Hours'),
+                    ('name', 'ilike', 'إضافي')
+                ])
+                leave_type = leave_types[0] if leave_types else None
         elif leave_type_name == 'Annual Leave':
-            leave_types = LeaveType.search([
-                '|', '|',
-                ('name', '=', 'Annual Leave'),
-                ('name', 'ilike', 'Annual Leave'),
-                ('name', 'ilike', 'سنوي')
-            ])
+            emp_alloc = self.env['hr.leave.allocation'].sudo().search([
+                ('employee_id', '=', self.employee_id.id),
+                ('holiday_status_id.name', 'ilike', 'Annual'),
+                ('state', '=', 'validate'),
+            ], limit=1)
+            if emp_alloc:
+                leave_type = emp_alloc.holiday_status_id
+            else:
+                leave_types = LeaveType.search([
+                    '|', '|',
+                    ('name', '=', 'Annual Leave'),
+                    ('name', 'ilike', 'Annual Leave'),
+                    ('name', 'ilike', 'سنوي')
+                ])
+                leave_type = leave_types[0] if leave_types else None
         elif leave_type_name == 'Paid Time Off':
             leave_types = LeaveType.search([
                 '|', '|',
@@ -543,10 +561,11 @@ class HrPayslip(models.Model):
                 ('name', 'ilike', 'Paid Time Off'),
                 ('name', 'ilike', 'مدفوع')
             ])
+            leave_type = leave_types[0] if leave_types else None
         else:
             leave_types = LeaveType.search([('name', '=', leave_type_name)])
+            leave_type = leave_types[0] if leave_types else None
 
-        leave_type = leave_types[0] if leave_types else None
         if not leave_type:
             return
 
@@ -724,13 +743,22 @@ class HrPayslip(models.Model):
 
             # 1. Update Extra Hours Time Off Allocation with monthly overtime earned
             if Allocation and LeaveType:
-                extra_types = LeaveType.search([
-                    '|', '|',
-                    ('name', '=', 'Extra Hours'),
-                    ('name', 'ilike', 'Extra Hours'),
-                    ('name', 'ilike', 'إضافي')
-                ])
-                extra_type = extra_types[0] if extra_types else None
+                emp_alloc = Allocation.search([
+                    ('employee_id', '=', payslip.employee_id.id),
+                    ('holiday_status_id.name', 'ilike', 'Extra'),
+                    ('state', '=', 'validate'),
+                ], limit=1)
+                if emp_alloc:
+                    extra_type = emp_alloc.holiday_status_id
+                else:
+                    extra_types = LeaveType.search([
+                        '|', '|',
+                        ('name', '=', 'Extra Hours'),
+                        ('name', 'ilike', 'Extra Hours'),
+                        ('name', 'ilike', 'إضافي')
+                    ])
+                    extra_type = extra_types[0] if extra_types else None
+
                 if extra_type:
                     existing_alloc = Allocation.search([
                         ('employee_id', '=', payslip.employee_id.id),
@@ -764,6 +792,11 @@ class HrPayslip(models.Model):
                             existing_alloc.write(alloc_vals)
                             if existing_alloc.state != 'validate':
                                 existing_alloc.sudo().write({'state': 'validate'})
+                            if hasattr(existing_alloc, 'action_validate'):
+                                try:
+                                    existing_alloc.action_validate()
+                                except Exception:
+                                    pass
                         else:
                             new_alloc = Allocation.with_context(
                                 employee_id=payslip.employee_id.id,
@@ -773,6 +806,11 @@ class HrPayslip(models.Model):
                                 allocation_skip_state_check=True,
                             ).create(alloc_vals)
                             new_alloc.sudo().write({'state': 'validate'})
+                            if hasattr(new_alloc, 'action_validate'):
+                                try:
+                                    new_alloc.action_validate()
+                                except Exception:
+                                    pass
                     else:
                         if existing_alloc:
                             existing_alloc.unlink()
