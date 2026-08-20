@@ -930,20 +930,17 @@ class HrPayslip(models.Model):
             ('holiday_status_id', '=', extra_type.id),
             ('state', 'in', ['confirm', 'validate', 'validate1']),
             ('id', 'not in', sync_allocs.ids),
-        ])
+        ], order='id asc')
         other_alloc_hours = round(sum(self._allocation_hours(a) for a in other_allocs), 2)
         current_sync_hours = round(sum(self._allocation_hours(a) for a in sync_allocs), 2)
         current_remaining = round(other_alloc_hours + current_sync_hours - taken_hours, 2)
-
-        # remaining = other + sync - taken  =>  sync = target + taken - other
-        sync_needed = round(target_hours + taken_hours - other_alloc_hours, 2)
 
         _logger.info(
             "Factory ExtraHours DASHBOARD emp=%s(%s) leave_type=%s(id=%s) "
             "requires_allocation=%s request_unit=%s hide_on_dashboard=%s\n"
             "  other_alloc_hours=%s sync_alloc_hours=%s taken_hours=%s\n"
-            "  current_remaining(card)=%s target_hours=%s sync_needed=%s\n"
-            "  other_allocs=%s",
+            "  current_remaining(card)=%s target_hours=%s\n"
+            "  other_allocs=%s allocation_fields_sample=%s",
             employee.name,
             employee.id,
             extra_type.name,
@@ -956,147 +953,166 @@ class HrPayslip(models.Model):
             taken_hours,
             current_remaining,
             target_hours,
-            sync_needed,
             [(a.id, a.name, a.state, self._allocation_hours(a)) for a in other_allocs],
+            [f for f in (
+                'holiday_type', 'employee_id', 'holiday_status_id', 'number_of_days',
+                'number_of_hours_display', 'number_of_hours', 'allocation_type', 'date_from',
+            ) if f in Allocation._fields],
         )
 
-        # Prefer updating an existing sync allocation (avoid create-state errors).
-        # Odoo forbids create(..., state='validate') — must create as 'confirm' then validate.
-        if sync_needed <= 0.01:
-            if sync_allocs:
-                try:
+        def _hours_write_vals(hours):
+            days = round(hours / hours_per_day, 4) if hours_per_day else hours
+            vals = {}
+            # In Odoo 19, hours drive days when request unit is hour
+            if 'number_of_hours_display' in Allocation._fields:
+                vals['number_of_hours_display'] = hours
+            if 'number_of_days' in Allocation._fields:
+                vals['number_of_days'] = days
+            if 'number_of_days_display' in Allocation._fields:
+                vals['number_of_days_display'] = days
+            if 'number_of_hours' in Allocation._fields:
+                vals['number_of_hours'] = hours
+            return vals, days
+
+        # Preferred path: resize the first existing Extra Hours allocation so remaining == target.
+        # Avoids create() issues (no holiday_type in Odoo 19; no state=validate on create).
+        if other_allocs:
+            main = other_allocs[0]
+            rest = other_allocs[1:]
+            rest_hours = round(sum(self._allocation_hours(a) for a in rest), 2)
+            # remaining = main + rest + sync - taken  → set main so remaining=target, drop sync allocs
+            main_needed = round(target_hours + taken_hours - rest_hours, 2)
+            if main_needed < 0.01:
+                main_needed = 0.01  # keep a tiny positive allocation rather than unlink user data
+            hour_vals, days = _hours_write_vals(main_needed)
+            try:
+                main.with_context(
+                    mail_notrack=True,
+                    tracking_disable=True,
+                ).write(hour_vals)
+                if main.state != 'validate':
+                    main.sudo()._action_validate()
+                if sync_allocs:
                     sync_allocs.with_context(
                         allocation_skip_state_check=True,
                         mail_notrack=True,
                         tracking_disable=True,
                     ).unlink()
-                except Exception:
-                    _logger.exception("Factory ExtraHours DASHBOARD failed removing sync allocs when sync_needed~0")
-            _logger.info(
-                "Factory ExtraHours DASHBOARD no sync alloc needed (sync_needed=%s). "
-                "Card remaining should be ~%s from other allocs alone.",
-                sync_needed,
-                round(other_alloc_hours - taken_hours, 2),
-            )
-            final_remaining = round(other_alloc_hours - taken_hours, 2)
-        else:
-            days = round(sync_needed / hours_per_day, 4) if hours_per_day else sync_needed
-            hour_vals = {
-                'number_of_days': days,
-            }
-            if 'number_of_days_display' in Allocation._fields:
-                hour_vals['number_of_days_display'] = days
-            if 'number_of_hours' in Allocation._fields:
-                hour_vals['number_of_hours'] = sync_needed
-            if 'number_of_hours_display' in Allocation._fields:
-                hour_vals['number_of_hours_display'] = sync_needed
-
-            target_alloc = sync_allocs[:1]
-            if target_alloc:
-                try:
-                    target_alloc.with_context(
-                        mail_notrack=True,
-                        tracking_disable=True,
-                        leave_skip_state_check=True,
-                    ).write(hour_vals)
-                    if target_alloc.state != 'validate':
-                        target_alloc.sudo()._action_validate()
-                    (sync_allocs - target_alloc).with_context(
-                        allocation_skip_state_check=True,
-                        mail_notrack=True,
-                        tracking_disable=True,
-                    ).unlink()
-                    _logger.info(
-                        "Factory ExtraHours DASHBOARD updated sync alloc id=%s hours=%s days=%s",
-                        target_alloc.id,
-                        sync_needed,
-                        days,
-                    )
-                except Exception:
-                    _logger.exception(
-                        "Factory ExtraHours DASHBOARD update failed for alloc id=%s — will recreate",
-                        target_alloc.id,
-                    )
-                    target_alloc = Allocation.browse()
-            else:
-                target_alloc = Allocation.browse()
-
-            if not target_alloc:
-                # Clean any leftover sync allocs then create as confirm → validate
-                if sync_allocs:
-                    try:
-                        sync_allocs.with_context(
-                            allocation_skip_state_check=True,
-                            mail_notrack=True,
-                            tracking_disable=True,
-                        ).unlink()
-                    except Exception:
-                        for alloc in sync_allocs.exists():
-                            try:
-                                alloc.with_context(mail_notrack=True, tracking_disable=True).write({'state': 'refuse'})
-                                alloc.with_context(
-                                    allocation_skip_state_check=True,
-                                    mail_notrack=True,
-                                    tracking_disable=True,
-                                ).unlink()
-                            except Exception:
-                                _logger.exception(
-                                    "Factory ExtraHours DASHBOARD could not remove sync alloc id=%s",
-                                    alloc.id,
-                                )
-
-                alloc_vals = {
-                    'name': sync_name,
-                    'holiday_type': 'employee',
-                    'employee_id': employee.id,
-                    'holiday_status_id': extra_type.id,
-                    'number_of_days': days,
-                    # DO NOT pass state='validate' — Odoo raises "Incorrect state for new allocation"
-                }
-                if 'allocation_type' in Allocation._fields:
-                    alloc_vals['allocation_type'] = 'regular'
-                if 'date_from' in Allocation._fields:
-                    alloc_vals['date_from'] = self.date_from or fields.Date.context_today(self)
-                if 'date_to' in Allocation._fields:
-                    alloc_vals['date_to'] = False
-                alloc_vals.update({k: v for k, v in hour_vals.items() if k != 'number_of_days'})
-
-                new_alloc = Allocation.with_context(
-                    employee_id=employee.id,
-                    mail_create_nolog=True,
-                    mail_notrack=True,
-                    tracking_disable=True,
-                    mail_create_nosubscribe=True,
-                ).create(alloc_vals)
-                try:
-                    new_alloc.sudo()._action_validate()
-                except Exception:
-                    _logger.exception(
-                        "Factory ExtraHours DASHBOARD _action_validate failed; forcing state=validate"
-                    )
-                    new_alloc.sudo().write({'state': 'validate'})
+                final_remaining = round(
+                    self._allocation_hours(main) + rest_hours - taken_hours, 2
+                )
                 _logger.info(
-                    "Factory ExtraHours DASHBOARD created+validated sync alloc id=%s hours=%s days=%s state=%s",
-                    new_alloc.id,
-                    sync_needed,
+                    "Factory ExtraHours DASHBOARD resized existing alloc id=%s "
+                    "hours %s -> %s days=%s final_remaining≈%s",
+                    main.id,
+                    self._allocation_hours(main),
+                    main_needed,
                     days,
-                    new_alloc.state,
+                    final_remaining,
+                )
+                # Re-read after compute fields
+                main.invalidate_recordset()
+                final_remaining = round(
+                    self._allocation_hours(main) + rest_hours - taken_hours, 2
+                )
+                match = abs(final_remaining - target_hours) < 0.08
+                _logger.info(
+                    "Factory ExtraHours DASHBOARD VERDICT emp=%s card_remaining≈%s target=%s MATCH=%s "
+                    "(updated existing allocation id=%s)",
+                    employee.id,
+                    final_remaining,
+                    target_hours,
+                    match,
+                    main.id,
+                )
+                return match
+            except Exception:
+                _logger.exception(
+                    "Factory ExtraHours DASHBOARD failed resizing alloc id=%s — fallback to create",
+                    main.id,
                 )
 
-            final_remaining = round(other_alloc_hours + sync_needed - taken_hours, 2)
+        # Fallback: create sync allocation (only fields that exist on this Odoo version)
+        sync_needed = round(target_hours + taken_hours - other_alloc_hours, 2)
+        if sync_needed <= 0.01:
+            if sync_allocs:
+                sync_allocs.with_context(
+                    allocation_skip_state_check=True,
+                    mail_notrack=True,
+                    tracking_disable=True,
+                ).unlink()
+            final_remaining = round(other_alloc_hours - taken_hours, 2)
+            match = abs(final_remaining - target_hours) < 0.08
+            _logger.info(
+                "Factory ExtraHours DASHBOARD VERDICT emp=%s card_remaining≈%s target=%s MATCH=%s (no create)",
+                employee.id, final_remaining, target_hours, match,
+            )
+            return match
 
-        match = abs(final_remaining - target_hours) < 0.05
+        hour_vals, days = _hours_write_vals(sync_needed)
+        if sync_allocs:
+            try:
+                sync_allocs[0].with_context(mail_notrack=True, tracking_disable=True).write(hour_vals)
+                if sync_allocs[0].state != 'validate':
+                    sync_allocs[0].sudo()._action_validate()
+                (sync_allocs - sync_allocs[0]).with_context(
+                    allocation_skip_state_check=True,
+                    mail_notrack=True,
+                    tracking_disable=True,
+                ).unlink()
+                final_remaining = round(other_alloc_hours + sync_needed - taken_hours, 2)
+                match = abs(final_remaining - target_hours) < 0.08
+                _logger.info(
+                    "Factory ExtraHours DASHBOARD VERDICT emp=%s updated sync alloc id=%s "
+                    "remaining≈%s MATCH=%s",
+                    employee.id, sync_allocs[0].id, final_remaining, match,
+                )
+                return match
+            except Exception:
+                _logger.exception("Factory ExtraHours DASHBOARD sync alloc update failed")
+
+        alloc_vals = {
+            'name': sync_name,
+            'employee_id': employee.id,
+            'holiday_status_id': extra_type.id,
+        }
+        # Never pass holiday_type — removed in Odoo 19
+        if 'allocation_type' in Allocation._fields:
+            alloc_vals['allocation_type'] = 'regular'
+        if 'date_from' in Allocation._fields:
+            alloc_vals['date_from'] = self.date_from or fields.Date.context_today(self)
+        if 'date_to' in Allocation._fields:
+            alloc_vals['date_to'] = False
+        alloc_vals.update(hour_vals)
+
+        # Strip any invalid keys defensively
+        alloc_vals = {k: v for k, v in alloc_vals.items() if k in Allocation._fields}
+
+        new_alloc = Allocation.with_context(
+            employee_id=employee.id,
+            mail_create_nolog=True,
+            mail_notrack=True,
+            tracking_disable=True,
+            mail_create_nosubscribe=True,
+        ).create(alloc_vals)
+        try:
+            new_alloc.sudo()._action_validate()
+        except Exception:
+            _logger.exception("Factory ExtraHours DASHBOARD validate failed; forcing state")
+            new_alloc.sudo().write({'state': 'validate'})
+
+        final_remaining = round(other_alloc_hours + sync_needed - taken_hours, 2)
+        match = abs(final_remaining - target_hours) < 0.08
         _logger.info(
-            "Factory ExtraHours DASHBOARD VERDICT emp=%s card_remaining≈%s target=%s MATCH=%s\n"
-            "  >>> Time Off Dashboard Extra Hours card reads LEAVE ALLOCATION remaining, "
-            "not overtime lines. Expected UI: %s hours (%.4f days at %.2fh/day)",
+            "Factory ExtraHours DASHBOARD VERDICT emp=%s created alloc id=%s "
+            "card_remaining≈%s target=%s MATCH=%s state=%s vals=%s",
             employee.id,
+            new_alloc.id,
             final_remaining,
             target_hours,
             match,
-            final_remaining,
-            final_remaining / hours_per_day if hours_per_day else 0.0,
-            hours_per_day,
+            new_alloc.state,
+            alloc_vals,
         )
         return match
 
