@@ -69,57 +69,18 @@ class HrPayslip(models.Model):
         compute="_compute_attendance_reconciliation_fields",
         store=True
     )
+    is_reconciled = fields.Boolean(
+        string="Attendance Reconciled",
+        default=False,
+        copy=False,
+        help="Tracks whether attendance reconciliation and leave settlements have already been applied for this payslip."
+    )
 
     @api.depends('employee_id', 'date_from', 'date_to')
     def _compute_attendance_reconciliation_fields(self):
-        for payslip in self:
-            if payslip.employee_id and payslip.date_from and payslip.date_to:
-                # Convert flexible rest days from Absent (A) to Rest Day (ARS)
-                payslip._convert_flexible_rest_days_to_ars()
-
-                res = payslip._get_reconciled_attendance_variance()
-                gross_ot = round(res.get('total_ot', 0.0), 2)
-                gross_ut = round(res.get('total_undertime', 0.0), 2)
-
-                payslip.attendance_gross_overtime = gross_ot
-                payslip.attendance_gross_undertime = gross_ut
-                payslip.attendance_net_reconciled = round(gross_ot - gross_ut, 2)
-
-                # Get previous banked extra hours balance
-                prev_extra_hours = round(payslip._get_previous_extra_hours_balance(), 2)
-                total_extra_avail = round(prev_extra_hours + gross_ot, 2)
-                payslip.total_extra_hours_available = total_extra_avail
-
-                lateness = gross_ut
-
-                # STEP 1: Deduct lateness from Total Available Extra Hours (Banked + New OT)
-                covered_extra = round(min(lateness, total_extra_avail), 2)
-                rem_lateness = round(lateness - covered_extra, 2)
-
-                # STEP 2a: Deduct remaining lateness from Annual Leave
-                covered_annual_leave = 0.0
-                if rem_lateness > 0.01:
-                    annual_leave_avail = round(payslip._get_available_leave_hours_by_type('Annual Leave'), 2)
-                    covered_annual_leave = round(min(rem_lateness, annual_leave_avail), 2)
-                    rem_lateness = round(rem_lateness - covered_annual_leave, 2)
-
-                # STEP 2b: Deduct remaining lateness from Paid Time Off (if Annual Leave exhausted/insufficient)
-                covered_paid_time_off = 0.0
-                if rem_lateness > 0.01:
-                    paid_time_off_avail = round(payslip._get_available_leave_hours_by_type('Paid Time Off'), 2)
-                    covered_paid_time_off = round(min(rem_lateness, paid_time_off_avail), 2)
-                    rem_lateness = round(rem_lateness - covered_paid_time_off, 2)
-
-                # Guard against floating-point micro fractions (< 0.01h)
-                if rem_lateness < 0.01:
-                    rem_lateness = 0.0
-
-                # STEP 3: Remaining lateness goes to Monthly Cash Salary Deduction
-                payslip.lateness_covered_by_extra_hours = covered_extra
-                payslip.lateness_covered_by_annual_leave = covered_annual_leave
-                payslip.lateness_covered_by_paid_time_off = covered_paid_time_off
-                payslip.undertime_cash_deduction_hours = rem_lateness
-            else:
+        valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to)
+        if not valid_slips:
+            for payslip in self:
                 payslip.attendance_gross_overtime = 0.0
                 payslip.attendance_gross_undertime = 0.0
                 payslip.attendance_net_reconciled = 0.0
@@ -128,157 +89,281 @@ class HrPayslip(models.Model):
                 payslip.lateness_covered_by_annual_leave = 0.0
                 payslip.lateness_covered_by_paid_time_off = 0.0
                 payslip.undertime_cash_deduction_hours = 0.0
+            return
 
-    def compute_sheet(self):
+        # 1. Bulk Rest Day Conversion
+        valid_slips._convert_flexible_rest_days_to_ars()
+
+        emp_ids = valid_slips.mapped('employee_id').ids
+        min_date = min(valid_slips.mapped('date_from'))
+        max_date = max(valid_slips.mapped('date_to'))
+
+        # Bulk Pre-fetch 1: Attendances for all employees in batch
+        attendances = self.env['hr.attendance'].sudo().search([
+            ('employee_id', 'in', emp_ids),
+            ('check_in', '>=', datetime.datetime.combine(min_date, datetime.time.min)),
+            ('check_in', '<=', datetime.datetime.combine(max_date, datetime.time.max))
+        ])
+        att_by_emp = defaultdict(list)
+        for att in attendances:
+            att_by_emp[att.employee_id.id].append(att)
+
+        # Bulk Pre-fetch 2: Banked extra hours
+        banked_extra_by_emp = defaultdict(float)
+        if 'hr.attendance.overtime.line' in self.env:
+            ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
+                ('employee_id', 'in', emp_ids),
+                ('date', '<', min_date),
+                ('compensable_as_leave', '=', True),
+                ('status', '=', 'approved'),
+            ])
+            for line in ot_lines:
+                banked_extra_by_emp[line.employee_id.id] += line.duration
+
+        # Bulk Pre-fetch 3: Leave allocations & taken leaves
+        LeaveType = self.env['hr.leave.type'].sudo()
+        annual_types = LeaveType.search(['|', '|', ('name', '=', 'Annual Leave'), ('name', 'ilike', 'Annual Leave'), ('name', 'ilike', 'سنوي')])
+        pto_types = LeaveType.search(['|', '|', ('name', '=', 'Paid Time Off'), ('name', 'ilike', 'Paid Time Off'), ('name', 'ilike', 'مدفوع')])
+
+        annual_type_ids = set(annual_types.ids)
+        pto_type_ids = set(pto_types.ids)
+        target_type_ids = list(annual_type_ids | pto_type_ids)
+
+        alloc_hours_by_emp_type = defaultdict(float)
+        if target_type_ids:
+            allocations = self.env['hr.leave.allocation'].sudo().search([
+                ('employee_id', 'in', emp_ids),
+                ('state', '=', 'validate'),
+                ('holiday_status_id', 'in', target_type_ids)
+            ])
+            for alloc in allocations:
+                hrs = 0.0
+                if hasattr(alloc, 'number_of_hours_display') and alloc.number_of_hours_display:
+                    hrs = alloc.number_of_hours_display
+                elif hasattr(alloc, 'number_of_days') and alloc.number_of_days:
+                    hrs = alloc.number_of_days * 8.0
+                elif hasattr(alloc, 'number_of_days_display') and alloc.number_of_days_display:
+                    hrs = alloc.number_of_days_display * 8.0
+                alloc_hours_by_emp_type[(alloc.employee_id.id, alloc.holiday_status_id.id)] += hrs
+
+            taken_leaves = self.env['hr.leave'].sudo().search([
+                ('employee_id', 'in', emp_ids),
+                ('state', '=', 'validate'),
+                ('holiday_status_id', 'in', target_type_ids),
+                '!', ('name', 'ilike', 'Monthly Lateness Settlement')
+            ])
+            for lve in taken_leaves:
+                hrs = 0.0
+                if hasattr(lve, 'number_of_hours') and lve.number_of_hours:
+                    hrs = lve.number_of_hours
+                elif hasattr(lve, 'number_of_days') and lve.number_of_days:
+                    hrs = lve.number_of_days * 8.0
+                alloc_hours_by_emp_type[(lve.employee_id.id, lve.holiday_status_id.id)] -= hrs
+
         for payslip in self:
-            if payslip.employee_id and payslip.date_from and payslip.date_to:
-                if hasattr(payslip.employee_id, '_create_absent_work_entries_for_period'):
-                    payslip.employee_id._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
+            if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
+                payslip.attendance_gross_overtime = 0.0
+                payslip.attendance_gross_undertime = 0.0
+                payslip.attendance_net_reconciled = 0.0
+                payslip.total_extra_hours_available = 0.0
+                payslip.lateness_covered_by_extra_hours = 0.0
+                payslip.lateness_covered_by_annual_leave = 0.0
+                payslip.lateness_covered_by_paid_time_off = 0.0
+                payslip.undertime_cash_deduction_hours = 0.0
+                continue
 
-        self._convert_flexible_rest_days_to_ars()
+            emp_id = payslip.employee_id.id
+            emp_attendances = [
+                att for att in att_by_emp.get(emp_id, [])
+                if payslip.date_from <= att.check_in.date() <= payslip.date_to
+            ]
 
-        # Force refresh worked_days_line_ids so the payslip Worked Days tab instantly updates
-        for payslip in self:
-            if payslip.state == 'draft':
-                worked_days_vals = payslip._get_worked_day_lines()
-                payslip.worked_days_line_ids.unlink()
-                payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
+            # In-memory variance calculation (0 DB queries per slip)
+            daily_hours = defaultdict(float)
+            for att in emp_attendances:
+                daily_hours[att.check_in.date()] += att.worked_hours
 
-        self._compute_attendance_reconciliation_fields()
-        res = super().compute_sheet()
-        self._sync_reconciliation_settlements()
-        return res
+            total_days_in_month = (payslip.date_to - payslip.date_from).days + 1
+            target_work_days = total_days_in_month - (total_days_in_month // 7)
 
-    def action_payslip_done(self):
-        res = super().action_payslip_done()
-        self._sync_reconciliation_settlements()
-        return res
+            break_hrs = payslip.employee_id._get_lunch_break_duration() if payslip.employee_id else 1.0
+            min_ot_threshold = 0.75
+            min_lateness_threshold = 0.25
 
-    def action_payslip_draft(self):
-        self._revert_reconciliation_settlements()
-        return super().action_payslip_draft()
+            total_ot = 0.0
+            total_undertime = 0.0
+            worked_days_count = len(daily_hours)
 
-    def action_payslip_cancel(self):
-        res = super().action_payslip_cancel()
-        self._revert_reconciliation_settlements()
-        return res
+            # Method 2: Earn 1 Rest Day for every 6 Worked Days
+            allowed_rest_days = worked_days_count // 6
 
-    def action_cancel(self):
-        res = super().action_cancel() if hasattr(super(), 'action_cancel') else True
-        self._revert_reconciliation_settlements()
-        return res
+            for att_date, raw_hrs in daily_hours.items():
+                if raw_hrs >= 6.0:
+                    net_hrs = max(0.0, raw_hrs - break_hrs)
+                elif raw_hrs > 4.0:
+                    net_hrs = max(0.0, raw_hrs - (break_hrs / 2.0))
+                else:
+                    net_hrs = raw_hrs
 
-    def unlink(self):
-        self._revert_reconciliation_settlements()
-        return super().unlink()
+                standard_target = 8.0
+                if net_hrs > standard_target:
+                    ot_excess = net_hrs - standard_target
+                    if ot_excess >= min_ot_threshold:
+                        total_ot += ot_excess
+                elif net_hrs < standard_target:
+                    shortfall = standard_target - net_hrs
+                    if shortfall > min_lateness_threshold:
+                        total_undertime += shortfall
 
-    def write(self, vals):
-        res = super().write(vals)
-        if vals.get('state') == 'cancel':
-            self._revert_reconciliation_settlements()
-        return res
+            if worked_days_count > target_work_days:
+                extra_worked_days = worked_days_count - target_work_days
+                total_ot += (extra_worked_days * 8.0)
+            else:
+                unworked_days = total_days_in_month - worked_days_count
+                if unworked_days > allowed_rest_days:
+                    excess_unworked_days = unworked_days - allowed_rest_days
+                    total_undertime += (excess_unworked_days * 8.0)
 
-    def _get_worked_day_lines(self, *args, **kwargs):
-        """
-        Harmonizes Odoo's native Worked Days tab lines with our Reconciliation Engine:
-        Ensures Extra Hours / Overtime line matches the net remaining extra hours after Step 1 lateness settlement.
-        """
-        res = super()._get_worked_day_lines(*args, **kwargs)
-        for payslip in self:
-            if payslip.employee_id and payslip.date_from and payslip.date_to:
-                net_extra_hrs = round(payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours, 2)
-                for line in res:
-                    code = line.get('code') or ''
-                    work_entry_type = self.env['hr.work.entry.type'].browse(line.get('work_entry_type_id')) if line.get('work_entry_type_id') else None
-                    if code in ['OVERTIME', 'EXTRA', 'OUT'] or (work_entry_type and ('overtime' in work_entry_type.name.lower() or 'extra' in work_entry_type.name.lower())):
-                        line['number_of_hours'] = max(0.0, net_extra_hrs)
-                        line['number_of_days'] = round(max(0.0, net_extra_hrs) / 8.0, 2)
-                        emp = payslip.employee_id
-                        w = emp.wage if emp else 0.0
-                        hourly_rate = w / 240.0
-                        line['amount'] = round(max(0.0, net_extra_hrs) * hourly_rate, 3)
-        return res
+            gross_ot = round(total_ot, 2)
+            gross_ut = round(total_undertime, 2)
+
+            payslip.attendance_gross_overtime = gross_ot
+            payslip.attendance_gross_undertime = gross_ut
+            payslip.attendance_net_reconciled = round(gross_ot - gross_ut, 2)
+
+            prev_extra_hours = round(banked_extra_by_emp.get(emp_id, 0.0), 2)
+            total_extra_avail = round(prev_extra_hours + gross_ot, 2)
+            payslip.total_extra_hours_available = total_extra_avail
+
+            lateness = gross_ut
+
+            # STEP 1: Deduct lateness from Extra Hours
+            covered_extra = round(min(lateness, total_extra_avail), 2)
+            rem_lateness = round(lateness - covered_extra, 2)
+
+            # STEP 2a: Deduct remaining lateness from Annual Leave
+            covered_annual_leave = 0.0
+            if rem_lateness > 0.01:
+                annual_leave_avail = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in annual_type_ids))
+                covered_annual_leave = round(min(rem_lateness, annual_leave_avail), 2)
+                rem_lateness = round(rem_lateness - covered_annual_leave, 2)
+
+            # STEP 2b: Deduct remaining lateness from Paid Time Off
+            covered_paid_time_off = 0.0
+            if rem_lateness > 0.01:
+                paid_time_off_avail = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in pto_type_ids))
+                covered_paid_time_off = round(min(rem_lateness, paid_time_off_avail), 2)
+                rem_lateness = round(rem_lateness - covered_paid_time_off, 2)
+
+            if rem_lateness < 0.01:
+                rem_lateness = 0.0
+
+            payslip.lateness_covered_by_extra_hours = covered_extra
+            payslip.lateness_covered_by_annual_leave = covered_annual_leave
+            payslip.lateness_covered_by_paid_time_off = covered_paid_time_off
+            payslip.undertime_cash_deduction_hours = rem_lateness
 
     def _convert_flexible_rest_days_to_ars(self):
         """
-        Automatic Flexible Rest Day Conversion:
+        Automatic Flexible Rest Day Conversion (Batch Optimized for 500+ employees):
         Converts 'Absent' (ABS / ABSENT) work entries on unworked rest days to 'Rest Day' (ARS)
         up to the earned rest day quota (Method 2: 1 Rest Day earned per 6 Worked Days).
         Safely handles validated work entries without raising Invalid Operation errors.
         """
+        if not self:
+            return
+
+        valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to)
+        if not valid_slips:
+            return
+
         rest_type = False
         if 'hr.work.entry' in self.env:
             rest_type = self.env['hr.work.entry.type'].sudo().search([
                 '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
             ], limit=1)
 
-        for payslip in self:
+        if not rest_type:
+            return
+
+        emp_ids = valid_slips.mapped('employee_id').ids
+        min_date = min(valid_slips.mapped('date_from'))
+        max_date = max(valid_slips.mapped('date_to'))
+
+        # Bulk Query 1: Attendances for all employees
+        attendances = self.env['hr.attendance'].sudo().search([
+            ('employee_id', 'in', emp_ids),
+            ('check_in', '>=', datetime.datetime.combine(min_date, datetime.time.min)),
+            ('check_in', '<=', datetime.datetime.combine(max_date, datetime.time.max))
+        ])
+        worked_dates_by_emp = defaultdict(set)
+        for att in attendances:
+            worked_dates_by_emp[att.employee_id.id].add(att.check_in.date())
+
+        # Bulk Query 2: Work entries for all employees
+        WorkEntry = self.env['hr.work.entry'].sudo()
+        we_fields = WorkEntry._fields
+        start_field = next((c for c in ['date_start', 'date_from', 'start_datetime', 'date'] if c in we_fields), None)
+        stop_field = next((c for c in ['date_stop', 'date_to', 'end_datetime', 'date'] if c in we_fields), None)
+
+        if not start_field or not stop_field:
+            return
+
+        work_entries = WorkEntry.search([
+            ('employee_id', 'in', emp_ids),
+            (start_field, '>=', datetime.datetime.combine(min_date, datetime.time.min)),
+            (stop_field, '<=', datetime.datetime.combine(max_date, datetime.time.max))
+        ]).sorted(start_field)
+
+        we_by_emp = defaultdict(list)
+        for we in work_entries:
+            we_by_emp[we.employee_id.id].append(we)
+
+        for payslip in valid_slips:
             try:
-                if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
-                    continue
+                emp_id = payslip.employee_id.id
+                slip_start = datetime.datetime.combine(payslip.date_from, datetime.time.min)
+                slip_end = datetime.datetime.combine(payslip.date_to, datetime.time.max)
 
-                attendances = self.env['hr.attendance'].sudo().search([
-                    ('employee_id', '=', payslip.employee_id.id),
-                    ('check_in', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
-                    ('check_in', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
-                ])
-                worked_dates = set(att.check_in.date() for att in attendances)
+                slip_worked_dates = set(
+                    d for d in worked_dates_by_emp.get(emp_id, set())
+                    if payslip.date_from <= d <= payslip.date_to
+                )
 
-                if rest_type and 'hr.work.entry' in self.env:
-                    WorkEntry = self.env['hr.work.entry'].sudo()
-                    we_fields = WorkEntry._fields
+                emp_work_entries = [
+                    we for we in we_by_emp.get(emp_id, [])
+                    if getattr(we, start_field) and getattr(we, stop_field) and
+                    getattr(we, start_field) >= slip_start and getattr(we, stop_field) <= slip_end
+                ]
 
-                    start_field = None
-                    for candidate in ['date_start', 'date_from', 'start_datetime', 'date']:
-                        if candidate in we_fields:
-                            start_field = candidate
-                            break
+                for we in emp_work_entries:
+                    code = (we.work_entry_type_id.code or '').strip()
+                    name = (we.work_entry_type_id.name or '').lower()
+                    if not we.work_entry_type_id.is_leave and code not in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] and 'absent' not in name:
+                        start_val = getattr(we, start_field, None)
+                        if start_val:
+                            we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
+                            if we_date:
+                                slip_worked_dates.add(we_date)
 
-                    stop_field = None
-                    for candidate in ['date_stop', 'date_to', 'end_datetime', 'date']:
-                        if candidate in we_fields:
-                            stop_field = candidate
-                            break
+                worked_days_count = len(slip_worked_dates)
+                allowed_rest_days = worked_days_count // 6
 
-                    if not start_field or not stop_field:
+                converted_count = 0
+                for we in emp_work_entries:
+                    start_val = getattr(we, start_field, None)
+                    if not start_val:
                         continue
-
-                    domain = [
-                        ('employee_id', '=', payslip.employee_id.id),
-                        (start_field, '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
-                        (stop_field, '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
-                    ]
-                    work_entries = WorkEntry.search(domain).sorted(start_field)
-
-                    for we in work_entries:
+                    we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
+                    if we_date:
                         code = (we.work_entry_type_id.code or '').strip()
                         name = (we.work_entry_type_id.name or '').lower()
-                        if not we.work_entry_type_id.is_leave and code not in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] and 'absent' not in name:
-                            start_val = getattr(we, start_field, None)
-                            if start_val:
-                                we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
-                                if we_date:
-                                    worked_dates.add(we_date)
-
-                    # Method 2: Earn 1 Rest Day for every 6 Worked Days
-                    worked_days_count = len(worked_dates)
-                    allowed_rest_days = worked_days_count // 6
-
-                    converted_count = 0
-                    for we in work_entries:
-                        start_val = getattr(we, start_field, None)
-                        if not start_val:
-                            continue
-                        we_date = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
-                        if we_date:
-                            code = (we.work_entry_type_id.code or '').strip()
-                            name = (we.work_entry_type_id.name or '').lower()
-                            if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in name:
-                                if converted_count < allowed_rest_days:
-                                    if hasattr(we, 'state') and we.state == 'validated':
-                                        we.sudo().write({'state': 'draft'})
-                                    we.sudo().write({'work_entry_type_id': rest_type.id})
-                                    converted_count += 1
+                        if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in name:
+                            if converted_count < allowed_rest_days:
+                                if hasattr(we, 'state') and we.state == 'validated':
+                                    we.sudo().write({'state': 'draft'})
+                                we.sudo().write({'work_entry_type_id': rest_type.id})
+                                converted_count += 1
             except Exception:
                 pass
 
@@ -453,6 +538,9 @@ class HrPayslip(models.Model):
         for payslip in self:
             if not payslip.employee_id or not payslip.date_to:
                 continue
+
+            # Reset reconciliation flag so next compute can re-reconcile freshly
+            payslip.write({'is_reconciled': False})
 
             # 1. Unlink/remove all settlement leaves created for this payslip's month-end date
             settlement_leaves = Leave.search([
