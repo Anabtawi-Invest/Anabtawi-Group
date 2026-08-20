@@ -729,19 +729,32 @@ class HrPayslip(models.Model):
             total_extra_hours_available - lateness_covered_by_extra_hours
         (e.g. 10:30 when previous 08:00 + monthly OT 02:30 and no Step-1 lateness).
         """
-        OvertimeLine = self.env['hr.attendance.overtime.line'].sudo() if 'hr.attendance.overtime.line' in self.env else None
-        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
-        Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
-        LeaveType = self.env['hr.leave.type'].sudo() if 'hr.leave.type' in self.env else None
+        # IMPORTANT: do NOT use `if not self.env['model']` — empty recordsets are falsy in Odoo!
+        has_overtime_line_model = 'hr.attendance.overtime.line' in self.env
+        has_allocation_model = 'hr.leave.allocation' in self.env
+        has_leave_model = 'hr.leave' in self.env
+        has_leave_type_model = 'hr.leave.type' in self.env
 
         _logger.info(
-            "Factory ExtraHours DEBUG sync START payslips=%s OvertimeLine_model=%s",
+            "Factory ExtraHours DEBUG sync START payslips=%s "
+            "has_overtime_line_model=%s has_allocation=%s has_leave=%s "
+            "overtime_models=%s",
             self.ids,
-            bool(OvertimeLine),
+            has_overtime_line_model,
+            has_allocation_model,
+            has_leave_model,
+            [m for m in self.env.registry if 'overtime' in m],
         )
-        if not OvertimeLine:
-            _logger.warning("Factory ExtraHours DEBUG abort: hr.attendance.overtime.line model missing")
+        if not has_overtime_line_model:
+            _logger.warning(
+                "Factory ExtraHours DEBUG abort: hr.attendance.overtime.line model missing from registry"
+            )
             return
+
+        OvertimeLine = self.env['hr.attendance.overtime.line'].sudo()
+        Allocation = self.env['hr.leave.allocation'].sudo() if has_allocation_model else None
+        Leave = self.env['hr.leave'].sudo() if has_leave_model else None
+        LeaveType = self.env['hr.leave.type'].sudo() if has_leave_type_model else None
 
         for payslip in self:
             if not payslip.employee_id or not payslip.date_to:
@@ -774,7 +787,7 @@ class HrPayslip(models.Model):
 
             # Remove Extra Hours allocations that cancel overtime on the dashboard
             # (any name: Monthly Overtime Earned / Extra Hours Reconciliation / etc.)
-            if Allocation and LeaveType:
+            if Allocation is not None and LeaveType is not None:
                 extra_types = LeaveType.search([
                     '|', '|', '|',
                     ('name', '=', 'Extra Hours'),
@@ -814,7 +827,7 @@ class HrPayslip(models.Model):
                     _logger.info("Factory ExtraHours DEBUG unlinked %s Extra Hours allocations", len(all_extra_allocs))
 
             # Extra Hours lateness is applied on the overtime line only (avoid double deduction)
-            if Leave and LeaveType:
+            if Leave is not None and LeaveType is not None:
                 extra_types = LeaveType.search([
                     '|', '|',
                     ('name', '=', 'Extra Hours'),
@@ -982,7 +995,7 @@ class HrPayslip(models.Model):
             payslip.write({'is_reconciled': False})
 
             # 1. Unlink/remove all settlement leaves created for this payslip's date range
-            if Leave:
+            if Leave is not None:
                 settlement_leaves = Leave.search([
                     ('employee_id', '=', payslip.employee_id.id),
                     ('request_date_from', '>=', payslip.date_from),
@@ -993,7 +1006,7 @@ class HrPayslip(models.Model):
                     settlement_leaves.unlink()
 
             # 2. Revert Monthly Overtime Allocation if created for this payslip month
-            if Allocation:
+            if Allocation is not None:
                 month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
                 alloc_name = f"Monthly Overtime Earned - {month_str}"
                 ot_allocs = Allocation.search([
@@ -1004,7 +1017,7 @@ class HrPayslip(models.Model):
                     ot_allocs.unlink()
 
             # 3. Revert Overtime line if created for this payslip date_to
-            if OvertimeLine:
+            if OvertimeLine is not None:
                 ot_lines = OvertimeLine.search([
                     ('employee_id', '=', payslip.employee_id.id),
                     ('date', '=', payslip.date_to),
