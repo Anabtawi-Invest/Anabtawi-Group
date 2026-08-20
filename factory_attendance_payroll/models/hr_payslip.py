@@ -499,8 +499,9 @@ class HrPayslip(models.Model):
 
     def _create_or_update_settlement_leave(self, leave_type_name, hours, leave_desc):
         """
-        Creates or updates a validated hr.leave record for the employee at payslip.date_to.
-        If hours <= 0, deletes any previously created settlement leave for this payslip.
+        Creates validated hr.leave settlement records per absent date (e.g. Day 19, Day 31)
+        and supports fractional hours (less than a full day) using hourly time off.
+        Directly links to the active allocation to reduce balance without altering calendar ABS entries.
         """
         self.ensure_one()
         Leave = self.env['hr.leave'].sudo()
@@ -534,95 +535,164 @@ class HrPayslip(models.Model):
         if not leave_type:
             return
 
-        existing_leave = Leave.search([
+        # 1. Clean up previously generated settlement leaves for this leave type in this payslip period
+        prev_settlement_leaves = Leave.search([
             ('employee_id', '=', self.employee_id.id),
             ('holiday_status_id', '=', leave_type.id),
-            ('request_date_to', '=', self.date_to),
-            ('name', 'ilike', leave_desc),
-        ], limit=1)
+            ('request_date_from', '>=', self.date_from),
+            ('request_date_to', '<=', self.date_to),
+            ('name', 'ilike', 'Lateness Settlement'),
+        ])
+        if prev_settlement_leaves:
+            prev_settlement_leaves.unlink()
 
-        if hours > 0.01:
-            days = round(hours / 8.0, 4)
-            month_str = self.date_to.strftime('%B %Y') if self.date_to else ''
-            full_name = f"{leave_desc} - {month_str}"
+        if hours <= 0.01:
+            return
 
-            # Fix 1: Multi-Day Date Span so Odoo registers the exact number of days (e.g. 2 days)
-            num_days_span = max(1, int(round(days)))
-            start_date = self.date_to - datetime.timedelta(days=num_days_span - 1)
+        # 2. Find the active validated allocation
+        alloc = self.env['hr.leave.allocation'].sudo().search([
+            ('employee_id', '=', self.employee_id.id),
+            ('holiday_status_id', '=', leave_type.id),
+            ('state', '=', 'validate'),
+        ], order='date_to desc, id desc', limit=1)
 
-            dt_start = datetime.datetime.combine(start_date, datetime.time(8, 0, 0))
-            dt_stop = datetime.datetime.combine(self.date_to, datetime.time(17, 0, 0))
+        # 3. Find candidate absent / unpunched dates in this payslip period
+        absent_dates = []
+        if 'hr.work.entry' in self.env:
+            WorkEntry = self.env['hr.work.entry'].sudo()
+            we_fields = WorkEntry._fields
+            start_field = next((c for c in ['date_start', 'date_from', 'start_datetime', 'date'] if c in we_fields), None)
+            stop_field = next((c for c in ['date_stop', 'date_to', 'end_datetime', 'date'] if c in we_fields), None)
+            if start_field and stop_field:
+                domain = [
+                    ('employee_id', '=', self.employee_id.id),
+                    (start_field, '>=', datetime.datetime.combine(self.date_from, datetime.time.min)),
+                    (stop_field, '<=', datetime.datetime.combine(self.date_to, datetime.time.max)),
+                    ('work_entry_type_id.code', 'in', ['ABS', 'ABSENT']),
+                ]
+                absent_entries = WorkEntry.search(domain).sorted(start_field)
+                for we in absent_entries:
+                    start_val = getattr(we, start_field, None)
+                    d = start_val.date() if isinstance(start_val, (datetime.datetime, datetime.date)) else None
+                    if d and d not in absent_dates:
+                        absent_dates.append(d)
 
+        # If no absent work entries found, fallback to month-end date
+        if not absent_dates:
+            absent_dates = [self.date_to]
+
+        ctx_leave = Leave.with_context(
+            employee_id=self.employee_id.id,
+            mail_create_nolog=True,
+            mail_notrack=True,
+            tracking_disable=True,
+            leave_skip_state_check=True,
+            leave_skip_work_entries=True,
+            no_work_entry=True,
+        )
+
+        remaining_hours = hours
+        absent_date_idx = 0
+
+        # 4. Create 1-day settlement records for full days (8.0h chunks) on exact absent dates
+        while remaining_hours >= 7.99:
+            target_date = absent_dates[absent_date_idx] if absent_date_idx < len(absent_dates) else self.date_to
+            absent_date_idx += 1
+
+            dt_start = datetime.datetime.combine(target_date, datetime.time(8, 0, 0))
+            dt_stop = datetime.datetime.combine(target_date, datetime.time(17, 0, 0))
+
+            full_name = f"Lateness Settlement ({leave_type_name}) - {target_date.strftime('%d/%m/%Y')}"
             leave_vals = {
                 'name': full_name,
                 'employee_id': self.employee_id.id,
                 'holiday_status_id': leave_type.id,
-                'request_date_from': start_date,
-                'request_date_to': self.date_to,
+                'request_date_from': target_date,
+                'request_date_to': target_date,
                 'date_from': dt_start,
                 'date_to': dt_stop,
-                'number_of_days': days,
+                'number_of_days': 1.0,
                 'state': 'validate',
             }
             if 'number_of_days_display' in Leave._fields:
-                leave_vals['number_of_days_display'] = days
+                leave_vals['number_of_days_display'] = 1.0
             if 'number_of_hours' in Leave._fields:
-                leave_vals['number_of_hours'] = hours
+                leave_vals['number_of_hours'] = 8.0
             if 'number_of_hours_display' in Leave._fields:
-                leave_vals['number_of_hours_display'] = hours
-
-            # Fix 2: Explicitly link to the employee's active validated allocation
-            alloc = self.env['hr.leave.allocation'].sudo().search([
-                ('employee_id', '=', self.employee_id.id),
-                ('holiday_status_id', '=', leave_type.id),
-                ('state', '=', 'validate'),
-            ], order='date_to desc, id desc', limit=1)
-
+                leave_vals['number_of_hours_display'] = 8.0
             if alloc:
                 if 'holiday_allocation_id' in Leave._fields:
                     leave_vals['holiday_allocation_id'] = alloc.id
                 elif 'allocation_id' in Leave._fields:
                     leave_vals['allocation_id'] = alloc.id
 
-            ctx_leave = Leave.with_context(
-                employee_id=self.employee_id.id,
-                mail_create_nolog=True,
-                mail_notrack=True,
-                tracking_disable=True,
-                leave_skip_state_check=True,
-            )
+            try:
+                new_leave = ctx_leave.create(leave_vals)
+                new_leave.sudo().write({'state': 'validate'})
+                if 'hr.work.entry' in self.env:
+                    we_model = self.env['hr.work.entry'].sudo()
+                    if 'leave_id' in we_model._fields:
+                        generated_we = we_model.search([('leave_id', '=', new_leave.id)])
+                        if generated_we:
+                            generated_we.unlink()
+            except Exception:
+                pass
+
+            remaining_hours -= 8.0
+
+        # 5. Create hourly settlement record for remaining fractional hours (< 8.0h, e.g. 2h)
+        if remaining_hours > 0.01:
+            target_date = absent_dates[absent_date_idx] if absent_date_idx < len(absent_dates) else self.date_to
+            frac_hours = round(remaining_hours, 2)
+            frac_days = round(frac_hours / 8.0, 4)
+
+            dt_start = datetime.datetime.combine(target_date, datetime.time(8, 0, 0))
+            dt_stop = dt_start + datetime.timedelta(hours=frac_hours)
+
+            full_name = f"Lateness Settlement ({leave_type_name}) - {frac_hours}h ({target_date.strftime('%d/%m/%Y')})"
+            leave_vals = {
+                'name': full_name,
+                'employee_id': self.employee_id.id,
+                'holiday_status_id': leave_type.id,
+                'request_date_from': target_date,
+                'request_date_to': target_date,
+                'request_unit_hours': True,
+                'request_hour_from': 8.0,
+                'request_hour_to': 8.0 + frac_hours,
+                'date_from': dt_start,
+                'date_to': dt_stop,
+                'number_of_days': frac_days,
+                'state': 'validate',
+            }
+            if 'number_of_days_display' in Leave._fields:
+                leave_vals['number_of_days_display'] = frac_days
+            if 'number_of_hours' in Leave._fields:
+                leave_vals['number_of_hours'] = frac_hours
+            if 'number_of_hours_display' in Leave._fields:
+                leave_vals['number_of_hours_display'] = frac_hours
+            if alloc:
+                if 'holiday_allocation_id' in Leave._fields:
+                    leave_vals['holiday_allocation_id'] = alloc.id
+                elif 'allocation_id' in Leave._fields:
+                    leave_vals['allocation_id'] = alloc.id
 
             try:
-                if existing_leave:
-                    existing_leave.with_context(
-                        employee_id=self.employee_id.id,
-                        mail_create_nolog=True,
-                        mail_notrack=True,
-                        tracking_disable=True,
-                        leave_skip_state_check=True,
-                    ).write(leave_vals)
-                    if existing_leave.state != 'validate':
-                        existing_leave.sudo().write({'state': 'validate'})
-                else:
-                    new_leave = ctx_leave.create(leave_vals)
-                    new_leave.sudo().write({'state': 'validate'})
-                    if 'hr.work.entry' in self.env:
-                        we_model = self.env['hr.work.entry'].sudo()
-                        if 'leave_id' in we_model._fields:
-                            generated_we = we_model.search([('leave_id', '=', new_leave.id)])
-                            if generated_we:
-                                generated_we.unlink()
-            except Exception as e:
+                new_leave = ctx_leave.create(leave_vals)
+                new_leave.sudo().write({'state': 'validate'})
+                if 'hr.work.entry' in self.env:
+                    we_model = self.env['hr.work.entry'].sudo()
+                    if 'leave_id' in we_model._fields:
+                        generated_we = we_model.search([('leave_id', '=', new_leave.id)])
+                        if generated_we:
+                            generated_we.unlink()
+            except Exception:
                 pass
-        else:
-            if existing_leave:
-                existing_leave.unlink()
 
     def _sync_reconciliation_settlements(self):
         """
         1. Upload monthly overtime earned to Extra Hours Balance & sync Overtime Line.
-        2. Deduct Step 1 Extra Hours via approved hr.leave record (reduces Extra Hours allocation balance).
-        3. Deduct Step 2a Annual Leave via approved hr.leave record (reduces Annual Leave balance).
+        2. Deduct Step 1 Extra Hours via approved hr.leave records (reduces Extra Hours allocation balance).
+        3. Deduct Step 2a Annual Leave via approved hr.leave records (reduces Annual Leave balance).
         4. Deduct Step 2b Paid Time Off via approved hr.leave record (reduces Paid Time Off balance).
         """
         for payslip in self:
@@ -656,21 +726,21 @@ class HrPayslip(models.Model):
             payslip._create_or_update_settlement_leave(
                 'Extra Hours',
                 payslip.lateness_covered_by_extra_hours,
-                'Monthly Lateness Settlement via Extra Hours'
+                'Lateness Settlement via Extra Hours'
             )
 
             # 3. Step 2a: Annual Leave Time Off Deduction
             payslip._create_or_update_settlement_leave(
                 'Annual Leave',
                 payslip.lateness_covered_by_annual_leave,
-                'Monthly Lateness Settlement via Annual Leave'
+                'Lateness Settlement via Annual Leave'
             )
 
             # 4. Step 2b: Paid Time Off Time Off Deduction
             payslip._create_or_update_settlement_leave(
                 'Paid Time Off',
                 payslip.lateness_covered_by_paid_time_off,
-                'Monthly Lateness Settlement via Paid Time Off'
+                'Lateness Settlement via Paid Time Off'
             )
 
     def _revert_reconciliation_settlements(self):
@@ -689,11 +759,12 @@ class HrPayslip(models.Model):
             # Reset reconciliation flag so next compute can re-reconcile freshly
             payslip.write({'is_reconciled': False})
 
-            # 1. Unlink/remove all settlement leaves created for this payslip's month-end date
+            # 1. Unlink/remove all settlement leaves created for this payslip's date range
             settlement_leaves = Leave.search([
                 ('employee_id', '=', payslip.employee_id.id),
-                ('request_date_to', '=', payslip.date_to),
-                ('name', 'ilike', 'Monthly Lateness Settlement'),
+                ('request_date_from', '>=', payslip.date_from),
+                ('request_date_to', '<=', payslip.date_to),
+                ('name', 'ilike', 'Lateness Settlement'),
             ])
             if settlement_leaves:
                 settlement_leaves.unlink()

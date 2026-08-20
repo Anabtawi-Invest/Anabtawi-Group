@@ -325,13 +325,14 @@ class HrEmployee(models.Model):
         self.ensure_one()
         day_start_utc, next_day_start_utc, _employee_tz = self._get_day_utc_bounds(target_date)
 
-        # 1. Check hr.leave records with approved/validated state
+        # 1. Check hr.leave records with approved/validated state (excluding settlement deduction records)
         if "hr.leave" in self.env:
             leaves_count = self.env["hr.leave"].sudo().search_count([
                 ("employee_id", "=", self.id),
                 ("state", "in", ["validate", "validate1"]),
                 ("date_from", "<", fields.Datetime.to_string(next_day_start_utc)),
                 ("date_to", ">", fields.Datetime.to_string(day_start_utc)),
+                "!", ("name", "ilike", "Lateness Settlement"),
             ])
             if leaves_count > 0:
                 return True
