@@ -143,12 +143,14 @@ class HrPayslip(models.Model):
                 if 'Monthly Overtime Earned' in (alloc.name or ''):
                     continue
                 hrs = 0.0
-                if hasattr(alloc, 'number_of_hours_display') and alloc.number_of_hours_display:
-                    hrs = alloc.number_of_hours_display
-                elif hasattr(alloc, 'number_of_days') and alloc.number_of_days:
+                if hasattr(alloc, 'number_of_days') and alloc.number_of_days:
                     hrs = alloc.number_of_days * 8.0
                 elif hasattr(alloc, 'number_of_days_display') and alloc.number_of_days_display:
                     hrs = alloc.number_of_days_display * 8.0
+                elif hasattr(alloc, 'number_of_hours_display') and alloc.number_of_hours_display:
+                    hrs = alloc.number_of_hours_display
+                elif hasattr(alloc, 'number_of_hours') and alloc.number_of_hours:
+                    hrs = alloc.number_of_hours
                 alloc_hours_by_emp_type[(alloc.employee_id.id, alloc.holiday_status_id.id)] += hrs
 
             taken_leaves = self.env['hr.leave'].sudo().search([
@@ -159,10 +161,14 @@ class HrPayslip(models.Model):
             ])
             for lve in taken_leaves:
                 hrs = 0.0
-                if hasattr(lve, 'number_of_hours') and lve.number_of_hours:
-                    hrs = lve.number_of_hours
-                elif hasattr(lve, 'number_of_days') and lve.number_of_days:
+                if hasattr(lve, 'number_of_days') and lve.number_of_days:
                     hrs = lve.number_of_days * 8.0
+                elif hasattr(lve, 'number_of_days_display') and lve.number_of_days_display:
+                    hrs = lve.number_of_days_display * 8.0
+                elif hasattr(lve, 'number_of_hours') and lve.number_of_hours:
+                    hrs = lve.number_of_hours
+                elif hasattr(lve, 'number_of_hours_display') and lve.number_of_hours_display:
+                    hrs = lve.number_of_hours_display
                 alloc_hours_by_emp_type[(lve.employee_id.id, lve.holiday_status_id.id)] -= hrs
 
         for payslip in self:
@@ -736,11 +742,16 @@ class HrPayslip(models.Model):
                         ot_hours = payslip.attendance_gross_overtime
                         alloc_vals = {
                             'name': alloc_name,
+                            'holiday_type': 'employee',
                             'employee_id': payslip.employee_id.id,
                             'holiday_status_id': extra_type.id,
                             'number_of_days': ot_days,
                             'state': 'validate',
                         }
+                        if 'date_from' in Allocation._fields:
+                            alloc_vals['date_from'] = payslip.date_from
+                        if 'date_to' in Allocation._fields:
+                            alloc_vals['date_to'] = payslip.date_to
                         if 'number_of_days_display' in Allocation._fields:
                             alloc_vals['number_of_days_display'] = ot_days
                         if 'number_of_hours' in Allocation._fields:
@@ -750,14 +761,17 @@ class HrPayslip(models.Model):
 
                         if existing_alloc:
                             existing_alloc.write(alloc_vals)
+                            if existing_alloc.state != 'validate':
+                                existing_alloc.sudo().write({'state': 'validate'})
                         else:
                             new_alloc = Allocation.with_context(
+                                employee_id=payslip.employee_id.id,
                                 mail_create_nolog=True,
                                 mail_notrack=True,
                                 tracking_disable=True,
                                 allocation_skip_state_check=True,
                             ).create(alloc_vals)
-                            new_alloc.write({'state': 'validate'})
+                            new_alloc.sudo().write({'state': 'validate'})
                     else:
                         if existing_alloc:
                             existing_alloc.unlink()
