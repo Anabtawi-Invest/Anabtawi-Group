@@ -75,6 +75,12 @@ class HrPayslip(models.Model):
         copy=False,
         help="Tracks whether attendance reconciliation and leave settlements have already been applied for this payslip."
     )
+    extra_hours_allocated_days = fields.Float(
+        string="Extra Hours Added to Allocation",
+        default=0.0,
+        copy=False,
+        help="Tracks duration in days added directly to employee's Extra Hours allocation by this payslip."
+    )
 
     @api.depends('employee_id', 'date_from', 'date_to')
     def _compute_attendance_reconciliation_fields(self):
@@ -243,7 +249,8 @@ class HrPayslip(models.Model):
             payslip.attendance_gross_undertime = gross_ut
             payslip.attendance_net_reconciled = round(gross_ot - gross_ut, 2)
 
-            prior_alloc_extra = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in extra_type_ids))
+            current_slip_allocated_hours = (payslip.extra_hours_allocated_days or 0.0) * 8.0
+            prior_alloc_extra = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in extra_type_ids) - current_slip_allocated_hours)
             prior_ot_line_extra = round(banked_extra_by_emp.get(emp_id, 0.0), 2)
             prev_extra_hours = max(prior_alloc_extra, prior_ot_line_extra)
 
@@ -741,16 +748,26 @@ class HrPayslip(models.Model):
             month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
             alloc_name = f"Monthly Overtime Earned - {month_str}"
 
-            # 1. Update Extra Hours Time Off Allocation with monthly overtime earned
+            # 1. Update Employee's Active Extra Hours Allocation record directly
             if Allocation and LeaveType:
                 emp_alloc = Allocation.search([
                     ('employee_id', '=', payslip.employee_id.id),
                     ('holiday_status_id.name', 'ilike', 'Extra'),
                     ('state', '=', 'validate'),
-                ], limit=1)
+                ], order='id asc', limit=1)
+
+                ot_days = round(payslip.attendance_gross_overtime / 8.0, 4)
+                already_allocated = payslip.extra_hours_allocated_days or 0.0
+                diff = round(ot_days - already_allocated, 4)
+
                 if emp_alloc:
-                    extra_type = emp_alloc.holiday_status_id
-                else:
+                    if abs(diff) > 0.0001:
+                        new_days = max(0.0, round(emp_alloc.number_of_days + diff, 4))
+                        emp_alloc.sudo().write({'number_of_days': new_days})
+                        if 'number_of_days_display' in Allocation._fields:
+                            emp_alloc.sudo().write({'number_of_days_display': new_days})
+                        payslip.extra_hours_allocated_days = ot_days
+                elif ot_days > 0.0001:
                     extra_types = LeaveType.search([
                         '|', '|',
                         ('name', '=', 'Extra Hours'),
@@ -758,62 +775,26 @@ class HrPayslip(models.Model):
                         ('name', 'ilike', 'إضافي')
                     ])
                     extra_type = extra_types[0] if extra_types else None
-
-                if extra_type:
-                    existing_alloc = Allocation.search([
-                        ('employee_id', '=', payslip.employee_id.id),
-                        ('holiday_status_id', '=', extra_type.id),
-                        ('name', '=', alloc_name),
-                    ], limit=1)
-
-                    if payslip.attendance_gross_overtime > 0.01:
-                        ot_days = round(payslip.attendance_gross_overtime / 8.0, 4)
-                        ot_hours = payslip.attendance_gross_overtime
+                    if extra_type:
                         alloc_vals = {
-                            'name': alloc_name,
+                            'name': f"Extra Hours ({payslip.employee_id.name})",
                             'holiday_type': 'employee',
                             'employee_id': payslip.employee_id.id,
                             'holiday_status_id': extra_type.id,
                             'number_of_days': ot_days,
                             'state': 'validate',
                         }
-                        if 'date_from' in Allocation._fields:
-                            alloc_vals['date_from'] = payslip.date_from
-                        if 'date_to' in Allocation._fields:
-                            alloc_vals['date_to'] = False
                         if 'number_of_days_display' in Allocation._fields:
                             alloc_vals['number_of_days_display'] = ot_days
-                        if 'number_of_hours' in Allocation._fields:
-                            alloc_vals['number_of_hours'] = ot_hours
-                        if 'number_of_hours_display' in Allocation._fields:
-                            alloc_vals['number_of_hours_display'] = ot_hours
-
-                        if existing_alloc:
-                            existing_alloc.write(alloc_vals)
-                            if existing_alloc.state != 'validate':
-                                existing_alloc.sudo().write({'state': 'validate'})
-                            if hasattr(existing_alloc, 'action_validate'):
-                                try:
-                                    existing_alloc.action_validate()
-                                except Exception:
-                                    pass
-                        else:
-                            new_alloc = Allocation.with_context(
-                                employee_id=payslip.employee_id.id,
-                                mail_create_nolog=True,
-                                mail_notrack=True,
-                                tracking_disable=True,
-                                allocation_skip_state_check=True,
-                            ).create(alloc_vals)
-                            new_alloc.sudo().write({'state': 'validate'})
-                            if hasattr(new_alloc, 'action_validate'):
-                                try:
-                                    new_alloc.action_validate()
-                                except Exception:
-                                    pass
-                    else:
-                        if existing_alloc:
-                            existing_alloc.unlink()
+                        new_alloc = Allocation.with_context(
+                            employee_id=payslip.employee_id.id,
+                            mail_create_nolog=True,
+                            mail_notrack=True,
+                            tracking_disable=True,
+                            allocation_skip_state_check=True,
+                        ).create(alloc_vals)
+                        new_alloc.sudo().write({'state': 'validate'})
+                        payslip.extra_hours_allocated_days = ot_days
 
             # 2. Step 1: Extra Hours Time Off Deduction
             payslip._create_or_update_settlement_leave(
@@ -887,16 +868,19 @@ class HrPayslip(models.Model):
                 if settlement_leaves:
                     settlement_leaves.unlink()
 
-            # 2. Revert Monthly Overtime Allocation if created for this payslip month
-            if Allocation:
-                month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
-                alloc_name = f"Monthly Overtime Earned - {month_str}"
-                ot_allocs = Allocation.search([
+            # 2. Revert credited overtime on the employee's active Extra Hours Allocation
+            if Allocation and (payslip.extra_hours_allocated_days or 0.0) > 0.0:
+                emp_alloc = Allocation.search([
                     ('employee_id', '=', payslip.employee_id.id),
-                    ('name', '=', alloc_name),
-                ])
-                if ot_allocs:
-                    ot_allocs.unlink()
+                    ('holiday_status_id.name', 'ilike', 'Extra'),
+                    ('state', '=', 'validate'),
+                ], order='id asc', limit=1)
+                if emp_alloc:
+                    new_days = max(0.0, round(emp_alloc.number_of_days - payslip.extra_hours_allocated_days, 4))
+                    emp_alloc.sudo().write({'number_of_days': new_days})
+                    if 'number_of_days_display' in Allocation._fields:
+                        emp_alloc.sudo().write({'number_of_days_display': new_days})
+                payslip.extra_hours_allocated_days = 0.0
 
             # 3. Revert Overtime line if created for this payslip date_to
             if OvertimeLine:
