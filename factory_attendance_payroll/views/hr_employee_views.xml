@@ -5,9 +5,12 @@
         <field name="model">hr.employee</field>
         <field name="inherit_id" ref="hr.view_employee_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//page[@name='payroll_information']//field[@name='structure_type_id']" position="after">
+            <!-- Place before Schedule so fields stay visible even when payroll
+                 modules inject Employer Costs / payment fields after Pay Category. -->
+            <xpath expr="//page[@name='payroll_information']//separator[@name='schedule']" position="before">
+                <separator string="Work Station &amp; Break" name="factory_work_station_break"/>
                 <field name="employee_work_station"/>
-                <field name="break_duration_hours"/>
+                <field name="break_duration_hours" widget="float_time"/>
             </xpath>
         </field>
     </record>
