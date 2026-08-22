@@ -77,11 +77,9 @@ class HrEmployee(models.Model):
         store=False
     )
 
-    is_payroll_manager = fields.Boolean(
+    x_studio_manager = fields.Boolean(
         string="Manager",
-        related="version_id.is_payroll_manager",
-        inherited=True,
-        readonly=False,
+        tracking=True,
         groups="hr_payroll.group_hr_payroll_user",
         help="When enabled, factory attendance reconciliation is skipped on payslips. "
              "Absent work entry automation still applies.",
@@ -90,10 +88,7 @@ class HrEmployee(models.Model):
     def _is_factory_reconciliation_excluded(self):
         """Return True when factory payslip reconciliation must not run for this employee."""
         self.ensure_one()
-        # Studio field on employee Payroll tab (Schedule section).
-        if 'x_studio_manager' in self._fields and self.x_studio_manager:
-            return True
-        if self.is_payroll_manager:
+        if self.x_studio_manager:
             return True
         if 'payroll_properties' in self._fields and self.payroll_properties:
             props = dict(self.payroll_properties)
