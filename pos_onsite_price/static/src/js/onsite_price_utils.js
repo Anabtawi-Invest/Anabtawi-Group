@@ -90,26 +90,18 @@ function describeConfig(pos, config) {
 }
 
 function describeOrderProducts(order, config) {
-    const productById = getOnsiteProductMultipleMap(config);
-    const configuredIds = [...productById.keys()];
-    const lines = getOnsiteProductLines(order).map((line) => {
+    const configuredIds = (config?.products || [])
+        .map((line) => normalizeId(line.product_id))
+        .filter(Boolean);
+    return getOnsiteProductLines(order).map((line) => {
         const productId = getOnsiteLineProductId(line);
-        const qty = toNumber(line.getQuantity?.() ?? line.qty ?? 0);
-        const multiple = productById.get(productId) || 0;
-        const listedInMenu = configuredIds.includes(productId);
         return {
             productId,
             name: line.getProduct?.()?.display_name || line.full_product_name || "",
-            qty,
-            multiple,
-            lineEffectiveQty: listedInMenu ? qty * multiple : 0,
-            listedInMenu,
+            qty: toNumber(line.getQuantity?.() ?? line.qty ?? 0),
+            listedInMenu: configuredIds.includes(productId),
         };
     });
-    return {
-        lines,
-        orderTotalEffectiveQty: computeOrderTotalEffectiveQty(order, productById),
-    };
 }
 
 export function getSkipReason(order, config, pos) {
@@ -164,30 +156,6 @@ export function getOnsiteOrderSignature(order, config) {
         .join("|");
 }
 
-export function getOnsiteProductMultipleMap(config) {
-    const productById = new Map();
-    for (const line of config?.products || []) {
-        const productId = normalizeId(line.product_id);
-        if (productId) {
-            productById.set(productId, toNumber(line.multiple, 0));
-        }
-    }
-    return productById;
-}
-
-export function computeOrderTotalEffectiveQty(order, productById) {
-    let total = 0;
-    for (const line of getOnsiteProductLines(order)) {
-        const productId = getOnsiteLineProductId(line);
-        if (!productById.has(productId)) {
-            continue;
-        }
-        const qty = toNumber(line.getQuantity?.() ?? line.qty ?? 0);
-        total += qty * productById.get(productId);
-    }
-    return total;
-}
-
 export function findOnsiteRange(ranges, isOnSite, effectiveQty) {
     return (ranges || []).find((rng) => {
         if (Boolean(rng.is_on_site) !== Boolean(isOnSite)) {
@@ -200,20 +168,13 @@ export function findOnsiteRange(ranges, isOnSite, effectiveQty) {
 }
 
 export function applyOnsitePricesToOrder(order, isOnSite, config) {
-    const productById = getOnsiteProductMultipleMap(config);
-    const orderTotalEffectiveQty = computeOrderTotalEffectiveQty(order, productById);
-    const range = findOnsiteRange(config.ranges, isOnSite, orderTotalEffectiveQty);
-    if (!range) {
-        return {
-            ok: false,
-            error: _t(
-                "No on-site price range found for order total (effective qty: %s).",
-                orderTotalEffectiveQty
-            ),
-            orderTotalEffectiveQty,
-        };
+    const productById = new Map();
+    for (const line of config.products || []) {
+        const productId = normalizeId(line.product_id);
+        if (productId) {
+            productById.set(productId, toNumber(line.multiple, 0));
+        }
     }
-    const pricePerKilo = toNumber(range.price_per_kilo);
     const changes = [];
     for (const line of getOnsiteProductLines(order)) {
         const productId = getOnsiteLineProductId(line);
@@ -222,8 +183,21 @@ export function applyOnsitePricesToOrder(order, isOnSite, config) {
         }
         const multiple = productById.get(productId);
         const qty = toNumber(line.getQuantity?.() ?? line.qty ?? 0);
-        const lineEffectiveQty = qty * multiple;
-        const unitPrice = pricePerKilo * multiple;
+        const effectiveQty = qty * multiple;
+        const range = findOnsiteRange(config.ranges, isOnSite, effectiveQty);
+        if (!range) {
+            const product = line.getProduct?.() || line.product || {};
+            const name = product.display_name || product.name || String(productId);
+            return {
+                ok: false,
+                error: _t(
+                    "No on-site price range found for %s (effective qty: %s).",
+                    name,
+                    effectiveQty
+                ),
+            };
+        }
+        const unitPrice = toNumber(range.price_per_kilo) * multiple;
         if (typeof line.setUnitPrice === "function") {
             line.price_type = "manual";
             line.setUnitPrice(unitPrice);
@@ -234,14 +208,13 @@ export function applyOnsitePricesToOrder(order, isOnSite, config) {
             productId,
             qty,
             multiple,
-            lineEffectiveQty,
-            orderTotalEffectiveQty,
-            pricePerKilo,
+            effectiveQty,
+            pricePerKilo: toNumber(range.price_per_kilo),
             unitPrice,
             lineAmount: unitPrice * qty,
         });
     }
-    return { ok: true, changes, orderTotalEffectiveQty, pricePerKilo };
+    return { ok: true, changes };
 }
 
 export function menuHasOnsiteProducts(config) {
