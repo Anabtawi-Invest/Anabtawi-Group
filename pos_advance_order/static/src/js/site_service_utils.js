@@ -182,3 +182,76 @@ export function appendSiteServiceLineIfNeeded(lines, pos, menuConfig = null) {
         menuConfig: config,
     };
 }
+
+export function prepareLinesFromPosOrder(order) {
+    return (order?.getOrderlines?.() || order?.lines || [])
+        .filter((line) => !line.is_site_service_auto)
+        .map((line) => {
+            const product = line.getProduct?.() || line.product || line.product_id;
+            const productId = normalizeId(product?.id ?? product);
+            const qty = Number(line.getQuantity?.() ?? line.qty ?? 0);
+            return { product_id: productId, qty };
+        })
+        .filter((line) => line.product_id && line.qty > 0);
+}
+
+export function removeAutoSiteServiceLines(order) {
+    if (!order) {
+        return;
+    }
+    const lines = [...(order.getOrderlines?.() || order.lines || [])];
+    for (const line of lines) {
+        if (line.is_site_service_auto) {
+            order.removeOrderline(line);
+        }
+    }
+}
+
+/** Add or remove the cutting service line on a live POS cart (normal payment flow). */
+export async function applySiteServiceToPosOrder(pos, order, isOnSite, menuConfig = null) {
+    removeAutoSiteServiceLines(order);
+    if (!isOnSite || !order) {
+        return { added: false, score: 0 };
+    }
+    let config = menuConfig || getSiteServiceConfig(pos);
+    if (!config) {
+        const orm = pos?.data?.orm || pos?.env?.services?.orm;
+        config = await resolveSiteServiceConfig(pos, orm);
+    }
+    if (!config) {
+        console.warn("[SITE_SERVICE] Payment: no site service configuration loaded.");
+        return { added: false, score: 0, missingConfig: true };
+    }
+    const plainLines = prepareLinesFromPosOrder(order);
+    const result = appendSiteServiceLineIfNeeded(plainLines, pos, config);
+    if (!result.added) {
+        if (result.menuConfig) {
+            console.info(
+                `[SITE_SERVICE] Payment: service not added (score=${result.score}, threshold=${result.menuConfig.threshold}, skipped=${Boolean(result.skipped)}).`
+            );
+        }
+        return result;
+    }
+    const serviceProduct = pos.models?.["product.product"]?.get(config.serviceProductId);
+    if (!serviceProduct?.product_tmpl_id) {
+        console.warn("[SITE_SERVICE] Payment: service product not loaded in POS.");
+        return { ...result, added: false, missingProduct: true };
+    }
+    const newLine = await pos.addLineToCurrentOrder(
+        {
+            product_tmpl_id: serviceProduct.product_tmpl_id,
+            qty: 1,
+            price_unit: config.servicePrice,
+            is_site_service_auto: true,
+        },
+        {},
+        false
+    );
+    if (newLine) {
+        newLine.is_site_service_auto = true;
+    }
+    console.info(
+        `[SITE_SERVICE] Payment: added service line (score=${result.score}, threshold=${config.threshold}).`
+    );
+    return { ...result, added: Boolean(newLine) };
+}

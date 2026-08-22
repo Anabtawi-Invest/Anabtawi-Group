@@ -3,6 +3,7 @@
 import { _t } from "@web/core/l10n/translation";
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { OnSitePricePopup } from "@pos_onsite_price/js/onsite_price_popup";
+import { applySiteServiceToPosOrder } from "@pos_advance_order/js/site_service_utils";
 
 export function normalizeId(value) {
     if (!value) {
@@ -396,6 +397,20 @@ export async function promptAndApplyOnsitePricing({
         changes,
         uiState: order?.uiState?.onsitePricing || null,
     });
+    if (source === "pay" || source === "pay_fast") {
+        const siteServiceResult = await applySiteServiceToPosOrder(
+            pos,
+            order,
+            payload.isOnSite
+        );
+        logOnsite(`${source}: site service`, siteServiceResult);
+        if (siteServiceResult.missingProduct) {
+            notification.add(
+                _t("Site service product is not available in this Point of Sale."),
+                { type: "warning" }
+            );
+        }
+    }
     if (changes.length) {
         notification.add(
             stayMessage || _t("On-site prices applied. Check the new prices."),
