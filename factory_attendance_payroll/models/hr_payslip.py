@@ -80,10 +80,24 @@ class HrPayslip(models.Model):
         copy=False,
         help="Tracks whether attendance reconciliation and leave settlements have already been applied for this payslip."
     )
+    skip_factory_reconciliation = fields.Boolean(
+        string="Skip Factory Reconciliation",
+        compute="_compute_skip_factory_reconciliation",
+    )
+
+    @api.depends('employee_id', 'employee_id.is_payroll_manager')
+    def _compute_skip_factory_reconciliation(self):
+        for payslip in self:
+            payslip.skip_factory_reconciliation = bool(
+                payslip.employee_id and payslip.employee_id._is_factory_reconciliation_excluded()
+            )
 
     @api.depends('employee_id', 'date_from', 'date_to')
     def _compute_attendance_reconciliation_fields(self):
-        valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to)
+        valid_slips = self.filtered(
+            lambda s: s.employee_id and s.date_from and s.date_to
+            and not s.employee_id._is_factory_reconciliation_excluded()
+        )
         if not valid_slips:
             for payslip in self:
                 payslip.attendance_gross_overtime = 0.0
@@ -283,6 +297,13 @@ class HrPayslip(models.Model):
             payslip.lateness_covered_by_paid_time_off = covered_paid_time_off
             payslip.undertime_cash_deduction_hours = rem_lateness
 
+    def _filter_factory_reconciliation_slips(self):
+        """Payslips whose employees are subject to factory reconciliation."""
+        return self.filtered(
+            lambda payslip: payslip.employee_id
+            and not payslip.employee_id._is_factory_reconciliation_excluded()
+        )
+
     def _ensure_absent_work_entries_for_compute(self):
         """
         Daily cron already evaluates absences; on Compute Sheet only fill a short recent
@@ -335,65 +356,71 @@ class HrPayslip(models.Model):
             employees._create_absent_work_entries_for_period(date_from, date_to)
 
     def compute_sheet(self):
-        # 1. Run full reconciliation ONLY for payslips that have not been reconciled yet
         unreconciled_slips = self.filtered(lambda s: not s.is_reconciled)
+        factory_unreconciled = unreconciled_slips._filter_factory_reconciliation_slips()
+        manager_unreconciled = unreconciled_slips - factory_unreconciled
         _logger.info(
-            "Factory ExtraHours DEBUG compute_sheet: slips=%s unreconciled=%s reconciled_flags=%s",
+            "Factory ExtraHours DEBUG compute_sheet: slips=%s unreconciled=%s factory_unreconciled=%s manager_unreconciled=%s",
             [(s.id, s.employee_id.name, s.is_reconciled) for s in self],
             unreconciled_slips.ids,
-            {s.id: s.is_reconciled for s in self},
+            factory_unreconciled.ids,
+            manager_unreconciled.ids,
         )
         if unreconciled_slips:
+            # Absent gap-fill runs for ALL employees, including managers.
             unreconciled_slips._ensure_absent_work_entries_for_compute()
 
-            unreconciled_slips._convert_flexible_rest_days_to_ars()
+            if factory_unreconciled:
+                factory_unreconciled._convert_flexible_rest_days_to_ars()
 
-            # Force refresh worked_days_line_ids so the payslip Worked Days tab instantly updates
-            for payslip in unreconciled_slips:
-                if payslip.state == 'draft':
-                    worked_days_vals = payslip._get_worked_day_lines()
-                    payslip.worked_days_line_ids.unlink()
-                    payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
+                for payslip in factory_unreconciled:
+                    if payslip.state == 'draft':
+                        worked_days_vals = payslip._get_worked_day_lines()
+                        payslip.worked_days_line_ids.unlink()
+                        payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
 
-            unreconciled_slips._compute_attendance_reconciliation_fields()
-            unreconciled_slips._sync_reconciliation_settlements()
-            unreconciled_slips.write({'is_reconciled': True})
+                factory_unreconciled._compute_attendance_reconciliation_fields()
+                factory_unreconciled._sync_reconciliation_settlements()
+                factory_unreconciled.write({'is_reconciled': True})
+
+            if manager_unreconciled:
+                manager_unreconciled.write({'is_reconciled': True})
         else:
-            # Re-compute totals and refresh Extra Hours Time Off card on every Compute Sheet
-            self._compute_attendance_reconciliation_fields()
-            self._sync_extra_hours_time_off_balance()
+            factory_reconciled = self.filtered(lambda s: s.is_reconciled)._filter_factory_reconciliation_slips()
+            if factory_reconciled:
+                factory_reconciled._compute_attendance_reconciliation_fields()
+                factory_reconciled._sync_extra_hours_time_off_balance()
 
-        # 2. Always compute salary rules so newly added salary inputs/adjustments are calculated!
         res = super().compute_sheet()
         return res
 
     def action_payslip_done(self):
         res = super().action_payslip_done()
-        self._sync_reconciliation_settlements()
+        self._filter_factory_reconciliation_slips()._sync_reconciliation_settlements()
         return res
 
     def action_payslip_draft(self):
-        self._revert_reconciliation_settlements()
+        self._filter_factory_reconciliation_slips()._revert_reconciliation_settlements()
         return super().action_payslip_draft()
 
     def action_payslip_cancel(self):
         res = super().action_payslip_cancel()
-        self._revert_reconciliation_settlements()
+        self._filter_factory_reconciliation_slips()._revert_reconciliation_settlements()
         return res
 
     def action_cancel(self):
         res = super().action_cancel() if hasattr(super(), 'action_cancel') else True
-        self._revert_reconciliation_settlements()
+        self._filter_factory_reconciliation_slips()._revert_reconciliation_settlements()
         return res
 
     def unlink(self):
-        self._revert_reconciliation_settlements()
+        self._filter_factory_reconciliation_slips()._revert_reconciliation_settlements()
         return super().unlink()
 
     def write(self, vals):
         res = super().write(vals)
         if vals.get('state') == 'cancel':
-            self._revert_reconciliation_settlements()
+            self._filter_factory_reconciliation_slips()._revert_reconciliation_settlements()
         return res
 
     def _get_worked_day_lines(self, *args, **kwargs):
@@ -405,9 +432,14 @@ class HrPayslip(models.Model):
            If lateness was settled via Annual Leave (Step 2), NO cash deduction is made from salary!
         4. Excludes settlement leave entries from the Worked Days table.
         """
+        if len(self) == 1 and self.employee_id and self.employee_id._is_factory_reconciliation_excluded():
+            return super()._get_worked_day_lines(*args, **kwargs)
+
         res = super()._get_worked_day_lines(*args, **kwargs)
         for payslip in self:
             if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
+                continue
+            if payslip.employee_id._is_factory_reconciliation_excluded():
                 continue
 
             emp = payslip.employee_id
@@ -481,7 +513,10 @@ class HrPayslip(models.Model):
         if not self:
             return
 
-        valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to)
+        valid_slips = self.filtered(
+            lambda s: s.employee_id and s.date_from and s.date_to
+            and not s.employee_id._is_factory_reconciliation_excluded()
+        )
         if not valid_slips:
             return
 
@@ -1554,7 +1589,7 @@ class HrPayslip(models.Model):
         2. Deduct Step 2a Annual Leave via approved hr.leave records.
         3. Deduct Step 2b Paid Time Off via approved hr.leave records.
         """
-        for payslip in self:
+        for payslip in self._filter_factory_reconciliation_slips():
             if not payslip.employee_id or not payslip.date_to:
                 continue
 

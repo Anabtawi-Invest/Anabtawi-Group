@@ -77,6 +77,27 @@ class HrEmployee(models.Model):
         store=False
     )
 
+    is_payroll_manager = fields.Boolean(
+        string="Manager",
+        related="version_id.is_payroll_manager",
+        inherited=True,
+        readonly=False,
+        groups="hr_payroll.group_hr_payroll_user",
+        help="When enabled, factory attendance reconciliation is skipped on payslips. "
+             "Absent work entry automation still applies.",
+    )
+
+    def _is_factory_reconciliation_excluded(self):
+        """Return True when factory payslip reconciliation must not run for this employee."""
+        self.ensure_one()
+        if self.is_payroll_manager:
+            return True
+        if 'payroll_properties' in self._fields and self.payroll_properties:
+            props = dict(self.payroll_properties)
+            if props.get('manager'):
+                return True
+        return False
+
     def _compute_legacy_lunch_break_rule(self):
         for emp in self:
             if emp.employee_work_station == 'headoffice':
