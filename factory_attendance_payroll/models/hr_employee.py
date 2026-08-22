@@ -120,11 +120,18 @@ class HrEmployee(models.Model):
 
     @api.model
     def _cron_create_absent_work_entries(self):
-        """Daily/Monthly cron: evaluate current/past month up to yesterday and create absent work entries."""
+        """Daily cron: evaluate the past 2 days (excluding today) for active employees only."""
         today = fields.Date.context_today(self)
         yesterday = today - timedelta(days=1)
-        first_day_of_month = yesterday.replace(day=1)
-        self.search([("active", "=", True)])._create_absent_work_entries_for_period(first_day_of_month, yesterday)
+        two_days_ago = today - timedelta(days=2)
+        active_employees = self.search([("active", "=", True)])
+        _logger.info(
+            "Factory Absent Cron: evaluating %s active employees from %s to %s",
+            len(active_employees),
+            two_days_ago,
+            yesterday,
+        )
+        active_employees._create_absent_work_entries_for_period(two_days_ago, yesterday)
 
     def _get_absent_work_entry_type(self):
         absent_type = self.env.ref(
