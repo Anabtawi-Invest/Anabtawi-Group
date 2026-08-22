@@ -90,6 +90,9 @@ class HrEmployee(models.Model):
     def _is_factory_reconciliation_excluded(self):
         """Return True when factory payslip reconciliation must not run for this employee."""
         self.ensure_one()
+        # Studio field on employee Payroll tab (Schedule section).
+        if 'x_studio_manager' in self._fields and self.x_studio_manager:
+            return True
         if self.is_payroll_manager:
             return True
         if 'payroll_properties' in self._fields and self.payroll_properties:

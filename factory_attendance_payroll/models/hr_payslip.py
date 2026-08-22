@@ -85,7 +85,7 @@ class HrPayslip(models.Model):
         compute="_compute_skip_factory_reconciliation",
     )
 
-    @api.depends('employee_id', 'employee_id.is_payroll_manager')
+    @api.depends('employee_id')
     def _compute_skip_factory_reconciliation(self):
         for payslip in self:
             payslip.skip_factory_reconciliation = bool(

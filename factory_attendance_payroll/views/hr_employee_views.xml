@@ -12,9 +12,6 @@
                 <field name="employee_work_station"/>
                 <field name="break_duration_hours" widget="float_time"/>
             </xpath>
-            <xpath expr="//page[@name='payroll_information']//field[@name='resource_calendar_id'][last()]" position="after">
-                <field name="is_payroll_manager" groups="hr_payroll.group_hr_payroll_user"/>
-            </xpath>
         </field>
     </record>
 </odoo>
