@@ -3,6 +3,8 @@
 import datetime
 import logging
 from collections import defaultdict
+from datetime import timedelta
+
 from odoo import models, fields, api
 
 _logger = logging.getLogger(__name__)
@@ -281,6 +283,57 @@ class HrPayslip(models.Model):
             payslip.lateness_covered_by_paid_time_off = covered_paid_time_off
             payslip.undertime_cash_deduction_hours = rem_lateness
 
+    def _ensure_absent_work_entries_for_compute(self):
+        """
+        Daily cron already evaluates absences; on Compute Sheet only fill a short recent
+        gap inside the payslip period so payroll stays correct without re-scanning the
+        full month for every employee.
+
+        Set ir.config_parameter ``factory_attendance_payroll.absent_compute_gap_days`` to:
+        - 3 (default): last 3 days through yesterday, batched by period
+        - 0: skip entirely (cron / manual work-entry regenerate only)
+        - N: custom gap length in days
+        """
+        if not hasattr(self.env['hr.employee'], '_create_absent_work_entries_for_period'):
+            return
+
+        gap_days = int(
+            self.env['ir.config_parameter'].sudo().get_param(
+                'factory_attendance_payroll.absent_compute_gap_days',
+                '3',
+            )
+            or 0
+        )
+        if gap_days <= 0:
+            _logger.info(
+                "Factory Absent Compute: skipped (absent_compute_gap_days=%s, cron-only mode)",
+                gap_days,
+            )
+            return
+
+        today = fields.Date.context_today(self)
+        yesterday = today - timedelta(days=1)
+        employees_by_period = defaultdict(lambda: self.env['hr.employee'])
+
+        for payslip in self:
+            if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
+                continue
+            latest_eval = min(payslip.date_to, yesterday)
+            earliest_eval = max(payslip.date_from, latest_eval - timedelta(days=gap_days - 1))
+            if earliest_eval > latest_eval:
+                continue
+            employees_by_period[(earliest_eval, latest_eval)] |= payslip.employee_id
+
+        for (date_from, date_to), employees in employees_by_period.items():
+            _logger.info(
+                "Factory Absent Compute: gap-fill %s employees from %s to %s (gap_days=%s)",
+                len(employees),
+                date_from,
+                date_to,
+                gap_days,
+            )
+            employees._create_absent_work_entries_for_period(date_from, date_to)
+
     def compute_sheet(self):
         # 1. Run full reconciliation ONLY for payslips that have not been reconciled yet
         unreconciled_slips = self.filtered(lambda s: not s.is_reconciled)
@@ -291,10 +344,7 @@ class HrPayslip(models.Model):
             {s.id: s.is_reconciled for s in self},
         )
         if unreconciled_slips:
-            for payslip in unreconciled_slips:
-                if payslip.employee_id and payslip.date_from and payslip.date_to:
-                    if hasattr(payslip.employee_id, '_create_absent_work_entries_for_period'):
-                        payslip.employee_id._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
+            unreconciled_slips._ensure_absent_work_entries_for_compute()
 
             unreconciled_slips._convert_flexible_rest_days_to_ars()
 

@@ -195,14 +195,21 @@ class HrEmployee(models.Model):
         """
         Evaluates a single employee for a specific monthly window:
         1. Checks manager / Working Schedule exemption (work_entry_source == 'calendar').
-        2. Evaluates each working day in the month up to yesterday.
+        2. Evaluates each working day in the calendar month up to yesterday.
         3. Identifies candidate un-punched days (expected work hours > 0, NO check-in, NO approved leave/time-off).
         4. Applies 4-Day Monthly Grace Rule:
            - First 4 unpunched days in the month are forgiven (NO absent work entry).
            - 5th unpunched day and all excess days beyond 4 receive an ABSENT work entry.
+
+        The scan always starts on the 1st of the calendar month so the 4-day grace rule stays
+        correct when the daily cron passes only a short date range (e.g. last 2 days).
         """
         self.ensure_one()
-        versions = self._get_versions_with_contract_overlap_with_period(month_from, month_to)
+        month_from = fields.Date.to_date(month_from)
+        month_to = fields.Date.to_date(month_to)
+        month_scan_start = month_from.replace(day=1)
+
+        versions = self._get_versions_with_contract_overlap_with_period(month_scan_start, month_to)
         if not versions:
             return
 
@@ -212,11 +219,11 @@ class HrEmployee(models.Model):
 
         yesterday = fields.Date.context_today(self) - timedelta(days=1)
         eval_to = min(month_to, yesterday)
-        if month_from > eval_to:
+        if month_scan_start > eval_to:
             return
 
         candidate_unpunched_days = []
-        current = month_from
+        current = month_scan_start
         while current <= eval_to:
             work_entry_source = self._get_work_entry_source_on_day(current)
             # Manager & Office Working Schedule Exemption:
