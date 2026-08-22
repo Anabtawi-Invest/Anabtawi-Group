@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_tax_audit_report_wizard_user,tax.audit.report.wizard.user,model_tax_audit_report_wizard,account.group_account_invoice,1,1,1,1
+access_tax_audit_report_wizard_manager,tax.audit.report.wizard.manager,model_tax_audit_report_wizard,account.group_account_manager,1,1,1,1

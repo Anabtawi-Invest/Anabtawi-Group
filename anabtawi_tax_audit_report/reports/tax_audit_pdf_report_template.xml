@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_tax_audit_pdf_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <t t-set="report_data" t-value="o._get_report_data()"/>
+                    <t t-set="summary" t-value="report_data['summary']"/>
+                    <t t-set="details" t-value="report_data['details']"/>
+                    <t t-set="curr" t-value="o.currency_id.name or 'JOD'"/>
+
+                    <style>
+                        .header-bar {
+                            border-bottom: 2px solid #1A365D;
+                            padding-bottom: 8px;
+                            margin-bottom: 12px;
+                        }
+                        .company-title {
+                            font-size: 16pt;
+                            font-weight: 700;
+                            color: #1A365D;
+                            letter-spacing: -0.5px;
+                        }
+                        .report-subtitle {
+                            font-size: 9.5pt;
+                            color: #4A5568;
+                            font-weight: 500;
+                            margin-top: 2px;
+                        }
+                        .meta-box {
+                            margin-top: 8px;
+                            margin-bottom: 14px;
+                            background-color: #F7FAFC;
+                            border: 1px solid #E2E8F0;
+                            border-radius: 4px;
+                            padding: 6px 10px;
+                        }
+                        .meta-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                        }
+                        .meta-table td {
+                            padding: 2px 4px;
+                            font-size: 8.5pt;
+                        }
+                        .meta-label {
+                            font-weight: 600;
+                            color: #4A5568;
+                            width: 18%;
+                        }
+                        .meta-val {
+                            color: #1A202C;
+                            width: 32%;
+                        }
+                        .section-title {
+                            font-size: 11pt;
+                            font-weight: 700;
+                            color: #1A365D;
+                            margin-top: 14px;
+                            margin-bottom: 6px;
+                            border-left: 3px solid #2B6CB0;
+                            padding-left: 6px;
+                        }
+                        table.data-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-bottom: 12px;
+                            font-size: 8pt;
+                        }
+                        table.data-table th {
+                            background-color: #2B6CB0;
+                            color: #FFFFFF;
+                            font-weight: 600;
+                            text-align: left;
+                            padding: 5px 6px;
+                            border: 1px solid #2B6CB0;
+                        }
+                        table.data-table td {
+                            padding: 4px 6px;
+                            border: 1px solid #E2E8F0;
+                            color: #2D3748;
+                        }
+                        table.data-table tr:nth-child(even) {
+                            background-color: #F8FAFC;
+                        }
+                        .text-center { text-align: center; }
+                        .text-right { text-align: right; }
+                        .font-bold { font-weight: 700; }
+                        .badge {
+                            display: inline-block;
+                            padding: 1px 5px;
+                            border-radius: 3px;
+                            font-size: 7pt;
+                            font-weight: 600;
+                        }
+                        .badge-pos { background-color: #EBF8FF; color: #2B6CB0; border: 1px solid #BEE3F8; }
+                        .badge-sale { background-color: #F0FFF4; color: #2F855A; border: 1px solid #C6F6D5; }
+                        .badge-purchase { background-color: #FFFAF0; color: #DD6B20; border: 1px solid #FEEBC8; }
+                        .badge-expense { background-color: #FFF5F5; color: #E53E3E; border: 1px solid #FED7D7; }
+                        .summary-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-bottom: 14px;
+                        }
+                        .summary-table th {
+                            background-color: #1A365D;
+                            color: #FFFFFF;
+                            padding: 6px 8px;
+                            font-size: 8.5pt;
+                            border: 1px solid #1A365D;
+                        }
+                        .summary-table td {
+                            padding: 5px 8px;
+                            border: 1px solid #CBD5E0;
+                            font-size: 8.5pt;
+                        }
+                        .summary-subheading {
+                            background-color: #EDF2F7;
+                            font-weight: 700;
+                            color: #2D3748;
+                        }
+                        .summary-subtotal {
+                            background-color: #F7FAFC;
+                            font-weight: 600;
+                        }
+                        .summary-grandtotal {
+                            background-color: #EBF8FF;
+                            font-weight: 700;
+                            color: #1A365D;
+                            border-top: 2px solid #2B6CB0 !important;
+                            border-bottom: 2px solid #2B6CB0 !important;
+                        }
+                    </style>
+
+                    <div class="page">
+                        <div class="header-bar">
+                            <div class="company-title">TAX AUDIT &amp; RETURN DECLARATION</div>
+                            <div class="report-subtitle">Consolidated Invoices Report: POS Sales, Local B2B Sales, Vendor Purchases &amp; Taxable Expense Bills</div>
+                        </div>
+
+                        <div class="meta-box">
+                            <table class="meta-table">
+                                <tr>
+                                    <td class="meta-label">Reporting Period:</td>
+                                    <td class="meta-val"><span t-esc="o.date_from"/> to <span t-esc="o.date_to"/></td>
+                                    <td class="meta-label">Tax Jurisdiction:</td>
+                                    <td class="meta-val"><span t-esc="o.tax_jurisdiction"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="meta-label">Currency:</td>
+                                    <td class="meta-val"><span t-esc="curr"/></td>
+                                    <td class="meta-label">Generation Mode:</td>
+                                    <td class="meta-val">Odoo 19 Posted Invoices &amp; Bills</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div class="section-title">1. Executive Tax Summary &amp; Declaration Settlement</div>
+                        <table class="summary-table">
+                            <thead>
+                                <tr>
+                                    <th>Tax Stream / Channel</th>
+                                    <th class="text-center" style="width: 14%;">Invoices Count</th>
+                                    <th class="text-right" style="width: 22%;">Taxable Base (<t t-esc="curr"/>)</th>
+                                    <th class="text-center" style="width: 12%;">Tax Rate</th>
+                                    <th class="text-right" style="width: 22%;">Tax Amount (<t t-esc="curr"/>)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="summary-subheading">
+                                    <td colspan="5">A. Output Tax (Sales &amp; Revenues)</td>
+                                </tr>
+                                <tr>
+                                    <td>Local B2B Wholesale Sales Invoices</td>
+                                    <td class="text-center"><span t-esc="summary['local_sales']['count']"/></td>
+                                    <td class="text-right"><span t-esc="summary['local_sales']['base']" t-options='{"widget": "float", "precision": 2}'/></td>
+                                    <td class="text-center"><span t-esc="o.tax_rate"/>%</td>
+                                    <td class="text-right"><span t-esc="summary['local_sales']['tax']" t-options='{"widget": "float", "precision": 2}'/></td>
+                                </tr>
+                                <tr>
+                                    <td>Point of Sale (POS) Retail Invoices / Daily Closures</td>
+                                    <td class="text-center"><span t-esc="summary['pos_sales']['count']"/></td>
+                                    <td class="text-right"><span t-esc="summary['pos_sales']['base']" t-options='{"widget": "float", "precision": 2}'/></td>
+                                    <td class="text-center"><span t-esc="o.tax_rate"/>%</td>
+                                    <td class="text-right"><span t-esc="summary['pos_sales']['tax']" t-options='{"widget": "float", "precision": 2}'/></td>
+                                </tr>
+                                <t t-set="total_out_count" t-value="summary['local_sales']['count'] + summary['pos_sales']['count']"/>
+                                <t t-set="total_out_base" t-value="summary['local_sales']['base'] + summary['pos_sales']['base']"/>
+                                <t t-set="total_out_tax" t-value="summary['local_sales']['tax'] + summary['pos_sales']['tax']"/>
+                                <tr class="summary-subtotal">
+                                    <td><strong>Total Output Tax (Sales)</strong></td>
+                                    <td class="text-center"><strong><span t-esc="total_out_count"/></strong></td>
+                                    <td class="text-right"><strong><span t-esc="total_out_base" t-options='{"widget": "float", "precision": 2}'/></strong></td>
+                                    <td class="text-center">-</td>
+                                    <td class="text-right"><strong><span t-esc="total_out_tax" t-options='{"widget": "float", "precision": 2}'/></strong></td>
+                                </tr>
+
+                                <tr class="summary-subheading">
+                                    <td colspan="5">B. Input Tax (Purchases &amp; Deductible Expense Invoices)</td>
+                                </tr>
+                                <tr>
+                                    <td>Trade Purchases / Raw Materials Vendor Bills</td>
+                                    <td class="text-center"><span t-esc="summary['trade_purchases']['count']"/></td>
+                                    <td class="text-right"><span t-esc="summary['trade_purchases']['base']" t-options='{"widget": "float", "precision": 2}'/></td>
+                                    <td class="text-center"><span t-esc="o.tax_rate"/>%</td>
+                                    <td class="text-right"><span t-esc="summary['trade_purchases']['tax']" t-options='{"widget": "float", "precision": 2}'/></td>
+                                </tr>
+                                <tr>
+                                    <td>Operational Expense Invoices / Bills (Rent, Power, Telco)</td>
+                                    <td class="text-center"><span t-esc="summary['expense_bills']['count']"/></td>
+                                    <td class="text-right"><span t-esc="summary['expense_bills']['base']" t-options='{"widget": "float", "precision": 2}'/></td>
+                                    <td class="text-center"><span t-esc="o.tax_rate"/>%</td>
+                                    <td class="text-right"><span t-esc="summary['expense_bills']['tax']" t-options='{"widget": "float", "precision": 2}'/></td>
+                                </tr>
+                                <t t-set="total_in_count" t-value="summary['trade_purchases']['count'] + summary['expense_bills']['count']"/>
+                                <t t-set="total_in_base" t-value="summary['trade_purchases']['base'] + summary['expense_bills']['base']"/>
+                                <t t-set="total_in_tax" t-value="summary['trade_purchases']['tax'] + summary['expense_bills']['tax']"/>
+                                <tr class="summary-subtotal">
+                                    <td><strong>Total Input Tax (Purchases &amp; Expenses)</strong></td>
+                                    <td class="text-center"><strong><span t-esc="total_in_count"/></strong></td>
+                                    <td class="text-right"><strong><span t-esc="total_in_base" t-options='{"widget": "float", "precision": 2}'/></strong></td>
+                                    <td class="text-center">-</td>
+                                    <td class="text-right"><strong><span t-esc="total_in_tax" t-options='{"widget": "float", "precision": 2}'/></strong></td>
+                                </tr>
+
+                                <t t-set="net_tax" t-value="total_out_tax - total_in_tax"/>
+                                <t t-set="net_base" t-value="total_out_base - total_in_base"/>
+                                <t t-set="net_count" t-value="total_out_count + total_in_count"/>
+                                <tr class="summary-grandtotal">
+                                    <td><strong>NET TAX PAYABLE / (REFUNDABLE) [A - B]</strong></td>
+                                    <td class="text-center"><strong><span t-esc="net_count"/></strong></td>
+                                    <td class="text-right"><strong><span t-esc="net_base" t-options='{"widget": "float", "precision": 2}'/></strong></td>
+                                    <td class="text-center">-</td>
+                                    <td class="text-right" style="font-size: 9.5pt; color: #1A365D;">
+                                        <strong><span t-esc="net_tax" t-options='{"widget": "float", "precision": 2}'/> <t t-esc="curr"/></strong>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="section-title">2. Itemized Invoices &amp; Vendor Bills Audit Register</div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 10%;">Date</th>
+                                    <th style="width: 16%;">Invoice #</th>
+                                    <th style="width: 25%;">Partner / Entity</th>
+                                    <th class="text-center" style="width: 16%;">Channel / Type</th>
+                                    <th class="text-right" style="width: 11%;">Base (<t t-esc="curr"/>)</th>
+                                    <th class="text-right" style="width: 10%;">Tax (<t t-esc="curr"/>)</th>
+                                    <th class="text-right" style="width: 12%;">Total (<t t-esc="curr"/>)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="tot_base" t-value="0.0"/>
+                                <t t-set="tot_tax" t-value="0.0"/>
+                                <t t-set="tot_total" t-value="0.0"/>
+                                <t t-foreach="details" t-as="d">
+                                    <t t-set="tot_base" t-value="tot_base + d['taxable_base']"/>
+                                    <t t-set="tot_tax" t-value="tot_tax + d['tax_amount']"/>
+                                    <t t-set="tot_total" t-value="tot_total + d['total_amount']"/>
+                                    <tr>
+                                        <td><span t-esc="d['date']"/></td>
+                                        <td><span t-esc="d['inv_number']"/></td>
+                                        <td><span t-esc="d['partner']"/></td>
+                                        <td class="text-center">
+                                            <t t-if="d['cat_key'] == 'local_sales'"><span class="badge badge-sale">Local Sale</span></t>
+                                            <t t-elif="d['cat_key'] == 'pos_sales'"><span class="badge badge-pos">POS Sale</span></t>
+                                            <t t-elif="d['cat_key'] == 'trade_purchases'"><span class="badge badge-purchase">Trade Purchase</span></t>
+                                            <t t-else=""><span class="badge badge-expense">Expense Bill</span></t>
+                                        </td>
+                                        <td class="text-right"><span t-esc="d['taxable_base']" t-options='{"widget": "float", "precision": 2}'/></td>
+                                        <td class="text-right"><span t-esc="d['tax_amount']" t-options='{"widget": "float", "precision": 2}'/></td>
+                                        <td class="text-right font-bold"><span t-esc="d['total_amount']" t-options='{"widget": "float", "precision": 2}'/></td>
+                                    </tr>
+                                </t>
+                                <tr style="background-color: #EDF2F7; font-weight: bold; border-top: 2px solid #2B6CB0;">
+                                    <td colspan="4" class="text-right">GRAND TOTALS:</td>
+                                    <td class="text-right"><span t-esc="tot_base" t-options='{"widget": "float", "precision": 2}'/></td>
+                                    <td class="text-right"><span t-esc="tot_tax" t-options='{"widget": "float", "precision": 2}'/></td>
+                                    <td class="text-right"><span t-esc="tot_total" t-options='{"widget": "float", "precision": 2}'/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>
