@@ -243,23 +243,8 @@ class HrPayslip(models.Model):
 
             # In-memory variance calculation (0 DB queries per slip)
             daily_hours = defaultdict(float)
-            approved_ot_dates = set()
             for att in emp_attendances:
-                att_d = att.check_in.date()
-                daily_hours[att_d] += att.worked_hours
-
-                # Overtime is only credited if HR Officer has approved/validated it on attendance
-                is_ot_approved = False
-                if hasattr(att, 'overtime_status') and att.overtime_status == 'approved':
-                    is_ot_approved = True
-                elif hasattr(att, 'validated_overtime_hours') and (att.validated_overtime_hours or 0.0) > 0.001:
-                    is_ot_approved = True
-                elif hasattr(att, 'linked_overtime_ids') and att.linked_overtime_ids:
-                    if any(line.status == 'approved' for line in att.linked_overtime_ids):
-                        is_ot_approved = True
-
-                if is_ot_approved:
-                    approved_ot_dates.add(att_d)
+                daily_hours[att.check_in.date()] += att.worked_hours
 
             total_days_in_month = (payslip.date_to - payslip.date_from).days + 1
             target_work_days = total_days_in_month - (total_days_in_month // 7)
@@ -291,10 +276,8 @@ class HrPayslip(models.Model):
                 if effective_hrs > standard_target:
                     ot_excess = effective_hrs - standard_target
                     if ot_excess >= min_ot_threshold:
-                        # ONLY credit overtime if approved/validated by HR on attendance
-                        if att_date in approved_ot_dates:
-                            # 125% Overtime multiplier (1h overtime = 1.25h extra hours)
-                            total_ot += (ot_excess * 1.25)
+                        # 125% Overtime multiplier (1h overtime = 1.25h extra hours)
+                        total_ot += (ot_excess * 1.25)
                 elif effective_hrs < standard_target:
                     shortfall = standard_target - effective_hrs
                     if shortfall > min_lateness_threshold:
@@ -306,9 +289,7 @@ class HrPayslip(models.Model):
 
             if worked_days_count > target_work_days:
                 extra_worked_days = worked_days_count - target_work_days
-                extra_approved_days = sum(1 for d in sorted(daily_hours.keys())[target_work_days:] if d in approved_ot_dates)
-                if extra_approved_days > 0:
-                    total_ot += (extra_approved_days * 8.0 * 1.25)
+                total_ot += (extra_worked_days * 8.0 * 1.25)
             else:
                 unworked_days = total_days_in_month - covered_days_count
                 if unworked_days > allowed_rest_days:
@@ -1865,22 +1846,8 @@ class HrPayslip(models.Model):
 
         # 2. Group raw check-in hours by date
         daily_hours = defaultdict(float)
-        approved_ot_dates = set()
         for att in attendances:
-            att_d = att.check_in.date()
-            daily_hours[att_d] += att.worked_hours
-
-            is_ot_approved = False
-            if hasattr(att, 'overtime_status') and att.overtime_status == 'approved':
-                is_ot_approved = True
-            elif hasattr(att, 'validated_overtime_hours') and (att.validated_overtime_hours or 0.0) > 0.001:
-                is_ot_approved = True
-            elif hasattr(att, 'linked_overtime_ids') and att.linked_overtime_ids:
-                if any(line.status == 'approved' for line in att.linked_overtime_ids):
-                    is_ot_approved = True
-
-            if is_ot_approved:
-                approved_ot_dates.add(att_d)
+            daily_hours[att.check_in.date()] += att.worked_hours
 
         # 3. Calculate Monthly Quota based on total days in payslip window
         total_days_in_month = (self.date_to - self.date_from).days + 1
@@ -1916,8 +1883,7 @@ class HrPayslip(models.Model):
             if effective_hrs > standard_target:
                 ot_excess = effective_hrs - standard_target
                 if ot_excess >= min_ot_threshold:
-                    if att_date in approved_ot_dates:
-                        total_ot += ot_excess
+                    total_ot += ot_excess
             elif effective_hrs < standard_target:
                 shortfall = standard_target - effective_hrs
                 if shortfall > min_lateness_threshold:
@@ -1931,9 +1897,7 @@ class HrPayslip(models.Model):
         if worked_days_count > target_work_days:
             # Employee worked extra days beyond monthly target -> Extra worked days count as Overtime!
             extra_worked_days = worked_days_count - target_work_days
-            extra_approved_days = sum(1 for d in sorted(daily_hours.keys())[target_work_days:] if d in approved_ot_dates)
-            if extra_approved_days > 0:
-                total_ot += (extra_approved_days * 8.0)
+            total_ot += (extra_worked_days * 8.0)
         else:
             unworked_days = total_days_in_month - covered_days_count
             if unworked_days > allowed_rest_days:
