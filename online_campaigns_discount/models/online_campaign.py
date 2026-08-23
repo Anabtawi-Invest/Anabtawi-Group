@@ -11,11 +11,21 @@ class OnlineDiscountCampaign(models.Model):
 
     name = fields.Char(required=True, tracking=True)
     active = fields.Boolean(default=True)
+    calendar_id = fields.Many2one(
+        "online.campaign.calendar",
+        string="Calendar",
+        required=True,
+        ondelete="cascade",
+        tracking=True,
+        index=True,
+    )
     state = fields.Selection(
         [
             ("draft", "Draft"),
             ("pending", "Waiting for Approval"),
             ("approved", "Approved"),
+            ("pending_addition", "Pending Addition"),
+            ("pending_removal", "Pending Removal"),
             ("rejected", "Rejected"),
             ("cancelled", "Cancelled"),
         ],
@@ -106,6 +116,16 @@ class OnlineDiscountCampaign(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for values in vals_list:
+            if values.get("calendar_id"):
+                calendar = self.env["online.campaign.calendar"].browse(values["calendar_id"])
+                values.setdefault("company_id", calendar.company_id.id)
+                values.setdefault("currency_id", calendar.currency_id.id)
+                if calendar.state == "approved":
+                    values["state"] = "pending_addition"
+                elif calendar.state == "pending":
+                    values["state"] = "pending"
+                elif calendar.state == "draft":
+                    values["state"] = "draft"
             if values.get("aggregator_id"):
                 aggregator = self.env["online.campaign.aggregator"].browse(values["aggregator_id"])
                 values.setdefault(
@@ -125,10 +145,10 @@ class OnlineDiscountCampaign(models.Model):
         }
         locked = self.filtered(
             lambda campaign: campaign.state == "approved"
-            or (campaign.state == "pending" and (campaign.ecommerce_approved or campaign.finance_approved))
+            or (campaign.calendar_id and campaign.calendar_id.state == "approved" and campaign.state == "approved")
         )
         if protected.intersection(values) and locked:
-            raise UserError(_("Reset the campaign to draft before changing approved commercial terms."))
+            raise UserError(_("Reset the campaign calendar to draft before changing approved commercial terms."))
         return super().write(values)
 
     @api.constrains("start_datetime", "end_datetime")
@@ -195,74 +215,36 @@ class OnlineDiscountCampaign(models.Model):
             campaign._check_scope_selection()
             campaign._check_company_configuration()
 
-    def action_submit(self):
-        if self.filtered(lambda campaign: campaign.state != "draft"):
-            raise UserError(_("Only draft campaigns can be submitted."))
-        self._check_ready_for_approval()
-        self.write({
-            "state": "pending", "ecommerce_approved": False, "finance_approved": False,
-            "ecommerce_approved_by": False, "ecommerce_approved_at": False,
-            "finance_approved_by": False, "finance_approved_at": False,
-            "rejection_reason": False,
-        })
-
-    def _finalize_approval(self):
+    def action_request_removal(self):
         for campaign in self:
-            if campaign.ecommerce_approved and campaign.finance_approved:
+            if campaign.calendar_id.state == "approved" and campaign.state == "approved":
+                campaign.state = "pending_removal"
+            elif campaign.calendar_id.state == "draft":
+                campaign.state = "cancelled"
+
+    def action_cancel_removal_request(self):
+        for campaign in self:
+            if campaign.state == "pending_removal":
                 campaign.state = "approved"
 
+    def action_submit(self):
+        return self.mapped("calendar_id").action_submit()
+
     def action_ecommerce_approve(self):
-        if not self.env.user.has_group("online_campaigns_discount.group_online_campaign_ecommerce_manager"):
-            raise AccessError(_("Only an E-commerce Campaign Manager can give this approval."))
-        self._check_ready_for_approval()
-        for campaign in self.filtered(lambda item: item.state == "pending"):
-            campaign.write({
-                "ecommerce_approved": True,
-                "ecommerce_approved_by": self.env.user.id,
-                "ecommerce_approved_at": fields.Datetime.now(),
-            })
-        self._finalize_approval()
+        return self.mapped("calendar_id").action_ecommerce_approve()
 
     def action_finance_approve(self):
-        if not self.env.user.has_group("online_campaigns_discount.group_online_campaign_finance_manager"):
-            raise AccessError(_("Only an Online Campaign Finance Manager can give this approval."))
-        self._check_ready_for_approval()
-        missing_accounts = self.filtered(
-            lambda campaign: (campaign.aggregator_contribution_percent > 0 and not campaign.aggregator_id.receivable_account_id)
-            or not campaign.aggregator_id.discount_expense_account_id
-            or not campaign.aggregator_id.receivable_account_id
-            or not campaign.aggregator_id.commission_expense_account_id
-        )
-        if missing_accounts:
-            raise UserError(_(
-                "Configure the required aggregator receivable, company discount expense, and commission expense accounts before finance approval."
-            ))
-        for campaign in self.filtered(lambda item: item.state == "pending"):
-            campaign.write({
-                "finance_approved": True,
-                "finance_approved_by": self.env.user.id,
-                "finance_approved_at": fields.Datetime.now(),
-            })
-        self._finalize_approval()
+        return self.mapped("calendar_id").action_finance_approve()
 
     def action_reject(self):
-        if not self.env.user.has_group("online_campaigns_discount.group_online_campaign_approver"):
-            raise AccessError(_("Only a campaign approver can reject campaigns."))
-        if self.filtered(lambda campaign: not campaign.rejection_reason):
-            raise UserError(_("Enter a rejection reason before rejecting the campaign."))
-        self.write({"state": "rejected"})
+        return self.mapped("calendar_id").action_reject()
 
     def action_cancel(self):
-        self.write({"state": "cancelled"})
+        return self.mapped("calendar_id").action_cancel()
 
     def action_reset_to_draft(self):
-        if not self.env.user.has_group("online_campaigns_discount.group_online_campaign_approver"):
-            raise AccessError(_("Only a campaign approver can reset campaigns."))
-        self.write({
-            "state": "draft", "ecommerce_approved": False, "finance_approved": False,
-            "ecommerce_approved_by": False, "ecommerce_approved_at": False,
-            "finance_approved_by": False, "finance_approved_at": False,
-        })
+        return self.mapped("calendar_id").action_reset_to_draft()
+
 
     def applies_to_product(self, product):
         self.ensure_one()
@@ -309,6 +291,7 @@ class OnlineDiscountCampaign(models.Model):
         now = fields.Datetime.now()
         return [
             ("active", "=", True), ("state", "=", "approved"),
+            ("calendar_id.state", "=", "approved"),
             ("company_id", "=", config.company_id.id), ("pos_config_ids", "in", config.id),
             ("end_datetime", ">=", now),
         ]

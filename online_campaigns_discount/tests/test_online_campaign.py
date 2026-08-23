@@ -39,10 +39,18 @@ class TestOnlineCampaign(CommonPosTest):
             "commission_expense_account_id": cls.company_data["default_account_expense"].id,
         })
         cls.now = fields.Datetime.now()
+        cls.today = fields.Date.context_today(cls.env.user)
+        cls.calendar = cls.env["online.campaign.calendar"].create({
+            "name": "Test August Calendar",
+            "start_date": cls.today - timedelta(days=1),
+            "end_date": cls.today + timedelta(days=30),
+            "company_id": cls.pos_config_usd.company_id.id,
+        })
 
     def _campaign(self, **values):
         defaults = {
             "name": "Aggregator 30%",
+            "calendar_id": self.calendar.id,
             "start_datetime": self.now - timedelta(days=1),
             "end_datetime": self.now + timedelta(days=30),
             "aggregator_id": self.aggregator.id,
@@ -106,20 +114,45 @@ class TestOnlineCampaign(CommonPosTest):
         self.assertEqual(campaign.compute_order_discounts([(6, 1), (10, 1), (20, 1)]), [3, 2, 0])
 
     def test_09_dual_approval_required(self):
-        campaign = self._campaign()
-        campaign.action_submit()
+        cal = self.env["online.campaign.calendar"].create({
+            "name": "Calendar Dual Approval Test",
+            "start_date": self.today,
+            "end_date": self.today + timedelta(days=10),
+            "company_id": self.pos_config_usd.company_id.id,
+        })
+        campaign = self._campaign(calendar_id=cal.id)
+        cal.action_submit()
+        self.assertEqual(cal.state, "pending")
         self.assertEqual(campaign.state, "pending")
-        campaign.action_ecommerce_approve()
+        cal.action_ecommerce_approve()
+        self.assertEqual(cal.state, "pending")
         self.assertEqual(campaign.state, "pending")
-        campaign.action_finance_approve()
+        cal.action_finance_approve()
+        self.assertEqual(cal.state, "approved")
         self.assertEqual(campaign.state, "approved")
-        self.assertTrue(campaign.ecommerce_approved)
-        self.assertTrue(campaign.finance_approved)
+        self.assertTrue(cal.ecommerce_approved)
+        self.assertTrue(cal.finance_approved)
 
     def test_10_unapproved_and_expired_campaigns_not_loaded(self):
-        draft = self._campaign(name="Draft")
+        draft_cal = self.env["online.campaign.calendar"].create({
+            "name": "Draft Calendar",
+            "start_date": self.today,
+            "end_date": self.today + timedelta(days=10),
+            "company_id": self.pos_config_usd.company_id.id,
+        })
+        draft = self._campaign(name="Draft", calendar_id=draft_cal.id)
+
+        approved_cal = self.env["online.campaign.calendar"].create({
+            "name": "Approved Calendar",
+            "start_date": self.today - timedelta(days=10),
+            "end_date": self.today - timedelta(days=1),
+            "state": "approved",
+            "ecommerce_approved": True,
+            "finance_approved": True,
+            "company_id": self.pos_config_usd.company_id.id,
+        })
         expired = self._campaign(
-            name="Expired", state="approved", ecommerce_approved=True, finance_approved=True,
+            name="Expired", calendar_id=approved_cal.id, state="approved",
             start_datetime=self.now - timedelta(days=3), end_datetime=self.now - timedelta(days=2),
         )
         domain = draft._load_pos_data_domain({}, self.pos_config_usd)
@@ -207,3 +240,38 @@ class TestOnlineCampaign(CommonPosTest):
         self.assertEqual(settlement.variance_amount, 0)
         settlement.action_mark_reconciled()
         self.assertEqual(settlement.state, "reconciled")
+
+    def test_14_post_approval_addition_and_removal(self):
+        cal = self.env["online.campaign.calendar"].create({
+            "name": "Post Approval Change Calendar",
+            "start_date": self.today,
+            "end_date": self.today + timedelta(days=30),
+            "company_id": self.pos_config_usd.company_id.id,
+        })
+        existing_campaign = self._campaign(name="Existing Approved Campaign", calendar_id=cal.id)
+        cal.action_submit()
+        cal.action_ecommerce_approve()
+        cal.action_finance_approve()
+        self.assertEqual(cal.state, "approved")
+        self.assertEqual(existing_campaign.state, "approved")
+
+        # 1. Add a new campaign to the approved calendar -> pending_addition
+        new_campaign = self._campaign(name="New Mid-Month Addition", calendar_id=cal.id)
+        self.assertEqual(new_campaign.state, "pending_addition")
+        self.assertTrue(cal.has_pending_changes)
+
+        # 2. Request removal of existing approved campaign -> pending_removal
+        existing_campaign.action_request_removal()
+        self.assertEqual(existing_campaign.state, "pending_removal")
+        self.assertTrue(cal.has_pending_changes)
+
+        # 3. Dual manager approval for pending changes on the calendar
+        cal.action_ecommerce_approve()
+        self.assertTrue(cal.pending_ecommerce_approved)
+        self.assertEqual(new_campaign.state, "pending_addition") # Awaiting finance
+        self.assertEqual(existing_campaign.state, "pending_removal") # Awaiting finance
+
+        cal.action_finance_approve()
+        self.assertFalse(cal.has_pending_changes)
+        self.assertEqual(new_campaign.state, "approved")
+        self.assertEqual(existing_campaign.state, "cancelled")

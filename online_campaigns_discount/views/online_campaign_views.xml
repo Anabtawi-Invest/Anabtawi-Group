@@ -61,14 +61,156 @@
         <field name="view_mode">list,form</field>
     </record>
 
+    <!-- Campaign Calendar Views -->
+    <record id="view_online_campaign_calendar_list" model="ir.ui.view">
+        <field name="name">online.campaign.calendar.list</field>
+        <field name="model">online.campaign.calendar</field>
+        <field name="arch" type="xml">
+            <list decoration-success="state == 'approved'" decoration-warning="state == 'pending' or has_pending_changes"
+                  decoration-danger="state == 'rejected'" decoration-muted="state == 'cancelled' or not active"
+                  default_order="start_date desc">
+                <field name="name"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <field name="aggregator_id" optional="show"/>
+                <field name="ecommerce_approved" optional="show"/>
+                <field name="finance_approved" optional="show"/>
+                <field name="has_pending_changes" string="Pending Changes" optional="show"/>
+                <field name="state" widget="badge"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_online_campaign_calendar_calendar" model="ir.ui.view">
+        <field name="name">online.campaign.calendar.calendar</field>
+        <field name="model">online.campaign.calendar</field>
+        <field name="arch" type="xml">
+            <calendar string="Campaign Calendars" date_start="start_date" date_stop="end_date"
+                      color="aggregator_id" mode="month" quick_create="0" event_open_popup="1">
+                <field name="name"/>
+                <field name="aggregator_id"/>
+                <field name="state"/>
+            </calendar>
+        </field>
+    </record>
+
+    <record id="view_online_campaign_calendar_form" model="ir.ui.view">
+        <field name="name">online.campaign.calendar.form</field>
+        <field name="model">online.campaign.calendar</field>
+        <field name="arch" type="xml">
+            <form string="Campaign Calendar">
+                <header>
+                    <button name="action_submit" type="object" string="Submit for Approval" class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_ecommerce_approve" type="object" string="E-commerce Approve" class="btn-primary"
+                            groups="online_campaigns_discount.group_online_campaign_ecommerce_manager"
+                            invisible="state != 'pending' or ecommerce_approved"/>
+                    <button name="action_finance_approve" type="object" string="Finance Approve" class="btn-primary"
+                            groups="online_campaigns_discount.group_online_campaign_finance_manager"
+                            invisible="state != 'pending' or finance_approved"/>
+
+                    <button name="action_ecommerce_approve" type="object" string="Approve Changes (E-commerce)" class="btn-warning"
+                            groups="online_campaigns_discount.group_online_campaign_ecommerce_manager"
+                            invisible="state != 'approved' or not has_pending_changes or pending_ecommerce_approved"/>
+                    <button name="action_finance_approve" type="object" string="Approve Changes (Accounting)" class="btn-warning"
+                            groups="online_campaigns_discount.group_online_campaign_finance_manager"
+                            invisible="state != 'approved' or not has_pending_changes or pending_finance_approved"/>
+
+                    <button name="action_reject" type="object" string="Reject"
+                            groups="online_campaigns_discount.group_online_campaign_approver"
+                            invisible="state not in ('pending', 'approved') or (state == 'approved' and not has_pending_changes)"/>
+                    <button name="action_cancel" type="object" string="Cancel Calendar"
+                            invisible="state in ('cancelled', 'approved')"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Draft"
+                            groups="online_campaigns_discount.group_online_campaign_approver"
+                            invisible="state not in ('approved', 'rejected', 'cancelled')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,pending,approved"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <field name="has_pending_changes" invisible="1"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. August 2026 Online Campaigns Calendar"/></h1>
+                    </div>
+                    <group>
+                        <group string="Schedule and Scope">
+                            <field name="company_id" options="{'no_create': True}" readonly="state != 'draft'"/>
+                            <field name="currency_id" options="{'no_create': True}" readonly="state != 'draft'"/>
+                            <field name="start_date" readonly="state != 'draft'"/>
+                            <field name="end_date" readonly="state != 'draft'"/>
+                            <field name="aggregator_id" domain="[('company_id', '=', company_id)]" readonly="state != 'draft'"/>
+                        </group>
+                        <group string="Calendar Approvals">
+                            <group string="Initial Approval">
+                                <field name="ecommerce_approved"/>
+                                <field name="ecommerce_approved_by" invisible="not ecommerce_approved"/>
+                                <field name="ecommerce_approved_at" invisible="not ecommerce_approved"/>
+                                <field name="finance_approved"/>
+                                <field name="finance_approved_by" invisible="not finance_approved"/>
+                                <field name="finance_approved_at" invisible="not finance_approved"/>
+                            </group>
+                            <group string="Pending Change Approvals" invisible="not has_pending_changes">
+                                <field name="pending_ecommerce_approved" string="E-commerce Approved Changes"/>
+                                <field name="pending_finance_approved" string="Accounting Approved Changes"/>
+                            </group>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Discount Campaigns">
+                            <field name="campaign_ids" readonly="state in ('pending', 'cancelled')">
+                                <list decoration-success="state == 'approved'"
+                                      decoration-warning="state in ('pending', 'pending_addition')"
+                                      decoration-danger="state == 'pending_removal'"
+                                      decoration-muted="state == 'cancelled'">
+                                    <field name="name"/>
+                                    <field name="aggregator_id"/>
+                                    <field name="start_datetime"/>
+                                    <field name="end_datetime"/>
+                                    <field name="discount_percent" string="Discount %"/>
+                                    <field name="discount_cap_amount" widget="monetary"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                    <field name="state" widget="badge"/>
+                                    <button name="action_request_removal" type="object" string="Request Removal"
+                                            class="btn-sm btn-danger"
+                                            invisible="parent.state != 'approved' or state != 'approved'"/>
+                                    <button name="action_cancel_removal_request" type="object" string="Cancel Removal Request"
+                                            class="btn-sm btn-secondary"
+                                            invisible="state != 'pending_removal'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Rejection &amp; Notes">
+                            <group>
+                                <field name="rejection_reason" placeholder="Required operational explanation when a calendar is rejected."/>
+                                <field name="note"/>
+                            </group>
+                        </page>
+                    </notebook>
+                    <chatter/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_online_campaign_calendars" model="ir.actions.act_window">
+        <field name="name">Campaign Calendars</field>
+        <field name="res_model">online.campaign.calendar</field>
+        <field name="view_mode">list,calendar,form</field>
+    </record>
+
+    <!-- Campaign Line Views -->
     <record id="view_online_discount_campaign_list" model="ir.ui.view">
         <field name="name">online.discount.campaign.list</field>
         <field name="model">online.discount.campaign</field>
         <field name="arch" type="xml">
-            <list decoration-success="state == 'approved'" decoration-warning="state == 'pending'"
-                  decoration-danger="state == 'rejected'" decoration-muted="state == 'cancelled' or not active"
+            <list decoration-success="state == 'approved'" decoration-warning="state in ('pending', 'pending_addition')"
+                  decoration-danger="state in ('rejected', 'pending_removal')" decoration-muted="state == 'cancelled' or not active"
                   default_order="start_datetime desc, priority">
                 <field name="name"/>
+                <field name="calendar_id"/>
                 <field name="aggregator_id"/>
                 <field name="start_datetime"/>
                 <field name="end_datetime"/>
@@ -76,8 +218,6 @@
                 <field name="discount_cap_amount" widget="monetary"/>
                 <field name="currency_id" column_invisible="True"/>
                 <field name="aggregator_commission_percent" string="Commission %" optional="show"/>
-                <field name="ecommerce_approved" optional="show"/>
-                <field name="finance_approved" optional="show"/>
                 <field name="state" widget="badge"/>
                 <field name="company_id" groups="base.group_multi_company"/>
             </list>
@@ -91,6 +231,7 @@
             <calendar string="Online Campaign Calendar" date_start="start_datetime" date_stop="end_datetime"
                       color="aggregator_id" mode="month" quick_create="0" event_open_popup="1">
                 <field name="name"/>
+                <field name="calendar_id"/>
                 <field name="aggregator_id"/>
                 <field name="discount_percent"/>
                 <field name="state"/>
@@ -104,22 +245,10 @@
         <field name="arch" type="xml">
             <form string="Online Campaign">
                 <header>
-                    <button name="action_submit" type="object" string="Submit for Approval" class="btn-primary"
-                            invisible="state != 'draft'"/>
-                    <button name="action_ecommerce_approve" type="object" string="E-commerce Approve" class="btn-primary"
-                            groups="online_campaigns_discount.group_online_campaign_ecommerce_manager"
-                            invisible="state != 'pending' or ecommerce_approved"/>
-                    <button name="action_finance_approve" type="object" string="Finance Approve" class="btn-primary"
-                            groups="online_campaigns_discount.group_online_campaign_finance_manager"
-                            invisible="state != 'pending' or finance_approved"/>
-                    <button name="action_reject" type="object" string="Reject"
-                            groups="online_campaigns_discount.group_online_campaign_approver"
-                            invisible="state != 'pending'"/>
-                    <button name="action_cancel" type="object" string="Cancel"
-                            invisible="state in ('cancelled', 'approved')"/>
-                    <button name="action_reset_to_draft" type="object" string="Reset to Draft"
-                            groups="online_campaigns_discount.group_online_campaign_approver"
-                            invisible="state not in ('approved', 'rejected', 'cancelled')"/>
+                    <button name="action_request_removal" type="object" string="Request Removal from Calendar" class="btn-danger"
+                            invisible="state != 'approved'"/>
+                    <button name="action_cancel_removal_request" type="object" string="Cancel Removal Request" class="btn-secondary"
+                            invisible="state != 'pending_removal'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,pending,approved"/>
                 </header>
                 <sheet>
@@ -131,6 +260,7 @@
                     </div>
                     <group>
                         <group string="Schedule and Channel">
+                            <field name="calendar_id" options="{'no_create': True}" readonly="state != 'draft'"/>
                             <field name="company_id" options="{'no_create': True}" readonly="state != 'draft'"/>
                             <field name="currency_id" options="{'no_create': True}" readonly="state != 'draft'"/>
                             <field name="aggregator_id" domain="[('company_id', '=', company_id)]" readonly="state != 'draft'"/>
@@ -156,20 +286,7 @@
                         <field name="product_ids" widget="many2many_tags" invisible="apply_scope != 'specific_products'" readonly="state != 'draft'"/>
                         <field name="category_ids" widget="many2many_tags" invisible="apply_scope != 'specific_categories'" readonly="state != 'draft'"/>
                     </group>
-                    <group string="Required Approvals">
-                        <group>
-                            <field name="ecommerce_approved"/>
-                            <field name="ecommerce_approved_by" invisible="not ecommerce_approved"/>
-                            <field name="ecommerce_approved_at" invisible="not ecommerce_approved"/>
-                        </group>
-                        <group>
-                            <field name="finance_approved"/>
-                            <field name="finance_approved_by" invisible="not finance_approved"/>
-                            <field name="finance_approved_at" invisible="not finance_approved"/>
-                        </group>
-                    </group>
-                    <group string="Rejection and Internal Notes">
-                        <field name="rejection_reason" placeholder="Required operational explanation when a campaign is rejected."/>
+                    <group string="Notes">
                         <field name="note"/>
                     </group>
                     <chatter/>
@@ -184,6 +301,7 @@
         <field name="arch" type="xml">
             <search>
                 <field name="name"/>
+                <field name="calendar_id"/>
                 <field name="aggregator_id"/>
                 <field name="pricelist_ids"/>
                 <field name="pos_config_ids"/>
@@ -191,6 +309,7 @@
                 <filter name="approved" string="Approved" domain="[('state', '=', 'approved')]"/>
                 <filter name="active_now" string="Active Now" domain="[('state', '=', 'approved'), ('start_datetime', '&lt;=', context_today()), ('end_datetime', '&gt;=', context_today())]"/>
                 <separator/>
+                <filter name="group_calendar" string="Calendar" context="{'group_by': 'calendar_id'}"/>
                 <filter name="group_aggregator" string="Aggregator" context="{'group_by': 'aggregator_id'}"/>
                 <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
                 <filter name="group_start" string="Start Month" context="{'group_by': 'start_datetime:month'}"/>
@@ -208,9 +327,9 @@
 
     <record id="action_online_discount_campaign_calendar" model="ir.actions.act_window">
         <field name="name">Campaign Calendar</field>
-        <field name="res_model">online.discount.campaign</field>
-        <field name="view_mode">calendar,list,form</field>
-        <field name="view_id" ref="view_online_discount_campaign_calendar"/>
-        <field name="search_view_id" ref="view_online_discount_campaign_search"/>
+        <field name="res_model">online.campaign.calendar</field>
+        <field name="view_mode">list,calendar,form</field>
+        <field name="view_id" ref="view_online_campaign_calendar_list"/>
     </record>
 </odoo>
+
