@@ -151,6 +151,24 @@ class HrAttendance(models.Model):
                         ot_lines.write({'status': 'refused'})
         return True
 
+    @api.onchange('overtime_status')
+    def _onchange_overtime_status(self):
+        for att in self:
+            if att.overtime_status == 'approved':
+                att.validated_overtime_hours = att.daily_variance_hours if att.daily_variance_hours >= 0.75 else (att.overtime_hours or 0.0)
+            elif att.overtime_status == 'refused':
+                att.validated_overtime_hours = 0.0
+
+    def write(self, vals):
+        if vals.get('overtime_status') == 'approved' and 'validated_overtime_hours' not in vals:
+            for att in self:
+                att_ot = att.daily_variance_hours if att.daily_variance_hours >= 0.75 else (att.overtime_hours or 0.0)
+                if att_ot >= 0.75:
+                    vals['validated_overtime_hours'] = att_ot
+        elif vals.get('overtime_status') == 'refused' and 'validated_overtime_hours' not in vals:
+            vals['validated_overtime_hours'] = 0.0
+        return super().write(vals)
+
     def _update_overtime(self, attendance_domain=None):
         """
         Batch-optimized overtime generator: Pre-fetches all overtime lines
