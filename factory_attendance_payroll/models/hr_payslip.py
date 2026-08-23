@@ -190,6 +190,19 @@ class HrPayslip(models.Model):
                     hrs = lve.number_of_hours_display
                 alloc_hours_by_emp_type[(lve.employee_id.id, lve.holiday_status_id.id)] -= hrs
 
+        # Bulk Pre-fetch 3b: Approved leaves during period (excluding lateness settlements)
+        approved_leaves_by_emp = defaultdict(list)
+        if 'hr.leave' in self.env:
+            approved_leaves = self.env['hr.leave'].sudo().search([
+                ('employee_id', 'in', emp_ids),
+                ('state', 'in', ['validate', 'validate1']),
+                ('request_date_from', '<=', max_date),
+                ('request_date_to', '>=', min_date),
+                '!', ('name', 'ilike', 'Lateness Settlement')
+            ])
+            for lve in approved_leaves:
+                approved_leaves_by_emp[lve.employee_id.id].append(lve)
+
         for payslip in self:
             if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
                 payslip.attendance_gross_overtime = 0.0
@@ -207,6 +220,26 @@ class HrPayslip(models.Model):
                 att for att in att_by_emp.get(emp_id, [])
                 if payslip.date_from <= att.check_in.date() <= payslip.date_to
             ]
+
+            # Collect approved leave dates and partial hours for this payslip period
+            approved_leave_dates = set()
+            leave_partial_hours_by_date = defaultdict(float)
+            for lve in approved_leaves_by_emp.get(emp_id, []):
+                req_from = lve.request_date_from or (lve.date_from.date() if lve.date_from else None)
+                req_to = lve.request_date_to or (lve.date_to.date() if lve.date_to else None)
+                if not req_from or not req_to:
+                    continue
+                start_overlap = max(payslip.date_from, req_from)
+                end_overlap = min(payslip.date_to, req_to)
+                if start_overlap <= end_overlap:
+                    curr_d = start_overlap
+                    while curr_d <= end_overlap:
+                        approved_leave_dates.add(curr_d)
+                        # If hourly leave, track partial hours
+                        lve_hrs = getattr(lve, 'number_of_hours', None) or getattr(lve, 'number_of_hours_display', None)
+                        if lve_hrs and getattr(lve, 'request_unit_hours', False):
+                            leave_partial_hours_by_date[curr_d] += lve_hrs
+                        curr_d += timedelta(days=1)
 
             # In-memory variance calculation (0 DB queries per slip)
             daily_hours = defaultdict(float)
@@ -228,6 +261,9 @@ class HrPayslip(models.Model):
             allowed_rest_days = worked_days_count // 6
 
             for att_date, raw_hrs in daily_hours.items():
+                # Add partial leave hours if employee had partial leave on a worked day
+                partial_lve_hrs = leave_partial_hours_by_date.get(att_date, 0.0)
+
                 if raw_hrs >= 6.0:
                     net_hrs = max(0.0, raw_hrs - break_hrs)
                 elif raw_hrs > 4.0:
@@ -235,22 +271,27 @@ class HrPayslip(models.Model):
                 else:
                     net_hrs = raw_hrs
 
+                effective_hrs = net_hrs + partial_lve_hrs
                 standard_target = 8.0
-                if net_hrs > standard_target:
-                    ot_excess = net_hrs - standard_target
+                if effective_hrs > standard_target:
+                    ot_excess = effective_hrs - standard_target
                     if ot_excess >= min_ot_threshold:
                         # 125% Overtime multiplier (1h overtime = 1.25h extra hours)
                         total_ot += (ot_excess * 1.25)
-                elif net_hrs < standard_target:
-                    shortfall = standard_target - net_hrs
+                elif effective_hrs < standard_target:
+                    shortfall = standard_target - effective_hrs
                     if shortfall > min_lateness_threshold:
                         total_undertime += shortfall
+
+            worked_dates = set(daily_hours.keys())
+            covered_dates = worked_dates | approved_leave_dates
+            covered_days_count = len(covered_dates)
 
             if worked_days_count > target_work_days:
                 extra_worked_days = worked_days_count - target_work_days
                 total_ot += (extra_worked_days * 8.0 * 1.25)
             else:
-                unworked_days = total_days_in_month - worked_days_count
+                unworked_days = total_days_in_month - covered_days_count
                 if unworked_days > allowed_rest_days:
                     excess_unworked_days = unworked_days - allowed_rest_days
                     total_undertime += (excess_unworked_days * 8.0)
@@ -1776,6 +1817,33 @@ class HrPayslip(models.Model):
             ('check_in', '<=', datetime.datetime.combine(self.date_to, datetime.time.max))
         ])
 
+        # 1b. Fetch approved leaves in payslip date window (excluding lateness settlements)
+        approved_leave_dates = set()
+        leave_partial_hours_by_date = defaultdict(float)
+        if 'hr.leave' in self.env:
+            approved_leaves = self.env['hr.leave'].sudo().search([
+                ('employee_id', '=', self.employee_id.id),
+                ('state', 'in', ['validate', 'validate1']),
+                ('request_date_from', '<=', self.date_to),
+                ('request_date_to', '>=', self.date_from),
+                '!', ('name', 'ilike', 'Lateness Settlement')
+            ])
+            for lve in approved_leaves:
+                req_from = lve.request_date_from or (lve.date_from.date() if lve.date_from else None)
+                req_to = lve.request_date_to or (lve.date_to.date() if lve.date_to else None)
+                if not req_from or not req_to:
+                    continue
+                start_overlap = max(self.date_from, req_from)
+                end_overlap = min(self.date_to, req_to)
+                if start_overlap <= end_overlap:
+                    curr_d = start_overlap
+                    while curr_d <= end_overlap:
+                        approved_leave_dates.add(curr_d)
+                        lve_hrs = getattr(lve, 'number_of_hours', None) or getattr(lve, 'number_of_hours_display', None)
+                        if lve_hrs and getattr(lve, 'request_unit_hours', False):
+                            leave_partial_hours_by_date[curr_d] += lve_hrs
+                        curr_d += timedelta(days=1)
+
         # 2. Group raw check-in hours by date
         daily_hours = defaultdict(float)
         for att in attendances:
@@ -1799,6 +1867,8 @@ class HrPayslip(models.Model):
         allowed_rest_days = worked_days_count // 6
 
         for att_date, raw_hrs in daily_hours.items():
+            partial_lve_hrs = leave_partial_hours_by_date.get(att_date, 0.0)
+
             # Apply break deduction rule according to employee location
             if raw_hrs >= 6.0:
                 net_hrs = max(0.0, raw_hrs - break_hrs)
@@ -1807,24 +1877,29 @@ class HrPayslip(models.Model):
             else:
                 net_hrs = raw_hrs
 
+            effective_hrs = net_hrs + partial_lve_hrs
             standard_target = 8.0  # Net Working Hours target per shift
 
-            if net_hrs > standard_target:
-                ot_excess = net_hrs - standard_target
+            if effective_hrs > standard_target:
+                ot_excess = effective_hrs - standard_target
                 if ot_excess >= min_ot_threshold:
                     total_ot += ot_excess
-            elif net_hrs < standard_target:
-                shortfall = standard_target - net_hrs
+            elif effective_hrs < standard_target:
+                shortfall = standard_target - effective_hrs
                 if shortfall > min_lateness_threshold:
                     total_undertime += shortfall
 
         # 4. Monthly Rest Day Quota Reconciliation
+        worked_dates = set(daily_hours.keys())
+        covered_dates = worked_dates | approved_leave_dates
+        covered_days_count = len(covered_dates)
+
         if worked_days_count > target_work_days:
             # Employee worked extra days beyond monthly target -> Extra worked days count as Overtime!
             extra_worked_days = worked_days_count - target_work_days
             total_ot += (extra_worked_days * 8.0)
         else:
-            unworked_days = total_days_in_month - worked_days_count
+            unworked_days = total_days_in_month - covered_days_count
             if unworked_days > allowed_rest_days:
                 # Employee took more off days than their rest day quota -> Excess unworked days count as Undertime
                 excess_unworked_days = unworked_days - allowed_rest_days
