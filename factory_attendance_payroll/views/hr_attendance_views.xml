@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Inherit Attendance Form View to hide misleading native overtime_hours and display accurate factory metrics -->
+    <!-- Inherit Attendance Form View to display factory metrics and explicit HR overtime approval buttons -->
     <record id="hr_attendance_view_form_inherit_factory_metrics" model="ir.ui.view">
         <field name="name">hr.attendance.form.inherit.factory.metrics</field>
         <field name="model">hr.attendance</field>
         <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_approve_factory_overtime" string="Approve Extra Hours" type="object"
+                        class="btn-success" icon="fa-check"
+                        invisible="daily_variance_hours &lt; 0.75 or overtime_status == 'approved'"/>
+                <button name="action_refuse_factory_overtime" string="Refuse Extra Hours" type="object"
+                        class="btn-secondary" icon="fa-times"
+                        invisible="daily_variance_hours &lt; 0.75 or overtime_status == 'refused'"/>
+            </xpath>
             <xpath expr="//field[@name='overtime_hours']" position="attributes">
                 <attribute name="invisible">1</attribute>
             </xpath>
@@ -17,7 +25,7 @@
         </field>
     </record>
 
-    <!-- Inherit Attendance Tree/List View to display Net Worked Hours and Daily Variance in HR List -->
+    <!-- Inherit Attendance Tree/List View to display Net Worked Hours, Daily Variance, and Quick Approve/Refuse Buttons -->
     <record id="view_attendance_tree_inherit_factory_metrics" model="ir.ui.view">
         <field name="name">hr.attendance.tree.inherit.factory.metrics</field>
         <field name="model">hr.attendance</field>
@@ -26,6 +34,12 @@
             <xpath expr="//field[@name='worked_hours']" position="after">
                 <field name="net_worked_hours" widget="float_time" optional="show"/>
                 <field name="daily_variance_hours" widget="float_time" optional="show"/>
+                <button name="action_approve_factory_overtime" type="object" icon="fa-check text-success"
+                        title="Approve Extra Hours"
+                        invisible="daily_variance_hours &lt; 0.75 or overtime_status == 'approved'"/>
+                <button name="action_refuse_factory_overtime" type="object" icon="fa-times text-danger"
+                        title="Refuse Extra Hours"
+                        invisible="daily_variance_hours &lt; 0.75 or overtime_status == 'refused'"/>
             </xpath>
         </field>
     </record>

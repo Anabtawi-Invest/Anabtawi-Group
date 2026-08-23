@@ -76,6 +76,81 @@ class HrAttendance(models.Model):
             excess = net_hrs - 8.0
             attendance.overtime_hours = excess if excess >= 0.75 else 0.0
 
+    def action_approve_factory_overtime(self):
+        """
+        Explicit HR Action to validate and approve daily overtime for factory attendance.
+        Sets overtime_status to 'approved' and updates validated_overtime_hours.
+        """
+        for att in self:
+            att_ot = att.daily_variance_hours if att.daily_variance_hours >= 0.75 else (att.overtime_hours or 0.0)
+            if att_ot < 0.75:
+                continue
+
+            vals = {}
+            if hasattr(att, 'overtime_status'):
+                vals['overtime_status'] = 'approved'
+            if hasattr(att, 'validated_overtime_hours'):
+                vals['validated_overtime_hours'] = att_ot
+            if vals:
+                att.sudo().write(vals)
+
+            if hasattr(att, 'linked_overtime_ids') and att.linked_overtime_ids:
+                att.linked_overtime_ids.sudo().write({
+                    'status': 'approved',
+                    'duration': att_ot,
+                    'manual_duration': att_ot,
+                })
+            elif 'hr.attendance.overtime.line' in self.env:
+                att_date = att.check_in.date() if att.check_in else None
+                if att_date and att.employee_id:
+                    ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
+                        ('employee_id', '=', att.employee_id.id),
+                        ('date', '=', att_date)
+                    ])
+                    if ot_lines:
+                        ot_lines.write({
+                            'status': 'approved',
+                            'duration': att_ot,
+                            'manual_duration': att_ot,
+                        })
+                    else:
+                        self.env['hr.attendance.overtime.line'].sudo().create({
+                            'employee_id': att.employee_id.id,
+                            'date': att_date,
+                            'duration': att_ot,
+                            'manual_duration': att_ot,
+                            'status': 'approved',
+                            'compensable_as_leave': True,
+                        })
+        return True
+
+    def action_refuse_factory_overtime(self):
+        """
+        Explicit HR Action to refuse daily overtime for factory attendance.
+        Sets overtime_status to 'refused' and clears validated_overtime_hours.
+        """
+        for att in self:
+            vals = {}
+            if hasattr(att, 'overtime_status'):
+                vals['overtime_status'] = 'refused'
+            if hasattr(att, 'validated_overtime_hours'):
+                vals['validated_overtime_hours'] = 0.0
+            if vals:
+                att.sudo().write(vals)
+
+            if hasattr(att, 'linked_overtime_ids') and att.linked_overtime_ids:
+                att.linked_overtime_ids.sudo().write({'status': 'refused'})
+            elif 'hr.attendance.overtime.line' in self.env:
+                att_date = att.check_in.date() if att.check_in else None
+                if att_date and att.employee_id:
+                    ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
+                        ('employee_id', '=', att.employee_id.id),
+                        ('date', '=', att_date)
+                    ])
+                    if ot_lines:
+                        ot_lines.write({'status': 'refused'})
+        return True
+
     def _update_overtime(self, attendance_domain=None):
         """
         Batch-optimized overtime generator: Pre-fetches all overtime lines
