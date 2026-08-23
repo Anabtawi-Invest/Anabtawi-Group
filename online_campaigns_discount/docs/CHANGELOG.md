@@ -1,3 +1,9 @@
+## 19.0.5.7.0
+- Shifted campaign approval workflow to the Campaign Calendar level (`online.campaign.calendar`).
+- Dual-manager approval (E-commerce Manager + Accounting Manager) required to approve calendars and activate campaigns.
+- Additions and removals to approved calendars require dual-manager change approval before taking effect.
+- Fixed syntax error in `security.xml`.
+
 ## 19.0.5.6.0
 - Aggregator order ID now prints on the customer receipt: extends point_of_sale.ReceiptHeader with a line showing "<Aggregator> Order ID: <ref>" when online_aggregator_order_ref is set. Wired the previously-unused receipt_extension.xml into the manifest assets.
 
