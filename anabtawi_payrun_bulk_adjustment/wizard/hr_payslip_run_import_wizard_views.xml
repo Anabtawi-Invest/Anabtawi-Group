@@ -23,7 +23,7 @@
                                     icon="fa-download"/>
                         </group>
                         <group string="2. Upload Partial Payments">
-                            <field name="excel_file" filename="file_name" required="1"/>
+                            <field name="excel_file" filename="file_name"/>
                             <field name="file_name" invisible="1"/>
                             <field name="import_mode" widget="radio"/>
                             <field name="recompute_payslips"/>
