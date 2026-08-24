@@ -947,9 +947,15 @@ class HrPayslip(models.Model):
 
                 settlement_leaves = Leave.search(domain)
                 if settlement_leaves:
+                    for leave in settlement_leaves:
+                        if hasattr(leave, 'action_refuse'):
+                            try:
+                                leave.sudo().action_refuse()
+                            except Exception:
+                                pass
                     leave_ids = tuple(settlement_leaves.ids)
                     try:
-                        self.env.cr.execute("UPDATE hr_leave SET state = 'draft' WHERE id IN %s", (leave_ids,))
+                        self.env.cr.execute("UPDATE hr_leave SET state = 'refuse' WHERE id IN %s", (leave_ids,))
                         settlement_leaves.invalidate_recordset(['state'])
                         settlement_leaves.sudo().unlink()
                     except Exception as err:
@@ -960,20 +966,27 @@ class HrPayslip(models.Model):
                         except Exception as sqerr:
                             _logger.error("SQL delete failed for leaves %s: %s", leave_ids, sqerr)
 
-            # 2. Revert Monthly Extra Hours Reconciliation Allocation
+            # 2. Refuse and Delete Monthly Extra Hours Reconciliation Allocation
             if Allocation:
                 month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
                 alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
                 ot_allocs = Allocation.search([
                     ('employee_id', '=', payslip.employee_id.id),
-                    '|',
+                    '|', '|',
                     ('name', '=', alloc_name),
                     ('name', 'ilike', 'Extra Hours Reconciliation'),
+                    ('name', 'ilike', 'Monthly Overtime Earned'),
                 ])
                 if ot_allocs:
+                    for alloc in ot_allocs:
+                        if hasattr(alloc, 'action_refuse'):
+                            try:
+                                alloc.sudo().action_refuse()
+                            except Exception:
+                                pass
                     alloc_ids = tuple(ot_allocs.ids)
                     try:
-                        self.env.cr.execute("UPDATE hr_leave_allocation SET state = 'draft' WHERE id IN %s", (alloc_ids,))
+                        self.env.cr.execute("UPDATE hr_leave_allocation SET state = 'refuse' WHERE id IN %s", (alloc_ids,))
                         ot_allocs.invalidate_recordset(['state'])
                         ot_allocs.sudo().unlink()
                     except Exception as err:
