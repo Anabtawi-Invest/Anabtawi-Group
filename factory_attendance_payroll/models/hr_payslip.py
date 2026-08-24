@@ -541,7 +541,7 @@ class HrPayslip(models.Model):
                 ('employee_id', '=', self.employee_id.id),
                 ('holiday_status_id.name', 'ilike', 'Extra'),
                 ('state', '=', 'validate'),
-            ] + comp_domain, limit=1)
+            ], limit=1)
             if emp_alloc:
                 leave_type = emp_alloc.holiday_status_id
             else:
@@ -560,11 +560,11 @@ class HrPayslip(models.Model):
                     ('employee_id', '=', self.employee_id.id),
                     ('holiday_status_id.name', 'ilike', 'سنوي'),
                     ('state', '=', 'validate'),
-                ] + comp_domain, limit=1) or self.env['hr.leave.allocation'].sudo().search([
+                ], limit=1) or self.env['hr.leave.allocation'].sudo().search([
                     ('employee_id', '=', self.employee_id.id),
                     ('holiday_status_id.name', 'ilike', 'Annual'),
                     ('state', '=', 'validate'),
-                ] + comp_domain, limit=1)
+                ], limit=1)
 
                 if emp_alloc:
                     leave_type = emp_alloc.holiday_status_id
