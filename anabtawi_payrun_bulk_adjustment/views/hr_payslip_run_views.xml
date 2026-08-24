@@ -6,12 +6,14 @@
         <field name="model">hr.payslip.run</field>
         <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//header" position="inside">
-                <button name="action_open_bulk_adjustment_wizard" 
-                        string="Bulk Salary Adjustments" 
-                        type="object" 
-                        class="btn-primary" 
-                        invisible="state not in ('draft', 'verify')"/>
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button name="action_open_bulk_adjustment_wizard" 
+                            string="Bulk Salary Adjustments" 
+                            type="object" 
+                            class="btn-primary" 
+                            invisible="state not in ('draft', 'verify')"/>
+                </header>
             </xpath>
         </field>
     </record>
