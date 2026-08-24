@@ -14,12 +14,12 @@ _logger = logging.getLogger(__name__)
 EXCUSED_LEAVE_WORK_ENTRY_CODES = [
     # Display Codes
     "GTO", "CTO", "HW", "STO", "PTO", "SIK", "ANU", "PHD", "BFV", "HIL",
-    "FWS", "DIE", "MRD", "NPO", "PID", "HAJ", "MAM", "LDO", "TRV", "MKA", "BRK", "UNP", "ARS",
+    "FWS", "DIE", "MRD", "NPO", "PID", "HAJ", "MAM", "LDO", "TRV", "MKA", "BRK", "UNP", "ARS", "RST", "RESTDAY", "RestDay", "REST_DAY",
     # Payroll Codes
     "LEAVE100", "LEAVE105", "WORK110", "LEAVE110", "LEAVE120", "SICKLEAVE0",
-    "An_le", "un_paid", "REST",
+    "An_le", "un_paid", "REST", "RST", "RESTDAY", "RestDay", "REST_DAY",
     # General / standard leave codes
-    "LEAVE", "SICK", "VAC", "ANNUAL", "UNPAID", "HOLIDAY", "REST_DAY",
+    "LEAVE", "SICK", "VAC", "ANNUAL", "UNPAID", "HOLIDAY", "REST_DAY", "RESTDAY", "RestDay",
 ]
 
 ABSENT_WORK_ENTRY_CODES = ["ABS", "ABSENT", "A"]
@@ -77,25 +77,6 @@ class HrEmployee(models.Model):
         store=False
     )
 
-    x_studio_manager = fields.Boolean(
-        string="Manager",
-        tracking=True,
-        groups="hr_payroll.group_hr_payroll_user",
-        help="When enabled, factory attendance reconciliation is skipped on payslips. "
-             "Absent work entry automation still applies.",
-    )
-
-    def _is_factory_reconciliation_excluded(self):
-        """Return True when factory payslip reconciliation must not run for this employee."""
-        self.ensure_one()
-        if self.x_studio_manager:
-            return True
-        if 'payroll_properties' in self._fields and self.payroll_properties:
-            props = dict(self.payroll_properties)
-            if props.get('manager'):
-                return True
-        return False
-
     def _compute_legacy_lunch_break_rule(self):
         for emp in self:
             if emp.employee_work_station == 'headoffice':
@@ -139,18 +120,11 @@ class HrEmployee(models.Model):
 
     @api.model
     def _cron_create_absent_work_entries(self):
-        """Daily cron: evaluate the past 2 days (excluding today) for active employees only."""
+        """Daily/Monthly cron: evaluate current/past month up to yesterday and create absent work entries."""
         today = fields.Date.context_today(self)
         yesterday = today - timedelta(days=1)
-        two_days_ago = today - timedelta(days=2)
-        active_employees = self.search([("active", "=", True)])
-        _logger.info(
-            "Factory Absent Cron: evaluating %s active employees from %s to %s",
-            len(active_employees),
-            two_days_ago,
-            yesterday,
-        )
-        active_employees._create_absent_work_entries_for_period(two_days_ago, yesterday)
+        first_day_of_month = yesterday.replace(day=1)
+        self.search([("active", "=", True)])._create_absent_work_entries_for_period(first_day_of_month, yesterday)
 
     def _get_absent_work_entry_type(self):
         absent_type = self.env.ref(
@@ -214,21 +188,14 @@ class HrEmployee(models.Model):
         """
         Evaluates a single employee for a specific monthly window:
         1. Checks manager / Working Schedule exemption (work_entry_source == 'calendar').
-        2. Evaluates each working day in the calendar month up to yesterday.
+        2. Evaluates each working day in the month up to yesterday.
         3. Identifies candidate un-punched days (expected work hours > 0, NO check-in, NO approved leave/time-off).
         4. Applies 4-Day Monthly Grace Rule:
            - First 4 unpunched days in the month are forgiven (NO absent work entry).
            - 5th unpunched day and all excess days beyond 4 receive an ABSENT work entry.
-
-        The scan always starts on the 1st of the calendar month so the 4-day grace rule stays
-        correct when the daily cron passes only a short date range (e.g. last 2 days).
         """
         self.ensure_one()
-        month_from = fields.Date.to_date(month_from)
-        month_to = fields.Date.to_date(month_to)
-        month_scan_start = month_from.replace(day=1)
-
-        versions = self._get_versions_with_contract_overlap_with_period(month_scan_start, month_to)
+        versions = self._get_versions_with_contract_overlap_with_period(month_from, month_to)
         if not versions:
             return
 
@@ -238,11 +205,11 @@ class HrEmployee(models.Model):
 
         yesterday = fields.Date.context_today(self) - timedelta(days=1)
         eval_to = min(month_to, yesterday)
-        if month_scan_start > eval_to:
+        if month_from > eval_to:
             return
 
         candidate_unpunched_days = []
-        current = month_scan_start
+        current = month_from
         while current <= eval_to:
             work_entry_source = self._get_work_entry_source_on_day(current)
             # Manager & Office Working Schedule Exemption:
