@@ -266,9 +266,9 @@ class HrPayslip(models.Model):
             covered_extra = round(min(lateness, total_extra_avail), 2)
             rem_lateness = round(lateness - covered_extra, 2)
 
-            # STEP 2a: Deduct remaining lateness from Annual Leave
+            # STEP 2a: Deduct remaining lateness from Annual Leave (ONLY if employee accepts annual deduction)
             covered_annual_leave = 0.0
-            if rem_lateness > 0.01:
+            if rem_lateness > 0.01 and emp.allow_annual_leave_lateness_deduction:
                 annual_leave_avail = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in annual_type_ids))
                 covered_annual_leave = round(min(rem_lateness, annual_leave_avail), 2)
                 rem_lateness = round(rem_lateness - covered_annual_leave, 2)

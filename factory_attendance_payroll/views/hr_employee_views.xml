@@ -8,6 +8,9 @@
             <xpath expr="//page[@name='payroll_information']//field[@name='structure_type_id']" position="after">
                 <field name="employee_work_station"/>
                 <field name="break_duration_hours"/>
+                <field name="allow_annual_leave_lateness_deduction"/>
+                <field name="annual_deduction_approval_filename" invisible="1"/>
+                <field name="annual_deduction_approval_document" filename="annual_deduction_approval_filename" invisible="not allow_annual_leave_lateness_deduction"/>
             </xpath>
         </field>
     </record>

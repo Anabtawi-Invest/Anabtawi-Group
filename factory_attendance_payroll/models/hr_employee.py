@@ -64,6 +64,23 @@ class HrEmployee(models.Model):
         help="Lunch/Break duration in hours subtracted from attendance shifts (e.g. 1.0 = 60 min, 0.75 = 45 min, 0.5 = 30 min)."
     )
 
+    allow_annual_leave_lateness_deduction = fields.Boolean(
+        string="Accept Annual Deduction",
+        default=False,
+        tracking=True,
+        help="If checked, lateness hours can be deducted from the employee's Annual Leave balance. Requires uploading an approval document."
+    )
+
+    annual_deduction_approval_document = fields.Binary(
+        string="Approval Document",
+        attachment=True,
+        help="Upload approval document confirming employee accepts Annual Leave lateness deduction."
+    )
+
+    annual_deduction_approval_filename = fields.Char(
+        string="Approval Document Filename"
+    )
+
     # Legacy view compatibility aliases
     lunch_break_rule = fields.Selection([
         ('factory', 'Factory / Branches (1.0h Break)'),
