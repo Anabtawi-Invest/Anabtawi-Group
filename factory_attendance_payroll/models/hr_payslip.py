@@ -935,25 +935,30 @@ class HrPayslip(models.Model):
 
                 domain = [
                     ('employee_id', '=', payslip.employee_id.id),
+                    '|',
                     ('request_date_from', '>=', payslip.date_from),
+                    ('date_from', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                    '|',
                     ('request_date_to', '<=', payslip.date_to),
+                    ('date_to', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
                 ]
                 if target_type_ids:
                     domain.append(('holiday_status_id', 'in', target_type_ids))
 
                 settlement_leaves = Leave.search(domain)
-                for leave in settlement_leaves:
+                if settlement_leaves:
+                    leave_ids = tuple(settlement_leaves.ids)
                     try:
-                        if leave.state in ('validate', 'validate1', 'confirm'):
-                            if hasattr(leave, 'action_refuse'):
-                                try:
-                                    leave.sudo().action_refuse()
-                                except Exception:
-                                    pass
-                            leave.sudo().write({'state': 'draft'})
-                        leave.sudo().unlink()
+                        self.env.cr.execute("UPDATE hr_leave SET state = 'draft' WHERE id IN %s", (leave_ids,))
+                        settlement_leaves.invalidate_recordset(['state'])
+                        settlement_leaves.sudo().unlink()
                     except Exception as err:
-                        _logger.warning("Failed to delete settlement leave %s: %s", leave.id, err)
+                        _logger.warning("ORM unlink failed for leaves %s, forcing SQL delete: %s", leave_ids, err)
+                        try:
+                            self.env.cr.execute("DELETE FROM hr_leave WHERE id IN %s", (leave_ids,))
+                            settlement_leaves.invalidate_recordset()
+                        except Exception as sqerr:
+                            _logger.error("SQL delete failed for leaves %s: %s", leave_ids, sqerr)
 
             # 2. Revert Monthly Extra Hours Reconciliation Allocation
             if Allocation:
@@ -965,18 +970,19 @@ class HrPayslip(models.Model):
                     ('name', '=', alloc_name),
                     ('name', 'ilike', 'Extra Hours Reconciliation'),
                 ])
-                for alloc in ot_allocs:
+                if ot_allocs:
+                    alloc_ids = tuple(ot_allocs.ids)
                     try:
-                        if alloc.state in ('validate', 'validate1', 'confirm'):
-                            if hasattr(alloc, 'action_refuse'):
-                                try:
-                                    alloc.sudo().action_refuse()
-                                except Exception:
-                                    pass
-                            alloc.sudo().write({'state': 'draft'})
-                        alloc.sudo().unlink()
+                        self.env.cr.execute("UPDATE hr_leave_allocation SET state = 'draft' WHERE id IN %s", (alloc_ids,))
+                        ot_allocs.invalidate_recordset(['state'])
+                        ot_allocs.sudo().unlink()
                     except Exception as err:
-                        _logger.warning("Failed to delete reconciliation allocation %s: %s", alloc.id, err)
+                        _logger.warning("ORM unlink failed for allocs %s, forcing SQL delete: %s", alloc_ids, err)
+                        try:
+                            self.env.cr.execute("DELETE FROM hr_leave_allocation WHERE id IN %s", (alloc_ids,))
+                            ot_allocs.invalidate_recordset()
+                        except Exception as sqerr:
+                            _logger.error("SQL delete failed for allocs %s: %s", alloc_ids, sqerr)
 
             # 3. Revert Overtime line if created for this payslip date_to
             if OvertimeLine:
