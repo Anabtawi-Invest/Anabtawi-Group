@@ -957,15 +957,18 @@ class HrPayslip(models.Model):
                     leave_ids = tuple(settlement_leaves.ids) if len(settlement_leaves) > 1 else (settlement_leaves.id, 0)
                     try:
                         self.env.cr.execute("UPDATE hr_leave SET state = 'refuse' WHERE id IN %s", (leave_ids,))
+                    except Exception:
+                        pass
+                    try:
                         settlement_leaves.invalidate_recordset(['state'])
                         settlement_leaves.sudo().unlink()
                     except Exception as err:
                         _logger.warning("ORM unlink failed for leaves %s, forcing SQL delete: %s", leave_ids, err)
-                        try:
-                            self.env.cr.execute("DELETE FROM hr_leave WHERE id IN %s", (leave_ids,))
-                            settlement_leaves.invalidate_recordset()
-                        except Exception as sqerr:
-                            _logger.error("SQL delete failed for leaves %s: %s", leave_ids, sqerr)
+                    try:
+                        self.env.cr.execute("DELETE FROM hr_leave WHERE id IN %s", (leave_ids,))
+                    except Exception:
+                        pass
+                    settlement_leaves.invalidate_recordset()
 
             # 2. Refuse and Delete Monthly Extra Hours Reconciliation Allocation
             if Allocation:
@@ -973,10 +976,11 @@ class HrPayslip(models.Model):
                 alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
                 ot_allocs = Allocation.search([
                     ('employee_id', '=', payslip.employee_id.id),
-                    '|', '|',
+                    '|', '|', '|',
                     ('name', '=', alloc_name),
                     ('name', 'ilike', 'Extra Hours Reconciliation'),
                     ('name', 'ilike', 'Monthly Overtime Earned'),
+                    ('holiday_status_id.name', 'ilike', 'Extra'),
                 ])
                 if ot_allocs:
                     for alloc in ot_allocs:
@@ -988,15 +992,18 @@ class HrPayslip(models.Model):
                     alloc_ids = tuple(ot_allocs.ids) if len(ot_allocs) > 1 else (ot_allocs.id, 0)
                     try:
                         self.env.cr.execute("UPDATE hr_leave_allocation SET state = 'refuse' WHERE id IN %s", (alloc_ids,))
+                    except Exception:
+                        pass
+                    try:
                         ot_allocs.invalidate_recordset(['state'])
                         ot_allocs.sudo().unlink()
                     except Exception as err:
                         _logger.warning("ORM unlink failed for allocs %s, forcing SQL delete: %s", alloc_ids, err)
-                        try:
-                            self.env.cr.execute("DELETE FROM hr_leave_allocation WHERE id IN %s", (alloc_ids,))
-                            ot_allocs.invalidate_recordset()
-                        except Exception as sqerr:
-                            _logger.error("SQL delete failed for allocs %s: %s", alloc_ids, sqerr)
+                    try:
+                        self.env.cr.execute("DELETE FROM hr_leave_allocation WHERE id IN %s", (alloc_ids,))
+                    except Exception:
+                        pass
+                    ot_allocs.invalidate_recordset()
 
             # 3. Revert Overtime line if created for this payslip date_to
             if OvertimeLine:
