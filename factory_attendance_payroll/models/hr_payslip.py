@@ -1649,12 +1649,87 @@ class HrPayslip(models.Model):
                 'Lateness Settlement via Paid Time Off'
             )
 
+    def _safe_unlink_allocations(self, allocations):
+        """Unlink allocations even when validated (refuse first if needed)."""
+        if not allocations:
+            return
+        try:
+            allocations.with_context(
+                allocation_skip_state_check=True,
+                mail_notrack=True,
+                tracking_disable=True,
+            ).unlink()
+            return
+        except Exception:
+            _logger.exception(
+                "Factory ExtraHours REVERT failed bulk unlink allocs ids=%s — trying refuse then unlink",
+                allocations.ids,
+            )
+        for alloc in allocations.exists():
+            try:
+                if alloc.state in ('validate', 'validate1', 'confirm'):
+                    alloc.with_context(
+                        mail_notrack=True,
+                        tracking_disable=True,
+                    ).write({'state': 'refuse'})
+                alloc.with_context(
+                    allocation_skip_state_check=True,
+                    mail_notrack=True,
+                    tracking_disable=True,
+                ).unlink()
+            except Exception:
+                _logger.exception(
+                    "Factory ExtraHours REVERT could not remove allocation id=%s name=%s state=%s",
+                    alloc.id,
+                    alloc.name,
+                    alloc.state,
+                )
+
+    def _restore_extra_hours_dashboard_after_revert(self, employee):
+        """
+        After reconciliation Extra Hours artifacts are removed, re-sync the Time Off
+        Extra Hours card to the balance that remains from non-payslip sources
+        (remaining OT lines + normal allocations − real leaves).
+        """
+        self.ensure_one()
+        employee.ensure_one()
+        self.env.flush_all()
+        employee.invalidate_recordset()
+
+        breakdown = self._debug_extra_hours_balance_breakdown(employee, 'AFTER_REVERT_CLEANUP')
+        target = breakdown.get('odoo_available')
+        if target is None:
+            target = breakdown.get('formula_available')
+        if target is None:
+            target = 0.0
+        target = max(0.0, round(float(target), 2))
+
+        _logger.info(
+            "Factory ExtraHours REVERT dashboard restore emp=%s(%s) payslip=%s target=%s "
+            "(odoo_available=%s formula_available=%s)",
+            employee.name,
+            employee.id,
+            self.id,
+            target,
+            breakdown.get('odoo_available'),
+            breakdown.get('formula_available'),
+        )
+        try:
+            return self._sync_extra_hours_dashboard_allocation(employee, target)
+        except Exception:
+            _logger.exception(
+                "Factory ExtraHours REVERT dashboard sync failed emp=%s target=%s",
+                employee.id,
+                target,
+            )
+            return False
+
     def _revert_reconciliation_settlements(self):
         """
         Reverses all Time Off settlement records (Extra Hours, Annual Leave, Paid Time Off),
         reverts credited monthly overtime allocations, and clears attendance overtime lines
         when the payslip is cancelled or set to draft.
-        This immediately restores the balances back to the employee.
+        Then restores the Extra Hours Time Off card to the pre-reconcile remaining balance.
         """
         Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
         Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
@@ -1664,46 +1739,66 @@ class HrPayslip(models.Model):
             if not payslip.employee_id or not payslip.date_to:
                 continue
 
+            employee = payslip.employee_id
+
             # Reset reconciliation flag so next compute can re-reconcile freshly
             payslip.write({'is_reconciled': False})
 
             # 1. Unlink/remove all settlement leaves created for this payslip's date range
             if Leave is not None:
                 settlement_leaves = Leave.search([
-                    ('employee_id', '=', payslip.employee_id.id),
+                    ('employee_id', '=', employee.id),
                     ('request_date_from', '>=', payslip.date_from),
                     ('request_date_to', '<=', payslip.date_to),
                     ('name', 'ilike', 'Lateness Settlement'),
                 ])
                 if settlement_leaves:
-                    settlement_leaves.unlink()
+                    try:
+                        settlement_leaves.unlink()
+                    except Exception:
+                        _logger.exception(
+                            "Factory ExtraHours REVERT failed unlinking settlement leaves emp=%s ids=%s",
+                            employee.id,
+                            settlement_leaves.ids,
+                        )
+                        for leave in settlement_leaves.exists():
+                            try:
+                                if leave.state in ('validate', 'validate1', 'confirm'):
+                                    leave.with_context(
+                                        mail_notrack=True,
+                                        tracking_disable=True,
+                                    ).write({'state': 'refuse'})
+                                leave.unlink()
+                            except Exception:
+                                _logger.exception(
+                                    "Factory ExtraHours REVERT could not remove leave id=%s",
+                                    leave.id,
+                                )
 
-            # 2. Revert Monthly Overtime / Extra Hours Reconciliation allocations for this payslip
+            # 2. Remove reconciliation-created Extra Hours allocations only
             if Allocation is not None:
-                month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
                 ot_allocs = Allocation.search([
-                    ('employee_id', '=', payslip.employee_id.id),
-                    '|', '|',
-                    ('name', '=', f"Monthly Overtime Earned - {month_str}"),
-                    ('name', 'ilike', f"Extra Hours Reconciliation: {month_str}"),
+                    ('employee_id', '=', employee.id),
+                    '|', '|', '|',
+                    ('name', 'ilike', 'Monthly Overtime Earned'),
+                    ('name', 'ilike', 'Extra Hours Reconciliation'),
+                    ('name', 'ilike', 'Lateness Settlement'),
                     ('name', 'ilike', 'Factory Extra Hours'),
                 ])
-                if ot_allocs:
-                    ot_allocs.with_context(
-                        allocation_skip_state_check=True,
-                        mail_notrack=True,
-                        tracking_disable=True,
-                    ).unlink()
+                payslip._safe_unlink_allocations(ot_allocs)
 
-            # 3. Revert Overtime line if created for this payslip date_to
+            # 3. Remove overtime lines written for this payslip end date (reconciliation credit)
             if OvertimeLine is not None:
                 ot_lines = OvertimeLine.search([
-                    ('employee_id', '=', payslip.employee_id.id),
+                    ('employee_id', '=', employee.id),
                     ('date', '=', payslip.date_to),
                     ('compensable_as_leave', '=', True),
                 ])
                 if ot_lines:
                     ot_lines.unlink()
+
+            # 4. Re-sync Extra Hours dashboard to remaining non-payslip balance
+            payslip._restore_extra_hours_dashboard_after_revert(employee)
 
     def _get_previous_extra_hours_balance(self):
         """
