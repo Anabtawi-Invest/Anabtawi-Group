@@ -382,15 +382,8 @@ class HrPayslip(models.Model):
                 if 'settlement' in line_name or 'lateness coverage' in line_name or 'monthly lateness' in line_name:
                     continue
 
-                # 1. Attendance Line Break Deduction: Net Paid Working Hours = Raw Hours - (Shifts * Break)
+                # 1. Attendance Line: Preserve exact attendance hours matching the Attendance App
                 if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
-                    raw_hours = line.get('number_of_hours', 0.0)
-                    total_break_deduction = worked_shifts_count * break_hrs
-                    if raw_hours > total_break_deduction and total_break_deduction > 0:
-                        net_work_hours = round(raw_hours - total_break_deduction, 2)
-                        line['number_of_hours'] = net_work_hours
-                        line['number_of_days'] = round(net_work_hours / 8.0, 2)
-                        line['amount'] = round(net_work_hours * hourly_rate, 3)
                     filtered_lines.append(line)
 
                 # 2. Overtime Line
