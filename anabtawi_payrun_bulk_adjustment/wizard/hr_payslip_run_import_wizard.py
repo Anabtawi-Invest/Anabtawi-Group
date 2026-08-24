@@ -56,17 +56,46 @@ class HrPayslipRunImportWizard(models.TransientModel):
         return input_type
 
     def _get_slip_actual_salary(self, slip):
-        """Extracts the Actual Salary from the Salary Computation tab lines (line_ids)."""
-        actual_line = slip.line_ids.filtered(
-            lambda l: (l.name and l.name.strip().lower() == 'actual salary') or 
-                      (l.code and l.code.upper() in ['ACTUAL', 'ACTUAL_SALARY', 'ACTUAL_SAL'])
-        )
-        if actual_line:
-            return actual_line[0].total
-        if hasattr(slip, 'wage') and slip.wage:
+        """Extracts the Actual Salary from the Salary Computation tab lines (line_ids) safely."""
+        if not slip:
+            return 0.0
+
+        # 1. Primary Source: Check Salary Computation lines (line_ids)
+        if "line_ids" in slip._fields and slip.line_ids:
+            actual_line = slip.line_ids.filtered(
+                lambda l: (l.name and l.name.strip().lower() == 'actual salary') or 
+                          (l.code and l.code.upper() in ['ACTUAL', 'ACTUAL_SALARY', 'ACTUAL_SAL'])
+            )
+            if actual_line:
+                return actual_line[0].total
+
+            net_line = slip.line_ids.filtered(lambda l: l.code and l.code.upper() in ['NET', 'GROSS', 'BASIC'])
+            if net_line:
+                return net_line[0].total
+
+        # 2. Safe Fallbacks if line_ids are not computed yet
+        if "wage" in slip._fields and getattr(slip, 'wage', False):
             return slip.wage
-        if slip.contract_id and slip.contract_id.wage:
-            return slip.contract_id.wage
+
+        if "version_id" in slip._fields and getattr(slip, 'version_id', False):
+            version = slip.version_id
+            if getattr(version, 'contract_wage', False):
+                return version.contract_wage
+
+        if "contract_id" in slip._fields and getattr(slip, 'contract_id', False):
+            contract = slip.contract_id
+            if getattr(contract, 'wage', False):
+                return contract.wage
+
+        if getattr(slip, 'employee_id', False):
+            emp = slip.employee_id
+            if "wage" in emp._fields and getattr(emp, 'wage', False):
+                return emp.wage
+            if "contract_id" in emp._fields and getattr(emp, 'contract_id', False):
+                contract = emp.contract_id
+                if getattr(contract, 'wage', False):
+                    return contract.wage
+
         return 0.0
 
     def action_export_template(self):
@@ -107,7 +136,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
 
         for slip in slips:
             emp = slip.employee_id
-            emp_code = getattr(emp, 'employee_number', False) or emp.registration_number or emp.barcode or ''
+            emp_code = getattr(emp, 'employee_number', False) or getattr(emp, 'registration_number', False) or getattr(emp, 'barcode', False) or ''
             actual_salary = self._get_slip_actual_salary(slip)
 
             existing_input = slip.input_line_ids.filtered(lambda i: i.input_type_id == partial_input_type)
@@ -195,7 +224,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
         slips_by_code = {}
         for slip in target_slips:
             emp = slip.employee_id
-            code = getattr(emp, 'employee_number', False) or emp.registration_number or emp.barcode
+            code = getattr(emp, 'employee_number', False) or getattr(emp, 'registration_number', False) or getattr(emp, 'barcode', False)
             if code:
                 slips_by_code[str(code).strip()] = slip
             slips_by_code[str(emp.id)] = slip
