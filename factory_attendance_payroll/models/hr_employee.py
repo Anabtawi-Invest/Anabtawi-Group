@@ -402,12 +402,23 @@ class HrEmployee(models.Model):
         return (version.work_entry_source or "").strip()
 
     def _get_expected_hours_on_day(self, target_date):
-        """Return expected work hours based on the contract work entry source (planning vs calendar)."""
+        """Return expected net work hours (after break deduction) based on contract work entry source (planning vs calendar)."""
         self.ensure_one()
         source = self._get_work_entry_source_on_day(target_date)
         if source == "planning":
-            return self._get_planning_hours_on_day(target_date)
-        return self._get_calendar_hours_on_day(target_date)
+            gross_hrs = self._get_planning_hours_on_day(target_date)
+        else:
+            gross_hrs = self._get_calendar_hours_on_day(target_date)
+
+        if gross_hrs <= 0:
+            return 0.0
+
+        break_hrs = self._get_lunch_break_duration()
+        if gross_hrs >= 6.0:
+            return max(0.0, gross_hrs - break_hrs)
+        elif gross_hrs > 4.0:
+            return max(0.0, gross_hrs - (break_hrs / 2.0))
+        return gross_hrs
 
     def _get_day_utc_bounds(self, target_date):
         self.ensure_one()
