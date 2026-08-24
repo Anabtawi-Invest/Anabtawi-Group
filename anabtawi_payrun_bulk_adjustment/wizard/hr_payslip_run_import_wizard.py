@@ -197,33 +197,63 @@ class HrPayslipRunImportWizard(models.TransientModel):
         }
 
     def _create_employee_salary_adjustment(self, emp, partial_input_type, partial_amount):
-        """Creates or updates a Salary Adjustment record under the Employee Profile."""
+        """Creates or updates a Salary Adjustment record under the Employee Profile safely."""
         note_text = _("Mid-month partial salary payment loan")
         today = fields.Date.today()
 
         # 1. Standard Odoo Salary Attachment model (hr.salary.attachment)
         if 'hr.salary.attachment' in self.env:
             Attachment = self.env['hr.salary.attachment']
-            existing = Attachment.search([
-                ('employee_id', '=', emp.id),
-                ('date_start', '=', today),
-            ], limit=1)
+            fields_dict = Attachment._fields
 
-            vals = {
-                'employee_id': emp.id,
-                'description': note_text,
-                'amount': partial_amount,
-                'date_start': today,
-            }
-            if 'payslip_input_type_id' in Attachment._fields:
-                vals['payslip_input_type_id'] = partial_input_type.id
-            elif 'input_type_id' in Attachment._fields:
-                vals['input_type_id'] = partial_input_type.id
-            if 'monthly_amount' in Attachment._fields:
+            domain = []
+            if 'employee_ids' in fields_dict:
+                domain.append(('employee_ids', 'in', [emp.id]))
+            elif 'employee_id' in fields_dict:
+                domain.append(('employee_id', '=', emp.id))
+
+            if 'date_start' in fields_dict:
+                domain.append(('date_start', '=', today))
+            elif 'date' in fields_dict:
+                domain.append(('date', '=', today))
+
+            existing = Attachment.search(domain, limit=1) if domain else False
+
+            vals = {}
+            if 'employee_ids' in fields_dict:
+                vals['employee_ids'] = [(4, emp.id)]
+            if 'employee_id' in fields_dict:
+                vals['employee_id'] = emp.id
+
+            if 'description' in fields_dict:
+                vals['description'] = note_text
+            elif 'name' in fields_dict:
+                vals['name'] = note_text
+
+            if 'amount' in fields_dict:
+                vals['amount'] = partial_amount
+            if 'monthly_amount' in fields_dict:
                 vals['monthly_amount'] = partial_amount
+            if 'total_amount' in fields_dict:
+                vals['total_amount'] = partial_amount
+
+            if 'date_start' in fields_dict:
+                vals['date_start'] = today
+            elif 'date' in fields_dict:
+                vals['date'] = today
+
+            if 'payslip_input_type_id' in fields_dict:
+                vals['payslip_input_type_id'] = partial_input_type.id
+            elif 'input_type_id' in fields_dict:
+                vals['input_type_id'] = partial_input_type.id
+            elif 'type_id' in fields_dict:
+                vals['type_id'] = partial_input_type.id
 
             if existing:
-                existing.write(vals)
+                try:
+                    existing.write(vals)
+                except Exception as e:
+                    _logger.warning("Could not write hr.salary.attachment: %s", str(e))
             else:
                 try:
                     Attachment.create(vals)
@@ -234,17 +264,35 @@ class HrPayslipRunImportWizard(models.TransientModel):
         for model_name in ['hr.salary.adjustment', 'sb.hr.salary.adjustment', 'hr.employee.salary.adjustment']:
             if model_name in self.env:
                 AdjModel = self.env[model_name]
-                vals = {
-                    'employee_id': emp.id,
-                    'amount': partial_amount,
-                    'note': note_text,
-                }
-                if 'type_id' in AdjModel._fields:
+                adj_fields = AdjModel._fields
+                vals = {}
+                if 'employee_id' in adj_fields:
+                    vals['employee_id'] = emp.id
+                elif 'employee_ids' in adj_fields:
+                    vals['employee_ids'] = [(4, emp.id)]
+
+                if 'amount' in adj_fields:
+                    vals['amount'] = partial_amount
+                elif 'payslip_amount' in adj_fields:
+                    vals['payslip_amount'] = partial_amount
+
+                if 'note' in adj_fields:
+                    vals['note'] = note_text
+                elif 'description' in adj_fields:
+                    vals['description'] = note_text
+                elif 'name' in adj_fields:
+                    vals['name'] = note_text
+
+                if 'type_id' in adj_fields:
                     vals['type_id'] = partial_input_type.id
-                if 'input_type_id' in AdjModel._fields:
+                elif 'input_type_id' in adj_fields:
                     vals['input_type_id'] = partial_input_type.id
-                if 'date_start' in AdjModel._fields:
+
+                if 'date_start' in adj_fields:
                     vals['date_start'] = today
+                elif 'date' in adj_fields:
+                    vals['date'] = today
+
                 try:
                     AdjModel.create(vals)
                 except Exception as e:
@@ -361,7 +409,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
             self.payrun_id.message_post(body=log_msg)
 
         return {
-            'type': 'ir.actions.act_url' if False else 'ir.actions.client',
+            'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': _("Salary Adjustments Created"),

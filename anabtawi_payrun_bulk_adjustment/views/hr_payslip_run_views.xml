@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- 1. Download Template Button on Pay Run Payslips List View -->
+    <!-- 1. Download Template Button on Pay Run Payslips List View (Direct Download, No Modal Popup) -->
     <record id="view_hr_payslip_list_bulk_adjustment" model="ir.ui.view">
         <field name="name">hr.payslip.list.bulk.adjustment</field>
         <field name="model">hr.payslip</field>
@@ -8,14 +8,14 @@
         <field name="arch" type="xml">
             <xpath expr="//list/header" position="inside">
                 <button string="Download Baseline Template" 
-                        name="action_open_bulk_adjustment_wizard" 
+                        name="action_export_template" 
                         type="object" 
                         class="btn-primary"/>
             </xpath>
         </field>
     </record>
 
-    <!-- 2. Upload Bulk Adjustment Button on Employees List View -->
+    <!-- 2. Upload Bulk Adjustment Button on Employees List View (Opens Upload Modal) -->
     <record id="view_hr_employee_tree_bulk_adjustment" model="ir.ui.view">
         <field name="name">hr.employee.tree.bulk.adjustment</field>
         <field name="model">hr.employee</field>
@@ -42,15 +42,15 @@ action = records.action_open_bulk_adjustment_wizard()
         </field>
     </record>
 
-    <!-- 4. Server Action for Payrun / Payslips List View -->
+    <!-- 4. Server Action for Payrun / Payslips List View (Direct Download) -->
     <record id="action_payrun_bulk_adjustment_server" model="ir.actions.server">
-        <field name="name">Upload Bulk Adjustment</field>
+        <field name="name">Download Baseline Template</field>
         <field name="model_id" ref="hr_payroll.model_hr_payslip_run"/>
         <field name="binding_model_id" ref="hr_payroll.model_hr_payslip_run"/>
         <field name="binding_view_types">form,list</field>
         <field name="state">code</field>
         <field name="code">
-action = records.action_open_bulk_adjustment_wizard()
+action = records.action_export_template()
         </field>
     </record>
 </odoo>

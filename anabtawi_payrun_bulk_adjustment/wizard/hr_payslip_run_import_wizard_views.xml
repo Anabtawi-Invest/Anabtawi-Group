@@ -4,17 +4,20 @@
         <field name="name">hr.payslip.run.import.wizard.form</field>
         <field name="model">hr.payslip.run.import.wizard</field>
         <field name="arch" type="xml">
-            <form string="Partial Salary Payments Import">
+            <form string="Upload Bulk Salary Adjustments">
                 <sheet>
-                    <div class="alert alert-info" role="alert">
+                    <div class="alert alert-info" role="alert" invisible="not payrun_id">
                         <strong>Mid-Month Partial Payment Workflow:</strong><br/>
                         1. Compute the draft Payrun to calculate each employee's <strong>Actual Salary</strong>.<br/>
-                        2. Click <strong>Download Excel Template</strong>. The file will include <em>Employee Code, Name, Actual Salary</em>, and an empty <em>Partial Payment Amount</em> column.<br/>
-                        3. Enter the approved partial payment / salary loan amounts in Excel.<br/>
-                        4. Upload the Excel file back and click <strong>Import Partial Payments</strong>.
+                        2. Click <strong>Download Excel Template</strong>.<br/>
+                        3. Enter approved partial payment amounts in Excel.<br/>
+                        4. Upload the Excel file and click <strong>Import Partial Payments</strong>.
+                    </div>
+                    <div class="alert alert-info" role="alert" invisible="payrun_id">
+                        Upload the completed Excel sheet to create <strong>Salary Partial Payment</strong> adjustments directly under employee profiles.
                     </div>
                     <group>
-                        <group string="1. Template Export">
+                        <group string="1. Template Export" invisible="not payrun_id">
                             <field name="payrun_id" readonly="1"/>
                             <button name="action_export_template" 
                                     string="Download Excel Template" 
@@ -22,7 +25,7 @@
                                     class="btn-secondary" 
                                     icon="fa-download"/>
                         </group>
-                        <group string="2. Upload Partial Payments">
+                        <group string="Upload Excel File">
                             <field name="excel_file" filename="file_name"/>
                             <field name="file_name" invisible="1"/>
                         </group>
