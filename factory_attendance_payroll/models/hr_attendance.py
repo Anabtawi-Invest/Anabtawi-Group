@@ -50,7 +50,9 @@ class HrAttendance(models.Model):
             attendance.attendance_break_hours = deducted_break
             attendance.net_worked_hours = net_hrs
 
-            standard_target = 8.0
+            target_date = attendance.check_in.date() if attendance.check_in else False
+            expected_hrs = attendance.employee_id._get_expected_hours_on_day(target_date) if (attendance.employee_id and target_date) else 8.0
+            standard_target = expected_hrs if expected_hrs > 0 else 8.0
             excess = net_hrs - standard_target
             min_ot_threshold = 0.75         # 45 minutes Overtime threshold (post-shift excess >= 45m credited)
             min_lateness_threshold = 0.25   # 15 minutes Lateness Grace Period
@@ -77,7 +79,10 @@ class HrAttendance(models.Model):
             raw_hrs = attendance.worked_hours or 0.0
             break_hrs = attendance.employee_id._get_lunch_break_duration()
             net_hrs = max(0.0, raw_hrs - break_hrs) if raw_hrs >= 6.0 else raw_hrs
-            excess = net_hrs - 8.0
+            target_date = attendance.check_in.date() if attendance.check_in else False
+            expected_hrs = attendance.employee_id._get_expected_hours_on_day(target_date) if (attendance.employee_id and target_date) else 8.0
+            standard_target = expected_hrs if expected_hrs > 0 else 8.0
+            excess = net_hrs - standard_target
             attendance.overtime_hours = excess if excess >= 0.75 else 0.0
 
     def _update_overtime(self, attendance_domain=None):

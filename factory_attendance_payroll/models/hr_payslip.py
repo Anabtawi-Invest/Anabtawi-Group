@@ -1136,7 +1136,8 @@ class HrPayslip(models.Model):
             else:
                 net_hrs = raw_hrs
 
-            standard_target = 8.0  # Net Working Hours target per shift
+            expected_hrs = self.employee_id._get_expected_hours_on_day(att_date) if self.employee_id else 8.0
+            standard_target = expected_hrs if expected_hrs > 0 else 8.0
 
             if net_hrs > standard_target:
                 ot_excess = net_hrs - standard_target
