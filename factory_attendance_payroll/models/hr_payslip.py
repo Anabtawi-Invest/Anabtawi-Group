@@ -924,10 +924,24 @@ class HrPayslip(models.Model):
                     ('employee_id', '=', payslip.employee_id.id),
                     ('request_date_from', '>=', payslip.date_from),
                     ('request_date_to', '<=', payslip.date_to),
+                    '|', '|', '|',
                     ('name', 'ilike', 'Lateness Settlement'),
+                    ('name', 'ilike', 'Lateness Coverage'),
+                    ('lateness_reconcile_generated', '=', True),
+                    ('lateness_reconcile_payslip_id', '=', payslip.id),
                 ])
-                if settlement_leaves:
-                    settlement_leaves.unlink()
+                for leave in settlement_leaves:
+                    try:
+                        if leave.state in ('validate', 'validate1', 'confirm'):
+                            if hasattr(leave, 'action_refuse'):
+                                try:
+                                    leave.sudo().action_refuse()
+                                except Exception:
+                                    pass
+                            leave.sudo().write({'state': 'draft'})
+                        leave.sudo().unlink()
+                    except Exception as err:
+                        _logger.warning("Failed to delete settlement leave %s: %s", leave.id, err)
 
             # 2. Revert Monthly Extra Hours Reconciliation Allocation
             if Allocation:
