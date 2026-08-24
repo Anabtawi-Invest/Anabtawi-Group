@@ -212,12 +212,21 @@ class HrEmployee(models.Model):
         current = month_from
         while current <= eval_to:
             work_entry_source = self._get_work_entry_source_on_day(current)
-            # Manager & Office Working Schedule Exemption:
-            # If contract work entry source is 'calendar', skip absence generation.
+            # 1. Calendar (Working Schedule) Mode:
+            # Skip automated absence generation; work entries & shift hours are governed by resource calendar.
             if work_entry_source == "calendar":
                 current += timedelta(days=1)
                 continue
 
+            # 2. Planning Mode:
+            # If no planning slot is published on current date, treat as unscheduled day off.
+            if work_entry_source == "planning":
+                planning_hours = self._get_planning_hours_on_day(current)
+                if planning_hours <= 0:
+                    current += timedelta(days=1)
+                    continue
+
+            # 3. Attendance Mode (Factory Workers / 6 Days + 1 RestDay):
             expected_hours = self._get_expected_hours_on_day(current)
             if expected_hours <= 0:
                 # Non-working day (standard calendar weekend or rest day)
@@ -351,7 +360,9 @@ class HrEmployee(models.Model):
                 return True
             code = (type_obj.code or "").strip().upper()
             display_code = (getattr(type_obj, "display_code", False) or "").strip().upper()
-            if code in EXCUSED_LEAVE_WORK_ENTRY_CODES or display_code in EXCUSED_LEAVE_WORK_ENTRY_CODES:
+            name = (type_obj.name or "").strip().upper()
+            if (code in EXCUSED_LEAVE_WORK_ENTRY_CODES or display_code in EXCUSED_LEAVE_WORK_ENTRY_CODES or
+                any(c in code or c in display_code or c in name for c in ["RST", "RESTDAY", "REST_DAY"])):
                 return True
 
         # 3. Check resource calendar global leaves / public holidays
