@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- 1. Add button right next to 'Export XLSX' on Pay Run Payslips list view (as shown in your screenshot) -->
+    <!-- 1. Download Template Button on Pay Run Payslips List View -->
     <record id="view_hr_payslip_list_bulk_adjustment" model="ir.ui.view">
         <field name="name">hr.payslip.list.bulk.adjustment</field>
         <field name="model">hr.payslip</field>
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
         <field name="arch" type="xml">
             <xpath expr="//list/header" position="inside">
-                <button string="Bulk Salary Adjustments" 
+                <button string="Download Baseline Template" 
                         name="action_open_bulk_adjustment_wizard" 
                         type="object" 
                         class="btn-primary"/>
@@ -15,55 +15,36 @@
         </field>
     </record>
 
-    <!-- 2. Add button on Individual Payslip Form View -->
-    <record id="view_hr_payslip_form_bulk_adjustment" model="ir.ui.view">
-        <field name="name">hr.payslip.form.bulk.adjustment</field>
-        <field name="model">hr.payslip</field>
-        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+    <!-- 2. Upload Bulk Adjustment Button on Employees List View -->
+    <record id="view_hr_employee_tree_bulk_adjustment" model="ir.ui.view">
+        <field name="name">hr.employee.tree.bulk.adjustment</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_tree"/>
         <field name="arch" type="xml">
-            <xpath expr="//form" position="inside">
-                <header>
-                    <button string="Bulk Salary Adjustments" 
-                            name="action_open_bulk_adjustment_wizard" 
-                            type="object" 
-                            class="btn-primary"/>
-                </header>
+            <xpath expr="//list/header" position="inside">
+                <button string="Upload Bulk Adjustment" 
+                        name="action_open_bulk_adjustment_wizard" 
+                        type="object" 
+                        class="btn-primary"/>
             </xpath>
         </field>
     </record>
 
-    <!-- 3. Add button on Payrun Form View -->
-    <record id="hr_payslip_run_form_inherit_bulk_adjustment" model="ir.ui.view">
-        <field name="name">hr.payslip.run.form.inherit.bulk.adjustment</field>
-        <field name="model">hr.payslip.run</field>
-        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
-        <field name="arch" type="xml">
-            <xpath expr="//form" position="inside">
-                <header>
-                    <button name="action_open_bulk_adjustment_wizard" 
-                            string="Bulk Salary Adjustments" 
-                            type="object" 
-                            class="btn-primary"/>
-                </header>
-            </xpath>
-        </field>
-    </record>
-
-    <!-- 4. Action Menu (Actions Dropdown) Binding for Payslip List & Form -->
-    <record id="action_payslip_bulk_adjustment_server" model="ir.actions.server">
-        <field name="name">Bulk Salary Adjustments</field>
-        <field name="model_id" ref="hr_payroll.model_hr_payslip"/>
-        <field name="binding_model_id" ref="hr_payroll.model_hr_payslip"/>
-        <field name="binding_view_types">form,list</field>
+    <!-- 3. Server Action for Employees Module (Actions Menu) -->
+    <record id="action_employee_bulk_adjustment_server" model="ir.actions.server">
+        <field name="name">Upload Bulk Adjustment</field>
+        <field name="model_id" ref="hr.model_hr_employee"/>
+        <field name="binding_model_id" ref="hr.model_hr_employee"/>
+        <field name="binding_view_types">list,form</field>
         <field name="state">code</field>
         <field name="code">
 action = records.action_open_bulk_adjustment_wizard()
         </field>
     </record>
 
-    <!-- 5. Action Menu (Actions Dropdown) Binding for Payrun List & Form -->
+    <!-- 4. Server Action for Payrun / Payslips List View -->
     <record id="action_payrun_bulk_adjustment_server" model="ir.actions.server">
-        <field name="name">Bulk Salary Adjustments</field>
+        <field name="name">Upload Bulk Adjustment</field>
         <field name="model_id" ref="hr_payroll.model_hr_payslip_run"/>
         <field name="binding_model_id" ref="hr_payroll.model_hr_payslip_run"/>
         <field name="binding_view_types">form,list</field>

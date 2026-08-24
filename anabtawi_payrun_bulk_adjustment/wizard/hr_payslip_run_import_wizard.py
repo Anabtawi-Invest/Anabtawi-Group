@@ -20,23 +20,24 @@ class HrPayslipRunImportWizard(models.TransientModel):
     payrun_id = fields.Many2one('hr.payslip.run', string="Payrun", required=False, ondelete='cascade')
     excel_file = fields.Binary(string="Excel File", help="Upload the completed partial payment Excel file.")
     file_name = fields.Char(string="File Name")
-    import_mode = fields.Selection([
-        ('replace', 'Replace existing partial payment / input lines'),
-        ('append', 'Add / Update amounts on existing input lines'),
-    ], default='replace', required=True, string="Import Mode")
-    recompute_payslips = fields.Boolean(
-        string="Recompute Payslips",
-        default=True,
-        help="Automatically trigger salary calculation for updated payslips after import."
-    )
+
+    def _get_emp_code(self, emp):
+        """Returns the primary employee code (employee_number)."""
+        if not emp:
+            return ""
+        code = getattr(emp, 'employee_number', False) or getattr(emp, 'sb_employee_number', False) or getattr(emp, 'registration_number', False) or getattr(emp, 'barcode', False) or ''
+        return str(code).strip()
 
     def _get_target_payslips(self):
         """Helper to return relevant payslips from Payrun or Active Selection."""
         if self.payrun_id and self.payrun_id.slip_ids:
             return self.payrun_id.slip_ids
         active_ids = self._context.get('active_ids', [])
-        if active_ids:
+        if active_ids and self._context.get('active_model') == 'hr.payslip':
             return self.env['hr.payslip'].browse(active_ids)
+        if active_ids and self._context.get('active_model') == 'hr.employee':
+            employees = self.env['hr.employee'].browse(active_ids)
+            return self.env['hr.payslip'].search([('employee_id', 'in', employees.ids), ('state', 'in', ['draft', 'verify'])])
         return self.env['hr.payslip']
 
     def _get_partial_payment_input_type(self):
@@ -50,7 +51,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
                 input_type = False
         if not input_type:
             input_type = InputType.create({
-                'name': 'Partial Salary Payment / Loan',
+                'name': 'Salary partial payment',
                 'code': 'PARTIAL_PAYMENT',
             })
         return input_type
@@ -60,7 +61,6 @@ class HrPayslipRunImportWizard(models.TransientModel):
         if not slip:
             return 0.0
 
-        # 1. Primary Source: Check Salary Computation lines (line_ids)
         if "line_ids" in slip._fields and slip.line_ids:
             actual_line = slip.line_ids.filtered(
                 lambda l: (l.name and l.name.strip().lower() == 'actual salary') or 
@@ -73,7 +73,6 @@ class HrPayslipRunImportWizard(models.TransientModel):
             if net_line:
                 return net_line[0].total
 
-        # 2. Safe Fallbacks if line_ids are not computed yet
         if "wage" in slip._fields and getattr(slip, 'wage', False):
             return slip.wage
 
@@ -110,7 +109,6 @@ class HrPayslipRunImportWizard(models.TransientModel):
 
         partial_input_type = self._get_partial_payment_input_type()
 
-        # Build headers
         headers = [
             "Employee Code", 
             "Employee Name", 
@@ -119,7 +117,6 @@ class HrPayslipRunImportWizard(models.TransientModel):
             "Notes"
         ]
 
-        # Styling
         header_fill = openpyxl.styles.PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
         header_font = openpyxl.styles.Font(color="FFFFFF", bold=True)
         ws.append(headers)
@@ -129,28 +126,46 @@ class HrPayslipRunImportWizard(models.TransientModel):
             cell.fill = header_fill
             cell.font = header_font
 
-        # Populate rows with target payslips
         slips = self._get_target_payslips().sorted(key=lambda s: s.employee_id.name or '')
         if not slips:
-            raise UserError(_("No payslips found to export template for."))
+            active_emp_ids = self._context.get('active_ids', [])
+            if active_emp_ids and self._context.get('active_model') == 'hr.employee':
+                employees = self.env['hr.employee'].browse(active_emp_ids)
+            else:
+                employees = self.env['hr.employee'].search([('active', '=', True)])
 
-        for slip in slips:
-            emp = slip.employee_id
-            emp_code = getattr(emp, 'employee_number', False) or getattr(emp, 'registration_number', False) or getattr(emp, 'barcode', False) or ''
-            actual_salary = self._get_slip_actual_salary(slip)
+            for emp in employees.sorted(key=lambda e: e.name or ''):
+                emp_code = self._get_emp_code(emp)
+                wage = 0.0
+                if "wage" in emp._fields and emp.wage:
+                    wage = emp.wage
+                elif "contract_id" in emp._fields and emp.contract_id and getattr(emp.contract_id, 'wage', False):
+                    wage = emp.contract_id.wage
 
-            existing_input = slip.input_line_ids.filtered(lambda i: i.input_type_id == partial_input_type)
-            existing_partial_amt = existing_input[0].amount if existing_input else 0.0
+                ws.append([
+                    emp_code,
+                    emp.name,
+                    round(wage, 3),
+                    0.0,
+                    ""
+                ])
+        else:
+            for slip in slips:
+                emp = slip.employee_id
+                emp_code = self._get_emp_code(emp)
+                actual_salary = self._get_slip_actual_salary(slip)
 
-            ws.append([
-                emp_code,
-                emp.name,
-                round(actual_salary, 3),
-                existing_partial_amt,
-                ""
-            ])
+                existing_input = slip.input_line_ids.filtered(lambda i: i.input_type_id == partial_input_type)
+                existing_partial_amt = existing_input[0].amount if existing_input else 0.0
 
-        # Formatting columns
+                ws.append([
+                    emp_code,
+                    emp.name,
+                    round(actual_salary, 3),
+                    existing_partial_amt,
+                    ""
+                ])
+
         ws.column_dimensions['A'].width = 18
         ws.column_dimensions['B'].width = 30
         ws.column_dimensions['C'].width = 18
@@ -181,8 +196,76 @@ class HrPayslipRunImportWizard(models.TransientModel):
             'target': 'self',
         }
 
+    def _create_employee_salary_adjustment(self, emp, partial_input_type, partial_amount):
+        """Creates or updates a Salary Adjustment record under the Employee Profile."""
+        note_text = _("Mid-month partial salary payment loan")
+        today = fields.Date.today()
+
+        # 1. Standard Odoo Salary Attachment model (hr.salary.attachment)
+        if 'hr.salary.attachment' in self.env:
+            Attachment = self.env['hr.salary.attachment']
+            existing = Attachment.search([
+                ('employee_id', '=', emp.id),
+                ('date_start', '=', today),
+            ], limit=1)
+
+            vals = {
+                'employee_id': emp.id,
+                'description': note_text,
+                'amount': partial_amount,
+                'date_start': today,
+            }
+            if 'payslip_input_type_id' in Attachment._fields:
+                vals['payslip_input_type_id'] = partial_input_type.id
+            elif 'input_type_id' in Attachment._fields:
+                vals['input_type_id'] = partial_input_type.id
+            if 'monthly_amount' in Attachment._fields:
+                vals['monthly_amount'] = partial_amount
+
+            if existing:
+                existing.write(vals)
+            else:
+                try:
+                    Attachment.create(vals)
+                except Exception as e:
+                    _logger.warning("Could not create hr.salary.attachment: %s", str(e))
+
+        # 2. Check custom Salary Adjustment models if present
+        for model_name in ['hr.salary.adjustment', 'sb.hr.salary.adjustment', 'hr.employee.salary.adjustment']:
+            if model_name in self.env:
+                AdjModel = self.env[model_name]
+                vals = {
+                    'employee_id': emp.id,
+                    'amount': partial_amount,
+                    'note': note_text,
+                }
+                if 'type_id' in AdjModel._fields:
+                    vals['type_id'] = partial_input_type.id
+                if 'input_type_id' in AdjModel._fields:
+                    vals['input_type_id'] = partial_input_type.id
+                if 'date_start' in AdjModel._fields:
+                    vals['date_start'] = today
+                try:
+                    AdjModel.create(vals)
+                except Exception as e:
+                    _logger.warning("Could not create %s: %s", model_name, str(e))
+
+        # 3. Update active draft payslips for this employee if present
+        draft_slips = self.env['hr.payslip'].search([
+            ('employee_id', '=', emp.id),
+            ('state', 'in', ['draft', 'verify']),
+        ])
+        for slip in draft_slips:
+            slip.input_line_ids.filtered(lambda i: i.input_type_id == partial_input_type).unlink()
+            if partial_amount > 0.0:
+                self.env['hr.payslip.input'].create({
+                    'payslip_id': slip.id,
+                    'input_type_id': partial_input_type.id,
+                    'amount': partial_amount,
+                })
+
     def action_import_adjustments(self):
-        """Reads uploaded Excel file and sets partial payment salary inputs for employees."""
+        """Reads uploaded Excel file and creates Salary Adjustments on employee profiles."""
         self.ensure_one()
         if not openpyxl:
             raise UserError(_("The 'openpyxl' Python package is required to read Excel files."))
@@ -219,17 +302,15 @@ class HrPayslipRunImportWizard(models.TransientModel):
 
         partial_input_type = self._get_partial_payment_input_type()
 
-        target_slips = self._get_target_payslips()
-
-        slips_by_code = {}
-        for slip in target_slips:
-            emp = slip.employee_id
-            code = getattr(emp, 'employee_number', False) or getattr(emp, 'registration_number', False) or getattr(emp, 'barcode', False)
+        # Build index of all active employees matching by employee_number
+        all_employees = self.env['hr.employee'].search([])
+        emp_by_code = {}
+        for emp in all_employees:
+            code = self._get_emp_code(emp)
             if code:
-                slips_by_code[str(code).strip()] = slip
-            slips_by_code[str(emp.id)] = slip
+                emp_by_code[code] = emp
+            emp_by_code[str(emp.id)] = emp
 
-        updated_slips = self.env['hr.payslip']
         missing_codes = []
         updated_count = 0
         total_partial_amount = 0.0
@@ -246,8 +327,8 @@ class HrPayslipRunImportWizard(models.TransientModel):
             if emp_code.endswith('.0'):
                 emp_code = emp_code[:-2]
 
-            slip = slips_by_code.get(emp_code)
-            if not slip:
+            emp = emp_by_code.get(emp_code)
+            if not emp:
                 missing_codes.append(f"Row {row_idx}: Code '{emp_code}'")
                 continue
 
@@ -257,55 +338,34 @@ class HrPayslipRunImportWizard(models.TransientModel):
             except (ValueError, TypeError):
                 partial_amount = 0.0
 
-            if self.import_mode == 'replace':
-                slip.input_line_ids.filtered(lambda i: i.input_type_id == partial_input_type).unlink()
-
-            if partial_amount > 0.0 or self.import_mode == 'replace':
-                existing_line = slip.input_line_ids.filtered(lambda i: i.input_type_id == partial_input_type)
-                if existing_line:
-                    existing_line[0].write({'amount': partial_amount})
-                else:
-                    self.env['hr.payslip.input'].create({
-                        'payslip_id': slip.id,
-                        'input_type_id': partial_input_type.id,
-                        'amount': partial_amount,
-                    })
-
-                updated_slips |= slip
+            if partial_amount > 0.0:
+                self._create_employee_salary_adjustment(emp, partial_input_type, partial_amount)
                 updated_count += 1
                 total_partial_amount += partial_amount
 
-        if self.recompute_payslips and updated_slips:
-            updated_slips.compute_sheet()
-
-        # Chatter Log
-        log_msg = _(
-            "<b>Partial Salary Payments Imported</b><br/>"
-            "• File: <code>%s</code><br/>"
-            "• Updated Payslips: <b>%d</b><br/>"
-            "• Total Partial Loans Registered: <b>%.3f JOD</b><br/>"
-            "• Auto-recomputed: %s"
-        ) % (
-            self.file_name or 'Uploaded Excel',
-            updated_count,
-            total_partial_amount,
-            "Yes" if self.recompute_payslips else "No"
-        )
-
-        if missing_codes:
-            log_msg += "<br/><br/><b style='color:red;'>Unmatched Rows (%d):</b><br/>%s" % (
-                len(missing_codes), "<br/>".join(missing_codes[:10])
-            )
-
         if self.payrun_id:
+            log_msg = _(
+                "<b>Partial Salary Payments Imported</b><br/>"
+                "• File: <code>%s</code><br/>"
+                "• Employees Updated: <b>%d</b><br/>"
+                "• Total Partial Loans: <b>%.3f JOD</b>"
+            ) % (
+                self.file_name or 'Uploaded Excel',
+                updated_count,
+                total_partial_amount,
+            )
+            if missing_codes:
+                log_msg += "<br/><br/><b style='color:red;'>Unmatched Rows (%d):</b><br/>%s" % (
+                    len(missing_codes), "<br/>".join(missing_codes[:10])
+                )
             self.payrun_id.message_post(body=log_msg)
 
         return {
-            'type': 'ir.actions.client',
+            'type': 'ir.actions.act_url' if False else 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _("Partial Payments Imported"),
-                'message': _("Successfully set partial payment salary inputs for %d employees (Total: %.3f JOD).") % 
+                'title': _("Salary Adjustments Created"),
+                'message': _("Created Salary Partial Payment adjustments for %d employees (Total: %.3f JOD).") % 
                            (updated_count, total_partial_amount),
                 'type': 'success',
                 'sticky': False,

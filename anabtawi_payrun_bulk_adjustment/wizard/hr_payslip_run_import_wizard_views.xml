@@ -4,17 +4,17 @@
         <field name="name">hr.payslip.run.import.wizard.form</field>
         <field name="model">hr.payslip.run.import.wizard</field>
         <field name="arch" type="xml">
-            <form string="Partial Salary Payments &amp; Adjustments Import">
+            <form string="Partial Salary Payments Import">
                 <sheet>
                     <div class="alert alert-info" role="alert">
                         <strong>Mid-Month Partial Payment Workflow:</strong><br/>
                         1. Compute the draft Payrun to calculate each employee's <strong>Actual Salary</strong>.<br/>
                         2. Click <strong>Download Excel Template</strong>. The file will include <em>Employee Code, Name, Actual Salary</em>, and an empty <em>Partial Payment Amount</em> column.<br/>
                         3. Enter the approved partial payment / salary loan amounts in Excel.<br/>
-                        4. Upload the Excel file back and click <strong>Import Partial Payments</strong> to register the salary input lines.
+                        4. Upload the Excel file back and click <strong>Import Partial Payments</strong>.
                     </div>
                     <group>
-                        <group string="1. Template &amp; Baseline Export">
+                        <group string="1. Template Export">
                             <field name="payrun_id" readonly="1"/>
                             <button name="action_export_template" 
                                     string="Download Excel Template" 
@@ -25,8 +25,6 @@
                         <group string="2. Upload Partial Payments">
                             <field name="excel_file" filename="file_name"/>
                             <field name="file_name" invisible="1"/>
-                            <field name="import_mode" widget="radio"/>
-                            <field name="recompute_payslips"/>
                         </group>
                     </group>
                 </sheet>
