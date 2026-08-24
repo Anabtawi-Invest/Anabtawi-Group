@@ -52,9 +52,13 @@ class HrAttendance(models.Model):
 
             standard_target = 8.0
             excess = net_hrs - standard_target
-            min_ot_threshold = 0.75         # 45 minutes Overtime threshold
+            min_ot_threshold = 0.75         # 45 minutes Overtime threshold (post-shift excess >= 45m credited)
             min_lateness_threshold = 0.25   # 15 minutes Lateness Grace Period
 
+            # Rule Enforcement:
+            # 1. Early Arrival (before shift start): Never counted as overtime.
+            # 2. Early Departure (before shift end): Always calculated as undertime/lateness deduction.
+            # 3. Post-shift Overtime: Credited ONLY if excess >= 45 minutes (0.75h).
             if excess >= min_ot_threshold:
                 attendance.daily_variance_hours = excess
             elif excess < -min_lateness_threshold:
