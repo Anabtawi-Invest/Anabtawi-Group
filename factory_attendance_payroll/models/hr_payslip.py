@@ -539,18 +539,21 @@ class HrPayslip(models.Model):
         if leave_type_name == 'Extra Hours':
             emp_alloc = self.env['hr.leave.allocation'].sudo().search([
                 ('employee_id', '=', self.employee_id.id),
+                ('holiday_status_id.name', 'ilike', 'إضافي'),
+                ('state', '=', 'validate'),
+            ], limit=1) or self.env['hr.leave.allocation'].sudo().search([
+                ('employee_id', '=', self.employee_id.id),
                 ('holiday_status_id.name', 'ilike', 'Extra'),
                 ('state', '=', 'validate'),
             ], limit=1)
+
             if emp_alloc:
                 leave_type = emp_alloc.holiday_status_id
             else:
-                leave_types = LeaveType.search(comp_domain + [
-                    '|', '|',
-                    ('name', '=', 'Extra Hours'),
-                    ('name', 'ilike', 'Extra Hours'),
-                    ('name', 'ilike', 'إضافي')
-                ])
+                leave_types = LeaveType.search(comp_domain + [('name', 'ilike', 'إضافي')]) \
+                    or LeaveType.search(comp_domain + [('name', '=', 'Extra Hours')]) \
+                    or LeaveType.search(comp_domain + [('name', 'ilike', 'Extra Hours')]) \
+                    or LeaveType.search(comp_domain + [('name', 'ilike', 'Extra')])
                 leave_type = _clean_leave_type_select(leave_types)
         elif leave_type_name == 'Annual Leave':
             if hasattr(company, 'lateness_annual_leave_type_id') and company.lateness_annual_leave_type_id:
@@ -949,10 +952,22 @@ class HrPayslip(models.Model):
                 alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
                 ot_allocs = Allocation.search([
                     ('employee_id', '=', payslip.employee_id.id),
+                    '|',
                     ('name', '=', alloc_name),
+                    ('name', 'ilike', 'Extra Hours Reconciliation'),
                 ])
-                if ot_allocs:
-                    ot_allocs.unlink()
+                for alloc in ot_allocs:
+                    try:
+                        if alloc.state in ('validate', 'validate1', 'confirm'):
+                            if hasattr(alloc, 'action_refuse'):
+                                try:
+                                    alloc.sudo().action_refuse()
+                                except Exception:
+                                    pass
+                            alloc.sudo().write({'state': 'draft'})
+                        alloc.sudo().unlink()
+                    except Exception as err:
+                        _logger.warning("Failed to delete reconciliation allocation %s: %s", alloc.id, err)
 
             # 3. Revert Overtime line if created for this payslip date_to
             if OvertimeLine:
@@ -962,7 +977,10 @@ class HrPayslip(models.Model):
                     ('compensable_as_leave', '=', True),
                 ])
                 if ot_lines:
-                    ot_lines.unlink()
+                    try:
+                        ot_lines.unlink()
+                    except Exception as err:
+                        _logger.warning("Failed to delete overtime line: %s", err)
 
     def _get_previous_extra_hours_balance(self):
         """
