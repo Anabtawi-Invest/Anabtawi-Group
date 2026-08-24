@@ -6,7 +6,7 @@
         <field name="model">hr.payslip.run</field>
         <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//sheet" position="before">
+            <xpath expr="//form/*[1]" position="before">
                 <header>
                     <button name="action_open_bulk_adjustment_wizard" 
                             string="Bulk Salary Adjustments" 
