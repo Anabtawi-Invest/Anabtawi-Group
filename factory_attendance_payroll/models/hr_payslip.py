@@ -692,6 +692,10 @@ class HrPayslip(models.Model):
                 leave_vals['number_of_hours'] = 8.0
             if 'number_of_hours_display' in Leave._fields:
                 leave_vals['number_of_hours_display'] = 8.0
+            if 'lateness_reconcile_generated' in Leave._fields:
+                leave_vals['lateness_reconcile_generated'] = True
+            if 'lateness_reconcile_payslip_id' in Leave._fields:
+                leave_vals['lateness_reconcile_payslip_id'] = self.id
             if alloc:
                 if 'holiday_allocation_id' in Leave._fields:
                     leave_vals['holiday_allocation_id'] = alloc.id
@@ -742,6 +746,10 @@ class HrPayslip(models.Model):
                 leave_vals['number_of_hours'] = frac_hours
             if 'number_of_hours_display' in Leave._fields:
                 leave_vals['number_of_hours_display'] = frac_hours
+            if 'lateness_reconcile_generated' in Leave._fields:
+                leave_vals['lateness_reconcile_generated'] = True
+            if 'lateness_reconcile_payslip_id' in Leave._fields:
+                leave_vals['lateness_reconcile_payslip_id'] = self.id
             if alloc:
                 if 'holiday_allocation_id' in Leave._fields:
                     leave_vals['holiday_allocation_id'] = alloc.id
@@ -919,16 +927,21 @@ class HrPayslip(models.Model):
 
             # 1. Unlink/remove all settlement leaves created for this payslip's date range
             if Leave:
-                settlement_leaves = Leave.search([
+                LeaveType = self.env['hr.leave.type'].sudo()
+                extra_types = LeaveType.search(['|', '|', ('name', '=', 'Extra Hours'), ('name', 'ilike', 'Extra Hours'), ('name', 'ilike', 'إضافي')])
+                annual_types = LeaveType.search(['|', '|', ('name', '=', 'Annual Leave'), ('name', 'ilike', 'Annual Leave'), ('name', 'ilike', 'سنوي')])
+                pto_types = LeaveType.search(['|', '|', ('name', '=', 'Paid Time Off'), ('name', 'ilike', 'Paid Time Off'), ('name', 'ilike', 'مدفوع')])
+                target_type_ids = list(set(extra_types.ids | annual_types.ids | pto_types.ids))
+
+                domain = [
                     ('employee_id', '=', payslip.employee_id.id),
                     ('request_date_from', '>=', payslip.date_from),
                     ('request_date_to', '<=', payslip.date_to),
-                    '|', '|', '|',
-                    ('name', 'ilike', 'Lateness Settlement'),
-                    ('name', 'ilike', 'Lateness Coverage'),
-                    ('lateness_reconcile_generated', '=', True),
-                    ('lateness_reconcile_payslip_id', '=', payslip.id),
-                ])
+                ]
+                if target_type_ids:
+                    domain.append(('holiday_status_id', 'in', target_type_ids))
+
+                settlement_leaves = Leave.search(domain)
                 for leave in settlement_leaves:
                     try:
                         if leave.state in ('validate', 'validate1', 'confirm'):
