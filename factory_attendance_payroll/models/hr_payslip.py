@@ -222,7 +222,8 @@ class HrPayslip(models.Model):
                 else:
                     net_hrs = raw_hrs
 
-                standard_target = 8.0
+                expected_hrs = payslip.employee_id._get_expected_hours_on_day(att_date) if payslip.employee_id else 8.0
+                standard_target = expected_hrs if expected_hrs > 0 else 8.0
                 if net_hrs > standard_target:
                     ot_excess = net_hrs - standard_target
                     if ot_excess >= min_ot_threshold:
@@ -233,14 +234,16 @@ class HrPayslip(models.Model):
                     if shortfall > min_lateness_threshold:
                         total_undertime += shortfall
 
-            if worked_days_count > target_work_days:
-                extra_worked_days = worked_days_count - target_work_days
-                total_ot += (extra_worked_days * 8.0 * 1.25)
-            else:
-                unworked_days = total_days_in_month - worked_days_count
-                if unworked_days > allowed_rest_days:
-                    excess_unworked_days = unworked_days - allowed_rest_days
-                    total_undertime += (excess_unworked_days * 8.0)
+            work_entry_source = payslip.employee_id._get_work_entry_source_on_day(payslip.date_from) if payslip.employee_id else 'attendance'
+            if work_entry_source == 'attendance':
+                if worked_days_count > target_work_days:
+                    extra_worked_days = worked_days_count - target_work_days
+                    total_ot += (extra_worked_days * 8.0 * 1.25)
+                else:
+                    unworked_days = total_days_in_month - worked_days_count
+                    if unworked_days > allowed_rest_days:
+                        excess_unworked_days = unworked_days - allowed_rest_days
+                        total_undertime += (excess_unworked_days * 8.0)
 
             gross_ot = round(total_ot, 2)
             gross_ut = round(total_undertime, 2)
@@ -1148,17 +1151,19 @@ class HrPayslip(models.Model):
                 if shortfall > min_lateness_threshold:
                     total_undertime += shortfall
 
-        # 4. Monthly Rest Day Quota Reconciliation
-        if worked_days_count > target_work_days:
-            # Employee worked extra days beyond monthly target -> Extra worked days count as Overtime!
-            extra_worked_days = worked_days_count - target_work_days
-            total_ot += (extra_worked_days * 8.0)
-        else:
-            unworked_days = total_days_in_month - worked_days_count
-            if unworked_days > allowed_rest_days:
-                # Employee took more off days than their rest day quota -> Excess unworked days count as Undertime
-                excess_unworked_days = unworked_days - allowed_rest_days
-                total_undertime += (excess_unworked_days * 8.0)
+        # 4. Monthly Rest Day Quota Reconciliation (ONLY for factory attendance workers without fixed calendar/planning schedules)
+        work_entry_source = self.employee_id._get_work_entry_source_on_day(self.date_from) if self.employee_id else 'attendance'
+        if work_entry_source == 'attendance':
+            if worked_days_count > target_work_days:
+                # Employee worked extra days beyond monthly target -> Extra worked days count as Overtime!
+                extra_worked_days = worked_days_count - target_work_days
+                total_ot += (extra_worked_days * 8.0)
+            else:
+                unworked_days = total_days_in_month - worked_days_count
+                if unworked_days > allowed_rest_days:
+                    # Employee took more off days than their rest day quota -> Excess unworked days count as Undertime
+                    excess_unworked_days = unworked_days - allowed_rest_days
+                    total_undertime += (excess_unworked_days * 8.0)
 
         return {
             'total_ot': total_ot,
