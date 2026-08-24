@@ -928,19 +928,20 @@ class HrPayslip(models.Model):
             # 1. Unlink/remove all settlement leaves created for this payslip's date range
             if Leave:
                 LeaveType = self.env['hr.leave.type'].sudo()
+                company = payslip.company_id or payslip.env.company
                 extra_types = LeaveType.search(['|', '|', ('name', '=', 'Extra Hours'), ('name', 'ilike', 'Extra Hours'), ('name', 'ilike', 'إضافي')])
                 annual_types = LeaveType.search(['|', '|', ('name', '=', 'Annual Leave'), ('name', 'ilike', 'Annual Leave'), ('name', 'ilike', 'سنوي')])
+                if hasattr(company, 'lateness_annual_leave_type_id') and company.lateness_annual_leave_type_id:
+                    annual_types |= company.lateness_annual_leave_type_id
                 pto_types = LeaveType.search(['|', '|', ('name', '=', 'Paid Time Off'), ('name', 'ilike', 'Paid Time Off'), ('name', 'ilike', 'مدفوع')])
                 target_type_ids = list(set(extra_types.ids | annual_types.ids | pto_types.ids))
 
+                dt_start = datetime.datetime.combine(payslip.date_from, datetime.time.min)
+                dt_stop = datetime.datetime.combine(payslip.date_to, datetime.time.max)
                 domain = [
                     ('employee_id', '=', payslip.employee_id.id),
-                    '|',
-                    ('request_date_from', '>=', payslip.date_from),
-                    ('date_from', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
-                    '|',
-                    ('request_date_to', '<=', payslip.date_to),
-                    ('date_to', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                    ('date_from', '<=', fields.Datetime.to_string(dt_stop)),
+                    ('date_to', '>=', fields.Datetime.to_string(dt_start)),
                 ]
                 if target_type_ids:
                     domain.append(('holiday_status_id', 'in', target_type_ids))
@@ -953,7 +954,7 @@ class HrPayslip(models.Model):
                                 leave.sudo().action_refuse()
                             except Exception:
                                 pass
-                    leave_ids = tuple(settlement_leaves.ids)
+                    leave_ids = tuple(settlement_leaves.ids) if len(settlement_leaves) > 1 else (settlement_leaves.id, 0)
                     try:
                         self.env.cr.execute("UPDATE hr_leave SET state = 'refuse' WHERE id IN %s", (leave_ids,))
                         settlement_leaves.invalidate_recordset(['state'])
@@ -984,7 +985,7 @@ class HrPayslip(models.Model):
                                 alloc.sudo().action_refuse()
                             except Exception:
                                 pass
-                    alloc_ids = tuple(ot_allocs.ids)
+                    alloc_ids = tuple(ot_allocs.ids) if len(ot_allocs) > 1 else (ot_allocs.id, 0)
                     try:
                         self.env.cr.execute("UPDATE hr_leave_allocation SET state = 'refuse' WHERE id IN %s", (alloc_ids,))
                         ot_allocs.invalidate_recordset(['state'])
