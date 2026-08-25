@@ -407,7 +407,9 @@ class HrPayslip(models.Model):
 
             res = filtered_lines
 
-          def _convert_flexible_rest_days_to_ars(self):
+        return res
+
+    def _convert_flexible_rest_days_to_ars(self):
         """
         Self-Contained Factory Flexible Rest Day & Absence Manager:
         1. Evaluates attendance workers (work_entry_source == 'attendance').
