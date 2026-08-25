@@ -358,20 +358,26 @@ class HrPayslip(models.Model):
             emp = payslip.employee_id
             break_hrs = emp._get_lunch_break_duration() if emp else 1.0
             w = emp.wage if emp else 0.0
-            hourly_rate = w / 240.0
 
-            # Count worked shifts in this period
+            # Dynamic hourly rate: wage / total scheduled hours from worked days lines
+            # We first calculate raw attendance hours, then compute rate against total (attendance + absent)
             attendances = self.env['hr.attendance'].sudo().search([
                 ('employee_id', '=', emp.id),
                 ('check_in', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
                 ('check_in', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
             ])
             worked_shifts_count = len(set(att.check_in.date() for att in attendances))
-
-            net_extra_hrs = round(payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours, 2)
-            rem_cash_deduction_hrs = round(payslip.undertime_cash_deduction_hours, 2)
-
             total_raw_attendance_hrs = round(sum(att.worked_hours for att in attendances), 2)
+
+            rem_cash_deduction_hrs = round(payslip.undertime_cash_deduction_hours, 2)
+            total_scheduled_hours = total_raw_attendance_hrs + rem_cash_deduction_hrs
+            if total_scheduled_hours > 0:
+                hourly_rate = w / total_scheduled_hours
+            else:
+                weekly_hours = (emp.resource_calendar_id.full_time_required_hours if emp.resource_calendar_id else None) or 49.5
+                hourly_rate = (w / 26.0) / (weekly_hours / 6.0)
+            hourly_rate = round(hourly_rate, 4)
+            net_extra_hrs = round(payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours, 2)
 
             filtered_lines = []
             for line in res:
