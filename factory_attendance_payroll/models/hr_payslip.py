@@ -407,14 +407,13 @@ class HrPayslip(models.Model):
 
             res = filtered_lines
 
-        return res
-
-    def _convert_flexible_rest_days_to_ars(self):
+          def _convert_flexible_rest_days_to_ars(self):
         """
-        Automatic Flexible Rest Day Conversion (Batch Optimized for 500+ employees):
-        Converts 'Absent' (ABS / ABSENT) work entries on unworked rest days to 'Rest Day' (ARS)
-        up to the earned rest day quota (Method 2: 1 Rest Day earned per 6 Worked Days).
-        Safely handles validated work entries without raising Invalid Operation errors.
+        Self-Contained Factory Flexible Rest Day & Absence Manager:
+        1. Evaluates attendance workers (work_entry_source == 'attendance').
+        2. Calculates Earned Rest Days (1 Rest Day per 6 Worked Days).
+        3. Generates/Converts earned unworked days into Rest Day (RST).
+        4. Generates/Converts excess unworked days into Absent (ABS - Red Box).
         """
         if not self:
             return
@@ -423,11 +422,19 @@ class HrPayslip(models.Model):
         if not valid_slips:
             return
 
-        rest_type = False
-        if 'hr.work.entry' in self.env:
-            rest_type = self.env['hr.work.entry.type'].sudo().search([
-                '|', ('code', '=', 'RST'), '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
-            ], limit=1)
+        if 'hr.work.entry' not in self.env:
+            return
+
+        WorkEntry = self.env['hr.work.entry'].sudo()
+        Leave = self.env['hr.leave'].sudo()
+        Attendance = self.env['hr.attendance'].sudo()
+
+        rest_type = self.env['hr.work.entry.type'].sudo().search([
+            '|', ('code', '=', 'RST'), '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
+        ], limit=1)
+        absent_type = self.env['hr.work.entry.type'].sudo().search([
+            '|', ('code', '=', 'ABS'), '|', ('code', '=', 'ABSENT'), ('name', 'ilike', 'Absent')
+        ], limit=1)
 
         if not rest_type:
             return
@@ -436,8 +443,8 @@ class HrPayslip(models.Model):
         min_date = min(valid_slips.mapped('date_from'))
         max_date = max(valid_slips.mapped('date_to'))
 
-        # Bulk Query 1: Attendances for all employees
-        attendances = self.env['hr.attendance'].sudo().search([
+        # Bulk Query 1: Attendances
+        attendances = Attendance.search([
             ('employee_id', 'in', emp_ids),
             ('check_in', '>=', datetime.datetime.combine(min_date, datetime.time.min)),
             ('check_in', '<=', datetime.datetime.combine(max_date, datetime.time.max))
@@ -446,72 +453,109 @@ class HrPayslip(models.Model):
         for att in attendances:
             worked_dates_by_emp[att.employee_id.id].add(att.check_in.date())
 
-        # Bulk Query 2: Work entries for all employees
-        WorkEntry = self.env['hr.work.entry'].sudo()
+        # Bulk Query 2: Work entries
         we_fields = WorkEntry._fields
-        start_field = next((c for c in ['date_start', 'date_from', 'start_datetime', 'date'] if c in we_fields), None)
-        stop_field = next((c for c in ['date_stop', 'date_to', 'end_datetime', 'date'] if c in we_fields), None)
+        start_field = next((c for c in ['date', 'date_start', 'date_from', 'start_datetime'] if c in we_fields), None)
+        stop_field = next((c for c in ['date', 'date_stop', 'date_to', 'end_datetime'] if c in we_fields), None)
 
         if not start_field or not stop_field:
             return
 
-        work_entries = WorkEntry.search([
-            ('employee_id', 'in', emp_ids),
-            (start_field, '>=', datetime.datetime.combine(min_date, datetime.time.min)),
-            (stop_field, '<=', datetime.datetime.combine(max_date, datetime.time.max))
-        ]).sorted(start_field)
+        we_domain = [('employee_id', 'in', emp_ids)]
+        if 'date' in we_fields:
+            we_domain.extend([('date', '>=', min_date), ('date', '<=', max_date)])
+        else:
+            we_domain.extend([
+                (start_field, '>=', datetime.datetime.combine(min_date, datetime.time.min)),
+                (stop_field, '<=', datetime.datetime.combine(max_date, datetime.time.max))
+            ])
 
-        we_by_emp = defaultdict(list)
+        work_entries = WorkEntry.search(we_domain).sorted(start_field)
+        we_by_emp_date = defaultdict(dict)
         for we in work_entries:
-            we_by_emp[we.employee_id.id].append(we)
+            start_val = getattr(we, start_field, None)
+            d = start_val.date() if isinstance(start_val, datetime.datetime) else (start_val if isinstance(start_val, datetime.date) else None)
+            if d:
+                we_by_emp_date[we.employee_id.id][d] = we
 
         for payslip in valid_slips:
             try:
-                emp_id = payslip.employee_id.id
-                slip_start = datetime.datetime.combine(payslip.date_from, datetime.time.min)
-                slip_end = datetime.datetime.combine(payslip.date_to, datetime.time.max)
+                emp = payslip.employee_id
+                emp_id = emp.id
+                
+                # Check work entry source
+                wes = 'attendance'
+                if hasattr(emp, '_get_work_entry_source_on_day'):
+                    wes = emp._get_work_entry_source_on_day(payslip.date_to) or 'attendance'
+                elif hasattr(emp, 'work_entry_source'):
+                    wes = emp.work_entry_source or 'attendance'
 
-                slip_worked_dates = set(
-                    d for d in worked_dates_by_emp.get(emp_id, set())
-                    if payslip.date_from <= d <= payslip.date_to
-                )
+                if wes != 'attendance':
+                    continue
 
-                emp_work_entries = [
-                    we for we in we_by_emp.get(emp_id, [])
-                    if getattr(we, start_field) and getattr(we, stop_field) and
-                    getattr(we, start_field) >= slip_start and getattr(we, stop_field) <= slip_end
-                ]
+                # 1. Determine worked vs unworked dates in payslip period
+                worked_dates = set(d for d in worked_dates_by_emp.get(emp_id, set()) if payslip.date_from <= d <= payslip.date_to)
+                unworked_dates = []
 
-                for we in emp_work_entries:
-                    code = (we.work_entry_type_id.code or '').strip()
-                    name = (we.work_entry_type_id.name or '').lower()
-                    if not we.work_entry_type_id.is_leave and code not in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] and 'absent' not in name:
-                        start_val = getattr(we, start_field, None)
-                        if start_val:
-                            we_date = start_val.date() if isinstance(start_val, datetime.datetime) else (start_val if isinstance(start_val, datetime.date) else None)
-                            if we_date:
-                                slip_worked_dates.add(we_date)
+                curr_d = payslip.date_from
+                while curr_d <= payslip.date_to:
+                    if curr_d not in worked_dates:
+                        # Check if day has approved leave
+                        has_leave = bool(Leave.search([
+                            ('employee_id', '=', emp_id),
+                            ('state', 'in', ['confirm', 'validate1', 'validate']),
+                            ('date_from', '<=', fields.Datetime.to_string(datetime.datetime.combine(curr_d, datetime.time.max))),
+                            ('date_to', '>=', fields.Datetime.to_string(datetime.datetime.combine(curr_d, datetime.time.min))),
+                        ], limit=1))
+                        if not has_leave:
+                            unworked_dates.append(curr_d)
+                    curr_d += datetime.timedelta(days=1)
 
-                worked_days_count = len(slip_worked_dates)
+                worked_days_count = len(worked_dates)
                 allowed_rest_days = worked_days_count // 6
 
-                converted_count = 0
-                for we in emp_work_entries:
-                    start_val = getattr(we, start_field, None)
-                    if not start_val:
+                # Sort unworked dates chronologically
+                unworked_dates.sort()
+
+                # Get version/contract for creating work entries if needed
+                version = False
+                if hasattr(emp, '_get_versions_with_contract_overlap_with_period'):
+                    version_rec = emp._get_versions_with_contract_overlap_with_period(payslip.date_from, payslip.date_to)[:1]
+                    if version_rec:
+                        version = version_rec.id
+
+                for idx, u_date in enumerate(unworked_dates):
+                    target_type = rest_type if idx < allowed_rest_days else absent_type
+                    if not target_type:
                         continue
-                    we_date = start_val.date() if isinstance(start_val, datetime.datetime) else (start_val if isinstance(start_val, datetime.date) else None)
-                    if we_date:
-                        code = (we.work_entry_type_id.code or '').strip()
-                        name = (we.work_entry_type_id.name or '').lower()
-                        if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in name:
-                            if converted_count < allowed_rest_days:
-                                if hasattr(we, 'state') and we.state == 'validated':
-                                    we.sudo().write({'state': 'draft'})
-                                we.sudo().write({'work_entry_type_id': rest_type.id})
-                                converted_count += 1
-            except Exception:
-                pass
+
+                    we = we_by_emp_date[emp_id].get(u_date)
+                    if we:
+                        if we.work_entry_type_id.id != target_type.id:
+                            if hasattr(we, 'state') and we.state == 'validated':
+                                we.sudo().write({'state': 'draft'})
+                            we.sudo().write({'work_entry_type_id': target_type.id})
+                    else:
+                        # Create missing work entry record container (RST for rest day, ABS for absent)
+                        vals = {
+                            'employee_id': emp_id,
+                            'date': u_date,
+                            'duration': 8.0,
+                            'work_entry_type_id': target_type.id,
+                            'company_id': payslip.company_id.id,
+                        }
+                        if version and 'version_id' in WorkEntry._fields:
+                            vals['version_id'] = version
+                        if 'date_start' in we_fields:
+                            vals['date_start'] = datetime.datetime.combine(u_date, datetime.time(8, 0, 0))
+                        if 'date_stop' in we_fields:
+                            vals['date_stop'] = datetime.datetime.combine(u_date, datetime.time(16, 0, 0))
+                        try:
+                            WorkEntry.create(vals)
+                        except Exception:
+                            pass
+            except Exception as err:
+                _logger.warning("Error converting flexible rest days for slip %s: %s", payslip.id, err)
 
     def _create_or_update_settlement_leave(self, leave_type_name, hours, leave_desc):
         """
