@@ -390,6 +390,10 @@ class HrPayslip(models.Model):
                 if 'settlement' in line_name or 'lateness coverage' in line_name or 'monthly lateness' in line_name:
                     continue
 
+                # Filter out Rest Day lines (ARS, REST, RESTDAY) from the Worked Days tab
+                if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
+                    continue
+
                 # 1. Attendance Line: Dynamically set hours to total raw attendance worked hours from Attendance App
                 if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
                     if total_raw_attendance_hrs > 0.01:
