@@ -426,7 +426,7 @@ class HrPayslip(models.Model):
         rest_type = False
         if 'hr.work.entry' in self.env:
             rest_type = self.env['hr.work.entry.type'].sudo().search([
-                '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
+                '|', ('code', '=', 'RST'), '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
             ], limit=1)
 
         if not rest_type:
