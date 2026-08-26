@@ -26,8 +26,8 @@
             <xpath expr="//field[@name='worked_hours']" position="after">
                 <field name="attendance_break_hours" widget="float_time" readonly="1"/>
                 <field name="net_worked_hours" widget="float_time" readonly="1"/>
-                <field name="daily_undertime_hours" widget="float_time" readonly="1" invisible="daily_undertime_hours &lt;= 0.0"/>
-                <field name="daily_overtime_hours" widget="float_time" readonly="1" invisible="daily_overtime_hours &lt; 0.75"/>
+                <field name="daily_undertime_hours" widget="float_time" readonly="1"/>
+                <field name="daily_overtime_hours" widget="float_time" readonly="1"/>
                 <label for="action_approve_factory_overtime" string="Overtime Validation" invisible="daily_overtime_hours &lt; 0.75"/>
                 <div class="d-flex align-items-center gap-2" invisible="daily_overtime_hours &lt; 0.75">
                     <button name="action_approve_factory_overtime" string="Approve Extra Hours (✔)" type="object"
