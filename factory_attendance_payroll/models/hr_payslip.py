@@ -193,32 +193,15 @@ class HrPayslip(models.Model):
         # Bulk Pre-fetch 3b: Approved leaves during period (excluding lateness settlements)
         approved_leaves_by_emp = defaultdict(list)
         if 'hr.leave' in self.env:
-            min_dt = datetime.combine(min_date, time.min)
-            max_dt = datetime.combine(max_date, time.max)
             approved_leaves = self.env['hr.leave'].sudo().search([
                 ('employee_id', 'in', emp_ids),
                 ('state', 'in', ['validate', 'validate1']),
-                '|',
-                    '&', ('request_date_from', '<=', max_date), ('request_date_to', '>=', min_date),
-                    '&', ('date_from', '<=', max_dt), ('date_to', '>=', min_dt),
+                ('request_date_from', '<=', max_date),
+                ('request_date_to', '>=', min_date),
                 '!', ('name', 'ilike', 'Lateness Settlement')
             ])
             for lve in approved_leaves:
                 approved_leaves_by_emp[lve.employee_id.id].append(lve)
-
-        # Bulk Pre-fetch 3c: Valid Work Entries (Home Working, Field Work, Extra Hours, Public Holidays, Sick/Paid Leaves)
-        valid_work_entries_by_emp = defaultdict(list)
-        if 'hr.work.entry' in self.env:
-            min_dt = datetime.combine(min_date, time.min)
-            max_dt = datetime.combine(max_date, time.max)
-            work_entries = self.env['hr.work.entry'].sudo().search([
-                ('employee_id', 'in', emp_ids),
-                ('date_start', '<=', max_dt),
-                ('date_stop', '>=', min_dt),
-                ('state', '!=', 'cancelled'),
-            ])
-            for we in work_entries:
-                valid_work_entries_by_emp[we.employee_id.id].append(we)
 
         for payslip in self:
             if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
@@ -238,11 +221,9 @@ class HrPayslip(models.Model):
                 if payslip.date_from <= att.check_in.date() <= payslip.date_to
             ]
 
-            # Collect approved covered dates (Leaves + Work Entries: Annual, Extra Hours EHD/EHW, Sick STO, Paid PTO, Home Working WORK110, Field Work FWS, Public Holiday PHD)
-            approved_covered_dates = set()
+            # Collect approved leave dates and partial hours for this payslip period
+            approved_leave_dates = set()
             leave_partial_hours_by_date = defaultdict(float)
-
-            # 1. From hr.leave (All approved time offs)
             for lve in approved_leaves_by_emp.get(emp_id, []):
                 req_from = lve.request_date_from or (lve.date_from.date() if lve.date_from else None)
                 req_to = lve.request_date_to or (lve.date_to.date() if lve.date_to else None)
@@ -253,35 +234,11 @@ class HrPayslip(models.Model):
                 if start_overlap <= end_overlap:
                     curr_d = start_overlap
                     while curr_d <= end_overlap:
-                        approved_covered_dates.add(curr_d)
+                        approved_leave_dates.add(curr_d)
+                        # If hourly leave, track partial hours
                         lve_hrs = getattr(lve, 'number_of_hours', None) or getattr(lve, 'number_of_hours_display', None)
                         if lve_hrs and getattr(lve, 'request_unit_hours', False):
                             leave_partial_hours_by_date[curr_d] += lve_hrs
-                        curr_d += timedelta(days=1)
-
-            # 2. From hr.work.entry (EHD, Extra_Hours_Weekends, WORK110 Home Working, FWS Field Work, PHD Public Holiday, STO, PTO, etc.)
-            absence_codes = {'ABS', 'ABSENT', 'UNPAID', 'LAT', 'LATENESS'}
-            for we in valid_work_entries_by_emp.get(emp_id, []):
-                wet = we.work_entry_type_id
-                code_upper = (wet.code or '').strip().upper()
-                display_code_upper = (wet.display_code or '').strip().upper()
-                name_upper = (wet.name or '').strip().upper()
-
-                if code_upper in absence_codes or display_code_upper in absence_codes or 'ABSEN' in name_upper or 'LATENESS' in name_upper:
-                    continue
-
-                we_start = we.date_start.date() if we.date_start else None
-                we_stop = we.date_stop.date() if we.date_stop else None
-                if not we_start or not we_stop:
-                    continue
-                start_overlap = max(payslip.date_from, we_start)
-                end_overlap = min(payslip.date_to, we_stop)
-                if start_overlap <= end_overlap:
-                    curr_d = start_overlap
-                    while curr_d <= end_overlap:
-                        approved_covered_dates.add(curr_d)
-                        if getattr(we, 'duration', 0.0) and we.duration < 8.0:
-                            leave_partial_hours_by_date[curr_d] += we.duration
                         curr_d += timedelta(days=1)
 
             # In-memory variance calculation (0 DB queries per slip)
@@ -344,7 +301,7 @@ class HrPayslip(models.Model):
                         total_undertime += shortfall
 
             worked_dates = set(daily_hours.keys())
-            covered_dates = worked_dates | approved_covered_dates
+            covered_dates = worked_dates | approved_leave_dates
             covered_days_count = len(covered_dates)
 
             if worked_days_count > target_work_days:
@@ -1880,17 +1837,14 @@ class HrPayslip(models.Model):
         ])
 
         # 1b. Fetch approved leaves in payslip date window (excluding lateness settlements)
-        approved_covered_dates = set()
+        approved_leave_dates = set()
         leave_partial_hours_by_date = defaultdict(float)
         if 'hr.leave' in self.env:
-            min_dt = datetime.datetime.combine(self.date_from, datetime.time.min)
-            max_dt = datetime.datetime.combine(self.date_to, datetime.time.max)
             approved_leaves = self.env['hr.leave'].sudo().search([
                 ('employee_id', '=', self.employee_id.id),
                 ('state', 'in', ['validate', 'validate1']),
-                '|',
-                    '&', ('request_date_from', '<=', self.date_to), ('request_date_to', '>=', self.date_from),
-                    '&', ('date_from', '<=', max_dt), ('date_to', '>=', min_dt),
+                ('request_date_from', '<=', self.date_to),
+                ('request_date_to', '>=', self.date_from),
                 '!', ('name', 'ilike', 'Lateness Settlement')
             ])
             for lve in approved_leaves:
@@ -1903,44 +1857,10 @@ class HrPayslip(models.Model):
                 if start_overlap <= end_overlap:
                     curr_d = start_overlap
                     while curr_d <= end_overlap:
-                        approved_covered_dates.add(curr_d)
+                        approved_leave_dates.add(curr_d)
                         lve_hrs = getattr(lve, 'number_of_hours', None) or getattr(lve, 'number_of_hours_display', None)
                         if lve_hrs and getattr(lve, 'request_unit_hours', False):
                             leave_partial_hours_by_date[curr_d] += lve_hrs
-                        curr_d += timedelta(days=1)
-
-        # 1c. Fetch valid work entries (EHD, Extra_Hours_Weekends, WORK110 Home Working, FWS Field Work, PHD Public Holiday, STO, PTO, etc.)
-        if 'hr.work.entry' in self.env:
-            min_dt = datetime.datetime.combine(self.date_from, datetime.time.min)
-            max_dt = datetime.datetime.combine(self.date_to, datetime.time.max)
-            work_entries = self.env['hr.work.entry'].sudo().search([
-                ('employee_id', '=', self.employee_id.id),
-                ('date_start', '<=', max_dt),
-                ('date_stop', '>=', min_dt),
-                ('state', '!=', 'cancelled'),
-            ])
-            absence_codes = {'ABS', 'ABSENT', 'UNPAID', 'LAT', 'LATENESS'}
-            for we in work_entries:
-                wet = we.work_entry_type_id
-                code_upper = (wet.code or '').strip().upper()
-                display_code_upper = (wet.display_code or '').strip().upper()
-                name_upper = (wet.name or '').strip().upper()
-
-                if code_upper in absence_codes or display_code_upper in absence_codes or 'ABSEN' in name_upper or 'LATENESS' in name_upper:
-                    continue
-
-                we_start = we.date_start.date() if we.date_start else None
-                we_stop = we.date_stop.date() if we.date_stop else None
-                if not we_start or not we_stop:
-                    continue
-                start_overlap = max(self.date_from, we_start)
-                end_overlap = min(self.date_to, we_stop)
-                if start_overlap <= end_overlap:
-                    curr_d = start_overlap
-                    while curr_d <= end_overlap:
-                        approved_covered_dates.add(curr_d)
-                        if getattr(we, 'duration', 0.0) and we.duration < 8.0:
-                            leave_partial_hours_by_date[curr_d] += we.duration
                         curr_d += timedelta(days=1)
 
         # 2. Group raw check-in hours by date
@@ -2005,7 +1925,7 @@ class HrPayslip(models.Model):
 
         # 4. Monthly Rest Day Quota Reconciliation
         worked_dates = set(daily_hours.keys())
-        covered_dates = worked_dates | approved_covered_dates
+        covered_dates = worked_dates | approved_leave_dates
         covered_days_count = len(covered_dates)
 
         if worked_days_count > target_work_days:
