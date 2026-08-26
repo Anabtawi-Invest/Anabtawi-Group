@@ -5,15 +5,12 @@
         <field name="model">hr.employee</field>
         <field name="inherit_id" ref="hr.view_employee_form"/>
         <field name="arch" type="xml">
-            <!-- Place before Schedule so fields stay visible even when payroll
-                 modules inject Employer Costs / payment fields after Pay Category. -->
-            <xpath expr="//page[@name='payroll_information']//separator[@name='schedule']" position="before">
-                <separator string="Work Station &amp; Break" name="factory_work_station_break"/>
+            <xpath expr="//page[@name='payroll_information']//field[@name='structure_type_id']" position="after">
                 <field name="employee_work_station"/>
-                <field name="break_duration_hours" widget="float_time"/>
-            </xpath>
-            <xpath expr="//page[@name='payroll_information']//field[@name='resource_calendar_id'][last()]" position="after">
-                <field name="x_studio_manager" groups="hr_payroll.group_hr_payroll_user"/>
+                <field name="break_duration_hours"/>
+                <field name="allow_annual_leave_lateness_deduction"/>
+                <field name="annual_deduction_approval_filename" invisible="1"/>
+                <field name="annual_deduction_approval_document" filename="annual_deduction_approval_filename" invisible="not allow_annual_leave_lateness_deduction"/>
             </xpath>
         </field>
     </record>

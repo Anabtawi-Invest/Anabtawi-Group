@@ -4,11 +4,15 @@
         <field name="name">hr.payslip.form.inherit.attendance.reconciliation</field>
         <field name="model">hr.payslip</field>
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+        <field name="priority">99</field>
         <field name="arch" type="xml">
+            <!-- Place Termination Clearance directly under the Period in the top main group -->
+            <xpath expr="//sheet//group[.//field[@name='date_from'] or .//field[@name='date_to']]" position="inside">
+                <field name="termination_clearance" widget="boolean_toggle" string="Termination Clearance / مخالصة نهاية الخدمة"/>
+            </xpath>
+
             <xpath expr="//notebook" position="before">
-                <field name="skip_factory_reconciliation" invisible="1"/>
-                <group string="Attendance &amp; Reconciliation Audit Tracking" name="attendance_reconciliation_tracking"
-                       invisible="skip_factory_reconciliation">
+                <group string="Attendance &amp; Reconciliation Audit Tracking" name="attendance_reconciliation_tracking">
                     <group string="Gross Attendance Totals">
                         <field name="attendance_gross_overtime" widget="float_time" readonly="1"/>
                         <field name="attendance_gross_undertime" widget="float_time" readonly="1"/>
