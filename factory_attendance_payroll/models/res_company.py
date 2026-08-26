@@ -11,11 +11,12 @@ class ResCompany(models.Model):
     )
 
     def _auto_init(self):
-        try:
-            self.env.cr.execute("""
-                ALTER TABLE res_company 
-                ADD COLUMN IF NOT EXISTS enable_overtime_calculation BOOLEAN DEFAULT TRUE;
-            """)
-        except Exception:
-            pass
+        with self.env.cr.savepoint():
+            try:
+                self.env.cr.execute("""
+                    ALTER TABLE res_company 
+                    ADD COLUMN IF NOT EXISTS enable_overtime_calculation BOOLEAN DEFAULT TRUE;
+                """)
+            except Exception:
+                pass
         return super()._auto_init()

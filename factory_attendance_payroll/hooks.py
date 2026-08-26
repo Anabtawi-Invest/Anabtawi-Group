@@ -3,50 +3,46 @@ from odoo import api, SUPERUSER_ID
 def pre_init_hook(env):
     """
     Pre-Init Hook (Runs before XML data loading):
-    1. Ensures enable_overtime_calculation column exists in res_company in PostgreSQL immediately.
-    2. Sets noupdate=True on ALL ir.model.data records belonging to factory_attendance_payroll.
+    Safely ensures all required PostgreSQL columns exist and cleans up legacy views using savepoints.
     """
-    try:
-        env.cr.execute("""
-            ALTER TABLE res_company 
-            ADD COLUMN IF NOT EXISTS enable_overtime_calculation BOOLEAN DEFAULT TRUE;
-        """)
-        env.cr.execute("""
-            ALTER TABLE hr_attendance 
-            ADD COLUMN IF NOT EXISTS daily_undertime_hours DOUBLE PRECISION DEFAULT 0.0,
-            ADD COLUMN IF NOT EXISTS daily_overtime_hours DOUBLE PRECISION DEFAULT 0.0;
-        """)
-        env.cr.execute("""
-            ALTER TABLE hr_payslip 
-            ADD COLUMN IF NOT EXISTS remaining_extra_hours_balance DOUBLE PRECISION DEFAULT 0.0;
-        """)
-        # Remove any orphaned view referencing enable_overtime_calculation to fix Settings crash
-        env.cr.execute("""
-            DELETE FROM ir_ui_view WHERE name = 'res.config.settings.view.form.inherit.factory.payroll' 
-               OR arch_db ILIKE '%enable_overtime_calculation%';
-            DELETE FROM ir_model_data WHERE module = 'factory_attendance_payroll' 
-               AND name = 'res_config_settings_view_form_inherit_factory_payroll';
-        """)
-    except Exception:
-        pass
+    with env.cr.savepoint():
+        try:
+            env.cr.execute("""
+                ALTER TABLE res_company 
+                ADD COLUMN IF NOT EXISTS enable_overtime_calculation BOOLEAN DEFAULT TRUE;
+            """)
+        except Exception:
+            pass
 
-    try:
-        # Ensure noupdate=False on all UI views so XML view changes apply immediately on upgrade
-        env.cr.execute("""
-            UPDATE ir_model_data 
-            SET noupdate = FALSE 
-            WHERE module = 'factory_attendance_payroll' 
-              AND model = 'ir.ui.view';
-        """)
-        # Set noupdate=True on non-view records to protect data
-        env.cr.execute("""
-            UPDATE ir_model_data 
-            SET noupdate = TRUE 
-            WHERE module = 'factory_attendance_payroll' 
-              AND model != 'ir.ui.view';
-        """)
-    except Exception:
-        pass
+    with env.cr.savepoint():
+        try:
+            env.cr.execute("""
+                ALTER TABLE hr_attendance 
+                ADD COLUMN IF NOT EXISTS daily_undertime_hours DOUBLE PRECISION DEFAULT 0.0,
+                ADD COLUMN IF NOT EXISTS daily_overtime_hours DOUBLE PRECISION DEFAULT 0.0;
+            """)
+        except Exception:
+            pass
+
+    with env.cr.savepoint():
+        try:
+            env.cr.execute("""
+                ALTER TABLE hr_payslip 
+                ADD COLUMN IF NOT EXISTS remaining_extra_hours_balance DOUBLE PRECISION DEFAULT 0.0;
+            """)
+        except Exception:
+            pass
+
+    with env.cr.savepoint():
+        try:
+            env.cr.execute("""
+                UPDATE ir_model_data 
+                SET noupdate = FALSE 
+                WHERE module = 'factory_attendance_payroll' 
+                  AND model = 'ir.ui.view';
+            """)
+        except Exception:
+            pass
 
 def post_init_hook(env):
     """
