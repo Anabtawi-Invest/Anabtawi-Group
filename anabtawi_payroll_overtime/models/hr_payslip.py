@@ -199,67 +199,85 @@ class HrPayslip(models.Model):
         return self._get_employee_extra_hours_balance()
 
     def _apply_termination_clearance_inputs(self):
-        input_model = self.env["hr.payslip.input"]
+        """
+        Unified Termination Clearance calculation:
+        Calculates Extra Hours, Annual Leave, and Paid Time Off balances
+        using the Wage / 240.0 rate and sets both quantity and amount.
+        """
+        input_model = self.env["hr.payslip.input"].sudo()
+        input_type_model = self.env["hr.payslip.input.type"].sudo()
+        clearance_codes = ["CLEAR_EXTRA", "CLEAR_ANNUAL", "CLEAR_PTO", "REM_LEAVE", "ETH_PAY_EOC"]
+
         for slip in self:
-            if not slip.termination_clearance or not slip.employee_id:
+            if not slip.employee_id:
                 continue
 
-            rem_leave_type = slip._get_input_type_by_code("REM_LEAVE")
-            eoc_type = slip._get_input_type_by_code("ETH_PAY_EOC")
+            if not slip.termination_clearance:
+                lines_to_clear = slip.input_line_ids.filtered(lambda l: l.input_type_id.code in clearance_codes)
+                if lines_to_clear:
+                    lines_to_clear.unlink()
+                continue
 
-            if not eoc_type.overtime_quantity_type:
-                raise ValidationError(
-                    _(
-                        "Input Type 'ETH_PAY_EOC' must have 'Use Quantity for Overtime' enabled."
-                    )
-                )
+            wage = slip.employee_id.wage or 0.0
+            hourly_rate = round(wage / 240.0, 4) if wage > 0 else 0.0
+            daily_rate = round(hourly_rate * 8.0, 4)
 
-            rem_leave_value = slip._get_termination_leave_amount()
-            eoc_value = slip._get_termination_extra_hours_value()
-
-            rem_leave_line = slip.input_line_ids.filtered(lambda l: l.input_type_id == rem_leave_type)[:1]
-            eoc_line = slip.input_line_ids.filtered(lambda l: l.input_type_id == eoc_type)[:1]
-
-            rem_leave_vals = {
-                "payslip_id": slip.id,
-                "input_type_id": rem_leave_type.id,
-                "amount": 0.0,
-                "quantity": rem_leave_value,
-            }
-            eoc_vals = {
-                "payslip_id": slip.id,
-                "input_type_id": eoc_type.id,
-                "quantity": eoc_value,
-            }
-
-            if rem_leave_line:
-                rem_leave_line.write(rem_leave_vals)
+            # Extra hours balance
+            extra_hrs = max(0.0, round(slip._get_employee_extra_hours_balance(), 2))
+            # Annual leave balance
+            annual_hrs = 0.0
+            if hasattr(slip, "_get_available_leave_hours_by_type"):
+                annual_hrs = max(0.0, round(slip._get_available_leave_hours_by_type("Annual Leave"), 2))
             else:
-                if slip.id:
-                    input_model.create(rem_leave_vals)
-                else:
-                    slip.input_line_ids += input_model.new({
-                        "input_type_id": rem_leave_type.id,
-                        "amount": 0.0,
-                        "quantity": rem_leave_value,
+                annual_hrs = max(0.0, round(slip._get_termination_leave_amount(), 2))
+            annual_days = round(annual_hrs / 8.0, 2)
+
+            # Paid Time Off balance
+            pto_hrs = 0.0
+            if hasattr(slip, "_get_available_leave_hours_by_type"):
+                pto_hrs = max(0.0, round(slip._get_available_leave_hours_by_type("Paid Time Off"), 2))
+            pto_days = round(pto_hrs / 8.0, 2)
+
+            clearance_specs = [
+                ("CLEAR_EXTRA", f"Termination: Extra Hours Settlement ({extra_hrs} hrs @ {hourly_rate} JOD)", extra_hrs, round(extra_hrs * hourly_rate, 3)),
+                ("CLEAR_ANNUAL", f"Termination: Annual Leave Settlement ({annual_days} days @ {daily_rate} JOD)", annual_days, round(annual_days * daily_rate, 3)),
+                ("CLEAR_PTO", f"Termination: Paid Time Off Settlement ({pto_days} days @ {daily_rate} JOD)", pto_days, round(pto_days * daily_rate, 3)),
+            ]
+
+            for code, name, qty, amount in clearance_specs:
+                input_type = input_type_model.search([("code", "=", code)], limit=1)
+                if not input_type:
+                    input_type = input_type_model.create({
+                        "name": name,
+                        "code": code,
+                        "country_id": False,
                     })
 
-            if eoc_line:
-                eoc_line.write(eoc_vals)
-            else:
-                if slip.id:
-                    input_model.create(eoc_vals)
+                line = slip.input_line_ids.filtered(lambda l: l.input_type_id.id == input_type.id)[:1]
+                if qty > 0.001 or amount > 0.001:
+                    vals = {
+                        "input_type_id": input_type.id,
+                        "name": name,
+                        "amount": amount,
+                    }
+                    if hasattr(input_model, "quantity"):
+                        vals["quantity"] = qty
+
+                    if line:
+                        line.write(vals)
+                    else:
+                        if slip.id:
+                            input_model.create(dict(vals, payslip_id=slip.id))
+                        else:
+                            slip.input_line_ids += input_model.new(vals)
                 else:
-                    slip.input_line_ids += input_model.new({
-                        "input_type_id": eoc_type.id,
-                        "quantity": eoc_value,
-                    })
+                    if line:
+                        line.unlink()
 
     @api.onchange("termination_clearance", "employee_id", "date_to")
     def _onchange_termination_clearance(self):
         for slip in self:
-            if slip.termination_clearance and slip.employee_id:
-                slip._apply_termination_clearance_inputs()
+            slip._apply_termination_clearance_inputs()
 
     def _get_overtime_quantity_to_deduct(self):
         self.ensure_one()
