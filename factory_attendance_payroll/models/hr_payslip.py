@@ -26,6 +26,12 @@ class HrPayslip(models.Model):
         store=True,
         help="Previous Extra Hours Balance plus new Monthly Overtime Earned."
     )
+    remaining_extra_hours_balance = fields.Float(
+        string="Remaining Extra Hours Balance",
+        compute="_compute_attendance_reconciliation_fields",
+        store=True,
+        help="Remaining Extra Hours available after settling Step 1 Lateness (Total Available minus Step 1 Settled Lateness)."
+    )
 
     # 3-Step Lateness Settlement Audit Breakdown Fields
     lateness_covered_by_extra_hours = fields.Float(
@@ -275,8 +281,8 @@ class HrPayslip(models.Model):
                 rem_lateness = 0.0
 
             payslip.lateness_covered_by_extra_hours = covered_extra
+            payslip.remaining_extra_hours_balance = round(max(0.0, total_extra_avail - covered_extra), 2)
             payslip.lateness_covered_by_annual_leave = covered_annual_leave
-            payslip.lateness_covered_by_paid_time_off = 0.0
             payslip.undertime_cash_deduction_hours = rem_lateness
 
     def compute_sheet(self):

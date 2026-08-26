@@ -16,6 +16,10 @@ def pre_init_hook(env):
             ADD COLUMN IF NOT EXISTS daily_undertime_hours DOUBLE PRECISION DEFAULT 0.0,
             ADD COLUMN IF NOT EXISTS daily_overtime_hours DOUBLE PRECISION DEFAULT 0.0;
         """)
+        env.cr.execute("""
+            ALTER TABLE hr_payslip 
+            ADD COLUMN IF NOT EXISTS remaining_extra_hours_balance DOUBLE PRECISION DEFAULT 0.0;
+        """)
         # Remove any orphaned view referencing enable_overtime_calculation to fix Settings crash
         env.cr.execute("""
             DELETE FROM ir_ui_view WHERE name = 'res.config.settings.view.form.inherit.factory.payroll' 
