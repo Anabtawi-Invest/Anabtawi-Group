@@ -358,26 +358,18 @@ class HrPayslip(models.Model):
             emp = payslip.employee_id
             break_hrs = emp._get_lunch_break_duration() if emp else 1.0
             w = emp.wage if emp else 0.0
+            hourly_rate = w / 240.0
 
-            # Dynamic hourly rate: wage / total scheduled hours from worked days lines
-            # We first calculate raw attendance hours, then compute rate against total (attendance + absent)
+            # Count worked shifts in this period
             attendances = self.env['hr.attendance'].sudo().search([
                 ('employee_id', '=', emp.id),
                 ('check_in', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
                 ('check_in', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
             ])
             worked_shifts_count = len(set(att.check_in.date() for att in attendances))
-            total_raw_attendance_hrs = round(sum(att.worked_hours for att in attendances), 2)
 
-            rem_cash_deduction_hrs = round(payslip.undertime_cash_deduction_hours, 2)
-            total_scheduled_hours = total_raw_attendance_hrs + rem_cash_deduction_hrs
-            if total_scheduled_hours > 0:
-                hourly_rate = w / total_scheduled_hours
-            else:
-                weekly_hours = (emp.resource_calendar_id.full_time_required_hours if emp.resource_calendar_id else None) or 49.5
-                hourly_rate = (w / 26.0) / (weekly_hours / 6.0)
-            hourly_rate = round(hourly_rate, 4)
             net_extra_hrs = round(payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours, 2)
+            rem_cash_deduction_hrs = round(payslip.undertime_cash_deduction_hours, 2)
 
             filtered_lines = []
             for line in res:
@@ -390,16 +382,8 @@ class HrPayslip(models.Model):
                 if 'settlement' in line_name or 'lateness coverage' in line_name or 'monthly lateness' in line_name:
                     continue
 
-                # Filter out Rest Day lines (ARS, REST, RESTDAY) from the Worked Days tab
-                if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
-                    continue
-
-                # 1. Attendance Line: Dynamically set hours to total raw attendance worked hours from Attendance App
+                # 1. Attendance Line: Preserve exact attendance hours matching the Attendance App
                 if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
-                    if total_raw_attendance_hrs > 0.01:
-                        line['number_of_hours'] = total_raw_attendance_hrs
-                        line['number_of_days'] = round(total_raw_attendance_hrs / 8.0, 2)
-                        line['amount'] = round(total_raw_attendance_hrs * hourly_rate, 3)
                     filtered_lines.append(line)
 
                 # 2. Overtime Line
@@ -986,8 +970,40 @@ class HrPayslip(models.Model):
                         pass
                     settlement_leaves.invalidate_recordset()
 
-            # 2. Preserve Extra Hours Allocations intact (as per user rule: do NOT delete extra hour allocation)
-            pass
+            # 2. Refuse and Delete Monthly Extra Hours Reconciliation Allocation
+            if Allocation:
+                month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
+                alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
+                ot_allocs = Allocation.search([
+                    ('employee_id', '=', payslip.employee_id.id),
+                    '|', '|', '|',
+                    ('name', '=', alloc_name),
+                    ('name', 'ilike', 'Extra Hours Reconciliation'),
+                    ('name', 'ilike', 'Monthly Overtime Earned'),
+                    ('holiday_status_id.name', 'ilike', 'Extra'),
+                ])
+                if ot_allocs:
+                    for alloc in ot_allocs:
+                        if hasattr(alloc, 'action_refuse'):
+                            try:
+                                alloc.sudo().action_refuse()
+                            except Exception:
+                                pass
+                    alloc_ids = tuple(ot_allocs.ids) if len(ot_allocs) > 1 else (ot_allocs.id, 0)
+                    try:
+                        self.env.cr.execute("UPDATE hr_leave_allocation SET state = 'refuse' WHERE id IN %s", (alloc_ids,))
+                    except Exception:
+                        pass
+                    try:
+                        ot_allocs.invalidate_recordset(['state'])
+                        ot_allocs.sudo().unlink()
+                    except Exception as err:
+                        _logger.warning("ORM unlink failed for allocs %s, forcing SQL delete: %s", alloc_ids, err)
+                    try:
+                        self.env.cr.execute("DELETE FROM hr_leave_allocation WHERE id IN %s", (alloc_ids,))
+                    except Exception:
+                        pass
+                    ot_allocs.invalidate_recordset()
 
             # 3. Revert Overtime line if created for this payslip date_to
             if OvertimeLine:
