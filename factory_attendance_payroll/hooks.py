@@ -3,26 +3,10 @@ from odoo import api, SUPERUSER_ID
 def pre_init_hook(env):
     """
     Pre-Init Hook (Runs before XML data loading):
-    1. Ensures enable_overtime_calculation column exists in res_company in PostgreSQL immediately.
-    2. Sets noupdate=True on ALL ir.model.data records belonging to factory_attendance_payroll.
+    Sets noupdate=True on ALL ir.model.data records belonging to factory_attendance_payroll.
+    This permanently prevents Odoo module upgrader from attempting to delete ANY legacy record
+    (hr.employee, hr.attendance, hr.work.entry, etc.) on existing staging/test databases!
     """
-    try:
-        env.cr.execute("""
-            ALTER TABLE res_company 
-            ADD COLUMN IF NOT EXISTS enable_overtime_calculation BOOLEAN DEFAULT TRUE;
-        """)
-        env.cr.execute("""
-            ALTER TABLE hr_attendance 
-            ADD COLUMN IF NOT EXISTS daily_undertime_hours DOUBLE PRECISION DEFAULT 0.0,
-            ADD COLUMN IF NOT EXISTS daily_overtime_hours DOUBLE PRECISION DEFAULT 0.0;
-        """)
-        env.cr.execute("""
-            ALTER TABLE hr_payslip 
-            ADD COLUMN IF NOT EXISTS termination_clearance BOOLEAN DEFAULT FALSE;
-        """)
-    except Exception:
-        pass
-
     try:
         model_data = env['ir.model.data'].sudo().search([
             ('module', '=', 'factory_attendance_payroll')
@@ -35,18 +19,17 @@ def pre_init_hook(env):
 def post_init_hook(env):
     """
     Post-Init Hook:
-    1. Binds attendance reconciliation and termination clearance rules
+    1. Binds attendance reconciliation rules (ATT_RECON_VAR, OT_NET, DED_UNDERTIME)
        dynamically to ALL Payroll Structures in the database.
     2. Patches BASIC (Actual Salary) rule and DED_UNDERTIME to use dynamic hourly rate:
        hourly_rate = wage / sum(worked_days_line_ids.number_of_hours)
     """
     # -----------------------------------------------------------------------
-    # Step 1: Bind reconciliation and termination rules to all structures
+    # Step 1: Bind reconciliation rules to all salary structures
     # -----------------------------------------------------------------------
     try:
         structures = env['hr.payroll.structure'].sudo().search([])
-        rule_codes = ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME', 'CLEAR_EXTRA', 'CLEAR_ANNUAL', 'CLEAR_PTO']
-        rules = env['hr.salary.rule'].sudo().search([('code', 'in', rule_codes)])
+        rules = env['hr.salary.rule'].sudo().search([('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME'])])
 
         for structure in structures:
             for rule in rules:
