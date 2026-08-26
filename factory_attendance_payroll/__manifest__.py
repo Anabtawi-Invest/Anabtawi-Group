@@ -18,6 +18,7 @@
         'views/hr_payslip_views.xml',
         'views/hr_employee_views.xml',
         'views/hr_attendance_views.xml',
+        'views/res_config_settings_views.xml',
     ],
     'pre_init_hook': 'pre_init_hook',
     'post_init_hook': 'post_init_hook',
