@@ -5,6 +5,7 @@
         <field name="name">hr.attendance.form.inherit.factory.metrics</field>
         <field name="model">hr.attendance</field>
         <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
+        <field name="priority">99</field>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='overtime_hours']" position="attributes">
                 <attribute name="invisible">1</attribute>
@@ -14,6 +15,9 @@
                 <field name="net_worked_hours" widget="float_time" readonly="1"/>
                 <field name="daily_variance_hours" widget="float_time" readonly="1"/>
             </xpath>
+            <xpath expr="//button[@name='action_approve_overtime']" position="attributes">
+                <attribute name="invisible">not is_manager or overtime_status not in ['to_approve', 'refused'] or not overtime_status</attribute>
+            </xpath>
         </field>
     </record>
 
@@ -22,10 +26,24 @@
         <field name="name">hr.attendance.tree.inherit.factory.metrics</field>
         <field name="model">hr.attendance</field>
         <field name="inherit_id" ref="hr_attendance.view_attendance_tree"/>
+        <field name="priority">99</field>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='worked_hours']" position="after">
                 <field name="net_worked_hours" widget="float_time" optional="show"/>
                 <field name="daily_variance_hours" widget="float_time" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Inherit Attendance Management Tree View to ensure checkmark approve button is visible -->
+    <record id="view_attendance_tree_management_inherit_factory_metrics" model="ir.ui.view">
+        <field name="name">hr.attendance.tree.management.inherit.factory.metrics</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.view_attendance_tree_management"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//list/button[@name='action_approve_overtime' and @icon='fa-check']" position="attributes">
+                <attribute name="invisible">not is_manager or overtime_status not in ['to_approve', 'refused']</attribute>
             </xpath>
         </field>
     </record>

@@ -146,3 +146,17 @@ class HrAttendance(models.Model):
             except Exception:
                 pass
         return res
+
+    def action_approve_overtime(self):
+        """Allow direct validation of extra hours by manager."""
+        for attendance in self:
+            if attendance.linked_overtime_ids:
+                attendance.linked_overtime_ids.filtered(lambda l: l.status in ['to_approve', 'refused']).sudo().write({'status': 'approved'})
+            attendance.overtime_status = 'approved'
+        if hasattr(super(), 'action_approve_overtime'):
+            try:
+                super().action_approve_overtime()
+            except Exception:
+                pass
+        return True
+
