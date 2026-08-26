@@ -11,6 +11,11 @@ def pre_init_hook(env):
             ALTER TABLE res_company 
             ADD COLUMN IF NOT EXISTS enable_overtime_calculation BOOLEAN DEFAULT TRUE;
         """)
+        env.cr.execute("""
+            ALTER TABLE hr_attendance 
+            ADD COLUMN IF NOT EXISTS daily_undertime_hours DOUBLE PRECISION DEFAULT 0.0,
+            ADD COLUMN IF NOT EXISTS daily_overtime_hours DOUBLE PRECISION DEFAULT 0.0;
+        """)
     except Exception:
         pass
 
