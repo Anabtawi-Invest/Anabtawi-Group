@@ -836,7 +836,13 @@ class HrPayslip(models.Model):
                         ('name', '=', alloc_name),
                     ], limit=1)
 
-                    net_ot_hours = max(0.0, payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours)
+                    prev_bal = payslip._get_previous_extra_hours_balance()
+                    # Calculate new month allocation so that Total Active Allocations - Leaves = Remaining Extra Hours Balance
+                    if payslip.remaining_extra_hours_balance > prev_bal:
+                        net_ot_hours = round(payslip.remaining_extra_hours_balance - prev_bal, 4)
+                    else:
+                        net_ot_hours = 0.0
+
                     if net_ot_hours > 0.01:
                         ot_days = round(net_ot_hours / 8.0, 4)
                         alloc_vals = {
@@ -986,8 +992,34 @@ class HrPayslip(models.Model):
                         pass
                     settlement_leaves.invalidate_recordset()
 
-            # 2. Preserve Extra Hours Allocations intact (as per user rule: do NOT delete extra hour allocation)
-            pass
+            # 2. Reverse and remove Extra Hours Allocation created for this payslip month
+            if Allocation:
+                month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
+                alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
+                month_allocs = Allocation.search([
+                    ('employee_id', '=', payslip.employee_id.id),
+                    ('name', '=', alloc_name),
+                ])
+                if month_allocs:
+                    for alloc in month_allocs:
+                        if hasattr(alloc, 'action_refuse'):
+                            try:
+                                alloc.sudo().action_refuse()
+                            except Exception:
+                                pass
+                    alloc_ids = tuple(month_allocs.ids) if len(month_allocs) > 1 else (month_allocs.id, 0)
+                    try:
+                        self.env.cr.execute("UPDATE hr_leave_allocation SET state = 'refuse' WHERE id IN %s", (alloc_ids,))
+                    except Exception:
+                        pass
+                    try:
+                        month_allocs.sudo().unlink()
+                    except Exception:
+                        try:
+                            self.env.cr.execute("DELETE FROM hr_leave_allocation WHERE id IN %s", (alloc_ids,))
+                        except Exception:
+                            pass
+                    month_allocs.invalidate_recordset()
 
             # 3. Revert Overtime line if created for this payslip date_to
             if OvertimeLine:
