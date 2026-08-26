@@ -183,22 +183,54 @@ class HrPayslipRunImportWizard(models.TransientModel):
             'target': 'self',
         }
 
+    def _resolve_relation_type_id(self, target_model_obj, field_name, partial_input_type):
+        """Dynamically finds the correct record ID for a Many2one field on an adjustment/attachment model."""
+        field_obj = target_model_obj._fields.get(field_name)
+        if not field_obj or field_obj.type != 'many2one':
+            return False
+
+        comodel_name = field_obj.comodel_name
+        if not comodel_name or comodel_name not in self.env:
+            return False
+
+        if comodel_name == 'hr.payslip.input.type':
+            return partial_input_type.id
+
+        CoModel = self.env[comodel_name]
+        c_fields = CoModel._fields
+
+        domain = []
+        if 'code' in c_fields:
+            domain = [('code', 'in', ['PARTIAL_PAYMENT', 'LOAN', 'ADVANCE', 'OTHER', 'DEDUCTION'])]
+        elif 'name' in c_fields:
+            domain = [('name', 'ilike', 'partial')]
+
+        found = CoModel.search(domain, limit=1) if domain else False
+        if not found:
+            found = CoModel.search([], limit=1)
+        if not found and 'name' in c_fields:
+            try:
+                vals = {'name': 'Salary partial payment'}
+                if 'code' in c_fields:
+                    vals['code'] = 'PARTIAL_PAYMENT'
+                found = CoModel.create(vals)
+            except Exception:
+                found = False
+
+        return found.id if found else False
+
     def _create_employee_salary_adjustment(self, emp, partial_input_type, partial_amount):
-        """Creates or updates a Salary Adjustment record under the Employee Profile safely.
-        The ENTIRE hr.salary.attachment block is wrapped in one savepoint so that
-        even a failed .search() cannot poison the outer transaction.
-        """
+        """Creates or updates a Salary Adjustment record under the Employee Profile safely."""
         note_text = _("Mid-month partial salary payment loan")
         today = fields.Date.today()
 
         # 1. Standard Odoo Salary Attachment model (hr.salary.attachment)
         if 'hr.salary.attachment' in self.env:
-            with self.env.cr.savepoint():
-                try:
+            try:
+                with self.env.cr.savepoint():
                     Attachment = self.env['hr.salary.attachment']
                     fields_dict = Attachment._fields
 
-                    # Build search domain using only fields that exist on the model
                     domain = []
                     if 'employee_ids' in fields_dict:
                         domain.append(('employee_ids', 'in', [emp.id]))
@@ -212,7 +244,6 @@ class HrPayslipRunImportWizard(models.TransientModel):
 
                     existing = Attachment.search(domain, limit=1) if domain else False
 
-                    # Build vals dict using only fields that exist on the model
                     vals = {}
                     if 'employee_ids' in fields_dict:
                         vals['employee_ids'] = [(4, emp.id)]
@@ -236,29 +267,32 @@ class HrPayslipRunImportWizard(models.TransientModel):
                     elif 'date' in fields_dict:
                         vals['date'] = today
 
-                    if 'payslip_input_type_id' in fields_dict:
-                        vals['payslip_input_type_id'] = partial_input_type.id
-                    elif 'input_type_id' in fields_dict:
-                        vals['input_type_id'] = partial_input_type.id
-                    elif 'type_id' in fields_dict:
-                        vals['type_id'] = partial_input_type.id
+                    if 'company_id' in fields_dict and emp.company_id:
+                        vals['company_id'] = emp.company_id.id
+
+                    for type_fname in ['deduction_type_id', 'attachment_type_id', 'payslip_input_type_id', 'input_type_id', 'type_id']:
+                        if type_fname in fields_dict:
+                            type_val = self._resolve_relation_type_id(Attachment, type_fname, partial_input_type)
+                            if type_val:
+                                vals[type_fname] = type_val
+                                break
 
                     if existing:
                         existing.write(vals)
                     else:
                         Attachment.create(vals)
 
-                except Exception as e:
-                    _logger.warning(
-                        "hr.salary.attachment block failed for emp %s: %s",
-                        emp.id, str(e)
-                    )
+            except Exception as e:
+                _logger.warning(
+                    "hr.salary.attachment creation/update skipped for emp %s (%s): %s",
+                    emp.id, emp.name, str(e)
+                )
 
         # 2. Check custom Salary Adjustment models if present
         for model_name in ['hr.salary.adjustment', 'sb.hr.salary.adjustment', 'hr.employee.salary.adjustment']:
             if model_name in self.env:
-                with self.env.cr.savepoint():
-                    try:
+                try:
+                    with self.env.cr.savepoint():
                         AdjModel = self.env[model_name]
                         adj_fields = AdjModel._fields
                         vals = {}
@@ -279,27 +313,28 @@ class HrPayslipRunImportWizard(models.TransientModel):
                         elif 'name' in adj_fields:
                             vals['name'] = note_text
 
-                        if 'type_id' in adj_fields:
-                            vals['type_id'] = partial_input_type.id
-                        elif 'input_type_id' in adj_fields:
-                            vals['input_type_id'] = partial_input_type.id
-
                         if 'date_start' in adj_fields:
                             vals['date_start'] = today
                         elif 'date' in adj_fields:
                             vals['date'] = today
 
+                        if 'company_id' in adj_fields and emp.company_id:
+                            vals['company_id'] = emp.company_id.id
+
+                        for type_fname in ['type_id', 'input_type_id', 'adjustment_type_id']:
+                            if type_fname in adj_fields:
+                                type_val = self._resolve_relation_type_id(AdjModel, type_fname, partial_input_type)
+                                if type_val:
+                                    vals[type_fname] = type_val
+                                    break
+
                         AdjModel.create(vals)
 
-                    except Exception as e:
-                        _logger.warning(
-                            "Could not create %s for emp %s: %s",
-                            model_name, emp.id, str(e)
-                        )
-
-        # NOTE: We do NOT update draft payslips via hr.payslip.input directly.
-        # hr.salary.attachment records on the employee profile are automatically
-        # pulled into payslips by Odoo Payroll during month-end computation.
+                except Exception as e:
+                    _logger.warning(
+                        "Could not create %s for emp %s (%s): %s",
+                        model_name, emp.id, emp.name, str(e)
+                    )
 
     def action_import_adjustments(self):
         """Reads the uploaded Excel file and creates Salary Adjustments on employee profiles."""
@@ -326,9 +361,9 @@ class HrPayslipRunImportWizard(models.TransientModel):
         partial_col_idx = None
         for idx, col_name in enumerate(header_row):
             c_lower = col_name.lower()
-            if c_lower in ['employee code', 'employee_number', 'emp code', 'code', 'badge id']:
+            if c_lower in ['employee code', 'employee_number', 'emp code', 'code', 'badge id', 'badge_id', 'employee id', 'employee_id']:
                 code_col_idx = idx
-            elif 'partial payment' in c_lower or 'loan' in c_lower or 'advance' in c_lower or c_lower == 'partial_payment':
+            elif 'partial' in c_lower or 'loan' in c_lower or 'advance' in c_lower or 'adjustment' in c_lower:
                 partial_col_idx = idx
 
         if code_col_idx is None:
@@ -338,13 +373,17 @@ class HrPayslipRunImportWizard(models.TransientModel):
 
         partial_input_type = self._get_partial_payment_input_type()
 
-        # Build index of all employees by employee_number
+        # Build comprehensive index of all employees
         all_employees = self.env['hr.employee'].search([])
         emp_by_code = {}
         for emp in all_employees:
             code = self._get_emp_code(emp)
             if code:
                 emp_by_code[code] = emp
+            if getattr(emp, 'barcode', False):
+                emp_by_code[str(emp.barcode).strip()] = emp
+            if getattr(emp, 'registration_number', False):
+                emp_by_code[str(emp.registration_number).strip()] = emp
             emp_by_code[str(emp.id)] = emp
 
         missing_codes = []
@@ -368,7 +407,11 @@ class HrPayslipRunImportWizard(models.TransientModel):
 
             raw_amount = row[partial_col_idx] if partial_col_idx < len(row) else 0.0
             try:
-                partial_amount = float(raw_amount or 0.0)
+                if isinstance(raw_amount, str):
+                    clean_str = raw_amount.replace(',', '').replace('JOD', '').replace('$', '').strip()
+                    partial_amount = float(clean_str) if clean_str else 0.0
+                else:
+                    partial_amount = float(raw_amount or 0.0)
             except (ValueError, TypeError):
                 partial_amount = 0.0
 
