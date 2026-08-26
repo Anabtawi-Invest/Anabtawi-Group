@@ -7,14 +7,14 @@
             <form string="Upload Bulk Salary Adjustments">
                 <sheet>
                     <div class="alert alert-info" role="alert" invisible="not payrun_id">
-                        <strong>Mid-Month Partial Payment Workflow:</strong><br/>
+                        <strong>Bulk Salary Adjustments Workflow:</strong><br/>
                         1. Compute the draft Payrun to calculate each employee's <strong>Actual Salary</strong>.<br/>
                         2. Click <strong>Download Excel Template</strong>.<br/>
-                        3. Enter approved partial payment amounts in Excel.<br/>
-                        4. Upload the Excel file and click <strong>Import Partial Payments</strong>.
+                        3. Fill the <strong>Adjustment Type</strong> (e.g. Partial Salary Payment, Company loan, Advance payment) and <strong>Adjustment Amount</strong> in Excel.<br/>
+                        4. Upload the Excel file and click <strong>Import Salary Adjustments</strong>.
                     </div>
                     <div class="alert alert-info" role="alert" invisible="payrun_id">
-                        Upload the completed Excel sheet to create <strong>Salary Partial Payment</strong> adjustments directly under employee profiles.
+                        Upload the completed Excel sheet to automatically create <strong>Salary Adjustments</strong> under employee profiles based on the entered <strong>Type</strong> and <strong>Amount</strong>.
                     </div>
                     <group>
                         <group string="1. Template Export" invisible="not payrun_id">
@@ -33,7 +33,7 @@
                 </sheet>
                 <footer>
                     <button name="action_import_adjustments" 
-                            string="Import Partial Payments" 
+                            string="Import Salary Adjustments" 
                             type="object" 
                             class="btn-primary" 
                             data-hotkey="q"/>
