@@ -298,19 +298,9 @@ class HrPayslipRunImportWizard(models.TransientModel):
                 except Exception as e:
                     _logger.warning("Could not create %s: %s", model_name, str(e))
 
-        # 3. Update active draft payslips for this employee if present
-        draft_slips = self.env['hr.payslip'].search([
-            ('employee_id', '=', emp.id),
-            ('state', 'in', ['draft', 'verify']),
-        ])
-        for slip in draft_slips:
-            slip.input_line_ids.filtered(lambda i: i.input_type_id == partial_input_type).unlink()
-            if partial_amount > 0.0:
-                self.env['hr.payslip.input'].create({
-                    'payslip_id': slip.id,
-                    'input_type_id': partial_input_type.id,
-                    'amount': partial_amount,
-                })
+        # NOTE: We do NOT update draft payslips directly here.
+        # Salary attachments created on the employee profile are automatically
+        # pulled into payslips by Odoo Payroll at month-end computation.
 
     def action_import_adjustments(self):
         """Reads uploaded Excel file and creates Salary Adjustments on employee profiles."""
