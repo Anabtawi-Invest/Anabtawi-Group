@@ -93,7 +93,7 @@ class HrPayslip(models.Model):
                 payslip.total_extra_hours_available = 0.0
                 payslip.lateness_covered_by_extra_hours = 0.0
                 payslip.lateness_covered_by_annual_leave = 0.0
-                payslip.lateness_covered_by_paid_time_off = 0.0
+                payslip.remaining_extra_hours_balance = 0.0
                 payslip.undertime_cash_deduction_hours = 0.0
             return
 
@@ -185,7 +185,7 @@ class HrPayslip(models.Model):
                 payslip.total_extra_hours_available = 0.0
                 payslip.lateness_covered_by_extra_hours = 0.0
                 payslip.lateness_covered_by_annual_leave = 0.0
-                payslip.lateness_covered_by_paid_time_off = 0.0
+                payslip.remaining_extra_hours_balance = 0.0
                 payslip.undertime_cash_deduction_hours = 0.0
                 continue
 
