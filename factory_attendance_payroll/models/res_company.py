@@ -7,7 +7,7 @@ class ResCompany(models.Model):
     enable_overtime_calculation = fields.Boolean(
         string="Enable Overtime Calculation",
         default=True,
-        help="When unchecked, any extra hours worked beyond the schedule are treated as unpaid hours and will not generate overtime or affect payslips."
+        help="When unchecked, extra hours worked beyond the schedule are treated as unpaid hours and will not generate overtime or affect payslips."
     )
 
     def _auto_init(self):
