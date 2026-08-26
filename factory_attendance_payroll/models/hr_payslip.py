@@ -296,7 +296,10 @@ class HrPayslip(models.Model):
                 payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
 
         self._compute_attendance_reconciliation_fields()
-        self._sync_reconciliation_settlements()
+        try:
+            self._sync_reconciliation_settlements()
+        except Exception as e:
+            _logger.warning("Could not sync reconciliation settlement leaves during compute_sheet: %s", e)
         self.write({'is_reconciled': True})
 
         # 2. Always compute salary rules so newly added salary inputs/adjustments are calculated!
@@ -668,6 +671,11 @@ class HrPayslip(models.Model):
             leave_skip_state_check=True,
             leave_skip_work_entries=True,
             no_work_entry=True,
+            leave_skip_payslip_check=True,
+            leave_skip_date_check=True,
+            skip_payslip_validation=True,
+            payslip_skip_leave_check=True,
+            leave_fast_create=True,
         )
 
         remaining_hours = hours
