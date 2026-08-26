@@ -203,6 +203,9 @@ class HrPayslip(models.Model):
             total_days_in_month = (payslip.date_to - payslip.date_from).days + 1
             target_work_days = total_days_in_month - (total_days_in_month // 7)
 
+            company = payslip.company_id or self.env.company
+            allow_ot = getattr(company, 'enable_overtime_calculation', True)
+
             break_hrs = payslip.employee_id._get_lunch_break_duration() if payslip.employee_id else 1.0
             min_ot_threshold = 0.75
             min_lateness_threshold = 0.25
@@ -226,7 +229,7 @@ class HrPayslip(models.Model):
                 standard_target = expected_hrs if expected_hrs > 0 else 8.0
                 if net_hrs > standard_target:
                     ot_excess = net_hrs - standard_target
-                    if ot_excess >= min_ot_threshold:
+                    if ot_excess >= min_ot_threshold and allow_ot:
                         # 125% Overtime multiplier (1h overtime = 1.25h extra hours)
                         total_ot += (ot_excess * 1.25)
                 elif net_hrs < standard_target:
@@ -237,8 +240,9 @@ class HrPayslip(models.Model):
             work_entry_source = payslip.employee_id._get_work_entry_source_on_day(payslip.date_from) if payslip.employee_id else 'attendance'
             if work_entry_source == 'attendance':
                 if worked_days_count > target_work_days:
-                    extra_worked_days = worked_days_count - target_work_days
-                    total_ot += (extra_worked_days * 8.0 * 1.25)
+                    if allow_ot:
+                        extra_worked_days = worked_days_count - target_work_days
+                        total_ot += (extra_worked_days * 8.0 * 1.25)
                 else:
                     unworked_days = total_days_in_month - worked_days_count
                     if unworked_days > allowed_rest_days:
@@ -377,7 +381,9 @@ class HrPayslip(models.Model):
                 weekly_hours = (emp.resource_calendar_id.full_time_required_hours if emp.resource_calendar_id else None) or 49.5
                 hourly_rate = (w / 26.0) / (weekly_hours / 6.0)
             hourly_rate = round(hourly_rate, 4)
-            net_extra_hrs = round(payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours, 2)
+            company = payslip.company_id or self.env.company
+            allow_ot = getattr(company, 'enable_overtime_calculation', True)
+            net_extra_hrs = round(payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours, 2) if allow_ot else 0.0
 
             filtered_lines = []
             for line in res:
@@ -1134,6 +1140,9 @@ class HrPayslip(models.Model):
         total_days_in_month = (self.date_to - self.date_from).days + 1
         target_work_days = total_days_in_month - (total_days_in_month // 7)
 
+        company = self.company_id or self.env.company
+        allow_ot = getattr(company, 'enable_overtime_calculation', True)
+
         break_hrs = self.employee_id._get_lunch_break_duration() if self.employee_id else 1.0
         min_ot_threshold = 0.75         # 45 minutes Overtime threshold
         min_lateness_threshold = 0.25   # 15 minutes Lateness Grace Period
@@ -1161,7 +1170,7 @@ class HrPayslip(models.Model):
 
             if net_hrs > standard_target:
                 ot_excess = net_hrs - standard_target
-                if ot_excess >= min_ot_threshold:
+                if ot_excess >= min_ot_threshold and allow_ot:
                     total_ot += ot_excess
             elif net_hrs < standard_target:
                 shortfall = standard_target - net_hrs
@@ -1173,8 +1182,9 @@ class HrPayslip(models.Model):
         if work_entry_source == 'attendance':
             if worked_days_count > target_work_days:
                 # Employee worked extra days beyond monthly target -> Extra worked days count as Overtime!
-                extra_worked_days = worked_days_count - target_work_days
-                total_ot += (extra_worked_days * 8.0)
+                if allow_ot:
+                    extra_worked_days = worked_days_count - target_work_days
+                    total_ot += (extra_worked_days * 8.0)
             else:
                 unworked_days = total_days_in_month - worked_days_count
                 if unworked_days > allowed_rest_days:

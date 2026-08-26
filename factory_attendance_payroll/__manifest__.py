@@ -1,6 +1,6 @@
 {
     'name': 'Factory Attendance & Payroll Reconciliation',
-    'version': '19.0.2.1.0',
+    'version': '19.0.2.2.0',
     'category': 'Human Resources/Payroll',
     'summary': 'Multi-location break deduction, daily attendance monitoring, planning shift integration, and 3-Step Lateness Settlement for any Salary Structure.',
     'author': 'Custom Solutions',
@@ -18,6 +18,7 @@
         'views/hr_payslip_views.xml',
         'views/hr_employee_views.xml',
         'views/hr_attendance_views.xml',
+        'views/res_config_settings_views.xml',
     ],
     'pre_init_hook': 'pre_init_hook',
     'post_init_hook': 'post_init_hook',
