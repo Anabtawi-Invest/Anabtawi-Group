@@ -16,6 +16,10 @@ def pre_init_hook(env):
             ADD COLUMN IF NOT EXISTS daily_undertime_hours DOUBLE PRECISION DEFAULT 0.0,
             ADD COLUMN IF NOT EXISTS daily_overtime_hours DOUBLE PRECISION DEFAULT 0.0;
         """)
+        env.cr.execute("""
+            ALTER TABLE hr_payslip 
+            ADD COLUMN IF NOT EXISTS termination_clearance BOOLEAN DEFAULT FALSE;
+        """)
     except Exception:
         pass
 
@@ -31,17 +35,18 @@ def pre_init_hook(env):
 def post_init_hook(env):
     """
     Post-Init Hook:
-    1. Binds attendance reconciliation rules (ATT_RECON_VAR, OT_NET, DED_UNDERTIME)
+    1. Binds attendance reconciliation and termination clearance rules
        dynamically to ALL Payroll Structures in the database.
     2. Patches BASIC (Actual Salary) rule and DED_UNDERTIME to use dynamic hourly rate:
        hourly_rate = wage / sum(worked_days_line_ids.number_of_hours)
     """
     # -----------------------------------------------------------------------
-    # Step 1: Bind reconciliation rules to all salary structures
+    # Step 1: Bind reconciliation and termination rules to all structures
     # -----------------------------------------------------------------------
     try:
         structures = env['hr.payroll.structure'].sudo().search([])
-        rules = env['hr.salary.rule'].sudo().search([('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME'])])
+        rule_codes = ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME', 'CLEAR_EXTRA', 'CLEAR_ANNUAL', 'CLEAR_PTO']
+        rules = env['hr.salary.rule'].sudo().search([('code', 'in', rule_codes)])
 
         for structure in structures:
             for rule in rules:

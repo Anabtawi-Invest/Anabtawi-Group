@@ -79,8 +79,85 @@ class HrPayslip(models.Model):
         string="Extra Hours Added to Allocation",
         default=0.0,
         copy=False,
-        help="Tracks duration in days added directly to employee's Extra Hours allocation by this payslip."
+    termination_clearance = fields.Boolean(
+        string="Termination Clearance / مخالصة نهاية الخدمة",
+        default=False,
+        copy=False,
+        help="When enabled, collects all remaining Extra Hours, Annual Leaves, and Paid Time Off balances and creates Salary Inputs using Wage / 240 rate."
     )
+
+    @api.onchange('termination_clearance', 'employee_id')
+    def _onchange_termination_clearance(self):
+        for slip in self:
+            slip._apply_termination_clearance_inputs()
+
+    def _get_clearance_input_type(self, code, name):
+        InputType = self.env['hr.payslip.input.type'].sudo()
+        input_type = InputType.search([('code', '=', code)], limit=1)
+        if not input_type:
+            input_type = InputType.create({
+                'name': name,
+                'code': code,
+                'country_id': False,
+            })
+        return input_type
+
+    def _apply_termination_clearance_inputs(self):
+        clearance_codes = ['CLEAR_EXTRA', 'CLEAR_ANNUAL', 'CLEAR_PTO']
+        for slip in self:
+            if not slip.employee_id:
+                continue
+
+            if not slip.termination_clearance:
+                lines_to_clear = slip.input_line_ids.filtered(lambda l: l.input_type_id.code in clearance_codes)
+                if lines_to_clear:
+                    lines_to_clear.unlink()
+                continue
+
+            wage = slip.employee_id.wage or 0.0
+            # Hourly rate for termination clearance is strictly wage / 240.0
+            hourly_rate = round(wage / 240.0, 4) if wage > 0 else 0.0
+            daily_rate = round(hourly_rate * 8.0, 4) # wage / 30.0
+
+            # 1. Extra Hours remaining balance (in hours)
+            extra_hrs = max(0.0, round(slip._get_previous_extra_hours_balance(), 2))
+
+            # 2. Annual Leave remaining balance (in days)
+            annual_hrs = max(0.0, round(slip._get_available_leave_hours_by_type('Annual Leave'), 2))
+            annual_days = round(annual_hrs / 8.0, 2)
+
+            # 3. Paid Time Off remaining balance (in days)
+            pto_hrs = max(0.0, round(slip._get_available_leave_hours_by_type('Paid Time Off'), 2))
+            pto_days = round(pto_hrs / 8.0, 2)
+
+            clearance_specs = [
+                ('CLEAR_EXTRA', f"Termination: Extra Hours Settlement ({extra_hrs} hrs @ {hourly_rate} JOD)", extra_hrs, round(extra_hrs * hourly_rate, 3)),
+                ('CLEAR_ANNUAL', f"Termination: Annual Leave Settlement ({annual_days} days @ {daily_rate} JOD)", annual_days, round(annual_days * daily_rate, 3)),
+                ('CLEAR_PTO', f"Termination: Paid Time Off Settlement ({pto_days} days @ {daily_rate} JOD)", pto_days, round(pto_days * daily_rate, 3)),
+            ]
+
+            InputModel = self.env['hr.payslip.input'].sudo()
+            for code, name, qty, amount in clearance_specs:
+                input_type = slip._get_clearance_input_type(code, name)
+                line = slip.input_line_ids.filtered(lambda l: l.input_type_id.id == input_type.id)[:1]
+                if qty > 0.001 or amount > 0.001:
+                    vals = {
+                        'input_type_id': input_type.id,
+                        'name': name,
+                        'amount': amount,
+                    }
+                    if hasattr(InputModel, 'quantity'):
+                        vals['quantity'] = qty
+                    if line:
+                        line.write(vals)
+                    else:
+                        if slip.id:
+                            InputModel.create(dict(vals, payslip_id=slip.id))
+                        else:
+                            slip.input_line_ids += InputModel.new(vals)
+                else:
+                    if line:
+                        line.unlink()
 
     @api.depends('employee_id', 'date_from', 'date_to')
     def _compute_attendance_reconciliation_fields(self):
@@ -309,6 +386,9 @@ class HrPayslip(models.Model):
                 payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
 
         self._compute_attendance_reconciliation_fields()
+        for payslip in self:
+            if payslip.termination_clearance:
+                payslip._apply_termination_clearance_inputs()
         self._sync_reconciliation_settlements()
         self.write({'is_reconciled': True})
 

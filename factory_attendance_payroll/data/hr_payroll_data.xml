@@ -69,4 +69,63 @@ else:
         </field>
         <field name="struct_id" search="[]"/>
     </record>
+
+    <!-- Termination Clearance Input Types -->
+    <record id="input_type_clear_extra" model="hr.payslip.input.type">
+        <field name="name">Termination: Extra Hours Settlement / مخالصة ساعات إضافية</field>
+        <field name="code">CLEAR_EXTRA</field>
+        <field name="country_id" eval="False"/>
+    </record>
+
+    <record id="input_type_clear_annual" model="hr.payslip.input.type">
+        <field name="name">Termination: Annual Leave Settlement / مخالصة إجازة سنوية</field>
+        <field name="code">CLEAR_ANNUAL</field>
+        <field name="country_id" eval="False"/>
+    </record>
+
+    <record id="input_type_clear_pto" model="hr.payslip.input.type">
+        <field name="name">Termination: Paid Time Off Settlement / مخالصة إجازة مدفوعة</field>
+        <field name="code">CLEAR_PTO</field>
+        <field name="country_id" eval="False"/>
+    </record>
+
+    <!-- Termination Clearance Salary Rules -->
+    <record id="rule_clear_extra_hours" model="hr.salary.rule">
+        <field name="name">Termination Extra Hours Settlement</field>
+        <field name="code">CLEAR_EXTRA</field>
+        <field name="category_id" ref="hr_payroll.ALW"/>
+        <field name="sequence">61</field>
+        <field name="appears_on_payslip" eval="True"/>
+        <field name="condition_select">python</field>
+        <field name="condition_python">result = bool(inputs.get('CLEAR_EXTRA') and inputs['CLEAR_EXTRA'].amount &gt; 0)</field>
+        <field name="amount_select">code</field>
+        <field name="amount_python_compute">result = inputs['CLEAR_EXTRA'].amount if 'CLEAR_EXTRA' in inputs else 0.0</field>
+        <field name="struct_id" search="[]"/>
+    </record>
+
+    <record id="rule_clear_annual_leave" model="hr.salary.rule">
+        <field name="name">Termination Annual Leave Settlement</field>
+        <field name="code">CLEAR_ANNUAL</field>
+        <field name="category_id" ref="hr_payroll.ALW"/>
+        <field name="sequence">62</field>
+        <field name="appears_on_payslip" eval="True"/>
+        <field name="condition_select">python</field>
+        <field name="condition_python">result = bool(inputs.get('CLEAR_ANNUAL') and inputs['CLEAR_ANNUAL'].amount &gt; 0)</field>
+        <field name="amount_select">code</field>
+        <field name="amount_python_compute">result = inputs['CLEAR_ANNUAL'].amount if 'CLEAR_ANNUAL' in inputs else 0.0</field>
+        <field name="struct_id" search="[]"/>
+    </record>
+
+    <record id="rule_clear_paid_time_off" model="hr.salary.rule">
+        <field name="name">Termination Paid Time Off Settlement</field>
+        <field name="code">CLEAR_PTO</field>
+        <field name="category_id" ref="hr_payroll.ALW"/>
+        <field name="sequence">63</field>
+        <field name="appears_on_payslip" eval="True"/>
+        <field name="condition_select">python</field>
+        <field name="condition_python">result = bool(inputs.get('CLEAR_PTO') and inputs['CLEAR_PTO'].amount &gt; 0)</field>
+        <field name="amount_select">code</field>
+        <field name="amount_python_compute">result = inputs['CLEAR_PTO'].amount if 'CLEAR_PTO' in inputs else 0.0</field>
+        <field name="struct_id" search="[]"/>
+    </record>
 </odoo>
