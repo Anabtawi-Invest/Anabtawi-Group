@@ -185,117 +185,112 @@ class HrPayslipRunImportWizard(models.TransientModel):
 
     def _create_employee_salary_adjustment(self, emp, partial_input_type, partial_amount):
         """Creates or updates a Salary Adjustment record under the Employee Profile safely.
-        Uses savepoints so that any failed operation rolls back cleanly without
-        poisoning the outer transaction.
+        The ENTIRE hr.salary.attachment block is wrapped in one savepoint so that
+        even a failed .search() cannot poison the outer transaction.
         """
         note_text = _("Mid-month partial salary payment loan")
         today = fields.Date.today()
 
         # 1. Standard Odoo Salary Attachment model (hr.salary.attachment)
         if 'hr.salary.attachment' in self.env:
-            Attachment = self.env['hr.salary.attachment']
-            fields_dict = Attachment._fields
+            with self.env.cr.savepoint():
+                try:
+                    Attachment = self.env['hr.salary.attachment']
+                    fields_dict = Attachment._fields
 
-            # Build search domain using only fields that actually exist on the model
-            domain = []
-            if 'employee_ids' in fields_dict:
-                domain.append(('employee_ids', 'in', [emp.id]))
-            elif 'employee_id' in fields_dict:
-                domain.append(('employee_id', '=', emp.id))
+                    # Build search domain using only fields that exist on the model
+                    domain = []
+                    if 'employee_ids' in fields_dict:
+                        domain.append(('employee_ids', 'in', [emp.id]))
+                    elif 'employee_id' in fields_dict:
+                        domain.append(('employee_id', '=', emp.id))
 
-            if 'date_start' in fields_dict:
-                domain.append(('date_start', '=', today))
-            elif 'date' in fields_dict:
-                domain.append(('date', '=', today))
+                    if 'date_start' in fields_dict:
+                        domain.append(('date_start', '=', today))
+                    elif 'date' in fields_dict:
+                        domain.append(('date', '=', today))
 
-            existing = Attachment.search(domain, limit=1) if domain else False
+                    existing = Attachment.search(domain, limit=1) if domain else False
 
-            # Build vals dict using only fields that actually exist on the model
-            vals = {}
-            if 'employee_ids' in fields_dict:
-                vals['employee_ids'] = [(4, emp.id)]
-            if 'employee_id' in fields_dict:
-                vals['employee_id'] = emp.id
+                    # Build vals dict using only fields that exist on the model
+                    vals = {}
+                    if 'employee_ids' in fields_dict:
+                        vals['employee_ids'] = [(4, emp.id)]
+                    if 'employee_id' in fields_dict:
+                        vals['employee_id'] = emp.id
 
-            if 'description' in fields_dict:
-                vals['description'] = note_text
-            elif 'name' in fields_dict:
-                vals['name'] = note_text
+                    if 'description' in fields_dict:
+                        vals['description'] = note_text
+                    elif 'name' in fields_dict:
+                        vals['name'] = note_text
 
-            if 'amount' in fields_dict:
-                vals['amount'] = partial_amount
-            if 'monthly_amount' in fields_dict:
-                vals['monthly_amount'] = partial_amount
-            if 'total_amount' in fields_dict:
-                vals['total_amount'] = partial_amount
+                    if 'amount' in fields_dict:
+                        vals['amount'] = partial_amount
+                    if 'monthly_amount' in fields_dict:
+                        vals['monthly_amount'] = partial_amount
+                    if 'total_amount' in fields_dict:
+                        vals['total_amount'] = partial_amount
 
-            if 'date_start' in fields_dict:
-                vals['date_start'] = today
-            elif 'date' in fields_dict:
-                vals['date'] = today
+                    if 'date_start' in fields_dict:
+                        vals['date_start'] = today
+                    elif 'date' in fields_dict:
+                        vals['date'] = today
 
-            if 'payslip_input_type_id' in fields_dict:
-                vals['payslip_input_type_id'] = partial_input_type.id
-            elif 'input_type_id' in fields_dict:
-                vals['input_type_id'] = partial_input_type.id
-            elif 'type_id' in fields_dict:
-                vals['type_id'] = partial_input_type.id
+                    if 'payslip_input_type_id' in fields_dict:
+                        vals['payslip_input_type_id'] = partial_input_type.id
+                    elif 'input_type_id' in fields_dict:
+                        vals['input_type_id'] = partial_input_type.id
+                    elif 'type_id' in fields_dict:
+                        vals['type_id'] = partial_input_type.id
 
-            if existing:
-                with self.env.cr.savepoint():
-                    try:
+                    if existing:
                         existing.write(vals)
-                    except Exception as e:
-                        _logger.warning(
-                            "Could not update hr.salary.attachment id=%s for emp %s: %s",
-                            existing.id, emp.id, str(e)
-                        )
-            else:
-                with self.env.cr.savepoint():
-                    try:
+                    else:
                         Attachment.create(vals)
-                    except Exception as e:
-                        _logger.warning(
-                            "Could not create hr.salary.attachment for emp %s: %s",
-                            emp.id, str(e)
-                        )
+
+                except Exception as e:
+                    _logger.warning(
+                        "hr.salary.attachment block failed for emp %s: %s",
+                        emp.id, str(e)
+                    )
 
         # 2. Check custom Salary Adjustment models if present
         for model_name in ['hr.salary.adjustment', 'sb.hr.salary.adjustment', 'hr.employee.salary.adjustment']:
             if model_name in self.env:
-                AdjModel = self.env[model_name]
-                adj_fields = AdjModel._fields
-                vals = {}
-                if 'employee_id' in adj_fields:
-                    vals['employee_id'] = emp.id
-                elif 'employee_ids' in adj_fields:
-                    vals['employee_ids'] = [(4, emp.id)]
-
-                if 'amount' in adj_fields:
-                    vals['amount'] = partial_amount
-                elif 'payslip_amount' in adj_fields:
-                    vals['payslip_amount'] = partial_amount
-
-                if 'note' in adj_fields:
-                    vals['note'] = note_text
-                elif 'description' in adj_fields:
-                    vals['description'] = note_text
-                elif 'name' in adj_fields:
-                    vals['name'] = note_text
-
-                if 'type_id' in adj_fields:
-                    vals['type_id'] = partial_input_type.id
-                elif 'input_type_id' in adj_fields:
-                    vals['input_type_id'] = partial_input_type.id
-
-                if 'date_start' in adj_fields:
-                    vals['date_start'] = today
-                elif 'date' in adj_fields:
-                    vals['date'] = today
-
                 with self.env.cr.savepoint():
                     try:
+                        AdjModel = self.env[model_name]
+                        adj_fields = AdjModel._fields
+                        vals = {}
+                        if 'employee_id' in adj_fields:
+                            vals['employee_id'] = emp.id
+                        elif 'employee_ids' in adj_fields:
+                            vals['employee_ids'] = [(4, emp.id)]
+
+                        if 'amount' in adj_fields:
+                            vals['amount'] = partial_amount
+                        elif 'payslip_amount' in adj_fields:
+                            vals['payslip_amount'] = partial_amount
+
+                        if 'note' in adj_fields:
+                            vals['note'] = note_text
+                        elif 'description' in adj_fields:
+                            vals['description'] = note_text
+                        elif 'name' in adj_fields:
+                            vals['name'] = note_text
+
+                        if 'type_id' in adj_fields:
+                            vals['type_id'] = partial_input_type.id
+                        elif 'input_type_id' in adj_fields:
+                            vals['input_type_id'] = partial_input_type.id
+
+                        if 'date_start' in adj_fields:
+                            vals['date_start'] = today
+                        elif 'date' in adj_fields:
+                            vals['date'] = today
+
                         AdjModel.create(vals)
+
                     except Exception as e:
                         _logger.warning(
                             "Could not create %s for emp %s: %s",
