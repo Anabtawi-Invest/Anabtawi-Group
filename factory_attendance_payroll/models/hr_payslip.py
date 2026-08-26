@@ -40,12 +40,6 @@ class HrPayslip(models.Model):
         store=True,
         help="Step 2: Lateness hours covered using available Annual Leave balance."
     )
-    lateness_covered_by_paid_time_off = fields.Float(
-        string="Step 2b: Lateness Deducted from Paid Time Off (Deprecated)",
-        compute="_compute_attendance_reconciliation_fields",
-        store=True,
-        help="Deprecated field kept for schema backward compatibility."
-    )
     undertime_cash_deduction_hours = fields.Float(
         string="Step 3: Remaining Lateness Deducted from Cash",
         compute="_compute_attendance_reconciliation_fields",

@@ -27,11 +27,20 @@ def pre_init_hook(env):
         pass
 
     try:
-        model_data = env['ir.model.data'].sudo().search([
-            ('module', '=', 'factory_attendance_payroll')
-        ])
-        if model_data:
-            model_data.write({'noupdate': True})
+        # Ensure noupdate=False on all UI views so XML view changes apply immediately on upgrade
+        env.cr.execute("""
+            UPDATE ir_model_data 
+            SET noupdate = FALSE 
+            WHERE module = 'factory_attendance_payroll' 
+              AND model = 'ir.ui.view';
+        """)
+        # Set noupdate=True on non-view records to protect data
+        env.cr.execute("""
+            UPDATE ir_model_data 
+            SET noupdate = TRUE 
+            WHERE module = 'factory_attendance_payroll' 
+              AND model != 'ir.ui.view';
+        """)
     except Exception:
         pass
 
