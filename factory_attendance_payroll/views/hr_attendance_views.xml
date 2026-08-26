@@ -17,15 +17,15 @@
                 <attribute name="invisible">overtime_status not in ['to_approve', 'refused'] or not overtime_status or daily_overtime_hours &lt; 0.75</attribute>
             </xpath>
 
-            <!-- Hide native overtime_hours in favor of daily_overtime_hours -->
+            <!-- Hide native overtime_hours and daily_variance_hours in favor of separate clean fields -->
             <xpath expr="//field[@name='overtime_hours']" position="attributes">
                 <attribute name="invisible">1</attribute>
             </xpath>
 
             <!-- Add separate Break, Net Worked Hours, Daily Lateness, and Daily Extra Hours -->
             <xpath expr="//field[@name='worked_hours']" position="after">
-                <field name="attendance_break_hours" widget="float_time" readonly="1"/>
-                <field name="net_worked_hours" widget="float_time" readonly="1"/>
+                <field name="attendance_break_hours" widget="float_time" readonly="1" string="Lunch Break Deducted"/>
+                <field name="net_worked_hours" widget="float_time" readonly="1" string="Net Worked Hours"/>
                 <field name="daily_undertime_hours" widget="float_time" readonly="1" string="Daily Lateness"/>
                 <field name="daily_overtime_hours" widget="float_time" readonly="1" string="Daily Extra Hours"/>
                 <label for="action_approve_factory_overtime" string="Overtime Validation" invisible="daily_overtime_hours &lt; 0.75"/>
@@ -43,7 +43,7 @@
         </field>
     </record>
 
-    <!-- Inherit Attendance Tree/List View to display Net Worked Hours, Lateness, Extra Hours and Validation Actions -->
+    <!-- Inherit Attendance Tree/List View to display Net Worked Hours, Daily Lateness, Daily Extra Hours -->
     <record id="view_attendance_tree_inherit_factory_metrics" model="ir.ui.view">
         <field name="name">hr.attendance.tree.inherit.factory.metrics</field>
         <field name="model">hr.attendance</field>
@@ -51,7 +51,7 @@
         <field name="priority">99</field>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='worked_hours']" position="after">
-                <field name="net_worked_hours" widget="float_time" optional="show"/>
+                <field name="net_worked_hours" widget="float_time" optional="show" string="Net Worked Hours"/>
                 <field name="daily_undertime_hours" widget="float_time" optional="show" string="Daily Lateness"/>
                 <field name="daily_overtime_hours" widget="float_time" optional="show" string="Daily Extra Hours"/>
                 <button name="action_approve_factory_overtime" type="object" icon="fa-check text-success"
@@ -64,15 +64,35 @@
         </field>
     </record>
 
-    <!-- Inherit Attendance Tree Management View with priority 99 to ensure checkmark icon is visible only when daily extra hours exist -->
+    <!-- Inherit Attendance Tree Management View with priority 99 -->
     <record id="view_attendance_tree_management_inherit_factory_metrics" model="ir.ui.view">
         <field name="name">hr.attendance.tree.management.inherit.factory.metrics</field>
         <field name="model">hr.attendance</field>
         <field name="inherit_id" ref="hr_attendance.view_attendance_tree_management"/>
         <field name="priority">99</field>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='worked_hours']" position="after">
+                <field name="net_worked_hours" widget="float_time" optional="show" string="Net Worked Hours"/>
+                <field name="daily_undertime_hours" widget="float_time" optional="show" string="Daily Lateness"/>
+                <field name="daily_overtime_hours" widget="float_time" optional="show" string="Daily Extra Hours"/>
+            </xpath>
             <xpath expr="//list/button[@name='action_approve_overtime' and @icon='fa-check']" position="attributes">
                 <attribute name="invisible">overtime_status not in ['to_approve', 'refused'] or daily_overtime_hours &lt; 0.75</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Inherit Attendance Search/Filter View to add quick filters for Lateness and Extra Hours -->
+    <record id="hr_attendance_view_filter_inherit_factory_metrics" model="ir.ui.view">
+        <field name="name">hr.attendance.view.filter.inherit.factory.metrics</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.hr_attendance_view_filter"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[last()]" position="after">
+                <separator/>
+                <filter string="Has Lateness" name="filter_has_lateness" domain="[('daily_undertime_hours', '&gt;', 0)]"/>
+                <filter string="Has Extra Hours" name="filter_has_extra_hours" domain="[('daily_overtime_hours', '&gt;=', 0.75)]"/>
             </xpath>
         </field>
     </record>
