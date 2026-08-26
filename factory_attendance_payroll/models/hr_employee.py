@@ -14,12 +14,12 @@ _logger = logging.getLogger(__name__)
 EXCUSED_LEAVE_WORK_ENTRY_CODES = [
     # Display Codes
     "GTO", "CTO", "HW", "STO", "PTO", "SIK", "ANU", "PHD", "BFV", "HIL",
-    "FWS", "DIE", "MRD", "NPO", "PID", "HAJ", "MAM", "LDO", "TRV", "MKA", "BRK", "UNP", "ARS", "RST", "RESTDAY", "RestDay", "REST_DAY",
+    "FWS", "DIE", "MRD", "NPO", "PID", "HAJ", "MAM", "LDO", "TRV", "MKA", "BRK", "UNP", "ARS",
     # Payroll Codes
     "LEAVE100", "LEAVE105", "WORK110", "LEAVE110", "LEAVE120", "SICKLEAVE0",
-    "An_le", "un_paid", "REST", "RST", "RESTDAY", "RestDay", "REST_DAY",
+    "An_le", "un_paid", "REST",
     # General / standard leave codes
-    "LEAVE", "SICK", "VAC", "ANNUAL", "UNPAID", "HOLIDAY", "REST_DAY", "RESTDAY", "RestDay",
+    "LEAVE", "SICK", "VAC", "ANNUAL", "UNPAID", "HOLIDAY", "REST_DAY",
 ]
 
 ABSENT_WORK_ENTRY_CODES = ["ABS", "ABSENT", "A"]
@@ -64,23 +64,6 @@ class HrEmployee(models.Model):
         help="Lunch/Break duration in hours subtracted from attendance shifts (e.g. 1.0 = 60 min, 0.75 = 45 min, 0.5 = 30 min)."
     )
 
-    allow_annual_leave_lateness_deduction = fields.Boolean(
-        string="Accept Annual Deduction",
-        default=False,
-        tracking=True,
-        help="If checked, lateness hours can be deducted from the employee's Annual Leave balance. Requires uploading an approval document."
-    )
-
-    annual_deduction_approval_document = fields.Binary(
-        string="Approval Document",
-        attachment=True,
-        help="Upload approval document confirming employee accepts Annual Leave lateness deduction."
-    )
-
-    annual_deduction_approval_filename = fields.Char(
-        string="Approval Document Filename"
-    )
-
     # Legacy view compatibility aliases
     lunch_break_rule = fields.Selection([
         ('factory', 'Factory / Branches (1.0h Break)'),
@@ -93,6 +76,25 @@ class HrEmployee(models.Model):
         string="Custom Lunch Break (Hours)",
         store=False
     )
+
+    x_studio_manager = fields.Boolean(
+        string="Manager",
+        tracking=True,
+        groups="hr_payroll.group_hr_payroll_user",
+        help="When enabled, factory attendance reconciliation is skipped on payslips. "
+             "Absent work entry automation still applies.",
+    )
+
+    def _is_factory_reconciliation_excluded(self):
+        """Return True when factory payslip reconciliation must not run for this employee."""
+        self.ensure_one()
+        if self.x_studio_manager:
+            return True
+        if 'payroll_properties' in self._fields and self.payroll_properties:
+            props = dict(self.payroll_properties)
+            if props.get('manager'):
+                return True
+        return False
 
     def _compute_legacy_lunch_break_rule(self):
         for emp in self:
@@ -137,11 +139,18 @@ class HrEmployee(models.Model):
 
     @api.model
     def _cron_create_absent_work_entries(self):
-        """Daily/Monthly cron: evaluate current/past month up to yesterday and create absent work entries."""
+        """Daily cron: evaluate the past 2 days (excluding today) for active employees only."""
         today = fields.Date.context_today(self)
         yesterday = today - timedelta(days=1)
-        first_day_of_month = yesterday.replace(day=1)
-        self.search([("active", "=", True)])._create_absent_work_entries_for_period(first_day_of_month, yesterday)
+        two_days_ago = today - timedelta(days=2)
+        active_employees = self.search([("active", "=", True)])
+        _logger.info(
+            "Factory Absent Cron: evaluating %s active employees from %s to %s",
+            len(active_employees),
+            two_days_ago,
+            yesterday,
+        )
+        active_employees._create_absent_work_entries_for_period(two_days_ago, yesterday)
 
     def _get_absent_work_entry_type(self):
         absent_type = self.env.ref(
@@ -205,14 +214,21 @@ class HrEmployee(models.Model):
         """
         Evaluates a single employee for a specific monthly window:
         1. Checks manager / Working Schedule exemption (work_entry_source == 'calendar').
-        2. Evaluates each working day in the month up to yesterday.
+        2. Evaluates each working day in the calendar month up to yesterday.
         3. Identifies candidate un-punched days (expected work hours > 0, NO check-in, NO approved leave/time-off).
         4. Applies 4-Day Monthly Grace Rule:
            - First 4 unpunched days in the month are forgiven (NO absent work entry).
            - 5th unpunched day and all excess days beyond 4 receive an ABSENT work entry.
+
+        The scan always starts on the 1st of the calendar month so the 4-day grace rule stays
+        correct when the daily cron passes only a short date range (e.g. last 2 days).
         """
         self.ensure_one()
-        versions = self._get_versions_with_contract_overlap_with_period(month_from, month_to)
+        month_from = fields.Date.to_date(month_from)
+        month_to = fields.Date.to_date(month_to)
+        month_scan_start = month_from.replace(day=1)
+
+        versions = self._get_versions_with_contract_overlap_with_period(month_scan_start, month_to)
         if not versions:
             return
 
@@ -222,28 +238,19 @@ class HrEmployee(models.Model):
 
         yesterday = fields.Date.context_today(self) - timedelta(days=1)
         eval_to = min(month_to, yesterday)
-        if month_from > eval_to:
+        if month_scan_start > eval_to:
             return
 
         candidate_unpunched_days = []
-        current = month_from
+        current = month_scan_start
         while current <= eval_to:
             work_entry_source = self._get_work_entry_source_on_day(current)
-            # 1. Calendar (Working Schedule) Mode:
-            # Skip automated absence generation; work entries & shift hours are governed by resource calendar.
+            # Manager & Office Working Schedule Exemption:
+            # If contract work entry source is 'calendar', skip absence generation.
             if work_entry_source == "calendar":
                 current += timedelta(days=1)
                 continue
 
-            # 2. Planning Mode:
-            # If no planning slot is published on current date, treat as unscheduled day off.
-            if work_entry_source == "planning":
-                planning_hours = self._get_planning_hours_on_day(current)
-                if planning_hours <= 0:
-                    current += timedelta(days=1)
-                    continue
-
-            # 3. Attendance Mode (Factory Workers / 6 Days + 1 RestDay):
             expected_hours = self._get_expected_hours_on_day(current)
             if expected_hours <= 0:
                 # Non-working day (standard calendar weekend or rest day)
@@ -377,9 +384,7 @@ class HrEmployee(models.Model):
                 return True
             code = (type_obj.code or "").strip().upper()
             display_code = (getattr(type_obj, "display_code", False) or "").strip().upper()
-            name = (type_obj.name or "").strip().upper()
-            if (code in EXCUSED_LEAVE_WORK_ENTRY_CODES or display_code in EXCUSED_LEAVE_WORK_ENTRY_CODES or
-                any(c in code or c in display_code or c in name for c in ["RST", "RESTDAY", "REST_DAY"])):
+            if code in EXCUSED_LEAVE_WORK_ENTRY_CODES or display_code in EXCUSED_LEAVE_WORK_ENTRY_CODES:
                 return True
 
         # 3. Check resource calendar global leaves / public holidays
@@ -419,23 +424,12 @@ class HrEmployee(models.Model):
         return (version.work_entry_source or "").strip()
 
     def _get_expected_hours_on_day(self, target_date):
-        """Return expected net work hours (after break deduction) based on contract work entry source (planning vs calendar)."""
+        """Return expected work hours based on the contract work entry source (planning vs calendar)."""
         self.ensure_one()
         source = self._get_work_entry_source_on_day(target_date)
         if source == "planning":
-            gross_hrs = self._get_planning_hours_on_day(target_date)
-        else:
-            gross_hrs = self._get_calendar_hours_on_day(target_date)
-
-        if gross_hrs <= 0:
-            return 0.0
-
-        break_hrs = self._get_lunch_break_duration()
-        if gross_hrs >= 6.0:
-            return max(0.0, gross_hrs - break_hrs)
-        elif gross_hrs > 4.0:
-            return max(0.0, gross_hrs - (break_hrs / 2.0))
-        return gross_hrs
+            return self._get_planning_hours_on_day(target_date)
+        return self._get_calendar_hours_on_day(target_date)
 
     def _get_day_utc_bounds(self, target_date):
         self.ensure_one()
