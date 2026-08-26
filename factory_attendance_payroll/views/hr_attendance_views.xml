@@ -1,27 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Inherit Attendance Form View to hide misleading native overtime_hours and display accurate factory metrics -->
+    <!-- Inherit Attendance Form View with priority 99 to display factory metrics and explicit approval buttons -->
     <record id="hr_attendance_view_form_inherit_factory_metrics" model="ir.ui.view">
         <field name="name">hr.attendance.form.inherit.factory.metrics</field>
         <field name="model">hr.attendance</field>
         <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
         <field name="priority">99</field>
         <field name="arch" type="xml">
+            <!-- Ensure statusbar is directly clickable -->
+            <xpath expr="//field[@name='overtime_status']" position="attributes">
+                <attribute name="options">{'clickable': '1'}</attribute>
+            </xpath>
+
+            <!-- Ensure standard Approve button is visible -->
+            <xpath expr="//button[@name='action_approve_overtime']" position="attributes">
+                <attribute name="invisible">overtime_status not in ['to_approve', 'refused'] or not overtime_status</attribute>
+            </xpath>
+
+            <!-- Hide native overtime_hours in favor of daily_variance_hours -->
             <xpath expr="//field[@name='overtime_hours']" position="attributes">
                 <attribute name="invisible">1</attribute>
             </xpath>
+
+            <!-- Add break, net hours, daily variance, and dedicated inline validation buttons -->
             <xpath expr="//field[@name='worked_hours']" position="after">
                 <field name="attendance_break_hours" widget="float_time" readonly="1"/>
                 <field name="net_worked_hours" widget="float_time" readonly="1"/>
                 <field name="daily_variance_hours" widget="float_time" readonly="1"/>
-            </xpath>
-            <xpath expr="//button[@name='action_approve_overtime']" position="attributes">
-                <attribute name="invisible">not is_manager or overtime_status not in ['to_approve', 'refused'] or not overtime_status</attribute>
+                <label for="action_approve_factory_overtime" string="Overtime Validation" invisible="daily_variance_hours &lt; 0.75"/>
+                <div class="d-flex align-items-center gap-2" invisible="daily_variance_hours &lt; 0.75">
+                    <button name="action_approve_factory_overtime" string="Approve Extra Hours (✔)" type="object"
+                            class="btn btn-sm btn-success" icon="fa-check"
+                            invisible="overtime_status == 'approved'"/>
+                    <button name="action_refuse_factory_overtime" string="Refuse Extra Hours (✖)" type="object"
+                            class="btn btn-sm btn-danger" icon="fa-times"
+                            invisible="overtime_status == 'refused'"/>
+                    <span class="badge text-bg-success py-1 px-2" invisible="overtime_status != 'approved'">Approved (معتمد ✔)</span>
+                    <span class="badge text-bg-danger py-1 px-2" invisible="overtime_status != 'refused'">Refused (مرفوض ✖)</span>
+                </div>
             </xpath>
         </field>
     </record>
 
-    <!-- Inherit Attendance Tree/List View to display Net Worked Hours and Daily Variance in HR List -->
+    <!-- Inherit Attendance Tree/List View to display Net Worked Hours, Daily Variance, and Quick Approve/Refuse Buttons -->
     <record id="view_attendance_tree_inherit_factory_metrics" model="ir.ui.view">
         <field name="name">hr.attendance.tree.inherit.factory.metrics</field>
         <field name="model">hr.attendance</field>
@@ -31,11 +52,17 @@
             <xpath expr="//field[@name='worked_hours']" position="after">
                 <field name="net_worked_hours" widget="float_time" optional="show"/>
                 <field name="daily_variance_hours" widget="float_time" optional="show"/>
+                <button name="action_approve_factory_overtime" type="object" icon="fa-check text-success"
+                        title="Approve Extra Hours"
+                        invisible="daily_variance_hours &lt; 0.75 or overtime_status == 'approved'"/>
+                <button name="action_refuse_factory_overtime" type="object" icon="fa-times text-danger"
+                        title="Refuse Extra Hours"
+                        invisible="daily_variance_hours &lt; 0.75 or overtime_status == 'refused'"/>
             </xpath>
         </field>
     </record>
 
-    <!-- Inherit Attendance Management Tree View to ensure checkmark approve button is visible -->
+    <!-- Inherit Attendance Tree Management View with priority 99 to ensure checkmark icon is visible -->
     <record id="view_attendance_tree_management_inherit_factory_metrics" model="ir.ui.view">
         <field name="name">hr.attendance.tree.management.inherit.factory.metrics</field>
         <field name="model">hr.attendance</field>
@@ -43,7 +70,7 @@
         <field name="priority">99</field>
         <field name="arch" type="xml">
             <xpath expr="//list/button[@name='action_approve_overtime' and @icon='fa-check']" position="attributes">
-                <attribute name="invisible">not is_manager or overtime_status not in ['to_approve', 'refused']</attribute>
+                <attribute name="invisible">overtime_status not in ['to_approve', 'refused']</attribute>
             </xpath>
         </field>
     </record>
