@@ -936,8 +936,15 @@ class HrPayslip(models.Model):
         when the payslip is cancelled or set to draft.
         This immediately restores the balances back to the employee.
         """
-        Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
-        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
+        ctx = {
+            'leave_skip_payslip_check': True,
+            'leave_skip_date_check': True,
+            'skip_payslip_validation': True,
+            'payslip_skip_leave_check': True,
+            'no_work_entry': True,
+        }
+        Leave = self.env['hr.leave'].sudo().with_context(**ctx) if 'hr.leave' in self.env else None
+        Allocation = self.env['hr.leave.allocation'].sudo().with_context(**ctx) if 'hr.leave.allocation' in self.env else None
         OvertimeLine = self.env['hr.attendance.overtime.line'].sudo() if 'hr.attendance.overtime.line' in self.env else None
 
         for payslip in self:
@@ -949,90 +956,59 @@ class HrPayslip(models.Model):
 
             # 1. Unlink/remove all settlement leaves created for this payslip's date range
             if Leave:
-                LeaveType = self.env['hr.leave.type'].sudo()
-                company = payslip.company_id or payslip.env.company
-                extra_types = LeaveType.search(['|', '|', ('name', '=', 'Extra Hours'), ('name', 'ilike', 'Extra Hours'), ('name', 'ilike', 'إضافي')])
-                annual_types = LeaveType.search(['|', '|', ('name', '=', 'Annual Leave'), ('name', 'ilike', 'Annual Leave'), ('name', 'ilike', 'سنوي')])
-                if hasattr(company, 'lateness_annual_leave_type_id') and company.lateness_annual_leave_type_id:
-                    annual_types |= company.lateness_annual_leave_type_id
-                pto_types = LeaveType.search(['|', '|', ('name', '=', 'Paid Time Off'), ('name', 'ilike', 'Paid Time Off'), ('name', 'ilike', 'مدفوع')])
-                target_type_ids = list(set(extra_types.ids | annual_types.ids | pto_types.ids))
-
-                dt_start = datetime.datetime.combine(payslip.date_from, datetime.time.min)
-                dt_stop = datetime.datetime.combine(payslip.date_to, datetime.time.max)
-                domain = [
-                    ('employee_id', '=', payslip.employee_id.id),
-                    ('date_from', '<=', fields.Datetime.to_string(dt_stop)),
-                    ('date_to', '>=', fields.Datetime.to_string(dt_start)),
-                ]
-                if target_type_ids:
-                    domain.append(('holiday_status_id', 'in', target_type_ids))
-
-                settlement_leaves = Leave.search(domain)
-                if settlement_leaves:
-                    for leave in settlement_leaves:
-                        if hasattr(leave, 'action_refuse'):
+                try:
+                    month_leaves = Leave.search([
+                        ('employee_id', '=', payslip.employee_id.id),
+                        ('name', 'ilike', 'Lateness Settlement'),
+                        ('date_from', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                        ('date_to', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                    ])
+                    if month_leaves:
+                        with self.env.cr.savepoint():
                             try:
-                                leave.sudo().action_refuse()
+                                month_leaves.sudo().write({'state': 'draft'})
+                                month_leaves.sudo().unlink()
                             except Exception:
-                                pass
-                    leave_ids = tuple(settlement_leaves.ids) if len(settlement_leaves) > 1 else (settlement_leaves.id, 0)
-                    try:
-                        self.env.cr.execute("UPDATE hr_leave SET state = 'refuse' WHERE id IN %s", (leave_ids,))
-                    except Exception:
-                        pass
-                    try:
-                        settlement_leaves.invalidate_recordset(['state'])
-                        settlement_leaves.sudo().unlink()
-                    except Exception as err:
-                        _logger.warning("ORM unlink failed for leaves %s, forcing SQL delete: %s", leave_ids, err)
-                    try:
-                        self.env.cr.execute("DELETE FROM hr_leave WHERE id IN %s", (leave_ids,))
-                    except Exception:
-                        pass
-                    settlement_leaves.invalidate_recordset()
+                                leave_ids = tuple(month_leaves.ids) if len(month_leaves) > 1 else (month_leaves.id, 0)
+                                self.env.cr.execute("DELETE FROM hr_leave WHERE id IN %s", (leave_ids,))
+                                month_leaves.invalidate_recordset()
+                except Exception:
+                    pass
 
             # 2. Reverse and remove Extra Hours Allocation created for this payslip month
             if Allocation:
-                month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
-                alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
-                month_allocs = Allocation.search([
-                    ('employee_id', '=', payslip.employee_id.id),
-                    ('name', '=', alloc_name),
-                ])
-                if month_allocs:
-                    for alloc in month_allocs:
-                        if hasattr(alloc, 'action_refuse'):
+                try:
+                    month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
+                    alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
+                    month_allocs = Allocation.search([
+                        ('employee_id', '=', payslip.employee_id.id),
+                        ('name', '=', alloc_name),
+                    ])
+                    if month_allocs:
+                        with self.env.cr.savepoint():
                             try:
-                                alloc.sudo().action_refuse()
+                                month_allocs.sudo().write({'state': 'draft'})
+                                month_allocs.sudo().unlink()
                             except Exception:
-                                pass
-                    alloc_ids = tuple(month_allocs.ids) if len(month_allocs) > 1 else (month_allocs.id, 0)
-                    try:
-                        self.env.cr.execute("UPDATE hr_leave_allocation SET state = 'refuse' WHERE id IN %s", (alloc_ids,))
-                    except Exception:
-                        pass
-                    try:
-                        month_allocs.sudo().unlink()
-                    except Exception:
-                        try:
-                            self.env.cr.execute("DELETE FROM hr_leave_allocation WHERE id IN %s", (alloc_ids,))
-                        except Exception:
-                            pass
-                    month_allocs.invalidate_recordset()
+                                alloc_ids = tuple(month_allocs.ids) if len(month_allocs) > 1 else (month_allocs.id, 0)
+                                self.env.cr.execute("DELETE FROM hr_leave_allocation WHERE id IN %s", (alloc_ids,))
+                                month_allocs.invalidate_recordset()
+                except Exception:
+                    pass
 
             # 3. Revert Overtime line if created for this payslip date_to
             if OvertimeLine:
-                ot_lines = OvertimeLine.search([
-                    ('employee_id', '=', payslip.employee_id.id),
-                    ('date', '=', payslip.date_to),
-                    ('compensable_as_leave', '=', True),
-                ])
-                if ot_lines:
-                    try:
-                        ot_lines.unlink()
-                    except Exception as err:
-                        _logger.warning("Failed to delete overtime line: %s", err)
+                try:
+                    ot_lines = OvertimeLine.search([
+                        ('employee_id', '=', payslip.employee_id.id),
+                        ('date', '=', payslip.date_to),
+                        ('compensable_as_leave', '=', True),
+                    ])
+                    if ot_lines:
+                        with self.env.cr.savepoint():
+                            ot_lines.unlink()
+                except Exception as err:
+                    _logger.warning("Failed to delete overtime line: %s", err)
 
     def _get_previous_extra_hours_balance(self):
         """
