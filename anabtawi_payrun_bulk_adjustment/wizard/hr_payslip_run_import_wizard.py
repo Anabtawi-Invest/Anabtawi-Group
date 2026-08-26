@@ -187,7 +187,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
         }
 
     def _resolve_attachment_type(self, target_model_obj, field_name, type_str):
-        """Dynamically matches the salary adjustment type from the Excel sheet against hr.salary.attachment.type."""
+        """Dynamically matches the salary adjustment type against hr.salary.attachment.type."""
         field_obj = target_model_obj._fields.get(field_name)
         if not field_obj or field_obj.type != 'many2one':
             return False
@@ -199,7 +199,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
         CoModel = self.env[comodel_name].sudo()
         c_fields = CoModel._fields
 
-        # 1. If user provided a Type Name or Code in the Excel file, search for it
+        # 1. Search by user provided string
         if type_str:
             clean_type = str(type_str).strip()
             domain = []
@@ -212,7 +212,6 @@ class HrPayslipRunImportWizard(models.TransientModel):
 
             found = CoModel.search(domain, limit=1) if domain else False
             if not found and ('name' in c_fields or 'code' in c_fields):
-                # Fuzzy partial matching
                 domain_fuzzy = []
                 if 'name' in c_fields and 'code' in c_fields:
                     domain_fuzzy = ['|', ('code', 'ilike', clean_type), ('name', 'ilike', clean_type)]
@@ -241,11 +240,60 @@ class HrPayslipRunImportWizard(models.TransientModel):
                 if 'code' in c_fields:
                     vals['code'] = 'PA_pay'
                 found = CoModel.create(vals)
-            except Exception as e:
-                _logger.warning("Could not auto-create type on %s: %s", comodel_name, str(e))
+            except Exception:
                 found = False
 
         return found.id if found else False
+
+    def _resolve_payslip_input_type(self, type_str=None):
+        """Finds or creates the matching hr.payslip.input.type for other_input_type_id."""
+        if 'hr.payslip.input.type' not in self.env:
+            return False
+
+        InputType = self.env['hr.payslip.input.type'].sudo()
+        c_fields = InputType._fields
+
+        # 1. Search by user provided string
+        if type_str:
+            clean = str(type_str).strip()
+            domain = []
+            if 'code' in c_fields and 'name' in c_fields:
+                domain = ['|', ('code', '=ilike', clean), ('name', '=ilike', clean)]
+            elif 'code' in c_fields:
+                domain = [('code', '=ilike', clean)]
+            elif 'name' in c_fields:
+                domain = [('name', '=ilike', clean)]
+            found = InputType.search(domain, limit=1) if domain else False
+            if found:
+                return found.id
+
+        # 2. Search by standard codes
+        for code in ['PA_pay', 'PARTIAL_PAYMENT', 'SAL_PAY1', 'com_lon', 'LOAN', 'ADVANCE', 'OTHER', 'DEDUCTION']:
+            if 'code' in c_fields:
+                found = InputType.search([('code', '=', code)], limit=1)
+                if found:
+                    return found.id
+
+        # 3. Search by name 'partial'
+        if 'name' in c_fields:
+            found = InputType.search([('name', 'ilike', 'partial')], limit=1)
+            if found:
+                return found.id
+
+        # 4. Fallback to any input type in system
+        found = InputType.search([], limit=1)
+        if found:
+            return found.id
+
+        # 5. Create if none exists
+        try:
+            vals = {'name': 'Partial Salary Payment', 'code': 'PARTIAL_PAYMENT'}
+            if 'country_id' in c_fields:
+                vals['country_id'] = False
+            created = InputType.create(vals)
+            return created.id
+        except Exception:
+            return False
 
     def _create_employee_salary_adjustment(self, emp, type_str, amount, note_text):
         """Creates or updates a Salary Adjustment / Attachment record under the Employee Profile."""
@@ -301,13 +349,34 @@ class HrPayslipRunImportWizard(models.TransientModel):
                     if 'company_id' in fields_dict:
                         vals['company_id'] = emp.company_id.id if emp.company_id else self.env.company.id
 
-                    # Resolve type field (deduction_type_id / attachment_type_id / type_id)
-                    for type_fname in ['deduction_type_id', 'attachment_type_id', 'payslip_input_type_id', 'input_type_id', 'type_id']:
+                    # Resolve deduction_type_id / attachment_type_id (Many2one to hr.salary.attachment.type)
+                    ded_type_id = False
+                    for type_fname in ['deduction_type_id', 'attachment_type_id', 'type_id']:
                         if type_fname in fields_dict:
-                            type_val = self._resolve_attachment_type(Attachment, type_fname, type_str)
-                            if type_val:
-                                vals[type_fname] = type_val
+                            ded_type_id = self._resolve_attachment_type(Attachment, type_fname, type_str)
+                            if ded_type_id:
+                                vals[type_fname] = ded_type_id
                                 break
+
+                    # Resolve other_input_type_id / payslip_input_type_id / input_type_id (Many2one to hr.payslip.input.type)
+                    # This is required and constrained NOT NULL in Odoo 19!
+                    for input_fname in ['other_input_type_id', 'payslip_input_type_id', 'input_type_id']:
+                        if input_fname in fields_dict:
+                            # 1. Check if deduction type has a linked input_type
+                            linked_input_id = False
+                            if ded_type_id and 'hr.salary.attachment.type' in self.env:
+                                ded_rec = self.env['hr.salary.attachment.type'].sudo().browse(ded_type_id)
+                                if 'input_type_id' in ded_rec._fields and ded_rec.input_type_id:
+                                    linked_input_id = ded_rec.input_type_id.id
+                                elif 'other_input_type_id' in ded_rec._fields and ded_rec.other_input_type_id:
+                                    linked_input_id = ded_rec.other_input_type_id.id
+
+                            # 2. Fallback to resolving payslip input type directly
+                            if not linked_input_id:
+                                linked_input_id = self._resolve_payslip_input_type(type_str)
+
+                            if linked_input_id:
+                                vals[input_fname] = linked_input_id
 
                     if existing:
                         existing.write(vals)
