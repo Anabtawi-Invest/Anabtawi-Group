@@ -3,10 +3,17 @@ from odoo import api, SUPERUSER_ID
 def pre_init_hook(env):
     """
     Pre-Init Hook (Runs before XML data loading):
-    Sets noupdate=True on ALL ir.model.data records belonging to factory_attendance_payroll.
-    This permanently prevents Odoo module upgrader from attempting to delete ANY legacy record
-    (hr.employee, hr.attendance, hr.work.entry, etc.) on existing staging/test databases!
+    1. Ensures enable_overtime_calculation column exists in res_company in PostgreSQL immediately.
+    2. Sets noupdate=True on ALL ir.model.data records belonging to factory_attendance_payroll.
     """
+    try:
+        env.cr.execute("""
+            ALTER TABLE res_company 
+            ADD COLUMN IF NOT EXISTS enable_overtime_calculation BOOLEAN DEFAULT TRUE;
+        """)
+    except Exception:
+        pass
+
     try:
         model_data = env['ir.model.data'].sudo().search([
             ('module', '=', 'factory_attendance_payroll')
