@@ -35,16 +35,16 @@ class HrPayslip(models.Model):
         help="Step 1: Lateness hours covered using total available Extra Hours Balance."
     )
     lateness_covered_by_annual_leave = fields.Float(
-        string="Step 2a: Lateness Deducted from Annual Leave",
+        string="Step 2: Lateness Deducted from Annual Leave",
         compute="_compute_attendance_reconciliation_fields",
         store=True,
-        help="Step 2a: Lateness hours covered using available Annual Leave balance."
+        help="Step 2: Lateness hours covered using available Annual Leave balance."
     )
     lateness_covered_by_paid_time_off = fields.Float(
-        string="Step 2b: Lateness Deducted from Paid Time Off",
+        string="Step 2b: Lateness Deducted from Paid Time Off (Deprecated)",
         compute="_compute_attendance_reconciliation_fields",
         store=True,
-        help="Step 2b: Lateness hours covered using available Paid Time Off balance when Annual Leave is exhausted."
+        help="Deprecated field kept for schema backward compatibility."
     )
     undertime_cash_deduction_hours = fields.Float(
         string="Step 3: Remaining Lateness Deducted from Cash",
@@ -270,26 +270,19 @@ class HrPayslip(models.Model):
             covered_extra = round(min(lateness, total_extra_avail), 2)
             rem_lateness = round(lateness - covered_extra, 2)
 
-            # STEP 2a: Deduct remaining lateness from Annual Leave (ONLY if employee accepts annual deduction)
+            # STEP 2: Deduct remaining lateness from Annual Leave (ONLY if employee accepts annual deduction)
             covered_annual_leave = 0.0
             if rem_lateness > 0.01 and payslip.employee_id and payslip.employee_id.allow_annual_leave_lateness_deduction:
                 annual_leave_avail = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in annual_type_ids))
                 covered_annual_leave = round(min(rem_lateness, annual_leave_avail), 2)
                 rem_lateness = round(rem_lateness - covered_annual_leave, 2)
 
-            # STEP 2b: Deduct remaining lateness from Paid Time Off
-            covered_paid_time_off = 0.0
-            if rem_lateness > 0.01:
-                paid_time_off_avail = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in pto_type_ids))
-                covered_paid_time_off = round(min(rem_lateness, paid_time_off_avail), 2)
-                rem_lateness = round(rem_lateness - covered_paid_time_off, 2)
-
             if rem_lateness < 0.01:
                 rem_lateness = 0.0
 
             payslip.lateness_covered_by_extra_hours = covered_extra
             payslip.lateness_covered_by_annual_leave = covered_annual_leave
-            payslip.lateness_covered_by_paid_time_off = covered_paid_time_off
+            payslip.lateness_covered_by_paid_time_off = 0.0
             payslip.undertime_cash_deduction_hours = rem_lateness
 
     def compute_sheet(self):
@@ -893,21 +886,14 @@ class HrPayslip(models.Model):
                 'Lateness Settlement via Extra Hours'
             )
 
-            # 3. Step 2a: Annual Leave Time Off Deduction
+            # 3. Step 2: Annual Leave Time Off Deduction
             payslip._create_or_update_settlement_leave(
                 'Annual Leave',
                 payslip.lateness_covered_by_annual_leave,
                 'Lateness Settlement via Annual Leave'
             )
 
-            # 4. Step 2b: Paid Time Off Time Off Deduction
-            payslip._create_or_update_settlement_leave(
-                'Paid Time Off',
-                payslip.lateness_covered_by_paid_time_off,
-                'Lateness Settlement via Paid Time Off'
-            )
-
-            # 5. Sync Extra Hours Attendance Overtime Line
+            # 4. Sync Extra Hours Attendance Overtime Line
             net_extra_hours_change = payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours
             if OvertimeLine and net_extra_hours_change != 0.0:
                 existing_line = OvertimeLine.search([
