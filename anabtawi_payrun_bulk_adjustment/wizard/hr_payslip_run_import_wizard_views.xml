@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_payslip_run_import_wizard_form" model="ir.ui.view">
+        <field name="name">hr.payslip.run.import.wizard.form</field>
+        <field name="model">hr.payslip.run.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Upload Bulk Salary Adjustments">
+                <sheet>
+                    <div class="alert alert-info" role="alert" invisible="not payrun_id">
+                        <strong>Bulk Salary Adjustments Workflow:</strong><br/>
+                        1. Compute the draft Payrun to calculate each employee's <strong>Actual Salary</strong>.<br/>
+                        2. Click <strong>Download Excel Template</strong>.<br/>
+                        3. Fill the <strong>Adjustment Type</strong> (e.g. Partial Salary Payment, Company loan, Advance payment) and <strong>Adjustment Amount</strong> in Excel.<br/>
+                        4. Upload the Excel file and click <strong>Import Salary Adjustments</strong>.
+                    </div>
+                    <div class="alert alert-info" role="alert" invisible="payrun_id">
+                        Upload the completed Excel sheet to automatically create <strong>Salary Adjustments</strong> under employee profiles based on the entered <strong>Type</strong> and <strong>Amount</strong>.
+                    </div>
+                    <group>
+                        <group string="1. Template Export" invisible="not payrun_id">
+                            <field name="payrun_id" readonly="1"/>
+                            <button name="action_export_template" 
+                                    string="Download Excel Template" 
+                                    type="object" 
+                                    class="btn-secondary" 
+                                    icon="fa-download"/>
+                        </group>
+                        <group string="Upload Excel File">
+                            <field name="excel_file" filename="file_name"/>
+                            <field name="file_name" invisible="1"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_import_adjustments" 
+                            string="Import Salary Adjustments" 
+                            type="object" 
+                            class="btn-primary" 
+                            data-hotkey="q"/>
+                    <button string="Cancel" 
+                            class="btn-secondary" 
+                            special="cancel" 
+                            data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

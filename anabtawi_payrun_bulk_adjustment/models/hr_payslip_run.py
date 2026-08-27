@@ -1,0 +1,29 @@
+from odoo import models, _, exceptions
+
+
+class HrPayslipRun(models.Model):
+    _inherit = 'hr.payslip.run'
+
+    def action_export_template(self):
+        """Directly exports the Excel template for this payrun."""
+        rec = self[:1]
+        if not rec:
+            raise exceptions.UserError(_("Please select a Payrun."))
+        wizard = self.env['hr.payslip.run.import.wizard'].create({
+            'payrun_id': rec.id,
+        })
+        return wizard.action_export_template()
+
+    def action_open_bulk_adjustment_wizard(self):
+        """Opens the Bulk Salary Adjustments import wizard for this payrun."""
+        rec = self[:1]
+        return {
+            'name': _("Upload Bulk Salary Adjustments"),
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.payslip.run.import.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_payrun_id': rec.id if rec else False,
+            },
+        }
