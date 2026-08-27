@@ -619,7 +619,6 @@ class PosReportingDashboard(models.TransientModel):
                         "visa_amount": amt if is_visa else 0.0,
                         "partner_id": po.partner_id.id if po else False,
                         "company_id": cfg.company_id.id,
-                    })          "company_id": cfg.company_id.id,
                     })
 
         elif metric_type in ("untaxed_sales", "tax_amount", "discount_amount"):
