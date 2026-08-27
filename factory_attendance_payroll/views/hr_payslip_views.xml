@@ -11,11 +11,11 @@
                         <field name="attendance_gross_overtime" widget="float_time" readonly="1"/>
                         <field name="attendance_gross_undertime" widget="float_time" readonly="1"/>
                         <field name="total_extra_hours_available" widget="float_time" readonly="1"/>
+                        <field name="remaining_extra_hours_balance" widget="float_time" readonly="1"/>
                     </group>
                     <group string="3-Step Lateness Settlement Audit">
                         <field name="lateness_covered_by_extra_hours" widget="float_time" readonly="1"/>
                         <field name="lateness_covered_by_annual_leave" widget="float_time" readonly="1"/>
-                        <field name="lateness_covered_by_paid_time_off" widget="float_time" readonly="1"/>
                         <field name="undertime_cash_deduction_hours" widget="float_time" readonly="1"/>
                     </group>
                 </group>
