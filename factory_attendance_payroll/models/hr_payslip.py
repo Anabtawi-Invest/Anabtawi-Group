@@ -195,6 +195,31 @@ class HrPayslip(models.Model):
                 if payslip.date_from <= att.check_in.date() <= payslip.date_to
             ]
 
+            # Pre-fetch validated / approved overtime for employee in payslip period
+            approved_ot_dates = set()
+            approved_ot_hours_by_emp_date = defaultdict(float)
+
+            if 'hr.attendance.overtime.line' in self.env:
+                approved_lines = self.env['hr.attendance.overtime.line'].sudo().search([
+                    ('employee_id', '=', emp_id),
+                    ('date', '>=', payslip.date_from),
+                    ('date', '<=', payslip.date_to),
+                    ('status', '=', 'approved')
+                ])
+                for line in approved_lines:
+                    dur = line.manual_duration if hasattr(line, 'manual_duration') and line.manual_duration else line.duration
+                    if dur > 0:
+                        approved_ot_dates.add((emp_id, line.date))
+                        approved_ot_hours_by_emp_date[(emp_id, line.date)] += dur
+
+            for att in emp_attendances:
+                att_d = att.check_in.date()
+                if (hasattr(att, 'overtime_status') and att.overtime_status == 'approved') or (hasattr(att, 'validated_overtime_hours') and att.validated_overtime_hours > 0):
+                    approved_ot_dates.add((emp_id, att_d))
+                    val_hrs = getattr(att, 'validated_overtime_hours', 0.0) or getattr(att, 'daily_overtime_hours', 0.0)
+                    if val_hrs > 0 and (emp_id, att_d) not in approved_ot_hours_by_emp_date:
+                        approved_ot_hours_by_emp_date[(emp_id, att_d)] = val_hrs
+
             # In-memory variance calculation (0 DB queries per slip)
             daily_hours = defaultdict(float)
             for att in emp_attendances:
@@ -230,10 +255,36 @@ class HrPayslip(models.Model):
                 if net_hrs > standard_target:
                     ot_excess = net_hrs - standard_target
                     if ot_excess >= min_ot_threshold and allow_ot:
-                        # 125% Overtime multiplier (1h overtime = 1.25h extra hours)
-                        total_ot += (ot_excess * 1.25)
+                        # Extra hours validation check: ONLY count overtime if validated / approved!
+                        if (emp_id, att_date) in approved_ot_dates:
+                            val_ot = approved_ot_hours_by_emp_date.get((emp_id, att_date), ot_excess)
+                            eff_ot = val_ot if val_ot > 0 else ot_excess
+                            # 125% Overtime multiplier (1h overtime = 1.25h extra hours)
+                            total_ot += (eff_ot * 1.25)
                 elif net_hrs < standard_target:
                     shortfall = standard_target - net_hrs
+                    # Exclude partial time off/leave hours on attendance date
+                    if payslip.employee_id and payslip.employee_id._has_approved_leave_on_day(att_date):
+                        leave_hrs = 0.0
+                        if 'hr.leave' in self.env:
+                            day_start = datetime.datetime.combine(att_date, datetime.time.min)
+                            day_end = datetime.datetime.combine(att_date, datetime.time.max)
+                            day_leaves = self.env['hr.leave'].sudo().search([
+                                ('employee_id', '=', emp_id),
+                                ('state', 'in', ['validate', 'validate1']),
+                                ('date_from', '<=', fields.Datetime.to_string(day_end)),
+                                ('date_to', '>=', fields.Datetime.to_string(day_start)),
+                                '!', ('name', 'ilike', 'Lateness Settlement')
+                            ])
+                            for lve in day_leaves:
+                                if hasattr(lve, 'number_of_hours_display') and lve.number_of_hours_display:
+                                    leave_hrs += lve.number_of_hours_display
+                                elif hasattr(lve, 'number_of_hours') and lve.number_of_hours:
+                                    leave_hrs += lve.number_of_hours
+                                else:
+                                    leave_hrs += 8.0
+                        shortfall = max(0.0, shortfall - leave_hrs)
+
                     if shortfall > min_lateness_threshold:
                         total_undertime += shortfall
 
@@ -242,9 +293,21 @@ class HrPayslip(models.Model):
                 if worked_days_count > target_work_days:
                     if allow_ot:
                         extra_worked_days = worked_days_count - target_work_days
-                        total_ot += (extra_worked_days * 8.0 * 1.25)
+                        approved_extra_days = sum(1 for d in daily_hours.keys() if (emp_id, d) in approved_ot_dates)
+                        eff_extra_days = min(extra_worked_days, approved_extra_days) if approved_ot_dates else 0
+                        if eff_extra_days > 0:
+                            total_ot += (eff_extra_days * 8.0 * 1.25)
                 else:
-                    unworked_days = total_days_in_month - worked_days_count
+                    # Count approved time off / leave days (Annual Leave, Sick Leave, PTO, Public Holidays, etc.)
+                    approved_leave_days_count = 0
+                    curr_d = payslip.date_from
+                    while curr_d <= payslip.date_to:
+                        if curr_d not in daily_hours:
+                            if payslip.employee_id and payslip.employee_id._has_approved_leave_on_day(curr_d):
+                                approved_leave_days_count += 1
+                        curr_d += datetime.timedelta(days=1)
+
+                    unworked_days = max(0, total_days_in_month - worked_days_count - approved_leave_days_count)
                     if unworked_days > allowed_rest_days:
                         excess_unworked_days = unworked_days - allowed_rest_days
                         total_undertime += (excess_unworked_days * 8.0)

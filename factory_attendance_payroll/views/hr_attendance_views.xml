@@ -28,17 +28,6 @@
                 <field name="net_worked_hours" widget="float_time" readonly="1" string="Net Worked Hours"/>
                 <field name="daily_undertime_hours" widget="float_time" readonly="1" string="Daily Lateness"/>
                 <field name="daily_overtime_hours" widget="float_time" readonly="1" string="Daily Extra Hours"/>
-                <label for="action_approve_factory_overtime" string="Overtime Validation" invisible="daily_overtime_hours &lt; 0.75"/>
-                <div class="d-flex align-items-center gap-2" invisible="daily_overtime_hours &lt; 0.75">
-                    <button name="action_approve_factory_overtime" string="Approve Extra Hours (✔)" type="object"
-                            class="btn btn-sm btn-success" icon="fa-check"
-                            invisible="overtime_status == 'approved'"/>
-                    <button name="action_refuse_factory_overtime" string="Refuse Extra Hours (✖)" type="object"
-                            class="btn btn-sm btn-danger" icon="fa-times"
-                            invisible="overtime_status == 'refused'"/>
-                    <span class="badge text-bg-success py-1 px-2" invisible="overtime_status != 'approved'">Approved (معتمد ✔)</span>
-                    <span class="badge text-bg-danger py-1 px-2" invisible="overtime_status != 'refused'">Refused (مرفوض ✖)</span>
-                </div>
             </xpath>
         </field>
     </record>
