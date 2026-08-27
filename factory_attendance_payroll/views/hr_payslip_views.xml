@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_payslip_form_inherit_attendance_reconciliation" model="ir.ui.view">
+        <field name="name">hr.payslip.form.inherit.attendance.reconciliation</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="before">
+                <group string="Attendance &amp; Reconciliation Audit Tracking" name="attendance_reconciliation_tracking">
+                    <group string="Gross Attendance Totals">
+                        <field name="attendance_gross_overtime" widget="float_time" readonly="1"/>
+                        <field name="attendance_gross_undertime" widget="float_time" readonly="1"/>
+                        <field name="total_extra_hours_available" widget="float_time" readonly="1"/>
+                        <field name="remaining_extra_hours_balance" widget="float_time" readonly="1"/>
+                    </group>
+                    <group string="3-Step Lateness Settlement Audit">
+                        <field name="lateness_covered_by_extra_hours" widget="float_time" readonly="1"/>
+                        <field name="lateness_covered_by_annual_leave" widget="float_time" readonly="1"/>
+                        <field name="undertime_cash_deduction_hours" widget="float_time" readonly="1"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
