@@ -15,6 +15,7 @@ class PosUnifiedReport(models.TransientModel):
 
     report_type = fields.Selection([
         ("pos_sales", "POS Sales"),
+        ("online_sales", "Online & Delivery Sales"),
         ("advance_deposit", "Advance Order Deposit"),
         ("cash_in", "Cash In"),
         ("cash_out", "Cash Out"),
@@ -30,6 +31,7 @@ class PosUnifiedReport(models.TransientModel):
     discount_amount = fields.Float(string="Discount Amount", digits=(16, 3))
     cash_amount = fields.Float(string="Cash Amount", digits=(16, 3))
     visa_amount = fields.Float(string="Visa / Card Amount", digits=(16, 3))
+    online_amount = fields.Float(string="Online & Delivery Amount", digits=(16, 3))
     employee_debt_amount = fields.Float(string="Employee Debt Amount", digits=(16, 3))
     cash_in_amount = fields.Float(string="Cash In Amount", digits=(16, 3))
     cash_out_amount = fields.Float(string="Cash Out Amount", digits=(16, 3))

@@ -145,6 +145,17 @@
                         </div>
                     </div>
 
+                    <!-- Online & Delivery Sales -->
+                    <div class="o_kpi_card card-online clickable_kpi" t-on-click="() => this.onKpiClick('online_sales')" title="Click to view detailed transactions &amp; export Excel">
+                        <div class="kpi_icon"><i class="fa fa-globe text-warning"/></div>
+                        <div class="kpi_title">Online &amp; Delivery Sales</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.online_sales)"/></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-warning text-dark badge_sub"><t t-esc="getPercent(data.kpis.online_sales, data.kpis.total_sales)"/>% of Sales</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
+
                     <!-- Debt Sales (مبيعات الذمم) -->
                     <div class="o_kpi_card card-employee-debt clickable_kpi" t-on-click="() => this.onKpiClick('employee_debt')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-id-card-o text-purple"/></div>
@@ -318,6 +329,12 @@
                                         <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'visa' &amp;&amp; state.sortOrder === 'asc'"/>
                                         <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'visa'"/>
                                     </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('online_sales')">
+                                        Online &amp; Delivery
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'online_sales' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'online_sales' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'online_sales'"/>
+                                    </th>
                                     <th class="text-end sortable_th" t-on-click="() => this.sortBy('employee_debt')">
                                         Debt Sales (مبيعات الذمم)
                                         <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'employee_debt' &amp;&amp; state.sortOrder === 'desc'"/>
@@ -409,6 +426,7 @@
                                         <td class="val_num text-warning"><t t-esc="formatCurrency(branch.discount_amount)"/></td>
                                         <td class="val_num text-success"><t t-esc="formatCurrency(branch.cash)"/></td>
                                         <td class="val_num text-info"><t t-esc="formatCurrency(branch.visa)"/></td>
+                                        <td class="val_num text-warning"><t t-esc="formatCurrency(branch.online_sales)"/></td>
                                         <td class="val_num text-purple"><t t-esc="formatCurrency(branch.employee_debt)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.hospitality)"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.talabat)"/></td>
@@ -434,6 +452,7 @@
                                     <td class="val_num text-warning"><t t-esc="formatCurrency(data.global_totals.discount_amount)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.cash)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.visa)"/></td>
+                                    <td class="val_num text-warning"><t t-esc="formatCurrency(data.global_totals.online_sales)"/></td>
                                     <td class="val_num text-purple"><t t-esc="formatCurrency(data.global_totals.employee_debt)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.hospitality)"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.talabat)"/></td>
