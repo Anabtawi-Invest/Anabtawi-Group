@@ -407,8 +407,8 @@ class HrEmployee(models.Model):
         self.ensure_one()
         if not target_date or "resource.calendar.leaves" not in self.env:
             return False
-        dt_start = fields.Datetime.to_string(datetime.datetime.combine(target_date, datetime.time.min))
-        dt_end = fields.Datetime.to_string(datetime.datetime.combine(target_date, datetime.time.max))
+        dt_start = fields.Datetime.to_string(datetime.combine(target_date, time.min))
+        dt_end = fields.Datetime.to_string(datetime.combine(target_date, time.max))
 
         calendar_ids = set()
         if self.resource_calendar_id:
