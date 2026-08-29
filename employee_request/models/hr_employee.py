@@ -36,20 +36,111 @@ class HrEmployee(models.Model):
         digits = string.digits
         return "".join(secrets.choice(digits) for _ in range(int(length)))
 
+    def _employee_password_db_snapshot(self):
+        """Read OTP columns directly from DB for logging."""
+        self.ensure_one()
+        self.env.cr.execute(
+            """
+            SELECT employee_password,
+                   employee_password_generated_at,
+                   employee_password_expires_at,
+                   company_id
+              FROM hr_employee
+             WHERE id = %s
+            """,
+            (self.id,),
+        )
+        row = self.env.cr.fetchone() or (None, None, None, None)
+        return {
+            "employee_id": self.id,
+            "employee_name": self.name,
+            "db_password": row[0] or False,
+            "db_password_repr": repr(row[0]),
+            "db_password_len": len(str(row[0] or "")),
+            "db_generated_at": str(row[1]) if row[1] else None,
+            "db_expires_at": str(row[2]) if row[2] else None,
+            "db_company_id": row[3],
+            "orm_password": self.employee_password or False,
+            "orm_password_repr": repr(self.employee_password),
+            "orm_generated_at": str(self.employee_password_generated_at)
+            if self.employee_password_generated_at
+            else None,
+            "orm_expires_at": str(self.employee_password_expires_at)
+            if self.employee_password_expires_at
+            else None,
+            "company_id": self.company_id.id,
+            "company_name": self.company_id.display_name,
+        }
+
     def write(self, vals):
         vals = dict(vals or {})
-        if "employee_password" in vals:
+        password_in_vals = "employee_password" in vals
+        before = {
+            employee.id: employee._employee_password_db_snapshot()
+            for employee in self
+        }
+
+        if password_in_vals:
             password = vals.get("employee_password")
+            _logger.warning(
+                "[employee_request] WRITE employee_password START ids=%s "
+                "incoming_password_repr=%s incoming_len=%s incoming_keys=%s",
+                self.ids,
+                repr(password),
+                len(str(password or "")),
+                sorted(vals.keys()),
+            )
             if password in (False, None, ""):
-                vals.setdefault("employee_password_generated_at", False)
-                vals.setdefault("employee_password_expires_at", False)
+                vals["employee_password"] = False
+                vals["employee_password_generated_at"] = False
+                vals["employee_password_expires_at"] = False
             else:
                 # Manual or portal OTP set: always refresh the 5-minute validity window.
                 now = fields.Datetime.now()
                 vals["employee_password"] = str(password).strip()
                 vals["employee_password_generated_at"] = now
                 vals["employee_password_expires_at"] = now + relativedelta(minutes=5)
-        return super().write(vals)
+                _logger.warning(
+                    "[employee_request] WRITE employee_password NORMALIZED ids=%s "
+                    "stored_repr=%s generated_at=%s expires_at=%s",
+                    self.ids,
+                    repr(vals["employee_password"]),
+                    vals["employee_password_generated_at"],
+                    vals["employee_password_expires_at"],
+                )
+        elif any(
+            key in vals
+            for key in (
+                "employee_password_generated_at",
+                "employee_password_expires_at",
+            )
+        ):
+            _logger.warning(
+                "[employee_request] WRITE OTP timestamps without password ids=%s vals=%s",
+                self.ids,
+                {k: vals.get(k) for k in vals},
+            )
+
+        res = super().write(vals)
+
+        if password_in_vals:
+            self.invalidate_recordset(
+                [
+                    "employee_password",
+                    "employee_password_generated_at",
+                    "employee_password_expires_at",
+                ]
+            )
+            for employee in self:
+                after = employee._employee_password_db_snapshot()
+                _logger.warning(
+                    "[employee_request] WRITE employee_password DONE id=%s "
+                    "before=%s after=%s",
+                    employee.id,
+                    before.get(employee.id),
+                    after,
+                )
+        return res
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -62,6 +153,11 @@ class HrEmployee(models.Model):
                 vals["employee_password"] = str(password).strip()
                 vals["employee_password_generated_at"] = now
                 vals["employee_password_expires_at"] = now + relativedelta(minutes=5)
+                _logger.warning(
+                    "[employee_request] CREATE employee_password password_repr=%s expires_at=%s",
+                    repr(vals["employee_password"]),
+                    vals["employee_password_expires_at"],
+                )
             prepared.append(vals)
         return super().create(prepared)
 
