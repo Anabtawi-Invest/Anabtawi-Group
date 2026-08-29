@@ -54,6 +54,10 @@ class HrPayslip(models.Model):
     )
 
     # Legacy field aliases for view compatibility
+    lateness_covered_by_paid_time_off = fields.Float(
+        string="Lateness Covered by Paid Time Off",
+        default=0.0
+    )
     undertime_covered_by_extra_hours = fields.Float(
         related="lateness_covered_by_extra_hours",
         string="Undertime Settled via Extra Hours",
