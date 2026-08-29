@@ -39,6 +39,13 @@ class HrAttendance(models.Model):
         help="Net daily variance: positive for overtime, negative for lateness."
     )
 
+    is_public_holiday = fields.Boolean(
+        string="Public Holiday",
+        compute="_compute_factory_attendance_metrics",
+        store=True,
+        help="Indicates whether this attendance was logged on an official Public Holiday."
+    )
+
     @api.depends('worked_hours', 'employee_id')
     def _compute_factory_attendance_metrics(self):
         for attendance in self:
@@ -48,6 +55,7 @@ class HrAttendance(models.Model):
                 attendance.daily_undertime_hours = 0.0
                 attendance.daily_overtime_hours = 0.0
                 attendance.daily_variance_hours = 0.0
+                attendance.is_public_holiday = False
                 continue
 
             raw_hrs = attendance.worked_hours
@@ -67,6 +75,16 @@ class HrAttendance(models.Model):
             attendance.net_worked_hours = net_hrs
 
             target_date = attendance.check_in.date() if attendance.check_in else False
+            is_holiday = attendance.employee_id._is_public_holiday_on_day(target_date) if (attendance.employee_id and target_date) else False
+            attendance.is_public_holiday = is_holiday
+
+            if is_holiday:
+                # Public Holiday: 150% (1.5x) extra hours for all net worked hours, zero lateness
+                attendance.daily_overtime_hours = round(net_hrs * 1.5, 2)
+                attendance.daily_undertime_hours = 0.0
+                attendance.daily_variance_hours = round(net_hrs * 1.5, 2)
+                continue
+
             expected_hrs = attendance.employee_id._get_expected_hours_on_day(target_date) if (attendance.employee_id and target_date) else 8.0
             standard_target = expected_hrs if expected_hrs > 0 else 8.0
             excess = net_hrs - standard_target
@@ -98,6 +116,10 @@ class HrAttendance(models.Model):
             break_hrs = attendance.employee_id._get_lunch_break_duration()
             net_hrs = max(0.0, raw_hrs - break_hrs) if raw_hrs >= 6.0 else raw_hrs
             target_date = attendance.check_in.date() if attendance.check_in else False
+            is_holiday = attendance.employee_id._is_public_holiday_on_day(target_date) if (attendance.employee_id and target_date) else False
+            if is_holiday:
+                attendance.overtime_hours = round(net_hrs * 1.5, 2)
+                continue
             expected_hrs = attendance.employee_id._get_expected_hours_on_day(target_date) if (attendance.employee_id and target_date) else 8.0
             standard_target = expected_hrs if expected_hrs > 0 else 8.0
             excess = net_hrs - standard_target

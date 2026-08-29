@@ -383,23 +383,34 @@ class HrEmployee(models.Model):
                 return True
 
         # 3. Check resource calendar global leaves / public holidays
+        if self._is_public_holiday_on_day(target_date):
+            return True
+
+        return False
+
+    def _is_public_holiday_on_day(self, target_date):
+        """
+        Checks whether target_date is a Public Holiday / Global Leave in resource.calendar.leaves
+        for the employee's calendar.
+        """
+        self.ensure_one()
+        if not target_date or "resource.calendar.leaves" not in self.env:
+            return False
+        day_start_utc, next_day_start_utc, _employee_tz = self._get_day_utc_bounds(target_date)
         version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
         calendar = (
             version.resource_calendar_id
             or self.resource_calendar_id
             or self.company_id.resource_calendar_id
         )
-        if calendar and "resource.calendar.leaves" in self.env:
-            global_leaves = self.env["resource.calendar.leaves"].sudo().search_count([
-                ("calendar_id", "=", calendar.id),
-                ("resource_id", "in", [False, self.resource_id.id if self.resource_id else False]),
-                ("date_from", "<", fields.Datetime.to_string(next_day_start_utc)),
-                ("date_to", ">", fields.Datetime.to_string(day_start_utc)),
-            ])
-            if global_leaves > 0:
-                return True
-
-        return False
+        if not calendar:
+            return False
+        return bool(self.env["resource.calendar.leaves"].sudo().search_count([
+            ("calendar_id", "=", calendar.id),
+            ("resource_id", "in", [False, self.resource_id.id if self.resource_id else False]),
+            ("date_from", "<", fields.Datetime.to_string(next_day_start_utc)),
+            ("date_to", ">", fields.Datetime.to_string(day_start_utc)),
+        ]))
 
     def _has_checkin_on_day(self, target_date):
         """Checks if the employee has any attendance check-in recorded on target_date."""
