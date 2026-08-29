@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Employee Request",
-    "version": "19.0.1.2.0",
+    "version": "19.0.1.3.0",
     "category": "Human Resources",
-    "summary": "Employee request and 5-minute Employee Portal OTP support.",
+    "summary": "Employee OTP for portal/POS, with daily generation and expiry cleanup.",
     "author":"Anabtawi",
     "license": "LGPL-3",
     "depends": ["base", "hr", "point_of_sale"],

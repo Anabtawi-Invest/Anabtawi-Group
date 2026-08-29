@@ -95,11 +95,22 @@ class HrEmployee(models.Model):
                 vals["employee_password_generated_at"] = False
                 vals["employee_password_expires_at"] = False
             else:
-                # Manual or portal OTP set: always refresh the 5-minute validity window.
+                # Manual / portal / cron OTP: refresh validity window.
                 now = fields.Datetime.now()
                 vals["employee_password"] = str(password).strip()
                 vals["employee_password_generated_at"] = now
-                vals["employee_password_expires_at"] = now + relativedelta(minutes=5)
+                validity_hours = self.env.context.get("employee_otp_validity_hours")
+                if validity_hours:
+                    vals["employee_password_expires_at"] = now + relativedelta(
+                        hours=int(validity_hours)
+                    )
+                else:
+                    validity_minutes = int(
+                        self.env.context.get("employee_otp_validity_minutes", 5)
+                    )
+                    vals["employee_password_expires_at"] = now + relativedelta(
+                        minutes=validity_minutes
+                    )
                 _logger.warning(
                     "[employee_request] WRITE employee_password NORMALIZED ids=%s "
                     "stored_repr=%s generated_at=%s expires_at=%s",
@@ -236,10 +247,11 @@ class HrEmployee(models.Model):
         now = fields.Datetime.now()
 
         if force:
-            domain = []
+            domain = [("active", "=", True)]
         else:
             cutoff = now - relativedelta(hours=24)
             domain = [
+                ("active", "=", True),
                 "|",
                 ("employee_password_generated_at", "=", False),
                 ("employee_password_generated_at", "<", cutoff),
@@ -250,10 +262,29 @@ class HrEmployee(models.Model):
             employee.write(
                 {
                     "employee_password": self._generate_employee_password(),
-                    "employee_password_generated_at": now,
-                    "employee_password_expires_at": now + relativedelta(minutes=5),
                 }
             )
+
+    @api.model
+    def _cron_generate_daily_employee_otps(self):
+        """Generate a fresh OTP for every active employee (valid for 24 hours)."""
+        employees = self.sudo().search([("active", "=", True)])
+        _logger.info(
+            "[employee_request] daily OTP generation starting for %s employee(s)",
+            len(employees),
+        )
+        generated = 0
+        for employee in employees:
+            employee.with_context(employee_otp_validity_hours=24).write(
+                {
+                    "employee_password": self._generate_employee_password(),
+                }
+            )
+            generated += 1
+        _logger.info(
+            "[employee_request] daily OTP generation done count=%s",
+            generated,
+        )
 
     # -----------------------
     # POS helpers (RPC calls)
