@@ -39,6 +39,11 @@ class HrAttendance(models.Model):
         help="Net daily variance: positive for overtime, negative for lateness."
     )
 
+    is_public_holiday = fields.Boolean(
+        string="Public Holiday",
+        default=False
+    )
+
     @api.depends('worked_hours', 'employee_id')
     def _compute_factory_attendance_metrics(self):
         for attendance in self:
