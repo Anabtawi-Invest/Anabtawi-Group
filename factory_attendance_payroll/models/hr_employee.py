@@ -402,25 +402,26 @@ class HrEmployee(models.Model):
     def _is_public_holiday_on_day(self, target_date):
         """
         Checks whether target_date is a Public Holiday / Global Leave in resource.calendar.leaves
-        for the employee's calendar.
+        for the employee's calendar or company calendar.
         """
         self.ensure_one()
         if not target_date or "resource.calendar.leaves" not in self.env:
             return False
-        day_start_utc, next_day_start_utc, _employee_tz = self._get_day_utc_bounds(target_date)
-        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
-        calendar = (
-            version.resource_calendar_id
-            or self.resource_calendar_id
-            or self.company_id.resource_calendar_id
-        )
-        if not calendar:
-            return False
+        dt_start = fields.Datetime.to_string(datetime.datetime.combine(target_date, datetime.time.min))
+        dt_end = fields.Datetime.to_string(datetime.datetime.combine(target_date, datetime.time.max))
+
+        calendar_ids = set()
+        if self.resource_calendar_id:
+            calendar_ids.add(self.resource_calendar_id.id)
+        if self.company_id and self.company_id.resource_calendar_id:
+            calendar_ids.add(self.company_id.resource_calendar_id.id)
+        calendar_list = [False] + list(calendar_ids)
+
         return bool(self.env["resource.calendar.leaves"].sudo().search_count([
-            ("calendar_id", "=", calendar.id),
+            ("calendar_id", "in", calendar_list),
             ("resource_id", "in", [False, self.resource_id.id if self.resource_id else False]),
-            ("date_from", "<", fields.Datetime.to_string(next_day_start_utc)),
-            ("date_to", ">", fields.Datetime.to_string(day_start_utc)),
+            ("date_from", "<=", dt_end),
+            ("date_to", ">=", dt_start),
         ]))
 
     def _has_checkin_on_day(self, target_date):

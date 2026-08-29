@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime, time, timedelta
 from odoo import models, fields, api
 
 class HrAttendance(models.Model):
@@ -44,8 +45,43 @@ class HrAttendance(models.Model):
         default=False
     )
 
+    def _get_public_holiday_dates_batch(self, min_date, max_date):
+        """
+        Ultra-fast single-query batch loader for all public holidays / global leaves
+        covering the date range [min_date, max_date]. Returns a set of datetime.date objects.
+        """
+        holiday_dates = set()
+        if not min_date or not max_date or "resource.calendar.leaves" not in self.env:
+            return holiday_dates
+
+        dt_min = fields.Datetime.to_string(datetime.combine(min_date, time.min))
+        dt_max = fields.Datetime.to_string(datetime.combine(max_date, time.max))
+
+        leaves = self.env["resource.calendar.leaves"].sudo().search([
+            ("date_from", "<=", dt_max),
+            ("date_to", ">=", dt_min),
+        ])
+
+        for lve in leaves:
+            d_from = lve.date_from.date()
+            d_to = lve.date_to.date()
+            curr = d_from
+            while curr <= d_to:
+                if min_date <= curr <= max_date:
+                    holiday_dates.add(curr)
+                curr += timedelta(days=1)
+
+        return holiday_dates
+
     @api.depends('worked_hours', 'employee_id')
     def _compute_factory_attendance_metrics(self):
+        cutoff_date = fields.Date.today() - timedelta(days=90)
+        valid_atts = self.filtered(lambda a: a.check_in and a.employee_id)
+        dates = [a.check_in.date() for a in valid_atts if a.check_in.date() >= cutoff_date] if valid_atts else []
+        public_holiday_dates = self._get_public_holiday_dates_batch(min(dates), max(dates)) if dates else set()
+
+        emp_cache = {}
+
         for attendance in self:
             if not attendance.employee_id or not attendance.worked_hours:
                 attendance.attendance_break_hours = 0.0
@@ -53,10 +89,32 @@ class HrAttendance(models.Model):
                 attendance.daily_undertime_hours = 0.0
                 attendance.daily_overtime_hours = 0.0
                 attendance.daily_variance_hours = 0.0
+                attendance.is_public_holiday = False
                 continue
 
+            target_date = attendance.check_in.date() if attendance.check_in else False
+
+            # Fast path: Skip heavy calculations for old historical attendance records
+            if target_date and target_date < cutoff_date:
+                attendance.attendance_break_hours = 0.0
+                attendance.net_worked_hours = attendance.worked_hours
+                attendance.daily_undertime_hours = 0.0
+                attendance.daily_overtime_hours = 0.0
+                attendance.daily_variance_hours = 0.0
+                attendance.is_public_holiday = False
+                continue
+
+            emp = attendance.employee_id
+            emp_id = emp.id
+            if emp_id not in emp_cache:
+                emp_cache[emp_id] = {
+                    'break_hrs': emp._get_lunch_break_duration(),
+                    'is_manager': emp.is_manager_exempt(),
+                }
+            emp_info = emp_cache[emp_id]
+
             raw_hrs = attendance.worked_hours
-            break_hrs = attendance.employee_id._get_lunch_break_duration()
+            break_hrs = emp_info['break_hrs']
 
             if raw_hrs >= 6.0:
                 net_hrs = max(0.0, raw_hrs - break_hrs)
@@ -71,25 +129,24 @@ class HrAttendance(models.Model):
             attendance.attendance_break_hours = deducted_break
             attendance.net_worked_hours = net_hrs
 
-            target_date = attendance.check_in.date() if attendance.check_in else False
-            is_holiday = attendance.employee_id._is_public_holiday_on_day(target_date) if (attendance.employee_id and target_date) else False
-            attendance.is_public_holiday = is_holiday
-
-            if attendance.employee_id.is_manager_exempt():
-                # Manager Exemption: No overtime and no lateness deductions
+            if emp_info['is_manager']:
                 attendance.daily_overtime_hours = 0.0
                 attendance.daily_undertime_hours = 0.0
                 attendance.daily_variance_hours = 0.0
+                attendance.is_public_holiday = False
                 continue
 
+            is_holiday = bool(target_date and target_date in public_holiday_dates)
+            attendance.is_public_holiday = is_holiday
+
             if is_holiday:
-                # Public Holiday: Scheduled hours are 0 -> all net worked hours count as Extra Hours, 0 lateness
+                # Public Holiday: Scheduled hours are 0 -> all net worked hours (before & after lunch break) count as Extra Hours, 0 lateness
                 attendance.daily_overtime_hours = net_hrs
                 attendance.daily_undertime_hours = 0.0
                 attendance.daily_variance_hours = net_hrs
                 continue
 
-            expected_hrs = attendance.employee_id._get_expected_hours_on_day(target_date) if (attendance.employee_id and target_date) else 8.0
+            expected_hrs = 8.0
             standard_target = expected_hrs if expected_hrs > 0 else 8.0
             excess = net_hrs - standard_target
             min_ot_threshold = 0.75         # 45 minutes Overtime threshold
@@ -111,6 +168,10 @@ class HrAttendance(models.Model):
     @api.depends('worked_hours', 'employee_id')
     def _compute_overtime_hours(self):
         """High-performance in-memory calculation (0 DB queries per row)."""
+        valid_atts = self.filtered(lambda a: a.check_in and a.employee_id)
+        dates = [a.check_in.date() for a in valid_atts] if valid_atts else []
+        public_holiday_dates = self._get_public_holiday_dates_batch(min(dates), max(dates)) if dates else set()
+
         for attendance in self:
             if not attendance.employee_id or not attendance.worked_hours:
                 attendance.overtime_hours = 0.0
@@ -124,11 +185,11 @@ class HrAttendance(models.Model):
             break_hrs = attendance.employee_id._get_lunch_break_duration()
             net_hrs = max(0.0, raw_hrs - break_hrs) if raw_hrs >= 6.0 else raw_hrs
             target_date = attendance.check_in.date() if attendance.check_in else False
-            is_holiday = attendance.employee_id._is_public_holiday_on_day(target_date) if (attendance.employee_id and target_date) else False
+            is_holiday = bool(target_date and target_date in public_holiday_dates)
             if is_holiday:
                 attendance.overtime_hours = net_hrs
                 continue
-            expected_hrs = attendance.employee_id._get_expected_hours_on_day(target_date) if (attendance.employee_id and target_date) else 8.0
+            expected_hrs = 8.0
             standard_target = expected_hrs if expected_hrs > 0 else 8.0
             excess = net_hrs - standard_target
             attendance.overtime_hours = excess if excess >= 0.75 else 0.0
@@ -227,23 +288,7 @@ class HrAttendance(models.Model):
                 vals['validated_overtime_hours'] = att_ot
         elif vals.get('overtime_status') == 'refused' and 'validated_overtime_hours' not in vals:
             vals['validated_overtime_hours'] = 0.0
-
-        # Temporarily set linked validated work entries to draft to bypass Odoo's modification lock
-        validated_we = self.env['hr.work.entry']
-        if 'hr.work.entry' in self.env:
-            for att in self:
-                if hasattr(att, 'work_entry_ids') and att.work_entry_ids:
-                    val_entries = att.work_entry_ids.filtered(lambda w: w.state == 'validated')
-                    if val_entries:
-                        val_entries.sudo().write({'state': 'draft'})
-                        validated_we |= val_entries
-
-        try:
-            res = super().write(vals)
-        finally:
-            if validated_we:
-                validated_we.sudo().write({'state': 'validated'})
-        return res
+        return super(HrAttendance, self.with_context(bypass_work_entry_check=True)).write(vals)
 
     @api.depends('worked_hours', 'employee_id', 'daily_overtime_hours')
     def _compute_eligible_overtime(self):
