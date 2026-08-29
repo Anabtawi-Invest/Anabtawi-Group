@@ -14,7 +14,7 @@
 
             <!-- Ensure standard Approve button is visible only when there are extra hours to approve -->
             <xpath expr="//button[@name='action_approve_overtime']" position="attributes">
-                <attribute name="invisible">overtime_status not in ['to_approve', 'refused'] or not overtime_status or daily_overtime_hours &lt;= 0</attribute>
+                <attribute name="invisible">overtime_status not in ['to_approve', 'refused'] or not overtime_status or daily_overtime_hours &lt; 0.75</attribute>
             </xpath>
 
             <!-- Hide native overtime_hours and daily_variance_hours in favor of separate clean fields -->
@@ -28,6 +28,7 @@
                 <field name="net_worked_hours" widget="float_time" readonly="1" string="Net Worked Hours"/>
                 <field name="daily_undertime_hours" widget="float_time" readonly="1" string="Daily Lateness"/>
                 <field name="daily_overtime_hours" widget="float_time" readonly="1" string="Daily Extra Hours"/>
+                <field name="is_public_holiday" readonly="1" string="Public Holiday"/>
             </xpath>
         </field>
     </record>
@@ -43,12 +44,13 @@
                 <field name="net_worked_hours" widget="float_time" optional="show" string="Net Worked Hours"/>
                 <field name="daily_undertime_hours" widget="float_time" optional="show" string="Daily Lateness"/>
                 <field name="daily_overtime_hours" widget="float_time" optional="show" string="Daily Extra Hours"/>
+                <field name="is_public_holiday" optional="show" string="Public Holiday"/>
                 <button name="action_approve_factory_overtime" type="object" icon="fa-check text-success"
                         title="Approve Extra Hours"
-                        invisible="daily_overtime_hours &lt;= 0 or overtime_status == 'approved'"/>
+                        invisible="daily_overtime_hours &lt; 0.75 or overtime_status == 'approved'"/>
                 <button name="action_refuse_factory_overtime" type="object" icon="fa-times text-danger"
                         title="Refuse Extra Hours"
-                        invisible="daily_overtime_hours &lt;= 0 or overtime_status == 'refused'"/>
+                        invisible="daily_overtime_hours &lt; 0.75 or overtime_status == 'refused'"/>
             </xpath>
         </field>
     </record>
@@ -64,9 +66,10 @@
                 <field name="net_worked_hours" widget="float_time" optional="show" string="Net Worked Hours"/>
                 <field name="daily_undertime_hours" widget="float_time" optional="show" string="Daily Lateness"/>
                 <field name="daily_overtime_hours" widget="float_time" optional="show" string="Daily Extra Hours"/>
+                <field name="is_public_holiday" optional="show" string="Public Holiday"/>
             </xpath>
             <xpath expr="//list/button[@name='action_approve_overtime' and @icon='fa-check']" position="attributes">
-                <attribute name="invisible">overtime_status not in ['to_approve', 'refused'] or daily_overtime_hours &lt;= 0</attribute>
+                <attribute name="invisible">overtime_status not in ['to_approve', 'refused'] or daily_overtime_hours &lt; 0.75</attribute>
             </xpath>
         </field>
     </record>
@@ -81,7 +84,8 @@
             <xpath expr="//filter[last()]" position="after">
                 <separator/>
                 <filter string="Has Lateness" name="filter_has_lateness" domain="[('daily_undertime_hours', '&gt;', 0)]"/>
-                <filter string="Has Extra Hours" name="filter_has_extra_hours" domain="[('daily_overtime_hours', '&gt;', 0)]"/>
+                <filter string="Has Extra Hours" name="filter_has_extra_hours" domain="[('daily_overtime_hours', '&gt;=', 0.75)]"/>
+                <filter string="Public Holiday Attendance" name="filter_public_holiday" domain="[('is_public_holiday', '=', True)]"/>
             </xpath>
         </field>
     </record>

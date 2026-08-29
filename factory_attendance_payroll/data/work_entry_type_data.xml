@@ -8,11 +8,11 @@
             <field name="color">1</field>
             <field name="is_leave">False</field>
         </record>
-        <record id="work_entry_type_extra_hours_ends" model="hr.work.entry.type">
-            <field name="name">Extra Hours ends</field>
-            <field name="display_code">EXT</field>
-            <field name="code">EXTRA_HOURS_ENDS</field>
-            <field name="color">3</field>
+        <record id="work_entry_type_holiday_worked" model="hr.work.entry.type">
+            <field name="name">Public Holiday Worked</field>
+            <field name="display_code">PHW</field>
+            <field name="code">HOLIDAY_WORKED</field>
+            <field name="color">6</field>
             <field name="is_leave">False</field>
         </record>
     </data>
