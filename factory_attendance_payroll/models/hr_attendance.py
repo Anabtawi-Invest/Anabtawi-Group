@@ -165,34 +165,20 @@ class HrAttendance(models.Model):
                 attendance.daily_undertime_hours = 0.0
                 attendance.daily_variance_hours = 0.0
 
-    @api.depends('worked_hours', 'employee_id')
+    @api.depends('daily_overtime_hours', 'employee_id')
     def _compute_overtime_hours(self):
-        """High-performance in-memory calculation (0 DB queries per row)."""
-        valid_atts = self.filtered(lambda a: a.check_in and a.employee_id)
-        dates = [a.check_in.date() for a in valid_atts] if valid_atts else []
-        public_holiday_dates = self._get_public_holiday_dates_batch(min(dates), max(dates)) if dates else set()
-
+        """High-performance in-memory direct assignment (0 DB queries per row)."""
         for attendance in self:
-            if not attendance.employee_id or not attendance.worked_hours:
+            if attendance.employee_id and attendance.employee_id.is_manager_exempt():
                 attendance.overtime_hours = 0.0
-                continue
+            else:
+                attendance.overtime_hours = attendance.daily_overtime_hours or 0.0
 
-            if attendance.employee_id.is_manager_exempt():
-                attendance.overtime_hours = 0.0
-                continue
-
-            raw_hrs = attendance.worked_hours or 0.0
-            break_hrs = attendance.employee_id._get_lunch_break_duration()
-            net_hrs = max(0.0, raw_hrs - break_hrs) if raw_hrs >= 6.0 else raw_hrs
-            target_date = attendance.check_in.date() if attendance.check_in else False
-            is_holiday = bool(target_date and target_date in public_holiday_dates)
-            if is_holiday:
-                attendance.overtime_hours = net_hrs
-                continue
-            expected_hrs = 8.0
-            standard_target = expected_hrs if expected_hrs > 0 else 8.0
-            excess = net_hrs - standard_target
-            attendance.overtime_hours = excess if excess >= 0.75 else 0.0
+    @api.depends('daily_overtime_hours')
+    def _compute_eligible_overtime(self):
+        """Instant eligibility flag based on Daily Extra Hours."""
+        for attendance in self:
+            attendance.eligible_overtime = bool(attendance.daily_overtime_hours >= 0.75)
 
     def action_approve_factory_overtime(self):
         """

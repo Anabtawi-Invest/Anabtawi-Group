@@ -101,9 +101,6 @@ class HrPayslip(models.Model):
                 payslip.undertime_cash_deduction_hours = 0.0
             return
 
-        # 1. Bulk Rest Day Conversion
-        valid_slips._convert_flexible_rest_days_to_ars()
-
         emp_ids = valid_slips.mapped('employee_id').ids
         min_date = min(valid_slips.mapped('date_from'))
         max_date = max(valid_slips.mapped('date_to'))
@@ -450,18 +447,16 @@ class HrPayslip(models.Model):
             break_hrs = emp._get_lunch_break_duration() if emp else 1.0
             w = emp.wage if emp else 0.0
 
-            # Dynamic hourly rate: wage / total scheduled hours from worked days lines
-            # We first calculate raw attendance hours, then compute rate against total (attendance + absent)
-            attendances = self.env['hr.attendance'].sudo().search([
-                ('employee_id', '=', emp.id),
-                ('check_in', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
-                ('check_in', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
-            ])
-            worked_shifts_count = len(set(att.check_in.date() for att in attendances))
-            total_raw_attendance_hrs = round(sum(att.worked_hours for att in attendances), 2)
+            # Separate regular attendances from public holiday worked attendances
+            holiday_dates = payslip.env['hr.attendance']._get_public_holiday_dates_batch(payslip.date_from, payslip.date_to)
+            regular_attendances = attendances.filtered(lambda a: a.check_in.date() not in holiday_dates)
+            holiday_attendances = attendances.filtered(lambda a: a.check_in.date() in holiday_dates)
+
+            total_regular_attendance_hrs = round(sum(att.worked_hours for att in regular_attendances), 2)
+            total_holiday_worked_hrs = round(sum(att.worked_hours for att in holiday_attendances), 2)
 
             rem_cash_deduction_hrs = round(payslip.undertime_cash_deduction_hours, 2)
-            total_scheduled_hours = total_raw_attendance_hrs + rem_cash_deduction_hrs
+            total_scheduled_hours = total_regular_attendance_hrs + total_holiday_worked_hrs + rem_cash_deduction_hrs
             if total_scheduled_hours > 0:
                 hourly_rate = w / total_scheduled_hours
             else:
@@ -487,15 +482,23 @@ class HrPayslip(models.Model):
                 if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
                     continue
 
-                # 1. Attendance Line: Dynamically set hours to total raw attendance worked hours from Attendance App
+                # 1. Attendance Line: Only includes regular workday attendances (prevents holiday double count)
                 if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
-                    if total_raw_attendance_hrs > 0.01:
-                        line['number_of_hours'] = total_raw_attendance_hrs
-                        line['number_of_days'] = round(total_raw_attendance_hrs / 8.0, 2)
-                        line['amount'] = round(total_raw_attendance_hrs * hourly_rate, 3)
+                    if total_regular_attendance_hrs > 0.01:
+                        line['number_of_hours'] = total_regular_attendance_hrs
+                        line['number_of_days'] = round(total_regular_attendance_hrs / 8.0, 2)
+                        line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
+                        filtered_lines.append(line)
+
+                # 2. Public Holiday Line: Uses holiday worked hours at 150% rate (or scheduled hours if taken off)
+                elif code in ['GTO', 'PHD', 'HOLIDAY', 'LEAVE110', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name:
+                    hol_hrs = total_holiday_worked_hrs if total_holiday_worked_hrs > 0.01 else (line.get('number_of_hours') or 8.0)
+                    line['number_of_hours'] = hol_hrs
+                    line['number_of_days'] = round(hol_hrs / 8.0, 2)
+                    line['amount'] = round(hol_hrs * hourly_rate * 1.5, 3)
                     filtered_lines.append(line)
 
-                # 2. Overtime Line
+                # 3. Overtime Line
                 elif code in ['OVERTIME', 'EXTRA', 'OUT'] or 'overtime' in we_name or 'extra' in we_name:
                     if net_extra_hrs > 0.01:
                         line['number_of_hours'] = net_extra_hrs
@@ -503,7 +506,7 @@ class HrPayslip(models.Model):
                         line['amount'] = round(net_extra_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
-                # 3. Absent / Unpaid Deduction Line: ONLY include if Step 3 Cash Deduction > 0!
+                # 4. Absent / Unpaid Deduction Line: ONLY include if Step 3 Cash Deduction > 0!
                 elif code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in we_name:
                     if rem_cash_deduction_hrs > 0.01:
                         line['number_of_hours'] = rem_cash_deduction_hrs
