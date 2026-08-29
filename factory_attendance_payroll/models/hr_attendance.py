@@ -227,7 +227,23 @@ class HrAttendance(models.Model):
                 vals['validated_overtime_hours'] = att_ot
         elif vals.get('overtime_status') == 'refused' and 'validated_overtime_hours' not in vals:
             vals['validated_overtime_hours'] = 0.0
-        return super().write(vals)
+
+        # Temporarily set linked validated work entries to draft to bypass Odoo's modification lock
+        validated_we = self.env['hr.work.entry']
+        if 'hr.work.entry' in self.env:
+            for att in self:
+                if hasattr(att, 'work_entry_ids') and att.work_entry_ids:
+                    val_entries = att.work_entry_ids.filtered(lambda w: w.state == 'validated')
+                    if val_entries:
+                        val_entries.sudo().write({'state': 'draft'})
+                        validated_we |= val_entries
+
+        try:
+            res = super().write(vals)
+        finally:
+            if validated_we:
+                validated_we.sudo().write({'state': 'validated'})
+        return res
 
     @api.depends('worked_hours', 'employee_id', 'daily_overtime_hours')
     def _compute_eligible_overtime(self):

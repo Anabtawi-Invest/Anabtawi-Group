@@ -44,6 +44,16 @@ def pre_init_hook(env):
         except Exception:
             pass
 
+    with env.cr.savepoint():
+        try:
+            env.cr.execute("""
+                UPDATE hr_work_entry 
+                SET state = 'draft' 
+                WHERE state = 'validated';
+            """)
+        except Exception:
+            pass
+
 def post_init_hook(env):
     """
     Post-Init Hook:
