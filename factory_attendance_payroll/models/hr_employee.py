@@ -128,11 +128,12 @@ class HrEmployee(models.Model):
     # -------------------------------------------------------------------------
 
     def generate_work_entries(self, date_start, date_stop, force=False):
-        """After a force regenerate (Reset), re-apply ABSENT for the full range with monthly 4-day threshold rule."""
+        """After a force regenerate (Reset), re-apply ABSENT for the full range with monthly 4-day threshold rule and sync Public Holiday extra hours."""
         result = super().generate_work_entries(date_start, date_stop, force=force)
+        employees = self if self else self.search([("active", "=", True)])
         if force:
-            employees = self if self else self.search([("active", "=", True)])
             employees._create_absent_work_entries_for_period(date_start, date_stop)
+        employees._sync_public_holiday_work_entries(date_start, date_stop)
         return result
 
     @api.model
@@ -141,7 +142,126 @@ class HrEmployee(models.Model):
         today = fields.Date.context_today(self)
         yesterday = today - timedelta(days=1)
         first_day_of_month = yesterday.replace(day=1)
-        self.search([("active", "=", True)])._create_absent_work_entries_for_period(first_day_of_month, yesterday)
+        active_employees = self.search([("active", "=", True)])
+        active_employees._create_absent_work_entries_for_period(first_day_of_month, yesterday)
+        active_employees._sync_public_holiday_work_entries(first_day_of_month, yesterday)
+
+    def _get_extra_hours_ends_work_entry_type(self):
+        """Finds or creates the 'Extra Hours ends' work entry type."""
+        wet_model = self.env["hr.work.entry.type"].sudo()
+        extra_type = self.env.ref(
+            "factory_attendance_payroll.work_entry_type_extra_hours_ends",
+            raise_if_not_found=False,
+        )
+        if not extra_type:
+            extra_type = wet_model.search([("name", "=", "Extra Hours ends")], limit=1)
+        if not extra_type:
+            extra_type = wet_model.search([("code", "=", "EXTRA_HOURS_ENDS")], limit=1)
+        if not extra_type:
+            extra_type = wet_model.search([("name", "ilike", "Extra Hours ends")], limit=1)
+        if not extra_type:
+            extra_type = wet_model.search([("name", "ilike", "Extra Hours")], limit=1)
+        if not extra_type:
+            extra_type = wet_model.create({
+                "name": "Extra Hours ends",
+                "display_code": "EXT",
+                "code": "EXTRA_HOURS_ENDS",
+                "color": 3,
+                "is_leave": False,
+            })
+        return extra_type
+
+    def _sync_public_holiday_work_entries(self, date_from, date_to):
+        """
+        Synchronizes attendances worked on Public Holidays into 'Extra Hours ends' work entries.
+        """
+        if not self:
+            return
+        date_from = fields.Date.to_date(date_from)
+        date_to = fields.Date.to_date(date_to)
+        if not date_from or not date_to or date_from > date_to:
+            return
+
+        extra_type = self[0]._get_extra_hours_ends_work_entry_type()
+        if not extra_type or "hr.work.entry" not in self.env:
+            return
+
+        WorkEntry = self.env["hr.work.entry"].sudo()
+        we_fields = WorkEntry._fields
+        start_f = next((c for c in ['date_start', 'date_from', 'start_datetime', 'date'] if c in we_fields), None)
+        stop_f = next((c for c in ['date_stop', 'date_to', 'end_datetime', 'date'] if c in we_fields), None)
+        if not start_f or not stop_f:
+            return
+
+        emp_ids = self.ids
+        attendances = self.env["hr.attendance"].sudo().search([
+            ("employee_id", "in", emp_ids),
+            ("check_in", ">=", fields.Datetime.to_string(datetime.combine(date_from, time.min))),
+            ("check_in", "<=", fields.Datetime.to_string(datetime.combine(date_to, time.max))),
+        ])
+
+        for employee in self:
+            emp_atts = attendances.filtered(lambda a: a.employee_id.id == employee.id and a.check_in)
+            for att in emp_atts:
+                att_date = att.check_in.date()
+                if not employee._is_public_holiday(att_date):
+                    continue
+
+                # Employee attended on a public holiday!
+                raw_hrs = att.worked_hours or 0.0
+                break_hrs = employee._get_lunch_break_duration()
+                if raw_hrs >= 6.0:
+                    net_hrs = max(0.0, raw_hrs - break_hrs)
+                elif raw_hrs > 4.0:
+                    net_hrs = max(0.0, raw_hrs - (break_hrs / 2.0))
+                else:
+                    net_hrs = raw_hrs
+
+                day_start_dt = datetime.combine(att_date, time.min)
+                day_end_dt = datetime.combine(att_date, time.max)
+
+                # Look for existing non-leave attendance work entries on this day
+                existing_we = WorkEntry.search([
+                    ("employee_id", "=", employee.id),
+                    (start_f, "<=", day_end_dt),
+                    (stop_f, ">=", day_start_dt),
+                    ("state", "!=", "cancelled"),
+                    ("work_entry_type_id.is_leave", "=", False),
+                ])
+
+                if existing_we:
+                    editable_we = existing_we.filtered(lambda w: w.state != 'validated')
+                    if editable_we:
+                        editable_we.write({"work_entry_type_id": extra_type.id})
+                    else:
+                        for w in existing_we:
+                            w.write({"state": "draft"})
+                            w.write({"work_entry_type_id": extra_type.id})
+                else:
+                    version = employee._get_versions_with_contract_overlap_with_period(att_date, att_date)[:1]
+                    vals = {
+                        "employee_id": employee.id,
+                        "work_entry_type_id": extra_type.id,
+                        "company_id": employee.company_id.id,
+                        "state": "draft",
+                    }
+                    if version:
+                        if "version_id" in we_fields:
+                            vals["version_id"] = version.id
+                        elif "contract_id" in we_fields:
+                            vals["contract_id"] = version.id
+                    if "duration" in we_fields:
+                        vals["duration"] = round(net_hrs, 2)
+                    if start_f == "date":
+                        vals["date"] = att_date
+                    else:
+                        vals[start_f] = att.check_in
+                        vals[stop_f] = att.check_out or (att.check_in + timedelta(hours=net_hrs))
+
+                    try:
+                        WorkEntry.create(vals)
+                    except Exception as e:
+                        _logger.debug("Could not create Extra Hours ends work entry: %s", e)
 
     def _get_absent_work_entry_type(self):
         absent_type = self.env.ref(
@@ -341,14 +461,92 @@ class HrEmployee(models.Model):
             dur,
         )
 
+    def _is_public_holiday(self, target_date):
+        """
+        Checks if target_date is a Public Holiday / Global Time Off for this employee:
+        1. resource.calendar.leaves (Global time off / Public holidays for the calendar/company/resource).
+        2. hr.leave approved public holiday records.
+        3. hr.work.entry records with Public Holiday types (PHD, GTO, HOLIDAY, etc.).
+        """
+        self.ensure_one()
+        day_start_utc, next_day_start_utc, _employee_tz = self._get_day_utc_bounds(target_date)
+        day_start_str = fields.Datetime.to_string(day_start_utc)
+        next_day_start_str = fields.Datetime.to_string(next_day_start_utc)
+
+        # 1. Check resource.calendar.leaves
+        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
+        calendar = (
+            version.resource_calendar_id
+            or self.resource_calendar_id
+            or self.company_id.resource_calendar_id
+        )
+        if "resource.calendar.leaves" in self.env:
+            cal_domain = [
+                ("date_from", "<", next_day_start_str),
+                ("date_to", ">", day_start_str),
+                ("resource_id", "in", [False, self.resource_id.id if self.resource_id else False]),
+            ]
+            if calendar:
+                cal_domain.append(("calendar_id", "in", [False, calendar.id]))
+            global_leaves = self.env["resource.calendar.leaves"].sudo().search_count(cal_domain)
+            if global_leaves > 0:
+                return True
+
+        # 2. Check hr.leave records with approved/validated state
+        if "hr.leave" in self.env:
+            emp_leaves = self.env["hr.leave"].sudo().search([
+                ("employee_id", "=", self.id),
+                ("state", "in", ["validate", "validate1"]),
+                ("date_from", "<", next_day_start_str),
+                ("date_to", ">", day_start_str),
+                "!", ("name", "ilike", "Lateness Settlement"),
+            ])
+            for lve in emp_leaves:
+                lve_type = lve.holiday_status_id
+                name = (lve_type.name or "").lower()
+                code = (getattr(lve_type, "code", "") or "").upper()
+                if any(k in name for k in ["holiday", "public", "عطلة", "رسمية"]) or code in ["PHD", "HOLIDAY", "GTO", "LEAVE100"]:
+                    return True
+
+        # 3. Check hr.work.entry for existing public holiday work entries
+        if "hr.work.entry" in self.env:
+            WorkEntry = self.env["hr.work.entry"].sudo()
+            we_fields = WorkEntry._fields
+            start_f = next((c for c in ['date_start', 'date_from', 'start_datetime', 'date'] if c in we_fields), None)
+            stop_f = next((c for c in ['date_stop', 'date_to', 'end_datetime', 'date'] if c in we_fields), None)
+            if start_f and stop_f:
+                day_start_dt = datetime.combine(target_date, time.min)
+                day_end_dt = datetime.combine(target_date, time.max)
+                work_entries = WorkEntry.search([
+                    ("employee_id", "=", self.id),
+                    (start_f, "<=", day_end_dt),
+                    (stop_f, ">=", day_start_dt),
+                    ("state", "!=", "cancelled"),
+                ])
+                for we in work_entries:
+                    type_obj = we.work_entry_type_id
+                    if not type_obj:
+                        continue
+                    code = (type_obj.code or "").strip().upper()
+                    display_code = (getattr(type_obj, "display_code", False) or "").strip().upper()
+                    name = (type_obj.name or "").lower()
+                    if code in ["PHD", "HOLIDAY", "GTO", "LEAVE100"] or display_code in ["PHD", "GTO"] or any(k in name for k in ["holiday", "public", "عطلة", "رسمية"]):
+                        return True
+
+        return False
+
     def _has_approved_leave_on_day(self, target_date):
         """
         Checks whether the employee has an approved Time Off / Leave (Silver color in UI) on target_date:
-        1. Approved hr.leave in states ['validate', 'validate1'].
-        2. Existing leave work entry in hr.work.entry (is_leave=True or excused leave code).
-        3. Resource calendar global leaves / public holidays.
+        1. Public Holiday / Global Time Off.
+        2. Approved hr.leave in states ['validate', 'validate1'].
+        3. Existing leave work entry in hr.work.entry (is_leave=True or excused leave code).
+        4. Resource calendar global leaves / public holidays.
         """
         self.ensure_one()
+        if self._is_public_holiday(target_date):
+            return True
+
         day_start_utc, next_day_start_utc, _employee_tz = self._get_day_utc_bounds(target_date)
 
         # 1. Check hr.leave records with approved/validated state (excluding settlement deduction records)
@@ -383,34 +581,23 @@ class HrEmployee(models.Model):
                 return True
 
         # 3. Check resource calendar global leaves / public holidays
-        if self._is_public_holiday_on_day(target_date):
-            return True
-
-        return False
-
-    def _is_public_holiday_on_day(self, target_date):
-        """
-        Checks whether target_date is a Public Holiday / Global Leave in resource.calendar.leaves
-        for the employee's calendar.
-        """
-        self.ensure_one()
-        if not target_date or "resource.calendar.leaves" not in self.env:
-            return False
-        day_start_utc, next_day_start_utc, _employee_tz = self._get_day_utc_bounds(target_date)
         version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
         calendar = (
             version.resource_calendar_id
             or self.resource_calendar_id
             or self.company_id.resource_calendar_id
         )
-        if not calendar:
-            return False
-        return bool(self.env["resource.calendar.leaves"].sudo().search_count([
-            ("calendar_id", "=", calendar.id),
-            ("resource_id", "in", [False, self.resource_id.id if self.resource_id else False]),
-            ("date_from", "<", fields.Datetime.to_string(next_day_start_utc)),
-            ("date_to", ">", fields.Datetime.to_string(day_start_utc)),
-        ]))
+        if calendar and "resource.calendar.leaves" in self.env:
+            global_leaves = self.env["resource.calendar.leaves"].sudo().search_count([
+                ("calendar_id", "=", calendar.id),
+                ("resource_id", "in", [False, self.resource_id.id if self.resource_id else False]),
+                ("date_from", "<", fields.Datetime.to_string(next_day_start_utc)),
+                ("date_to", ">", fields.Datetime.to_string(day_start_utc)),
+            ])
+            if global_leaves > 0:
+                return True
+
+        return False
 
     def _has_checkin_on_day(self, target_date):
         """Checks if the employee has any attendance check-in recorded on target_date."""
@@ -432,6 +619,9 @@ class HrEmployee(models.Model):
     def _get_expected_hours_on_day(self, target_date):
         """Return expected net work hours (after break deduction) based on contract work entry source (planning vs calendar)."""
         self.ensure_one()
+        if self._is_public_holiday(target_date):
+            return 0.0
+
         source = self._get_work_entry_source_on_day(target_date)
         if source == "planning":
             gross_hrs = self._get_planning_hours_on_day(target_date)
