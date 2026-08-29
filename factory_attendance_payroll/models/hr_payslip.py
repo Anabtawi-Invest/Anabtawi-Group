@@ -447,8 +447,15 @@ class HrPayslip(models.Model):
             break_hrs = emp._get_lunch_break_duration() if emp else 1.0
             w = emp.wage if emp else 0.0
 
+            # Fetch all attendances for this payslip period
+            attendances = self.env['hr.attendance'].sudo().search([
+                ('employee_id', '=', emp.id),
+                ('check_in', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                ('check_in', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
+            ])
+
             # Separate regular attendances from public holiday worked attendances
-            holiday_dates = payslip.env['hr.attendance']._get_public_holiday_dates_batch(payslip.date_from, payslip.date_to)
+            holiday_dates = self.env['hr.attendance']._get_public_holiday_dates_batch(payslip.date_from, payslip.date_to)
             regular_attendances = attendances.filtered(lambda a: a.check_in.date() not in holiday_dates)
             holiday_attendances = attendances.filtered(lambda a: a.check_in.date() in holiday_dates)
 
