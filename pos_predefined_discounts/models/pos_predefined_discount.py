@@ -66,36 +66,58 @@ class PosPredefinedDiscount(models.Model):
 
     @api.model
     def pos_get_employee_partners(self, config_id=False, search=False, limit=200):
-        """Return res.partner records linked to active employees (for POS picker)."""
+        """Return employee partners for the POS picker.
+
+        Rows are keyed by partner id (for setting the POS customer), but the
+        displayed name is the employee name. Search matches employee name,
+        barcode, and linked partner name.
+        """
         Employee = self.env["hr.employee"].sudo()
-        domain = [("active", "=", True)]
-        company = False
+        domain = [
+            ("active", "=", True),
+            "|",
+            ("work_contact_id", "!=", False),
+            ("user_partner_id", "!=", False),
+        ]
         if config_id:
             config = self.env["pos.config"].sudo().browse(int(config_id)).exists()
             if config and config.company_id:
-                company = config.company_id
-                domain += ["|", ("company_id", "=", False), ("company_id", "=", company.id)]
+                domain = [
+                    "|",
+                    ("company_id", "=", False),
+                    ("company_id", "=", config.company_id.id),
+                ] + domain
 
-        employees = Employee.search(domain, order="name")
-        partners = (employees.mapped("work_contact_id") | employees.mapped("user_partner_id")).exists()
-
+        search = str(search or "").strip()
         if search:
-            search = str(search).strip()
-            if search:
-                partners = partners.filtered(
-                    lambda p: search.lower() in (p.name or "").lower()
-                    or search.lower() in (p.barcode or "").lower()
-                )
+            domain += [
+                "|",
+                "|",
+                "|",
+                ("name", "ilike", search),
+                ("barcode", "ilike", search),
+                ("work_contact_id.name", "ilike", search),
+                ("user_partner_id.name", "ilike", search),
+            ]
 
-        partners = partners.sorted(key=lambda p: (p.name or "").lower())[: int(limit or 200)]
-        return [
-            {
-                "id": partner.id,
-                "name": partner.name,
-                "barcode": partner.barcode or "",
-            }
-            for partner in partners
-        ]
+        employees = Employee.search(domain, order="name", limit=int(limit or 200))
+        result = []
+        seen_partner_ids = set()
+        for employee in employees:
+            partner = employee.work_contact_id or employee.user_partner_id
+            if not partner or partner.id in seen_partner_ids:
+                continue
+            seen_partner_ids.add(partner.id)
+            result.append(
+                {
+                    "id": partner.id,
+                    "name": employee.name,
+                    "partner_name": partner.name,
+                    "barcode": employee.barcode or partner.barcode or "",
+                    "employee_id": employee.id,
+                }
+            )
+        return result
 
     @api.model
     def _employee_for_partner(self, partner, company=False):

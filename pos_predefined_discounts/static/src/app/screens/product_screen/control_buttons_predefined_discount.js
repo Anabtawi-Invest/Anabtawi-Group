@@ -242,6 +242,7 @@ patch(ControlButtons.prototype, {
                 title: _t("Employee Discount"),
                 discounts,
                 partners,
+                configId: this.pos.config.id,
             });
             if (!payload?.discountId || !payload?.partnerId) {
                 return;

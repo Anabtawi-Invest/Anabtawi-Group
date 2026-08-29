@@ -7,17 +7,22 @@
                 <input
                     class="form-control mb-2"
                     type="text"
-                    placeholder="Search by name or barcode..."
-                    t-model="state.search"
+                    placeholder="Search by employee name or barcode..."
+                    t-att-value="state.search"
+                    t-on-input="onSearchInput"
                 />
-                <select class="form-select" t-model.number="state.partnerId">
-                    <t t-foreach="filteredPartners" t-as="partner" t-key="partner.id">
+                <select class="form-select" t-model.number="state.partnerId" t-att-disabled="state.loading">
+                    <t t-if="!state.partners.length">
+                        <option value="">No employees found</option>
+                    </t>
+                    <t t-foreach="state.partners" t-as="partner" t-key="partner.id">
                         <option t-att-value="partner.id">
                             <t t-esc="partner.name"/>
                             <t t-if="partner.barcode"> (<t t-esc="partner.barcode"/>)</t>
                         </option>
                     </t>
                 </select>
+                <div t-if="state.loading" class="form-text">Searching...</div>
             </div>
 
             <div class="mb-3">
