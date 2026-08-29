@@ -36,6 +36,35 @@ class HrEmployee(models.Model):
         digits = string.digits
         return "".join(secrets.choice(digits) for _ in range(int(length)))
 
+    def write(self, vals):
+        vals = dict(vals or {})
+        if "employee_password" in vals:
+            password = vals.get("employee_password")
+            if password in (False, None, ""):
+                vals.setdefault("employee_password_generated_at", False)
+                vals.setdefault("employee_password_expires_at", False)
+            else:
+                # Manual or portal OTP set: always refresh the 5-minute validity window.
+                now = fields.Datetime.now()
+                vals["employee_password"] = str(password).strip()
+                vals["employee_password_generated_at"] = now
+                vals["employee_password_expires_at"] = now + relativedelta(minutes=5)
+        return super().write(vals)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        now = fields.Datetime.now()
+        prepared = []
+        for vals in vals_list:
+            vals = dict(vals or {})
+            password = vals.get("employee_password")
+            if password not in (False, None, ""):
+                vals["employee_password"] = str(password).strip()
+                vals["employee_password_generated_at"] = now
+                vals["employee_password_expires_at"] = now + relativedelta(minutes=5)
+            prepared.append(vals)
+        return super().create(prepared)
+
     def action_generate_employee_portal_otp(self):
         """Generate a 5-digit OTP for the Employee Portal.
 
