@@ -332,11 +332,6 @@
                                 <div class="pc-check-head mb-2">
                                     <t t-esc="employee.name if employee else request.env.user.name"/>
                                 </div>
-                                <div class="mb-3 text-end">
-                                    <a href="/my/overtime_approvals" class="btn btn-outline-primary btn-sm">
-                                        <t t-esc="txt_overtime_approvals_btn"/>
-                                    </a>
-                                </div>
                                 <div t-if="show_success" class="alert alert-success py-2" role="alert">
                                     <t t-esc="txt_attendance_updated"/>
                                 </div>

@@ -643,173 +643,33 @@ class AnabtawiMobileAPI(http.Controller):
             "state": leave.state,
         } for leave in leaves]})
 
-    def _ensure_default_overtime_categories(self, employee):
-        """Create/read the standard Employee App overtime categories.
-
-        The PWA depends on /anabtawi/mobile/overtime/categories returning real
-        approval.category records. Some databases do not have the categories
-        created yet, so the API safely creates them when the overtime bridge
-        fields are available. This is limited to approval.category only and does
-        not change normal Odoo login/session behavior.
-        """
-        Category = request.env["approval.category"].sudo()
-        if "is_overtime_category" not in Category._fields:
-            _logger.warning("Overtime category field is_overtime_category is missing on approval.category")
-            return Category.browse()
-
-        default_categories = [
-            ("Regular Weekday OT", 10),
-            ("Weekend / Weekly Off OT", 20),
-            ("Public Holiday OT", 30),
-            ("Emergency OT", 40),
-        ]
-
-        created_or_found = Category.browse()
-        for name, sequence in default_categories:
-            domain = [
-                ("name", "=", name),
-                ("is_overtime_category", "=", True),
-            ]
-            if "company_id" in Category._fields:
-                domain.append(("company_id", "in", [False, employee.company_id.id]))
-
-            category = Category.search(domain, limit=1)
-            if not category:
-                vals = {
-                    "name": name,
-                    "is_overtime_category": True,
-                }
-                if "sequence" in Category._fields:
-                    vals["sequence"] = sequence
-                if "company_id" in Category._fields and employee.company_id:
-                    vals["company_id"] = employee.company_id.id
-
-                # Optional metadata fields used by some overtime bridge versions.
-                if "overtime_multiplier" in Category._fields:
-                    vals["overtime_multiplier"] = 1.25 if name == "Regular Weekday OT" else 1.5
-                if "overtime_rate" in Category._fields:
-                    vals["overtime_rate"] = 1.25 if name == "Regular Weekday OT" else 1.5
-                if "description" in Category._fields:
-                    vals["description"] = _("Employee App overtime category")
-
-                try:
-                    category = Category.create(vals)
-                    _logger.info("Created Employee App overtime category: %s", name)
-                except Exception:
-                    _logger.exception("Could not create Employee App overtime category: %s", name)
-                    continue
-            created_or_found |= category
-        return created_or_found
-
-    def _overtime_categories(self, employee):
-        Category = request.env["approval.category"].sudo()
-        if "is_overtime_category" in Category._fields:
-            # Always top up any missing standard categories, not just when the
-            # table is completely empty — otherwise a database with 1-2
-            # manually created categories never gets the rest auto-created.
-            self._ensure_default_overtime_categories(employee)
-
-        domain = []
-        if "is_overtime_category" in Category._fields:
-            domain.append(("is_overtime_category", "=", True))
-        else:
-            # Fallback only for very old/partial bridge deployments.
-            domain = ["|", "|", ("name", "ilike", "overtime"), ("name", "ilike", "OT"), ("name", "ilike", "اضافي")]
-
-        if "company_id" in Category._fields:
-            domain.append(("company_id", "in", [False, employee.company_id.id]))
-
-        return Category.search(domain, order="sequence, id" if "sequence" in Category._fields else "id")
+    def _overtime_feature_disabled(self):
+        return _error(
+            "feature_disabled",
+            _("Overtime approval requests are no longer available."),
+            410,
+        )
 
     @http.route(
         "/anabtawi/mobile/overtime/categories",
         type="http", auth="public", methods=["GET"], csrf=False,
     )
     def overtime_categories(self, **kwargs):
-        employee, _user, _token, error = self._require_employee()
-        if error:
-            return error
-        categories = self._overtime_categories(employee)
-        return _json({"status": "ok", "categories": [
-            {"id": category.id, "name": category.name} for category in categories
-        ]})
+        return self._overtime_feature_disabled()
 
     @http.route(
         "/anabtawi/mobile/overtime/create",
         type="http", auth="public", methods=["POST"], csrf=False,
     )
     def overtime_create(self, **kwargs):
-        employee, user, _token, error = self._require_employee()
-        if error:
-            return error
-        data = _payload()
-        try:
-            category_id = int(data.get("category_id") or 0)
-            date_from = fields.Date.to_date(data.get("date_from"))
-            date_to = fields.Date.to_date(data.get("date_to"))
-            quantity = float(data.get("hours") or data.get("planned_hours") or 0)
-        except (TypeError, ValueError):
-            return _error("invalid_request", _("Valid category, dates, and hours are required."), 422)
-        category = self._overtime_categories(employee).filtered(lambda item: item.id == category_id)
-        if not category:
-            return _error("invalid_category", _("This overtime category is not available."), 422)
-        if not date_from or not date_to or date_to < date_from or quantity <= 0:
-            return _error("invalid_request", _("Check the overtime dates and requested hours."), 422)
-        reason = (data.get("reason") or "").strip()
-        if not reason:
-            return _error("invalid_request", _("A reason is required."), 422)
-        vals = {
-            "name": _("Overtime request — %(employee)s", employee=employee.name),
-            "category_id": category.id,
-            "request_owner_id": user.id,
-            "company_id": employee.company_id.id,
-            "overtime_employee_id": employee.id,
-            "overtime_date_from": date_from,
-            "overtime_date_to": date_to,
-            "quantity": quantity,
-            "date": date_from,
-            "date_start": datetime.combine(date_from, time.min),
-            "date_end": datetime.combine(date_to, time.max),
-        }
-        Approval = request.env["approval.request"].sudo()
-        if "reason" in Approval._fields:
-            vals["reason"] = reason
-        try:
-            with request.env.cr.savepoint():
-                approval = Approval.create(vals)
-                approval.action_confirm()
-        except (UserError, ValidationError) as exc:
-            return _error("validation_error", exc.args[0] if exc.args else str(exc), 422)
-        except Exception:
-            _logger.exception("Mobile overtime creation failed for employee_id=%s", employee.id)
-            return _error("server_error", _("The overtime request could not be saved."), 500)
-        return _json({
-            "status": "ok",
-            "request_id": approval.id,
-            "state": approval.request_status,
-        }, 201)
+        return self._overtime_feature_disabled()
 
     @http.route(
         "/anabtawi/mobile/overtime/list",
         type="http", auth="public", methods=["GET"], csrf=False,
     )
     def overtime_list(self, **kwargs):
-        employee, user, _token, error = self._require_employee()
-        if error:
-            return error
-        approvals = request.env["approval.request"].sudo().search([
-            ("request_owner_id", "=", user.id),
-            ("is_overtime_category", "=", True),
-            ("overtime_employee_id", "=", employee.id),
-        ], order="create_date desc, id desc", limit=30)
-        return _json({"status": "ok", "records": [{
-            "id": approval.id,
-            "name": approval.name,
-            "date_from": fields.Date.to_string(approval.overtime_date_from) if approval.overtime_date_from else None,
-            "date_to": fields.Date.to_string(approval.overtime_date_to) if approval.overtime_date_to else None,
-            "hours": approval.quantity,
-            "state": approval.request_status,
-        } for approval in approvals]})
+        return self._overtime_feature_disabled()
 
 
     @http.route(
