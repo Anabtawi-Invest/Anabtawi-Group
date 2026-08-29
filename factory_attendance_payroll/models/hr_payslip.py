@@ -265,9 +265,10 @@ class HrPayslip(models.Model):
 
                 is_holiday = payslip.employee_id._is_public_holiday_on_day(att_date) if payslip.employee_id else False
                 if is_holiday:
-                    # Public Holiday work: scheduled hours are 0 -> entire net worked time is Extra Hours, 0 undertime
+                    # Public Holiday work: every hour worked credits 1.5 hours (150% rate)
+                    # e.g. 10h worked on holiday → 15h credited in Monthly Overtime Earned
                     if allow_ot and net_hrs > 0:
-                        total_ot += net_hrs
+                        total_ot += net_hrs * 1.5
                     continue
 
                 expected_hrs = payslip.employee_id._get_expected_hours_on_day(att_date) if payslip.employee_id else 8.0
