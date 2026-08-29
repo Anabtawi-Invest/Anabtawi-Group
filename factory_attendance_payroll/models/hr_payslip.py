@@ -460,8 +460,17 @@ class HrPayslip(models.Model):
             regular_attendances = attendances.filtered(lambda a: a.check_in.date() not in holiday_dates)
             holiday_attendances = attendances.filtered(lambda a: a.check_in.date() in holiday_dates)
 
-            total_regular_attendance_hrs = round(sum(att.worked_hours for att in regular_attendances), 2)
-            total_holiday_worked_hrs = round(sum(att.worked_hours for att in holiday_attendances), 2)
+            def _net_hrs(att):
+                """Apply lunch break deduction — same logic as reconciliation engine."""
+                raw = att.worked_hours or 0.0
+                if raw >= 6.0:
+                    return max(0.0, raw - break_hrs)
+                elif raw > 4.0:
+                    return max(0.0, raw - (break_hrs / 2.0))
+                return raw
+
+            total_regular_attendance_hrs = round(sum(_net_hrs(att) for att in regular_attendances), 2)
+            total_holiday_worked_hrs = round(sum(_net_hrs(att) for att in holiday_attendances), 2)
 
             rem_cash_deduction_hrs = round(payslip.undertime_cash_deduction_hours, 2)
             total_scheduled_hours = total_regular_attendance_hrs + total_holiday_worked_hrs + rem_cash_deduction_hrs
