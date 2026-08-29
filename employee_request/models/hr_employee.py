@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 
+import logging
 import secrets
 import string
 
 from dateutil.relativedelta import relativedelta
 
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class HrEmployee(models.Model):
@@ -125,34 +128,92 @@ class HrEmployee(models.Model):
         ]
 
     @api.model
-    def pos_employee_request_check_password(self, employee_id, password):
-        """Validate that the given password matches the employee's current password.
+    def pos_employee_request_password_diag(self, employee_id, password):
+        """Return why an OTP check would pass/fail (for logs / debugging)."""
+        now = fields.Datetime.now()
+        diag = {
+            "ok": False,
+            "reason": "unknown",
+            "employee_id": employee_id or None,
+            "now": fields.Datetime.to_string(now),
+            "submitted_len": len(str(password or "").strip()),
+            "submitted_isdigit": str(password or "").strip().isdigit(),
+        }
 
-        Also enforces the 24h validity window.
-        """
         if not employee_id or password in (False, None, ""):
-            return False
+            diag["reason"] = "missing_employee_or_password"
+            return diag
 
         employee = self.sudo().browse(int(employee_id)).exists()
         if not employee:
-            return False
+            diag["reason"] = "employee_not_found"
+            return diag
 
-        # enforce numeric password
+        diag.update(
+            {
+                "employee_id": employee.id,
+                "employee_name": employee.name,
+                "has_stored_password": bool(employee.employee_password),
+                "stored_len": len(str(employee.employee_password or "")),
+                "generated_at": fields.Datetime.to_string(employee.employee_password_generated_at)
+                if employee.employee_password_generated_at
+                else None,
+                "expires_at": fields.Datetime.to_string(employee.employee_password_expires_at)
+                if employee.employee_password_expires_at
+                else None,
+            }
+        )
+
         password = str(password).strip()
         if not password.isdigit():
-            return False
+            diag["reason"] = "not_numeric"
+            return diag
 
-        if not employee.employee_password or str(employee.employee_password) != password:
-            return False
+        stored = str(employee.employee_password or "").strip()
+        if not stored:
+            diag["reason"] = "no_stored_password"
+            return diag
+
+        if stored != password:
+            diag["reason"] = "mismatch"
+            return diag
 
         if not employee.employee_password_generated_at:
-            return False
+            diag["reason"] = "missing_generated_at"
+            return diag
 
-        now = fields.Datetime.now()
         if employee.employee_password_expires_at:
-            return employee.employee_password_expires_at > now
+            if employee.employee_password_expires_at <= now:
+                diag["reason"] = "expired"
+                diag["expired_seconds_ago"] = int(
+                    (now - employee.employee_password_expires_at).total_seconds()
+                )
+                return diag
+            diag["ok"] = True
+            diag["reason"] = "ok"
+            return diag
 
-        # Backward compatibility for records generated before the expires field existed.
         cutoff = now - relativedelta(minutes=5)
-        return employee.employee_password_generated_at >= cutoff
+        if employee.employee_password_generated_at < cutoff:
+            diag["reason"] = "expired_fallback_5min"
+            return diag
 
+        diag["ok"] = True
+        diag["reason"] = "ok"
+        return diag
+
+    @api.model
+    def pos_employee_request_check_password(self, employee_id, password):
+        """Validate that the given password matches the employee's current password.
+
+        Also enforces the OTP expiry window.
+        """
+        diag = self.pos_employee_request_password_diag(employee_id, password)
+        if not diag.get("ok"):
+            _logger.info(
+                "[employee_request] OTP check failed employee_id=%s reason=%s diag=%s",
+                employee_id,
+                diag.get("reason"),
+                {k: v for k, v in diag.items() if k not in ("ok",)},
+            )
+        return bool(diag.get("ok"))

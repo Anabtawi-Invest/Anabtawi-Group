@@ -50,6 +50,14 @@ class PosPredefinedDiscount(models.Model):
         )
 
     @api.model
+    def _pos_discount_employee_password_diag(self, employee, password):
+        if not employee:
+            return {"ok": False, "reason": "no_employee"}
+        return self.env["hr.employee"].sudo().pos_employee_request_password_diag(
+            employee.id, password
+        )
+
+    @api.model
     def _load_pos_data_domain(self, data, config):
         return [("pos_config_id", "=", config.id), ("active", "=", True)]
 
@@ -189,16 +197,47 @@ class PosPredefinedDiscount(models.Model):
         company = discount.pos_config_id.company_id
         employee = self._employee_for_partner(partner, company=company)
         if not employee:
+            _logger.warning(
+                "[pos_predefined_discounts] no employee for partner_id=%s company_id=%s",
+                partner.id,
+                company.id if company else None,
+            )
             raise UserError(_("No employee is linked to the selected customer."))
 
-        if not self._pos_discount_employee_password_matches(employee, password):
+        diag = self._pos_discount_employee_password_diag(employee, password)
+        if not diag.get("ok"):
+            reason = diag.get("reason") or "unknown"
             _logger.warning(
-                "POS employee discount auth FAILED: discount_id=%s partner_id=%s employee_id=%s",
+                "[pos_predefined_discounts] employee discount OTP FAILED "
+                "discount_id=%s partner_id=%s(%s) employee_id=%s(%s) reason=%s diag=%s",
                 discount.id,
                 partner.id,
+                partner.display_name,
                 employee.id,
+                employee.name,
+                reason,
+                diag,
             )
-            raise UserError(_("Authorization failed. Employee OTP does not match."))
+            reason_messages = {
+                "mismatch": _("OTP value does not match the stored employee password."),
+                "expired": _("OTP has expired."),
+                "expired_fallback_5min": _("OTP has expired (older than 5 minutes)."),
+                "no_stored_password": _("Employee has no OTP stored."),
+                "missing_generated_at": _("Employee OTP has no generation timestamp."),
+                "not_numeric": _("OTP must be numeric."),
+                "missing_employee_or_password": _("Employee or OTP is missing."),
+                "employee_not_found": _("Employee record was not found."),
+            }
+            detail = reason_messages.get(reason, _("OTP validation failed (%s).") % reason)
+            raise UserError(_("Authorization failed. %s") % detail)
+
+        _logger.info(
+            "[pos_predefined_discounts] employee discount OTP OK "
+            "discount_id=%s partner_id=%s employee_id=%s",
+            discount.id,
+            partner.id,
+            employee.id,
+        )
 
         return {
             "authorized": True,
