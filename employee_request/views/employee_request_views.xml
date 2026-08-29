@@ -10,9 +10,15 @@
                     <field name="employee_password" widget="password_eye_char" password="True"/>
                     <field name="employee_password_generated_at" readonly="1"/>
                     <field name="employee_password_expires_at" readonly="1"/>
+                    <button
+                        name="action_generate_employee_portal_otp_button"
+                        type="object"
+                        string="Generate OTP"
+                        class="btn-primary"
+                        groups="hr.group_hr_manager"
+                    />
                 </group>
             </xpath>
         </field>
     </record>
 </odoo>
-

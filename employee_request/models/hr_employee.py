@@ -97,7 +97,35 @@ class HrEmployee(models.Model):
             ("employee_password_expires_at", "!=", False),
             ("employee_password_expires_at", "<=", now),
         ])
-        employees.write({"employee_password": False})
+        if employees:
+            _logger.info(
+                "[employee_request] clearing %s expired OTP(s): %s",
+                len(employees),
+                employees.mapped(lambda e: (e.id, e.name)),
+            )
+            employees.write({
+                "employee_password": False,
+                "employee_password_generated_at": False,
+                "employee_password_expires_at": False,
+            })
+
+    def action_generate_employee_portal_otp_button(self):
+        """UI button: generate a fresh OTP and show it to the HR manager."""
+        self.ensure_one()
+        result = self.action_generate_employee_portal_otp()
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": "Employee OTP Generated",
+                "message": (
+                    f"OTP: {result.get('otp_number')} "
+                    f"(valid until {result.get('otp_expires_at')} UTC)"
+                ),
+                "type": "success",
+                "sticky": True,
+            },
+        }
 
     @api.model
     def _cron_rotate_employee_password(self, force=False):
@@ -178,18 +206,46 @@ class HrEmployee(models.Model):
             diag["reason"] = "employee_not_found"
             return diag
 
+        # Bypass cache / confirm real DB value (rules out stale ORM cache / company tricks).
+        self.env.cr.execute(
+            """
+            SELECT employee_password,
+                   employee_password_generated_at,
+                   employee_password_expires_at,
+                   company_id
+              FROM hr_employee
+             WHERE id = %s
+            """,
+            (employee.id,),
+        )
+        row = self.env.cr.fetchone()
+        db_password = row[0] if row else None
+        db_generated = row[1] if row else None
+        db_expires = row[2] if row else None
+        db_company_id = row[3] if row else None
+
+        orm_password = employee.employee_password
         diag.update(
             {
                 "employee_id": employee.id,
                 "employee_name": employee.name,
-                "has_stored_password": bool(employee.employee_password),
-                "stored_len": len(str(employee.employee_password or "")),
+                "employee_company_id": employee.company_id.id,
+                "employee_company_name": employee.company_id.display_name,
+                "db_company_id": db_company_id,
+                "env_company_id": self.env.company.id if self.env.company else None,
+                "has_stored_password": bool(orm_password),
+                "stored_len": len(str(orm_password or "")),
+                "db_has_password": bool(db_password),
+                "db_stored_len": len(str(db_password or "")),
+                "orm_equals_db": str(orm_password or "") == str(db_password or ""),
                 "generated_at": fields.Datetime.to_string(employee.employee_password_generated_at)
                 if employee.employee_password_generated_at
                 else None,
                 "expires_at": fields.Datetime.to_string(employee.employee_password_expires_at)
                 if employee.employee_password_expires_at
                 else None,
+                "db_generated_at": fields.Datetime.to_string(db_generated) if db_generated else None,
+                "db_expires_at": fields.Datetime.to_string(db_expires) if db_expires else None,
             }
         )
 
@@ -198,7 +254,7 @@ class HrEmployee(models.Model):
             diag["reason"] = "not_numeric"
             return diag
 
-        stored = str(employee.employee_password or "").strip()
+        stored = str(db_password or orm_password or "").strip()
         if not stored:
             diag["reason"] = "no_stored_password"
             return diag
@@ -207,23 +263,24 @@ class HrEmployee(models.Model):
             diag["reason"] = "mismatch"
             return diag
 
-        if not employee.employee_password_generated_at:
+        generated_at = employee.employee_password_generated_at or db_generated
+        expires_at = employee.employee_password_expires_at or db_expires
+
+        if not generated_at:
             diag["reason"] = "missing_generated_at"
             return diag
 
-        if employee.employee_password_expires_at:
-            if employee.employee_password_expires_at <= now:
+        if expires_at:
+            if expires_at <= now:
                 diag["reason"] = "expired"
-                diag["expired_seconds_ago"] = int(
-                    (now - employee.employee_password_expires_at).total_seconds()
-                )
+                diag["expired_seconds_ago"] = int((now - expires_at).total_seconds())
                 return diag
             diag["ok"] = True
             diag["reason"] = "ok"
             return diag
 
         cutoff = now - relativedelta(minutes=5)
-        if employee.employee_password_generated_at < cutoff:
+        if generated_at < cutoff:
             diag["reason"] = "expired_fallback_5min"
             return diag
 

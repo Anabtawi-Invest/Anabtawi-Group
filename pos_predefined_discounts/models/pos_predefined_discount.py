@@ -222,7 +222,11 @@ class PosPredefinedDiscount(models.Model):
                 "mismatch": _("OTP value does not match the stored employee password."),
                 "expired": _("OTP has expired."),
                 "expired_fallback_5min": _("OTP has expired (older than 5 minutes)."),
-                "no_stored_password": _("Employee has no OTP stored."),
+                "no_stored_password": _(
+                    "Employee has no OTP stored in the database. "
+                    "The value on the employee form may be unsaved, or the 5-minute OTP cron already cleared it. "
+                    "Click Generate OTP (or save the password again) and check that Expires At is in the future."
+                ),
                 "missing_generated_at": _("Employee OTP has no generation timestamp."),
                 "not_numeric": _("OTP must be numeric."),
                 "missing_employee_or_password": _("Employee or OTP is missing."),
