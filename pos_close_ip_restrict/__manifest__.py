@@ -1,7 +1,7 @@
 {
     "name": "POS Close IP Restrict",
     "summary": "Allow closing a POS session only from registered devices and optional IPs.",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.1.1",
     "category": "Point of Sale",
     "author": "Anabtawi Group",
     "license": "LGPL-3",

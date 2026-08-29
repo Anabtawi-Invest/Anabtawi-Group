@@ -57,7 +57,3 @@ class PosSession(models.Model):
         return super()._validate_session(
             balancing_account, amount_to_balance, bank_payment_method_diffs
         )
-
-    def delete_opening_control_session(self):
-        self._raise_if_close_ip_forbidden()
-        return super().delete_opening_control_session()
