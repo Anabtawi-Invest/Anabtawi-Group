@@ -209,15 +209,6 @@ class HrEmployee(models.Model):
                 return True
         return False
 
-    def _get_holiday_worked_work_entry_type(self):
-        self.ensure_one()
-        w_type = self.env.ref("factory_attendance_payroll.work_entry_type_holiday_worked", raise_if_not_found=False)
-        if not w_type:
-            w_type = self.env["hr.work.entry.type"].sudo().search([("code", "=", "HOLIDAY_WORKED")], limit=1)
-        if not w_type:
-            w_type = self.env["hr.work.entry.type"].sudo().search([("display_code", "=", "PHW")], limit=1)
-        return w_type
-
     def _apply_monthly_absence_for_month(self, month_from, month_to):
         """
         Evaluates a single employee for a specific monthly window:

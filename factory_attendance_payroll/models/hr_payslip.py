@@ -262,13 +262,6 @@ class HrPayslip(models.Model):
                 else:
                     net_hrs = raw_hrs
 
-                is_holiday = payslip.employee_id._is_public_holiday_on_day(att_date) if payslip.employee_id else False
-                if is_holiday:
-                    # Public Holiday work: all worked net hours earn 150% (1.5x) multiplier, zero undertime
-                    if allow_ot and net_hrs > 0:
-                        total_ot += round(net_hrs * 1.5, 2)
-                    continue
-
                 expected_hrs = payslip.employee_id._get_expected_hours_on_day(att_date) if payslip.employee_id else 8.0
                 standard_target = expected_hrs if expected_hrs > 0 else 8.0
                 if net_hrs > standard_target:
@@ -529,16 +522,12 @@ class HrPayslip(models.Model):
             return
 
         rest_type = False
-        holiday_worked_type = False
         if 'hr.work.entry' in self.env:
             rest_type = self.env['hr.work.entry.type'].sudo().search([
                 '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
             ], limit=1)
-            holiday_worked_type = self.env['hr.work.entry.type'].sudo().search([
-                '|', ('code', '=', 'HOLIDAY_WORKED'), ('display_code', '=', 'PHW')
-            ], limit=1)
 
-        if not rest_type and not holiday_worked_type:
+        if not rest_type:
             return
 
         emp_ids = valid_slips.mapped('employee_id').ids
@@ -620,12 +609,6 @@ class HrPayslip(models.Model):
                                     we.sudo().write({'state': 'draft'})
                                 we.sudo().write({'work_entry_type_id': rest_type.id})
                                 converted_count += 1
-                        # 2. Convert attendances on Public Holidays to Public Holiday Worked (PHW)
-                        elif holiday_worked_type and we_date in slip_worked_dates and payslip.employee_id._is_public_holiday_on_day(we_date):
-                            if we.work_entry_type_id.id != holiday_worked_type.id:
-                                if hasattr(we, 'state') and we.state == 'validated':
-                                    we.sudo().write({'state': 'draft'})
-                                we.sudo().write({'work_entry_type_id': holiday_worked_type.id})
             except Exception:
                 pass
 
