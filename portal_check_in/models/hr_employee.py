@@ -115,7 +115,7 @@ class HrEmployee(models.Model):
         return radius_earth_m * c
 
     def _get_portal_geofence_work_locations(self):
-        """Return work locations used to validate portal check-in geofence."""
+        """Return work locations used to validate portal check-in and check-out geofence."""
         self.ensure_one()
         if self.allow_remote_attendance:
             return self.env["hr.work.location"]
@@ -124,14 +124,15 @@ class HrEmployee(models.Model):
             return (
                 self._safe_float(location.attendance_geo_latitude) is not None
                 and self._safe_float(location.attendance_geo_longitude) is not None
+                and (self._safe_float(location.attendance_geo_radius_m) or 0.0) > 0.0
             )
 
-        # Preferred: locations explicitly allowed on the employee profile.
+        # 1. Preferred: locations explicitly allowed on the employee profile.
         if self.attendance_work_location_ids:
             return self.attendance_work_location_ids.filtered(_has_coordinates)
 
-        # Backward compatibility: fall back to the single work location.
-        if self.work_location_id and self.work_location_id.attendance_geo_enforce:
+        # 2. Fall back to the primary work location.
+        if self.work_location_id:
             return self.work_location_id.filtered(_has_coordinates)
 
         return self.env["hr.work.location"]
@@ -146,21 +147,26 @@ class HrEmployee(models.Model):
             return False
         if self.attendance_work_location_ids:
             return True
+        if self.work_location_id:
+            return True
         return bool(self._get_portal_geofence_work_locations())
 
     def _check_portal_geo_restriction(self, geo_information=None):
         self.ensure_one()
-        # Restrict only check-in; check-out remains unchanged.
         if self.allow_remote_attendance:
             return
 
         if self.attendance_work_location_ids and not self._get_portal_geofence_work_locations():
             raise UserError(_(
-                "تم تحديد مواقع دوام للموظف، لكن إحداثياتها (خط العرض/خط الطول) غير مضبوطة."
+                "تم تحديد مواقع دوام للموظف، لكن إحداثياتها (خط العرض/خط الطول/نصف القطر) غير مضبوطة."
             ))
 
         work_locations = self._get_portal_geofence_work_locations()
         if not work_locations:
+            if self.work_location_id and not self.attendance_work_location_ids:
+                raise UserError(_(
+                    "لم يتم ضبط إحداثيات ونطاق موقع العمل المحدد للموظف (%s)."
+                ) % self.work_location_id.name)
             return
 
         payload = geo_information or {}
@@ -186,10 +192,15 @@ class HrEmployee(models.Model):
                 nearest_distance_m = distance_m
                 nearest_radius_m = radius_m
 
+        action_name = "تسجيل الانصراف" if self.attendance_state == 'checked_in' else "تسجيل الحضور"
         raise UserError(_(
-            "تم رفض تسجيل الحضور: أنت خارج النطاق المسموح لمواقع الدوام المحددة. "
-            "أقرب مسافة %.0f متر، وأقرب نطاق مسموح %.0f متر."
-        ) % (nearest_distance_m or 0.0, nearest_radius_m or 0.0))
+            "تم رفض %(action)s: أنت خارج النطاق المسموح لمواقع الدوام المحددة. "
+            "أقرب مسافة %(dist).0f متر، وأقرب نطاق مسموح %(rad).0f متر."
+        ) % {
+            'action': action_name,
+            'dist': nearest_distance_m or 0.0,
+            'rad': nearest_radius_m or 0.0,
+        })
 
     def _get_available_overtime_authorization_request(self):
         self.ensure_one()
@@ -328,8 +339,10 @@ class HrEmployee(models.Model):
     def _attendance_action_change(self, geo_information=None):
         self.ensure_one()
 
+        # Enforce geofence restriction for both check-in and check-out
+        self._check_portal_geo_restriction(geo_information=geo_information)
+
         if self.attendance_state != 'checked_in':
-            self._check_portal_geo_restriction(geo_information=geo_information)
             approval_request = self._check_overtime_gate_before_check_in()
             if approval_request:
                 return self._create_authorized_attendance(
