@@ -78,7 +78,7 @@ class PosPredefinedDiscount(models.Model):
 
         Rows are keyed by partner id (for setting the POS customer), but the
         displayed name is the employee name. Search matches employee name,
-        barcode, and linked partner name.
+        barcode, employee number, and linked partner name.
         """
         Employee = self.env["hr.employee"].sudo()
         domain = [
@@ -98,30 +98,37 @@ class PosPredefinedDiscount(models.Model):
 
         search = str(search or "").strip()
         if search:
-            domain += [
-                "|",
-                "|",
-                "|",
+            search_clauses = [
                 ("name", "ilike", search),
                 ("barcode", "ilike", search),
                 ("work_contact_id.name", "ilike", search),
                 ("user_partner_id.name", "ilike", search),
             ]
+            if "employee_number" in Employee._fields:
+                search_clauses.append(("employee_number", "ilike", search))
+            domain += (
+                ["|"] * (len(search_clauses) - 1) + search_clauses
+                if len(search_clauses) > 1
+                else search_clauses
+            )
 
         employees = Employee.search(domain, order="name", limit=int(limit or 200))
         result = []
         seen_partner_ids = set()
+        has_employee_number = "employee_number" in Employee._fields
         for employee in employees:
             partner = employee.work_contact_id or employee.user_partner_id
             if not partner or partner.id in seen_partner_ids:
                 continue
             seen_partner_ids.add(partner.id)
+            employee_number = employee.employee_number or "" if has_employee_number else ""
             result.append(
                 {
                     "id": partner.id,
                     "name": employee.name,
                     "partner_name": partner.name,
                     "barcode": employee.barcode or partner.barcode or "",
+                    "employee_number": employee_number,
                     "employee_id": employee.id,
                 }
             )

@@ -7,7 +7,7 @@
                 <input
                     class="form-control mb-2"
                     type="text"
-                    placeholder="Search by employee name or barcode..."
+                    placeholder="Search by employee name, barcode, or employee number..."
                     t-att-value="state.search"
                     t-on-input="onSearchInput"
                 />
@@ -18,7 +18,8 @@
                     <t t-foreach="state.partners" t-as="partner" t-key="partner.id">
                         <option t-att-value="partner.id">
                             <t t-esc="partner.name"/>
-                            <t t-if="partner.barcode"> (<t t-esc="partner.barcode"/>)</t>
+                            <t t-if="partner.employee_number"> (<t t-esc="partner.employee_number"/>)</t>
+                            <t t-elif="partner.barcode"> (<t t-esc="partner.barcode"/>)</t>
                         </option>
                     </t>
                 </select>
