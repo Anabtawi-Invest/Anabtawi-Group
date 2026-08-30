@@ -39,6 +39,16 @@ def pre_init_hook(env):
 def post_init_hook(env):
     """
     Post-Init Hook:
-    Salary rules are defined in data/hr_payroll_data.xml.
+    Links created reconciliation salary rules to all salary structures.
     """
-    pass
+    try:
+        rules = env['hr.salary.rule'].sudo().search([
+            ('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME'])
+        ])
+        structures = env['hr.payroll.structure'].sudo().search([])
+        if rules and structures:
+            for rule in rules:
+                if hasattr(structures, 'rule_ids'):
+                    structures.write({'rule_ids': [(4, rule.id)]})
+    except Exception:
+        pass
