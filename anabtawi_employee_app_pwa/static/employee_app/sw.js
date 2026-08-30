@@ -1,4 +1,4 @@
-const CACHE = "anabtawi-employee-app-v1.2.0";
+const CACHE = "anabtawi-employee-app-v1.2.1";
 const SHELL = [
   "/employee-portal",
   "/employee-portal/manifest.webmanifest",
