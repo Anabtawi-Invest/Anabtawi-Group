@@ -16,7 +16,8 @@ const API_CACHE_PATHS = [
   "/anabtawi/mobile/leaves/balances",
   "/anabtawi/mobile/leaves/list",
   "/anabtawi/mobile/overtime/categories",
-  "/anabtawi/mobile/overtime/list",`n  "/anabtawi/mobile/payslips/list"
+  "/anabtawi/mobile/overtime/list",
+  "/anabtawi/mobile/payslips/list"
 ];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
