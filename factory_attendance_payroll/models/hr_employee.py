@@ -335,11 +335,17 @@ class HrEmployee(models.Model):
         return day_start_utc, next_day_start_utc, employee_tz
 
     def _get_versions_with_contract_overlap_with_period(self, date_from, date_to):
-        """Returns contract versions covering the specified period."""
-        self.ensure_one()
+        """Returns contract versions covering the specified period for all employees in self."""
+        if hasattr(super(), '_get_versions_with_contract_overlap_with_period'):
+            try:
+                return super()._get_versions_with_contract_overlap_with_period(date_from, date_to)
+            except Exception:
+                pass
+        if not self:
+            return self.env['hr.contract'] if 'hr.contract' in self.env else self.env['hr.employee']
         if "hr.contract" in self.env:
             domain = [
-                ("employee_id", "=", self.id),
+                ("employee_id", "in", self.ids),
                 ("state", "in", ["open", "close"]),
                 ("date_start", "<=", date_to),
                 "|",
