@@ -11,9 +11,8 @@
                 <field name="product_id"/>
                 <field name="requested_qty" sum="Total Requested"/>
                 <field name="sent_qty" sum="Total Sent"/>
-                <field name="sent_return_qty" sum="Total Sent Returns" optional="show"/>
                 <field name="received_qty" sum="Total Received"/>
-                <field name="received_return_qty" sum="Total Received Returns" optional="show"/>
+                <field name="return_qty" sum="Total Returns"/>
                 <field name="sold_qty" sum="Total Sold"/>
                 <field name="variance_sent_received" sum="Total Sent - Received" optional="show"/>
                 <field name="variance_received_sold" sum="Total Received - Sold" optional="show"/>
@@ -31,6 +30,7 @@
                 <field name="requested_qty" type="measure"/>
                 <field name="sent_qty" type="measure"/>
                 <field name="received_qty" type="measure"/>
+                <field name="return_qty" type="measure"/>
                 <field name="sold_qty" type="measure"/>
             </pivot>
         </field>
