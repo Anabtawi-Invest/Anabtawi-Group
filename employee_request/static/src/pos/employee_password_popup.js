@@ -36,7 +36,12 @@ export class EmployeePasswordPopup extends Component {
         return this.props.employees.filter((e) => {
             const name = (e.name || "").toLowerCase();
             const barcode = (e.barcode || "").toLowerCase();
-            return name.includes(q) || barcode.includes(q);
+            const employeeNumber = (e.employee_number || "").toLowerCase();
+            return (
+                name.includes(q) ||
+                barcode.includes(q) ||
+                employeeNumber.includes(q)
+            );
         });
     }
 

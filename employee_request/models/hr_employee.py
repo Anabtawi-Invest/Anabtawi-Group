@@ -303,11 +303,27 @@ class HrEmployee(models.Model):
 
         if search:
             search = str(search)
-            domain += ["|", ("name", "ilike", search), ("barcode", "ilike", search)]
+            search_clauses = [
+                ("name", "ilike", search),
+                ("barcode", "ilike", search),
+            ]
+            if "employee_number" in self._fields:
+                search_clauses.append(("employee_number", "ilike", search))
+            domain += (
+                ["|"] * (len(search_clauses) - 1) + search_clauses
+                if len(search_clauses) > 1
+                else search_clauses
+            )
 
         employees = self.sudo().search(domain, limit=int(limit), order="name")
+        has_employee_number = "employee_number" in self._fields
         return [
-            {"id": e.id, "name": e.name, "barcode": e.barcode or ""}
+            {
+                "id": e.id,
+                "name": e.name,
+                "barcode": e.barcode or "",
+                "employee_number": e.employee_number or "" if has_employee_number else "",
+            }
             for e in employees
         ]
 
