@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_branch_supply_flow_report_line_list" model="ir.ui.view">
+        <field name="name">branch.supply.flow.report.line.list</field>
+        <field name="model">branch.supply.flow.report.line</field>
+        <field name="arch" type="xml">
+            <list string="Branch Supply Flow Report" create="false" edit="false" delete="false">
+                <field name="location_id"/>
+                <field name="product_id"/>
+                <field name="uom_id" optional="show"/>
+                <field name="requested_qty" sum="Total Requested"/>
+                <field name="sent_qty" sum="Total Sent"/>
+                <field name="sent_return_qty" sum="Total Sent Returns" optional="show"/>
+                <field name="received_qty" sum="Total Received"/>
+                <field name="received_return_qty" sum="Total Received Returns" optional="show"/>
+                <field name="sold_qty" sum="Total Sold"/>
+                <field name="variance_sent_received" sum="Total Sent - Received" optional="show"/>
+                <field name="variance_received_sold" sum="Total Received - Sold" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_branch_supply_flow_report_line_pivot" model="ir.ui.view">
+        <field name="name">branch.supply.flow.report.line.pivot</field>
+        <field name="model">branch.supply.flow.report.line</field>
+        <field name="arch" type="xml">
+            <pivot string="Branch Supply Flow Report">
+                <field name="location_id" type="row"/>
+                <field name="product_id" type="row"/>
+                <field name="requested_qty" type="measure"/>
+                <field name="sent_qty" type="measure"/>
+                <field name="received_qty" type="measure"/>
+                <field name="sold_qty" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_branch_supply_flow_report_line_search" model="ir.ui.view">
+        <field name="name">branch.supply.flow.report.line.search</field>
+        <field name="model">branch.supply.flow.report.line</field>
+        <field name="arch" type="xml">
+            <search string="Branch Supply Flow Report">
+                <field name="product_id"/>
+                <field name="location_id"/>
+                <group>
+                    <filter string="Branch" name="group_by_location" context="{'group_by': 'location_id'}"/>
+                    <filter string="Product" name="group_by_product" context="{'group_by': 'product_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+</odoo>
