@@ -306,18 +306,17 @@ class BranchSupplyFlowWizard(models.TransientModel):
             product = Product.browse(product_id)
             dispatch = dispatch_data.get(product_id, {})
             receipt = receipt_data.get(product_id, {})
-            sent_returns = dispatch.get("returns", 0.0)
-            received_returns = receipt.get("returns", 0.0)
-            sent_net = dispatch.get("done", 0.0) - sent_returns
-            received_net = receipt.get("done", 0.0) - received_returns
+            sent_net = dispatch.get("done", 0.0) - dispatch.get("returns", 0.0)
+            received_net = receipt.get("done", 0.0) - receipt.get("returns", 0.0)
             sold_qty = sold_data.get(product_id, 0.0)
             vals_list.append({
                 "location_id": branch_location.id,
                 "product_id": product_id,
                 "requested_qty": dispatch.get("requested", 0.0),
                 "sent_qty": sent_net,
+                "sent_return_qty": dispatch.get("returns", 0.0),
                 "received_qty": received_net,
-                "return_qty": sent_returns + received_returns,
+                "received_return_qty": receipt.get("returns", 0.0),
                 "sold_qty": sold_qty,
                 "variance_sent_received": sent_net - received_net,
                 "variance_received_sold": received_net - sold_qty,
@@ -384,8 +383,9 @@ class BranchSupplyFlowWizard(models.TransientModel):
             _("Product"),
             _("Requested Qty"),
             _("Sent Qty (Net)"),
+            _("Sent Returns"),
             _("Received Qty (Net)"),
-            _("Returns"),
+            _("Received Returns"),
             _("Sold Qty (POS)"),
             _("Sent - Received"),
             _("Received - Sold"),
@@ -395,7 +395,7 @@ class BranchSupplyFlowWizard(models.TransientModel):
 
         sheet.set_column(0, 0, 30)
         sheet.set_column(1, 1, 45)
-        sheet.set_column(2, 8, 18)
+        sheet.set_column(2, 9, 18)
 
         row = 1
         for line in self.line_ids.sorted(
@@ -405,11 +405,12 @@ class BranchSupplyFlowWizard(models.TransientModel):
             sheet.write(row, 1, line.product_id.display_name, text_style)
             sheet.write_number(row, 2, line.requested_qty, number_style)
             sheet.write_number(row, 3, line.sent_qty, number_style)
-            sheet.write_number(row, 4, line.received_qty, number_style)
-            sheet.write_number(row, 5, line.return_qty, number_style)
-            sheet.write_number(row, 6, line.sold_qty, number_style)
-            sheet.write_number(row, 7, line.variance_sent_received, number_style)
-            sheet.write_number(row, 8, line.variance_received_sold, number_style)
+            sheet.write_number(row, 4, line.sent_return_qty, number_style)
+            sheet.write_number(row, 5, line.received_qty, number_style)
+            sheet.write_number(row, 6, line.received_return_qty, number_style)
+            sheet.write_number(row, 7, line.sold_qty, number_style)
+            sheet.write_number(row, 8, line.variance_sent_received, number_style)
+            sheet.write_number(row, 9, line.variance_received_sold, number_style)
             row += 1
 
         workbook.close()

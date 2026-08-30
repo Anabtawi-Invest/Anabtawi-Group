@@ -22,13 +22,9 @@ class BranchSupplyFlowReportLine(models.TransientModel):
 
     requested_qty = fields.Float(string="Requested Qty", digits="Product Unit", readonly=True)
     sent_qty = fields.Float(string="Sent Qty (Net)", digits="Product Unit", readonly=True)
+    sent_return_qty = fields.Float(string="Sent Returns", digits="Product Unit", readonly=True)
     received_qty = fields.Float(string="Received Qty (Net)", digits="Product Unit", readonly=True)
-    return_qty = fields.Float(
-        string="Returns",
-        digits="Product Unit",
-        readonly=True,
-        help="Total returns from dispatch and receipt transfers.",
-    )
+    received_return_qty = fields.Float(string="Received Returns", digits="Product Unit", readonly=True)
     sold_qty = fields.Float(string="Sold Qty (POS)", digits="Product Unit", readonly=True)
 
     variance_sent_received = fields.Float(
