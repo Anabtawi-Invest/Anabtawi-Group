@@ -475,14 +475,14 @@ class AnabtawiMobileAPI(http.Controller):
 
         lock_acquired = False
         try:
-            employee._acquire_portal_attendance_action_lock(lock_minutes=10)
+            employee._acquire_portal_attendance_action_lock()
             lock_acquired = True
             attendance = employee._attendance_action_change(geo_information=geo_information)
         except (UserError, ValidationError) as exc:
             if lock_acquired:
                 employee._release_portal_attendance_action_lock()
             message = exc.args[0] if exc.args else str(exc)
-            code = "attendance_locked" if "10" in message or "wait" in message.lower() else "attendance_rejected"
+            code = "attendance_locked" if any(w in message.lower() for w in ["wait", "lock", "minutes", "submitted", "انتظار", "دقيقة"]) else "attendance_rejected"
             return _error(code, message, 429 if code == "attendance_locked" else 422)
         except Exception:
             if lock_acquired:
