@@ -41,8 +41,15 @@
         <field name="model">branch.supply.flow.report.line</field>
         <field name="arch" type="xml">
             <search string="Branch Supply Flow Report">
-                <field name="product_id"/>
-                <field name="location_id"/>
+                <field name="product_id"
+                       string="Product"
+                       filter_domain="['|', '|',
+                           ('product_id.default_code', 'ilike', self),
+                           ('product_id.barcode', 'ilike', self),
+                           ('product_id.name', 'ilike', self)]"/>
+                <field name="location_id" string="Branch Location"/>
+                <field name="location_name" string="Branch Location Name"/>
+                <separator/>
                 <group>
                     <filter string="Branch" name="group_by_location" context="{'group_by': 'location_id'}"/>
                     <filter string="Product" name="group_by_product" context="{'group_by': 'product_id'}"/>
