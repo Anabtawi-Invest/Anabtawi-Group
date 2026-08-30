@@ -19,12 +19,6 @@ class BranchSupplyFlowReportLine(models.TransientModel):
         readonly=True,
     )
     product_id = fields.Many2one("product.product", string="Product", readonly=True)
-    uom_id = fields.Many2one("uom.uom", string="Unit of Measure", readonly=True)
-    uom_name = fields.Char(
-        related="uom_id.display_name",
-        string="Unit of Measure",
-        readonly=True,
-    )
 
     requested_qty = fields.Float(string="Requested Qty", digits="Product Unit", readonly=True)
     sent_qty = fields.Float(string="Sent Qty (Net)", digits="Product Unit", readonly=True)
