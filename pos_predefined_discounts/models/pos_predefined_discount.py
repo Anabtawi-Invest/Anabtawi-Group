@@ -73,28 +73,28 @@ class PosPredefinedDiscount(models.Model):
         ]
 
     @api.model
+    def _pos_employees_all_companies(self):
+        """HR employees across every company (POS discount picker / OTP validation)."""
+        company_ids = self.env["res.company"].sudo().search([]).ids
+        return self.env["hr.employee"].sudo().with_context(
+            allowed_company_ids=company_ids,
+        )
+
+    @api.model
     def pos_get_employee_partners(self, config_id=False, search=False, limit=200):
         """Return employee partners for the POS picker.
 
         Rows are keyed by partner id (for setting the POS customer), but the
         displayed name is the employee name. Search matches employee name,
-        barcode, employee number, and linked partner name.
+        barcode, employee number, and linked partner name across all companies.
         """
-        Employee = self.env["hr.employee"].sudo()
+        Employee = self._pos_employees_all_companies()
         domain = [
             ("active", "=", True),
             "|",
             ("work_contact_id", "!=", False),
             ("user_partner_id", "!=", False),
         ]
-        if config_id:
-            config = self.env["pos.config"].sudo().browse(int(config_id)).exists()
-            if config and config.company_id:
-                domain = [
-                    "|",
-                    ("company_id", "=", False),
-                    ("company_id", "=", config.company_id.id),
-                ] + domain
 
         search = str(search or "").strip()
         if search:
@@ -135,17 +135,15 @@ class PosPredefinedDiscount(models.Model):
         return result
 
     @api.model
-    def _employee_for_partner(self, partner, company=False):
+    def _employee_for_partner(self, partner):
         if not partner:
             return self.env["hr.employee"]
-        Employee = self.env["hr.employee"].sudo()
+        Employee = self._pos_employees_all_companies()
         domain = [
             "|",
             ("work_contact_id", "=", partner.id),
             ("user_partner_id", "=", partner.id),
         ]
-        if company:
-            domain = [("company_id", "=", company.id)] + domain
         return Employee.search(domain, limit=1)
 
     @api.model
@@ -201,13 +199,11 @@ class PosPredefinedDiscount(models.Model):
         if not password:
             raise UserError(_("OTP is required."))
 
-        company = discount.pos_config_id.company_id
-        employee = self._employee_for_partner(partner, company=company)
+        employee = self._employee_for_partner(partner)
         if not employee:
             _logger.warning(
-                "[pos_predefined_discounts] no employee for partner_id=%s company_id=%s",
+                "[pos_predefined_discounts] no employee for partner_id=%s",
                 partner.id,
-                company.id if company else None,
             )
             raise UserError(_("No employee is linked to the selected customer."))
 

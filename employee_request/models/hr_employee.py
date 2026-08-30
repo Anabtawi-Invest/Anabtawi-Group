@@ -294,12 +294,10 @@ class HrEmployee(models.Model):
         """Return employees for POS popup selection.
 
         We keep it minimal: name + barcode, and sudo because POS users might not have HR access.
+        Employees from all companies are included.
         """
+        company_ids = self.env["res.company"].sudo().search([]).ids
         domain = [("active", "=", True)]
-        if config_id:
-            config = self.env["pos.config"].sudo().browse(int(config_id)).exists()
-            if config and config.company_id:
-                domain += ["|", ("company_id", "=", False), ("company_id", "=", config.company_id.id)]
 
         if search:
             search = str(search)
@@ -315,7 +313,11 @@ class HrEmployee(models.Model):
                 else search_clauses
             )
 
-        employees = self.sudo().search(domain, limit=int(limit), order="name")
+        employees = (
+            self.sudo()
+            .with_context(allowed_company_ids=company_ids)
+            .search(domain, limit=int(limit), order="name")
+        )
         has_employee_number = "employee_number" in self._fields
         return [
             {
