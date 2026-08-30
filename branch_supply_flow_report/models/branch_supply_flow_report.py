@@ -5,7 +5,7 @@ from odoo import fields, models
 class BranchSupplyFlowReportLine(models.TransientModel):
     _name = "branch.supply.flow.report.line"
     _description = "Branch Supply Flow Report Line"
-    _order = "product_id"
+    _order = "location_name, product_id"
 
     wizard_id = fields.Many2one(
         "branch.supply.flow.wizard",
@@ -13,8 +13,10 @@ class BranchSupplyFlowReportLine(models.TransientModel):
         ondelete="cascade",
     )
     location_id = fields.Many2one("stock.location", string="Branch Location", readonly=True)
+    location_name = fields.Char(string="Branch Location", readonly=True)
     product_id = fields.Many2one("product.product", string="Product", readonly=True)
     uom_id = fields.Many2one("uom.uom", string="Unit of Measure", readonly=True)
+    uom_name = fields.Char(string="Unit of Measure", readonly=True)
 
     requested_qty = fields.Float(string="Requested Qty", digits="Product Unit", readonly=True)
     sent_qty = fields.Float(string="Sent Qty (Net)", digits="Product Unit", readonly=True)

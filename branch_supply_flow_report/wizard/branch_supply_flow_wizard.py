@@ -26,7 +26,7 @@ class BranchSupplyFlowWizard(models.TransientModel):
     )
     all_branch_locations = fields.Boolean(
         string="All Branch Locations",
-        default=False,
+        default=True,
         help="Include every branch stock location (warehouse stock location).",
     )
     location_id = fields.Many2one(
@@ -37,7 +37,7 @@ class BranchSupplyFlowWizard(models.TransientModel):
     )
     all_dispatch_operation_types = fields.Boolean(
         string="All Dispatch Operation Types",
-        default=False,
+        default=True,
         help="Include all internal operation types for factory-to-transit transfers.",
     )
     dispatch_picking_type_ids = fields.Many2many(
@@ -51,7 +51,7 @@ class BranchSupplyFlowWizard(models.TransientModel):
     )
     all_receipt_operation_types = fields.Boolean(
         string="All Receipt Operation Types",
-        default=False,
+        default=True,
         help="Include all internal operation types for transit-to-branch transfers.",
     )
     receipt_picking_type_ids = fields.Many2many(
@@ -65,7 +65,7 @@ class BranchSupplyFlowWizard(models.TransientModel):
     )
     all_pos_configs = fields.Boolean(
         string="All POS Branches",
-        default=False,
+        default=True,
         help="Include all POS configs for the selected branch(es).",
     )
     pos_config_ids = fields.Many2many(
@@ -198,17 +198,34 @@ class BranchSupplyFlowWizard(models.TransientModel):
         ]
 
     def _get_dispatch_pickings(self, date_from, date_to, branch_location):
+        """Dispatch transfers: factory -> intermediate/transit for this branch."""
         self.ensure_one()
         picking_types = self._get_dispatch_picking_types()
         branch_stock_ids = self._get_location_ids(branch_location)
+        receipt_pickings = self._get_receipt_pickings(date_from, date_to, branch_location)
+
+        pickings = self.env["stock.picking"]
+
+        # Primary: dispatch transfers linked to branch receipts via Source Document (origin).
+        origin_names = list({name for name in receipt_pickings.mapped("origin") if name})
+        if origin_names:
+            pickings |= self.env["stock.picking"].search([
+                *self._base_picking_domain(date_from, date_to),
+                ("name", "in", origin_names),
+                ("picking_type_id", "in", picking_types.ids),
+            ])
+
+        # Secondary: direct dispatch to intermediate locations (not branch stock).
+        direct_domain = [
+            *self._base_picking_domain(date_from, date_to),
+            ("picking_type_id", "in", picking_types.ids),
+            ("location_dest_id", "not in", branch_stock_ids),
+        ]
         warehouse = self._get_branch_warehouse(branch_location)
-        domain = self._base_picking_domain(date_from, date_to)
-        domain.append(("picking_type_id", "in", picking_types.ids))
         if warehouse:
-            domain.append(("location_dest_id.warehouse_id", "=", warehouse.id))
-        if self.all_dispatch_operation_types:
-            domain.append(("location_dest_id", "not in", branch_stock_ids))
-        return self.env["stock.picking"].search(domain)
+            direct_domain.append(("location_dest_id.warehouse_id", "=", warehouse.id))
+        pickings |= self.env["stock.picking"].search(direct_domain)
+        return pickings
 
     def _get_receipt_pickings(self, date_from, date_to, branch_location):
         self.ensure_one()
@@ -294,8 +311,10 @@ class BranchSupplyFlowWizard(models.TransientModel):
             sold_qty = sold_data.get(product_id, 0.0)
             vals_list.append({
                 "location_id": branch_location.id,
+                "location_name": branch_location.complete_name,
                 "product_id": product_id,
                 "uom_id": product.uom_id.id,
+                "uom_name": product.uom_id.display_name,
                 "requested_qty": dispatch.get("requested", 0.0),
                 "sent_qty": sent_net,
                 "sent_return_qty": dispatch.get("returns", 0.0),
@@ -335,7 +354,7 @@ class BranchSupplyFlowWizard(models.TransientModel):
             "res_model": "branch.supply.flow.report.line",
             "view_mode": "list,pivot",
             "domain": [("wizard_id", "=", self.id)],
-            "context": {"search_default_group_by_product": 1},
+            "context": {"search_default_group_by_location": 1},
         }
 
     def _generate_xlsx_content(self):
@@ -387,9 +406,9 @@ class BranchSupplyFlowWizard(models.TransientModel):
         for line in self.line_ids.sorted(
             key=lambda rec: (rec.location_id.display_name, rec.product_id.display_name)
         ):
-            sheet.write(row, 0, line.location_id.display_name, text_style)
+            sheet.write(row, 0, line.location_name or line.location_id.display_name, text_style)
             sheet.write(row, 1, line.product_id.display_name, text_style)
-            sheet.write(row, 2, line.uom_id.display_name or "", text_style)
+            sheet.write(row, 2, line.uom_name or (line.uom_id.display_name or ""), text_style)
             sheet.write_number(row, 3, line.requested_qty, number_style)
             sheet.write_number(row, 4, line.sent_qty, number_style)
             sheet.write_number(row, 5, line.sent_return_qty, number_style)

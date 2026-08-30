@@ -6,9 +6,11 @@
         <field name="model">branch.supply.flow.report.line</field>
         <field name="arch" type="xml">
             <list string="Branch Supply Flow Report" create="false" edit="false" delete="false">
-                <field name="location_id"/>
+                <field name="location_name"/>
+                <field name="location_id" column_invisible="True"/>
                 <field name="product_id"/>
-                <field name="uom_id" optional="show"/>
+                <field name="uom_name"/>
+                <field name="uom_id" column_invisible="True"/>
                 <field name="requested_qty" sum="Total Requested"/>
                 <field name="sent_qty" sum="Total Sent"/>
                 <field name="sent_return_qty" sum="Total Sent Returns" optional="show"/>
