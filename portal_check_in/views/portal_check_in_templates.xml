@@ -456,7 +456,7 @@
                         }
 
                         var locationMsgEl = document.getElementById('o_portal_location_permission_msg');
-                        var locationMsg = locationMsgEl && locationMsgEl.value ? locationMsgEl.value : 'Location permission required';
+                        var locationMsg = locationMsgEl &amp;&amp; locationMsgEl.value ? locationMsgEl.value : 'Location permission required';
 
                         if (!navigator.geolocation || !navigator.onLine) {
                             window.alert(locationMsg);
