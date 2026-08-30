@@ -1,8 +1,9 @@
-const CACHE = "anabtawi-employee-app-v1.1.9";
+const CACHE = "anabtawi-employee-app-v1.3.2";
 const SHELL = [
   "/employee-portal",
   "/employee-portal/manifest.webmanifest",
   "/anabtawi_employee_app_pwa/static/employee_app/app.js",
+  "/anabtawi_employee_app_pwa/static/employee_app/app.js?v=1.3.2",
   "/anabtawi_employee_app_pwa/static/employee_app/favicon.ico",
   "/anabtawi_employee_app_pwa/static/employee_app/brand/logo.png",
   "/anabtawi_employee_app_pwa/static/employee_app/brand/symbol.png",
