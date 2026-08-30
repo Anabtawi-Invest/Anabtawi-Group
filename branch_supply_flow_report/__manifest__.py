@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Branch Supply Flow Report",
-    "version": "19.0.1.0.6",
+    "version": "19.0.1.0.7",
     "summary": "Track branch request, dispatch, receipt, returns, and POS sales by product",
     "description": """
 Branch supply flow report for a selected period and branch location.

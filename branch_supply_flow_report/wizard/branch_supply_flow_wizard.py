@@ -381,6 +381,7 @@ class BranchSupplyFlowWizard(models.TransientModel):
         headers = [
             _("Branch Location"),
             _("Product"),
+            _("Unit of Measure"),
             _("Requested Qty"),
             _("Sent Qty (Net)"),
             _("Sent Returns"),
@@ -395,7 +396,8 @@ class BranchSupplyFlowWizard(models.TransientModel):
 
         sheet.set_column(0, 0, 30)
         sheet.set_column(1, 1, 45)
-        sheet.set_column(2, 9, 18)
+        sheet.set_column(2, 2, 16)
+        sheet.set_column(3, 10, 18)
 
         row = 1
         for line in self.line_ids.sorted(
@@ -403,14 +405,15 @@ class BranchSupplyFlowWizard(models.TransientModel):
         ):
             sheet.write(row, 0, line.location_name or line.location_id.display_name, text_style)
             sheet.write(row, 1, line.product_id.display_name, text_style)
-            sheet.write_number(row, 2, line.requested_qty, number_style)
-            sheet.write_number(row, 3, line.sent_qty, number_style)
-            sheet.write_number(row, 4, line.sent_return_qty, number_style)
-            sheet.write_number(row, 5, line.received_qty, number_style)
-            sheet.write_number(row, 6, line.received_return_qty, number_style)
-            sheet.write_number(row, 7, line.sold_qty, number_style)
-            sheet.write_number(row, 8, line.variance_sent_received, number_style)
-            sheet.write_number(row, 9, line.variance_received_sold, number_style)
+            sheet.write(row, 2, line.uom_name or "", text_style)
+            sheet.write_number(row, 3, line.requested_qty, number_style)
+            sheet.write_number(row, 4, line.sent_qty, number_style)
+            sheet.write_number(row, 5, line.sent_return_qty, number_style)
+            sheet.write_number(row, 6, line.received_qty, number_style)
+            sheet.write_number(row, 7, line.received_return_qty, number_style)
+            sheet.write_number(row, 8, line.sold_qty, number_style)
+            sheet.write_number(row, 9, line.variance_sent_received, number_style)
+            sheet.write_number(row, 10, line.variance_received_sold, number_style)
             row += 1
 
         workbook.close()
