@@ -47,10 +47,11 @@ class HrAttendance(models.Model):
         default=False
     )
 
-    def _get_public_holiday_dates_batch(self, min_date, max_date):
+    def _get_public_holiday_dates_batch(self, min_date, max_date, calendar_id=None):
         """
         Ultra-fast single-query batch loader for all public holidays / global leaves
-        covering the date range [min_date, max_date]. Returns a set of datetime.date objects.
+        covering the date range [min_date, max_date] for specific calendar_id (or global leaves).
+        Returns a set of datetime.date objects.
         """
         holiday_dates = set()
         if not min_date or not max_date or "resource.calendar.leaves" not in self.env:
@@ -59,11 +60,18 @@ class HrAttendance(models.Model):
         dt_min = fields.Datetime.to_string(datetime.combine(min_date, time.min))
         dt_max = fields.Datetime.to_string(datetime.combine(max_date, time.max))
 
-        leaves = self.env["resource.calendar.leaves"].sudo().search([
+        domain = [
             ("resource_id", "=", False),
             ("date_from", "<=", dt_max),
             ("date_to", ">=", dt_min),
-        ])
+        ]
+        LeaveModel = self.env["resource.calendar.leaves"]
+        if "holiday_id" in LeaveModel._fields:
+            domain.append(("holiday_id", "=", False))
+        if calendar_id:
+            domain += ["|", ("calendar_id", "=", False), ("calendar_id", "=", calendar_id)]
+
+        leaves = LeaveModel.sudo().search(domain)
 
         for lve in leaves:
             d_from = lve.date_from.date()
@@ -119,8 +127,19 @@ class HrAttendance(models.Model):
             return
 
         active_dates = [a.check_in.date() for a in recent_atts]
-        public_holiday_dates = self._get_public_holiday_dates_batch(min(active_dates), max(active_dates)) if active_dates else set()
+        min_d, max_d = min(active_dates), max(active_dates)
+
+        holidays_by_cal = {}
         emp_cache = {}
+
+        for attendance in recent_atts:
+            emp = attendance.employee_id
+            emp_id = emp.id
+            cal_id = emp.resource_calendar_id.id if emp.resource_calendar_id else False
+
+            if cal_id not in holidays_by_cal:
+                holidays_by_cal[cal_id] = self._get_public_holiday_dates_batch(min_d, max_d, calendar_id=cal_id)
+            public_holiday_dates = holidays_by_cal[cal_id]
 
         for attendance in recent_atts:
             emp = attendance.employee_id

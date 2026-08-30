@@ -558,7 +558,8 @@ class HrPayslip(models.Model):
                 ('check_in', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max))
             ])
 
-            holiday_dates = self.env['hr.attendance']._get_public_holiday_dates_batch(payslip.date_from, payslip.date_to)
+            cal_id = emp.resource_calendar_id.id if emp and emp.resource_calendar_id else False
+            holiday_dates = self.env['hr.attendance']._get_public_holiday_dates_batch(payslip.date_from, payslip.date_to, calendar_id=cal_id)
             regular_attendances = attendances.filtered(lambda a: a.check_in.date() not in holiday_dates)
             holiday_attendances = attendances.filtered(lambda a: a.check_in.date() in holiday_dates)
 
