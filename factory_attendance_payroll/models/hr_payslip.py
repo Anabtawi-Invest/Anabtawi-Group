@@ -355,31 +355,19 @@ class HrPayslip(models.Model):
     def compute_sheet(self):
         """
         Fast & decoupled payslip calculation:
-        1. Evaluates absent work entries across the employee batch.
-        2. Converts unworked rest days from Absent to Rest Day (ARS) up to the 6:1 quota.
-        3. Recalculates Worked Days lines purely in memory without creating DB leave records.
-        4. Calculates salary rules.
+        1. Computes reconciliation fields in memory.
+        2. Converts unworked rest days to Rest Day (ARS) up to the 6:1 quota.
+        3. Native super().compute_sheet() populates Worked Days and computes salary rules in 1 clean pass.
         """
-        # Run absence batch evaluation for payslips being computed
-        for payslip in self:
-            if payslip.employee_id and payslip.date_from and payslip.date_to:
-                if hasattr(payslip.employee_id, '_create_absent_work_entries_for_period'):
-                    payslip.employee_id._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
+        valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to)
+        if valid_slips:
+            valid_slips._compute_attendance_reconciliation_fields()
 
         self._convert_flexible_rest_days_to_ars()
 
-        # Refresh worked days lines in draft mode
-        for payslip in self:
-            if payslip.state == 'draft':
-                worked_days_vals = payslip._get_worked_day_lines()
-                payslip.worked_days_line_ids.unlink()
-                payslip.write({'worked_days_line_ids': [(0, 0, val) for val in worked_days_vals]})
-
-        self._compute_attendance_reconciliation_fields()
+        res = super().compute_sheet()
         self.write({'is_reconciled': True})
-
-        # Calculate salary rules
-        return super().compute_sheet()
+        return res
 
     def action_payslip_done(self):
         """Finalize and sync Time Off and Extra Hours allocations only when payslip is confirmed."""
@@ -545,6 +533,7 @@ class HrPayslip(models.Model):
         for we in work_entries:
             we_by_emp[we.employee_id.id].append(we)
 
+        to_update = self.env['hr.work.entry']
         for payslip in valid_slips:
             try:
                 emp_id = payslip.employee_id.id
@@ -565,12 +554,16 @@ class HrPayslip(models.Model):
                     name = (we.work_entry_type_id.name or '').lower()
                     if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in name:
                         if converted_count < allowed_rest_days:
-                            if hasattr(we, 'state') and we.state == 'validated':
-                                we.sudo().write({'state': 'draft'})
-                            we.sudo().write({'work_entry_type_id': rest_type.id})
+                            to_update |= we
                             converted_count += 1
             except Exception:
                 pass
+
+        if to_update:
+            draft_we = to_update.filtered(lambda w: hasattr(w, 'state') and w.state == 'validated')
+            if draft_we:
+                draft_we.sudo().write({'state': 'draft'})
+            to_update.sudo().write({'work_entry_type_id': rest_type.id})
 
     def _create_or_update_settlement_leave(self, leave_type_name, hours, leave_desc):
         """Creates validated hr.leave settlement records per absent date to reduce balance."""
