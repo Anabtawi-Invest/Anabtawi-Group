@@ -129,11 +129,13 @@ class ResPartner(models.Model):
             }
             domain += [("id", "in", list(limited_partner_ids))]
             new_partners = self.search(domain)
+            employee_partners = self.browse()
         elif stripped.isdigit() and offset == 0:
             employee_partners = self._search_partners_by_employee_number(stripped, company)
             partner_exact = self.search([("employee_number", "=", stripped)], limit=100)
             new_partners = employee_partners | partner_exact
         else:
+            employee_partners = self.browse()
             new_partners = self.search(domain, offset=offset, limit=100)
 
         _logger.info(

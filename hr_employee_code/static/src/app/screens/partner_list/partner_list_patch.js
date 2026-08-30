@@ -8,6 +8,15 @@ import { normalize } from "@web/core/l10n/utils";
 
 const LOG_PREFIX = "[hr_employee_code POS]";
 
+function partnerSummary(partner) {
+    return {
+        id: partner.id,
+        name: partner.name,
+        employee_number: partner.employee_number,
+        phone: partner.phone,
+    };
+}
+
 patch(PartnerList.prototype, {
     setup() {
         super.setup(...arguments);
