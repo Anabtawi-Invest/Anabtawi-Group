@@ -199,14 +199,19 @@ class HrEmployee(models.Model):
                     d_curr += timedelta(days=1)
 
         # Batch Pre-fetch 4: Leave Work Entries
-        dt_start_we = datetime.combine(date_from, time.min)
-        dt_end_we = datetime.combine(date_to, time.max)
-        work_entries = self.env["hr.work.entry"].sudo().search([
+        WEModel = self.env["hr.work.entry"]
+        we_domain = [
             ("employee_id", "in", emp_ids),
-            ("date_start", ">=", dt_start_we),
-            ("date_start", "<=", dt_end_we),
             ("state", "!=", "cancelled"),
-        ])
+        ]
+        if "date" in WEModel._fields:
+            we_domain += [("date", ">=", date_from), ("date", "<=", date_to)]
+        elif "date_start" in WEModel._fields:
+            we_domain += [
+                ("date_start", ">=", datetime.combine(date_from, time.min)),
+                ("date_start", "<=", datetime.combine(date_to, time.max)),
+            ]
+        work_entries = WEModel.sudo().search(we_domain)
         for we in work_entries:
             type_obj = we.work_entry_type_id
             if not type_obj:
@@ -216,10 +221,27 @@ class HrEmployee(models.Model):
             name = (type_obj.name or "").strip().upper()
             if type_obj.is_leave or code in EXCUSED_LEAVE_WORK_ENTRY_CODES or display_code in EXCUSED_LEAVE_WORK_ENTRY_CODES or \
                any(c in code or c in display_code or c in name for c in ["RST", "RESTDAY", "REST_DAY"]):
-                we_date = we.date_start.date() if we.date_start else False
+                we_date = getattr(we, "date", False) or (we.date_start.date() if hasattr(we, "date_start") and we.date_start else False)
+                if isinstance(we_date, datetime):
+                    we_date = we_date.date()
                 if we_date:
                     approved_leave_keys.add((we.employee_id.id, we_date))
 
+        # Batch Pre-fetch 5: Employee Contracts
+        cached_contracts = defaultdict(list)
+        if "hr.contract" in self.env:
+            contracts = self.env["hr.contract"].sudo().search([
+                ("employee_id", "in", emp_ids),
+                ("state", "in", ["open", "close"]),
+                ("date_start", "<=", date_to),
+                "|",
+                ("date_end", "=", False),
+                ("date_end", ">=", date_from),
+            ], order="date_start desc")
+            for c in contracts:
+                cached_contracts[c.employee_id.id].append(c)
+
+        self = self.with_context(cached_contracts=cached_contracts)
         absent_type = self._get_absent_work_entry_type()
         yesterday = fields.Date.context_today(self) - timedelta(days=1)
 
@@ -266,15 +288,22 @@ class HrEmployee(models.Model):
                 allowed_grace_days = 4
                 forgiven_days = [d[0] for d in candidate_unpunched_days[:allowed_grace_days]]
                 if forgiven_days:
-                    min_forgiven_dt = datetime.combine(min(forgiven_days), time.min)
-                    max_forgiven_dt = datetime.combine(max(forgiven_days), time.max)
-                    forgiven_we = self.env["hr.work.entry"].sudo().search([
+                    WEModel = self.env["hr.work.entry"]
+                    fg_domain = [
                         ("employee_id", "=", employee.id),
-                        ("date_start", ">=", min_forgiven_dt),
-                        ("date_start", "<=", max_forgiven_dt),
                         ("work_entry_type_id", "=", absent_type.id),
                         ("state", "!=", "validated"),
-                    ]).filtered(lambda w: w.date_start and w.date_start.date() in forgiven_days)
+                    ]
+                    if "date" in WEModel._fields:
+                        fg_domain += [("date", "in", forgiven_days)]
+                    elif "date_start" in WEModel._fields:
+                        fg_domain += [
+                            ("date_start", ">=", datetime.combine(min(forgiven_days), time.min)),
+                            ("date_start", "<=", datetime.combine(max(forgiven_days), time.max)),
+                        ]
+                    forgiven_we = WEModel.sudo().search(fg_domain)
+                    if "date_start" in WEModel._fields and "date" not in WEModel._fields:
+                        forgiven_we = forgiven_we.filtered(lambda w: w.date_start and w.date_start.date() in forgiven_days)
                     if forgiven_we:
                         forgiven_we.unlink()
 
@@ -288,38 +317,45 @@ class HrEmployee(models.Model):
         if dur <= 0.01:
             return
 
-        dt_day_start = datetime.combine(target_date, time.min)
-        dt_day_end = datetime.combine(target_date, time.max)
-        dt_start_val = datetime.combine(target_date, time(8, 0, 0))
-        dt_stop_val = dt_start_val + timedelta(hours=dur)
-
         work_entry_model = self.env["hr.work.entry"].sudo()
-        existing_work_entries = work_entry_model.search([
+        day_domain = [
             ("employee_id", "=", self.id),
-            ("date_start", ">=", dt_day_start),
-            ("date_start", "<=", dt_day_end),
             ("state", "!=", "cancelled"),
             ("work_entry_type_id.is_leave", "=", False),
-        ])
+        ]
+        if "date" in work_entry_model._fields:
+            day_domain += [("date", "=", target_date)]
+        elif "date_start" in work_entry_model._fields:
+            day_domain += [
+                ("date_start", ">=", datetime.combine(target_date, time.min)),
+                ("date_start", "<=", datetime.combine(target_date, time.max)),
+            ]
+        existing_work_entries = work_entry_model.search(day_domain)
 
         if existing_work_entries:
             editable_work_entries = existing_work_entries.filtered(lambda we: we.state != "validated")
             if editable_work_entries:
                 update_vals = {"work_entry_type_id": absent_type.id, "duration": dur}
                 if "date_start" in work_entry_model._fields:
-                    update_vals["date_start"] = dt_start_val
+                    update_vals["date_start"] = datetime.combine(target_date, time(8, 0, 0))
                 if "date_stop" in work_entry_model._fields:
-                    update_vals["date_stop"] = dt_stop_val
+                    update_vals["date_stop"] = datetime.combine(target_date, time(8, 0, 0)) + timedelta(hours=dur)
                 editable_work_entries.write(update_vals)
             return
 
-        if work_entry_model.search_count([
+        cnt_domain = [
             ("employee_id", "=", self.id),
-            ("date_start", ">=", dt_day_start),
-            ("date_start", "<=", dt_day_end),
             ("state", "!=", "cancelled"),
             ("work_entry_type_id", "=", absent_type.id),
-        ]):
+        ]
+        if "date" in work_entry_model._fields:
+            cnt_domain += [("date", "=", target_date)]
+        elif "date_start" in work_entry_model._fields:
+            cnt_domain += [
+                ("date_start", ">=", datetime.combine(target_date, time.min)),
+                ("date_start", "<=", datetime.combine(target_date, time.max)),
+            ]
+        if work_entry_model.search_count(cnt_domain):
             return
 
         version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
@@ -329,12 +365,16 @@ class HrEmployee(models.Model):
         we_vals = {
             "employee_id": self.id,
             "version_id": version.id,
-            "date_start": dt_start_val,
-            "date_stop": dt_stop_val,
             "duration": dur,
             "work_entry_type_id": absent_type.id,
             "company_id": self.company_id.id,
         }
+        if "date" in work_entry_model._fields:
+            we_vals["date"] = target_date
+        if "date_start" in work_entry_model._fields:
+            we_vals["date_start"] = datetime.combine(target_date, time(8, 0, 0))
+        if "date_stop" in work_entry_model._fields:
+            we_vals["date_stop"] = datetime.combine(target_date, time(8, 0, 0)) + timedelta(hours=dur)
         if "name" in work_entry_model._fields:
             we_vals["name"] = f"Absent: {self.name} - {target_date}"
 
@@ -356,6 +396,16 @@ class HrEmployee(models.Model):
 
     def _get_versions_with_contract_overlap_with_period(self, date_from, date_to):
         """Returns contract versions covering the specified period for all employees in self."""
+        cached = self.env.context.get('cached_contracts')
+        if cached is not None and "hr.contract" in self.env:
+            res = self.env['hr.contract']
+            for emp_id in self.ids:
+                for c in cached.get(emp_id, []):
+                    c_start = c.date_start
+                    c_end = c.date_end
+                    if c_start and c_start <= date_to and (not c_end or c_end >= date_from):
+                        res |= c
+            return res.sorted('date_start', reverse=True)
         if hasattr(super(), '_get_versions_with_contract_overlap_with_period'):
             try:
                 return super()._get_versions_with_contract_overlap_with_period(date_from, date_to)

@@ -339,6 +339,10 @@ class HrAttendance(models.Model):
             ])
             ot_lines_by_key = {(l.employee_id.id, l.date): l for l in ot_lines}
 
+        to_zero_ot = self.env['hr.attendance.overtime'] if 'hr.attendance.overtime' in self.env else False
+        to_zero_lines = self.env['hr.attendance.overtime.line'] if 'hr.attendance.overtime.line' in self.env else False
+        excess_writes = defaultdict(list)
+
         for att in valid_atts:
             try:
                 raw_hrs = att.worked_hours
@@ -365,12 +369,20 @@ class HrAttendance(models.Model):
 
                 if excess < min_ot_threshold:
                     if ot_rec:
-                        ot_rec.sudo().write({'duration': 0.0})
+                        to_zero_ot |= ot_rec
                     if ot_line:
-                        ot_line.sudo().write({'duration': 0.0, 'manual_duration': 0.0})
+                        to_zero_lines |= ot_line
                 else:
                     if ot_rec:
-                        ot_rec.sudo().write({'duration': excess})
+                        excess_writes[excess].append(ot_rec.id)
             except Exception:
                 pass
+
+        if to_zero_ot:
+            to_zero_ot.sudo().write({'duration': 0.0})
+        if to_zero_lines:
+            to_zero_lines.sudo().write({'duration': 0.0, 'manual_duration': 0.0})
+        if 'hr.attendance.overtime' in self.env:
+            for exc_val, rec_ids in excess_writes.items():
+                self.env['hr.attendance.overtime'].browse(rec_ids).sudo().write({'duration': exc_val})
         return res

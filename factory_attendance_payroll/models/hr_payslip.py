@@ -527,13 +527,16 @@ class HrPayslip(models.Model):
         for att in attendances:
             worked_dates_by_emp[att.employee_id.id].add(att.check_in.date())
 
-        dt_min_we = datetime.datetime.combine(min_date, datetime.time.min)
-        dt_max_we = datetime.datetime.combine(max_date, datetime.time.max)
-        work_entries = self.env['hr.work.entry'].sudo().search([
-            ('employee_id', 'in', emp_ids),
-            ('date_start', '>=', dt_min_we),
-            ('date_start', '<=', dt_max_we)
-        ])
+        we_domain = [('employee_id', 'in', emp_ids)]
+        WEModel = self.env['hr.work.entry']
+        if 'date' in WEModel._fields:
+            we_domain += [('date', '>=', min_date), ('date', '<=', max_date)]
+        elif 'date_start' in WEModel._fields:
+            we_domain += [
+                ('date_start', '>=', datetime.datetime.combine(min_date, datetime.time.min)),
+                ('date_start', '<=', datetime.datetime.combine(max_date, datetime.time.max))
+            ]
+        work_entries = WEModel.sudo().search(we_domain)
         we_by_emp = defaultdict(list)
         for we in work_entries:
             we_by_emp[we.employee_id.id].append(we)
@@ -550,7 +553,9 @@ class HrPayslip(models.Model):
                 for we in emp_work_entries:
                     code = (we.work_entry_type_id.code or '').strip()
                     if not we.work_entry_type_id.is_leave and code not in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS']:
-                        we_date = we.date_start.date() if we.date_start else False
+                        we_date = getattr(we, 'date', False) or (we.date_start.date() if hasattr(we, 'date_start') and we.date_start else False)
+                        if isinstance(we_date, datetime.datetime):
+                            we_date = we_date.date()
                         if we_date:
                             slip_worked_dates.add(we_date)
 

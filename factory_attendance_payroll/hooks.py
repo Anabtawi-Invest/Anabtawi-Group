@@ -35,6 +35,15 @@ def pre_init_hook(env):
         except Exception:
             pass
 
+    with env.cr.savepoint():
+        try:
+            env.cr.execute("""
+                CREATE INDEX IF NOT EXISTS idx_hr_attendance_emp_checkin ON hr_attendance (employee_id, check_in);
+                CREATE INDEX IF NOT EXISTS idx_hr_payslip_emp_dates ON hr_payslip (employee_id, date_from, date_to);
+            """)
+        except Exception:
+            pass
+
 
 def post_init_hook(env):
     """
