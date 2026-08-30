@@ -91,6 +91,17 @@ class HrPayslip(models.Model):
 
     @api.depends('employee_id', 'date_from', 'date_to')
     def _compute_attendance_reconciliation_fields(self):
+        if self.env.context.get('install_mode') or self.env.context.get('module_installation'):
+            self.attendance_gross_overtime = 0.0
+            self.attendance_gross_undertime = 0.0
+            self.attendance_net_reconciled = 0.0
+            self.total_extra_hours_available = 0.0
+            self.lateness_covered_by_extra_hours = 0.0
+            self.lateness_covered_by_annual_leave = 0.0
+            self.remaining_extra_hours_balance = 0.0
+            self.undertime_cash_deduction_hours = 0.0
+            return
+
         # Fast Path for module installation & batch performance:
         # Only compute detailed reconciliation for active draft/verify slips (or explicitly computed slips)
         valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to and (s.state in ['draft', 'verify'] or not s.id))
