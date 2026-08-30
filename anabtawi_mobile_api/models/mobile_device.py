@@ -9,6 +9,8 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
+_LAST_LOGIN_TOUCH_SECONDS = 300
+
 
 class AnabtawiMobileDevice(models.Model):
     _name = "anabtawi.mobile.device"
@@ -87,7 +89,7 @@ class AnabtawiMobileDevice(models.Model):
         except (TypeError, ValueError):
             return 30
 
-    def _apply_new_tokens(self, plain_token, ip_address=None):
+    def _apply_new_tokens(self, plain_token, ip_address=None, extra_vals=None):
         digest = self._hash_plain_token(plain_token)
         vals = {
             "token_hash": digest,
@@ -98,7 +100,49 @@ class AnabtawiMobileDevice(models.Model):
         }
         if ip_address:
             vals["last_ip"] = ip_address
+        if extra_vals:
+            vals.update(extra_vals)
         self.sudo().write(vals)
+
+    @api.model
+    def _is_concurrency_error(self, error):
+        msg = str(error or "").lower()
+        return (
+            "could not serialize access due to concurrent update" in msg
+            or "serializationfailure" in msg
+            or "could not obtain lock" in msg
+        )
+
+    def _safe_write_device(self, vals):
+        """Best-effort write for non-critical device activity fields."""
+        if not vals or not self:
+            return
+        try:
+            with self.env.cr.savepoint():
+                self.sudo().write(vals)
+        except Exception as error:
+            if not self._is_concurrency_error(error):
+                raise
+            _logger.debug(
+                "Concurrent update on mobile device %s ignored (fields: %s): %s",
+                self.ids,
+                sorted(vals.keys()),
+                error,
+            )
+
+    def _touch_last_activity(self, ip_address=None):
+        """Refresh last activity without writing on every API request."""
+        now = fields.Datetime.now()
+        for device in self:
+            vals = {}
+            if ip_address and ip_address != device.last_ip:
+                vals["last_ip"] = ip_address
+            if (
+                not device.last_login
+                or (now - device.last_login).total_seconds() >= _LAST_LOGIN_TOUCH_SECONDS
+            ):
+                vals["last_login"] = now
+            device._safe_write_device(vals)
 
     @api.model
     def register_or_refresh_login(self, user, device_uid_clean, device_name=None, ip_address=None, platform=None, manufacturer=None, model_name=None, app_version=None):
@@ -145,8 +189,9 @@ class AnabtawiMobileDevice(models.Model):
                 vals["app_version"] = app_version
             if ip_address:
                 vals["last_ip"] = ip_address
-            active_same_device.write(vals)
-            active_same_device._apply_new_tokens(plain, ip_address=ip_address)
+            active_same_device._apply_new_tokens(
+                plain, ip_address=ip_address, extra_vals=vals
+            )
             return {"access_token": plain}
 
         inactive_device = self_sudo.search([
@@ -167,8 +212,9 @@ class AnabtawiMobileDevice(models.Model):
             if ip_address:
                 vals["registered_ip"] = inactive_device.registered_ip or ip_address
                 vals["last_ip"] = ip_address
-            inactive_device.write(vals)
-            inactive_device._apply_new_tokens(plain, ip_address=ip_address)
+            inactive_device._apply_new_tokens(
+                plain, ip_address=ip_address, extra_vals=vals
+            )
             return {"access_token": plain}
 
         digest = self_sudo._hash_plain_token(plain)
@@ -216,20 +262,7 @@ class AnabtawiMobileDevice(models.Model):
         if not device.user_id.active:
             device.action_revoke_token()
             return self.env["res.users"]
-        now = fields.Datetime.now()
-        # Throttle DB writes: only update last_login if older than 1 hour or if IP changed.
-        # This saves 95%+ of write queries and row locks on every mobile request.
-        needs_update = False
-        vals = {}
-        if not device.last_login or (now - device.last_login).total_seconds() > 3600:
-            vals["last_login"] = now
-            needs_update = True
-        if ip_address and device.last_ip != ip_address:
-            vals["last_ip"] = ip_address
-            needs_update = True
-
-        if needs_update:
-            device.sudo().write(vals)
+        device._touch_last_activity(ip_address=ip_address)
         return device.user_id
 
     @api.model

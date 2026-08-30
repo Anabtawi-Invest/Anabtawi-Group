@@ -1,5 +1,4 @@
 import logging
-import os
 from datetime import datetime, time
 
 import pytz
@@ -337,13 +336,22 @@ class AnabtawiMobileAPI(http.Controller):
                 if field_name in employee._fields and employee[field_name]:
                     otp_number = str(employee[field_name])
                     break
+        job_title = (employee.job_title or "").strip()
+        emp_num = ""
+        for fn in ("employee_number", "registration_number", "barcode"):
+            if fn in employee._fields and employee[fn]:
+                emp_num = str(employee[fn]).strip()
+                break
+        full_job_title = f"{job_title} ({emp_num})" if (job_title and emp_num) else (job_title or (f"({emp_num})" if emp_num else ""))
+
         return _json({
             "status": "ok",
             "uid": user.id,
             "employee_id": employee.id,
             "login": user.login,
             "name": employee.name,
-            "job_title": employee.job_title or "",
+            "job_title": full_job_title,
+            "employee_number": emp_num,
             "department_name": employee.department_id.name if employee.department_id else "",
             "work_location": work_location.name if work_location else "",
             "mobile_phone": employee.mobile_phone or "",
@@ -407,6 +415,45 @@ class AnabtawiMobileAPI(http.Controller):
         end = timezone.localize(datetime.combine(today, time.max)).astimezone(pytz.UTC)
         return start.replace(tzinfo=None), end.replace(tzinfo=None)
 
+
+    def _employee_timezone_name(self, employee):
+        """Return the timezone used for Employee App display times.
+
+        Odoo stores attendance datetimes in UTC. The backend UI converts them
+        using the user's/employee's timezone, so the API must return the same
+        local display value to avoid the PWA showing UTC as local time.
+        """
+        tz_name = False
+        try:
+            if hasattr(employee, "_get_attendance_timezone"):
+                tz_name = employee._get_attendance_timezone()
+        except Exception:
+            tz_name = False
+        tz_name = tz_name or employee.tz or employee.user_id.tz or request.env.user.tz or "UTC"
+        try:
+            pytz.timezone(tz_name)
+        except pytz.UnknownTimeZoneError:
+            tz_name = "UTC"
+        return tz_name
+
+    def _datetime_to_employee_local(self, employee, value):
+        """Convert an Odoo UTC datetime to the employee local display string."""
+        if not value:
+            return None
+        dt_value = fields.Datetime.to_datetime(value)
+        if not dt_value:
+            return None
+        if dt_value.tzinfo is None:
+            dt_value = pytz.UTC.localize(dt_value)
+        timezone = pytz.timezone(self._employee_timezone_name(employee))
+        local_dt = dt_value.astimezone(timezone)
+        return local_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    def _datetime_to_utc_string(self, value):
+        if not value:
+            return None
+        return fields.Datetime.to_string(value)
+
     @http.route(
         "/anabtawi/mobile/attendance/status",
         type="http", auth="public", methods=["GET"], csrf=False,
@@ -454,13 +501,7 @@ class AnabtawiMobileAPI(http.Controller):
                 return _error("invalid_location", _("Invalid GPS coordinates."), 422)
             geo_information = {"latitude": latitude, "longitude": longitude}
 
-        if employee._is_portal_geo_tracking_required():
-            if latitude is None or longitude is None:
-                return _error(
-                    "location_required",
-                    _("GPS location is required for check-in and check-out."),
-                    422,
-                )
+        if employee.attendance_state != "checked_in" and employee._is_portal_geo_tracking_required():
             max_accuracy = _as_float(
                 request.env["ir.config_parameter"].sudo().get_param(
                     "anabtawi_mobile.max_location_accuracy_m", "100"
@@ -475,14 +516,14 @@ class AnabtawiMobileAPI(http.Controller):
 
         lock_acquired = False
         try:
-            employee._acquire_portal_attendance_action_lock()
+            employee._acquire_portal_attendance_action_lock(lock_minutes=10)
             lock_acquired = True
             attendance = employee._attendance_action_change(geo_information=geo_information)
         except (UserError, ValidationError) as exc:
             if lock_acquired:
                 employee._release_portal_attendance_action_lock()
             message = exc.args[0] if exc.args else str(exc)
-            code = "attendance_locked" if any(w in message.lower() for w in ["wait", "lock", "minutes", "submitted", "انتظار", "دقيقة"]) else "attendance_rejected"
+            code = "attendance_locked" if "10" in message or "wait" in message.lower() else "attendance_rejected"
             return _error(code, message, 429 if code == "attendance_locked" else 422)
         except Exception:
             if lock_acquired:
@@ -490,45 +531,17 @@ class AnabtawiMobileAPI(http.Controller):
             _logger.exception("Mobile attendance failed for employee_id=%s", employee.id)
             return _error("server_error", _("Attendance could not be saved."), 500)
 
-        # Safely resolve the attendance record
-        att_record = attendance if hasattr(attendance, '_fields') else request.env['hr.attendance'].sudo().search(
-            [('employee_id', '=', employee.id)], order='id desc', limit=1
-        )
-
-        if att_record and geo_information:
-            vals_to_write = {}
-            if employee.attendance_state == "checked_in":
-                if "in_latitude" in att_record._fields and att_record.in_latitude != latitude:
-                    vals_to_write["in_latitude"] = latitude
-                if "in_longitude" in att_record._fields and att_record.in_longitude != longitude:
-                    vals_to_write["in_longitude"] = longitude
-            else:
-                if "out_latitude" in att_record._fields and att_record.out_latitude != latitude:
-                    vals_to_write["out_latitude"] = latitude
-                if "out_longitude" in att_record._fields and att_record.out_longitude != longitude:
-                    vals_to_write["out_longitude"] = longitude
-            if vals_to_write:
-                try:
-                    att_record.sudo().write(vals_to_write)
-                except Exception as write_err:
-                    _logger.warning("Could not write GPS coordinates to attendance: %s", write_err)
-
         employee.invalidate_recordset(["attendance_state"])
-        check_in_str = fields.Datetime.to_string(att_record.check_in) if (att_record and hasattr(att_record, 'check_in') and att_record.check_in) else None
-        check_out_str = fields.Datetime.to_string(att_record.check_out) if (att_record and hasattr(att_record, 'check_out') and att_record.check_out) else None
-        worked_hours_val = round(att_record.worked_hours or 0.0, 2) if (att_record and hasattr(att_record, 'worked_hours')) else 0.0
-
         return _json({
             "status": "ok",
             "action": "check_in" if employee.attendance_state == "checked_in" else "check_out",
             "attendance_state": employee.attendance_state,
-            "check_in": check_in_str,
-            "check_out": check_out_str,
-            "worked_hours": worked_hours_val,
-            "in_latitude": att_record.in_latitude if (att_record and "in_latitude" in att_record._fields) else None,
-            "in_longitude": att_record.in_longitude if (att_record and "in_longitude" in att_record._fields) else None,
-            "out_latitude": att_record.out_latitude if (att_record and "out_latitude" in att_record._fields) else None,
-            "out_longitude": att_record.out_longitude if (att_record and "out_longitude" in att_record._fields) else None,
+            "timezone": self._employee_timezone_name(employee),
+            "check_in": self._datetime_to_employee_local(employee, attendance.check_in),
+            "check_out": self._datetime_to_employee_local(employee, attendance.check_out),
+            "check_in_utc": self._datetime_to_utc_string(attendance.check_in),
+            "check_out_utc": self._datetime_to_utc_string(attendance.check_out),
+            "worked_hours": round(attendance.worked_hours or 0.0, 2),
         })
 
     @http.route(
@@ -544,13 +557,12 @@ class AnabtawiMobileAPI(http.Controller):
         )
         return _json({"status": "ok", "records": [{
             "id": record.id,
-            "check_in": fields.Datetime.to_string(record.check_in) if record.check_in else None,
-            "check_out": fields.Datetime.to_string(record.check_out) if record.check_out else None,
+            "timezone": self._employee_timezone_name(employee),
+            "check_in": self._datetime_to_employee_local(employee, record.check_in),
+            "check_out": self._datetime_to_employee_local(employee, record.check_out),
+            "check_in_utc": self._datetime_to_utc_string(record.check_in),
+            "check_out_utc": self._datetime_to_utc_string(record.check_out),
             "worked_hours": round(record.worked_hours or 0.0, 2),
-            "in_latitude": record.in_latitude if "in_latitude" in record._fields else None,
-            "in_longitude": record.in_longitude if "in_longitude" in record._fields else None,
-            "out_latitude": record.out_latitude if "out_latitude" in record._fields else None,
-            "out_longitude": record.out_longitude if "out_longitude" in record._fields else None,
         } for record in records]})
 
     def _eligible_leave_types(self, employee):
@@ -744,12 +756,6 @@ class AnabtawiMobileAPI(http.Controller):
 
     def _overtime_categories(self, employee):
         Category = request.env["approval.category"].sudo()
-        if "is_overtime_category" in Category._fields:
-            # Always top up any missing standard categories, not just when the
-            # table is completely empty — otherwise a database with 1-2
-            # manually created categories never gets the rest auto-created.
-            self._ensure_default_overtime_categories(employee)
-
         domain = []
         if "is_overtime_category" in Category._fields:
             domain.append(("is_overtime_category", "=", True))
@@ -760,7 +766,10 @@ class AnabtawiMobileAPI(http.Controller):
         if "company_id" in Category._fields:
             domain.append(("company_id", "in", [False, employee.company_id.id]))
 
-        return Category.search(domain, order="sequence, id" if "sequence" in Category._fields else "id")
+        categories = Category.search(domain, order="sequence, id" if "sequence" in Category._fields else "id")
+        if not categories:
+            categories = self._ensure_default_overtime_categories(employee)
+        return categories
 
     @http.route(
         "/anabtawi/mobile/overtime/categories",
@@ -852,11 +861,10 @@ class AnabtawiMobileAPI(http.Controller):
             "state": approval.request_status,
         } for approval in approvals]})
 
-
     @http.route(
-        "/anabtawi/mobile/payslips/list",
-        type="http", auth="public", methods=["GET"], csrf=False,
-    )
+            "/anabtawi/mobile/payslips/list",
+            type="http", auth="public", methods=["GET"], csrf=False,
+        )
     def payslip_list(self, **kwargs):
         employee, _user, _token, error = self._require_employee()
         if error:
@@ -889,9 +897,9 @@ class AnabtawiMobileAPI(http.Controller):
         })
 
     @http.route(
-        "/anabtawi/mobile/payslips/download",
-        type="http", auth="public", methods=["GET"], csrf=False,
-    )
+            "/anabtawi/mobile/payslips/download",
+            type="http", auth="public", methods=["GET"], csrf=False,
+        )
     def payslip_download(self, **kwargs):
         employee, _user, _token, error = self._require_employee()
         if error:
@@ -936,9 +944,9 @@ class AnabtawiMobileAPI(http.Controller):
         return request.make_response(pdf_content, headers=headers)
 
     @http.route(
-        "/anabtawi/mobile/app/check_update",
-        type="http", auth="public", methods=["GET"], csrf=False, sitemap=False,
-    )
+            "/anabtawi/mobile/app/check_update",
+            type="http", auth="public", methods=["GET"], csrf=False, sitemap=False,
+        )
     def check_app_update(self, **kwargs):
         config = request.env["ir.config_parameter"].sudo()
         latest_version = config.get_param("anabtawi_mobile.latest_version")
@@ -967,9 +975,9 @@ class AnabtawiMobileAPI(http.Controller):
         })
 
     @http.route(
-        "/anabtawi/mobile/apk/download",
-        type="http", auth="public", methods=["GET"], csrf=False, sitemap=False,
-    )
+            "/anabtawi/mobile/apk/download",
+            type="http", auth="public", methods=["GET"], csrf=False, sitemap=False,
+        )
     def apk_download(self, **kwargs):
         module_path = os.path.dirname(os.path.dirname(__file__))
         apk_path = os.path.join(module_path, "static", "apk", "employee_app_latest.apk")
