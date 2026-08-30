@@ -201,6 +201,14 @@ class HrEmployee(models.Model):
             for employee in self:
                 employee._apply_monthly_absence_for_month(m_from, m_to)
 
+    def is_manager_exempt(self):
+        """Returns True if the employee is marked as Manager and exempt from overtime/lateness."""
+        self.ensure_one()
+        for fname in ['x_studio_manager', 'is_manager', 'x_manager']:
+            if fname in self._fields and getattr(self, fname):
+                return True
+        return False
+
     def _apply_monthly_absence_for_month(self, month_from, month_to):
         """
         Evaluates a single employee for a specific monthly window:
@@ -212,6 +220,9 @@ class HrEmployee(models.Model):
            - 5th unpunched day and all excess days beyond 4 receive an ABSENT work entry.
         """
         self.ensure_one()
+        if self.is_manager_exempt():
+            return
+
         versions = self._get_versions_with_contract_overlap_with_period(month_from, month_to)
         if not versions:
             return
@@ -383,23 +394,35 @@ class HrEmployee(models.Model):
                 return True
 
         # 3. Check resource calendar global leaves / public holidays
-        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
-        calendar = (
-            version.resource_calendar_id
-            or self.resource_calendar_id
-            or self.company_id.resource_calendar_id
-        )
-        if calendar and "resource.calendar.leaves" in self.env:
-            global_leaves = self.env["resource.calendar.leaves"].sudo().search_count([
-                ("calendar_id", "=", calendar.id),
-                ("resource_id", "in", [False, self.resource_id.id if self.resource_id else False]),
-                ("date_from", "<", fields.Datetime.to_string(next_day_start_utc)),
-                ("date_to", ">", fields.Datetime.to_string(day_start_utc)),
-            ])
-            if global_leaves > 0:
-                return True
+        if self._is_public_holiday_on_day(target_date):
+            return True
 
         return False
+
+    def _is_public_holiday_on_day(self, target_date):
+        """
+        Checks whether target_date is a Public Holiday / Global Leave in resource.calendar.leaves
+        for the employee's calendar or company calendar.
+        """
+        self.ensure_one()
+        if not target_date or "resource.calendar.leaves" not in self.env:
+            return False
+        dt_start = fields.Datetime.to_string(datetime.combine(target_date, time.min))
+        dt_end = fields.Datetime.to_string(datetime.combine(target_date, time.max))
+
+        calendar_ids = set()
+        if self.resource_calendar_id:
+            calendar_ids.add(self.resource_calendar_id.id)
+        if self.company_id and self.company_id.resource_calendar_id:
+            calendar_ids.add(self.company_id.resource_calendar_id.id)
+        calendar_list = [False] + list(calendar_ids)
+
+        return bool(self.env["resource.calendar.leaves"].sudo().search_count([
+            ("calendar_id", "in", calendar_list),
+            ("resource_id", "in", [False, self.resource_id.id if self.resource_id else False]),
+            ("date_from", "<=", dt_end),
+            ("date_to", ">=", dt_start),
+        ]))
 
     def _has_checkin_on_day(self, target_date):
         """Checks if the employee has any attendance check-in recorded on target_date."""
