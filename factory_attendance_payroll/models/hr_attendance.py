@@ -2,6 +2,7 @@
 from datetime import datetime, time, timedelta
 from odoo import models, fields, api
 
+
 class HrAttendance(models.Model):
     _inherit = 'hr.attendance'
 
@@ -9,7 +10,7 @@ class HrAttendance(models.Model):
         string="Lunch Break Deducted",
         compute="_compute_factory_attendance_metrics",
         store=True,
-        help="Break hours deducted (1.0h for Factory/Branch, 0.5h for Head Office)."
+        help="Break hours deducted (1.0h for Factory/Retail, 0.5h for Head Office)."
     )
 
     net_worked_hours = fields.Float(
@@ -140,15 +141,14 @@ class HrAttendance(models.Model):
             attendance.is_public_holiday = is_holiday
 
             if is_holiday:
-                # Public Holiday: Scheduled hours are 0 -> all net worked hours (before & after lunch break) count as Extra Hours, 0 lateness
+                # Public Holiday: Scheduled hours are 0 -> all net worked hours count as Extra Hours, 0 lateness
                 attendance.daily_overtime_hours = net_hrs
                 attendance.daily_undertime_hours = 0.0
                 attendance.daily_variance_hours = net_hrs
                 continue
 
             expected_hrs = 8.0
-            standard_target = expected_hrs if expected_hrs > 0 else 8.0
-            excess = net_hrs - standard_target
+            excess = net_hrs - expected_hrs
             min_ot_threshold = 0.75         # 45 minutes Overtime threshold
             min_lateness_threshold = 0.25   # 15 minutes Lateness Grace Period
 
@@ -188,7 +188,6 @@ class HrAttendance(models.Model):
         for att in self:
             att_ot = att.daily_overtime_hours if att.daily_overtime_hours >= 0.75 else 0.0
             if att_ot < 0.75:
-                # If there are no daily extra hours, clear validated overtime
                 att.sudo().write({'overtime_status': 'refused', 'validated_overtime_hours': 0.0})
                 if hasattr(att, 'linked_overtime_ids') and att.linked_overtime_ids:
                     att.linked_overtime_ids.sudo().write({'status': 'refused', 'duration': 0.0})
@@ -276,28 +275,8 @@ class HrAttendance(models.Model):
             vals['validated_overtime_hours'] = 0.0
         return super(HrAttendance, self.with_context(bypass_work_entry_check=True)).write(vals)
 
-    @api.depends('worked_hours', 'employee_id', 'daily_overtime_hours')
-    def _compute_eligible_overtime(self):
-        """
-        Factory Attendance Override:
-        Only attendance records with positive Daily Extra Hours >= 0.75h are eligible for approval.
-        """
-        if hasattr(super(), '_compute_eligible_overtime'):
-            try:
-                super()._compute_eligible_overtime()
-            except Exception:
-                pass
-        for attendance in self:
-            if attendance.daily_overtime_hours >= 0.75:
-                attendance.eligible_overtime = True
-            else:
-                attendance.eligible_overtime = False
-
     def _check_weekly_overtime_eligibility(self):
-        """
-        Factory Attendance Override:
-        Allow approval if attendance has valid positive extra hours.
-        """
+        """Allow approval if attendance has valid positive extra hours."""
         factory_atts = self.filtered(lambda a: a.daily_overtime_hours >= 0.75)
         other_atts = self - factory_atts
         if other_atts and hasattr(super(), '_check_weekly_overtime_eligibility'):
@@ -307,10 +286,7 @@ class HrAttendance(models.Model):
                 pass
 
     def action_approve_overtime(self):
-        """
-        Standard Odoo action_approve_overtime override:
-        Approves extra hours using daily_overtime_hours.
-        """
+        """Standard Odoo action_approve_overtime override."""
         for att in self:
             att_ot = att.daily_overtime_hours if att.daily_overtime_hours >= 0.75 else 0.0
             if hasattr(att, 'validated_overtime_hours'):
@@ -373,7 +349,7 @@ class HrAttendance(models.Model):
                     net_hrs = raw_hrs
 
                 target_date = att.check_in.date() if att.check_in else False
-                expected_hrs = att.employee_id._get_expected_hours_on_day(target_date) if (att.employee_id and target_date) else 8.0
+                expected_hrs = 8.0
                 standard_target = expected_hrs if expected_hrs > 0 else 8.0
                 excess = net_hrs - standard_target
                 min_ot_threshold = 0.75

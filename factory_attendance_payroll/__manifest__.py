@@ -1,8 +1,8 @@
 {
     'name': 'Factory Attendance & Payroll Reconciliation',
-    'version': '19.0.2.11.0',
+    'version': '19.0.3.0.0',
     'category': 'Human Resources/Payroll',
-    'summary': 'Multi-location break deduction, daily attendance monitoring, planning shift integration, and 3-Step Lateness Settlement for any Salary Structure.',
+    'summary': 'High-performance multi-location break deduction, daily attendance monitoring, planning shift integration, and 3-Step Lateness Settlement for any Salary Structure.',
     'author': 'Custom Solutions',
     'license': 'OPL-1',
     'depends': [
