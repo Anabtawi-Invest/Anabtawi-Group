@@ -60,6 +60,7 @@ class HrAttendance(models.Model):
         dt_max = fields.Datetime.to_string(datetime.combine(max_date, time.max))
 
         leaves = self.env["resource.calendar.leaves"].sudo().search([
+            ("resource_id", "=", False),
             ("date_from", "<=", dt_max),
             ("date_to", ">=", dt_min),
         ])

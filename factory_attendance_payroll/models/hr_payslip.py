@@ -377,12 +377,137 @@ class HrPayslip(models.Model):
         valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to)
         if valid_slips:
             valid_slips._compute_attendance_reconciliation_fields()
+            valid_slips._apply_termination_clearance_inputs()
 
         self._convert_flexible_rest_days_to_ars()
 
         res = super().compute_sheet()
         self.write({'is_reconciled': True})
         return res
+
+    def _apply_termination_clearance_inputs(self):
+        """
+        Auto-populates Termination Salary Inputs ONLY for the 3 specified input types:
+        1. CLEAR_EXTRA  -> Termination: Extra Hours Settlement
+        2. CLEAR_ANNUAL -> Termination: Annual Leave Settlement
+        3. CLEAR_PTO    -> Termination: Paid Time Off Settlement
+        """
+        input_model = self.env["hr.payslip.input"]
+        for slip in self:
+            is_term = (
+                getattr(slip, 'termination_clearance', False) or
+                (slip.struct_id and ('termination' in slip.struct_id.name.lower() or 'تيرمنيشن' in slip.struct_id.name))
+            )
+            if not is_term or not slip.employee_id:
+                continue
+
+            emp = slip.employee_id
+            w = emp.wage or 0.0
+            weekly_hours = (emp.resource_calendar_id.full_time_required_hours if emp.resource_calendar_id else None) or 49.5
+            hourly_rate = round((w / 26.0) / (weekly_hours / 6.0), 4) if weekly_hours else round(w / 240.0, 4)
+            daily_rate = round(w / 30.0, 4)
+
+            # 1. CLEAR_EXTRA (Termination: Extra Hours Settlement)
+            ot_hrs = round(slip.remaining_extra_hours_balance or slip.total_extra_hours_available, 2)
+            ot_amount = round(ot_hrs * hourly_rate, 3)
+            ot_type = self.env['hr.payslip.input.type'].sudo().search([('code', '=', 'CLEAR_EXTRA')], limit=1)
+            if ot_type:
+                ot_line = slip.input_line_ids.filtered(lambda l: l.input_type_id == ot_type)
+                if ot_line:
+                    ot_line.write({'quantity': ot_hrs, 'amount': ot_amount})
+                else:
+                    if slip.id:
+                        input_model.create({
+                            'payslip_id': slip.id,
+                            'input_type_id': ot_type.id,
+                            'quantity': ot_hrs,
+                            'amount': ot_amount,
+                        })
+                    else:
+                        slip.input_line_ids += input_model.new({
+                            'payslip_id': slip.id,
+                            'input_type_id': ot_type.id,
+                            'quantity': ot_hrs,
+                            'amount': ot_amount,
+                        })
+
+            # Fetch Annual & PTO Leave Balances
+            annual_leave_days = 0.0
+            pto_leave_days = 0.0
+
+            if hasattr(emp, '_get_consumed_leaves'):
+                annual_types = self.env['hr.leave.type'].sudo().search([
+                    '|', ('name', 'ilike', 'annual'), ('name', 'ilike', 'سنوي')
+                ], limit=1)
+                if annual_types:
+                    consumed_data, _ = emp._get_consumed_leaves(annual_types[0], target_date=slip.date_to or fields.Date.today())
+                    leave_content = consumed_data.get(emp, {}).get(annual_types[0], {})
+                    annual_leave_days = sum(v.get('virtual_remaining_leaves', 0.0) for v in leave_content.values())
+
+                pto_types = self.env['hr.leave.type'].sudo().search([
+                    ('name', 'ilike', 'paid time off')
+                ], limit=1)
+                if pto_types:
+                    consumed_data_pto, _ = emp._get_consumed_leaves(pto_types[0], target_date=slip.date_to or fields.Date.today())
+                    leave_content_pto = consumed_data_pto.get(emp, {}).get(pto_types[0], {})
+                    pto_leave_days = sum(v.get('virtual_remaining_leaves', 0.0) for v in leave_content_pto.values())
+
+            if not annual_leave_days:
+                for field_name in ['annual_leave_balance', 'remaining_leaves', 'annual_leave_balance_hours']:
+                    if field_name in emp._fields and getattr(emp, field_name):
+                        val = getattr(emp, field_name)
+                        annual_leave_days = val / 8.0 if 'hours' in field_name else val
+                        break
+
+            # 2. CLEAR_ANNUAL (Termination: Annual Leave Settlement)
+            annual_type = self.env['hr.payslip.input.type'].sudo().search([('code', '=', 'CLEAR_ANNUAL')], limit=1)
+            if annual_type:
+                annual_amount = round(annual_leave_days * daily_rate, 3)
+                annual_line = slip.input_line_ids.filtered(lambda l: l.input_type_id == annual_type)
+                if annual_line:
+                    annual_line.write({'quantity': annual_leave_days, 'amount': annual_amount})
+                else:
+                    if slip.id:
+                        input_model.create({
+                            'payslip_id': slip.id,
+                            'input_type_id': annual_type.id,
+                            'quantity': annual_leave_days,
+                            'amount': annual_amount,
+                        })
+                    else:
+                        slip.input_line_ids += input_model.new({
+                            'payslip_id': slip.id,
+                            'input_type_id': annual_type.id,
+                            'quantity': annual_leave_days,
+                            'amount': annual_amount,
+                        })
+
+            # 3. CLEAR_PTO (Termination: Paid Time Off Settlement)
+            pto_type = self.env['hr.payslip.input.type'].sudo().search([('code', '=', 'CLEAR_PTO')], limit=1)
+            if pto_type:
+                pto_amount = round(pto_leave_days * daily_rate, 3)
+                pto_line = slip.input_line_ids.filtered(lambda l: l.input_type_id == pto_type)
+                if pto_line:
+                    pto_line.write({'quantity': pto_leave_days, 'amount': pto_amount})
+                else:
+                    if slip.id:
+                        input_model.create({
+                            'payslip_id': slip.id,
+                            'input_type_id': pto_type.id,
+                            'quantity': pto_leave_days,
+                            'amount': pto_amount,
+                        })
+                    else:
+                        slip.input_line_ids += input_model.new({
+                            'payslip_id': slip.id,
+                            'input_type_id': pto_type.id,
+                            'quantity': pto_leave_days,
+                            'amount': pto_amount,
+                        })
+
+    @api.onchange('termination_clearance', 'employee_id', 'struct_id')
+    def _onchange_termination_clearance(self):
+        self._apply_termination_clearance_inputs()
 
     def action_payslip_done(self):
         """Finalize and sync Time Off and Extra Hours allocations only when payslip is confirmed."""
@@ -487,10 +612,16 @@ class HrPayslip(models.Model):
 
                 # 2. Public Holiday Line (150% rate)
                 elif code in ['GTO', 'PHD', 'HOLIDAY', 'LEAVE110', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name:
-                    hol_hrs = total_holiday_worked_hrs if total_holiday_worked_hrs > 0.01 else (line.get('number_of_hours') or 8.0)
-                    line['number_of_hours'] = hol_hrs
-                    line['number_of_days'] = round(hol_hrs / 8.0, 2)
-                    line['amount'] = round(hol_hrs * hourly_rate * 1.5, 3)
+                    if total_holiday_worked_hrs > 0.01:
+                        weighted_hol_hrs = round(total_holiday_worked_hrs * 1.5, 2)
+                        line['number_of_hours'] = weighted_hol_hrs
+                        line['number_of_days'] = round(weighted_hol_hrs / 8.0, 2)
+                        line['amount'] = round(weighted_hol_hrs * hourly_rate, 3)
+                    else:
+                        base_hrs = line.get('number_of_hours') or 8.0
+                        line['number_of_hours'] = base_hrs
+                        line['number_of_days'] = round(base_hrs / 8.0, 2)
+                        line['amount'] = round(base_hrs * hourly_rate, 3)
                     filtered_lines.append(line)
 
                 # 3. Overtime Line
