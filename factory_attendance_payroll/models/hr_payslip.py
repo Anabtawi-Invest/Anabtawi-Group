@@ -403,9 +403,8 @@ class HrPayslip(models.Model):
 
             emp = slip.employee_id
             w = emp.wage or 0.0
-            weekly_hours = (emp.resource_calendar_id.full_time_required_hours if emp.resource_calendar_id else None) or 49.5
-            hourly_rate = round((w / 26.0) / (weekly_hours / 6.0), 4) if weekly_hours else round(w / 240.0, 4)
-            daily_rate = round(w / 30.0, 4)
+            hourly_rate = w / 240.0
+            daily_rate = w / 30.0
 
             # 1. CLEAR_EXTRA (Termination: Extra Hours Settlement)
             ot_hrs = round(slip.remaining_extra_hours_balance or slip.total_extra_hours_available, 2)
