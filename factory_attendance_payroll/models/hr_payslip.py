@@ -392,24 +392,21 @@ class HrPayslip(models.Model):
         return super().action_payslip_draft()
 
     def action_payslip_cancel(self):
-        res = super().action_payslip_cancel()
         self._revert_reconciliation_settlements()
-        return res
+        return super().action_payslip_cancel()
 
     def action_cancel(self):
-        res = super().action_cancel() if hasattr(super(), 'action_cancel') else True
         self._revert_reconciliation_settlements()
-        return res
+        return super().action_cancel() if hasattr(super(), 'action_cancel') else True
 
     def unlink(self):
         self._revert_reconciliation_settlements()
         return super().unlink()
 
     def write(self, vals):
-        res = super().write(vals)
-        if vals.get('state') == 'cancel':
-            self._revert_reconciliation_settlements()
-        return res
+        if vals.get('state') == 'cancel' and not self._context.get('skip_reconcile_revert'):
+            self.with_context(skip_reconcile_revert=True)._revert_reconciliation_settlements()
+        return super().write(vals)
 
     def _get_worked_day_lines(self, *args, **kwargs):
         """
@@ -744,7 +741,14 @@ class HrPayslip(models.Model):
             if not payslip.employee_id or not payslip.date_to:
                 continue
 
-            payslip.write({'is_reconciled': False})
+            # Fast-path: If payslip was never confirmed / reconciled, skip database searches immediately
+            was_reconciled = getattr(payslip, 'is_reconciled', False)
+            if not was_reconciled and payslip.state in ['draft', 'verify']:
+                continue
+
+            # Reset in-memory flag without triggering recursive write loop
+            if 'is_reconciled' in payslip._fields and payslip.is_reconciled:
+                payslip.with_context(skip_reconcile_revert=True).sudo().write({'is_reconciled': False})
 
             if Leave:
                 try:
