@@ -101,13 +101,13 @@ class HrPayslip(models.Model):
                 payslip.undertime_cash_deduction_hours = 0.0
             return
 
-        # 1. Bulk Rest Day Conversion & Public Holiday Extra Hours Conversion
-        valid_slips._convert_flexible_rest_days_to_ars()
-        valid_slips.mapped('employee_id')._convert_public_holiday_attendances_to_extra_hours(min_date, max_date)
-
         emp_ids = valid_slips.mapped('employee_id').ids
         min_date = min(valid_slips.mapped('date_from'))
         max_date = max(valid_slips.mapped('date_to'))
+
+        # 1. Bulk Rest Day Conversion & Public Holiday Extra Hours Conversion
+        valid_slips._convert_flexible_rest_days_to_ars()
+        valid_slips.mapped('employee_id')._convert_public_holiday_attendances_to_extra_hours(min_date, max_date)
 
         # Bulk Pre-fetch 1: Attendances for all employees in batch
         attendances = self.env['hr.attendance'].sudo().search([
