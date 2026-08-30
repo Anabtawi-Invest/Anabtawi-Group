@@ -5,7 +5,7 @@ Odoo 19 integration addon for the Anabtawi Employee App.
 ## Main features
 
 - Employee App login endpoint with bearer token.
-- Attendance, leave, and employee profile APIs.
+- Attendance, leave, overtime, and employee profile APIs.
 - Single-device restriction for the Employee App only.
 - Registered device, registered IP, last IP, registered date, and last login shown under the employee Settings tab.
 - HR Manager can reset the Employee App device so the employee can register a different phone.
@@ -15,6 +15,7 @@ Odoo 19 integration addon for the Anabtawi Employee App.
 
 - `portal_check_in`
 - `portal_leaves`
+- `hr_attendance_overtime_approval_bridge`
 
 ## Installation / Upgrade
 
