@@ -76,10 +76,11 @@ class HrAttendance(models.Model):
 
     @api.depends('worked_hours', 'employee_id')
     def _compute_factory_attendance_metrics(self):
-        cutoff_date = fields.Date.today() - timedelta(days=90)
+        # Fast Path: Only compute detailed daily metrics for recent attendances (last 60 days)
+        cutoff_date = fields.Date.today() - timedelta(days=60)
         valid_atts = self.filtered(lambda a: a.check_in and a.employee_id)
-        dates = [a.check_in.date() for a in valid_atts if a.check_in.date() >= cutoff_date] if valid_atts else []
-        public_holiday_dates = self._get_public_holiday_dates_batch(min(dates), max(dates)) if dates else set()
+        active_dates = [a.check_in.date() for a in valid_atts if a.check_in.date() >= cutoff_date]
+        public_holiday_dates = self._get_public_holiday_dates_batch(min(active_dates), max(active_dates)) if active_dates else set()
 
         emp_cache = {}
 
@@ -95,10 +96,11 @@ class HrAttendance(models.Model):
 
             target_date = attendance.check_in.date() if attendance.check_in else False
 
-            # Fast path: Skip heavy calculations for old historical attendance records
+            # Installation / Historical Fast-Path: Skip heavy calculations for old records
             if target_date and target_date < cutoff_date:
-                attendance.attendance_break_hours = 0.0
-                attendance.net_worked_hours = attendance.worked_hours
+                raw_hrs = attendance.worked_hours
+                attendance.attendance_break_hours = 1.0 if raw_hrs >= 6.0 else 0.0
+                attendance.net_worked_hours = max(0.0, raw_hrs - attendance.attendance_break_hours)
                 attendance.daily_undertime_hours = 0.0
                 attendance.daily_overtime_hours = 0.0
                 attendance.daily_variance_hours = 0.0

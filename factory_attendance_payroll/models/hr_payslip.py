@@ -91,9 +91,14 @@ class HrPayslip(models.Model):
 
     @api.depends('employee_id', 'date_from', 'date_to')
     def _compute_attendance_reconciliation_fields(self):
-        valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to)
-        if not valid_slips:
-            for payslip in self:
+        # Fast Path for module installation & batch performance:
+        # Only compute detailed reconciliation for active draft/verify slips (or explicitly computed slips)
+        valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to and (s.state in ['draft', 'verify'] or not s.id))
+        
+        # For historical / done / cancelled slips, preserve their stored values without heavy re-querying
+        other_slips = self - valid_slips
+        for payslip in other_slips:
+            if not payslip.attendance_gross_overtime and not payslip.attendance_gross_undertime:
                 payslip.attendance_gross_overtime = 0.0
                 payslip.attendance_gross_undertime = 0.0
                 payslip.attendance_net_reconciled = 0.0
@@ -102,6 +107,8 @@ class HrPayslip(models.Model):
                 payslip.lateness_covered_by_annual_leave = 0.0
                 payslip.remaining_extra_hours_balance = 0.0
                 payslip.undertime_cash_deduction_hours = 0.0
+
+        if not valid_slips:
             return
 
         emp_ids = valid_slips.mapped('employee_id').ids
@@ -206,7 +213,7 @@ class HrPayslip(models.Model):
                         leave_dates_by_emp[lve.employee_id.id].add(d_curr)
                     d_curr += datetime.timedelta(days=1)
 
-        for payslip in self:
+        for payslip in valid_slips:
             if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
                 payslip.attendance_gross_overtime = 0.0
                 payslip.attendance_gross_undertime = 0.0
@@ -268,7 +275,6 @@ class HrPayslip(models.Model):
                     ot_excess = net_hrs - standard_target
                     if ot_excess >= min_ot_threshold and allow_ot:
                         approved_hrs = approved_ot_by_emp_date.get((emp_id, att_date), 0.0)
-                        # Check attendance status if overtime line not directly created
                         if not approved_hrs:
                             matching_atts = [a for a in emp_attendances if a.check_in.date() == att_date]
                             if any(getattr(a, 'overtime_status', False) == 'approved' for a in matching_atts):
