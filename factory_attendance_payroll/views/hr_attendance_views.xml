@@ -65,7 +65,7 @@
                 <field name="daily_undertime_hours" widget="float_time" optional="show" string="Daily Lateness"/>
                 <field name="daily_overtime_hours" widget="float_time" optional="show" string="Daily Extra Hours"/>
             </xpath>
-            <xpath expr="//list/button[@name='action_approve_overtime' and @icon='fa-check']" position="attributes">
+            <xpath expr="//*[self::list or self::tree]/button[@name='action_approve_overtime' and @icon='fa-check']" position="attributes">
                 <attribute name="invisible">overtime_status not in ['to_approve', 'refused'] or daily_overtime_hours &lt; 0.75</attribute>
             </xpath>
         </field>
