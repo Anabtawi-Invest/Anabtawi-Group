@@ -76,7 +76,7 @@ class HrAttendance(models.Model):
 
     @api.depends('worked_hours', 'employee_id')
     def _compute_factory_attendance_metrics(self):
-        if self.env.context.get('install_mode') or self.env.context.get('module_installation'):
+        if not getattr(self.env.registry, 'ready', True) or self.env.context.get('install_mode') or self.env.context.get('module_installation') or self.env.context.get('tracking_disable'):
             self.attendance_break_hours = 0.0
             self.net_worked_hours = 0.0
             self.daily_undertime_hours = 0.0

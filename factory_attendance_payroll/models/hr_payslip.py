@@ -91,7 +91,7 @@ class HrPayslip(models.Model):
 
     @api.depends('employee_id', 'date_from', 'date_to')
     def _compute_attendance_reconciliation_fields(self):
-        if self.env.context.get('install_mode') or self.env.context.get('module_installation'):
+        if not getattr(self.env.registry, 'ready', True) or self.env.context.get('install_mode') or self.env.context.get('module_installation') or self.env.context.get('tracking_disable'):
             self.attendance_gross_overtime = 0.0
             self.attendance_gross_undertime = 0.0
             self.attendance_net_reconciled = 0.0
