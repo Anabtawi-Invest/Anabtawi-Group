@@ -8,6 +8,7 @@ import { NumberPopup } from "@point_of_sale/app/components/popups/number_popup/n
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { PredefinedDiscountAuthPopup } from "./predefined_discount_auth_popup";
+import { EmployeeDiscountAuthPopup } from "./employee_discount_auth_popup";
 
 function getDiscountableLines(order) {
     return (order?.getOrderlines?.() || []).filter((line) =>
@@ -15,6 +16,13 @@ function getDiscountableLines(order) {
             ? line.isGlobalDiscountApplicable()
             : !line.isDiscountLine
     );
+}
+
+function normalizeDiscountRows(rows) {
+    return (rows || []).map((row) => ({
+        ...row,
+        discount: Math.max(0, Math.min(100, Number(row.discount) || 0)),
+    }));
 }
 
 patch(PosStore.prototype, {
@@ -44,7 +52,7 @@ patch(ControlButtons.prototype, {
             this.env.services.notification.add(_t("Add at least one order line first."), {
                 type: "warning",
             });
-            return;
+            return false;
         }
         for (const line of lines) {
             line.setDiscount(percent);
@@ -55,6 +63,24 @@ patch(ControlButtons.prototype, {
             _t("Discount %s%% applied to all order lines.").replace("%s", percent),
             { type: "success" }
         );
+        return true;
+    },
+
+    async _ensurePartnerLoaded(partnerId) {
+        let partner = this.pos.models["res.partner"].get(partnerId);
+        if (partner) {
+            return partner;
+        }
+        try {
+            await this.pos.data.callRelated("res.partner", "get_new_partner", [
+                this.pos.config.id,
+                [["id", "=", partnerId]],
+                0,
+            ]);
+        } catch {
+            // Partner may already be partially available locally.
+        }
+        return this.pos.models["res.partner"].get(partnerId) || false;
     },
 
     async clickDiscount() {
@@ -66,13 +92,11 @@ patch(ControlButtons.prototype, {
                 [
                     ["pos_config_id", "=", this.pos.config.id],
                     ["active", "=", true],
+                    ["allowed_for_employee", "=", false],
                 ],
-                ["id", "name", "discount", "is_employee_discount"]
+                ["id", "name", "discount", "allowed_for_employee"]
             );
-            discounts = (rows || []).map((row) => ({
-                ...row,
-                discount: Math.max(0, Math.min(100, Number(row.discount) || 0)),
-            }));
+            discounts = normalizeDiscountRows(rows);
         } catch {
             discounts = [];
         }
@@ -80,15 +104,9 @@ patch(ControlButtons.prototype, {
         if (discounts.length) {
             try {
                 const orm = this.env.services.orm;
-                const employees = await orm.call(
-                    "hr.employee",
-                    "pos_employee_request_get_employees",
-                    [this.pos.config.id, false, 200]
-                );
                 const payload = await makeAwaitable(this.dialog, PredefinedDiscountAuthPopup, {
                     title: _t("Discount Authorization"),
                     discounts,
-                    employees: employees || [],
                 });
                 if (!payload?.discountId) {
                     return;
@@ -96,9 +114,11 @@ patch(ControlButtons.prototype, {
                 await orm.call(
                     "pos.predefined.discount",
                     "pos_validate_discount_authorization",
-                    [payload.discountId, payload.password, payload.employeeId || false]
+                    [payload.discountId, payload.password, false]
                 );
-                const selectedDiscount = discounts.find((discount) => discount.id === payload.discountId);
+                const selectedDiscount = discounts.find(
+                    (discount) => discount.id === payload.discountId
+                );
                 if (selectedDiscount) {
                     this._applyDiscountOnAllLines(selectedDiscount.discount);
                 }
@@ -170,5 +190,95 @@ patch(ControlButtons.prototype, {
             },
         });
     },
-});
 
+    async clickEmployeeDiscount() {
+        const orm = this.env.services.orm;
+        let discounts = [];
+        let partners = [];
+
+        try {
+            const rows = await orm.searchRead(
+                "pos.predefined.discount",
+                [
+                    ["pos_config_id", "=", this.pos.config.id],
+                    ["active", "=", true],
+                    ["allowed_for_employee", "=", true],
+                ],
+                ["id", "name", "discount", "allowed_for_employee"]
+            );
+            discounts = normalizeDiscountRows(rows);
+        } catch {
+            discounts = [];
+        }
+
+        if (!discounts.length) {
+            this.env.services.notification.add(
+                _t("No employee discounts are configured for this POS."),
+                { type: "warning" }
+            );
+            return;
+        }
+
+        try {
+            partners = await orm.call(
+                "pos.predefined.discount",
+                "pos_get_employee_partners",
+                [this.pos.config.id, false, 200]
+            );
+        } catch {
+            partners = [];
+        }
+
+        if (!partners.length) {
+            this.env.services.notification.add(
+                _t("No employee customers are available."),
+                { type: "warning" }
+            );
+            return;
+        }
+
+        try {
+            const payload = await makeAwaitable(this.dialog, EmployeeDiscountAuthPopup, {
+                title: _t("Employee Discount"),
+                discounts,
+                partners,
+                configId: this.pos.config.id,
+            });
+            if (!payload?.discountId || !payload?.partnerId) {
+                return;
+            }
+
+            await orm.call(
+                "pos.predefined.discount",
+                "pos_validate_employee_discount_authorization",
+                [payload.discountId, payload.partnerId, payload.password]
+            );
+
+            const selectedDiscount = discounts.find(
+                (discount) => discount.id === payload.discountId
+            );
+            if (!selectedDiscount) {
+                return;
+            }
+
+            const applied = this._applyDiscountOnAllLines(selectedDiscount.discount);
+            if (!applied) {
+                return;
+            }
+
+            const partner = await this._ensurePartnerLoaded(payload.partnerId);
+            if (partner) {
+                this.pos.setPartnerToCurrentOrder(partner);
+            } else {
+                this.env.services.notification.add(
+                    _t("Discount applied, but the employee customer could not be loaded."),
+                    { type: "warning" }
+                );
+            }
+        } catch (error) {
+            const message =
+                error?.data?.message || error?.message || _t("Employee discount authorization failed.");
+            this.env.services.notification.add(message, { type: "danger" });
+        }
+    },
+});

@@ -2,7 +2,7 @@
 
 {
     "name": "POS Predefined Discounts",
-    "version": "1.0.0",
+    "version": "19.0.1.2.0",
     "category": "Sales/Point of Sale",
     "summary": "Select predefined disc"
                "ounts from POS instead of typing a number",
@@ -19,7 +19,10 @@
             "pos_predefined_discounts/static/src/app/models/pos_predefined_discount.js",
             "pos_predefined_discounts/static/src/app/screens/product_screen/predefined_discount_auth_popup.js",
             "pos_predefined_discounts/static/src/app/screens/product_screen/predefined_discount_auth_popup.xml",
+            "pos_predefined_discounts/static/src/app/screens/product_screen/employee_discount_auth_popup.js",
+            "pos_predefined_discounts/static/src/app/screens/product_screen/employee_discount_auth_popup.xml",
             "pos_predefined_discounts/static/src/app/screens/product_screen/control_buttons_predefined_discount.js",
+            "pos_predefined_discounts/static/src/app/screens/product_screen/control_buttons_predefined_discount.xml",
         ],
     },
     "installable": True,

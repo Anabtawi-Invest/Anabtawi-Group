@@ -7,12 +7,23 @@
         <field name="arch" type="xml">
             <xpath expr="//page[@name='hr_settings']/group[@name='settings_group']" position="inside">
                 <group string="Employee Request" name="employee_request_group" groups="hr.group_hr_manager">
-                    <field name="employee_password" widget="password_eye_char" password="True"/>
+                    <div colspan="2" class="text-muted mb-2">
+                        After Save, "Employee OTP Expires At" must become ~5 minutes from now.
+                        If it stays on an old date, the password was not written to the database
+                        (form value only). Prefer "Generate OTP".
+                    </div>
+                    <field name="employee_password" widget="password_eye_char"/>
                     <field name="employee_password_generated_at" readonly="1"/>
                     <field name="employee_password_expires_at" readonly="1"/>
+                    <button
+                        name="action_generate_employee_portal_otp_button"
+                        type="object"
+                        string="Generate OTP"
+                        class="btn-primary"
+                        groups="hr.group_hr_manager"
+                    />
                 </group>
             </xpath>
         </field>
     </record>
 </odoo>
-
