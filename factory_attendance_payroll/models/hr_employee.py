@@ -281,6 +281,10 @@ class HrEmployee(models.Model):
 
     def _apply_absence_for_day(self, target_date, duration, absent_type):
         self.ensure_one()
+        dur = min(round(duration, 2), 24.0)
+        if dur <= 0.01:
+            return
+
         work_entry_model = self.env["hr.work.entry"].sudo()
         existing_work_entries = work_entry_model.search([
             ("employee_id", "=", self.id),
@@ -292,7 +296,12 @@ class HrEmployee(models.Model):
         if existing_work_entries:
             editable_work_entries = existing_work_entries.filtered(lambda we: we.state != "validated")
             if editable_work_entries:
-                editable_work_entries.write({"work_entry_type_id": absent_type.id})
+                update_vals = {"work_entry_type_id": absent_type.id, "duration": dur}
+                if "date_start" in work_entry_model._fields:
+                    update_vals["date_start"] = datetime.combine(target_date, time(8, 0, 0))
+                if "date_stop" in work_entry_model._fields:
+                    update_vals["date_stop"] = datetime.combine(target_date, time(8, 0, 0)) + timedelta(hours=dur)
+                editable_work_entries.write(update_vals)
             return
 
         if work_entry_model.search_count([
@@ -303,22 +312,26 @@ class HrEmployee(models.Model):
         ]):
             return
 
-        dur = min(round(duration, 2), 24.0)
-        if dur <= 0:
-            return
-
         version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
         if not version:
             return
 
-        work_entry_model.create({
+        we_vals = {
             "employee_id": self.id,
             "version_id": version.id,
             "date": target_date,
             "duration": dur,
             "work_entry_type_id": absent_type.id,
             "company_id": self.company_id.id,
-        })
+        }
+        if "date_start" in work_entry_model._fields:
+            we_vals["date_start"] = datetime.combine(target_date, time(8, 0, 0))
+        if "date_stop" in work_entry_model._fields:
+            we_vals["date_stop"] = datetime.combine(target_date, time(8, 0, 0)) + timedelta(hours=dur)
+        if "name" in work_entry_model._fields:
+            we_vals["name"] = f"Absent: {self.name} - {target_date}"
+
+        work_entry_model.create(we_vals)
 
     def _get_day_utc_bounds(self, target_date):
         """Returns UTC bounds (start, next_day_start) for target_date according to employee tz."""
