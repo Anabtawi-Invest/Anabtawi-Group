@@ -6,7 +6,7 @@ from urllib.parse import quote, unquote
 
 import pytz
 
-from odoo import http, _
+from odoo import http, _, fields
 from odoo.exceptions import UserError
 from odoo.http import request
 from requests.exceptions import RequestException
@@ -20,6 +20,11 @@ class PortalCheckInController(http.Controller):
             'label': 'Time Off',
             'url': '/my/leaves?from_dashboard=1',
             'icon': 'fa-calendar',
+        },
+        'overtime_approvals': {
+            'label': 'Overtime Approvals',
+            'url': '/my/overtime_approvals?from_dashboard=1',
+            'icon': 'fa-clock-o',
         },
         'employee_code': {
             'label': 'Employee Code',
@@ -63,6 +68,14 @@ class PortalCheckInController(http.Controller):
             employee.id if employee else False,
         )
         return employee
+
+    def _get_available_overtime_authorization(self, employee):
+        approval_model = request.env["approval.request"].sudo()
+        if not employee or not hasattr(approval_model, "_get_available_preauthorized_request"):
+            return request.env["approval.request"]
+        return approval_model._get_available_preauthorized_request(
+            employee, target_date=fields.Date.context_today(employee)
+        )
 
     def _get_today_bounds_utc(self):
         """Return today's [start, end) bounds in UTC based on user timezone."""
@@ -189,6 +202,14 @@ class PortalCheckInController(http.Controller):
             if employee and "weekly_worked_hours" in employee._fields
             else 0.0
         )
+        weekly_gate_reached = (
+            employee._is_weekly_hours_threshold_reached()
+            if employee and hasattr(employee, "_is_weekly_hours_threshold_reached")
+            else False
+        )
+        available_overtime_authorization = (
+            self._get_available_overtime_authorization(employee) if employee else request.env["approval.request"]
+        )
         values = {
             'page_name': 'my_check_in',
             'employee': employee,
@@ -209,11 +230,18 @@ class PortalCheckInController(http.Controller):
             'location_restricted_message': unquote(kwargs.get('message', '')) if kwargs.get('message') else False,
             'weekly_worked_hours': weekly_worked_hours,
             'required_weekly_hours': required_weekly_hours,
+            'weekly_gate_reached': weekly_gate_reached,
+            'available_overtime_authorization': available_overtime_authorization,
             # Portal UI labels (Arabic via i18n)
             'txt_hello': _('Hello'),
+            'txt_overtime_approvals_btn': _('Overtime Approvals'),
             'txt_attendance_updated': _('Attendance updated successfully.'),
             'txt_no_employee': _('Your user is not linked to an employee profile.'),
             'txt_location_default': _('You cannot check in from this location.'),
+            'txt_weekly_threshold': _('You exceeded the weekly worked hours limit.'),
+            'txt_checkin_locked_ot': _('Check-in is locked until one overtime request is approved.'),
+            'txt_ot_auth_session': _('An approved overtime authorization is available for one session.'),
+            'txt_max_auth_hours': _('Maximum authorized hours:'),
             'txt_check_in_btn': _('CHECK IN'),
             'txt_check_out_btn': _('CHECK OUT'),
             'txt_stat_check_in': _('Check In'),
@@ -221,6 +249,9 @@ class PortalCheckInController(http.Controller):
             'txt_working_hours': _('Working Hours'),
             'txt_weekly_worked': _('Weekly Worked'),
             'txt_weekly_limit': _('Weekly Limit'),
+            'txt_ot_approval': _('OT Approval'),
+            'txt_approved': _('Approved'),
+            'txt_none': _('None'),
             'txt_hist_check_in': _('Check In'),
             'txt_hist_check_out': _('Check Out'),
             'txt_hist_hours': _('Hours'),
@@ -264,7 +295,7 @@ class PortalCheckInController(http.Controller):
                 current_path,
                 employee.portal_attendance_lock_until,
             )
-            employee._acquire_portal_attendance_action_lock(lock_minutes=10)
+            employee._acquire_portal_attendance_action_lock()
             lock_acquired = True
             employee.invalidate_recordset(['portal_attendance_lock_until'])
             _logger.info(
