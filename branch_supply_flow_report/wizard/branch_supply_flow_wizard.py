@@ -311,10 +311,8 @@ class BranchSupplyFlowWizard(models.TransientModel):
             sold_qty = sold_data.get(product_id, 0.0)
             vals_list.append({
                 "location_id": branch_location.id,
-                "location_name": branch_location.complete_name,
                 "product_id": product_id,
                 "uom_id": product.uom_id.id,
-                "uom_name": product.uom_id.display_name,
                 "requested_qty": dispatch.get("requested", 0.0),
                 "sent_qty": sent_net,
                 "sent_return_qty": dispatch.get("returns", 0.0),
