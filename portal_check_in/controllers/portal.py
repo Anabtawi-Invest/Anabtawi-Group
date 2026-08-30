@@ -99,29 +99,23 @@ class PortalCheckInController(http.Controller):
         geo_information = {
             'mode': 'systray',
         }
-        tracking_enabled = bool(employee.company_id.attendance_device_tracking)
-        _logger.info(
-            "portal_check_in: employee_id=%s company_id=%s company=%s tracking_enabled=%s",
-            employee.id,
-            employee.company_id.id,
-            employee.company_id.name,
-            tracking_enabled,
-        )
-        if not tracking_enabled:
-            # Keep the mode explicit (systray) like native Odoo flow, but skip device/location data.
-            return geo_information
+        if latitude is not False and longitude is not False:
+            ip_address = getattr(request, 'geoip', None) and request.geoip.ip
+            if not ip_address:
+                ip_address = request.httprequest.environ.get('REMOTE_ADDR') or False
+            browser = request.httprequest.user_agent.browser if hasattr(request.httprequest, 'user_agent') and request.httprequest.user_agent else False
+            geo_information.update({
+                'latitude': latitude,
+                'longitude': longitude,
+                'ip_address': ip_address,
+                'browser': browser,
+            })
+            try:
+                location = request.env['base.geocoder']._get_localisation(latitude, longitude)
+            except (UserError, RequestException):
+                location = _("Unknown")
+            geo_information['location'] = location
 
-        geo_information.update({
-            'latitude': latitude,
-            'longitude': longitude,
-            'ip_address': request.geoip.ip,
-            'browser': request.httprequest.user_agent.browser,
-        })
-        try:
-            location = request.env['base.geocoder']._get_localisation(latitude, longitude)
-        except (UserError, RequestException):
-            location = _("Unknown")
-        geo_information['location'] = location
         _logger.info(
             "portal_check_in: geo payload built for employee_id=%s -> lat=%s, lon=%s, ip=%s, browser=%s, location=%s",
             employee.id,
@@ -129,7 +123,7 @@ class PortalCheckInController(http.Controller):
             longitude,
             geo_information.get('ip_address'),
             geo_information.get('browser'),
-            location,
+            geo_information.get('location'),
         )
         return geo_information
 
