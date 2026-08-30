@@ -110,10 +110,12 @@ class PortalCheckInController(http.Controller):
                 'ip_address': ip_address,
                 'browser': browser,
             })
-            try:
-                location = request.env['base.geocoder']._get_localisation(latitude, longitude)
-            except (UserError, RequestException):
-                location = _("Unknown")
+            location = _("Unknown")
+            if 'base.geocoder' in request.env:
+                try:
+                    location = request.env['base.geocoder']._get_localisation(latitude, longitude)
+                except Exception:
+                    location = _("Unknown")
             geo_information['location'] = location
 
         _logger.info(
