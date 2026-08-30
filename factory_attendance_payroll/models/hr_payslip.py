@@ -97,16 +97,17 @@ class HrPayslip(models.Model):
         
         # For historical / done / cancelled slips, preserve their stored values without heavy re-querying
         other_slips = self - valid_slips
-        for payslip in other_slips:
-            if not payslip.attendance_gross_overtime and not payslip.attendance_gross_undertime:
-                payslip.attendance_gross_overtime = 0.0
-                payslip.attendance_gross_undertime = 0.0
-                payslip.attendance_net_reconciled = 0.0
-                payslip.total_extra_hours_available = 0.0
-                payslip.lateness_covered_by_extra_hours = 0.0
-                payslip.lateness_covered_by_annual_leave = 0.0
-                payslip.remaining_extra_hours_balance = 0.0
-                payslip.undertime_cash_deduction_hours = 0.0
+        if other_slips:
+            empty_slips = other_slips.filtered(lambda s: not s.attendance_gross_overtime and not s.attendance_gross_undertime)
+            if empty_slips:
+                empty_slips.attendance_gross_overtime = 0.0
+                empty_slips.attendance_gross_undertime = 0.0
+                empty_slips.attendance_net_reconciled = 0.0
+                empty_slips.total_extra_hours_available = 0.0
+                empty_slips.lateness_covered_by_extra_hours = 0.0
+                empty_slips.lateness_covered_by_annual_leave = 0.0
+                empty_slips.remaining_extra_hours_balance = 0.0
+                empty_slips.undertime_cash_deduction_hours = 0.0
 
         if not valid_slips:
             return
