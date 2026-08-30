@@ -315,7 +315,8 @@ class HrAttendance(models.Model):
         in 1 bulk query and ensures overtime lines match daily_overtime_hours.
         """
         res = super()._update_overtime(attendance_domain=attendance_domain)
-        valid_atts = self.filtered(lambda a: a.employee_id and a.worked_hours and a.check_in)
+        cutoff_date = fields.Date.today() - timedelta(days=60)
+        valid_atts = self.filtered(lambda a: a.employee_id and a.worked_hours and a.check_in and a.check_in.date() >= cutoff_date)
         if not valid_atts:
             return res
 

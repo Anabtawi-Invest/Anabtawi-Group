@@ -39,20 +39,6 @@ def pre_init_hook(env):
 def post_init_hook(env):
     """
     Post-Init Hook:
-    Binds attendance reconciliation rules (ATT_RECON_VAR, OT_NET, DED_UNDERTIME)
-    dynamically to all Payroll Structures in the database.
+    Salary rules are defined in data/hr_payroll_data.xml.
     """
-    try:
-        structures = env['hr.payroll.structure'].sudo().search([])
-        rules = env['hr.salary.rule'].sudo().search([('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME'])])
-
-        for structure in structures:
-            for rule in rules:
-                existing = env['hr.salary.rule'].sudo().search([
-                    ('code', '=', rule.code),
-                    ('struct_id', '=', structure.id)
-                ], limit=1)
-                if not existing:
-                    rule.sudo().copy({'struct_id': structure.id})
-    except Exception:
-        pass
+    pass
