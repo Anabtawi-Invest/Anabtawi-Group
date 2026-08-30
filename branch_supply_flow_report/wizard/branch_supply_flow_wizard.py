@@ -351,7 +351,7 @@ class BranchSupplyFlowWizard(models.TransientModel):
             "res_model": "branch.supply.flow.report.line",
             "view_mode": "list,pivot",
             "domain": [("wizard_id", "=", self.id)],
-            "context": {"search_default_group_by_location": 1},
+            "context": {"search_default_group_by_product": 1},
         }
 
     def _generate_xlsx_content(self):
