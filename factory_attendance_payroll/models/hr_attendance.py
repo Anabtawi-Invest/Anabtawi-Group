@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from collections import defaultdict
 from datetime import datetime, time, timedelta
 from odoo import models, fields, api
 
