@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_predefined_discounts.EmployeeDiscountAuthPopup">
+        <Dialog title="props.title" size="'lg'">
+            <div class="mb-3">
+                <label class="form-label">Employee</label>
+                <input
+                    class="form-control mb-2"
+                    type="text"
+                    placeholder="Search by employee name, barcode, or employee number..."
+                    t-att-value="state.search"
+                    t-on-input="onSearchInput"
+                />
+                <select class="form-select" t-model.number="state.partnerId" t-att-disabled="state.loading">
+                    <t t-if="!state.partners.length">
+                        <option value="">No employees found</option>
+                    </t>
+                    <t t-foreach="state.partners" t-as="partner" t-key="partner.id">
+                        <option t-att-value="partner.id">
+                            <t t-esc="partner.name"/>
+                            <t t-if="partner.employee_number"> (<t t-esc="partner.employee_number"/>)</t>
+                            <t t-elif="partner.barcode"> (<t t-esc="partner.barcode"/>)</t>
+                        </option>
+                    </t>
+                </select>
+                <div t-if="state.loading" class="form-text">Searching...</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Discount</label>
+                <select class="form-select" t-model.number="state.discountId">
+                    <t t-foreach="props.discounts" t-as="discount" t-key="discount.id">
+                        <option t-att-value="discount.id">
+                            <t t-esc="discount.name"/> - <t t-esc="discount.discount"/>%
+                        </option>
+                    </t>
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label">OTP</label>
+                <input
+                    class="form-control"
+                    type="password"
+                    inputmode="numeric"
+                    autocomplete="new-password"
+                    autocapitalize="off"
+                    autocorrect="off"
+                    spellcheck="false"
+                    name="pos_employee_discount_otp"
+                    value=""
+                    t-model="state.password"
+                    t-ref="password"
+                />
+            </div>
+
+            <t t-set-slot="footer">
+                <button class="btn btn-primary btn-lg lh-lg" t-att-disabled="!canConfirm" t-on-click="confirm">
+                    Confirm
+                </button>
+                <button class="btn btn-secondary btn-lg lh-lg" t-on-click="cancel">
+                    Cancel
+                </button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

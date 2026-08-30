@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Employee Request",
-    "version": "19.0.1.1.0",
+    "version": "19.0.1.3.0",
     "category": "Human Resources",
-    "summary": "Employee request and 5-minute Employee Portal OTP support.",
+    "summary": "Employee OTP for portal/POS, with daily generation and expiry cleanup.",
     "author":"Anabtawi",
     "license": "LGPL-3",
     "depends": ["base", "hr", "point_of_sale"],
@@ -17,11 +17,6 @@
         "web.assets_backend": [
             "employee_request/static/src/fields/password_eye_char_field.js",
             "employee_request/static/src/fields/password_eye_char_field.xml",
-        ],
-        "point_of_sale._assets_pos": [
-            "employee_request/static/src/pos/employee_password_popup.js",
-            "employee_request/static/src/pos/employee_password_popup.xml",
-            "employee_request/static/src/pos/employee_pricelist_password_validation.js",
         ],
     },
     "installable": True,

@@ -19,10 +19,11 @@ class PosPredefinedDiscount(models.Model):
 
     name = fields.Char(required=True)
     discount = fields.Float(string="Discount (%)", required=True, default=0.0)
-    is_employee_discount = fields.Boolean(
-        string="Employee Discount",
+    allowed_for_employee = fields.Boolean(
+        string="Allowed for Employee",
         default=False,
-        help="If enabled, this discount can be authorized by a selected employee password or the manager password.",
+        help="If enabled, this discount is available in the POS Employee Discount button "
+             "and must be authorized with the selected employee's OTP.",
     )
     pos_config_id = fields.Many2one(
         "pos.config",
@@ -37,43 +38,24 @@ class PosPredefinedDiscount(models.Model):
             if rec.discount < 0.0 or rec.discount > 100.0:
                 raise ValidationError(_("Discount must be between 0 and 100."))
 
-    # @api.model
-    # def _pos_discount_employee_password_matches(self, employee, password):
-    #     """Predefined-discount POS auth: digits only + exact match to employee_password (no date).
-    #
-    #     Implemented on this module so it does not depend on which employee_request revision is deployed.
-    #     """
-    #     if not employee:
-    #         return False
-    #     pwd = str(password or "").strip()
-    #     if not pwd.isdigit():
-    #         return False
-    #     stored = str(employee.sudo().employee_password or "").strip()
-    #     return bool(stored) and stored == pwd
-
     @api.model
     def _pos_discount_employee_password_matches(self, employee, password):
-        pwd = str(password or "").strip()
-        return pwd == "123"
+        """Validate employee OTP (digits + match + expiry) via employee_request."""
+        if not employee:
+            return False
+        return bool(
+            self.env["hr.employee"].sudo().pos_employee_request_check_password(
+                employee.id, password
+            )
+        )
 
     @api.model
     def _pos_discount_employee_password_diag(self, employee, password):
         if not employee:
-            return {"code": "no_employee"}
-        pwd = str(password or "").strip()
-        if not pwd.isdigit():
-            return {"code": "not_numeric", "employee_id": employee.id}
-        stored = str(employee.sudo().employee_password or "").strip()
-        if not stored:
-            return {"code": "no_stored_password", "employee_id": employee.id}
-        if stored != pwd:
-            return {
-                "code": "mismatch",
-                "employee_id": employee.id,
-                "stored_len": len(stored),
-                "submitted_len": len(pwd),
-            }
-        return {}
+            return {"ok": False, "reason": "no_employee"}
+        return self.env["hr.employee"].sudo().pos_employee_request_password_diag(
+            employee.id, password
+        )
 
     @api.model
     def _load_pos_data_domain(self, data, config):
@@ -81,13 +63,99 @@ class PosPredefinedDiscount(models.Model):
 
     @api.model
     def _load_pos_data_fields(self, config):
-        return ["id", "name", "discount", "sequence", "pos_config_id", "is_employee_discount"]
+        return [
+            "id",
+            "name",
+            "discount",
+            "sequence",
+            "pos_config_id",
+            "allowed_for_employee",
+        ]
+
+    @api.model
+    def _pos_employees_all_companies(self):
+        """HR employees across every company (POS discount picker / OTP validation)."""
+        company_ids = self.env["res.company"].sudo().search([]).ids
+        return self.env["hr.employee"].sudo().with_context(
+            allowed_company_ids=company_ids,
+        )
+
+    @api.model
+    def pos_get_employee_partners(self, config_id=False, search=False, limit=200):
+        """Return employee partners for the POS picker.
+
+        Rows are keyed by partner id (for setting the POS customer), but the
+        displayed name is the employee name. Search matches employee name,
+        barcode, employee number, and linked partner name across all companies.
+        """
+        Employee = self._pos_employees_all_companies()
+        domain = [
+            ("active", "=", True),
+            "|",
+            ("work_contact_id", "!=", False),
+            ("user_partner_id", "!=", False),
+        ]
+
+        search = str(search or "").strip()
+        if search:
+            search_clauses = [
+                ("name", "ilike", search),
+                ("barcode", "ilike", search),
+                ("work_contact_id.name", "ilike", search),
+                ("user_partner_id.name", "ilike", search),
+            ]
+            if "employee_number" in Employee._fields:
+                search_clauses.append(("employee_number", "ilike", search))
+            domain += (
+                ["|"] * (len(search_clauses) - 1) + search_clauses
+                if len(search_clauses) > 1
+                else search_clauses
+            )
+
+        employees = Employee.search(domain, order="name", limit=int(limit or 200))
+        result = []
+        seen_partner_ids = set()
+        has_employee_number = "employee_number" in Employee._fields
+        for employee in employees:
+            partner = employee.work_contact_id or employee.user_partner_id
+            if not partner or partner.id in seen_partner_ids:
+                continue
+            seen_partner_ids.add(partner.id)
+            employee_number = employee.employee_number or "" if has_employee_number else ""
+            result.append(
+                {
+                    "id": partner.id,
+                    "name": employee.name,
+                    "partner_name": partner.name,
+                    "barcode": employee.barcode or partner.barcode or "",
+                    "employee_number": employee_number,
+                    "employee_id": employee.id,
+                }
+            )
+        return result
+
+    @api.model
+    def _employee_for_partner(self, partner):
+        if not partner:
+            return self.env["hr.employee"]
+        Employee = self._pos_employees_all_companies()
+        domain = [
+            "|",
+            ("work_contact_id", "=", partner.id),
+            ("user_partner_id", "=", partner.id),
+        ]
+        return Employee.search(domain, limit=1)
 
     @api.model
     def pos_validate_discount_authorization(self, discount_id, password, employee_id=False):
+        """Manager authorization for the regular Discount button (non-employee discounts)."""
         discount = self.sudo().browse(int(discount_id or 0)).exists()
         if not discount:
             raise UserError(_("Invalid predefined discount."))
+        if discount.allowed_for_employee:
+            raise UserError(
+                _("This discount is reserved for Employee Discount. Use the Employee Discount button.")
+            )
 
         password = str(password or "").strip()
         if not password:
@@ -95,99 +163,95 @@ class PosPredefinedDiscount(models.Model):
 
         manager_user = discount.pos_config_id.advance_order_manager_id
         manager_employee = manager_user.employee_id if manager_user else False
-        hr_employee_model = self.env["hr.employee"]
-
-        employee_record = False
-        if discount.is_employee_discount and employee_id:
-            employee_record = hr_employee_model.sudo().browse(int(employee_id)).exists()
-
-        manager_valid = bool(
-            manager_employee and self._pos_discount_employee_password_matches(manager_employee, password)
-        )
-        employee_valid = bool(
-            employee_record and self._pos_discount_employee_password_matches(employee_record, password)
-        )
-
-        if manager_valid or employee_valid:
-            _logger.debug(
-                "POS predefined discount auth OK: discount_id=%s manager_valid=%s employee_valid=%s",
-                discount.id,
-                manager_valid,
-                employee_valid,
+        if not manager_employee:
+            raise UserError(
+                _("Please configure an Advance Orders Manager with an employee record on this POS.")
             )
+
+        if self._pos_discount_employee_password_matches(manager_employee, password):
             return {
                 "authorized": True,
-                "manager_override": manager_valid,
-                "employee_authorized": employee_valid,
+                "manager_override": True,
+                "employee_authorized": False,
             }
 
-        def _compact_diag(rec):
-            if not rec:
-                return {}
-            return self._pos_discount_employee_password_diag(rec, password)
-
-        manager_pw_diag = _compact_diag(manager_employee)
-        employee_pw_diag = _compact_diag(employee_record)
-
-        pos_cfg = discount.pos_config_id
-        rpc_co = self.env.company
-        cfg_co = pos_cfg.company_id
-        mgr_user_co = manager_user.company_id if manager_user else False
-        mgr_emp_co = manager_employee.company_id if manager_employee else False
-
-        company_ctx = {
-            "rpc_env_company_id": rpc_co.id if rpc_co else None,
-            "rpc_env_company_name": rpc_co.name if rpc_co else None,
-            "pos_config_company_id": cfg_co.id if cfg_co else None,
-            "pos_config_company_name": cfg_co.name if cfg_co else None,
-            "manager_res_users_company_id": mgr_user_co.id if mgr_user_co else None,
-            "manager_res_users_company_name": mgr_user_co.name if mgr_user_co else None,
-            "manager_employee_company_id": mgr_emp_co.id if mgr_emp_co else None,
-            "manager_employee_company_name": mgr_emp_co.name if mgr_emp_co else None,
-        }
-        # WARNING: plaintext credentials in logs — disable/remove after troubleshooting.
-        password_ctx = {
-            "submitted_employee_password": password,
-            "manager_stored_employee_password": (
-                str(manager_employee.sudo().employee_password or "")
-                if manager_employee
-                else None
-            ),
-        }
-
         _logger.warning(
-            "POS predefined discount auth FAILED: discount_id=%s pos_config=%s "
-            "manager_user=%s (%s) manager_employee=%s (%s) "
-            "is_employee_discount=%s selected_employee_id=%s pw_len=%s pw_isdigit=%s "
-            "manager_valid=%s employee_valid=%s manager_pw_diag=%s employee_pw_diag=%s "
-            "company_ctx=%s password_ctx=%s",
+            "POS predefined discount auth FAILED (manager): discount_id=%s pos_config=%s",
             discount.id,
             discount.pos_config_id.id,
-            manager_user.id if manager_user else None,
-            manager_user.login if manager_user else None,
-            manager_employee.id if manager_employee else None,
-            manager_employee.name if manager_employee else None,
-            discount.is_employee_discount,
-            employee_id or None,
-            len(password),
-            password.isdigit(),
-            manager_valid,
-            employee_valid,
-            manager_pw_diag,
-            employee_pw_diag,
-            company_ctx,
-            password_ctx,
+        )
+        raise UserError(_("Authorization failed. Enter the manager password to apply this discount."))
+
+    @api.model
+    def pos_validate_employee_discount_authorization(self, discount_id, partner_id, password):
+        """Employee-only OTP authorization for the Employee Discount button."""
+        discount = self.sudo().browse(int(discount_id or 0)).exists()
+        if not discount:
+            raise UserError(_("Invalid predefined discount."))
+        if not discount.allowed_for_employee:
+            raise UserError(_("This discount is not allowed for employees."))
+
+        partner = self.env["res.partner"].sudo().browse(int(partner_id or 0)).exists()
+        if not partner:
+            raise UserError(_("Please select an employee customer."))
+
+        password = str(password or "").strip()
+        if not password:
+            raise UserError(_("OTP is required."))
+
+        employee = self._employee_for_partner(partner)
+        if not employee:
+            _logger.warning(
+                "[pos_predefined_discounts] no employee for partner_id=%s",
+                partner.id,
+            )
+            raise UserError(_("No employee is linked to the selected customer."))
+
+        diag = self._pos_discount_employee_password_diag(employee, password)
+        if not diag.get("ok"):
+            reason = diag.get("reason") or "unknown"
+            _logger.warning(
+                "[pos_predefined_discounts] employee discount OTP FAILED "
+                "discount_id=%s partner_id=%s(%s) employee_id=%s(%s) reason=%s diag=%s",
+                discount.id,
+                partner.id,
+                partner.display_name,
+                employee.id,
+                employee.name,
+                reason,
+                diag,
+            )
+            reason_messages = {
+                "mismatch": _("OTP value does not match the stored employee password."),
+                "expired": _("OTP has expired."),
+                "expired_fallback_5min": _("OTP has expired (older than 5 minutes)."),
+                "no_stored_password": _(
+                    "Employee has no OTP stored in the database. "
+                    "The value on the employee form may be unsaved, or the 5-minute OTP cron already cleared it. "
+                    "Click Generate OTP (or save the password again) and check that Expires At is in the future."
+                ),
+                "missing_generated_at": _("Employee OTP has no generation timestamp."),
+                "not_numeric": _("OTP must be numeric."),
+                "missing_employee_or_password": _("Employee or OTP is missing."),
+                "employee_not_found": _("Employee record was not found."),
+            }
+            detail = reason_messages.get(reason, _("OTP validation failed (%s).") % reason)
+            raise UserError(_("Authorization failed. %s") % detail)
+
+        _logger.info(
+            "[pos_predefined_discounts] employee discount OTP OK "
+            "discount_id=%s partner_id=%s employee_id=%s",
+            discount.id,
+            partner.id,
+            employee.id,
         )
 
-        if discount.is_employee_discount:
-            raise UserError(
-                _("Authorization failed. Enter the selected employee password or the manager password.")
-            )
-
-        if not manager_employee:
-            raise UserError(_("Please configure an Advance Orders Manager with an employee record on this POS."))
-
-        raise UserError(_("Authorization failed. Enter the manager password to apply this discount."))
+        return {
+            "authorized": True,
+            "partner_id": partner.id,
+            "employee_id": employee.id,
+            "discount": discount.discount,
+        }
 
 
 class PosConfig(models.Model):

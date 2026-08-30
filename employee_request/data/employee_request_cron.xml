@@ -11,12 +11,27 @@
         <field name="active">True</field>
     </record>
 
+    <!--
+        Daily OTP generation at 06:00 Asia/Amman (Jordan) = 03:00 UTC.
+        Each OTP is valid for 24 hours.
+    -->
+    <record id="ir_cron_generate_daily_employee_otps" model="ir.cron">
+        <field name="name">Generate Daily Employee OTPs</field>
+        <field name="model_id" ref="hr.model_hr_employee"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_generate_daily_employee_otps()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).strftime('%Y-%m-%d 03:00:00')"/>
+        <field name="active">True</field>
+    </record>
+
     <!-- Run from Settings → Technical → Server Actions → Run (regenerates everyone). -->
     <record id="action_server_force_rotate_employee_password" model="ir.actions.server">
         <field name="name">Force generate employee OTPs</field>
         <field name="model_id" ref="hr.model_hr_employee"/>
         <field name="state">code</field>
-        <field name="code">model._cron_rotate_employee_password(force=True)</field>
+        <field name="code">model._cron_generate_daily_employee_otps()</field>
     </record>
 </odoo>
-

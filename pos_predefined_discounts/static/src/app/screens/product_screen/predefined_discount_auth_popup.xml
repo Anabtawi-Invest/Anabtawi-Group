@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="pos_predefined_discounts.PredefinedDiscountAuthPopup">
-        <Dialog title="props.title" size="'lg'">
+        <Dialog title="props.title" size="'md'">
             <div class="mb-3">
                 <label class="form-label">Discount</label>
-                <select class="form-select" t-model.number="state.discountId" t-on-change="onDiscountChange">
+                <select class="form-select" t-model.number="state.discountId">
                     <t t-foreach="props.discounts" t-as="discount" t-key="discount.id">
                         <option t-att-value="discount.id">
                             <t t-esc="discount.name"/> - <t t-esc="discount.discount"/>%
@@ -13,39 +13,8 @@
                 </select>
             </div>
 
-            <div class="form-check mb-3" t-if="showEmployeeOptions">
-                <input
-                    class="form-check-input"
-                    type="checkbox"
-                    id="pos_predefined_discount_is_employee"
-                    t-att-checked="state.isEmployee"
-                    t-on-change="onIsEmployeeChange"
-                />
-                <label class="form-check-label" for="pos_predefined_discount_is_employee">
-                    Is Employee
-                </label>
-            </div>
-
-            <div class="mb-3" t-if="showEmployeeField">
-                <label class="form-label">Employee</label>
-                <input
-                    class="form-control mb-2"
-                    type="text"
-                    placeholder="Search by name or barcode..."
-                    t-model="state.search"
-                />
-                <select class="form-select" t-model.number="state.employeeId">
-                    <t t-foreach="filteredEmployees" t-as="emp" t-key="emp.id">
-                        <option t-att-value="emp.id">
-                            <t t-esc="emp.name"/>
-                            <t t-if="emp.barcode"> (<t t-esc="emp.barcode"/>)</t>
-                        </option>
-                    </t>
-                </select>
-            </div>
-
             <div>
-                <label class="form-label">Password</label>
+                <label class="form-label">Manager Password</label>
                 <input
                     class="form-control"
                     type="password"
