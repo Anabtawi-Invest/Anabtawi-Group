@@ -1,4 +1,4 @@
-const CACHE = "anabtawi-employee-app-v1.1.9";
+const CACHE = "anabtawi-employee-app-v1.2.0";
 const SHELL = [
   "/employee-portal",
   "/employee-portal/manifest.webmanifest",
@@ -16,7 +16,7 @@ const API_CACHE_PATHS = [
   "/anabtawi/mobile/leaves/balances",
   "/anabtawi/mobile/leaves/list",
   "/anabtawi/mobile/overtime/categories",
-  "/anabtawi/mobile/overtime/list"
+  "/anabtawi/mobile/overtime/list",`n  "/anabtawi/mobile/payslips/list"
 ];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -45,3 +45,9 @@ self.addEventListener("fetch", (event) => {
     return response;
   }).catch(() => caches.match(event.request).then((cached) => cached || caches.match("/employee-portal"))));
 });
+
+
+
+
+
+

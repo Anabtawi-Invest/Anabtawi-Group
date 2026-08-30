@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, time
 
 import pytz
@@ -453,7 +454,13 @@ class AnabtawiMobileAPI(http.Controller):
                 return _error("invalid_location", _("Invalid GPS coordinates."), 422)
             geo_information = {"latitude": latitude, "longitude": longitude}
 
-        if employee.attendance_state != "checked_in" and employee._is_portal_geo_tracking_required():
+        if employee._is_portal_geo_tracking_required():
+            if latitude is None or longitude is None:
+                return _error(
+                    "location_required",
+                    _("GPS location is required for check-in and check-out."),
+                    422,
+                )
             max_accuracy = _as_float(
                 request.env["ir.config_parameter"].sudo().get_param(
                     "anabtawi_mobile.max_location_accuracy_m", "100"
@@ -483,14 +490,45 @@ class AnabtawiMobileAPI(http.Controller):
             _logger.exception("Mobile attendance failed for employee_id=%s", employee.id)
             return _error("server_error", _("Attendance could not be saved."), 500)
 
+        # Safely resolve the attendance record
+        att_record = attendance if hasattr(attendance, '_fields') else request.env['hr.attendance'].sudo().search(
+            [('employee_id', '=', employee.id)], order='id desc', limit=1
+        )
+
+        if att_record and geo_information:
+            vals_to_write = {}
+            if employee.attendance_state == "checked_in":
+                if "in_latitude" in att_record._fields and att_record.in_latitude != latitude:
+                    vals_to_write["in_latitude"] = latitude
+                if "in_longitude" in att_record._fields and att_record.in_longitude != longitude:
+                    vals_to_write["in_longitude"] = longitude
+            else:
+                if "out_latitude" in att_record._fields and att_record.out_latitude != latitude:
+                    vals_to_write["out_latitude"] = latitude
+                if "out_longitude" in att_record._fields and att_record.out_longitude != longitude:
+                    vals_to_write["out_longitude"] = longitude
+            if vals_to_write:
+                try:
+                    att_record.sudo().write(vals_to_write)
+                except Exception as write_err:
+                    _logger.warning("Could not write GPS coordinates to attendance: %s", write_err)
+
         employee.invalidate_recordset(["attendance_state"])
+        check_in_str = fields.Datetime.to_string(att_record.check_in) if (att_record and hasattr(att_record, 'check_in') and att_record.check_in) else None
+        check_out_str = fields.Datetime.to_string(att_record.check_out) if (att_record and hasattr(att_record, 'check_out') and att_record.check_out) else None
+        worked_hours_val = round(att_record.worked_hours or 0.0, 2) if (att_record and hasattr(att_record, 'worked_hours')) else 0.0
+
         return _json({
             "status": "ok",
             "action": "check_in" if employee.attendance_state == "checked_in" else "check_out",
             "attendance_state": employee.attendance_state,
-            "check_in": fields.Datetime.to_string(attendance.check_in) if attendance.check_in else None,
-            "check_out": fields.Datetime.to_string(attendance.check_out) if attendance.check_out else None,
-            "worked_hours": round(attendance.worked_hours or 0.0, 2),
+            "check_in": check_in_str,
+            "check_out": check_out_str,
+            "worked_hours": worked_hours_val,
+            "in_latitude": att_record.in_latitude if (att_record and "in_latitude" in att_record._fields) else None,
+            "in_longitude": att_record.in_longitude if (att_record and "in_longitude" in att_record._fields) else None,
+            "out_latitude": att_record.out_latitude if (att_record and "out_latitude" in att_record._fields) else None,
+            "out_longitude": att_record.out_longitude if (att_record and "out_longitude" in att_record._fields) else None,
         })
 
     @http.route(
@@ -509,6 +547,10 @@ class AnabtawiMobileAPI(http.Controller):
             "check_in": fields.Datetime.to_string(record.check_in) if record.check_in else None,
             "check_out": fields.Datetime.to_string(record.check_out) if record.check_out else None,
             "worked_hours": round(record.worked_hours or 0.0, 2),
+            "in_latitude": record.in_latitude if "in_latitude" in record._fields else None,
+            "in_longitude": record.in_longitude if "in_longitude" in record._fields else None,
+            "out_latitude": record.out_latitude if "out_latitude" in record._fields else None,
+            "out_longitude": record.out_longitude if "out_longitude" in record._fields else None,
         } for record in records]})
 
     def _eligible_leave_types(self, employee):

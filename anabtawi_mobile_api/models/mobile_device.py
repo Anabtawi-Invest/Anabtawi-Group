@@ -216,10 +216,20 @@ class AnabtawiMobileDevice(models.Model):
         if not device.user_id.active:
             device.action_revoke_token()
             return self.env["res.users"]
-        vals = {"last_login": fields.Datetime.now()}
-        if ip_address:
+        now = fields.Datetime.now()
+        # Throttle DB writes: only update last_login if older than 1 hour or if IP changed.
+        # This saves 95%+ of write queries and row locks on every mobile request.
+        needs_update = False
+        vals = {}
+        if not device.last_login or (now - device.last_login).total_seconds() > 3600:
+            vals["last_login"] = now
+            needs_update = True
+        if ip_address and device.last_ip != ip_address:
             vals["last_ip"] = ip_address
-        device.sudo().write(vals)
+            needs_update = True
+
+        if needs_update:
+            device.sudo().write(vals)
         return device.user_id
 
     @api.model
