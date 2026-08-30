@@ -336,22 +336,13 @@ class AnabtawiMobileAPI(http.Controller):
                 if field_name in employee._fields and employee[field_name]:
                     otp_number = str(employee[field_name])
                     break
-        job_title = (employee.job_title or "").strip()
-        emp_num = ""
-        for fn in ("employee_number", "registration_number", "barcode"):
-            if fn in employee._fields and employee[fn]:
-                emp_num = str(employee[fn]).strip()
-                break
-        full_job_title = f"{job_title} ({emp_num})" if (job_title and emp_num) else (job_title or (f"({emp_num})" if emp_num else ""))
-
         return _json({
             "status": "ok",
             "uid": user.id,
             "employee_id": employee.id,
             "login": user.login,
             "name": employee.name,
-            "job_title": full_job_title,
-            "employee_number": emp_num,
+            "job_title": employee.job_title or "",
             "department_name": employee.department_id.name if employee.department_id else "",
             "work_location": work_location.name if work_location else "",
             "mobile_phone": employee.mobile_phone or "",
@@ -415,45 +406,6 @@ class AnabtawiMobileAPI(http.Controller):
         end = timezone.localize(datetime.combine(today, time.max)).astimezone(pytz.UTC)
         return start.replace(tzinfo=None), end.replace(tzinfo=None)
 
-
-    def _employee_timezone_name(self, employee):
-        """Return the timezone used for Employee App display times.
-
-        Odoo stores attendance datetimes in UTC. The backend UI converts them
-        using the user's/employee's timezone, so the API must return the same
-        local display value to avoid the PWA showing UTC as local time.
-        """
-        tz_name = False
-        try:
-            if hasattr(employee, "_get_attendance_timezone"):
-                tz_name = employee._get_attendance_timezone()
-        except Exception:
-            tz_name = False
-        tz_name = tz_name or employee.tz or employee.user_id.tz or request.env.user.tz or "UTC"
-        try:
-            pytz.timezone(tz_name)
-        except pytz.UnknownTimeZoneError:
-            tz_name = "UTC"
-        return tz_name
-
-    def _datetime_to_employee_local(self, employee, value):
-        """Convert an Odoo UTC datetime to the employee local display string."""
-        if not value:
-            return None
-        dt_value = fields.Datetime.to_datetime(value)
-        if not dt_value:
-            return None
-        if dt_value.tzinfo is None:
-            dt_value = pytz.UTC.localize(dt_value)
-        timezone = pytz.timezone(self._employee_timezone_name(employee))
-        local_dt = dt_value.astimezone(timezone)
-        return local_dt.strftime("%Y-%m-%d %H:%M:%S")
-
-    def _datetime_to_utc_string(self, value):
-        if not value:
-            return None
-        return fields.Datetime.to_string(value)
-
     @http.route(
         "/anabtawi/mobile/attendance/status",
         type="http", auth="public", methods=["GET"], csrf=False,
@@ -516,14 +468,14 @@ class AnabtawiMobileAPI(http.Controller):
 
         lock_acquired = False
         try:
-            employee._acquire_portal_attendance_action_lock(lock_minutes=10)
+            employee._acquire_portal_attendance_action_lock()
             lock_acquired = True
             attendance = employee._attendance_action_change(geo_information=geo_information)
         except (UserError, ValidationError) as exc:
             if lock_acquired:
                 employee._release_portal_attendance_action_lock()
             message = exc.args[0] if exc.args else str(exc)
-            code = "attendance_locked" if "10" in message or "wait" in message.lower() else "attendance_rejected"
+            code = "attendance_locked" if any(w in message.lower() for w in ["wait", "lock", "minutes", "submitted", "انتظار", "دقيقة"]) else "attendance_rejected"
             return _error(code, message, 429 if code == "attendance_locked" else 422)
         except Exception:
             if lock_acquired:
@@ -536,11 +488,8 @@ class AnabtawiMobileAPI(http.Controller):
             "status": "ok",
             "action": "check_in" if employee.attendance_state == "checked_in" else "check_out",
             "attendance_state": employee.attendance_state,
-            "timezone": self._employee_timezone_name(employee),
-            "check_in": self._datetime_to_employee_local(employee, attendance.check_in),
-            "check_out": self._datetime_to_employee_local(employee, attendance.check_out),
-            "check_in_utc": self._datetime_to_utc_string(attendance.check_in),
-            "check_out_utc": self._datetime_to_utc_string(attendance.check_out),
+            "check_in": fields.Datetime.to_string(attendance.check_in) if attendance.check_in else None,
+            "check_out": fields.Datetime.to_string(attendance.check_out) if attendance.check_out else None,
             "worked_hours": round(attendance.worked_hours or 0.0, 2),
         })
 
@@ -557,11 +506,8 @@ class AnabtawiMobileAPI(http.Controller):
         )
         return _json({"status": "ok", "records": [{
             "id": record.id,
-            "timezone": self._employee_timezone_name(employee),
-            "check_in": self._datetime_to_employee_local(employee, record.check_in),
-            "check_out": self._datetime_to_employee_local(employee, record.check_out),
-            "check_in_utc": self._datetime_to_utc_string(record.check_in),
-            "check_out_utc": self._datetime_to_utc_string(record.check_out),
+            "check_in": fields.Datetime.to_string(record.check_in) if record.check_in else None,
+            "check_out": fields.Datetime.to_string(record.check_out) if record.check_out else None,
             "worked_hours": round(record.worked_hours or 0.0, 2),
         } for record in records]})
 
@@ -756,6 +702,12 @@ class AnabtawiMobileAPI(http.Controller):
 
     def _overtime_categories(self, employee):
         Category = request.env["approval.category"].sudo()
+        if "is_overtime_category" in Category._fields:
+            # Always top up any missing standard categories, not just when the
+            # table is completely empty — otherwise a database with 1-2
+            # manually created categories never gets the rest auto-created.
+            self._ensure_default_overtime_categories(employee)
+
         domain = []
         if "is_overtime_category" in Category._fields:
             domain.append(("is_overtime_category", "=", True))
@@ -766,10 +718,7 @@ class AnabtawiMobileAPI(http.Controller):
         if "company_id" in Category._fields:
             domain.append(("company_id", "in", [False, employee.company_id.id]))
 
-        categories = Category.search(domain, order="sequence, id" if "sequence" in Category._fields else "id")
-        if not categories:
-            categories = self._ensure_default_overtime_categories(employee)
-        return categories
+        return Category.search(domain, order="sequence, id" if "sequence" in Category._fields else "id")
 
     @http.route(
         "/anabtawi/mobile/overtime/categories",
@@ -860,3 +809,148 @@ class AnabtawiMobileAPI(http.Controller):
             "hours": approval.quantity,
             "state": approval.request_status,
         } for approval in approvals]})
+
+
+    @http.route(
+        "/anabtawi/mobile/payslips/list",
+        type="http", auth="public", methods=["GET"], csrf=False,
+    )
+    def payslip_list(self, **kwargs):
+        employee, _user, _token, error = self._require_employee()
+        if error:
+            return error
+
+        records = request.env["hr.payslip"].sudo().search(
+            [
+                ("employee_id", "=", employee.id),
+                ("state", "in", ["done", "paid"]),
+            ],
+            order="date_to desc, id desc",
+            limit=50,
+        )
+
+        return _json({
+            "status": "ok",
+            "records": [
+                {
+                    "id": payslip.id,
+                    "number": payslip.number or f"PAY/{payslip.id}",
+                    "name": payslip.name or _("Payslip"),
+                    "date_from": fields.Date.to_string(payslip.date_from) if payslip.date_from else None,
+                    "date_to": fields.Date.to_string(payslip.date_to) if payslip.date_to else None,
+                    "net_wage": round(payslip.net_wage or 0.0, 2) if hasattr(payslip, "net_wage") else 0.0,
+                    "basic_wage": round(payslip.basic_wage or 0.0, 2) if hasattr(payslip, "basic_wage") else 0.0,
+                    "state": payslip.state,
+                }
+                for payslip in records
+            ],
+        })
+
+    @http.route(
+        "/anabtawi/mobile/payslips/download",
+        type="http", auth="public", methods=["GET"], csrf=False,
+    )
+    def payslip_download(self, **kwargs):
+        employee, _user, _token, error = self._require_employee()
+        if error:
+            return error
+
+        data = _payload()
+        try:
+            payslip_id = int(kwargs.get("id") or data.get("id") or 0)
+        except (TypeError, ValueError):
+            return _error("invalid_request", _("Valid payslip ID is required."), 400)
+
+        if not payslip_id:
+            return _error("invalid_request", _("Valid payslip ID is required."), 400)
+
+        payslip = request.env["hr.payslip"].sudo().search(
+            [
+                ("id", "=", payslip_id),
+                ("employee_id", "=", employee.id),
+                ("state", "in", ["done", "paid"]),
+            ],
+            limit=1,
+        )
+
+        if not payslip:
+            return _error("not_found", _("Payslip not found or access denied."), 404)
+
+        try:
+            report_name = "hr_payroll.report_payslip"
+            pdf_content, _format = request.env["ir.actions.report"].sudo()._render_qweb_pdf(
+                report_name, [payslip.id]
+            )
+        except Exception:
+            _logger.exception("Failed to render PDF for payslip_id=%s", payslip.id)
+            return _error("pdf_failed", _("Could not generate payslip PDF."), 500)
+
+        filename = f"Payslip_{payslip.number or payslip.id}.pdf"
+        headers = [
+            ("Content-Type", "application/pdf"),
+            ("Content-Disposition", f'attachment; filename="{filename}"'),
+            ("Content-Length", str(len(pdf_content))),
+        ]
+        return request.make_response(pdf_content, headers=headers)
+
+    @http.route(
+        "/anabtawi/mobile/app/check_update",
+        type="http", auth="public", methods=["GET"], csrf=False, sitemap=False,
+    )
+    def check_app_update(self, **kwargs):
+        config = request.env["ir.config_parameter"].sudo()
+        latest_version = config.get_param("anabtawi_mobile.latest_version")
+        if not latest_version:
+            config.set_param("anabtawi_mobile.latest_version", "1.2.0")
+            latest_version = "1.2.0"
+
+        min_version = config.get_param("anabtawi_mobile.min_version", "1.0.0")
+        update_message = config.get_param(
+            "anabtawi_mobile.update_message",
+            _("A new version of the Anabtawi Employee App (v1.2.0) with Payslip support is available. Please update to continue.")
+        )
+        download_url = config.get_param(
+            "anabtawi_mobile.download_url",
+            "/anabtawi/mobile/apk/download"
+        )
+        force_update = config.get_param("anabtawi_mobile.force_update", "False").lower() in ("true", "1", "yes")
+
+        return _json({
+            "status": "ok",
+            "latest_version": latest_version,
+            "min_version": min_version,
+            "update_message": update_message,
+            "download_url": download_url,
+            "force_update": force_update,
+        })
+
+    @http.route(
+        "/anabtawi/mobile/apk/download",
+        type="http", auth="public", methods=["GET"], csrf=False, sitemap=False,
+    )
+    def apk_download(self, **kwargs):
+        module_path = os.path.dirname(os.path.dirname(__file__))
+        apk_path = os.path.join(module_path, "static", "apk", "employee_app_latest.apk")
+        if not os.path.exists(apk_path):
+            return request.make_response("APK file not found on server.", status=404)
+
+        with open(apk_path, "rb") as file:
+            apk_bytes = file.read()
+
+        filename = "Employee-App-v1.2.0-with-payslip.apk"
+        headers = [
+            ("Content-Type", "application/vnd.android.package-archive"),
+            ("Content-Disposition", f'attachment; filename="{filename}"'),
+            ("Content-Length", str(len(apk_bytes))),
+            ("Cache-Control", "no-cache"),
+        ]
+        return request.make_response(apk_bytes, headers=headers)
+
+    @http.route(["/pwa", "/mobile/app"], type="http", auth="public", csrf=False)
+    def pwa_index(self, **kwargs):
+        pwa_path = os.path.join(os.path.dirname(__file__), "../static/pwa/index.html")
+        if os.path.exists(pwa_path):
+            with open(pwa_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return request.make_response(content, [("Content-Type", "text/html; charset=utf-8")])
+        return _error("not_found", _("PWA application files not found."), 404)
