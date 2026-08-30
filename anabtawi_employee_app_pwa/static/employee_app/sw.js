@@ -1,8 +1,9 @@
-const CACHE = "anabtawi-employee-app-v1.2.0";
+const CACHE = "anabtawi-employee-app-v1.2.1";
 const SHELL = [
   "/employee-portal",
   "/employee-portal/manifest.webmanifest",
   "/anabtawi_employee_app_pwa/static/employee_app/app.js",
+  "/anabtawi_employee_app_pwa/static/employee_app/app.js?v=1.2.1",
   "/anabtawi_employee_app_pwa/static/employee_app/favicon.ico",
   "/anabtawi_employee_app_pwa/static/employee_app/brand/logo.png",
   "/anabtawi_employee_app_pwa/static/employee_app/brand/symbol.png",
@@ -16,7 +17,8 @@ const API_CACHE_PATHS = [
   "/anabtawi/mobile/leaves/balances",
   "/anabtawi/mobile/leaves/list",
   "/anabtawi/mobile/overtime/categories",
-  "/anabtawi/mobile/overtime/list",`n  "/anabtawi/mobile/payslips/list"
+  "/anabtawi/mobile/overtime/list",
+  "/anabtawi/mobile/payslips/list"
 ];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
