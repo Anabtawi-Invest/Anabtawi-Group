@@ -264,23 +264,26 @@ class HrPayslip(models.Model):
                     net_hrs = raw_hrs
 
                 is_holiday = att_date in public_holiday_dates
+                matching_atts = [a for a in emp_attendances if a.check_in.date() == att_date]
+                is_approved = (
+                    approved_ot_by_emp_date.get((emp_id, att_date), 0.0) > 0 or
+                    any(getattr(a, 'overtime_status', False) == 'approved' or getattr(a, 'validated_overtime_hours', 0.0) > 0 for a in matching_atts)
+                )
+
                 if is_holiday:
-                    # Public Holiday work: every net hour credits 1.5x (150% rate)
-                    if allow_ot and net_hrs > 0:
+                    # Public Holiday work: credits 1.5x ONLY IF explicitly approved by HR/Manager
+                    if allow_ot and net_hrs > 0 and is_approved:
                         total_ot += (net_hrs * 1.5)
                     continue
 
                 standard_target = 8.0
                 if net_hrs > standard_target:
                     ot_excess = net_hrs - standard_target
-                    if ot_excess >= min_ot_threshold and allow_ot:
+                    if ot_excess >= min_ot_threshold and allow_ot and is_approved:
                         approved_hrs = approved_ot_by_emp_date.get((emp_id, att_date), 0.0)
                         if not approved_hrs:
-                            matching_atts = [a for a in emp_attendances if a.check_in.date() == att_date]
-                            if any(getattr(a, 'overtime_status', False) == 'approved' for a in matching_atts):
-                                approved_hrs = ot_excess
-                        if approved_hrs > 0:
-                            total_ot += (approved_hrs * 1.25)
+                            approved_hrs = ot_excess
+                        total_ot += (approved_hrs * 1.25)
                 elif net_hrs < standard_target:
                     shortfall = standard_target - net_hrs
                     if shortfall > min_lateness_threshold:
