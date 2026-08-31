@@ -43,6 +43,18 @@ def pre_init_hook(env):
         try:
             env.cr.execute("""
                 UPDATE hr_work_entry_type
+                   SET round_days = 'NO',
+                       round_days_type = 'DOWN'
+                 WHERE round_days IS NULL OR round_days = '';
+            """)
+            if env.cr.rowcount:
+                _logger.warning(
+                    "[factory_attendance_payroll] pre_init_hook fixed %s work entry type(s) "
+                    "with missing round_days via SQL.",
+                    env.cr.rowcount,
+                )
+            env.cr.execute("""
+                UPDATE hr_work_entry_type
                    SET round_days_type = 'DOWN'
                  WHERE round_days IN ('HALF', 'FULL')
                    AND (round_days_type IS NULL OR round_days_type = '');
@@ -55,14 +67,23 @@ def pre_init_hook(env):
                 )
         except Exception:
             _logger.exception(
-                "[factory_attendance_payroll] pre_init_hook failed to fix round_days_type via SQL."
+                "[factory_attendance_payroll] pre_init_hook failed to fix work entry rounding via SQL."
             )
 
 
 def _fix_work_entry_type_rounding(env):
     """Ensure rounding-enabled work entry types always have a round type."""
+    missing_round_days = env['hr.work.entry.type'].sudo().search([('round_days', '=', False)])
+    if missing_round_days:
+        _logger.warning(
+            "[factory_attendance_payroll] Fixing %s work entry type(s) with missing round_days: %s",
+            len(missing_round_days),
+            [(t.id, t.name, t.code, t.round_days, t.round_days_type) for t in missing_round_days],
+        )
+        missing_round_days.write({'round_days': 'NO', 'round_days_type': 'DOWN'})
+
     bad_types = env['hr.work.entry.type'].sudo().search([
-        ('round_days', '!=', 'NO'),
+        ('round_days', 'in', ['HALF', 'FULL']),
         ('round_days_type', '=', False),
     ])
     if bad_types:

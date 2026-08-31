@@ -536,6 +536,7 @@ class HrPayslip(models.Model):
         return super().write(vals)
 
     def _round_days(self, work_entry_type, days):
+        round_days = work_entry_type.round_days or 'NO'
         _logger.info(
             "[factory_attendance_payroll] _round_days: payslip_ids=%s work_entry_type_id=%s "
             "name=%r code=%r display_code=%r round_days=%r round_days_type=%r days=%s",
@@ -548,7 +549,15 @@ class HrPayslip(models.Model):
             work_entry_type.round_days_type,
             days,
         )
-        if work_entry_type.round_days == 'NO':
+        if round_days == 'NO':
+            if not work_entry_type.round_days:
+                _logger.warning(
+                    "[factory_attendance_payroll] Work entry type id=%s name=%r code=%r has "
+                    "empty round_days — treating as NO rounding",
+                    work_entry_type.id,
+                    work_entry_type.name,
+                    work_entry_type.code,
+                )
             return days
         rounding_method = work_entry_type.round_days_type or 'DOWN'
         if not work_entry_type.round_days_type:
@@ -558,7 +567,7 @@ class HrPayslip(models.Model):
                 work_entry_type.id,
                 work_entry_type.name,
                 work_entry_type.code,
-                work_entry_type.round_days,
+                round_days,
                 rounding_method,
             )
             try:
@@ -569,7 +578,7 @@ class HrPayslip(models.Model):
                     "work entry type id=%s",
                     work_entry_type.id,
                 )
-        precision_rounding = 0.5 if work_entry_type.round_days == 'HALF' else 1
+        precision_rounding = 0.5 if round_days == 'HALF' else 1
         rounded = float_round(
             days,
             precision_rounding=precision_rounding,
@@ -592,7 +601,10 @@ class HrPayslip(models.Model):
             work_hours = self.version_id.get_work_hours(self.date_from, self.date_to, domain=domain)
             for work_entry_type_id, hours in work_hours.items():
                 work_entry_type = self.env['hr.work.entry.type'].browse(work_entry_type_id)
-                if work_entry_type.round_days != 'NO' and not work_entry_type.round_days_type:
+                round_days = work_entry_type.round_days or 'NO'
+                if (not work_entry_type.round_days) or (
+                    round_days != 'NO' and not work_entry_type.round_days_type
+                ):
                     _logger.warning(
                         "[factory_attendance_payroll] Work entry type used in payslip %s has "
                         "invalid rounding config: id=%s name=%r code=%r display_code=%r "
