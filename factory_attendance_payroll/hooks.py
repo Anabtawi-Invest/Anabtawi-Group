@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import api, SUPERUSER_ID
+
+_logger = logging.getLogger(__name__)
 
 
 def pre_init_hook(env):
@@ -35,6 +39,25 @@ def pre_init_hook(env):
         except Exception:
             pass
 
+    with env.cr.savepoint():
+        try:
+            env.cr.execute("""
+                UPDATE hr_work_entry_type
+                   SET round_days_type = 'DOWN'
+                 WHERE round_days IN ('HALF', 'FULL')
+                   AND (round_days_type IS NULL OR round_days_type = '');
+            """)
+            if env.cr.rowcount:
+                _logger.warning(
+                    "[factory_attendance_payroll] pre_init_hook fixed %s work entry type(s) "
+                    "with missing round_days_type via SQL.",
+                    env.cr.rowcount,
+                )
+        except Exception:
+            _logger.exception(
+                "[factory_attendance_payroll] pre_init_hook failed to fix round_days_type via SQL."
+            )
+
 
 def _fix_work_entry_type_rounding(env):
     """Ensure rounding-enabled work entry types always have a round type."""
@@ -43,6 +66,12 @@ def _fix_work_entry_type_rounding(env):
         ('round_days_type', '=', False),
     ])
     if bad_types:
+        _logger.warning(
+            "[factory_attendance_payroll] Fixing %s work entry type(s) with round_days enabled "
+            "but missing round_days_type: %s",
+            len(bad_types),
+            [(t.id, t.name, t.code, t.round_days, t.round_days_type) for t in bad_types],
+        )
         bad_types.write({'round_days_type': 'DOWN'})
 
     absent_type = env.ref(

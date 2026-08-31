@@ -536,17 +536,82 @@ class HrPayslip(models.Model):
         return super().write(vals)
 
     def _round_days(self, work_entry_type, days):
+        _logger.info(
+            "[factory_attendance_payroll] _round_days: payslip_ids=%s work_entry_type_id=%s "
+            "name=%r code=%r display_code=%r round_days=%r round_days_type=%r days=%s",
+            self.ids,
+            work_entry_type.id,
+            work_entry_type.name,
+            work_entry_type.code,
+            work_entry_type.display_code,
+            work_entry_type.round_days,
+            work_entry_type.round_days_type,
+            days,
+        )
         if work_entry_type.round_days == 'NO':
             return days
         rounding_method = work_entry_type.round_days_type or 'DOWN'
         if not work_entry_type.round_days_type:
-            work_entry_type.sudo().write({'round_days_type': rounding_method})
+            _logger.warning(
+                "[factory_attendance_payroll] Missing round_days_type on work entry type "
+                "id=%s name=%r code=%r round_days=%r — using fallback %r",
+                work_entry_type.id,
+                work_entry_type.name,
+                work_entry_type.code,
+                work_entry_type.round_days,
+                rounding_method,
+            )
+            try:
+                work_entry_type.sudo().write({'round_days_type': rounding_method})
+            except Exception:
+                _logger.exception(
+                    "[factory_attendance_payroll] Could not persist round_days_type on "
+                    "work entry type id=%s",
+                    work_entry_type.id,
+                )
         precision_rounding = 0.5 if work_entry_type.round_days == 'HALF' else 1
-        return float_round(
+        rounded = float_round(
             days,
             precision_rounding=precision_rounding,
             rounding_method=rounding_method,
         )
+        _logger.info(
+            "[factory_attendance_payroll] _round_days result: work_entry_type_id=%s "
+            "days=%s -> %s (method=%r precision=%s)",
+            work_entry_type.id,
+            days,
+            rounded,
+            rounding_method,
+            precision_rounding,
+        )
+        return rounded
+
+    def _get_worked_day_lines_values(self, domain=None):
+        self.ensure_one()
+        try:
+            work_hours = self.version_id.get_work_hours(self.date_from, self.date_to, domain=domain)
+            for work_entry_type_id, hours in work_hours.items():
+                work_entry_type = self.env['hr.work.entry.type'].browse(work_entry_type_id)
+                if work_entry_type.round_days != 'NO' and not work_entry_type.round_days_type:
+                    _logger.warning(
+                        "[factory_attendance_payroll] Work entry type used in payslip %s has "
+                        "invalid rounding config: id=%s name=%r code=%r display_code=%r "
+                        "round_days=%r round_days_type=%r hours=%s",
+                        self.id or 'new',
+                        work_entry_type.id,
+                        work_entry_type.name,
+                        work_entry_type.code,
+                        work_entry_type.display_code,
+                        work_entry_type.round_days,
+                        work_entry_type.round_days_type,
+                        hours,
+                    )
+        except Exception:
+            _logger.exception(
+                "[factory_attendance_payroll] Failed while logging work entry types for payslip %s",
+                self.id or 'new',
+            )
+        return super()._get_worked_day_lines_values(domain=domain)
 
     def _get_worked_day_lines(self, *args, **kwargs):
         """
