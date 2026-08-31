@@ -72,6 +72,10 @@ class HrAttendance(models.Model):
             domain += ["|", ("calendar_id", "=", False), ("calendar_id", "=", calendar_id)]
 
         leaves = LeaveModel.sudo().search(domain)
+        import pytz
+        user_tz = pytz.timezone('Asia/Amman')
+        # Converts 2026-08-24 21:00:00 UTC -> 2026-08-25 00:00:00 Asia/Amman
+        d_from = pytz.utc.localize(lve.date_from).astimezone(user_tz).date()
 
         for lve in leaves:
             d_from = lve.date_from.date()
