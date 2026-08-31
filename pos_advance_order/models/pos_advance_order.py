@@ -2023,7 +2023,9 @@ class PosAdvanceOrder(models.Model):
             if order.advance_deposit_move_id:
                 if order.advance_deposit_move_id.state != "posted":
                     raise UserError(_("Only posted deposit entries can be reversed."))
-                rev_moves = order.advance_deposit_move_id.with_context(
+                # POS users normally cannot create journal items; reverse with sudo
+                # (same pattern as _post_advance_deposit_move).
+                rev_moves = order.advance_deposit_move_id.sudo().with_context(
                     prefetch_fields=False,
                 )._reverse_moves(
                     default_values_list=[{"date": fields.Date.context_today(order)}],
