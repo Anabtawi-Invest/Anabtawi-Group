@@ -176,6 +176,16 @@ class PosAdvanceOrder(models.Model):
         compute="_compute_advance_payment_created",
         store=True,
     )
+    is_editable = fields.Boolean(
+        string="Editable",
+        compute="_compute_edit_flags",
+        help="True when the advance order can be edited from the backend.",
+    )
+    is_deposit_editable = fields.Boolean(
+        string="Deposit Fields Editable",
+        compute="_compute_edit_flags",
+        help="True when deposit-related fields (advance amount, tendered, payment method) can be edited.",
+    )
     advance_account_payment_id = fields.Many2one(
         "account.payment",
         string="Advance Account Payment",
@@ -550,6 +560,14 @@ class PosAdvanceOrder(models.Model):
                 order.advance_deposit_move_id
                 or order.advance_pos_order_id
                 or order.advance_account_payment_id
+            )
+
+    @api.depends("state", "advance_payment_created")
+    def _compute_edit_flags(self):
+        for order in self:
+            order.is_editable = order.state in ("draft", "confirmed", "advance_paid")
+            order.is_deposit_editable = (
+                order.state in ("draft", "confirmed") and not order.advance_payment_created
             )
 
     @api.depends(
@@ -1092,18 +1110,85 @@ class PosAdvanceOrder(models.Model):
         # Business rule: Advance Orders must never be deleted (audit trail).
         raise UserError(_("You cannot delete Advance Orders. You can cancel them instead."))
 
+    def _can_edit(self):
+        """Backend business fields are editable in draft / confirmed / advance_paid."""
+        self.ensure_one()
+        return self.state in ("draft", "confirmed", "advance_paid")
+
+    def _can_edit_deposit_fields(self):
+        """Deposit fields stay locked after the advance payment is created."""
+        self.ensure_one()
+        return self.state in ("draft", "confirmed") and not self.advance_payment_created
+
+    def _after_lines_edited(self):
+        """Recheck totals and refresh pending pledges after line changes."""
+        for order in self.filtered(lambda o: o._can_edit()):
+            if order.advance_amount and float_compare(
+                order.advance_amount,
+                order.amount_grand_total or 0.0,
+                precision_rounding=order.currency_id.rounding,
+            ) > 0:
+                raise UserError(
+                    _("Advance amount cannot be greater than the total after editing lines.")
+                )
+            if hasattr(order, "_sync_site_service_pledge_records"):
+                order._sync_site_service_pledge_records()
+
     def write(self, vals):
-        # Make cancelled advance orders fully read-only (server-side safety).
+        business_fields = {
+            "partner_id",
+            "user_id",
+            "picking_date",
+            "pos_config_id",
+            "from_pos_config_id",
+            "pos_payment_method_id",
+            "payment_method",
+            "advance_amount",
+            "amount_tendered",
+            "line_ids",
+            "discount_id",
+            "discount_amount",
+            "site_service",
+            "employee_id",
+            "is_employee_pricelist",
+            "employee_pricelist_employee_id",
+        }
+        deposit_fields = {
+            "advance_amount",
+            "amount_tendered",
+            "pos_payment_method_id",
+            "payment_method",
+            "from_pos_config_id",
+        }
+        # Make cancelled / fully paid advance orders read-only for business content.
         for order in self:
             if order.state == "cancel":
                 allowed = {"state"}
                 if any(field_name not in allowed for field_name in vals.keys()):
                     raise UserError(_("You cannot modify a cancelled advance order."))
+            elif order.state == "fully_paid":
+                if any(field_name in business_fields for field_name in vals.keys()):
+                    raise UserError(_("You cannot modify a fully paid advance order."))
+            elif not order._can_edit():
+                if any(field_name in business_fields for field_name in vals.keys()):
+                    raise UserError(_("You cannot modify this advance order in its current state."))
+            elif not order._can_edit_deposit_fields():
+                locked = [f for f in deposit_fields if f in vals]
+                if locked:
+                    raise UserError(
+                        _(
+                            "Deposit fields cannot be changed after the advance payment is created. "
+                            "Use Refund Advance if the deposit must be reversed."
+                        )
+                    )
         if vals.get("pos_payment_method_id") and "payment_method" not in vals:
             pm = self.env["pos.payment.method"].browse(vals["pos_payment_method_id"])
             vals = dict(vals)
             vals["payment_method"] = self._payment_method_selection_from_pos_pm(pm)
-        return super().write(vals)
+        res = super().write(vals)
+        if any(f in vals for f in ("line_ids", "site_service", "discount_id")):
+            self._after_lines_edited()
+        return res
 
     def _get_advance_pos_config(self):
         """POS config governing advance payment (deposit taken on From POS, else Picking POS)."""
@@ -2014,7 +2099,7 @@ class PosAdvanceOrder(models.Model):
 
     def _is_readonly(self):
         self.ensure_one()
-        return self.state != "draft"
+        return not self._can_edit()
 
     def _get_action_add_from_catalog_extra_context(self):
         self.ensure_one()
@@ -2220,10 +2305,36 @@ class PosAdvanceOrderLine(models.Model):
                 )
 
     @api.ondelete(at_uninstall=False)
-    def _unlink_except_when_order_not_draft(self):
+    def _unlink_except_when_order_not_editable(self):
         for line in self:
-            if line.order_id and line.order_id.state != "draft":
-                raise UserError(_("You can only delete lines on a Draft advance order."))
+            if line.order_id and not line.order_id._can_edit():
+                raise UserError(_("You can only delete lines on an editable advance order."))
+
+    def create(self, vals_list):
+        for vals in vals_list:
+            order = self.env["pos.advance.order"].browse(vals.get("order_id"))
+            if order and not order._can_edit():
+                raise UserError(_("You can only add lines on an editable advance order."))
+        lines = super().create(vals_list)
+        lines.mapped("order_id")._after_lines_edited()
+        return lines
+
+    def write(self, vals):
+        for line in self:
+            if line.order_id and not line.order_id._can_edit():
+                raise UserError(_("You can only modify lines on an editable advance order."))
+        res = super().write(vals)
+        self.mapped("order_id")._after_lines_edited()
+        return res
+
+    def unlink(self):
+        for line in self:
+            if line.order_id and not line.order_id._can_edit():
+                raise UserError(_("You can only delete lines on an editable advance order."))
+        orders = self.mapped("order_id")
+        res = super().unlink()
+        orders.exists()._after_lines_edited()
+        return res
 
     @api.readonly
     def action_add_from_catalog(self):
