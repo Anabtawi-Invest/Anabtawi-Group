@@ -157,8 +157,8 @@
                             <field name="user_id" required="1" readonly="not is_editable"/>
                             <field name="pos_payment_method_id" required="1" readonly="not is_deposit_editable"/>
                             <field name="payment_method" invisible="1"/>
-                            <field name="advance_amount" widget="monetary" readonly="not is_deposit_editable"/>
-                            <field name="amount_tendered" widget="monetary" readonly="not is_deposit_editable"/>
+                            <field name="advance_amount" widget="monetary" readonly="not is_editable"/>
+                            <field name="amount_tendered" widget="monetary" readonly="not is_editable"/>
                             <field name="is_employee_pricelist" readonly="not is_editable"/>
                             <field name="employee_pricelist_employee_id" readonly="1" invisible="not employee_pricelist_employee_id"/>
                             <field name="discount_id" readonly="not is_editable"/>

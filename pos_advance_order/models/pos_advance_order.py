@@ -184,7 +184,7 @@ class PosAdvanceOrder(models.Model):
     is_deposit_editable = fields.Boolean(
         string="Deposit Fields Editable",
         compute="_compute_edit_flags",
-        help="True when deposit-related fields (advance amount, tendered, payment method) can be edited.",
+        help="True when payment method / From POS can be edited (before deposit is created).",
     )
     advance_account_payment_id = fields.Many2one(
         "account.payment",
@@ -566,6 +566,7 @@ class PosAdvanceOrder(models.Model):
     def _compute_edit_flags(self):
         for order in self:
             order.is_editable = order.state in ("draft", "confirmed", "advance_paid")
+            # Payment method / From POS stay locked after deposit; advance/tendered use is_editable.
             order.is_deposit_editable = (
                 order.state in ("draft", "confirmed") and not order.advance_payment_created
             )
@@ -1116,7 +1117,7 @@ class PosAdvanceOrder(models.Model):
         return self.state in ("draft", "confirmed", "advance_paid")
 
     def _can_edit_deposit_fields(self):
-        """Deposit fields stay locked after the advance payment is created."""
+        """Payment method / From POS stay locked after the advance payment is created."""
         self.ensure_one()
         return self.state in ("draft", "confirmed") and not self.advance_payment_created
 
@@ -1153,9 +1154,8 @@ class PosAdvanceOrder(models.Model):
             "is_employee_pricelist",
             "employee_pricelist_employee_id",
         }
-        deposit_fields = {
-            "advance_amount",
-            "amount_tendered",
+        # Locked after deposit is posted (does not include advance_amount / amount_tendered).
+        deposit_setup_fields = {
             "pos_payment_method_id",
             "payment_method",
             "from_pos_config_id",
@@ -1173,11 +1173,11 @@ class PosAdvanceOrder(models.Model):
                 if any(field_name in business_fields for field_name in vals.keys()):
                     raise UserError(_("You cannot modify this advance order in its current state."))
             elif not order._can_edit_deposit_fields():
-                locked = [f for f in deposit_fields if f in vals]
+                locked = [f for f in deposit_setup_fields if f in vals]
                 if locked:
                     raise UserError(
                         _(
-                            "Deposit fields cannot be changed after the advance payment is created. "
+                            "Payment method and From POS cannot be changed after the advance payment is created. "
                             "Use Refund Advance if the deposit must be reversed."
                         )
                     )
@@ -1185,6 +1185,31 @@ class PosAdvanceOrder(models.Model):
             pm = self.env["pos.payment.method"].browse(vals["pos_payment_method_id"])
             vals = dict(vals)
             vals["payment_method"] = self._payment_method_selection_from_pos_pm(pm)
+
+        # Validate advance / tendered when edited (including advance_paid).
+        if "advance_amount" in vals or "amount_tendered" in vals:
+            for order in self:
+                if not order._can_edit() and order.state != "fully_paid":
+                    continue
+                if order.state in ("cancel", "fully_paid"):
+                    continue
+                new_advance = (
+                    vals["advance_amount"] if "advance_amount" in vals else order.advance_amount
+                ) or 0.0
+                new_tendered = (
+                    vals["amount_tendered"] if "amount_tendered" in vals else order.amount_tendered
+                ) or 0.0
+                if float_compare(new_advance, 0.0, precision_rounding=order.currency_id.rounding) < 0:
+                    raise UserError(_("Advance amount cannot be negative."))
+                if float_compare(
+                    new_advance,
+                    order.amount_grand_total or 0.0,
+                    precision_rounding=order.currency_id.rounding,
+                ) > 0:
+                    raise UserError(_("Advance amount cannot be greater than the total."))
+                if float_compare(new_tendered, new_advance, precision_rounding=order.currency_id.rounding) < 0:
+                    raise UserError(_("Amount tendered cannot be less than advance amount."))
+
         res = super().write(vals)
         if any(f in vals for f in ("line_ids", "site_service", "discount_id")):
             self._after_lines_edited()
