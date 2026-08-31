@@ -3,7 +3,7 @@
 from collections import defaultdict
 import datetime
 import logging
-from odoo import models, fields, api
+from odoo.tools.float_utils import float_round
 
 _logger = logging.getLogger(__name__)
 
@@ -536,9 +536,17 @@ class HrPayslip(models.Model):
         return super().write(vals)
 
     def _round_days(self, work_entry_type, days):
-        if work_entry_type.round_days != 'NO' and not work_entry_type.round_days_type:
-            work_entry_type.sudo().write({'round_days_type': 'DOWN'})
-        return super()._round_days(work_entry_type, days)
+        if work_entry_type.round_days == 'NO':
+            return days
+        rounding_method = work_entry_type.round_days_type or 'DOWN'
+        if not work_entry_type.round_days_type:
+            work_entry_type.sudo().write({'round_days_type': rounding_method})
+        precision_rounding = 0.5 if work_entry_type.round_days == 'HALF' else 1
+        return float_round(
+            days,
+            precision_rounding=precision_rounding,
+            rounding_method=rounding_method,
+        )
 
     def _get_worked_day_lines(self, *args, **kwargs):
         """
