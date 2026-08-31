@@ -1,6 +1,6 @@
 {
     'name': 'Factory Attendance & Payroll Reconciliation',
-    'version': '19.0.3.0.3',
+    'version': '19.0.3.0.4',
     'category': 'Human Resources/Payroll',
     'summary': 'High-performance multi-location break deduction, daily attendance monitoring, planning shift integration, and 3-Step Lateness Settlement for any Salary Structure.',
     'author': 'Custom Solutions',
