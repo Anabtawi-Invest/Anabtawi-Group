@@ -411,41 +411,46 @@ class HrPayslip(models.Model):
             annual_leave_days = 0.0
             pto_leave_days = 0.0
 
-            if hasattr(emp, '_get_consumed_leaves'):
-                annual_types = self.env['hr.leave.type'].sudo().search([
-                    '|', ('name', 'ilike', 'annual'), ('name', 'ilike', 'سنوي')
-                ], limit=1)
-                if annual_types:
-                    consumed_data, _ = emp._get_consumed_leaves(annual_types[0], target_date=slip.date_to or fields.Date.today())
-                    leave_content = consumed_data.get(emp, {}).get(annual_types[0], {})
-                    if isinstance(leave_content, dict):
-                        if 'virtual_remaining_leaves' in leave_content:
-                            annual_leave_days = float(leave_content.get('virtual_remaining_leaves', 0.0))
-                        elif 'remaining_leaves' in leave_content:
-                            annual_leave_days = float(leave_content.get('remaining_leaves', 0.0))
-                        else:
-                            annual_leave_days = sum(v.get('virtual_remaining_leaves', 0.0) for v in leave_content.values() if isinstance(v, dict))
+            # TIER 1: Search all matching annual leave types
+            annual_types = self.env['hr.leave.type'].sudo().search([
+                '|', '|', ('name', 'ilike', 'annual'), ('name', 'ilike', 'سنوي'), ('name', 'ilike', 'إجازة')
+            ])
+            for atype in annual_types:
+                if hasattr(emp, '_get_consumed_leaves'):
+                    try:
+                        consumed_data, _ = emp._get_consumed_leaves(atype, target_date=slip.date_to or fields.Date.today())
+                        leave_content = consumed_data.get(emp, {}).get(atype, {})
+                        if isinstance(leave_content, dict):
+                            val = leave_content.get('virtual_remaining_leaves') or leave_content.get('remaining_leaves') or 0.0
+                            if not val and isinstance(leave_content, dict):
+                                val = sum(v.get('virtual_remaining_leaves', 0.0) for v in leave_content.values() if isinstance(v, dict))
+                            if val:
+                                annual_leave_days += float(val)
+                    except Exception:
+                        pass
 
-                pto_types = self.env['hr.leave.type'].sudo().search([
-                    ('name', 'ilike', 'paid time off')
-                ], limit=1)
-                if pto_types:
-                    consumed_data_pto, _ = emp._get_consumed_leaves(pto_types[0], target_date=slip.date_to or fields.Date.today())
-                    leave_content_pto = consumed_data_pto.get(emp, {}).get(pto_types[0], {})
-                    if isinstance(leave_content_pto, dict):
-                        if 'virtual_remaining_leaves' in leave_content_pto:
-                            pto_leave_days = float(leave_content_pto.get('virtual_remaining_leaves', 0.0))
-                        elif 'remaining_leaves' in leave_content_pto:
-                            pto_leave_days = float(leave_content_pto.get('remaining_leaves', 0.0))
-                        else:
-                            pto_leave_days = sum(v.get('virtual_remaining_leaves', 0.0) for v in leave_content_pto.values() if isinstance(v, dict))
-
+            # TIER 2: Fallback on Employee Model Fields
             if not annual_leave_days:
                 for field_name in ['annual_leave_balance', 'remaining_leaves', 'annual_leave_balance_hours']:
                     if field_name in emp._fields and getattr(emp, field_name):
                         val = getattr(emp, field_name)
                         annual_leave_days = val / 8.0 if 'hours' in field_name else val
                         break
+
+            # TIER 3: Direct Search on Validated Leave Allocations
+            if not annual_leave_days and 'hr.leave.allocation' in self.env:
+                annual_allocs = self.env['hr.leave.allocation'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '=', 'validate'),
+                    '|', '|', ('holiday_status_id.name', 'ilike', 'annual'),
+                    ('holiday_status_id.name', 'ilike', 'سنوي'),
+                    ('holiday_status_id.name', 'ilike', 'إجازة'),
+                ])
+                if annual_allocs:
+                    for a in annual_allocs:
+                        rem = getattr(a, 'number_of_days_display', 0.0) or getattr(a, 'number_of_days', 0.0) or 0.0
+                        taken = getattr(a, 'leaves_taken', 0.0) or 0.0
+                        annual_leave_days += max(0.0, rem - taken)
 
             # 2. CLEAR_ANNUAL (Termination: Annual Leave Settlement)
             annual_type = self.env['hr.payslip.input.type'].sudo().search([('code', '=', 'CLEAR_ANNUAL')], limit=1)
