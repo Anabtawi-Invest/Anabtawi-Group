@@ -3,6 +3,7 @@
 from collections import defaultdict
 import datetime
 import logging
+from odoo import models, fields, api
 from odoo.tools.float_utils import float_round
 
 _logger = logging.getLogger(__name__)
