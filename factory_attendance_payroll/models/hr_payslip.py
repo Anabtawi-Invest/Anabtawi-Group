@@ -535,6 +535,11 @@ class HrPayslip(models.Model):
             self.with_context(skip_reconcile_revert=True)._revert_reconciliation_settlements()
         return super().write(vals)
 
+    def _round_days(self, work_entry_type, days):
+        if work_entry_type.round_days != 'NO' and not work_entry_type.round_days_type:
+            work_entry_type.sudo().write({'round_days_type': 'DOWN'})
+        return super()._round_days(work_entry_type, days)
+
     def _get_worked_day_lines(self, *args, **kwargs):
         """
         Harmonizes Odoo's native Worked Days tab lines with Reconciliation Engine:

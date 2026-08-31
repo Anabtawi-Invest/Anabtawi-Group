@@ -7,6 +7,8 @@
             <field name="code">ABSENT</field>
             <field name="color">1</field>
             <field name="is_leave">False</field>
+            <field name="round_days">NO</field>
+            <field name="round_days_type">DOWN</field>
         </record>
     </data>
 </odoo>

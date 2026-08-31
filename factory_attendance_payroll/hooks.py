@@ -36,6 +36,23 @@ def pre_init_hook(env):
             pass
 
 
+def _fix_work_entry_type_rounding(env):
+    """Ensure rounding-enabled work entry types always have a round type."""
+    bad_types = env['hr.work.entry.type'].sudo().search([
+        ('round_days', '!=', 'NO'),
+        ('round_days_type', '=', False),
+    ])
+    if bad_types:
+        bad_types.write({'round_days_type': 'DOWN'})
+
+    absent_type = env.ref(
+        'factory_attendance_payroll.work_entry_type_absent',
+        raise_if_not_found=False,
+    )
+    if absent_type and (not absent_type.round_days_type or absent_type.round_days != 'NO'):
+        absent_type.write({'round_days': 'NO', 'round_days_type': 'DOWN'})
+
+
 def post_init_hook(env):
     """
     Post-Init Hook:
@@ -50,5 +67,10 @@ def post_init_hook(env):
             for rule in rules:
                 if hasattr(structures, 'rule_ids'):
                     structures.write({'rule_ids': [(4, rule.id)]})
+    except Exception:
+        pass
+
+    try:
+        _fix_work_entry_type_rounding(env)
     except Exception:
         pass
