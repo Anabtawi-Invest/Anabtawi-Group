@@ -1700,7 +1700,8 @@ class PosAdvanceOrder(models.Model):
                 )
 
             order.state = "fully_paid"
-            order._generate_completion_invoice(pos_order)
+            # Invoice creation is deferred to cron so POS Complete returns faster.
+            order._schedule_completion_invoice(pos_order)
             summary = order._completion_receipt_vals(completion_pm=pm)
 
         if len(self) == 1 and summary:
@@ -1780,8 +1781,25 @@ class PosAdvanceOrder(models.Model):
             raise UserError(_("Advance order is not completed yet."))
         return self._completion_receipt_vals()
 
+    def _schedule_completion_invoice(self, pos_order):
+        """Mark the remaining POS order for async invoicing (cron)."""
+        self.ensure_one()
+        if not pos_order or not pos_order.partner_id:
+            return False
+        pos_order = pos_order.sudo()
+        if pos_order.account_move:
+            return pos_order.account_move
+        if not pos_order.to_invoice:
+            pos_order.write({"to_invoice": True})
+        _logger.info(
+            "[ADV_INVOICE] Scheduled completion invoice advance=%s pos_order=%s",
+            self.name,
+            pos_order.name,
+        )
+        return True
+
     def _generate_completion_invoice(self, pos_order):
-        """Create and post the customer invoice when the advance sale is completed."""
+        """Create and post the customer invoice for a completed advance sale."""
         self.ensure_one()
         if not pos_order or not pos_order.partner_id:
             return False
@@ -1797,6 +1815,37 @@ class PosAdvanceOrder(models.Model):
             pos_order.account_move.id if pos_order.account_move else False,
         )
         return pos_order.account_move
+
+    @api.model
+    def _cron_generate_completion_invoices(self, batch_size=50):
+        """Create invoices for completed advance orders marked to_invoice."""
+        Advance = self.sudo()
+        domain = [
+            ("state", "=", "fully_paid"),
+            ("remaining_pos_order_id", "!=", False),
+            ("remaining_pos_order_id.to_invoice", "=", True),
+            ("remaining_pos_order_id.account_move", "=", False),
+            ("partner_id", "!=", False),
+        ]
+        pending = Advance.search(domain, limit=batch_size, order="id asc")
+        if not pending:
+            return True
+        _logger.info(
+            "[ADV_INVOICE] Cron processing %s advance order(s) pending invoice",
+            len(pending),
+        )
+        for order in pending:
+            pos_order = order.remaining_pos_order_id
+            try:
+                with self.env.cr.savepoint():
+                    order._generate_completion_invoice(pos_order)
+            except Exception:
+                _logger.exception(
+                    "[ADV_INVOICE] Cron failed for advance=%s pos_order=%s",
+                    order.name,
+                    pos_order.name if pos_order else False,
+                )
+        return True
 
     def action_view_invoice(self):
         self.ensure_one()

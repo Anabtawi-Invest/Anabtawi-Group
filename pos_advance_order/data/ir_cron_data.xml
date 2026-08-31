@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="ir_cron_pos_advance_order_completion_invoice" model="ir.cron">
+        <field name="name">POS Advance Order: Generate Completion Invoices</field>
+        <field name="model_id" ref="model_pos_advance_order"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_generate_completion_invoices()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>
