@@ -72,14 +72,21 @@ class HrAttendance(models.Model):
             domain += ["|", ("calendar_id", "=", False), ("calendar_id", "=", calendar_id)]
 
         leaves = LeaveModel.sudo().search(domain)
+        
         import pytz
-        user_tz = pytz.timezone('Asia/Amman')
-        # Converts 2026-08-24 21:00:00 UTC -> 2026-08-25 00:00:00 Asia/Amman
-        d_from = pytz.utc.localize(lve.date_from).astimezone(user_tz).date()
+        tz_name = self.env.company.resource_calendar_id.tz or self.env.user.tz or 'Asia/Amman'
+        try:
+            user_tz = pytz.timezone(tz_name)
+        except Exception:
+            user_tz = pytz.timezone('Asia/Amman')
 
         for lve in leaves:
-            d_from = lve.date_from.date()
-            d_to = lve.date_to.date()
+            if not lve.date_from or not lve.date_to:
+                continue
+            df_utc = lve.date_from.replace(tzinfo=pytz.utc) if lve.date_from.tzinfo is None else lve.date_from
+            dt_utc = lve.date_to.replace(tzinfo=pytz.utc) if lve.date_to.tzinfo is None else lve.date_to
+            d_from = df_utc.astimezone(user_tz).date()
+            d_to = dt_utc.astimezone(user_tz).date()
             curr = d_from
             while curr <= d_to:
                 if min_date <= curr <= max_date:
