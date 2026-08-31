@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { _t } from "@web/core/l10n/translation";
-import { Component, onMounted, useRef, useState } from "@odoo/owl";
+import { Component, useState } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 
 export class PredefinedDiscountAuthPopup extends Component {
@@ -14,27 +14,18 @@ export class PredefinedDiscountAuthPopup extends Component {
         close: Function,
     };
     static defaultProps = {
-        title: _t("Discount Authorization"),
+        title: _t("Select Discount"),
         discounts: [],
     };
 
     setup() {
         this.state = useState({
             discountId: this.props.discounts?.[0]?.id || null,
-            password: "",
-        });
-        this.passwordRef = useRef("password");
-        onMounted(() => {
-            this.state.password = "";
-            if (this.passwordRef.el) {
-                this.passwordRef.el.value = "";
-                this.passwordRef.el.focus?.();
-            }
         });
     }
 
     get canConfirm() {
-        return Boolean(this.state.discountId && (this.state.password || "").trim());
+        return Boolean(this.state.discountId);
     }
 
     confirm() {
@@ -43,7 +34,6 @@ export class PredefinedDiscountAuthPopup extends Component {
         }
         this.props.getPayload({
             discountId: this.state.discountId,
-            password: this.state.password,
         });
         this.props.close();
     }
