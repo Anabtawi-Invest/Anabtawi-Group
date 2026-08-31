@@ -7,120 +7,275 @@
                     <span class="fw-bold" t-esc="popupTitle"/>
                     <small class="d-block opacity-75" t-esc="popupSubtitle"/>
                 </div>
-                <div class="form-group mb-3">
-                    <label><strong t-esc="searchLabel"/></label>
-                    <input
-                        type="text"
-                        class="form-control"
-                        t-att-placeholder="searchPlaceholder"
-                        t-att-value="state.search"
-                        t-on-input="onSearchInput"
-                        t-att-disabled="state.loading ? 'disabled' : undefined"
-                    />
-                </div>
 
-                <div class="table-responsive border rounded" style="max-height: 360px; overflow: auto;">
-                    <table class="table table-sm table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 32px;"></th>
-                                <th t-esc="colAdvanceLabel"/>
-                                <th t-esc="colCustomerLabel"/>
-                                <th t-esc="colPhoneLabel"/>
-                                <th t-esc="colTotalLabel"/>
-                                <th t-esc="colAdvancePaidLabel"/>
-                                <th t-esc="colRemainingLabel"/>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <t t-if="!filteredOrders.length">
+                <!-- ========== LIST VIEW ========== -->
+                <t t-if="state.view === 'list'">
+                    <div class="form-group mb-3">
+                        <label><strong t-esc="searchLabel"/></label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            t-att-placeholder="searchPlaceholder"
+                            t-att-value="state.search"
+                            t-on-input="onSearchInput"
+                            t-att-disabled="state.loading ? 'disabled' : undefined"
+                        />
+                    </div>
+
+                    <div class="table-responsive border rounded" style="max-height: 360px; overflow: auto;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-3">
-                                        <t t-esc="noOrdersText"/>
-                                    </td>
+                                    <th style="width: 32px;"></th>
+                                    <th t-esc="colAdvanceLabel"/>
+                                    <th t-esc="colCustomerLabel"/>
+                                    <th t-esc="colPhoneLabel"/>
+                                    <th t-esc="colTotalLabel"/>
+                                    <th t-esc="colAdvancePaidLabel"/>
+                                    <th t-esc="colRemainingLabel"/>
                                 </tr>
-                            </t>
-                            <t t-foreach="filteredOrders" t-as="order" t-key="order.id">
-                                <tr t-on-click="() => this.selectOrder(order.id)" style="cursor: pointer;">
-                                    <td>
-                                        <input
-                                            type="radio"
-                                            name="selected_advance_order"
-                                            t-att-checked="state.selected_order_id === order.id"
-                                            t-on-click.stop="() => this.selectOrder(order.id)"
-                                        />
-                                    </td>
-                                    <td t-esc="order.name"/>
-                                    <td t-esc="order.partner_id and order.partner_id[1] or ''"/>
-                                    <td t-esc="order.partner_phone || ''"/>
-                                    <td t-esc="order.amount_total"/>
-                                    <td t-esc="order.advance_amount"/>
-                                    <td t-esc="order.amount_remaining"/>
-                                </tr>
-                            </t>
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                <t t-if="!filteredOrders.length">
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted py-3">
+                                            <t t-esc="noOrdersText"/>
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="filteredOrders" t-as="order" t-key="order.id">
+                                    <tr t-on-click="() => this.selectOrder(order.id)" style="cursor: pointer;">
+                                        <td>
+                                            <input
+                                                type="radio"
+                                                name="selected_advance_order"
+                                                t-att-checked="state.selected_order_id === order.id"
+                                                t-on-click.stop="() => this.selectOrder(order.id)"
+                                            />
+                                        </td>
+                                        <td t-esc="order.name"/>
+                                        <td t-esc="order.partner_id and order.partner_id[1] or ''"/>
+                                        <td t-esc="order.partner_phone || ''"/>
+                                        <td t-esc="order.amount_total"/>
+                                        <td t-esc="order.advance_amount"/>
+                                        <td t-esc="order.amount_remaining"/>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
 
-                <div class="form-group mb-3 mt-3">
-                    <label><strong t-esc="amountTenderedLabel"/></label>
-                    <input
-                        type="number"
-                        class="form-control"
-                        min="0"
-                        step="0.01"
-                        t-att-value="state.amount_tendered"
-                        t-on-input="onAmountTenderedInput"
-                        t-att-disabled="state.loading ? 'disabled' : undefined"
-                    />
-                    <small class="text-muted" t-esc="amountTenderedHint"/>
-                    <div class="mt-1 text-muted">
-                        <span t-esc="colRemainingLabel"/>:
-                        <strong t-esc="remainingAmountFmt()"/>
-                    </div>
-                    <div class="text-muted">
-                        <span t-esc="changeReturnedLabel"/>:
-                        <strong t-esc="env.utils.formatCurrency(remainingChangeAmount)"/>
-                    </div>
-                </div>
-
-                <div class="form-group mb-0 mt-3">
-                    <label><strong t-esc="paymentMethodLabel"/></label>
-                    <div
-                        t-if="!state.payment_methods.length"
-                        class="alert alert-warning mb-0"
-                    >
-                        <span t-esc="noEligiblePaymentMethodsText"/>
-                    </div>
-                    <div t-else="" class="paymentmethods-container mb-0">
-                        <div class="paymentmethods d-flex flex-column gap-2">
-                            <t t-foreach="state.payment_methods" t-as="pm" t-key="pm.id">
-                                <div
-                                    role="button"
-                                    t-att-class="paymentMethodRowClass(pm)"
-                                    t-on-click="() => this.selectPaymentMethod(pm)"
-                                >
-                                    <div class="payment-method-display d-flex align-items-center gap-2 text-wrap lh-sm">
-                                        <img
-                                            class="payment-method-icon"
-                                            t-att-src="paymentMethodIconSrc(pm)"
-                                            alt=""
-                                        />
-                                        <span class="payment-name" t-esc="pm.name"/>
-                                    </div>
-                                    <span class="text-muted" t-esc="remainingAmountFmt()"/>
+                <!-- ========== DETAIL VIEW ========== -->
+                <t t-else="">
+                    <t t-set="order" t-value="selectedOrder"/>
+                    <t t-if="order">
+                        <div class="border rounded p-3 mb-3 bg-light">
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <div class="text-muted small" t-esc="colAdvanceLabel"/>
+                                    <div class="fw-bold" t-esc="order.name"/>
                                 </div>
-                            </t>
+                                <div class="col-md-6">
+                                    <div class="text-muted small" t-esc="colCustomerLabel"/>
+                                    <div class="fw-bold" t-esc="order.partner_id and order.partner_id[1] or ''"/>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="text-muted small" t-esc="colPhoneLabel"/>
+                                    <div t-esc="order.partner_phone || '-'"/>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="text-muted small" t-esc="pickingDateLabel"/>
+                                    <div t-esc="order.picking_date || '-'"/>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-muted small" t-esc="siteServiceLabel"/>
+                                    <div>
+                                        <span
+                                            t-att-class="order.site_service ? 'badge text-bg-info' : 'badge text-bg-secondary'"
+                                            t-esc="order.site_service ? siteServiceYesLabel : siteServiceNoLabel"
+                                        />
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-muted small" t-esc="discountLabel"/>
+                                    <div t-esc="discountDisplayName"/>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-muted small" t-esc="pledgeAmountLabel"/>
+                                    <div t-esc="_fmtMoney(order.pledge_amount)"/>
+                                </div>
+                            </div>
+                            <hr class="my-2"/>
+                            <div class="d-flex flex-wrap gap-3">
+                                <div>
+                                    <span class="text-muted" t-esc="colTotalLabel"/>:
+                                    <strong t-esc="_fmtMoney(order.amount_total)"/>
+                                </div>
+                                <div>
+                                    <span class="text-muted" t-esc="colAdvancePaidLabel"/>:
+                                    <strong t-esc="_fmtMoney(order.advance_amount)"/>
+                                </div>
+                                <div>
+                                    <span class="text-muted" t-esc="colRemainingLabel"/>:
+                                    <strong class="text-success" t-esc="_fmtMoney(order.amount_remaining)"/>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
+
+                        <div t-if="state.detailLoading" class="text-center text-muted py-3 mb-3">
+                            <span class="spinner-border spinner-border-sm me-2"/>
+                        </div>
+
+                        <t t-else="">
+                            <div class="mb-3">
+                                <strong class="d-block mb-2" t-esc="linesSectionLabel"/>
+                                <div class="table-responsive border rounded" style="max-height: 220px; overflow: auto;">
+                                    <table class="table table-sm mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th t-esc="colProductLabel"/>
+                                                <th class="text-center" t-esc="colQtyLabel"/>
+                                                <th class="text-end" t-esc="colUnitPriceLabel"/>
+                                                <th class="text-end" t-esc="colDiscountPctLabel"/>
+                                                <th class="text-end" t-esc="colSubtotalLabel"/>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-if="!state.detail_lines.length">
+                                                <tr>
+                                                    <td colspan="5" class="text-center text-muted py-2" t-esc="noLinesText"/>
+                                                </tr>
+                                            </t>
+                                            <t t-foreach="state.detail_lines" t-as="line" t-key="line.id">
+                                                <tr>
+                                                    <td t-esc="line.product_id and line.product_id[1] or ''"/>
+                                                    <td class="text-center" t-esc="line.product_qty"/>
+                                                    <td class="text-end" t-esc="_fmtMoney(line.price_unit)"/>
+                                                    <td class="text-end" t-esc="line.discount || 0"/>
+                                                    <td class="text-end" t-esc="_fmtMoney(line.price_subtotal_incl)"/>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <strong class="d-block mb-2" t-esc="pledgesSectionLabel"/>
+                                <div class="table-responsive border rounded" style="max-height: 160px; overflow: auto;">
+                                    <table class="table table-sm mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th t-esc="colProductLabel"/>
+                                                <th class="text-center" t-esc="colQtyLabel"/>
+                                                <th class="text-end" t-esc="colUnitPriceLabel"/>
+                                                <th class="text-end" t-esc="colSubtotalLabel"/>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-if="!state.detail_pledges.length">
+                                                <tr>
+                                                    <td colspan="4" class="text-center text-muted py-2" t-esc="noPledgesText"/>
+                                                </tr>
+                                            </t>
+                                            <t t-foreach="state.detail_pledges" t-as="pledge" t-key="pledge.id">
+                                                <tr>
+                                                    <td t-esc="pledge.product_id and pledge.product_id[1] or ''"/>
+                                                    <td class="text-center" t-esc="pledge.pledge_qty"/>
+                                                    <td class="text-end" t-esc="_fmtMoney(pledge.pledge_amount_unit)"/>
+                                                    <td class="text-end" t-esc="_fmtMoney(pledge.pledge_subtotal)"/>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </t>
+
+                        <div class="form-group mb-3">
+                            <label><strong t-esc="amountTenderedLabel"/></label>
+                            <input
+                                type="number"
+                                class="form-control"
+                                min="0"
+                                step="0.01"
+                                t-att-value="state.amount_tendered"
+                                t-on-input="onAmountTenderedInput"
+                                t-att-disabled="state.detailLoading ? 'disabled' : undefined"
+                            />
+                            <small class="text-muted" t-esc="amountTenderedHint"/>
+                            <div class="mt-1 text-muted">
+                                <span t-esc="colRemainingLabel"/>:
+                                <strong t-esc="remainingAmountFmt()"/>
+                            </div>
+                            <div class="text-muted">
+                                <span t-esc="changeReturnedLabel"/>:
+                                <strong t-esc="env.utils.formatCurrency(remainingChangeAmount)"/>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-0">
+                            <label><strong t-esc="paymentMethodLabel"/></label>
+                            <div
+                                t-if="!state.payment_methods.length"
+                                class="alert alert-warning mb-0"
+                            >
+                                <span t-esc="noEligiblePaymentMethodsText"/>
+                            </div>
+                            <div t-else="" class="paymentmethods-container mb-0">
+                                <div class="paymentmethods d-flex flex-column gap-2">
+                                    <t t-foreach="state.payment_methods" t-as="pm" t-key="pm.id">
+                                        <div
+                                            role="button"
+                                            t-att-class="paymentMethodRowClass(pm)"
+                                            t-on-click="() => this.selectPaymentMethod(pm)"
+                                        >
+                                            <div class="payment-method-display d-flex align-items-center gap-2 text-wrap lh-sm">
+                                                <img
+                                                    class="payment-method-icon"
+                                                    t-att-src="paymentMethodIconSrc(pm)"
+                                                    alt=""
+                                                />
+                                                <span class="payment-name" t-esc="pm.name"/>
+                                            </div>
+                                            <span class="text-muted" t-esc="remainingAmountFmt()"/>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </t>
             </div>
 
             <t t-set-slot="footer">
-                <button class="btn btn-secondary" t-on-click.stop="cancel" t-esc="cancelButtonLabel"/>
-                <button class="btn btn-primary" t-on-click.stop="confirm" t-att-disabled="state.loading ? 'disabled' : undefined">
-                    <t t-esc="completeButtonLabel"/>
-                </button>
+                <t t-if="state.view === 'list'">
+                    <button class="btn btn-secondary" t-on-click.stop="cancel" t-esc="cancelButtonLabel"/>
+                    <button
+                        class="btn btn-primary"
+                        t-on-click.stop="goToDetail"
+                        t-att-disabled="state.loading or !state.selected_order_id ? 'disabled' : undefined"
+                    >
+                        <t t-esc="nextButtonLabel"/>
+                    </button>
+                </t>
+                <t t-else="">
+                    <button
+                        class="btn btn-secondary"
+                        t-on-click.stop="goBackToList"
+                        t-att-disabled="state.detailLoading ? 'disabled' : undefined"
+                        t-esc="backButtonLabel"
+                    />
+                    <button class="btn btn-outline-secondary" t-on-click.stop="cancel" t-esc="cancelButtonLabel"/>
+                    <button
+                        class="btn btn-primary"
+                        t-on-click.stop="confirm"
+                        t-att-disabled="state.detailLoading ? 'disabled' : undefined"
+                    >
+                        <t t-esc="completeButtonLabel"/>
+                    </button>
+                </t>
             </t>
         </Dialog>
     </t>
