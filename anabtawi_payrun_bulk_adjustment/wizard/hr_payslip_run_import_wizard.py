@@ -18,6 +18,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
     _description = 'Payrun Bulk Salary Adjustments Wizard'
 
     payrun_id = fields.Many2one('hr.payslip.run', string="Payrun", required=False, ondelete='cascade')
+    adjustment_type = fields.Char(string="Default Adjustment Type", help="Optional default type to pre-fill in exported Excel template (e.g. Partial Salary Payment, Loan, Bonus).")
     excel_file = fields.Binary(string="Excel File", help="Upload the completed salary adjustment Excel file.")
     file_name = fields.Char(string="File Name")
 
@@ -119,6 +120,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
             cell.fill = header_fill
             cell.font = header_font
 
+        default_type = self.adjustment_type.strip() if self.adjustment_type else ""
         slips = self._get_target_payslips().sorted(key=lambda s: s.employee_id.name or '')
         if not slips:
             active_emp_ids = self._context.get('active_ids', [])
@@ -138,7 +140,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
                     emp_code, 
                     emp.name, 
                     round(wage, 3), 
-                    "Partial Salary Payment", 
+                    default_type, 
                     0.0, 
                     ""
                 ])
@@ -151,7 +153,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
                     emp_code, 
                     emp.name, 
                     round(actual_salary, 3), 
-                    "Partial Salary Payment", 
+                    default_type, 
                     0.0, 
                     ""
                 ])
@@ -166,6 +168,45 @@ class HrPayslipRunImportWizard(models.TransientModel):
         for row in range(2, ws.max_row + 1):
             ws.cell(row=row, column=3).number_format = '#,##0.000'
             ws.cell(row=row, column=5).number_format = '#,##0.000'
+
+        # Collect available adjustment types dynamically for Excel Dropdown List
+        type_names = set()
+        if 'hr.salary.attachment.type' in self.env:
+            try:
+                for t in self.env['hr.salary.attachment.type'].sudo().search([]):
+                    if getattr(t, 'name', False):
+                        type_names.add(t.name.strip())
+            except Exception:
+                pass
+        if 'hr.payslip.input.type' in self.env:
+            try:
+                for t in self.env['hr.payslip.input.type'].sudo().search([]):
+                    if getattr(t, 'name', False):
+                        type_names.add(t.name.strip())
+            except Exception:
+                pass
+
+        if not type_names:
+            type_names = {'Partial Salary Payment', 'Company Loan', 'Advance Payment', 'Bonus', 'Penalty', 'Deduction'}
+
+        sorted_types = sorted(list(type_names))
+
+        try:
+            from openpyxl.worksheet.datavalidation import DataValidation
+            # Use a hidden worksheet range for dropdown values to avoid Excel's 255-character inline string limit
+            ws_lookup = wb.create_sheet(title="_types_lookup")
+            ws_lookup.sheet_state = 'hidden'
+
+            for r_idx, name in enumerate(sorted_types, start=1):
+                ws_lookup.cell(row=r_idx, column=1, value=name)
+
+            formula_str = f"'_types_lookup'!$A$1:$A${len(sorted_types)}"
+            dv = DataValidation(type="list", formula1=formula_str, allow_blank=True)
+            ws.add_data_validation(dv)
+            max_r = max(ws.max_row + 500, 1000)
+            dv.add(f"D2:D{max_r}")
+        except Exception as e:
+            _logger.warning("Failed to add DataValidation dropdown to Excel: %s", str(e))
 
         output = io.BytesIO()
         wb.save(output)
@@ -233,12 +274,14 @@ class HrPayslipRunImportWizard(models.TransientModel):
         if not found:
             found = CoModel.search([], limit=1)
 
-        # 3. Create default if none exists
+        # 3. Create default or dynamic type if none exists
         if not found and 'name' in c_fields:
             try:
-                vals = {'name': 'Partial Salary Payment'}
+                name_val = type_str.strip() if type_str else 'Salary Adjustment'
+                code_val = type_str.strip().upper().replace(' ', '_') if type_str else 'SAL_ADJ'
+                vals = {'name': name_val}
                 if 'code' in c_fields:
-                    vals['code'] = 'PA_pay'
+                    vals['code'] = code_val
                 found = CoModel.create(vals)
             except Exception:
                 found = False
@@ -285,9 +328,11 @@ class HrPayslipRunImportWizard(models.TransientModel):
         if found:
             return found.id
 
-        # 5. Create if none exists
+        # 5. Create dynamic input type if none exists
         try:
-            vals = {'name': 'Partial Salary Payment', 'code': 'PARTIAL_PAYMENT'}
+            name_val = type_str.strip() if type_str else 'Salary Adjustment'
+            code_val = type_str.strip().upper().replace(' ', '_') if type_str else 'SAL_ADJ'
+            vals = {'name': name_val, 'code': code_val}
             if 'country_id' in c_fields:
                 vals['country_id'] = False
             created = InputType.create(vals)
@@ -308,19 +353,6 @@ class HrPayslipRunImportWizard(models.TransientModel):
                 with self.env.cr.savepoint():
                     Attachment = self.env['hr.salary.attachment'].sudo()
                     fields_dict = Attachment._fields
-
-                    domain = []
-                    if 'employee_ids' in fields_dict:
-                        domain.append(('employee_ids', 'in', [emp.id]))
-                    elif 'employee_id' in fields_dict:
-                        domain.append(('employee_id', '=', emp.id))
-
-                    if 'description' in fields_dict:
-                        domain.append(('description', '=', clean_note))
-                    elif 'name' in fields_dict:
-                        domain.append(('name', '=', clean_note))
-
-                    existing = Attachment.search(domain, limit=1) if domain else False
 
                     vals = {}
                     # Many2many / Many2one employee assignment
@@ -359,10 +391,8 @@ class HrPayslipRunImportWizard(models.TransientModel):
                                 break
 
                     # Resolve other_input_type_id / payslip_input_type_id / input_type_id (Many2one to hr.payslip.input.type)
-                    # This is required and constrained NOT NULL in Odoo 19!
                     for input_fname in ['other_input_type_id', 'payslip_input_type_id', 'input_type_id']:
                         if input_fname in fields_dict:
-                            # 1. Check if deduction type has a linked input_type
                             linked_input_id = False
                             if ded_type_id and 'hr.salary.attachment.type' in self.env:
                                 ded_rec = self.env['hr.salary.attachment.type'].sudo().browse(ded_type_id)
@@ -371,17 +401,14 @@ class HrPayslipRunImportWizard(models.TransientModel):
                                 elif 'other_input_type_id' in ded_rec._fields and ded_rec.other_input_type_id:
                                     linked_input_id = ded_rec.other_input_type_id.id
 
-                            # 2. Fallback to resolving payslip input type directly
                             if not linked_input_id:
                                 linked_input_id = self._resolve_payslip_input_type(type_str)
 
                             if linked_input_id:
                                 vals[input_fname] = linked_input_id
 
-                    if existing:
-                        existing.write(vals)
-                    else:
-                        Attachment.create(vals)
+                    # Always create a new attachment record for each row
+                    Attachment.create(vals)
                     created_or_updated = True
 
             except Exception as e:
