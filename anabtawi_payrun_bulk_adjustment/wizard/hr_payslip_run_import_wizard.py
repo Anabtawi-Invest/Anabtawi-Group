@@ -18,7 +18,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
     _description = 'Payrun Bulk Salary Adjustments Wizard'
 
     payrun_id = fields.Many2one('hr.payslip.run', string="Payrun", required=False, ondelete='cascade')
-    adjustment_type_id = fields.Many2one('hr.salary.attachment.type', string="Default Adjustment Type", help="Optional default type to pre-fill in exported Excel template.")
+    adjustment_type = fields.Char(string="Default Adjustment Type", help="Optional default type to pre-fill in exported Excel template (e.g. Partial Salary Payment, Loan, Bonus).")
     excel_file = fields.Binary(string="Excel File", help="Upload the completed salary adjustment Excel file.")
     file_name = fields.Char(string="File Name")
 
@@ -120,7 +120,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
             cell.fill = header_fill
             cell.font = header_font
 
-        default_type = (self.adjustment_type_id.name or self.adjustment_type_id.code) if self.adjustment_type_id else ""
+        default_type = self.adjustment_type.strip() if self.adjustment_type else ""
         slips = self._get_target_payslips().sorted(key=lambda s: s.employee_id.name or '')
         if not slips:
             active_emp_ids = self._context.get('active_ids', [])
@@ -630,4 +630,3 @@ class HrPayslipRunImportWizard(models.TransientModel):
                 'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
-        
