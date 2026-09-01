@@ -169,6 +169,38 @@ class HrPayslipRunImportWizard(models.TransientModel):
             ws.cell(row=row, column=3).number_format = '#,##0.000'
             ws.cell(row=row, column=5).number_format = '#,##0.000'
 
+        # Collect available adjustment types dynamically for Excel Dropdown List
+        type_names = set()
+        if 'hr.salary.attachment.type' in self.env:
+            try:
+                for t in self.env['hr.salary.attachment.type'].sudo().search([]):
+                    if getattr(t, 'name', False):
+                        type_names.add(t.name.strip())
+            except Exception:
+                pass
+        if 'hr.payslip.input.type' in self.env:
+            try:
+                for t in self.env['hr.payslip.input.type'].sudo().search([]):
+                    if getattr(t, 'name', False):
+                        type_names.add(t.name.strip())
+            except Exception:
+                pass
+
+        if not type_names:
+            type_names = {'Partial Salary Payment', 'Company Loan', 'Advance Payment', 'Bonus', 'Penalty', 'Deduction'}
+
+        sorted_types = sorted(list(type_names))
+
+        try:
+            from openpyxl.worksheet.datavalidation import DataValidation
+            formula_str = f'"{",".join(sorted_types)}"'
+            dv = DataValidation(type="list", formula1=formula_str, allow_blank=True)
+            ws.add_data_validation(dv)
+            max_r = max(ws.max_row + 500, 1000)
+            dv.add(f"D2:D{max_r}")
+        except Exception as e:
+            _logger.warning("Failed to add DataValidation dropdown to Excel: %s", str(e))
+
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
