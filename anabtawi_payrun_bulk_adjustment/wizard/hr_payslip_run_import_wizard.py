@@ -18,6 +18,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
     _description = 'Payrun Bulk Salary Adjustments Wizard'
 
     payrun_id = fields.Many2one('hr.payslip.run', string="Payrun", required=False, ondelete='cascade')
+    adjustment_type_id = fields.Many2one('hr.salary.attachment.type', string="Default Adjustment Type", help="Optional default type to pre-fill in exported Excel template.")
     excel_file = fields.Binary(string="Excel File", help="Upload the completed salary adjustment Excel file.")
     file_name = fields.Char(string="File Name")
 
@@ -119,6 +120,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
             cell.fill = header_fill
             cell.font = header_font
 
+        default_type = (self.adjustment_type_id.name or self.adjustment_type_id.code) if self.adjustment_type_id else ""
         slips = self._get_target_payslips().sorted(key=lambda s: s.employee_id.name or '')
         if not slips:
             active_emp_ids = self._context.get('active_ids', [])
@@ -138,7 +140,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
                     emp_code, 
                     emp.name, 
                     round(wage, 3), 
-                    "Partial Salary Payment", 
+                    default_type, 
                     0.0, 
                     ""
                 ])
@@ -151,7 +153,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
                     emp_code, 
                     emp.name, 
                     round(actual_salary, 3), 
-                    "Partial Salary Payment", 
+                    default_type, 
                     0.0, 
                     ""
                 ])
@@ -233,12 +235,14 @@ class HrPayslipRunImportWizard(models.TransientModel):
         if not found:
             found = CoModel.search([], limit=1)
 
-        # 3. Create default if none exists
+        # 3. Create default or dynamic type if none exists
         if not found and 'name' in c_fields:
             try:
-                vals = {'name': 'Partial Salary Payment'}
+                name_val = type_str.strip() if type_str else 'Salary Adjustment'
+                code_val = type_str.strip().upper().replace(' ', '_') if type_str else 'SAL_ADJ'
+                vals = {'name': name_val}
                 if 'code' in c_fields:
-                    vals['code'] = 'PA_pay'
+                    vals['code'] = code_val
                 found = CoModel.create(vals)
             except Exception:
                 found = False
@@ -285,9 +289,11 @@ class HrPayslipRunImportWizard(models.TransientModel):
         if found:
             return found.id
 
-        # 5. Create if none exists
+        # 5. Create dynamic input type if none exists
         try:
-            vals = {'name': 'Partial Salary Payment', 'code': 'PARTIAL_PAYMENT'}
+            name_val = type_str.strip() if type_str else 'Salary Adjustment'
+            code_val = type_str.strip().upper().replace(' ', '_') if type_str else 'SAL_ADJ'
+            vals = {'name': name_val, 'code': code_val}
             if 'country_id' in c_fields:
                 vals['country_id'] = False
             created = InputType.create(vals)
