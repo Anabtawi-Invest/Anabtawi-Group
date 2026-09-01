@@ -315,19 +315,6 @@ class HrPayslipRunImportWizard(models.TransientModel):
                     Attachment = self.env['hr.salary.attachment'].sudo()
                     fields_dict = Attachment._fields
 
-                    domain = []
-                    if 'employee_ids' in fields_dict:
-                        domain.append(('employee_ids', 'in', [emp.id]))
-                    elif 'employee_id' in fields_dict:
-                        domain.append(('employee_id', '=', emp.id))
-
-                    if 'description' in fields_dict:
-                        domain.append(('description', '=', clean_note))
-                    elif 'name' in fields_dict:
-                        domain.append(('name', '=', clean_note))
-
-                    existing = Attachment.search(domain, limit=1) if domain else False
-
                     vals = {}
                     # Many2many / Many2one employee assignment
                     if 'employee_ids' in fields_dict:
@@ -365,10 +352,8 @@ class HrPayslipRunImportWizard(models.TransientModel):
                                 break
 
                     # Resolve other_input_type_id / payslip_input_type_id / input_type_id (Many2one to hr.payslip.input.type)
-                    # This is required and constrained NOT NULL in Odoo 19!
                     for input_fname in ['other_input_type_id', 'payslip_input_type_id', 'input_type_id']:
                         if input_fname in fields_dict:
-                            # 1. Check if deduction type has a linked input_type
                             linked_input_id = False
                             if ded_type_id and 'hr.salary.attachment.type' in self.env:
                                 ded_rec = self.env['hr.salary.attachment.type'].sudo().browse(ded_type_id)
@@ -377,17 +362,14 @@ class HrPayslipRunImportWizard(models.TransientModel):
                                 elif 'other_input_type_id' in ded_rec._fields and ded_rec.other_input_type_id:
                                     linked_input_id = ded_rec.other_input_type_id.id
 
-                            # 2. Fallback to resolving payslip input type directly
                             if not linked_input_id:
                                 linked_input_id = self._resolve_payslip_input_type(type_str)
 
                             if linked_input_id:
                                 vals[input_fname] = linked_input_id
 
-                    if existing:
-                        existing.write(vals)
-                    else:
-                        Attachment.create(vals)
+                    # Always create a new attachment record for each row
+                    Attachment.create(vals)
                     created_or_updated = True
 
             except Exception as e:
