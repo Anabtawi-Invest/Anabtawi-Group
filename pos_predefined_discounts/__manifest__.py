@@ -2,7 +2,7 @@
 
 {
     "name": "POS Predefined Discounts",
-    "version": "19.0.1.2.0",
+    "version": "19.0.1.1.0",
     "category": "Sales/Point of Sale",
     "summary": "Select predefined disc"
                "ounts from POS instead of typing a number",

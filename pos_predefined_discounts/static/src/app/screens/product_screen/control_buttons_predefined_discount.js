@@ -102,20 +102,33 @@ patch(ControlButtons.prototype, {
         }
 
         if (discounts.length) {
-            const payload = await makeAwaitable(this.dialog, PredefinedDiscountAuthPopup, {
-                title: _t("Select Discount"),
-                discounts,
-            });
-            if (!payload?.discountId) {
+            try {
+                const orm = this.env.services.orm;
+                const payload = await makeAwaitable(this.dialog, PredefinedDiscountAuthPopup, {
+                    title: _t("Discount Authorization"),
+                    discounts,
+                });
+                if (!payload?.discountId) {
+                    return;
+                }
+                await orm.call(
+                    "pos.predefined.discount",
+                    "pos_validate_discount_authorization",
+                    [payload.discountId, payload.password, false]
+                );
+                const selectedDiscount = discounts.find(
+                    (discount) => discount.id === payload.discountId
+                );
+                if (selectedDiscount) {
+                    this._applyDiscountOnAllLines(selectedDiscount.discount);
+                }
+                return;
+            } catch (error) {
+                const message =
+                    error?.data?.message || error?.message || _t("Discount authorization failed.");
+                this.env.services.notification.add(message, { type: "danger" });
                 return;
             }
-            const selectedDiscount = discounts.find(
-                (discount) => discount.id === payload.discountId
-            );
-            if (selectedDiscount) {
-                this._applyDiscountOnAllLines(selectedDiscount.discount);
-            }
-            return;
         }
 
         let allowedPercents = [];

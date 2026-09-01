@@ -13,6 +13,23 @@
                 </select>
             </div>
 
+            <div>
+                <label class="form-label">Manager Password</label>
+                <input
+                    class="form-control"
+                    type="password"
+                    inputmode="numeric"
+                    autocomplete="new-password"
+                    autocapitalize="off"
+                    autocorrect="off"
+                    spellcheck="false"
+                    name="pos_discount_auth_password"
+                    value=""
+                    t-model="state.password"
+                    t-ref="password"
+                />
+            </div>
+
             <t t-set-slot="footer">
                 <button class="btn btn-primary btn-lg lh-lg" t-att-disabled="!canConfirm" t-on-click="confirm">
                     Confirm
