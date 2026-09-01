@@ -511,7 +511,7 @@ class HrPayslip(models.Model):
             # 3. CLEAR_PTO (Termination: Paid Time Off Settlement)
             pto_type = self.env['hr.payslip.input.type'].sudo().search([('code', '=', 'CLEAR_PTO')], limit=1)
             if pto_type:
-                pto_amount = round(pto_leave_days * daily_rate, 3)
+                pto_amount = round(pto_leave_days * (daily_rate*1.5), 3)
                 pto_line = slip.input_line_ids.filtered(lambda l: l.input_type_id == pto_type)
                 if pto_line:
                     pto_line.write({'quantity': pto_leave_days, 'amount': pto_amount})
