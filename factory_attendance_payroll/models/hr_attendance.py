@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 from datetime import datetime, time, timedelta
+import pytz
 from odoo import models, fields, api
 
 
@@ -72,7 +73,7 @@ class HrAttendance(models.Model):
             domain += ["|", ("calendar_id", "=", False), ("calendar_id", "=", calendar_id)]
 
         leaves = LeaveModel.sudo().search(domain)
-        
+
         import pytz
         tz_name = self.env.company.resource_calendar_id.tz or self.env.user.tz or 'Asia/Amman'
         try:
@@ -196,22 +197,53 @@ class HrAttendance(models.Model):
                 continue
 
             standard_target = 8.0
-            excess = net_hrs - standard_target
-            min_ot_threshold = 0.75
-            min_lateness_threshold = 0.25
+            min_ot_threshold = 0.75  # 45 minutes
+            min_lateness_threshold = 0.25  # 15 minutes
 
-            if excess >= min_ot_threshold:
-                attendance.daily_overtime_hours = excess
-                attendance.daily_undertime_hours = 0.0
-                attendance.daily_variance_hours = excess
-            elif excess < -min_lateness_threshold:
-                attendance.daily_overtime_hours = 0.0
-                attendance.daily_undertime_hours = abs(excess)
-                attendance.daily_variance_hours = excess
+            cal = emp.resource_calendar_id or self.env.company.resource_calendar_id
+            tz_name = emp.tz or (cal.tz if cal else False) or self.env.user.tz or 'Asia/Amman'
+            try:
+                emp_tz = pytz.timezone(tz_name)
+            except Exception:
+                emp_tz = pytz.timezone('Asia/Amman')
+
+            check_in_local = attendance.check_in.astimezone(emp_tz)
+            actual_in_hour = check_in_local.hour + (check_in_local.minute / 60.0)
+
+            actual_out_hour = 0.0
+            if attendance.check_out:
+                check_out_local = attendance.check_out.astimezone(emp_tz)
+                actual_out_hour = check_out_local.hour + (check_out_local.minute / 60.0)
+
+            dow = str(check_in_local.weekday())
+            day_cal = cal.attendance_ids.filtered(lambda a: a.dayofweek == dow) if cal else False
+            if day_cal:
+                sched_start = min(day_cal.mapped('hour_from'))
+                sched_end = max(day_cal.mapped('hour_to'))
             else:
-                attendance.daily_overtime_hours = 0.0
-                attendance.daily_undertime_hours = 0.0
-                attendance.daily_variance_hours = 0.0
+                sched_start = 8.0
+                sched_end = 16.5  # 4:30 PM
+
+            # 1. Lateness (Check-In delay vs Scheduled Start)
+            late_delay = max(0.0, actual_in_hour - sched_start)
+            if late_delay >= min_lateness_threshold:
+                undertime = round(late_delay, 2)
+            else:
+                undertime = 0.0
+
+            # 2. Overtime (Check-Out stay vs Scheduled End)
+            if attendance.check_out and actual_out_hour > sched_end:
+                extra_stay = actual_out_hour - sched_end
+                if extra_stay >= min_ot_threshold:
+                    overtime = round(extra_stay, 2)
+                else:
+                    overtime = 0.0
+            else:
+                overtime = 0.0
+
+            attendance.daily_undertime_hours = undertime
+            attendance.daily_overtime_hours = overtime
+            attendance.daily_variance_hours = round(overtime - undertime, 2)
 
     @api.depends('daily_overtime_hours', 'employee_id')
     def _compute_overtime_hours(self):
