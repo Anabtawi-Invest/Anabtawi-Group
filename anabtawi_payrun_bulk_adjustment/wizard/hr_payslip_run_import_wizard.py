@@ -193,7 +193,14 @@ class HrPayslipRunImportWizard(models.TransientModel):
 
         try:
             from openpyxl.worksheet.datavalidation import DataValidation
-            formula_str = f'"{",".join(sorted_types)}"'
+            # Use a hidden worksheet range for dropdown values to avoid Excel's 255-character inline string limit
+            ws_lookup = wb.create_sheet(title="_types_lookup")
+            ws_lookup.sheet_state = 'hidden'
+
+            for r_idx, name in enumerate(sorted_types, start=1):
+                ws_lookup.cell(row=r_idx, column=1, value=name)
+
+            formula_str = f"'_types_lookup'!$A$1:$A${len(sorted_types)}"
             dv = DataValidation(type="list", formula1=formula_str, allow_blank=True)
             ws.add_data_validation(dv)
             max_r = max(ws.max_row + 500, 1000)
