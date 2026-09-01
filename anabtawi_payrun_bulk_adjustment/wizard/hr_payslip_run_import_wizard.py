@@ -630,3 +630,4 @@ class HrPayslipRunImportWizard(models.TransientModel):
                 'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
+        
