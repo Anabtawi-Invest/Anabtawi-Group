@@ -19,6 +19,7 @@
                     <group>
                         <group string="1. Template Export" invisible="not payrun_id">
                             <field name="payrun_id" readonly="1"/>
+                            <field name="adjustment_type_id" options="{'no_create': True}"/>
                             <button name="action_export_template" 
                                     string="Download Excel Template" 
                                     type="object" 
