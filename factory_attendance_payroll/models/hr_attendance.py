@@ -225,9 +225,9 @@ class HrAttendance(models.Model):
             )
 
             if is_flexible:
-                # Flexible Schedule Rule: Net Worked Hours vs Daily Target (8.0h)
-                target = getattr(cal, 'hours_per_day', 8.0) or 8.0
-                excess = net_hrs - target
+                # Flexible Schedule Rule: Net Worked Hours vs Net Daily Target (8.0h)
+                standard_target = 8.0
+                excess = net_hrs - standard_target
 
                 if excess >= min_ot_threshold:
                     overtime = round(excess, 2)
@@ -239,14 +239,15 @@ class HrAttendance(models.Model):
                     overtime = 0.0
                     undertime = 0.0
             else:
-                # Fixed Shift Rule: Check-In vs Shift Start & Overtime from Net Worked Hours
+                # Fixed Shift Rule: Check-In vs Shift Start & Overtime from Net Worked Hours vs 8.0h Net Target
                 sched_start = min(day_cal.mapped('hour_from'))
 
                 # Lateness (Check-In delay vs Scheduled Start)
                 late_delay = max(0.0, actual_in_hour - sched_start)
                 undertime = round(late_delay, 2) if late_delay >= min_lateness_threshold else 0.0
 
-                # Overtime: Net Worked Hours minus Daily Target (8.0h)
+                # Overtime: Net Worked Hours minus Net Daily Target (8.0h)
+                standard_target = 8.0
                 excess = net_hrs - standard_target
                 if excess >= min_ot_threshold:
                     overtime = round(excess, 2)
