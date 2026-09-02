@@ -220,44 +220,6 @@ class PosSession(models.Model):
             move.display_name,
         )
 
-    @api.depends(
-        'payment_method_ids',
-        'order_ids',
-        'cash_register_balance_start',
-        'cash_register_balance_end_real',
-        'statement_line_ids.amount',
-        'order_ids.pledge_deposit_move_id',
-        'order_ids.total_pledge_amount',
-        'order_ids.advance_pledge_line_ids.state',
-        'order_ids.advance_pledge_line_ids.return_move_id.state',
-    )
-    def _compute_cash_balance(self):
-        super()._compute_cash_balance()
-        for session in self:
-            extra = session._get_pledge_deposit_closing_summary()["cash"]
-            if session.currency_id.is_zero(extra):
-                continue
-            session.cash_register_balance_end = session.currency_id.round(
-                session.cash_register_balance_end + extra
-            )
-            session.cash_register_difference = session.currency_id.round(
-                session.cash_register_balance_end_real - session.cash_register_balance_end
-            )
-
-    def _invalidate_open_sessions_cash_balance(self):
-        """When pledge JEs change outside payment flow, refresh theoretical cash."""
-        sessions = self.env["pos.session"].sudo().search(
-            [
-                ("config_id", "in", self.mapped("config_id").ids),
-                ("company_id", "in", self.mapped("company_id").ids),
-                ("state", "in", ("opened", "closing_control")),
-            ]
-        )
-        if sessions:
-            sessions.invalidate_recordset(
-                ["cash_register_balance_end", "cash_register_difference"]
-            )
-
     def get_closing_control_data(self):
         data = super().get_closing_control_data()
         summary = self._get_pledge_deposit_closing_summary()

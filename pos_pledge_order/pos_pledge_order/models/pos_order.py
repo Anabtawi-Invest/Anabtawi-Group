@@ -617,8 +617,6 @@ class PosOrder(models.Model):
         })
         move.action_post()
         self.pledge_deposit_move_id = move.id
-        if self.session_id:
-            self.session_id._invalidate_open_sessions_cash_balance()
         _logger.info(
             "[PLEDGE] Posted pledge deposit move %s for order %s (amount=%s)",
             move.id,

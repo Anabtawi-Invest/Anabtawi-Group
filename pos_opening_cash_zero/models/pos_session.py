@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from odoo import models
+from odoo.tools import float_is_zero
 
 
 class PosSession(models.Model):
@@ -17,11 +18,14 @@ class PosSession(models.Model):
     def pos_opening_cash_zero_reset(self):
         """Called from POS UI before showing the opening control popup."""
         self.ensure_one()
-        if (
+        if not (
             self.state == "opening_control"
             and self.config_id.cash_control
             and not self.rescue
         ):
-            self.cash_register_balance_start = 0
-            self.write({})
+            return 0
+        rounding = self.currency_id.rounding
+        if float_is_zero(self.cash_register_balance_start or 0.0, precision_rounding=rounding):
+            return 0
+        self.cash_register_balance_start = 0
         return 0
