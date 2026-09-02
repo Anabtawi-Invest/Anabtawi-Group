@@ -225,7 +225,7 @@ class HrAttendance(models.Model):
             )
 
             if is_flexible:
-                # Flexible Schedule Rule: Net Worked Hours vs Daily Target
+                # Flexible Schedule Rule: Net Worked Hours vs Daily Target (8.0h)
                 target = getattr(cal, 'hours_per_day', 8.0) or 8.0
                 excess = net_hrs - target
 
