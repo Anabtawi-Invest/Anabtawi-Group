@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_branch_supply_flow_snapshot_wizard_form" model="ir.ui.view">
+        <field name="name">branch.supply.flow.snapshot.wizard.form</field>
+        <field name="model">branch.supply.flow.snapshot.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate Supply Flow Snapshot">
+                <group>
+                    <group>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                        <field name="all_branch_locations"/>
+                        <field name="location_id"
+                               invisible="all_branch_locations"
+                               required="not all_branch_locations"
+                               options="{'no_create': True}"/>
+                        <field name="replace_auto_snapshot"/>
+                    </group>
+                    <group>
+                        <field name="all_dispatch_operation_types"/>
+                        <field name="dispatch_picking_type_ids"
+                               widget="many2many_tags"
+                               invisible="all_dispatch_operation_types"
+                               required="not all_dispatch_operation_types"
+                               options="{'no_create': True}"/>
+                        <field name="all_receipt_operation_types"/>
+                        <field name="receipt_picking_type_ids"
+                               widget="many2many_tags"
+                               invisible="all_receipt_operation_types"
+                               required="not all_receipt_operation_types"
+                               options="{'no_create': True}"/>
+                        <field name="all_pos_configs"/>
+                        <field name="pos_config_ids"
+                               widget="many2many_tags"
+                               invisible="all_pos_configs"
+                               options="{'no_create': True}"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_create_snapshot"
+                            type="object"
+                            string="Generate Snapshot"
+                            class="btn-primary"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_branch_supply_flow_snapshot_wizard" model="ir.actions.act_window">
+        <field name="name">Generate Snapshot</field>
+        <field name="res_model">branch.supply.flow.snapshot.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

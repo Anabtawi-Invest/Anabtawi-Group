@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_branch_supply_flow_snapshot_line_list" model="ir.ui.view">
+        <field name="name">branch.supply.flow.snapshot.line.list</field>
+        <field name="model">branch.supply.flow.snapshot.line</field>
+        <field name="arch" type="xml">
+            <list string="Supply Flow Analysis" create="false" edit="false" delete="false">
+                <field name="snapshot_id"/>
+                <field name="snapshot_date" optional="hide"/>
+                <field name="location_name"/>
+                <field name="location_id" column_invisible="True"/>
+                <field name="product_id"/>
+                <field name="product_categ_id" optional="show"/>
+                <field name="requested_qty" sum="Total Requested"/>
+                <field name="sent_qty" sum="Total Sent"/>
+                <field name="received_qty" sum="Total Received"/>
+                <field name="sold_qty" sum="Total Sold"/>
+                <field name="variance_sent_received" sum="Total Sent - Received" optional="show"/>
+                <field name="variance_received_sold" sum="Total Received - Sold" optional="show"/>
+                <field name="fill_rate" optional="show"/>
+                <field name="transit_loss_rate" optional="show"/>
+                <field name="sell_through_rate" optional="show"/>
+                <field name="has_issue" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_branch_supply_flow_snapshot_line_pivot" model="ir.ui.view">
+        <field name="name">branch.supply.flow.snapshot.line.pivot</field>
+        <field name="model">branch.supply.flow.snapshot.line</field>
+        <field name="arch" type="xml">
+            <pivot string="Supply Flow Analysis">
+                <field name="location_id" type="row"/>
+                <field name="product_id" type="row"/>
+                <field name="requested_qty" type="measure"/>
+                <field name="sent_qty" type="measure"/>
+                <field name="received_qty" type="measure"/>
+                <field name="sold_qty" type="measure"/>
+                <field name="variance_sent_received" type="measure"/>
+                <field name="variance_received_sold" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_branch_supply_flow_snapshot_line_graph_branch" model="ir.ui.view">
+        <field name="name">branch.supply.flow.snapshot.line.graph.branch</field>
+        <field name="model">branch.supply.flow.snapshot.line</field>
+        <field name="arch" type="xml">
+            <graph string="Branch Performance" type="bar" stacked="True">
+                <field name="location_id"/>
+                <field name="received_qty" type="measure"/>
+                <field name="sold_qty" type="measure"/>
+                <field name="variance_received_sold" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_branch_supply_flow_snapshot_line_graph_funnel" model="ir.ui.view">
+        <field name="name">branch.supply.flow.snapshot.line.graph.funnel</field>
+        <field name="model">branch.supply.flow.snapshot.line</field>
+        <field name="arch" type="xml">
+            <graph string="Supply Funnel" type="bar">
+                <field name="product_categ_id"/>
+                <field name="requested_qty" type="measure"/>
+                <field name="sent_qty" type="measure"/>
+                <field name="received_qty" type="measure"/>
+                <field name="sold_qty" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_branch_supply_flow_snapshot_line_graph_issues" model="ir.ui.view">
+        <field name="name">branch.supply.flow.snapshot.line.graph.issues</field>
+        <field name="model">branch.supply.flow.snapshot.line</field>
+        <field name="arch" type="xml">
+            <graph string="Transit Loss by Branch" type="bar">
+                <field name="location_id"/>
+                <field name="variance_sent_received" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_branch_supply_flow_snapshot_line_search" model="ir.ui.view">
+        <field name="name">branch.supply.flow.snapshot.line.search</field>
+        <field name="model">branch.supply.flow.snapshot.line</field>
+        <field name="arch" type="xml">
+            <search string="Supply Flow Analysis">
+                <field name="snapshot_id"/>
+                <field name="product_id"
+                       string="Product"
+                       filter_domain="['|', '|',
+                           ('product_id.default_code', 'ilike', self),
+                           ('product_id.barcode', 'ilike', self),
+                           ('product_id.name', 'ilike', self)]"/>
+                <field name="location_id" string="Branch Location"/>
+                <field name="product_categ_id" string="Category"/>
+                <separator/>
+                <filter string="Has Issues" name="filter_has_issue" domain="[('has_issue', '=', True)]"/>
+                <filter string="Transit Loss" name="filter_transit_loss" domain="[('has_transit_loss', '=', True)]"/>
+                <filter string="Low Sell-through" name="filter_low_sell_through" domain="[('has_low_sell_through', '=', True)]"/>
+                <filter string="Unsold Stock" name="filter_unsold_stock" domain="[('has_unsold_stock', '=', True)]"/>
+                <separator/>
+                <filter string="Latest Snapshot" name="filter_latest_snapshot"
+                        domain="[('snapshot_id', '=', context.get('latest_snapshot_id', 0))]"/>
+                <separator/>
+                <group>
+                    <filter string="Snapshot" name="group_by_snapshot" context="{'group_by': 'snapshot_id'}"/>
+                    <filter string="Branch" name="group_by_location" context="{'group_by': 'location_id'}"/>
+                    <filter string="Product" name="group_by_product" context="{'group_by': 'product_id'}"/>
+                    <filter string="Category" name="group_by_category" context="{'group_by': 'product_categ_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_branch_supply_flow_dashboard" model="ir.actions.act_window">
+        <field name="name">Supply Flow Dashboard</field>
+        <field name="res_model">branch.supply.flow.snapshot.line</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="view_id" ref="view_branch_supply_flow_snapshot_line_graph_branch"/>
+        <field name="search_view_id" ref="view_branch_supply_flow_snapshot_line_search"/>
+        <field name="context">{
+            'search_default_group_by_location': 1
+        }</field>
+    </record>
+
+    <record id="action_branch_supply_flow_funnel" model="ir.actions.act_window">
+        <field name="name">Supply Funnel</field>
+        <field name="res_model">branch.supply.flow.snapshot.line</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="view_id" ref="view_branch_supply_flow_snapshot_line_graph_funnel"/>
+        <field name="search_view_id" ref="view_branch_supply_flow_snapshot_line_search"/>
+        <field name="context">{
+            'search_default_group_by_category': 1
+        }</field>
+    </record>
+
+    <record id="action_branch_supply_flow_issues" model="ir.actions.act_window">
+        <field name="name">Supply Flow Issues</field>
+        <field name="res_model">branch.supply.flow.snapshot.line</field>
+        <field name="view_mode">list,graph,pivot</field>
+        <field name="view_id" ref="view_branch_supply_flow_snapshot_line_list"/>
+        <field name="search_view_id" ref="view_branch_supply_flow_snapshot_line_search"/>
+        <field name="domain">[('has_issue', '=', True)]</field>
+        <field name="context">{
+            'search_default_group_by_location': 1,
+            'search_default_filter_has_issue': 1
+        }</field>
+    </record>
+
+    <record id="action_branch_supply_flow_transit_loss" model="ir.actions.act_window">
+        <field name="name">Transit Loss Analysis</field>
+        <field name="res_model">branch.supply.flow.snapshot.line</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="view_id" ref="view_branch_supply_flow_snapshot_line_graph_issues"/>
+        <field name="search_view_id" ref="view_branch_supply_flow_snapshot_line_search"/>
+        <field name="domain">[('has_transit_loss', '=', True)]</field>
+        <field name="context">{
+            'search_default_group_by_location': 1,
+            'search_default_filter_transit_loss': 1
+        }</field>
+    </record>
+
+</odoo>

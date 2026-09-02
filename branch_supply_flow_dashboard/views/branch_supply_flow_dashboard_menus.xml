@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="action_branch_supply_flow_dashboard_main" model="ir.actions.server">
+        <field name="name">Supply Flow Dashboard</field>
+        <field name="model_id" ref="model_branch_supply_flow_snapshot"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_main_dashboard()</field>
+    </record>
+
+    <record id="action_branch_supply_flow_funnel_main" model="ir.actions.server">
+        <field name="name">Supply Funnel</field>
+        <field name="model_id" ref="model_branch_supply_flow_snapshot"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_main_funnel()</field>
+    </record>
+
+    <record id="action_branch_supply_flow_issues_main" model="ir.actions.server">
+        <field name="name">Supply Flow Issues</field>
+        <field name="model_id" ref="model_branch_supply_flow_snapshot"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_main_issues()</field>
+    </record>
+
+    <record id="action_branch_supply_flow_transit_loss_main" model="ir.actions.server">
+        <field name="name">Transit Loss Analysis</field>
+        <field name="model_id" ref="model_branch_supply_flow_snapshot"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_main_transit_loss()</field>
+    </record>
+
+    <menuitem id="menu_branch_supply_flow_dashboard_root"
+              name="Supply Flow Dashboard"
+              parent="stock.menu_warehouse_report"
+              sequence="45"/>
+
+    <menuitem id="menu_branch_supply_flow_dashboard"
+              name="Dashboard"
+              parent="menu_branch_supply_flow_dashboard_root"
+              action="action_branch_supply_flow_dashboard_main"
+              sequence="10"/>
+
+    <menuitem id="menu_branch_supply_flow_funnel"
+              name="Supply Funnel"
+              parent="menu_branch_supply_flow_dashboard_root"
+              action="action_branch_supply_flow_funnel_main"
+              sequence="20"/>
+
+    <menuitem id="menu_branch_supply_flow_issues"
+              name="Issues &amp; Alerts"
+              parent="menu_branch_supply_flow_dashboard_root"
+              action="action_branch_supply_flow_issues_main"
+              sequence="30"/>
+
+    <menuitem id="menu_branch_supply_flow_transit_loss"
+              name="Transit Loss"
+              parent="menu_branch_supply_flow_dashboard_root"
+              action="action_branch_supply_flow_transit_loss_main"
+              sequence="40"/>
+
+    <menuitem id="menu_branch_supply_flow_snapshots"
+              name="Snapshots"
+              parent="menu_branch_supply_flow_dashboard_root"
+              action="action_branch_supply_flow_snapshots"
+              sequence="50"/>
+
+    <menuitem id="menu_branch_supply_flow_generate_snapshot"
+              name="Generate Snapshot"
+              parent="menu_branch_supply_flow_dashboard_root"
+              action="action_branch_supply_flow_snapshot_wizard"
+              sequence="60"
+              groups="stock.group_stock_manager"/>
+
+</odoo>

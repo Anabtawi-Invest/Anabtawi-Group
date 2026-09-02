@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_branch_supply_flow_snapshot_list" model="ir.ui.view">
+        <field name="name">branch.supply.flow.snapshot.list</field>
+        <field name="model">branch.supply.flow.snapshot</field>
+        <field name="arch" type="xml">
+            <list string="Supply Flow Snapshots" create="false">
+                <field name="name"/>
+                <field name="snapshot_date"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="is_auto" optional="show"/>
+                <field name="line_count"/>
+                <field name="fill_rate" widget="progressbar"/>
+                <field name="transit_loss_rate" optional="show"/>
+                <field name="sell_through_rate" widget="progressbar"/>
+                <field name="issue_line_count" optional="show"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_branch_supply_flow_snapshot_form" model="ir.ui.view">
+        <field name="name">branch.supply.flow.snapshot.form</field>
+        <field name="model">branch.supply.flow.snapshot</field>
+        <field name="arch" type="xml">
+            <form string="Supply Flow Snapshot" create="false" edit="false">
+                <header>
+                    <button name="action_open_branch_comparison"
+                            type="object"
+                            string="Branch Comparison"
+                            class="btn-primary"/>
+                    <button name="action_open_funnel"
+                            type="object"
+                            string="Supply Funnel"
+                            class="btn-secondary"/>
+                    <button name="action_open_issues"
+                            type="object"
+                            string="View Issues"
+                            class="btn-secondary"
+                            invisible="issue_line_count == 0"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_lines"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-list">
+                            <field name="line_count" widget="statinfo" string="Lines"/>
+                        </button>
+                        <button name="action_open_issues"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-exclamation-triangle"
+                                invisible="issue_line_count == 0">
+                            <field name="issue_line_count" widget="statinfo" string="Issues"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="snapshot_date"/>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="is_auto"/>
+                        </group>
+                        <group>
+                            <field name="all_branch_locations"/>
+                            <field name="location_id" invisible="all_branch_locations"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group string="Key Performance Indicators">
+                        <group>
+                            <field name="total_requested_qty"/>
+                            <field name="total_sent_qty"/>
+                            <field name="total_received_qty"/>
+                            <field name="total_sold_qty"/>
+                            <field name="total_unsold_qty"/>
+                        </group>
+                        <group>
+                            <field name="fill_rate" widget="progressbar"/>
+                            <field name="transit_loss_rate"/>
+                            <field name="sell_through_rate" widget="progressbar"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Lines" name="lines">
+                            <field name="line_ids" readonly="1">
+                                <list create="false" edit="false" delete="false">
+                                    <field name="location_name"/>
+                                    <field name="product_id"/>
+                                    <field name="requested_qty"/>
+                                    <field name="sent_qty"/>
+                                    <field name="received_qty"/>
+                                    <field name="sold_qty"/>
+                                    <field name="fill_rate" optional="show"/>
+                                    <field name="transit_loss_rate" optional="show"/>
+                                    <field name="sell_through_rate" optional="show"/>
+                                    <field name="has_issue" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_branch_supply_flow_snapshot_search" model="ir.ui.view">
+        <field name="name">branch.supply.flow.snapshot.search</field>
+        <field name="model">branch.supply.flow.snapshot</field>
+        <field name="arch" type="xml">
+            <search string="Supply Flow Snapshots">
+                <field name="name"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <separator/>
+                <filter string="Auto Generated" name="filter_auto" domain="[('is_auto', '=', True)]"/>
+                <filter string="Manual" name="filter_manual" domain="[('is_auto', '=', False)]"/>
+                <filter string="Has Issues" name="filter_has_issues" domain="[('issue_line_count', '>', 0)]"/>
+                <separator/>
+                <group>
+                    <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                    <filter string="Month" name="group_month" context="{'group_by': 'period_key'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_branch_supply_flow_snapshots" model="ir.actions.act_window">
+        <field name="name">Snapshots</field>
+        <field name="res_model">branch.supply.flow.snapshot</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_branch_supply_flow_snapshot_search"/>
+        <field name="context">{'search_default_filter_auto': 0}</field>
+    </record>
+
+</odoo>
