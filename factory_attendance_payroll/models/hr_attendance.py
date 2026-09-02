@@ -74,7 +74,6 @@ class HrAttendance(models.Model):
 
         leaves = LeaveModel.sudo().search(domain)
 
-        import pytz
         tz_name = self.env.company.resource_calendar_id.tz or self.env.user.tz or 'Asia/Amman'
         try:
             user_tz = pytz.timezone(tz_name)
@@ -196,7 +195,6 @@ class HrAttendance(models.Model):
                 attendance.daily_variance_hours = net_hrs
                 continue
 
-            standard_target = 8.0
             min_ot_threshold = 0.75  # 45 minutes
             min_lateness_threshold = 0.25  # 15 minutes
 
@@ -217,29 +215,45 @@ class HrAttendance(models.Model):
 
             dow = str(check_in_local.weekday())
             day_cal = cal.attendance_ids.filtered(lambda a: a.dayofweek == dow) if cal else False
-            if day_cal:
-                sched_start = min(day_cal.mapped('hour_from'))
-                sched_end = max(day_cal.mapped('hour_to'))
-            else:
-                sched_start = 8.0
-                sched_end = 16.5  # 4:30 PM
 
-            # 1. Lateness (Check-In delay vs Scheduled Start)
-            late_delay = max(0.0, actual_in_hour - sched_start)
-            if late_delay >= min_lateness_threshold:
-                undertime = round(late_delay, 2)
-            else:
-                undertime = 0.0
+            is_flexible = bool(
+                getattr(cal, 'flexible_hours', False) 
+                or getattr(cal, 'flexible', False) 
+                or getattr(emp, 'flexible_hours', False)
+                or not day_cal
+            )
 
-            # 2. Overtime (Check-Out stay vs Scheduled End)
-            if attendance.check_out and actual_out_hour > sched_end:
-                extra_stay = actual_out_hour - sched_end
-                if extra_stay >= min_ot_threshold:
-                    overtime = round(extra_stay, 2)
+            if is_flexible:
+                # Flexible Schedule Rule: Net Worked Hours vs Daily Target
+                target = getattr(cal, 'hours_per_day', 8.0) or 8.0
+                excess = net_hrs - target
+
+                if excess >= min_ot_threshold:
+                    overtime = round(excess, 2)
+                    undertime = 0.0
+                elif excess < -min_lateness_threshold:
+                    overtime = 0.0
+                    undertime = round(abs(excess), 2)
                 else:
                     overtime = 0.0
+                    undertime = 0.0
             else:
-                overtime = 0.0
+                # Fixed Shift Rule: Check-In vs Shift Start & Check-Out vs Shift End
+                sched_start = min(day_cal.mapped('hour_from'))
+                sched_end = max(day_cal.mapped('hour_to'))
+
+                # Lateness (Check-In delay vs Scheduled Start)
+                late_delay = max(0.0, actual_in_hour - sched_start)
+                undertime = round(late_delay, 2) if late_delay >= min_lateness_threshold else 0.0
+
+                # Overtime (Check-Out stay vs Scheduled End with overnight shift support)
+                if attendance.check_out:
+                    is_next_day = attendance.check_out.date() > attendance.check_in.date()
+                    effective_out_hour = actual_out_hour + (24.0 if is_next_day else 0.0)
+                    extra_stay = effective_out_hour - sched_end
+                    overtime = round(extra_stay, 2) if extra_stay >= min_ot_threshold else 0.0
+                else:
+                    overtime = 0.0
 
             attendance.daily_undertime_hours = undertime
             attendance.daily_overtime_hours = overtime
