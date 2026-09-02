@@ -195,6 +195,7 @@ class HrAttendance(models.Model):
                 attendance.daily_variance_hours = net_hrs
                 continue
 
+            standard_target = 8.0
             min_ot_threshold = 0.75  # 45 minutes
             min_lateness_threshold = 0.25  # 15 minutes
 
