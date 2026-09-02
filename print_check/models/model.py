@@ -5,6 +5,9 @@ from datetime import datetime
 class AccountPayment(models.Model):
     _inherit = 'account.payment'
 
+    # جعل حقل رقم الشيك متاحاً للتعديل اليدوي عند الحاجة
+    check_number = fields.Char(readonly=False, copy=False)
+
     def action_print_check(self):
         # if self.payment_method_line_id.payment_method_id.name == 'Checks':
         #     cheque_date = self.date
@@ -29,6 +32,45 @@ class AccountPayment(models.Model):
                 'default_payment_id': self.id
             }
         }
+
+
+class AccountPaymentMethodLine(models.Model):
+    _inherit = 'account.payment.method.line'
+
+    @api.constrains('check_next_number')
+    def _check_check_next_number(self):
+        """تجاوز شرط المنع للسماح بإدخال أي رقم شيك حتى لو كان أصغر من آخر رقم مستخدم"""
+        pass
+
+    def _inverse_check_next_number(self):
+        """تحديث رقم تسلسل الشيكات في قاعدة البيانات للرقم المدخل فوراً"""
+        for line in self:
+            if line.check_next_number and line.check_sequence_id:
+                try:
+                    num = int(line.check_next_number)
+                    line.check_sequence_id.sudo().write({'number_next_actual': num})
+                except (ValueError, TypeError):
+                    pass
+        if hasattr(super(), '_inverse_check_next_number'):
+            try:
+                super()._inverse_check_next_number()
+            except Exception:
+                pass
+
+
+class AccountJournal(models.Model):
+    _inherit = 'account.journal'
+
+    @api.constrains('check_next_number')
+    def _check_next_number(self):
+        """تجاوز شرط المنع على مستوى دفتر اليومية"""
+        pass
+
+    @api.constrains('check_next_number')
+    def _check_check_next_number(self):
+        """تجاوز شرط المنع الإضافي على مستوى دفتر اليومية"""
+        pass
+
 
 class PrintCheck(models.TransientModel):
     _name = "print.check"
