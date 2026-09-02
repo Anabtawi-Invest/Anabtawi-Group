@@ -1,7 +1,7 @@
 {
     "name": "Anabtawi Payrun Bulk Salary Adjustments & Partial Payments",
     "summary": "Import bulk partial salary payments and salary adjustments per Payrun via Excel upload",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "category": "Human Resources/Payroll",
     "author": "Anabtawi Group",
     "license": "LGPL-3",
