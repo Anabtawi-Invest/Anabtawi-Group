@@ -18,6 +18,11 @@
                         class="btn-secondary"
                         invisible="payment_type != 'outbound'"/>
             </xpath>
+
+            <!-- Make Check Number editable when in Draft -->
+            <xpath expr="//field[@name='check_number']" position="attributes">
+                <attribute name="readonly">state not in ['draft']</attribute>
+            </xpath>
         </field>
     </record>
 </odoo>

@@ -5,7 +5,7 @@ from datetime import datetime
 class AccountPayment(models.Model):
     _inherit = 'account.payment'
 
-    # جعل حقل رقم الشيك متاحاً للتعديل اليدوي عند الحاجة
+    # إتاحة تعديل حقل رقم الشيك يدوياً في حالة المسودة
     check_number = fields.Char(readonly=False, copy=False)
 
     def action_print_check(self):
@@ -39,18 +39,20 @@ class AccountPaymentMethodLine(models.Model):
 
     @api.constrains('check_next_number')
     def _check_check_next_number(self):
-        """تجاوز شرط المنع للسماح بإدخال أي رقم شيك حتى لو كان أصغر من آخر رقم مستخدم"""
-        pass
+        """تجاوز قيد المنع للسماح بإدخال أي رقم شيك سابق يحدده المحاسب"""
+        return
 
     def _inverse_check_next_number(self):
-        """تحديث رقم تسلسل الشيكات في قاعدة البيانات للرقم المدخل فوراً"""
+        """تحديث رقم التسلسل الفعلي في قاعدة البيانات للرقم المدخل فوراً"""
         for line in self:
-            if line.check_next_number and line.check_sequence_id:
-                try:
-                    num = int(line.check_next_number)
-                    line.check_sequence_id.sudo().write({'number_next_actual': num})
-                except (ValueError, TypeError):
-                    pass
+            if hasattr(line, 'check_next_number') and line.check_next_number:
+                seq = getattr(line, 'check_sequence_id', False)
+                if seq:
+                    try:
+                        num = int(line.check_next_number)
+                        seq.sudo().write({'number_next_actual': num})
+                    except (ValueError, TypeError):
+                        pass
         if hasattr(super(), '_inverse_check_next_number'):
             try:
                 super()._inverse_check_next_number()
@@ -64,12 +66,12 @@ class AccountJournal(models.Model):
     @api.constrains('check_next_number')
     def _check_next_number(self):
         """تجاوز شرط المنع على مستوى دفتر اليومية"""
-        pass
+        return
 
     @api.constrains('check_next_number')
     def _check_check_next_number(self):
         """تجاوز شرط المنع الإضافي على مستوى دفتر اليومية"""
-        pass
+        return
 
 
 class PrintCheck(models.TransientModel):
