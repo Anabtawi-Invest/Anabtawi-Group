@@ -295,3 +295,18 @@ class PosSession(models.Model):
             patched.append(r)
         data["non_cash_payment_methods"] = patched
         return data
+
+    def _get_pledge_account_moves(self):
+        """Journal entries for pledge deposits/returns linked to this session."""
+        self.ensure_one()
+        moves = self.env["account.move"]
+        for order in self._get_closed_orders():
+            if order.pledge_deposit_move_id:
+                moves |= order.pledge_deposit_move_id
+        for pledge_line in self._get_pledge_return_lines_for_closing():
+            if pledge_line.return_move_id:
+                moves |= pledge_line.return_move_id
+        return moves
+
+    def _get_related_account_moves(self):
+        return super()._get_related_account_moves() | self._get_pledge_account_moves()

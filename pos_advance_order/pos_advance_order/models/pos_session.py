@@ -1256,3 +1256,64 @@ class PosSession(models.Model):
             session_line.id,
             settlement_line.id,
         )
+
+    def _advance_order_ids_refunded_in_session(self):
+        """Advance order ids registered on this session via ADV_REFUND markers."""
+        self.ensure_one()
+        messages = self.env["mail.message"].sudo().search(
+            [
+                ("model", "=", "pos.session"),
+                ("res_id", "=", self.id),
+                ("body", "ilike", "ADV_REFUND:"),
+            ]
+        )
+        advance_ids = []
+        seen_markers = set()
+        for message in messages:
+            body = message.body or ""
+            for advance_id, pm_id_str, amount_str in _ADV_REFUND_MSG_RE.findall(body):
+                marker = f"{advance_id}:{pm_id_str}:{amount_str}"
+                if marker in seen_markers:
+                    continue
+                seen_markers.add(marker)
+                advance_ids.append(int(advance_id))
+        return list(set(advance_ids))
+
+    def _advance_orders_completed_in_session(self):
+        """Advance orders whose remaining payment was completed in this session."""
+        self.ensure_one()
+        advances = self.env["pos.advance.order"].sudo().browse()
+        for order in self._get_closed_orders():
+            advance = order.advance_order_id
+            if not advance or not advance.remaining_pos_order_id:
+                continue
+            if order.id != advance.remaining_pos_order_id.id:
+                continue
+            advances |= advance
+        return advances
+
+    def _get_advance_account_moves(self):
+        """Journal entries for advance deposits/refunds/completions linked to this session."""
+        self.ensure_one()
+        AdvanceOrder = self.env["pos.advance.order"].sudo()
+        moves = self.env["account.move"]
+
+        for advance in self._advance_orders_deposited_in_session():
+            moves |= advance.advance_deposit_move_id
+            moves |= advance.advance_liability_move_id
+            if advance.advance_pos_order_id:
+                moves |= advance.advance_pos_order_id.account_move
+
+        for advance in AdvanceOrder.browse(self._advance_order_ids_refunded_in_session()).exists():
+            moves |= advance.advance_refund_move_id
+            if advance.refund_advance_pos_order_id:
+                moves |= advance.refund_advance_pos_order_id.account_move
+
+        for advance in self._advance_orders_completed_in_session():
+            moves |= advance.advance_completion_settlement_move_id
+            moves |= advance.pledge_completion_settlement_move_id
+
+        return moves
+
+    def _get_related_account_moves(self):
+        return super()._get_related_account_moves() | self._get_advance_account_moves()
