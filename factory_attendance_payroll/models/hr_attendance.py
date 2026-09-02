@@ -248,13 +248,13 @@ class HrAttendance(models.Model):
 
                 # Overtime (Check-Out stay vs Scheduled End with overnight shift support)
                 if attendance.check_out:
-                    is_next_day = attendance.check_out.date() > attendance.check_in.date()
-                    effective_out_hour = actual_out_hour + (24.0 if is_next_day else 0.0)
-                    extra_stay = effective_out_hour - sched_end
-                    overtime = round(extra_stay, 2) if extra_stay >= min_ot_threshold else 0.0
+                    excess = net_hrs - standard_target
+                    if excess >= min_ot_threshold:
+                        overtime = round(excess, 2)
+                    else:
+                        overtime = 0.0
                 else:
                     overtime = 0.0
-
             attendance.daily_undertime_hours = undertime
             attendance.daily_overtime_hours = overtime
             attendance.daily_variance_hours = round(overtime - undertime, 2)
