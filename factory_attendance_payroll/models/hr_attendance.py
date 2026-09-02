@@ -1,480 +1,400 @@
 # -*- coding: utf-8 -*-
+
 from collections import defaultdict
 from datetime import datetime, time, timedelta
+import logging
 import pytz
-from odoo import models, fields, api
+
+from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
+
+EXCUSED_LEAVE_WORK_ENTRY_CODES = [
+    "GTO", "CTO", "HW", "STO", "PTO", "SIK", "ANU", "PHD", "BFV", "HIL",
+    "FWS", "DIE", "MRD", "NPO", "PID", "HAJ", "MAM", "LDO", "TRV", "MKA", "BRK", "UNP", "ARS", "RST", "RESTDAY", "RestDay", "REST_DAY",
+    "LEAVE100", "LEAVE105", "WORK110", "LEAVE110", "LEAVE120", "SICKLEAVE0",
+    "An_le", "un_paid", "REST", "RST", "RESTDAY", "RestDay", "REST_DAY",
+    "LEAVE", "SICK", "VAC", "ANNUAL", "UNPAID", "HOLIDAY", "REST_DAY", "RESTDAY", "RestDay",
+]
+
+ABSENT_WORK_ENTRY_CODES = ["ABS", "ABSENT", "A"]
 
 
-class HrAttendance(models.Model):
-    _inherit = 'hr.attendance'
+class HrEmployee(models.Model):
+    _inherit = 'hr.employee'
 
-    attendance_break_hours = fields.Float(
-        string="Lunch Break Deducted",
-        compute="_compute_factory_attendance_metrics",
-        store=True,
-        help="Break hours deducted (1.0h for Factory/Retail, 0.5h for Head Office)."
+    employee_work_station = fields.Selection([
+        ('headoffice', 'Headoffice'),
+        ('retail', 'Retail'),
+        ('factory', 'Factory')
+    ], string="Employee Work Station", default='factory', tracking=True,
+       help="Work station of the employee. Automatically sets the default lunch break duration.")
+
+    break_duration_hours = fields.Float(
+        string="Break Duration (Hours)",
+        default=1.0,
+        tracking=True,
+        help="Lunch/Break duration in hours subtracted from attendance shifts (e.g. 1.0 = 60 min, 0.75 = 45 min, 0.5 = 30 min)."
     )
 
-    net_worked_hours = fields.Float(
-        string="Net Worked Hours",
-        compute="_compute_factory_attendance_metrics",
-        store=True,
-        help="Net worked hours after lunch break deduction."
+    allow_annual_leave_lateness_deduction = fields.Boolean(
+        string="Accept Annual Deduction",
+        default=False,
+        tracking=True,
+        help="If checked, lateness hours can be deducted from the employee's Annual Leave balance. Requires uploading an approval document."
     )
 
-    daily_undertime_hours = fields.Float(
-        string="Daily Lateness (Deduction)",
-        compute="_compute_factory_attendance_metrics",
-        store=True,
-        help="Hours short of daily shift target (deducted after 15m grace period)."
+    annual_deduction_approval_document = fields.Binary(
+        string="Approval Document",
+        attachment=True,
+        help="Upload approval document confirming employee accepts Annual Leave lateness deduction."
     )
 
-    daily_overtime_hours = fields.Float(
-        string="Daily Extra Hours",
-        compute="_compute_factory_attendance_metrics",
-        store=True,
-        help="Hours worked beyond daily shift target (eligible after 45m threshold)."
+    annual_deduction_approval_filename = fields.Char(
+        string="Approval Document Filename"
     )
 
-    daily_variance_hours = fields.Float(
-        string="Daily Variance (Net)",
-        compute="_compute_factory_attendance_metrics",
-        store=True,
-        help="Net daily variance: positive for overtime, negative for lateness."
+    # Legacy view compatibility aliases
+    lunch_break_rule = fields.Selection([
+        ('factory', 'Factory / Branches (1.0h Break)'),
+        ('office', 'Head Office (0.5h Break)'),
+        ('custom', 'Custom Break Duration')
+    ], string="Lunch Break Deduction Policy", compute="_compute_legacy_lunch_break_rule", store=False)
+
+    custom_lunch_break_hours = fields.Float(
+        related="break_duration_hours",
+        string="Custom Lunch Break (Hours)",
+        store=False
     )
 
-    is_public_holiday = fields.Boolean(
-        string="Public Holiday",
-        default=False
-    )
-
-    def _get_public_holiday_dates_batch(self, min_date, max_date, calendar_id=None):
-        """
-        Ultra-fast single-query batch loader for all public holidays / global leaves
-        covering the date range [min_date, max_date] for specific calendar_id (or global leaves).
-        Returns a set of datetime.date objects.
-        """
-        holiday_dates = set()
-        if not min_date or not max_date or "resource.calendar.leaves" not in self.env:
-            return holiday_dates
-
-        dt_min = fields.Datetime.to_string(datetime.combine(min_date, time.min))
-        dt_max = fields.Datetime.to_string(datetime.combine(max_date, time.max))
-
-        domain = [
-            ("resource_id", "=", False),
-            ("date_from", "<=", dt_max),
-            ("date_to", ">=", dt_min),
-        ]
-        LeaveModel = self.env["resource.calendar.leaves"]
-        if "holiday_id" in LeaveModel._fields:
-            domain.append(("holiday_id", "=", False))
-        if calendar_id:
-            domain += ["|", ("calendar_id", "=", False), ("calendar_id", "=", calendar_id)]
-
-        leaves = LeaveModel.sudo().search(domain)
-
-        tz_name = self.env.company.resource_calendar_id.tz or self.env.user.tz or 'Asia/Amman'
-        try:
-            user_tz = pytz.timezone(tz_name)
-        except Exception:
-            user_tz = pytz.timezone('Asia/Amman')
-
-        for lve in leaves:
-            if not lve.date_from or not lve.date_to:
-                continue
-            df_utc = lve.date_from.replace(tzinfo=pytz.utc) if lve.date_from.tzinfo is None else lve.date_from
-            dt_utc = lve.date_to.replace(tzinfo=pytz.utc) if lve.date_to.tzinfo is None else lve.date_to
-            d_from = df_utc.astimezone(user_tz).date()
-            d_to = dt_utc.astimezone(user_tz).date()
-            curr = d_from
-            while curr <= d_to:
-                if min_date <= curr <= max_date:
-                    holiday_dates.add(curr)
-                curr += timedelta(days=1)
-
-        return holiday_dates
-
-    @api.depends('worked_hours', 'employee_id')
-    def _compute_factory_attendance_metrics(self):
-        if not getattr(self.env.registry, 'ready', True) or self.env.context.get('install_mode') or self.env.context.get('module_installation') or self.env.context.get('tracking_disable'):
-            self.attendance_break_hours = 0.0
-            self.net_worked_hours = 0.0
-            self.daily_undertime_hours = 0.0
-            self.daily_overtime_hours = 0.0
-            self.daily_variance_hours = 0.0
-            self.is_public_holiday = False
-            return
-
-        invalid_atts = self.filtered(lambda a: not a.check_in or not a.employee_id or not a.worked_hours)
-        if invalid_atts:
-            invalid_atts.attendance_break_hours = 0.0
-            invalid_atts.net_worked_hours = 0.0
-            invalid_atts.daily_undertime_hours = 0.0
-            invalid_atts.daily_overtime_hours = 0.0
-            invalid_atts.daily_variance_hours = 0.0
-            invalid_atts.is_public_holiday = False
-
-        valid_atts = self - invalid_atts
-        if not valid_atts:
-            return
-
-        cutoff_date = fields.Date.today() - timedelta(days=60)
-        recent_atts = valid_atts.filtered(lambda a: a.check_in.date() >= cutoff_date)
-        old_atts = valid_atts - recent_atts
-
-        if old_atts:
-            old_atts.daily_undertime_hours = 0.0
-            old_atts.daily_overtime_hours = 0.0
-            old_atts.daily_variance_hours = 0.0
-            old_atts.is_public_holiday = False
-            for attendance in old_atts:
-                raw_hrs = attendance.worked_hours or 0.0
-                b_hrs = 1.0 if raw_hrs >= 6.0 else 0.0
-                attendance.attendance_break_hours = b_hrs
-                attendance.net_worked_hours = max(0.0, raw_hrs - b_hrs)
-
-        if not recent_atts:
-            return
-
-        active_dates = [a.check_in.date() for a in recent_atts]
-        min_d, max_d = min(active_dates), max(active_dates)
-
-        holidays_by_cal = {}
-        emp_cache = {}
-
-        for attendance in recent_atts:
-            emp = attendance.employee_id
-            emp_id = emp.id
-            cal_id = emp.resource_calendar_id.id if emp.resource_calendar_id else False
-
-            if cal_id not in holidays_by_cal:
-                holidays_by_cal[cal_id] = self._get_public_holiday_dates_batch(min_d, max_d, calendar_id=cal_id)
-            public_holiday_dates = holidays_by_cal[cal_id]
-
-        for attendance in recent_atts:
-            emp = attendance.employee_id
-            emp_id = emp.id
-            if emp_id not in emp_cache:
-                emp_cache[emp_id] = {
-                    'break_hrs': emp._get_lunch_break_duration(),
-                    'is_manager': emp.is_manager_exempt(),
-                }
-            emp_info = emp_cache[emp_id]
-
-            raw_hrs = attendance.worked_hours or 0.0
-            break_hrs = emp_info['break_hrs']
-
-            if raw_hrs >= 6.0:
-                net_hrs = max(0.0, raw_hrs - break_hrs)
-                deducted_break = break_hrs
-            elif raw_hrs > 4.0:
-                deducted_break = break_hrs / 2.0
-                net_hrs = max(0.0, raw_hrs - deducted_break)
+    def _compute_legacy_lunch_break_rule(self):
+        for emp in self:
+            if emp.employee_work_station == 'headoffice':
+                emp.lunch_break_rule = 'office'
             else:
-                deducted_break = 0.0
-                net_hrs = raw_hrs
+                emp.lunch_break_rule = 'factory'
 
-            attendance.attendance_break_hours = deducted_break
-            attendance.net_worked_hours = net_hrs
+    @api.onchange('employee_work_station')
+    def _onchange_employee_work_station(self):
+        for emp in self:
+            if emp.employee_work_station == 'headoffice':
+                emp.break_duration_hours = 0.5
+            elif emp.employee_work_station in ['retail', 'factory']:
+                emp.break_duration_hours = 1.0
 
-            if emp_info['is_manager']:
-                attendance.daily_overtime_hours = 0.0
-                attendance.daily_undertime_hours = 0.0
-                attendance.daily_variance_hours = 0.0
-                attendance.is_public_holiday = False
-                continue
-
-            target_date = attendance.check_in.date()
-            is_holiday = target_date in public_holiday_dates
-            attendance.is_public_holiday = is_holiday
-
-            if is_holiday:
-                attendance.daily_overtime_hours = net_hrs
-                attendance.daily_undertime_hours = 0.0
-                attendance.daily_variance_hours = net_hrs
-                continue
-
-            min_ot_threshold = 0.75  # 45 minutes
-            min_lateness_threshold = 0.25  # 15 minutes
-
-            cal = emp.resource_calendar_id or self.env.company.resource_calendar_id
-            tz_name = emp.tz or (cal.tz if cal else False) or self.env.user.tz or 'Asia/Amman'
-            try:
-                emp_tz = pytz.timezone(tz_name)
-            except Exception:
-                emp_tz = pytz.timezone('Asia/Amman')
-
-            check_in_local = attendance.check_in.astimezone(emp_tz)
-            actual_in_hour = check_in_local.hour + (check_in_local.minute / 60.0)
-
-            actual_out_hour = 0.0
-            if attendance.check_out:
-                check_out_local = attendance.check_out.astimezone(emp_tz)
-                actual_out_hour = check_out_local.hour + (check_out_local.minute / 60.0)
-
-            dow = str(check_in_local.weekday())
-            day_cal = cal.attendance_ids.filtered(lambda a: a.dayofweek == dow) if cal else False
-
-            is_flexible = bool(
-                getattr(cal, 'flexible_hours', False) 
-                or getattr(cal, 'flexible', False) 
-                or getattr(emp, 'flexible_hours', False)
-                or not day_cal
-            )
-
-            if is_flexible:
-                # Flexible Schedule Rule: Net Worked Hours vs Daily Target
-                target = getattr(cal, 'hours_per_day', 8.0) or 8.0
-                excess = net_hrs - target
-
-                if excess >= min_ot_threshold:
-                    overtime = round(excess, 2)
-                    undertime = 0.0
-                elif excess < -min_lateness_threshold:
-                    overtime = 0.0
-                    undertime = round(abs(excess), 2)
-                else:
-                    overtime = 0.0
-                    undertime = 0.0
-            else:
-                # Fixed Shift Rule: Check-In vs Shift Start & Check-Out vs Shift End
-                sched_start = min(day_cal.mapped('hour_from'))
-                sched_end = max(day_cal.mapped('hour_to'))
-
-                # Lateness (Check-In delay vs Scheduled Start)
-                late_delay = max(0.0, actual_in_hour - sched_start)
-                undertime = round(late_delay, 2) if late_delay >= min_lateness_threshold else 0.0
-
-                # Overtime (Check-Out stay vs Scheduled End with overnight shift support)
-                if attendance.check_out:
-                    excess = net_hrs - standard_target
-                    if excess >= min_ot_threshold:
-                        overtime = round(excess, 2)
-                    else:
-                        overtime = 0.0
-                else:
-                    overtime = 0.0
-            attendance.daily_undertime_hours = undertime
-            attendance.daily_overtime_hours = overtime
-            attendance.daily_variance_hours = round(overtime - undertime, 2)
-
-    @api.depends('daily_overtime_hours', 'employee_id')
-    def _compute_overtime_hours(self):
-        """High-performance in-memory direct assignment (0 DB queries per row)."""
-        for attendance in self:
-            if attendance.employee_id and attendance.employee_id.is_manager_exempt():
-                attendance.overtime_hours = 0.0
-            else:
-                attendance.overtime_hours = attendance.daily_overtime_hours or 0.0
-
-    @api.depends('daily_overtime_hours')
-    def _compute_eligible_overtime(self):
-        """Instant eligibility flag based on Daily Extra Hours."""
-        for attendance in self:
-            attendance.eligible_overtime = bool(attendance.daily_overtime_hours >= 0.75)
-
-    def action_approve_factory_overtime(self):
+    def _get_lunch_break_duration(self):
         """
-        Explicit HR Action to validate and approve daily overtime for factory attendance.
-        Sets overtime_status to 'approved' and updates validated_overtime_hours from daily_overtime_hours.
+        Returns the lunch break duration in hours for this employee:
+        - Uses configured break_duration_hours if set (>= 0.0)
+        - Otherwise defaults based on employee_work_station (Headoffice: 0.5h, Retail/Factory: 1.0h)
         """
-        for att in self:
-            att_ot = att.daily_overtime_hours if att.daily_overtime_hours >= 0.75 else 0.0
-            if att_ot < 0.75:
-                att.sudo().write({'overtime_status': 'refused', 'validated_overtime_hours': 0.0})
-                if hasattr(att, 'linked_overtime_ids') and att.linked_overtime_ids:
-                    att.linked_overtime_ids.sudo().write({'status': 'refused', 'duration': 0.0})
-                continue
-
-            vals = {}
-            if hasattr(att, 'overtime_status'):
-                vals['overtime_status'] = 'approved'
-            if hasattr(att, 'validated_overtime_hours'):
-                vals['validated_overtime_hours'] = att_ot
-            if vals:
-                att.sudo().write(vals)
-
-            if hasattr(att, 'linked_overtime_ids') and att.linked_overtime_ids:
-                att.linked_overtime_ids.sudo().write({
-                    'status': 'approved',
-                    'duration': att_ot,
-                    'manual_duration': att_ot,
-                })
-            elif 'hr.attendance.overtime.line' in self.env:
-                att_date = att.check_in.date() if att.check_in else None
-                if att_date and att.employee_id:
-                    ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
-                        ('employee_id', '=', att.employee_id.id),
-                        ('date', '=', att_date)
-                    ])
-                    if ot_lines:
-                        ot_lines.write({
-                            'status': 'approved',
-                            'duration': att_ot,
-                            'manual_duration': att_ot,
-                        })
-                    else:
-                        self.env['hr.attendance.overtime.line'].sudo().create({
-                            'employee_id': att.employee_id.id,
-                            'date': att_date,
-                            'duration': att_ot,
-                            'manual_duration': att_ot,
-                            'status': 'approved',
-                            'compensable_as_leave': True,
-                        })
-        return True
-
-    def action_refuse_factory_overtime(self):
-        """
-        Explicit HR Action to refuse daily overtime for factory attendance.
-        Sets overtime_status to 'refused' and clears validated_overtime_hours.
-        """
-        for att in self:
-            vals = {}
-            if hasattr(att, 'overtime_status'):
-                vals['overtime_status'] = 'refused'
-            if hasattr(att, 'validated_overtime_hours'):
-                vals['validated_overtime_hours'] = 0.0
-            if vals:
-                att.sudo().write(vals)
-
-            if hasattr(att, 'linked_overtime_ids') and att.linked_overtime_ids:
-                att.linked_overtime_ids.sudo().write({'status': 'refused', 'duration': 0.0})
-            elif 'hr.attendance.overtime.line' in self.env:
-                att_date = att.check_in.date() if att.check_in else None
-                if att_date and att.employee_id:
-                    ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
-                        ('employee_id', '=', att.employee_id.id),
-                        ('date', '=', att_date)
-                    ])
-                    if ot_lines:
-                        ot_lines.write({'status': 'refused', 'duration': 0.0})
-        return True
-
-    @api.onchange('overtime_status')
-    def _onchange_overtime_status(self):
-        for att in self:
-            if att.overtime_status == 'approved':
-                att.validated_overtime_hours = att.daily_overtime_hours if att.daily_overtime_hours >= 0.75 else 0.0
-            elif att.overtime_status == 'refused':
-                att.validated_overtime_hours = 0.0
-
-    def write(self, vals):
-        if vals.get('overtime_status') == 'approved' and 'validated_overtime_hours' not in vals:
-            for att in self:
-                att_ot = att.daily_overtime_hours if att.daily_overtime_hours >= 0.75 else 0.0
-                vals['validated_overtime_hours'] = att_ot
-        elif vals.get('overtime_status') == 'refused' and 'validated_overtime_hours' not in vals:
-            vals['validated_overtime_hours'] = 0.0
-        return super(HrAttendance, self.with_context(bypass_work_entry_check=True)).write(vals)
-
-    def _check_weekly_overtime_eligibility(self):
-        """Allow approval if attendance has valid positive extra hours."""
-        factory_atts = self.filtered(lambda a: a.daily_overtime_hours >= 0.75)
-        other_atts = self - factory_atts
-        if other_atts and hasattr(super(), '_check_weekly_overtime_eligibility'):
-            try:
-                super(HrAttendance, other_atts)._check_weekly_overtime_eligibility()
-            except Exception:
-                pass
-
-    def action_approve_overtime(self):
-        """Standard Odoo action_approve_overtime override."""
-        for att in self:
-            att_ot = att.daily_overtime_hours if att.daily_overtime_hours >= 0.75 else 0.0
-            if hasattr(att, 'validated_overtime_hours'):
-                att.validated_overtime_hours = att_ot
-        if hasattr(super(), 'action_approve_overtime'):
-            try:
-                res = super().action_approve_overtime()
-            except Exception:
-                res = self.action_approve_factory_overtime()
+        self.ensure_one()
+        if self.break_duration_hours is not None and self.break_duration_hours >= 0.0:
+            return self.break_duration_hours
+        elif self.employee_work_station == 'headoffice':
+            return 0.5
         else:
-            res = self.action_approve_factory_overtime()
-        for att in self:
-            att_ot = att.daily_overtime_hours if att.daily_overtime_hours >= 0.75 else 0.0
-            if hasattr(att, 'validated_overtime_hours'):
-                att.sudo().write({
-                    'validated_overtime_hours': att_ot,
-                    'overtime_status': 'approved' if att_ot >= 0.75 else 'refused'
-                })
-        return res
+            return 1.0
 
-    def _update_overtime(self, attendance_domain=None):
+    def is_manager_exempt(self):
+        """Returns True if the employee is marked as Manager and exempt from overtime/lateness."""
+        self.ensure_one()
+        for fname in ['x_studio_manager', 'is_manager', 'x_manager']:
+            if fname in self._fields and getattr(self, fname):
+                return True
+        return False
+
+    # -------------------------------------------------------------------------
+    # ABSENT WORK ENTRY AUTOMATION & 4-DAY MONTHLY GRACE THRESHOLD ENGINE
+    # -------------------------------------------------------------------------
+
+    def generate_work_entries(self, date_start, date_stop, force=False):
+        """After a force regenerate (Reset), re-apply ABSENT for the full range with monthly 4-day threshold rule."""
+        result = super().generate_work_entries(date_start, date_stop, force=force)
+        if force:
+            employees = self if self else self.search([("active", "=", True)])
+            employees._create_absent_work_entries_for_period(date_start, date_stop)
+        return result
+
+    @api.model
+    def _cron_create_absent_work_entries(self):
+        """Daily/Monthly cron: evaluate current/past month up to yesterday and create absent work entries."""
+        today = fields.Date.context_today(self)
+        yesterday = today - timedelta(days=1)
+        first_day_of_month = yesterday.replace(day=1)
+        self.search([("active", "=", True)])._create_absent_work_entries_for_period(first_day_of_month, yesterday)
+
+    def _get_absent_work_entry_type(self):
+        absent_type = self.env.ref(
+            "factory_attendance_payroll.work_entry_type_absent",
+            raise_if_not_found=False,
+        )
+        if not absent_type:
+            absent_type = self.env["hr.work.entry.type"].sudo().search([("code", "=", "ABSENT")], limit=1)
+        if not absent_type:
+            absent_type = self.env["hr.work.entry.type"].sudo().search([("display_code", "=", "ABS")], limit=1)
+        if not absent_type:
+            absent_type = self.env["hr.work.entry.type"].sudo().create({
+                "name": "Absent",
+                "display_code": "ABS",
+                "code": "ABSENT",
+                "color": 1,
+                "is_leave": False,
+            })
+        return absent_type
+
+    def _create_absent_work_entries_for_period(self, date_from, date_to):
         """
-        Batch-optimized overtime generator: Pre-fetches all overtime lines
-        in 1 bulk query and ensures overtime lines match daily_overtime_hours.
+        Applies monthly absence evaluation for each employee across the period [date_from, date_to].
+        Uses high-performance batch pre-fetching to eliminate N+1 database queries.
         """
-        res = super()._update_overtime(attendance_domain=attendance_domain)
-        cutoff_date = fields.Date.today() - timedelta(days=60)
-        valid_atts = self.filtered(lambda a: a.employee_id and a.worked_hours and a.check_in and a.check_in.date() >= cutoff_date)
-        if not valid_atts:
-            return res
+        if not self:
+            return
+        date_from = fields.Date.to_date(date_from)
+        date_to = fields.Date.to_date(date_to)
+        if not date_from or not date_to or date_from > date_to:
+            return
 
-        emp_ids = valid_atts.mapped('employee_id').ids
-        att_dates = list(set(a.check_in.date() for a in valid_atts))
+        # Split [date_from, date_to] into monthly intervals
+        months = []
+        curr = date_from
+        while curr <= date_to:
+            next_month = curr.replace(day=28) + timedelta(days=4)
+            last_day_of_month = next_month - timedelta(days=next_month.day)
+            m_end = min(date_to, last_day_of_month)
+            months.append((curr, m_end))
+            curr = m_end + timedelta(days=1)
 
-        ot_by_key = {}
-        if 'hr.attendance.overtime' in self.env:
-            ot_recs = self.env['hr.attendance.overtime'].sudo().search([
-                ('employee_id', 'in', emp_ids),
-                ('date', 'in', att_dates)
+        emp_ids = self.ids
+        dt_start = datetime.combine(date_from, time.min)
+        dt_end = datetime.combine(date_to, time.max)
+
+        # Batch Pre-fetch 1: Public holidays in range
+        public_holiday_dates = self.env['hr.attendance']._get_public_holiday_dates_batch(date_from, date_to)
+
+        # Batch Pre-fetch 2: Attendances (emp_id, check_in_date)
+        attendances = self.env['hr.attendance'].sudo().search([
+            ('employee_id', 'in', emp_ids),
+            ('check_in', '>=', dt_start),
+            ('check_in', '<=', dt_end),
+        ])
+        checked_in_keys = set((att.employee_id.id, att.check_in.date()) for att in attendances if att.check_in)
+
+        # Batch Pre-fetch 3: Approved Leaves (emp_id, leave_date)
+        approved_leave_keys = set()
+        if "hr.leave" in self.env:
+            leaves = self.env["hr.leave"].sudo().search([
+                ("employee_id", "in", emp_ids),
+                ("state", "in", ["validate", "validate1"]),
+                ("date_from", "<=", fields.Datetime.to_string(dt_end)),
+                ("date_to", ">=", fields.Datetime.to_string(dt_start)),
+                "!", ("name", "ilike", "Lateness Settlement"),
             ])
-            ot_by_key = {(r.employee_id.id, r.date): r for r in ot_recs}
+            for lve in leaves:
+                d_curr = lve.date_from.date()
+                d_last = lve.date_to.date()
+                while d_curr <= d_last:
+                    if date_from <= d_curr <= date_to:
+                        approved_leave_keys.add((lve.employee_id.id, d_curr))
+                    d_curr += timedelta(days=1)
 
-        ot_lines_by_key = {}
-        if 'hr.attendance.overtime.line' in self.env:
-            ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
-                ('employee_id', 'in', emp_ids),
-                ('date', 'in', att_dates)
-            ])
-            ot_lines_by_key = {(l.employee_id.id, l.date): l for l in ot_lines}
+        # Batch Pre-fetch 4: Leave Work Entries
+        work_entries = self.env["hr.work.entry"].sudo().search([
+            ("employee_id", "in", emp_ids),
+            ("date", ">=", date_from),
+            ("date", "<=", date_to),
+            ("state", "!=", "cancelled"),
+        ])
+        for we in work_entries:
+            type_obj = we.work_entry_type_id
+            if not type_obj:
+                continue
+            code = (type_obj.code or "").strip().upper()
+            display_code = (getattr(type_obj, "display_code", False) or "").strip().upper()
+            name = (type_obj.name or "").strip().upper()
+            if type_obj.is_leave or code in EXCUSED_LEAVE_WORK_ENTRY_CODES or display_code in EXCUSED_LEAVE_WORK_ENTRY_CODES or \
+               any(c in code or c in display_code or c in name for c in ["RST", "RESTDAY", "REST_DAY"]):
+                we_date = we.date
+                if isinstance(we_date, datetime):
+                    we_date = we_date.date()
+                if we_date:
+                    approved_leave_keys.add((we.employee_id.id, we_date))
 
-        to_zero_ot = self.env['hr.attendance.overtime'] if 'hr.attendance.overtime' in self.env else False
-        to_zero_lines = self.env['hr.attendance.overtime.line'] if 'hr.attendance.overtime.line' in self.env else False
-        excess_writes = defaultdict(list)
+        absent_type = self._get_absent_work_entry_type()
+        yesterday = fields.Date.context_today(self) - timedelta(days=1)
 
-        for att in valid_atts:
+        for m_from, m_to in months:
+            eval_to = min(m_to, yesterday)
+            if m_from > eval_to:
+                continue
+
+            for employee in self:
+                if employee.is_manager_exempt():
+                    continue
+
+                candidate_unpunched_days = []
+                current = m_from
+                while current <= eval_to:
+                    emp_key = (employee.id, current)
+
+                    # Public Holiday -> No absence
+                    if current in public_holiday_dates:
+                        current += timedelta(days=1)
+                        continue
+
+                    # Has check-in -> No absence
+                    if emp_key in checked_in_keys:
+                        current += timedelta(days=1)
+                        continue
+
+                    # Has approved leave / time off -> No absence
+                    if emp_key in approved_leave_keys:
+                        current += timedelta(days=1)
+                        continue
+
+                    # Expected hours (standard 8h)
+                    expected_hours = employee._get_expected_hours_on_day(current)
+                    if expected_hours <= 0:
+                        current += timedelta(days=1)
+                        continue
+
+                    candidate_unpunched_days.append((current, expected_hours))
+                    current += timedelta(days=1)
+
+                # 4-Day Monthly Grace Threshold Rule:
+                # First 4 unpunched days in month forgiven; 5th+ day receives ABSENT entry
+                allowed_grace_days = 4
+                forgiven_days = [d[0] for d in candidate_unpunched_days[:allowed_grace_days]]
+                if forgiven_days:
+                    forgiven_we = self.env["hr.work.entry"].sudo().search([
+                        ("employee_id", "=", employee.id),
+                        ("date", "in", forgiven_days),
+                        ("work_entry_type_id", "=", absent_type.id),
+                        ("state", "!=", "validated"),
+                    ])
+                    if forgiven_we:
+                        forgiven_we.unlink()
+
+                excess_absent_days = candidate_unpunched_days[allowed_grace_days:]
+                for target_date, exp_hours in excess_absent_days:
+                    employee._apply_absence_for_day(target_date, exp_hours, absent_type)
+
+    def _apply_absence_for_day(self, target_date, duration, absent_type):
+        self.ensure_one()
+        dur = min(round(duration, 2), 24.0)
+        if dur <= 0.01:
+            return
+
+        work_entry_model = self.env["hr.work.entry"].sudo()
+        existing_work_entries = work_entry_model.search([
+            ("employee_id", "=", self.id),
+            ("date", "=", target_date),
+            ("state", "!=", "cancelled"),
+            ("work_entry_type_id.is_leave", "=", False),
+        ])
+
+        if existing_work_entries:
+            editable_work_entries = existing_work_entries.filtered(lambda we: we.state != "validated")
+            if editable_work_entries:
+                update_vals = {"work_entry_type_id": absent_type.id, "duration": dur}
+                if "date_start" in work_entry_model._fields:
+                    update_vals["date_start"] = datetime.combine(target_date, time(8, 0, 0))
+                if "date_stop" in work_entry_model._fields:
+                    update_vals["date_stop"] = datetime.combine(target_date, time(8, 0, 0)) + timedelta(hours=dur)
+                editable_work_entries.write(update_vals)
+            return
+
+        if work_entry_model.search_count([
+            ("employee_id", "=", self.id),
+            ("date", "=", target_date),
+            ("state", "!=", "cancelled"),
+            ("work_entry_type_id", "=", absent_type.id),
+        ]):
+            return
+
+        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
+        if not version:
+            return
+
+        we_vals = {
+            "employee_id": self.id,
+            "version_id": version.id,
+            "date": target_date,
+            "duration": dur,
+            "work_entry_type_id": absent_type.id,
+            "company_id": self.company_id.id,
+        }
+        if "date_start" in work_entry_model._fields:
+            we_vals["date_start"] = datetime.combine(target_date, time(8, 0, 0))
+        if "date_stop" in work_entry_model._fields:
+            we_vals["date_stop"] = datetime.combine(target_date, time(8, 0, 0)) + timedelta(hours=dur)
+        if "name" in work_entry_model._fields:
+            we_vals["name"] = f"Absent: {self.name} - {target_date}"
+
+        work_entry_model.create(we_vals)
+
+    def _get_day_utc_bounds(self, target_date):
+        """Returns UTC bounds (start, next_day_start) for target_date according to employee tz."""
+        self.ensure_one()
+        tz_name = self.tz or self.company_id.tz or "UTC"
+        try:
+            employee_tz = pytz.timezone(tz_name)
+        except Exception:
+            employee_tz = pytz.UTC
+        day_start_local = employee_tz.localize(datetime.combine(target_date, time.min))
+        next_day_start_local = day_start_local + timedelta(days=1)
+        day_start_utc = day_start_local.astimezone(pytz.UTC).replace(tzinfo=None)
+        next_day_start_utc = next_day_start_local.astimezone(pytz.UTC).replace(tzinfo=None)
+        return day_start_utc, next_day_start_utc, employee_tz
+
+    def _get_versions_with_contract_overlap_with_period(self, date_from, date_to):
+        """Returns contract versions covering the specified period for all employees in self."""
+        if hasattr(super(), '_get_versions_with_contract_overlap_with_period'):
             try:
-                raw_hrs = att.worked_hours
-                break_hrs = att.employee_id._get_lunch_break_duration()
-
-                if raw_hrs >= 6.0:
-                    net_hrs = max(0.0, raw_hrs - break_hrs)
-                elif raw_hrs > 4.0:
-                    net_hrs = max(0.0, raw_hrs - (break_hrs / 2.0))
-                else:
-                    net_hrs = raw_hrs
-
-                target_date = att.check_in.date() if att.check_in else False
-                expected_hrs = 8.0
-                standard_target = expected_hrs if expected_hrs > 0 else 8.0
-                excess = net_hrs - standard_target
-                min_ot_threshold = 0.75
-
-                att_date = att.check_in.date()
-                key = (att.employee_id.id, att_date)
-
-                ot_rec = ot_by_key.get(key)
-                ot_line = ot_lines_by_key.get(key)
-
-                if excess < min_ot_threshold:
-                    if ot_rec:
-                        to_zero_ot |= ot_rec
-                    if ot_line:
-                        to_zero_lines |= ot_line
-                else:
-                    if ot_rec:
-                        excess_writes[excess].append(ot_rec.id)
+                return super()._get_versions_with_contract_overlap_with_period(date_from, date_to)
             except Exception:
                 pass
+        if not self:
+            return self.env['hr.contract'] if 'hr.contract' in self.env else self.env['hr.employee']
+        if "hr.contract" in self.env:
+            domain = [
+                ("employee_id", "in", self.ids),
+                ("state", "in", ["open", "close"]),
+                ("date_start", "<=", date_to),
+                "|",
+                ("date_end", "=", False),
+                ("date_end", ">=", date_from),
+            ]
+            return self.env["hr.contract"].sudo().search(domain, order="date_start desc")
+        return self.env["hr.employee"]
 
-        if to_zero_ot:
-            to_zero_ot.sudo().write({'duration': 0.0})
-        if to_zero_lines:
-            to_zero_lines.sudo().write({'duration': 0.0, 'manual_duration': 0.0})
-        if 'hr.attendance.overtime' in self.env:
-            for exc_val, rec_ids in excess_writes.items():
-                self.env['hr.attendance.overtime'].browse(rec_ids).sudo().write({'duration': exc_val})
-        return res
+    def _get_work_entry_source_on_day(self, target_date):
+        self.ensure_one()
+        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
+        if not version:
+            return "attendance"
+        return (getattr(version, 'work_entry_source', False) or "attendance").strip()
+
+    def _get_expected_hours_on_day(self, target_date):
+        """Return expected net work hours based on contract work entry source (planning vs calendar vs attendance)."""
+        self.ensure_one()
+        source = self._get_work_entry_source_on_day(target_date)
+        if source == "planning":
+            return self._get_planning_hours_on_day(target_date)
+        elif source == "calendar" and self.resource_calendar_id:
+            return 8.0
+        return 8.0
+
+    def _get_planning_hours_on_day(self, target_date):
+        """Get total published planning shift hours on target_date if planning module is installed."""
+        self.ensure_one()
+        if "planning.slot" not in self.env:
+            return 0.0
+        day_start_utc, next_day_start_utc, _employee_tz = self._get_day_utc_bounds(target_date)
+        slots = self.env["planning.slot"].sudo().search([
+            ("employee_id", "=", self.id),
+            ("state", "=", "published"),
+            ("start_datetime", "<", fields.Datetime.to_string(next_day_start_utc)),
+            ("end_datetime", ">", fields.Datetime.to_string(day_start_utc)),
+        ])
+        return sum(slot.allocated_hours for slot in slots)
