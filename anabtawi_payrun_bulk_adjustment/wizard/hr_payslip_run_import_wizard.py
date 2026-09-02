@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime, date
 import io
 import logging
 
@@ -19,8 +20,26 @@ class HrPayslipRunImportWizard(models.TransientModel):
 
     payrun_id = fields.Many2one('hr.payslip.run', string="Payrun", required=False, ondelete='cascade')
     adjustment_type = fields.Char(string="Default Adjustment Type", help="Optional default type to pre-fill in exported Excel template (e.g. Partial Salary Payment, Loan, Bonus).")
+    adjustment_date = fields.Date(
+        string="Adjustment Date", 
+        default=lambda self: self._default_adjustment_date(), 
+        help="Date assigned to created salary adjustments (defaults to Payrun start date or current date, can be overridden per row in Excel)."
+    )
     excel_file = fields.Binary(string="Excel File", help="Upload the completed salary adjustment Excel file.")
     file_name = fields.Char(string="File Name")
+
+    def _default_adjustment_date(self):
+        payrun_id = self._context.get('default_payrun_id')
+        if payrun_id:
+            payrun = self.env['hr.payslip.run'].browse(payrun_id)
+            if payrun.date_start:
+                return payrun.date_start
+        return fields.Date.today()
+
+    @api.onchange('payrun_id')
+    def _onchange_payrun_id(self):
+        if self.payrun_id and self.payrun_id.date_start:
+            self.adjustment_date = self.payrun_id.date_start
 
     def _get_emp_code(self, emp):
         """Returns the primary employee code (employee_number)."""
@@ -109,6 +128,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
             "Actual Salary", 
             "Adjustment Type", 
             "Adjustment Amount", 
+            "Date",
             "Notes"
         ]
 
@@ -121,6 +141,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
             cell.font = header_font
 
         default_type = self.adjustment_type.strip() if self.adjustment_type else ""
+        default_date_val = str(self.adjustment_date or (self.payrun_id.date_start if self.payrun_id else fields.Date.today()))
         slips = self._get_target_payslips().sorted(key=lambda s: s.employee_id.name or '')
         if not slips:
             active_emp_ids = self._context.get('active_ids', [])
@@ -142,6 +163,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
                     round(wage, 3), 
                     default_type, 
                     0.0, 
+                    default_date_val,
                     ""
                 ])
         else:
@@ -149,12 +171,14 @@ class HrPayslipRunImportWizard(models.TransientModel):
                 emp = slip.employee_id
                 emp_code = self._get_emp_code(emp)
                 actual_salary = self._get_slip_actual_salary(slip)
+                slip_date = str(slip.date_from or self.adjustment_date or default_date_val)
                 ws.append([
                     emp_code, 
                     emp.name, 
                     round(actual_salary, 3), 
                     default_type, 
                     0.0, 
+                    slip_date,
                     ""
                 ])
 
@@ -163,7 +187,8 @@ class HrPayslipRunImportWizard(models.TransientModel):
         ws.column_dimensions['C'].width = 18
         ws.column_dimensions['D'].width = 26
         ws.column_dimensions['E'].width = 22
-        ws.column_dimensions['F'].width = 30
+        ws.column_dimensions['F'].width = 16
+        ws.column_dimensions['G'].width = 30
 
         for row in range(2, ws.max_row + 1):
             ws.cell(row=row, column=3).number_format = '#,##0.000'
@@ -340,9 +365,9 @@ class HrPayslipRunImportWizard(models.TransientModel):
         except Exception:
             return False
 
-    def _create_employee_salary_adjustment(self, emp, type_str, amount, note_text):
+    def _create_employee_salary_adjustment(self, emp, type_str, amount, note_text, adj_date=None):
         """Creates or updates a Salary Adjustment / Attachment record under the Employee Profile."""
-        today = fields.Date.today()
+        target_date = adj_date or self.adjustment_date or (self.payrun_id.date_start if self.payrun_id else None) or fields.Date.today()
         created_or_updated = False
         errors = []
         clean_note = (note_text or type_str or _("Salary partial payment")).strip()
@@ -374,9 +399,9 @@ class HrPayslipRunImportWizard(models.TransientModel):
                         vals['amount'] = amount
 
                     if 'date_start' in fields_dict:
-                        vals['date_start'] = today
+                        vals['date_start'] = target_date
                     elif 'date' in fields_dict:
-                        vals['date'] = today
+                        vals['date'] = target_date
 
                     if 'company_id' in fields_dict:
                         vals['company_id'] = emp.company_id.id if emp.company_id else self.env.company.id
@@ -446,9 +471,9 @@ class HrPayslipRunImportWizard(models.TransientModel):
                             vals['name'] = clean_note
 
                         if 'date_start' in adj_fields:
-                            vals['date_start'] = today
+                            vals['date_start'] = target_date
                         elif 'date' in adj_fields:
-                            vals['date'] = today
+                            vals['date'] = target_date
 
                         if 'company_id' in adj_fields:
                             vals['company_id'] = emp.company_id.id if emp.company_id else self.env.company.id
@@ -495,6 +520,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
         name_col_idx = None
         type_col_idx = None
         amount_col_idx = None
+        date_col_idx = None
         notes_col_idx = None
 
         for idx, col_name in enumerate(header_row):
@@ -510,6 +536,9 @@ class HrPayslipRunImportWizard(models.TransientModel):
             # Adjustment Type
             elif any(k in c_lower for k in ['adjustment type', 'type', 'salary adjustment type', 'نوع', 'نوع الحركة', 'نوع التعديل', 'نوع الخصم']):
                 type_col_idx = idx
+            # Date
+            elif any(k in c_lower for k in ['date', 'تاريخ', 'start date', 'date start', 'تاريخ الحركة', 'تاريخ الخصم', 'تاريخ السلفة']):
+                date_col_idx = idx
             # Notes / Description
             elif any(k in c_lower for k in ['note', 'notes', 'description', 'ملاحظات', 'بيان']):
                 notes_col_idx = idx
@@ -526,14 +555,30 @@ class HrPayslipRunImportWizard(models.TransientModel):
         if name_col_idx is None:
             name_col_idx = 1 if len(header_row) > 1 else None
 
-        # 6-column format vs 5-column format
-        if len(header_row) >= 6:
+        # 7-column format (Code, Name, Actual, Type, Amount, Date, Notes)
+        if len(header_row) >= 7:
             if type_col_idx is None:
                 type_col_idx = 3
             if amount_col_idx is None:
                 amount_col_idx = 4
+            if date_col_idx is None:
+                date_col_idx = 5
             if notes_col_idx is None:
+                notes_col_idx = 6
+        elif len(header_row) == 6:
+            if type_col_idx is None:
+                type_col_idx = 3
+            if amount_col_idx is None:
+                amount_col_idx = 4
+            if notes_col_idx is None and date_col_idx is None:
                 notes_col_idx = 5
+        elif len(header_row) == 5:
+            if type_col_idx is None:
+                type_col_idx = 2
+            if amount_col_idx is None:
+                amount_col_idx = 3
+            if notes_col_idx is None and date_col_idx is None:
+                notes_col_idx = 4
         else:
             if amount_col_idx is None:
                 amount_col_idx = 3 if len(header_row) > 3 else 2
@@ -584,7 +629,7 @@ class HrPayslipRunImportWizard(models.TransientModel):
                 missing_codes.append(f"Row {row_idx}: '{display_label}'")
                 continue
 
-            # Parse Type, Amount, and Notes
+            # Parse Type, Amount, Notes, and Date
             raw_type = row[type_col_idx] if (type_col_idx is not None and type_col_idx < len(row)) else ""
             type_str = str(raw_type).strip() if raw_type is not None else ""
 
@@ -603,8 +648,26 @@ class HrPayslipRunImportWizard(models.TransientModel):
             raw_notes = row[notes_col_idx] if (notes_col_idx is not None and notes_col_idx < len(row)) else ""
             note_str = str(raw_notes).strip() if raw_notes is not None else ""
 
+            # Parse Date
+            row_date = None
+            if date_col_idx is not None and date_col_idx < len(row):
+                raw_date = row[date_col_idx]
+                if raw_date is not None and str(raw_date).strip():
+                    if isinstance(raw_date, datetime):
+                        row_date = raw_date.date()
+                    elif isinstance(raw_date, date):
+                        row_date = raw_date
+                    elif isinstance(raw_date, str):
+                        clean_d = raw_date.strip()
+                        for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%Y/%m/%d', '%Y.%m.%d', '%d.%m.%Y'):
+                            try:
+                                row_date = datetime.strptime(clean_d, fmt).date()
+                                break
+                            except ValueError:
+                                pass
+
             if adj_amount > 0.0:
-                success, errors = self._create_employee_salary_adjustment(emp, type_str, adj_amount, note_str)
+                success, errors = self._create_employee_salary_adjustment(emp, type_str, adj_amount, note_str, adj_date=row_date)
                 if success:
                     updated_count += 1
                     total_amount += adj_amount

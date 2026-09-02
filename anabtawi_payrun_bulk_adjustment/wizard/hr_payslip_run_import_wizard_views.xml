@@ -20,6 +20,7 @@
                         <group string="1. Template Export" invisible="not payrun_id">
                             <field name="payrun_id" readonly="1"/>
                             <field name="adjustment_type" placeholder="e.g. Partial Salary Payment, Loan, Bonus"/>
+                            <field name="adjustment_date"/>
                             <button name="action_export_template" 
                                     string="Download Excel Template" 
                                     type="object" 
@@ -27,6 +28,7 @@
                                     icon="fa-download"/>
                         </group>
                         <group string="Upload Excel File">
+                            <field name="adjustment_date" invisible="payrun_id"/>
                             <field name="excel_file" filename="file_name"/>
                             <field name="file_name" invisible="1"/>
                         </group>
