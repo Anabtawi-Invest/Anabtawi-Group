@@ -238,20 +238,22 @@ patch(ControlButtons.prototype, {
                 }
             );
 
-            const refundCount = result?.count || (result?.refund_order_name ? 1 : 0);
             const pledgeCount = selection.pledge_ids.length;
-            if (refundCount > 1) {
+            const batchCount = result?.count || (result?.return_move_name ? 1 : 0);
+            if (batchCount > 1) {
                 this.notification.add(
                     _t(
-                        "%s pledge(s) returned in %s refund order(s).",
-                        pledgeCount,
-                        refundCount
+                        "%s pledge(s) returned. Reversal entries created.",
+                        pledgeCount
                     ),
                     { type: "success" }
                 );
             } else {
                 this.notification.add(
-                    _t("%s pledge(s) returned successfully.", pledgeCount),
+                    _t(
+                        "%s pledge(s) returned successfully. Reversal entry created.",
+                        pledgeCount
+                    ),
                     { type: "success" }
                 );
             }
