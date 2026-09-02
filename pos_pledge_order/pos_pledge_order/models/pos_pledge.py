@@ -181,11 +181,6 @@ class PosPledge(models.Model):
                 "return_date": fields.Datetime.now(),
                 "return_move_id": reverse_moves[:1].id,
             })
-            po = pledge.pos_order_id
-            if po and po.session_id and po.session_id.state in ("opened", "closing_control"):
-                po.session_id.invalidate_recordset(
-                    ["cash_register_balance_end", "cash_register_difference"]
-                )
         return True
 
     def action_link_payments(self):

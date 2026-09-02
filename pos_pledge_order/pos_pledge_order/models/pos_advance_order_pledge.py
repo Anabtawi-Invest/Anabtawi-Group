@@ -194,22 +194,18 @@ class PosAdvanceOrderPledgeReturn(models.Model):
             if not sess and collection_order.session_id.state in ("opened", "closing_control"):
                 sess = collection_order.session_id
 
-            related_lines.write(
-                {
-                    "state": "returned",
-                    "return_date": fields.Datetime.now(),
-                    "return_move_id": reverse_move.id,
-                    "return_payment_method_id": return_pm.id,
-                    "pledge_move_id": move.id,
-                    "pos_order_id": collection_order.id,
-                    "return_pos_order_id": False,
-                }
-            )
+            write_vals = {
+                "state": "returned",
+                "return_date": fields.Datetime.now(),
+                "return_move_id": reverse_move.id,
+                "return_payment_method_id": return_pm.id,
+                "pledge_move_id": move.id,
+                "pos_order_id": collection_order.id,
+                "return_pos_order_id": False,
+            }
             if sess:
-                related_lines.write({"return_pos_session_id": sess.id})
-                sess.invalidate_recordset(
-                    ["cash_register_balance_end", "cash_register_difference"]
-                )
+                write_vals["return_pos_session_id"] = sess.id
+            related_lines.write(write_vals)
 
             amount = sum(abs(line.pledge_subtotal or 0.0) for line in related_lines)
             results.append(
