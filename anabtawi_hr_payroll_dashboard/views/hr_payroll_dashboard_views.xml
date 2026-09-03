@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Client Action for Executive Interactive Dashboard -->
+    <record id="action_hr_payroll_dashboard" model="ir.actions.client">
+        <field name="name">HR &amp; Payroll Executive Dashboard</field>
+        <field name="tag">hr_payroll_dashboard_main</field>
+    </record>
+
+    <!-- Views for hr.payroll.unified.report -->
+    <record id="view_hr_payroll_unified_report_pivot" model="ir.ui.view">
+        <field name="name">hr.payroll.unified.report.pivot</field>
+        <field name="model">hr.payroll.unified.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Unified Payroll Analysis" sample="1">
+                <field name="department_id" type="row"/>
+                <field name="date_to" interval="month" type="col"/>
+                <field name="net_salary" type="measure"/>
+                <field name="gross_salary" type="measure"/>
+                <field name="basic_salary" type="measure"/>
+                <field name="allowance_amount" type="measure"/>
+                <field name="overtime_amount" type="measure"/>
+                <field name="overtime_hours" type="measure"/>
+                <field name="lateness_hours" type="measure"/>
+                <field name="deduction_amount" type="measure"/>
+                <field name="social_security_amount" type="measure"/>
+                <field name="tax_amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_hr_payroll_unified_report_graph" model="ir.ui.view">
+        <field name="name">hr.payroll.unified.report.graph</field>
+        <field name="model">hr.payroll.unified.report</field>
+        <field name="arch" type="xml">
+            <graph string="Unified Payroll Analysis" type="bar" sample="1">
+                <field name="department_id"/>
+                <field name="net_salary" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_hr_payroll_unified_report_list" model="ir.ui.view">
+        <field name="name">hr.payroll.unified.report.list</field>
+        <field name="model">hr.payroll.unified.report</field>
+        <field name="arch" type="xml">
+            <list string="Unified Payroll Operations" create="false" delete="false">
+                <header>
+                    <button name="action_export_excel" string="Export Excel Package (.xlsx)" type="object" class="btn-success" icon="fa-file-excel-o"/>
+                </header>
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="department_id"/>
+                <field name="payslip_run_id"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="basic_salary" sum="Total Basic"/>
+                <field name="allowance_amount" sum="Total Allowances"/>
+                <field name="overtime_amount" sum="Total Overtime" optional="show"/>
+                <field name="overtime_hours" sum="Total OT Hours" optional="show"/>
+                <field name="lateness_hours" sum="Total Late Hours" optional="show"/>
+                <field name="gross_salary" sum="Total Gross"/>
+                <field name="deduction_amount" sum="Total Deductions"/>
+                <field name="social_security_amount" sum="Total Social Security" optional="show"/>
+                <field name="tax_amount" sum="Total Tax" optional="show"/>
+                <field name="net_salary" sum="Total Net"/>
+                <field name="state" widget="badge"/>
+                <button name="action_open_payslip" string="Open Slip" type="object" icon="fa-arrow-circle-right" invisible="not payslip_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hr_payroll_unified_report_search" model="ir.ui.view">
+        <field name="name">hr.payroll.unified.report.search</field>
+        <field name="model">hr.payroll.unified.report</field>
+        <field name="arch" type="xml">
+            <search string="Search Payroll Operations">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="department_id"/>
+                <field name="payslip_run_id"/>
+                <field name="company_id"/>
+                <filter string="Draft" name="state_draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Done" name="state_done" domain="[('state', '=', 'done')]"/>
+                <filter string="Paid" name="state_paid" domain="[('state', '=', 'paid')]"/>
+                <separator/>
+                <filter string="Department" name="group_department" context="{'group_by': 'department_id'}"/>
+                <filter string="Payrun Batch" name="group_batch" context="{'group_by': 'payslip_run_id'}"/>
+                <filter string="Company" name="group_company" context="{'group_by': 'company_id'}"/>
+                <filter string="Month" name="group_date" context="{'group_by': 'date_to:month'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_hr_payroll_unified_report" model="ir.actions.act_window">
+        <field name="name">Unified Payroll Analysis</field>
+        <field name="res_model">hr.payroll.unified.report</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="context">{'search_default_group_department': 1}</field>
+    </record>
+
+    <!-- Top Menu Items directly inside Payroll -> Reporting -->
+    <menuitem id="menu_hr_payroll_dashboard_root"
+              name="Executive HR &amp; Payroll Dashboard"
+              parent="hr_payroll.menu_hr_payroll_report"
+              action="action_hr_payroll_dashboard"
+              groups="anabtawi_hr_payroll_dashboard.group_hr_payroll_dashboard_user"
+              sequence="1"/>
+
+    <menuitem id="menu_hr_payroll_unified_report_item"
+              name="Unified Payroll &amp; OT Analysis"
+              parent="hr_payroll.menu_hr_payroll_report"
+              action="action_hr_payroll_unified_report"
+              groups="anabtawi_hr_payroll_dashboard.group_hr_payroll_dashboard_user"
+              sequence="2"/>
+
+    <menuitem id="menu_hr_payroll_excel_export_item"
+              name="Export Payroll &amp; Bank Excel Packages"
+              parent="hr_payroll.menu_hr_payroll_report"
+              action="action_hr_payroll_report_wizard"
+              groups="anabtawi_hr_payroll_dashboard.group_hr_payroll_dashboard_user"
+              sequence="3"/>
+</odoo>
