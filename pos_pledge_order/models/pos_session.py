@@ -220,6 +220,32 @@ class PosSession(models.Model):
             move.display_name,
         )
 
+    @api.depends(
+        "payment_method_ids",
+        "order_ids",
+        "cash_register_balance_start",
+        "cash_register_balance_end_real",
+        "statement_line_ids.amount",
+        "order_ids.pledge_deposit_move_id",
+        "order_ids.total_pledge_amount",
+        "order_ids.advance_pledge_line_ids.state",
+        "order_ids.advance_pledge_line_ids.return_move_id",
+        "order_ids.advance_pledge_line_ids.return_pos_session_id",
+    )
+    def _compute_cash_balance(self):
+        """Include pledge deposits/returns so closing theoretical cash matches the drawer."""
+        super()._compute_cash_balance()
+        for session in self:
+            extra = session._get_pledge_deposit_closing_summary()["cash"]
+            if session.currency_id.is_zero(extra):
+                continue
+            session.cash_register_balance_end = session.currency_id.round(
+                session.cash_register_balance_end + extra
+            )
+            session.cash_register_difference = session.currency_id.round(
+                session.cash_register_balance_end_real - session.cash_register_balance_end
+            )
+
     def get_closing_control_data(self):
         data = super().get_closing_control_data()
         summary = self._get_pledge_deposit_closing_summary()

@@ -5,7 +5,7 @@ import logging
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
-from odoo.tools import float_compare, float_is_zero
+from odoo.tools import float_is_zero
 
 _logger = logging.getLogger(__name__)
 
@@ -104,8 +104,121 @@ class PosAdvanceOrderPledgeReturn(models.Model):
         if vals:
             self.sudo().write(vals)
 
+    @api.model
+    def _get_pledge_return_liability_account(self, deposit_move, collection_order, return_config):
+        """Liability account to clear (same as deposit credit), never the cash box."""
+        if deposit_move:
+            credit_lines = deposit_move.line_ids.filtered(lambda l: l.credit > 0)
+            if credit_lines:
+                return credit_lines[:1].account_id
+        for config in (
+            collection_order.config_id if collection_order else False,
+            return_config,
+        ):
+            if config and config.pos_pledge_liability_account_id:
+                return config.pos_pledge_liability_account_id
+        raise UserError(
+            _("Please set 'Pledge Liability Account' on the POS configuration first.")
+        )
+
+    @api.model
+    def _get_pledge_return_liquidity_account(self, payment_method):
+        """Cash/bank account of the POS payment method used for the payout (current drawer)."""
+        journal = payment_method.journal_id
+        if not journal:
+            raise UserError(
+                _("Payment method %s has no journal; cannot post pledge return.")
+                % payment_method.display_name
+            )
+        outbound = journal.outbound_payment_method_line_ids.filtered(
+            lambda l: l.payment_account_id
+        )[:1]
+        if outbound:
+            return outbound.payment_account_id, journal
+        inbound = journal.inbound_payment_method_line_ids.filtered(
+            lambda l: l.payment_account_id
+        )[:1]
+        if inbound:
+            return inbound.payment_account_id, journal
+        if journal.default_account_id:
+            return journal.default_account_id, journal
+        raise UserError(
+            _(
+                "Configure a payment account on journal '%s' so pledge returns can be posted."
+            )
+            % journal.display_name
+        )
+
+    @api.model
+    def _create_pledge_return_move(
+        self,
+        collection_order,
+        deposit_move,
+        return_pm,
+        amount,
+        partner,
+        return_config=False,
+    ):
+        """Post Dr liability / Cr current-session liquidity (not a blind reverse of deposit)."""
+        currency = (
+            collection_order.currency_id
+            if collection_order and collection_order.currency_id
+            else self.env.company.currency_id
+        )
+        if float_is_zero(amount, precision_rounding=currency.rounding):
+            raise UserError(_("Pledge return amount is zero."))
+
+        liability_acc = self._get_pledge_return_liability_account(
+            deposit_move, collection_order, return_config
+        )
+        liquidity_acc, journal = self._get_pledge_return_liquidity_account(return_pm)
+        partner_id = partner.id if partner else False
+        order_name = collection_order.name if collection_order else ""
+        label = _("Pledge return - %s") % order_name
+
+        move = self.env["account.move"].sudo().create(
+            {
+                "move_type": "entry",
+                "journal_id": journal.id,
+                "date": fields.Date.context_today(self),
+                "ref": label,
+                "partner_id": partner_id,
+                "line_ids": [
+                    fields.Command.create(
+                        {
+                            "name": label,
+                            "account_id": liability_acc.id,
+                            "partner_id": partner_id,
+                            "debit": amount,
+                            "credit": 0.0,
+                        }
+                    ),
+                    fields.Command.create(
+                        {
+                            "name": label,
+                            "account_id": liquidity_acc.id,
+                            "partner_id": partner_id,
+                            "debit": 0.0,
+                            "credit": amount,
+                        }
+                    ),
+                ],
+            }
+        )
+        move.action_post()
+        _logger.info(
+            "[PLEDGE] Posted return move %s amount=%s liability=%s liquidity=%s journal=%s origin=%s",
+            move.name,
+            amount,
+            liability_acc.code,
+            liquidity_acc.code,
+            journal.display_name,
+            order_name,
+        )
+        return move
+
     def _action_return_pledges_accounting(self, pledges, pos_payment_method_id=None, pos_session_id=None):
-        """Reverse pledge deposit JE and mark pledge lines returned (B1 / legacy pos.pledge flow)."""
+        """Clear pledge liability and credit the return POS cash/bank (avoids cross-branch shortage)."""
         PledgeLine = self.env["pos.advance.order.pledge"]
         results = []
 
@@ -150,36 +263,20 @@ class PosAdvanceOrderPledgeReturn(models.Model):
                     )
                 )
 
-            move = self.env["account.move"]
+            deposit_move = self.env["account.move"]
             for line in related_lines:
                 candidate = line._get_pledge_deposit_move(collection_order)
                 if candidate:
-                    move = candidate
+                    deposit_move = candidate
                     break
-            if not move or move.state != "posted":
+            if not deposit_move or deposit_move.state != "posted":
                 raise UserError(
                     _(
                         "No posted pledge journal entry is linked to order %(order)s. "
-                        "Cannot reverse pledge deposit.",
+                        "Cannot return pledge deposit.",
                         order=collection_order.display_name,
                     )
                 )
-
-            existing_return = related_lines.filtered(lambda l: l.return_move_id)[:1]
-            reverse_move = existing_return.return_move_id
-            if not reverse_move:
-                move_sudo = move.sudo()
-                reverse_moves = move_sudo._reverse_moves(
-                    [
-                        {
-                            "date": fields.Date.context_today(group_pledges[:1]),
-                            "ref": _("Pledge return - %s") % (collection_order.name or collection_order.display_name),
-                        }
-                    ],
-                    cancel=False,
-                )
-                reverse_moves.sudo().action_post()
-                reverse_move = reverse_moves[:1]
 
             sess = False
             if pos_session_id:
@@ -194,12 +291,42 @@ class PosAdvanceOrderPledgeReturn(models.Model):
             if not sess and collection_order.session_id.state in ("opened", "closing_control"):
                 sess = collection_order.session_id
 
+            return_config = sess.config_id if sess else return_pm.mapped("config_ids")[:1]
+            if not return_config and return_pm:
+                return_config = self.env["pos.config"].sudo().search(
+                    [("payment_method_ids", "in", return_pm.id)], limit=1
+                )
+
+            amount = sum(abs(line.pledge_subtotal or 0.0) for line in related_lines)
+            currency = collection_order.currency_id or self.env.company.currency_id
+            if float_is_zero(amount, precision_rounding=currency.rounding):
+                amount = abs(
+                    sum(deposit_move.line_ids.filtered(lambda l: l.credit > 0).mapped("credit"))
+                )
+            if float_is_zero(amount, precision_rounding=currency.rounding):
+                raise UserError(
+                    _("Pledge return amount is zero for order %s.")
+                    % collection_order.display_name
+                )
+
+            existing_return = related_lines.filtered(lambda l: l.return_move_id)[:1]
+            return_move = existing_return.return_move_id
+            if not return_move:
+                return_move = self._create_pledge_return_move(
+                    collection_order,
+                    deposit_move,
+                    return_pm,
+                    amount,
+                    collection_order.partner_id,
+                    return_config=return_config,
+                )
+
             write_vals = {
                 "state": "returned",
                 "return_date": fields.Datetime.now(),
-                "return_move_id": reverse_move.id,
+                "return_move_id": return_move.id,
                 "return_payment_method_id": return_pm.id,
-                "pledge_move_id": move.id,
+                "pledge_move_id": deposit_move.id,
                 "pos_order_id": collection_order.id,
                 "return_pos_order_id": False,
             }
@@ -207,22 +334,22 @@ class PosAdvanceOrderPledgeReturn(models.Model):
                 write_vals["return_pos_session_id"] = sess.id
             related_lines.write(write_vals)
 
-            amount = sum(abs(line.pledge_subtotal or 0.0) for line in related_lines)
             results.append(
                 {
                     "pledge_ids": related_lines.ids,
-                    "return_move_id": reverse_move.id,
-                    "return_move_name": reverse_move.name,
+                    "return_move_id": return_move.id,
+                    "return_move_name": return_move.name,
                     "origin_order_name": collection_order.name,
                     "payment_method_name": return_pm.display_name,
                     "amount": amount,
                 }
             )
             _logger.info(
-                "[PLEDGE] Returned %s pledge line(s) via accounting reversal move=%s pm=%s origin=%s amount=%s",
+                "[PLEDGE] Returned %s pledge line(s) via return move=%s pm=%s session=%s origin=%s amount=%s",
                 len(related_lines),
-                reverse_move.name,
+                return_move.name,
                 return_pm.display_name,
+                sess.name if sess else False,
                 collection_order.name,
                 amount,
             )
@@ -236,7 +363,7 @@ class PosAdvanceOrderPledgeReturn(models.Model):
         }
 
     def action_return_pledges(self, pledge_ids=None, pos_payment_method_id=None, pos_session_id=None):
-        """Return pledges via deposit journal reversal (B1), not menu-product POS refunds."""
+        """Return pledges: clear liability, credit current POS liquidity (not blind deposit reverse)."""
         ctx = self.env.context
         if pos_payment_method_id is None:
             pos_payment_method_id = ctx.get("pos_payment_method_id")
