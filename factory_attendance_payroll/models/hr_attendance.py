@@ -239,18 +239,18 @@ class HrAttendance(models.Model):
                     overtime = 0.0
                     undertime = 0.0
             else:
-                # Fixed Shift Rule: Check-In vs Shift Start & Overtime from Net Worked Hours vs 8.0h Net Target
+                # Fixed Shift Rule: Check-In vs Shift Start & Overtime from Check-Out vs Shift End
                 sched_start = min(day_cal.mapped('hour_from'))
+                sched_end = max(day_cal.mapped('hour_to'))
 
                 # Lateness (Check-In delay vs Scheduled Start)
                 late_delay = max(0.0, actual_in_hour - sched_start)
                 undertime = round(late_delay, 2) if late_delay >= min_lateness_threshold else 0.0
 
-                # Overtime: Net Worked Hours minus Net Daily Target (8.0h)
-                standard_target = 8.0
-                excess = net_hrs - standard_target
-                if excess >= min_ot_threshold:
-                    overtime = round(excess, 2)
+                # Overtime (Check-Out delay vs Scheduled End)
+                if attendance.check_out:
+                    ot_delay = max(0.0, actual_out_hour - sched_end)
+                    overtime = round(ot_delay, 2) if ot_delay >= min_ot_threshold else 0.0
                 else:
                     overtime = 0.0
 
