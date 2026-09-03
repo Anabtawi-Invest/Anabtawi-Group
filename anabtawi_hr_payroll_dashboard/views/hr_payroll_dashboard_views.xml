@@ -103,20 +103,17 @@
               name="Executive HR &amp; Payroll Dashboard"
               parent="hr_payroll.menu_hr_payroll_report"
               action="action_hr_payroll_dashboard"
-              groups="anabtawi_hr_payroll_dashboard.group_hr_payroll_dashboard_user"
               sequence="1"/>
 
     <menuitem id="menu_hr_payroll_unified_report_item"
               name="Unified Payroll &amp; OT Analysis"
               parent="hr_payroll.menu_hr_payroll_report"
               action="action_hr_payroll_unified_report"
-              groups="anabtawi_hr_payroll_dashboard.group_hr_payroll_dashboard_user"
               sequence="2"/>
 
     <menuitem id="menu_hr_payroll_excel_export_item"
               name="Export Payroll &amp; Bank Excel Packages"
               parent="hr_payroll.menu_hr_payroll_report"
               action="action_hr_payroll_report_wizard"
-              groups="anabtawi_hr_payroll_dashboard.group_hr_payroll_dashboard_user"
               sequence="3"/>
 </odoo>
