@@ -18,6 +18,14 @@ class HrPayslip(models.Model):
         store=True,
         help="Total overtime hours earned from attendance during the month."
     )
+    rest_days_taken = fields.Float(
+        string="Rest Days Taken",
+        compute="_compute_attendance_reconciliation_fields",
+        store=True,
+        help="Weekly rest/off days taken this month (unworked days excluding public holidays "
+             "and approved leave). Monthly allowance is 4; each unused rest day adds "
+             "8 × 1.5 hours to Monthly Overtime Earned."
+    )
     attendance_gross_undertime = fields.Float(
         string="Monthly Lateness / Undertime",
         compute="_compute_attendance_reconciliation_fields",
@@ -94,6 +102,7 @@ class HrPayslip(models.Model):
     def _compute_attendance_reconciliation_fields(self):
         if not getattr(self.env.registry, 'ready', True) or self.env.context.get('install_mode') or self.env.context.get('module_installation') or self.env.context.get('tracking_disable'):
             self.attendance_gross_overtime = 0.0
+            self.rest_days_taken = 0.0
             self.attendance_gross_undertime = 0.0
             self.attendance_net_reconciled = 0.0
             self.total_extra_hours_available = 0.0
@@ -110,6 +119,7 @@ class HrPayslip(models.Model):
             empty_slips = other_slips.filtered(lambda s: not s.attendance_gross_overtime and not s.attendance_gross_undertime)
             if empty_slips:
                 empty_slips.attendance_gross_overtime = 0.0
+                empty_slips.rest_days_taken = 0.0
                 empty_slips.attendance_gross_undertime = 0.0
                 empty_slips.attendance_net_reconciled = 0.0
                 empty_slips.total_extra_hours_available = 0.0
@@ -218,9 +228,12 @@ class HrPayslip(models.Model):
                         leave_dates_by_emp[lve.employee_id.id].add(d_curr)
                     d_curr += datetime.timedelta(days=1)
 
+        monthly_rest_allowance = 4
+
         for payslip in valid_slips:
             if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
                 payslip.attendance_gross_overtime = 0.0
+                payslip.rest_days_taken = 0.0
                 payslip.attendance_gross_undertime = 0.0
                 payslip.attendance_net_reconciled = 0.0
                 payslip.total_extra_hours_available = 0.0
@@ -232,6 +245,7 @@ class HrPayslip(models.Model):
 
             if payslip.employee_id.is_manager_exempt():
                 payslip.attendance_gross_overtime = 0.0
+                payslip.rest_days_taken = 0.0
                 payslip.attendance_gross_undertime = 0.0
                 payslip.attendance_net_reconciled = 0.0
                 payslip.total_extra_hours_available = 0.0
@@ -298,6 +312,20 @@ class HrPayslip(models.Model):
             worked_days_count = len(daily_hours)
             allowed_rest_days = worked_days_count // 6
 
+            emp_leave_dates = leave_dates_by_emp.get(emp_id, set())
+            approved_leave_days_count = sum(
+                1 for d in range(total_days_in_month)
+                if (payslip.date_from + datetime.timedelta(days=d)) not in daily_hours
+                and ((payslip.date_from + datetime.timedelta(days=d)) in emp_leave_dates or
+                     (payslip.date_from + datetime.timedelta(days=d)) in public_holiday_dates)
+            )
+            # Weekly rest/off days taken: unworked days excluding public holidays & approved leave
+            rest_days_taken = max(0, total_days_in_month - worked_days_count - approved_leave_days_count)
+            unused_rest_days = max(0, monthly_rest_allowance - rest_days_taken)
+            if allow_ot and unused_rest_days > 0:
+                # Unused monthly rest entitlement → Extra Hours at 1.5x day rate
+                total_ot += (unused_rest_days * 8.0 * 1.5)
+
             regular_worked_days_count = sum(1 for d in daily_hours.keys() if d not in public_holiday_dates)
             is_termination = getattr(payslip, 'termination_clearance', False)
             is_partial_period = is_termination or total_days_in_month < 25
@@ -311,14 +339,7 @@ class HrPayslip(models.Model):
                         if eff_extra_days > 0:
                             total_ot += (eff_extra_days * 8.0 * 1.25)
                 else:
-                    emp_leave_dates = leave_dates_by_emp.get(emp_id, set())
-                    approved_leave_days_count = sum(
-                        1 for d in range(total_days_in_month)
-                        if (payslip.date_from + datetime.timedelta(days=d)) not in daily_hours
-                        and ((payslip.date_from + datetime.timedelta(days=d)) in emp_leave_dates or
-                             (payslip.date_from + datetime.timedelta(days=d)) in public_holiday_dates)
-                    )
-                    unworked_days = max(0, total_days_in_month - worked_days_count - approved_leave_days_count)
+                    unworked_days = rest_days_taken
                     if unworked_days > allowed_rest_days:
                         excess_unworked_days = unworked_days - allowed_rest_days
                         total_undertime += (excess_unworked_days * 8.0)
@@ -327,6 +348,7 @@ class HrPayslip(models.Model):
             gross_ut = round(total_undertime, 2)
 
             payslip.attendance_gross_overtime = gross_ot
+            payslip.rest_days_taken = float(rest_days_taken)
             payslip.attendance_gross_undertime = gross_ut
             payslip.attendance_net_reconciled = round(gross_ot - gross_ut, 2)
 

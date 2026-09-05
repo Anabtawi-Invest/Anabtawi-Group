@@ -8,6 +8,7 @@
             <xpath expr="//notebook" position="before">
                 <group string="Attendance &amp; Reconciliation Audit Tracking" name="attendance_reconciliation_tracking">
                     <group string="Gross Attendance Totals">
+                        <field name="rest_days_taken" readonly="1"/>
                         <field name="attendance_gross_overtime" widget="float_time" readonly="1"/>
                         <field name="attendance_gross_undertime" widget="float_time" readonly="1"/>
                         <field name="total_extra_hours_available" widget="float_time" readonly="1"/>
