@@ -925,12 +925,15 @@ class HrPayslip(models.Model):
             self.ids,
             list(self.env.context.keys()),
         )
-        LeaveType = self.env['hr.leave.type'].sudo() if 'hr.leave.type' in self.env else None
-        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
+        has_leave_type = 'hr.leave.type' in self.env
+        has_allocation = 'hr.leave.allocation' in self.env
+        LeaveType = self.env['hr.leave.type'].sudo() if has_leave_type else None
+        Allocation = self.env['hr.leave.allocation'].sudo() if has_allocation else None
         _logger.info(
-            "[FAP-RECON] models available LeaveType=%s Allocation=%s",
-            bool(LeaveType),
-            bool(Allocation),
+            "[FAP-RECON] models available has_leave_type=%s has_allocation=%s "
+            "(note: empty recordsets are falsy in Odoo — do not bool() them)",
+            has_leave_type,
+            has_allocation,
         )
 
         for payslip in self:
@@ -968,7 +971,7 @@ class HrPayslip(models.Model):
                     company.id,
                 )
 
-                if Allocation and LeaveType:
+                if has_allocation and has_leave_type and Allocation is not None and LeaveType is not None:
                     extra_types = LeaveType.search([
                         '|', '|',
                         ('name', '=', 'Extra Hours'),
