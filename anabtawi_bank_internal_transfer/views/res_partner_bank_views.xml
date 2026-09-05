@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_bank_form_inherit_internal_transfer" model="ir.ui.view">
+        <field name="name">res.partner.bank.form.inherit.internal.transfer</field>
+        <field name="model">res.partner.bank</field>
+        <field name="inherit_id" ref="hr.view_partner_bank_form_inherit_hr"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='bank_name']" position="after">
+                <field name="internal_transfer" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

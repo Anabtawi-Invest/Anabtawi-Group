@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_bank_internal_transfer_mapping"
+              name="Bank Internal Transfer Mapping"
+              parent="contacts.menu_config_bank_accounts"
+              action="action_bank_internal_transfer_mapping"
+              sequence="3"
+              groups="base.group_partner_manager"/>
+</odoo>
