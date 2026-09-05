@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Anabtawi Bank Internal Transfer',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.1',
     'category': 'Contacts',
     'summary': 'Map banks to internal transfer values on partner bank accounts',
     'depends': ['contacts', 'hr'],
