@@ -195,6 +195,7 @@ class HrAttendance(models.Model):
                 attendance.daily_variance_hours = net_hrs
                 continue
 
+            standard_target = 8.0
             min_ot_threshold = 0.75  # 45 minutes
             min_lateness_threshold = 0.25  # 15 minutes
 
@@ -217,16 +218,31 @@ class HrAttendance(models.Model):
             day_cal = cal.attendance_ids.filtered(lambda a: a.dayofweek == dow) if cal else False
 
             is_flexible = bool(
-                getattr(cal, 'flexible_hours', False) 
+                (cal and 'flexible' in (cal.name or '').lower())
+                or getattr(cal, 'flexible_hours', False) 
                 or getattr(cal, 'flexible', False) 
                 or getattr(emp, 'flexible_hours', False)
-                or not day_cal
             )
 
+            has_planning_slot = False
+            planning_slots = False
+            if 'planning.slot' in self.env:
+                day_start_utc, next_day_start_utc, _ = emp._get_day_utc_bounds(target_date)
+                planning_slots = self.env['planning.slot'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '=', 'published'),
+                    ('start_datetime', '<', fields.Datetime.to_string(next_day_start_utc)),
+                    ('end_datetime', '>', fields.Datetime.to_string(day_start_utc)),
+                ], order='start_datetime asc')
+                has_planning_slot = bool(planning_slots)
+
+            if not is_flexible and not day_cal and not has_planning_slot:
+                is_flexible = True
+
             if is_flexible:
-                # Flexible Schedule Rule: Net Worked Hours vs Daily Target (8.0h)
-                target = getattr(cal, 'hours_per_day', 8.0) or 8.0
-                excess = net_hrs - target
+                # Flexible Schedule Rule: Net Worked Hours vs Net Daily Target (8.0h)
+                standard_target = 8.0
+                excess = net_hrs - standard_target
 
                 if excess >= min_ot_threshold:
                     overtime = round(excess, 2)
@@ -238,20 +254,35 @@ class HrAttendance(models.Model):
                     overtime = 0.0
                     undertime = 0.0
             else:
-                # Fixed Shift Rule: Check-In vs Shift Start & Check-Out vs Shift End
-                sched_start = min(day_cal.mapped('hour_from'))
-                sched_end = max(day_cal.mapped('hour_to'))
+                # Fixed Shift Rule: Priority to Planning Shift bounds, fallback to Resource Calendar
+                sched_start = None
+                sched_end = None
+
+                if has_planning_slot and planning_slots:
+                    first_slot_start = planning_slots[0].start_datetime
+                    last_slot_end = planning_slots[-1].end_datetime
+                    if first_slot_start and last_slot_end:
+                        start_dt = pytz.utc.localize(first_slot_start).astimezone(emp_tz)
+                        end_dt = pytz.utc.localize(last_slot_end).astimezone(emp_tz)
+                        sched_start = start_dt.hour + (start_dt.minute / 60.0)
+                        sched_end = end_dt.hour + (end_dt.minute / 60.0)
+
+                if sched_start is None or sched_end is None:
+                    if day_cal:
+                        sched_start = min(day_cal.mapped('hour_from'))
+                        sched_end = max(day_cal.mapped('hour_to'))
+                    else:
+                        sched_start = 8.0
+                        sched_end = 16.5
 
                 # Lateness (Check-In delay vs Scheduled Start)
                 late_delay = max(0.0, actual_in_hour - sched_start)
                 undertime = round(late_delay, 2) if late_delay >= min_lateness_threshold else 0.0
 
-                # Overtime (Check-Out stay vs Scheduled End with overnight shift support)
+                # Overtime (Check-Out delay vs Scheduled End)
                 if attendance.check_out:
-                    is_next_day = attendance.check_out.date() > attendance.check_in.date()
-                    effective_out_hour = actual_out_hour + (24.0 if is_next_day else 0.0)
-                    extra_stay = effective_out_hour - sched_end
-                    overtime = round(extra_stay, 2) if extra_stay >= min_ot_threshold else 0.0
+                    ot_delay = max(0.0, actual_out_hour - sched_end)
+                    overtime = round(ot_delay, 2) if ot_delay >= min_ot_threshold else 0.0
                 else:
                     overtime = 0.0
 

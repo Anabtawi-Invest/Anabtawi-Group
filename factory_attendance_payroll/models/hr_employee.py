@@ -140,6 +140,8 @@ class HrEmployee(models.Model):
                 "code": "ABSENT",
                 "color": 1,
                 "is_leave": False,
+                "round_days": "NO",
+                "round_days_type": "DOWN",
             })
         return absent_type
 

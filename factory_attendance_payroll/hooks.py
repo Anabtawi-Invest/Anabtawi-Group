@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import api, SUPERUSER_ID
+
+_logger = logging.getLogger(__name__)
 
 
 def pre_init_hook(env):
@@ -35,6 +39,69 @@ def pre_init_hook(env):
         except Exception:
             pass
 
+    with env.cr.savepoint():
+        try:
+            env.cr.execute("""
+                UPDATE hr_work_entry_type
+                   SET round_days = 'NO',
+                       round_days_type = 'DOWN'
+                 WHERE round_days IS NULL OR round_days = '';
+            """)
+            if env.cr.rowcount:
+                _logger.warning(
+                    "[factory_attendance_payroll] pre_init_hook fixed %s work entry type(s) "
+                    "with missing round_days via SQL.",
+                    env.cr.rowcount,
+                )
+            env.cr.execute("""
+                UPDATE hr_work_entry_type
+                   SET round_days_type = 'DOWN'
+                 WHERE round_days IN ('HALF', 'FULL')
+                   AND (round_days_type IS NULL OR round_days_type = '');
+            """)
+            if env.cr.rowcount:
+                _logger.warning(
+                    "[factory_attendance_payroll] pre_init_hook fixed %s work entry type(s) "
+                    "with missing round_days_type via SQL.",
+                    env.cr.rowcount,
+                )
+        except Exception:
+            _logger.exception(
+                "[factory_attendance_payroll] pre_init_hook failed to fix work entry rounding via SQL."
+            )
+
+
+def _fix_work_entry_type_rounding(env):
+    """Ensure rounding-enabled work entry types always have a round type."""
+    missing_round_days = env['hr.work.entry.type'].sudo().search([('round_days', '=', False)])
+    if missing_round_days:
+        _logger.warning(
+            "[factory_attendance_payroll] Fixing %s work entry type(s) with missing round_days: %s",
+            len(missing_round_days),
+            [(t.id, t.name, t.code, t.round_days, t.round_days_type) for t in missing_round_days],
+        )
+        missing_round_days.write({'round_days': 'NO', 'round_days_type': 'DOWN'})
+
+    bad_types = env['hr.work.entry.type'].sudo().search([
+        ('round_days', 'in', ['HALF', 'FULL']),
+        ('round_days_type', '=', False),
+    ])
+    if bad_types:
+        _logger.warning(
+            "[factory_attendance_payroll] Fixing %s work entry type(s) with round_days enabled "
+            "but missing round_days_type: %s",
+            len(bad_types),
+            [(t.id, t.name, t.code, t.round_days, t.round_days_type) for t in bad_types],
+        )
+        bad_types.write({'round_days_type': 'DOWN'})
+
+    absent_type = env.ref(
+        'factory_attendance_payroll.work_entry_type_absent',
+        raise_if_not_found=False,
+    )
+    if absent_type and (not absent_type.round_days_type or absent_type.round_days != 'NO'):
+        absent_type.write({'round_days': 'NO', 'round_days_type': 'DOWN'})
+
 
 def post_init_hook(env):
     """
@@ -50,5 +117,10 @@ def post_init_hook(env):
             for rule in rules:
                 if hasattr(structures, 'rule_ids'):
                     structures.write({'rule_ids': [(4, rule.id)]})
+    except Exception:
+        pass
+
+    try:
+        _fix_work_entry_type_rounding(env)
     except Exception:
         pass
