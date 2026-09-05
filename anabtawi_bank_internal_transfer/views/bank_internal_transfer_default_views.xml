@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_bank_internal_transfer_default_form" model="ir.ui.view">
+        <field name="name">bank.internal.transfer.default.form</field>
+        <field name="model">bank.internal.transfer.default</field>
+        <field name="arch" type="xml">
+            <form string="Internal Transfer Default">
+                <group>
+                    <field name="default_value" placeholder="Type the default internal transfer name"/>
+                </group>
+                <footer>
+                    <button name="action_save" type="object" string="Save" class="btn-primary"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_bank_internal_transfer_default" model="ir.actions.act_window">
+        <field name="name">Internal Transfer Default</field>
+        <field name="res_model">bank.internal.transfer.default</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

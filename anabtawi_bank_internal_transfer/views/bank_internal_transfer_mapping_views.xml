@@ -36,7 +36,7 @@
             </p>
             <p>
                 Map each bank to an internal transfer value. Banks without a mapping
-                use the default value <strong>confirmed</strong> on bank accounts.
+                use the value set in <strong>Internal Transfer Default</strong>.
             </p>
         </field>
     </record>

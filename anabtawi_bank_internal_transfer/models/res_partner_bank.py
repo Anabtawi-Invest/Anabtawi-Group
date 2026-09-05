@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models
 
-DEFAULT_INTERNAL_TRANSFER = 'confirmed'
-
 
 class ResPartnerBank(models.Model):
     _inherit = 'res.partner.bank'
@@ -16,6 +14,7 @@ class ResPartnerBank(models.Model):
     @api.depends('bank_id')
     def _compute_internal_transfer(self):
         Mapping = self.env['bank.internal.transfer.mapping']
+        default_value = Mapping.get_default_internal_transfer()
         bank_ids = self.mapped('bank_id').ids
         mapping_by_bank = {
             mapping.bank_id.id: mapping.internal_transfer
@@ -25,4 +24,4 @@ class ResPartnerBank(models.Model):
             if bank_account.bank_id and bank_account.bank_id.id in mapping_by_bank:
                 bank_account.internal_transfer = mapping_by_bank[bank_account.bank_id.id]
             else:
-                bank_account.internal_transfer = DEFAULT_INTERNAL_TRANSFER
+                bank_account.internal_transfer = default_value

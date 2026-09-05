@@ -5,4 +5,9 @@
               parent="contacts.menu_config_bank_accounts"
               action="action_bank_internal_transfer_mapping"
               sequence="3"/>
+    <menuitem id="menu_bank_internal_transfer_default"
+              name="Internal Transfer Default"
+              parent="contacts.menu_config_bank_accounts"
+              action="action_bank_internal_transfer_default"
+              sequence="4"/>
 </odoo>
