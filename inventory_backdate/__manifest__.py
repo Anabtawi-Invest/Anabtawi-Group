@@ -1,15 +1,16 @@
 {
     "name": "Inventory Backdate",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.1.0",
     "category": "Inventory/Inventory",
-    "summary": "Backdate stock moves when an inventory adjustment uses Accounting Date",
+    "summary": "Backdate inventory adjustments and internal transfers with matching valuation",
     "description": """
 Extends Odoo's Accounting Date on inventory adjustments so stock moves,
 linked pickings, and journal entries all use the same historical date.
 
 - Stock moves (and move lines) are dated with the Accounting Date
-- Linked pickings get date_done updated
-- Optional Backdate Reason on the inventory adjustment
+- Internal transfers can force an Effective Date on Validate
+- Later movement values are replayed from the backdate so reports reconcile
+- Optional Backdate Reason
 - Automatic chatter audit on pickings and journal entries
 - Backdated indicator on stock moves
     """,
@@ -18,6 +19,7 @@ linked pickings, and journal entries all use the same historical date.
     "data": [
         "views/stock_quant_views.xml",
         "views/stock_move_views.xml",
+        "views/stock_picking_views.xml",
     ],
     "installable": True,
     "application": False,

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_inherit_inventory_backdate" model="ir.ui.view">
+        <field name="name">stock.picking.form.inherit.inventory.backdate</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='date_done']" position="attributes">
+                <attribute name="invisible">state == 'cancel'</attribute>
+                <attribute name="readonly">state in ('done', 'cancel') and not is_date_editable</attribute>
+            </xpath>
+            <xpath expr="//field[@name='date_done']" position="after">
+                <field name="backdate_reason"
+                       invisible="not date_done or state == 'cancel'"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="vpicktree_inherit_inventory_backdate" model="ir.ui.view">
+        <field name="name">stock.picking.list.inherit.inventory.backdate</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='date_done']" position="attributes">
+                <attribute name="optional">show</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

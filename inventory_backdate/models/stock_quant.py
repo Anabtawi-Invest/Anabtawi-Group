@@ -1,6 +1,6 @@
-from datetime import timezone
+from datetime import datetime, timezone
 
-from odoo import api, fields, models, _
+from odoo import api, fields, models
 from odoo.tools.misc import groupby
 
 
@@ -21,7 +21,11 @@ class StockQuant(models.Model):
 
     @api.model
     def _inventory_backdate_datetime(self, accounting_date):
-        """Keep the current clock time, on the chosen accounting date, in the user timezone."""
+        """Convert a Date/Datetime into a naive UTC datetime for stock moves."""
+        if not accounting_date:
+            return False
+        if isinstance(accounting_date, datetime):
+            return fields.Datetime.to_datetime(accounting_date)
         accounting_date = fields.Date.to_date(accounting_date)
         now_local = fields.Datetime.context_timestamp(self, fields.Datetime.now())
         local_dt = now_local.replace(
@@ -34,15 +38,20 @@ class StockQuant(models.Model):
     def _apply_inventory(self, date=None):
         if date is not None or not any(self.mapped("accounting_date")):
             reason = next((r for r in self.mapped("backdate_reason") if r), "")
+            ctx = {"inventory_backdate_from_quant": True}
             if reason:
-                self = self.with_context(inventory_backdate_reason=reason)
-            return super()._apply_inventory(date)
+                ctx["inventory_backdate_reason"] = reason
+            return super(StockQuant, self.with_context(**ctx))._apply_inventory(date)
 
         for accounting_date, inventory_ids in groupby(self, key=lambda quant: quant.accounting_date):
             inventories = self.env["stock.quant"].concat(*inventory_ids)
             reason = next((r for r in inventories.mapped("backdate_reason") if r), "")
-            inventories = inventories.with_context(inventory_backdate_reason=reason)
             apply_date = date
             if accounting_date:
                 apply_date = inventories._inventory_backdate_datetime(accounting_date)
+            inventories = inventories.with_context(
+                inventory_backdate_from_quant=True,
+                inventory_backdate_reason=reason,
+                force_effective_datetime=apply_date,
+            )
             super(StockQuant, inventories)._apply_inventory(apply_date)
