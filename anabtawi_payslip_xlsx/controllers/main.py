@@ -39,3 +39,41 @@ class PayslipXlsxController(http.Controller):
             ("Content-Disposition", content_disposition(filename)),
         ]
         return request.make_response(xlsx_content, headers=headers)
+
+    @http.route(
+        ["/anabtawi_payroll/payrun/xlsx"],
+        type="http",
+        auth="user",
+    )
+    def download_payrun_xlsx(self, payrun_id=None, **kwargs):
+        if (
+            not request.env.user.has_group("hr_payroll.group_hr_payroll_user")
+            or not payrun_id
+        ):
+            return request.not_found()
+
+        try:
+            payrun_id = int(payrun_id)
+        except (ValueError, TypeError):
+            return request.not_found()
+
+        payrun = request.env["hr.payslip.run"].browse(payrun_id)
+        if not payrun.exists():
+            return request.not_found()
+
+        xlsx_content = payrun._generate_payrun_xlsx()
+        period_str = payrun.date_start.strftime("%Y%m") if payrun.date_start else ""
+        if period_str:
+            filename = f"PayRun_Audit_{period_str}"
+        else:
+            filename = f"PayRun_Audit_{payrun.name or 'Report'}"
+        filename = osutil.clean_filename(filename + ".xlsx")
+
+        headers = [
+            (
+                "Content-Type",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ),
+            ("Content-Disposition", content_disposition(filename)),
+        ]
+        return request.make_response(xlsx_content, headers=headers)
