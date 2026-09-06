@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_inventory_as_of_line_list" model="ir.ui.view">
+        <field name="name">inventory.as.of.line.list</field>
+        <field name="model">inventory.as.of.line</field>
+        <field name="arch" type="xml">
+            <list multi_edit="1"
+                  decoration-success="state == 'applied'"
+                  decoration-muted="state == 'skip'"
+                  decoration-danger="state == 'error'"
+                  decoration-info="state == 'to_apply'">
+                <field name="row_number" optional="show"/>
+                <field name="raw_sku"/>
+                <field name="product_id"/>
+                <field name="location_id"/>
+                <field name="counted_as_of"/>
+                <field name="qty_as_of"/>
+                <field name="qty_today"/>
+                <field name="correction"/>
+                <field name="counted_to_apply"/>
+                <field name="state"/>
+                <field name="note" optional="hide"/>
+                <field name="error_message" optional="show"/>
+                <field name="batch_id" column_invisible="1"/>
+                <field name="company_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_inventory_as_of_line_form" model="ir.ui.view">
+        <field name="name">inventory.as.of.line.form</field>
+        <field name="model">inventory.as.of.line</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_mark_to_apply" type="object" string="Mark To Apply"
+                            invisible="state not in ('skip', 'error') or not product_id"/>
+                    <button name="action_mark_skip" type="object" string="Skip"
+                            invisible="state not in ('to_apply', 'error')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="to_apply,skip,applied,error"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="batch_id" readonly="1"/>
+                            <field name="row_number" readonly="1"/>
+                            <field name="raw_sku" readonly="1"/>
+                            <field name="product_id"/>
+                            <field name="location_id"/>
+                        </group>
+                        <group>
+                            <field name="counted_as_of"/>
+                            <field name="qty_as_of" readonly="1"/>
+                            <field name="qty_today" readonly="1"/>
+                            <field name="correction" readonly="1"/>
+                            <field name="counted_to_apply" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="note"/>
+                        <field name="error_message" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_inventory_as_of_line_search" model="ir.ui.view">
+        <field name="name">inventory.as.of.line.search</field>
+        <field name="model">inventory.as.of.line</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="raw_sku"/>
+                <field name="product_id"/>
+                <field name="location_id"/>
+                <field name="batch_id"/>
+                <filter name="to_apply" string="To Apply" domain="[('state', '=', 'to_apply')]"/>
+                <filter name="skip" string="Skip" domain="[('state', '=', 'skip')]"/>
+                <filter name="applied" string="Applied" domain="[('state', '=', 'applied')]"/>
+                <filter name="error" string="Error" domain="[('state', '=', 'error')]"/>
+                <group>
+                    <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
+                    <filter name="group_location" string="Location" context="{'group_by': 'location_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_inventory_as_of_line" model="ir.actions.act_window">
+        <field name="name">As-of Inventory Lines</field>
+        <field name="res_model">inventory.as.of.line</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Lines appear after you load a CSV on an As-of Inventory batch.
+            </p>
+        </field>
+    </record>
+
+    <record id="view_inventory_as_of_batch_list" model="ir.ui.view">
+        <field name="name">inventory.as.of.batch.list</field>
+        <field name="model">inventory.as.of.batch</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="as_of_datetime"/>
+                <field name="location_id"/>
+                <field name="state"/>
+                <field name="to_apply_count"/>
+                <field name="applied_count"/>
+                <field name="error_count"/>
+                <field name="skip_count"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_inventory_as_of_batch_form" model="ir.ui.view">
+        <field name="name">inventory.as.of.batch.form</field>
+        <field name="model">inventory.as.of.batch</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_load_recompute_lines" type="object" string="Load / Recompute Lines"
+                            class="btn-primary"
+                            invisible="state == 'applying'"
+                            confirm="Reload will replace existing review lines. Continue?"/>
+                    <button name="action_confirm_apply" type="object" string="Confirm Apply"
+                            class="btn-primary"
+                            invisible="state not in ('ready', 'error') or to_apply_count == 0"
+                            confirm="Apply all 'To Apply' lines in background chunks with the as-of date?"/>
+                    <button name="action_reset_draft" type="object" string="Reset to Draft"
+                            invisible="state in ('applying', 'draft') or applied_count"/>
+                    <field name="state" widget="statusbar"
+                            statusbar_visible="draft,ready,applying,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_lines" type="object" class="oe_stat_button" icon="fa-list">
+                            <field name="line_count" widget="statinfo" string="Lines"/>
+                        </button>
+                        <button name="action_open_lines" type="object" class="oe_stat_button" icon="fa-check"
+                                context="{'search_default_to_apply': 1}">
+                            <field name="to_apply_count" widget="statinfo" string="To Apply"/>
+                        </button>
+                        <button name="action_open_lines" type="object" class="oe_stat_button" icon="fa-times"
+                                context="{'search_default_error': 1}">
+                            <field name="error_count" widget="statinfo" string="Errors"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" readonly="state != 'draft'"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="as_of_datetime" readonly="state == 'applying'"/>
+                            <field name="accounting_date" readonly="state == 'applying'"/>
+                            <field name="location_id" readonly="state == 'applying'"/>
+                            <field name="inventory_reason" readonly="state == 'applying'"/>
+                        </group>
+                        <group>
+                            <field name="csv_filename" invisible="1"/>
+                            <field name="csv_file" filename="csv_filename" readonly="state == 'applying'"/>
+                            <field name="chunk_size" readonly="state == 'applying'"/>
+                            <field name="company_id" groups="base.group_multi_company" readonly="1"/>
+                            <field name="applied_count" readonly="1"/>
+                            <field name="skip_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="note" placeholder="Optional notes for this batch"/>
+                    </group>
+                    <notebook>
+                        <page string="Review Lines" name="lines">
+                            <field name="line_ids" readonly="state == 'applying'">
+                                <list multi_edit="1"
+                                      decoration-success="state == 'applied'"
+                                      decoration-muted="state == 'skip'"
+                                      decoration-danger="state == 'error'"
+                                      decoration-info="state == 'to_apply'"
+                                      editable="bottom">
+                                    <field name="row_number" readonly="1"/>
+                                    <field name="raw_sku" readonly="1"/>
+                                    <field name="product_id"/>
+                                    <field name="location_id"/>
+                                    <field name="counted_as_of"/>
+                                    <field name="qty_as_of" readonly="1"/>
+                                    <field name="qty_today" readonly="1"/>
+                                    <field name="correction" readonly="1"/>
+                                    <field name="counted_to_apply" readonly="1"/>
+                                    <field name="state"/>
+                                    <field name="error_message" optional="show" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_inventory_as_of_batch_search" model="ir.ui.view">
+        <field name="name">inventory.as.of.batch.search</field>
+        <field name="model">inventory.as.of.batch</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="location_id"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="ready" string="Ready" domain="[('state', '=', 'ready')]"/>
+                <filter name="applying" string="Applying" domain="[('state', '=', 'applying')]"/>
+                <filter name="done" string="Done" domain="[('state', '=', 'done')]"/>
+                <filter name="error" string="Error" domain="[('state', '=', 'error')]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_inventory_as_of_batch" model="ir.actions.act_window">
+        <field name="name">As-of Inventory Adjustment</field>
+        <field name="res_model">inventory.as.of.batch</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a batch, upload a CSV of counted quantities as of a past date, review, then apply.
+            </p>
+            <p>
+                CSV columns: <code>sku</code> (or barcode / default_code), <code>quantity</code>, optional <code>location</code>.
+            </p>
+        </field>
+    </record>
+</odoo>
