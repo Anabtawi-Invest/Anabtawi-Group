@@ -10,6 +10,9 @@
             </xpath>
             <xpath expr="//field[@name='accounting_date']" position="after">
                 <field name="backdate_reason" optional="show" invisible="not accounting_date"/>
+                <field name="quantity_at_date" optional="show" readonly="1" invisible="not accounting_date"/>
+                <field name="quantity_after_date" optional="show" readonly="1" invisible="not accounting_date"/>
+                <field name="expected_quantity" optional="show" readonly="1" invisible="not accounting_date"/>
             </xpath>
         </field>
     </record>
