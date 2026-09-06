@@ -20,8 +20,8 @@ class StockBackdateWizard(models.TransientModel):
     recalculate_valuation = fields.Boolean(
         string='Recalculate Inventory Valuation',
         help='Also update the date of the posted accounting entries linked '
-             'to the backdated stock moves. Entries with reconciled lines '
-             'are left untouched.',
+             'to the backdated stock moves (via their valuation layers). '
+             'Entries with reconciled lines are left untouched.',
     )
     filter_domain = fields.Char(
         string='Transfers Filter Domain',
@@ -69,10 +69,15 @@ class StockBackdateWizard(models.TransientModel):
             moves_to_update.mapped('move_line_ids').write({'date': self.new_date})
 
         if self.recalculate_valuation and moves_to_update:
-            journal_entries = self.env['account.move'].search([
+            # The accounting entry for a stock move is not linked directly;
+            # it goes through the move's valuation layer(s).
+            valuation_layers = self.env['stock.valuation.layer'].search([
                 ('stock_move_id', 'in', moves_to_update.ids),
-                ('state', '=', 'posted'),
+                ('account_move_id', '!=', False),
             ])
+            journal_entries = valuation_layers.account_move_id.filtered(
+                lambda m: m.state == 'posted'
+            )
             for entry in journal_entries:
                 if any(line.reconciled for line in entry.line_ids):
                     continue
