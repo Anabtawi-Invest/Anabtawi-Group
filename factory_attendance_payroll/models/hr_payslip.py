@@ -293,16 +293,24 @@ class HrPayslip(models.Model):
                     if shortfall > min_lateness_threshold:
                         total_undertime += shortfall
 
+            # Bound calculation to active contract overlapping dates within payslip period
+            contract_versions = payslip.employee_id._get_versions_with_contract_overlap_with_period(payslip.date_from, payslip.date_to)
+            c_starts = [c.date_start for c in contract_versions if c.date_start]
+            c_ends = [c.date_end for c in contract_versions if c.date_end]
+            eff_date_from = max(payslip.date_from, min(c_starts)) if c_starts else payslip.date_from
+            eff_date_to = min(payslip.date_to, max(c_ends)) if (c_ends and len(c_ends) == len(contract_versions)) else payslip.date_to
+
+            active_contract_days = (eff_date_to - eff_date_from).days + 1 if eff_date_from <= eff_date_to else 0
             total_days_in_month = (payslip.date_to - payslip.date_from).days + 1
-            target_work_days = total_days_in_month - (total_days_in_month // 7)
+            target_work_days = active_contract_days - (active_contract_days // 7)
             worked_days_count = len(daily_hours)
             allowed_rest_days = worked_days_count // 6
 
             regular_worked_days_count = sum(1 for d in daily_hours.keys() if d not in public_holiday_dates)
             is_termination = getattr(payslip, 'termination_clearance', False)
-            is_partial_period = is_termination or total_days_in_month < 25
+            is_partial_period = is_termination or active_contract_days < 25
 
-            if not is_partial_period:
+            if not is_partial_period and active_contract_days > 0:
                 if regular_worked_days_count > target_work_days:
                     if allow_ot:
                         extra_worked_days = regular_worked_days_count - target_work_days
@@ -313,12 +321,12 @@ class HrPayslip(models.Model):
                 else:
                     emp_leave_dates = leave_dates_by_emp.get(emp_id, set())
                     approved_leave_days_count = sum(
-                        1 for d in range(total_days_in_month)
-                        if (payslip.date_from + datetime.timedelta(days=d)) not in daily_hours
-                        and ((payslip.date_from + datetime.timedelta(days=d)) in emp_leave_dates or
-                             (payslip.date_from + datetime.timedelta(days=d)) in public_holiday_dates)
+                        1 for d in range(active_contract_days)
+                        if (eff_date_from + datetime.timedelta(days=d)) not in daily_hours
+                        and ((eff_date_from + datetime.timedelta(days=d)) in emp_leave_dates or
+                             (eff_date_from + datetime.timedelta(days=d)) in public_holiday_dates)
                     )
-                    unworked_days = max(0, total_days_in_month - worked_days_count - approved_leave_days_count)
+                    unworked_days = max(0, active_contract_days - worked_days_count - approved_leave_days_count)
                     if unworked_days > allowed_rest_days:
                         excess_unworked_days = unworked_days - allowed_rest_days
                         total_undertime += (excess_unworked_days * 8.0)

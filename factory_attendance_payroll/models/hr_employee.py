@@ -435,9 +435,12 @@ class HrEmployee(models.Model):
         return (getattr(version, 'work_entry_source', False) or "attendance").strip()
 
     def _get_expected_hours_on_day(self, target_date):
-        """Return expected net work hours based on contract work entry source (planning vs calendar vs attendance)."""
+        """Return expected net work hours based on contract work entry source (planning vs calendar vs attendance). Returns 0.0 if out of contract."""
         self.ensure_one()
-        source = self._get_work_entry_source_on_day(target_date)
+        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
+        if not version:
+            return 0.0
+        source = (getattr(version, 'work_entry_source', False) or "attendance").strip()
         if source == "planning":
             return self._get_planning_hours_on_day(target_date)
         elif source == "calendar" and self.resource_calendar_id:
