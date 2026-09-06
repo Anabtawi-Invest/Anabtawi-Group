@@ -101,6 +101,11 @@ class StockBackdateInventoryWizard(models.TransientModel):
             ctx['package_id'] = quant.package_id.id
         return product.with_context(**ctx).qty_available
 
+    def _svls_of(self, move):
+        """Valuation layers of a move (no reverse field on stock.move)."""
+        return self.env['stock.valuation.layer'].sudo().search(
+            [('stock_move_id', '=', move.id)])
+
     def _backdate_valuation(self, move, count_date):
         """Push valuation layers and their journal entries to ``count_date``.
 
@@ -109,7 +114,7 @@ class StockBackdateInventoryWizard(models.TransientModel):
         we rewrite both. ``create_date`` is a magic column, so it can only be
         set with raw SQL.
         """
-        svls = move.stock_valuation_layer_ids
+        svls = self._svls_of(move)
         if not svls:
             return
         self.env.cr.execute(
@@ -181,7 +186,7 @@ class StockBackdateInventoryWizard(models.TransientModel):
             return audit
 
         move = self._create_backdated_move(quant, delta, count_date)
-        svls = move.stock_valuation_layer_ids
+        svls = self._svls_of(move)
         audit['value'] = sum(svls.mapped('value'))
         audit['move'] = move.reference or move.name or str(move.id)
         entries = svls.mapped('account_move_id')
