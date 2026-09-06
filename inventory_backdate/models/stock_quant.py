@@ -13,22 +13,22 @@ class StockQuant(models.Model):
         copy=False,
     )
     quantity_at_date = fields.Float(
-        string="Qty at Date",
+        string="System Qty at Date",
         compute="_compute_historical_inventory",
         digits="Product Unit of Measure",
-        help="On-hand quantity of this product in this location as of the Accounting Date.",
+        help="What the system had in this location as of the Accounting Date (all in/out up to that date).",
     )
     quantity_after_date = fields.Float(
         string="Later In/Out",
         compute="_compute_historical_inventory",
         digits="Product Unit of Measure",
-        help="Net quantity of done in/out moves after the Accounting Date (in minus out).",
+        help="Net in/out after the Accounting Date. Example: an out of 3 later = -3.",
     )
     expected_quantity = fields.Float(
         string="On Hand After Apply",
         compute="_compute_historical_inventory",
         digits="Product Unit of Measure",
-        help="Expected on-hand today after apply: counted quantity at date + later in/out moves.",
+        help="Counted qty at date + later in/out. Example: 10 counted on 01/09, then out 3 → 7 today.",
     )
 
     @api.model
@@ -57,20 +57,63 @@ class StockQuant(models.Model):
         )
         return local_dt.astimezone(timezone.utc).replace(tzinfo=None)
 
+    def _move_line_qty(self, line):
+        if "quantity_product_uom" in line._fields:
+            return line.quantity_product_uom
+        return line.product_uom_id._compute_quantity(
+            line.quantity, line.product_id.uom_id, rounding_method="HALF-UP"
+        )
+
     def _get_quantity_at_date(self, at_dt):
-        """Quantity in this exact location as of `at_dt`, using Odoo's stock history."""
+        """Rebuild on-hand from done in/out lines in this location up to `at_dt`.
+
+        Example: no moves before 01/09 → 0, even if today's quant is already -3.
+        """
         self.ensure_one()
-        if not self.product_id or not self.location_id:
+        if not self.product_id or not self.location_id or not at_dt:
             return 0.0
-        ctx = {
-            "to_date": at_dt,
-            "location": self.location_id.id,
-            "strict": True,
-            "lot_id": self.lot_id.id if self.lot_id else False,
-            "owner_id": self.owner_id.id if self.owner_id else False,
-            "package_id": self.package_id.id if self.package_id else False,
-        }
-        return self.product_id.with_company(self.company_id or self.env.company).with_context(**ctx).qty_available
+
+        domain = [
+            ("product_id", "=", self.product_id.id),
+            ("move_id.state", "=", "done"),
+            "|",
+            ("location_id", "=", self.location_id.id),
+            ("location_dest_id", "=", self.location_id.id),
+        ]
+        if self.company_id:
+            domain.append(("company_id", "=", self.company_id.id))
+        if self.lot_id:
+            domain.append(("lot_id", "=", self.lot_id.id))
+
+        net = 0.0
+        for line in self.env["stock.move.line"].sudo().search(domain):
+            line_date = line.date or line.move_id.date
+            if not line_date or line_date > at_dt:
+                continue
+            if line.location_id == line.location_dest_id:
+                continue
+            incoming = line.location_dest_id.id == self.location_id.id
+            package = line.result_package_id if incoming else line.package_id
+            if self.package_id:
+                if package != self.package_id:
+                    continue
+            elif package:
+                continue
+            if self.owner_id:
+                if line.owner_id != self.owner_id:
+                    continue
+            elif line.owner_id:
+                continue
+            qty = self._move_line_qty(line)
+            net += qty if incoming else -qty
+        return net
+
+    def _get_historical_inventory_diff(self):
+        """Counted as of Accounting Date minus what the system had on that date."""
+        self.ensure_one()
+        as_of = self._inventory_backdate_datetime(self.accounting_date)
+        qty_at_date = self._get_quantity_at_date(as_of)
+        return self.inventory_quantity - qty_at_date
 
     @api.depends(
         "accounting_date",
@@ -115,30 +158,88 @@ class StockQuant(models.Model):
         historical = self.filtered(lambda quant: quant.accounting_date and quant.inventory_quantity_set)
         super(StockQuant, self - historical)._compute_inventory_diff_quantity()
         for quant in historical:
-            as_of = quant._inventory_backdate_datetime(quant.accounting_date)
-            qty_at_date = quant._get_quantity_at_date(as_of)
-            quant.inventory_diff_quantity = quant.inventory_quantity - qty_at_date
+            quant.inventory_diff_quantity = quant._get_historical_inventory_diff()
+
+    def _get_inventory_loss_location(self, default_loss_locations):
+        self.ensure_one()
+        return self.product_id.with_company(self.company_id).property_stock_inventory or default_loss_locations.get(
+            self.company_id.id
+        )
+
+    def _apply_historical_inventory(self):
+        """Apply counted qty as of Accounting Date, then keep later in/out on top.
+
+        01/09 system 0, counted 10, then out 3 on 04/09 → create +10 on 01/09, today = 7.
+        """
+        self.inventory_quantity_set = True
+        default_loss_locations = {}
+        missing_loss = self.filtered(
+            lambda quant: not quant.product_id.with_company(quant.company_id).property_stock_inventory
+        )
+        for company in missing_loss.mapped("company_id"):
+            loss_location_id = self.env["ir.default"].with_company(company)._get_model_defaults(
+                "product.template"
+            ).get("property_stock_inventory")
+            default_loss_locations[company.id] = self.env["stock.location"].browse(loss_location_id)
+
+        for accounting_date, inventory_ids in groupby(self, key=lambda quant: quant.accounting_date):
+            inventories = self.env["stock.quant"].concat(*inventory_ids)
+            reason = next((r for r in inventories.mapped("backdate_reason") if r), "")
+            apply_date = inventories._inventory_backdate_datetime(accounting_date)
+            move_vals = []
+            for quant in inventories:
+                if self.env.context.get("from_inverse_qty") and quant.product_uom_id.compare(
+                    quant.inventory_diff_quantity, 0
+                ) == 0:
+                    continue
+                diff = quant._get_historical_inventory_diff()
+                if quant.product_uom_id.is_zero(diff):
+                    continue
+                inventory_location = quant._get_inventory_loss_location(default_loss_locations)
+                if quant.product_uom_id.compare(diff, 0) > 0:
+                    move_vals.append(
+                        quant._get_inventory_move_values(
+                            diff,
+                            inventory_location,
+                            quant.location_id,
+                            package_dest_id=quant.package_id,
+                        )
+                    )
+                else:
+                    move_vals.append(
+                        quant._get_inventory_move_values(
+                            -diff,
+                            quant.location_id,
+                            inventory_location,
+                            package_id=quant.package_id,
+                        )
+                    )
+
+            backdate_ctx = {
+                "inventory_mode": False,
+                "inventory_backdate_from_quant": True,
+                "inventory_backdate_reason": reason,
+                "force_period_date": accounting_date,
+                "force_effective_datetime": apply_date,
+            }
+            if move_vals:
+                moves = self.env["stock.move"].with_context(**backdate_ctx).create(move_vals)
+                moves.with_context(ignore_dest_packages=True, **backdate_ctx)._action_done()
+                moves.write({"date": apply_date, "is_backdated": True})
+                moves._trigger_assign()
+
+            inventories.accounting_date = False
+
+        self.location_id.sudo().write({"last_inventory_date": fields.Date.today()})
+        date_by_location = {loc: loc._get_next_inventory_date() for loc in self.mapped("location_id")}
+        for quant in self:
+            quant.inventory_date = date_by_location[quant.location_id]
+        self.action_clear_inventory_quantity()
 
     def _apply_inventory(self, date=None):
-        # The Apply wizard always passes counting_date=now. That must not override Accounting Date.
         backdated = self.filtered(lambda quant: quant.accounting_date)
         rest = self - backdated
         if rest:
             super(StockQuant, rest)._apply_inventory(date)
-
-        for accounting_date, inventory_ids in groupby(backdated, key=lambda quant: quant.accounting_date):
-            inventories = self.env["stock.quant"].concat(*inventory_ids)
-            reason = next((r for r in inventories.mapped("backdate_reason") if r), "")
-            apply_date = inventories._inventory_backdate_datetime(accounting_date)
-            inventories.invalidate_recordset([
-                "inventory_diff_quantity",
-                "quantity_at_date",
-                "quantity_after_date",
-                "expected_quantity",
-            ])
-            super(StockQuant, inventories.with_context(
-                inventory_backdate_from_quant=True,
-                inventory_backdate_reason=reason,
-                force_effective_datetime=apply_date,
-                force_period_date=accounting_date,
-            ))._apply_inventory(apply_date)
+        if backdated:
+            backdated._apply_historical_inventory()

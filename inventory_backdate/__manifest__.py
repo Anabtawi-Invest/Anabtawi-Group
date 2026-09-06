@@ -1,6 +1,6 @@
 {
     "name": "Inventory Backdate",
-    "version": "19.0.1.3.0",
+    "version": "19.0.1.4.0",
     "category": "Inventory/Inventory",
     "summary": "Backdate inventory adjustments and internal transfers with matching valuation",
     "description": """
