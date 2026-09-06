@@ -10,10 +10,16 @@
                     <field name="reason" placeholder="Why are these transfers being backdated?"/>
                     <field name="recalculate_valuation"/>
                     <field name="filter_domain"/>
+                    <field name="matched_count"/>
                 </group>
+                <div class="alert alert-warning" role="alert"
+                     invisible="matched_count">
+                    No 'Done' transfers match this filter. Nothing will be backdated.
+                </div>
                 <footer>
                     <button name="action_apply_backdate" type="object"
-                            string="Apply Mass Backdate" class="btn-primary"/>
+                            string="Apply Mass Backdate" class="btn-primary"
+                            invisible="not matched_count"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"/>
                 </footer>
             </form>

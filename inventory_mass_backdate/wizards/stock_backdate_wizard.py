@@ -1,6 +1,6 @@
 import ast
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -30,6 +30,24 @@ class StockBackdateWizard(models.TransientModel):
              "('picking_type_code', '=', 'outgoing')]. Only transfers in "
              "the 'Done' state are ever processed.",
     )
+    matched_count = fields.Integer(
+        string='Transfers to Backdate',
+        compute='_compute_matched_count',
+        help="Number of 'Done' transfers matching the filter domain that "
+             "will be backdated when you apply.",
+    )
+
+    @api.depends('filter_domain')
+    def _compute_matched_count(self):
+        for wizard in self:
+            try:
+                domain = wizard._get_domain()
+            except UserError:
+                wizard.matched_count = 0
+                continue
+            wizard.matched_count = self.env['stock.picking'].search_count(
+                domain + [('state', '=', 'done')]
+            )
 
     def _get_domain(self):
         self.ensure_one()

@@ -1,6 +1,6 @@
 {
     'name': 'Inventory Mass Backdate',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.5.0',
     'category': 'Inventory/Inventory',
     'summary': 'Backdate completed stock transfers in bulk with a full audit trail',
     'description': """
@@ -28,11 +28,14 @@ use this feature.
     'website': '',
     'license': 'LGPL-3',
     'depends': ['stock', 'stock_account'],
+    'external_dependencies': {'python': ['openpyxl', 'xlsxwriter']},
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',
         'wizards/stock_backdate_wizard_views.xml',
+        'wizards/stock_backdate_inventory_wizard_views.xml',
         'views/stock_picking_views.xml',
+        'views/stock_quant_views.xml',
     ],
     'installable': True,
     'auto_install': False,
