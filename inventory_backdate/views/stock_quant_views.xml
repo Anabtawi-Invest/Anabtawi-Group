@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_stock_quant_tree_inventory_editable_inherit_backdate" model="ir.ui.view">
+        <field name="name">stock.quant.inventory.list.editable.inherit.inventory.backdate</field>
+        <field name="model">stock.quant</field>
+        <field name="inherit_id" ref="stock_account.view_stock_quant_tree_inventory_editable_inherit_stock_account"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='accounting_date']" position="attributes">
+                <attribute name="optional">show</attribute>
+            </xpath>
+            <xpath expr="//field[@name='accounting_date']" position="after">
+                <field name="backdate_reason" optional="show" invisible="not accounting_date"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
