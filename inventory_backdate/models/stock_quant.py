@@ -16,8 +16,7 @@ class StockQuant(models.Model):
         string="Qty at Date",
         compute="_compute_historical_inventory",
         digits="Product Unit of Measure",
-        help="On-hand quantity of this product in this location as of the Accounting Date, "
-             "after replaying all earlier in/out moves.",
+        help="On-hand quantity of this product in this location as of the Accounting Date.",
     )
     quantity_after_date = fields.Float(
         string="Later In/Out",
@@ -58,48 +57,20 @@ class StockQuant(models.Model):
         )
         return local_dt.astimezone(timezone.utc).replace(tzinfo=None)
 
-    def _move_line_qty_in_product_uom(self, line):
-        if "quantity_product_uom" in line._fields:
-            return line.quantity_product_uom
-        return line.product_uom_id._compute_quantity(
-            line.quantity, line.product_id.uom_id, rounding_method="HALF-UP"
-        )
-
-    def _get_subsequent_move_qty(self, at_dt):
-        """Net done quantity (in - out) for this quant after `at_dt`."""
-        self.ensure_one()
-        domain = [
-            ("product_id", "=", self.product_id.id),
-            ("state", "=", "done"),
-            ("date", ">", at_dt),
-            ("company_id", "=", (self.company_id or self.env.company).id),
-            "|",
-            ("location_id", "=", self.location_id.id),
-            ("location_dest_id", "=", self.location_id.id),
-        ]
-        if self.lot_id:
-            domain.append(("lot_id", "=", self.lot_id.id))
-        else:
-            domain.append(("lot_id", "=", False))
-        if self.owner_id:
-            domain.append(("owner_id", "=", self.owner_id.id))
-        else:
-            domain.append(("owner_id", "=", False))
-
-        net = 0.0
-        for line in self.env["stock.move.line"].sudo().search(domain):
-            qty = self._move_line_qty_in_product_uom(line)
-            incoming = line.location_dest_id == self.location_id
-            package = line.result_package_id if incoming else line.package_id
-            if package != self.package_id:
-                continue
-            net += qty if incoming else -qty
-        return net
-
     def _get_quantity_at_date(self, at_dt):
-        """Current on-hand minus later in/out = quantity as of `at_dt`."""
+        """Quantity in this exact location as of `at_dt`, using Odoo's stock history."""
         self.ensure_one()
-        return self.quantity - self._get_subsequent_move_qty(at_dt)
+        if not self.product_id or not self.location_id:
+            return 0.0
+        ctx = {
+            "to_date": at_dt,
+            "location": self.location_id.id,
+            "strict": True,
+            "lot_id": self.lot_id.id if self.lot_id else False,
+            "owner_id": self.owner_id.id if self.owner_id else False,
+            "package_id": self.package_id.id if self.package_id else False,
+        }
+        return self.product_id.with_company(self.company_id or self.env.company).with_context(**ctx).qty_available
 
     @api.depends(
         "accounting_date",
@@ -122,11 +93,11 @@ class StockQuant(models.Model):
                 )
                 continue
             as_of = quant._inventory_backdate_datetime(quant.accounting_date)
-            later_net = quant._get_subsequent_move_qty(as_of)
-            qty_at_date = quant.quantity - later_net
+            qty_at_date = quant._get_quantity_at_date(as_of)
+            later_net = quant.quantity - qty_at_date
             counted = quant.inventory_quantity if quant.inventory_quantity_set else qty_at_date
-            quant.quantity_after_date = later_net
             quant.quantity_at_date = qty_at_date
+            quant.quantity_after_date = later_net
             quant.expected_quantity = counted + later_net
 
     @api.depends(
@@ -149,28 +120,25 @@ class StockQuant(models.Model):
             quant.inventory_diff_quantity = quant.inventory_quantity - qty_at_date
 
     def _apply_inventory(self, date=None):
-        if date is not None or not any(self.mapped("accounting_date")):
-            reason = next((r for r in self.mapped("backdate_reason") if r), "")
-            ctx = {"inventory_backdate_from_quant": True}
-            if reason:
-                ctx["inventory_backdate_reason"] = reason
-            return super(StockQuant, self.with_context(**ctx))._apply_inventory(date)
+        # The Apply wizard always passes counting_date=now. That must not override Accounting Date.
+        backdated = self.filtered(lambda quant: quant.accounting_date)
+        rest = self - backdated
+        if rest:
+            super(StockQuant, rest)._apply_inventory(date)
 
-        for accounting_date, inventory_ids in groupby(self, key=lambda quant: quant.accounting_date):
+        for accounting_date, inventory_ids in groupby(backdated, key=lambda quant: quant.accounting_date):
             inventories = self.env["stock.quant"].concat(*inventory_ids)
             reason = next((r for r in inventories.mapped("backdate_reason") if r), "")
-            apply_date = date
-            if accounting_date:
-                apply_date = inventories._inventory_backdate_datetime(accounting_date)
-                inventories.invalidate_recordset([
-                    "inventory_diff_quantity",
-                    "quantity_at_date",
-                    "quantity_after_date",
-                    "expected_quantity",
-                ])
-            inventories = inventories.with_context(
+            apply_date = inventories._inventory_backdate_datetime(accounting_date)
+            inventories.invalidate_recordset([
+                "inventory_diff_quantity",
+                "quantity_at_date",
+                "quantity_after_date",
+                "expected_quantity",
+            ])
+            super(StockQuant, inventories.with_context(
                 inventory_backdate_from_quant=True,
                 inventory_backdate_reason=reason,
                 force_effective_datetime=apply_date,
-            )
-            super(StockQuant, inventories)._apply_inventory(apply_date)
+                force_period_date=accounting_date,
+            ))._apply_inventory(apply_date)
