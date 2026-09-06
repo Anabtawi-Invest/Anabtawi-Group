@@ -1,2 +1,0 @@
-id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_stock_backdate_wizard,stock.backdate.wizard,model_stock_backdate_wizard,group_inventory_backdate_manager,1,1,1,0
