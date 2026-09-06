@@ -19,6 +19,7 @@ This document serves as the permanent tracking register for all resolved issues,
 | **FIX-09** | **4-Day Monthly Absence Grace Rule** | Unpunched days immediately generated deduction work entries. | First 4 unpunched working days per month are forgiven (grace quota); 5th+ day receives an `ABSENT` work entry. | `models/hr_employee.py` |
 | **FIX-10** | **Bytecode & Pycache Management** | Compiled `.pyc` and `__pycache__` artifacts caused staging deployment conflicts. | All `__pycache__` directories and `.pyc` files are permanently excluded and cleaned. | Repository Root |
 | **FIX-11** | **Out of Contract Period & Combined Undertime Calculation** | Pre-contract days were consuming grace days and artificial rest day penalties were inflating gross undertime to 30:35. | Bounded calculation to active contract dates `[eff_date_from, eff_date_to]`, updated `_get_expected_hours_on_day()` to return `0.0h` out of contract, and combined daily punch lateness with full absent work entries (`14:35 + 8:00 = 22:35`). | `models/hr_employee.py`, `models/hr_payslip.py` |
+| **FIX-12** | **Fixed Shift Early Departure Undertime Capture** | Fixed shift attendance only measured check-in delay, missing early check-out departure hours. | Updated fixed schedule undertime calculation in `_compute_factory_attendance_metrics()` to capture `late_delay + early_leave` without altering flexible schedule logic. | `models/hr_attendance.py` |
 
 ---
 
