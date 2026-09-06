@@ -303,9 +303,6 @@ class HrPayslip(models.Model):
             active_contract_days = (eff_date_to - eff_date_from).days + 1 if eff_date_from <= eff_date_to else 0
             total_days_in_month = (payslip.date_to - payslip.date_from).days + 1
             target_work_days = active_contract_days - (active_contract_days // 7)
-            worked_days_count = len(daily_hours)
-            allowed_rest_days = worked_days_count // 6
-
             regular_worked_days_count = sum(1 for d in daily_hours.keys() if d not in public_holiday_dates)
             is_termination = getattr(payslip, 'termination_clearance', False)
             is_partial_period = is_termination or active_contract_days < 25
@@ -318,18 +315,27 @@ class HrPayslip(models.Model):
                         eff_extra_days = min(extra_worked_days, approved_extra_days) if approved_extra_days else 0
                         if eff_extra_days > 0:
                             total_ot += (eff_extra_days * 8.0 * 1.25)
-                else:
-                    emp_leave_dates = leave_dates_by_emp.get(emp_id, set())
-                    approved_leave_days_count = sum(
-                        1 for d in range(active_contract_days)
-                        if (eff_date_from + datetime.timedelta(days=d)) not in daily_hours
-                        and ((eff_date_from + datetime.timedelta(days=d)) in emp_leave_dates or
-                             (eff_date_from + datetime.timedelta(days=d)) in public_holiday_dates)
-                    )
-                    unworked_days = max(0, active_contract_days - worked_days_count - approved_leave_days_count)
-                    if unworked_days > allowed_rest_days:
-                        excess_unworked_days = unworked_days - allowed_rest_days
-                        total_undertime += (excess_unworked_days * 8.0)
+
+            # Combine daily punch lateness with full unworked ABSENT days (e.g. 14:35 punch lateness + 8:00 absent = 22:35)
+            WEModel = self.env['hr.work.entry']
+            if 'hr.work.entry' in self.env:
+                we_domain = [
+                    ('employee_id', '=', emp_id),
+                    ('state', '!=', 'cancelled'),
+                    '|', ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS']),
+                    ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS']),
+                ]
+                if 'date' in WEModel._fields:
+                    we_domain += [('date', '>=', eff_date_from), ('date', '<=', eff_date_to)]
+                elif 'date_start' in WEModel._fields:
+                    we_domain += [
+                        ('date_start', '>=', datetime.datetime.combine(eff_date_from, datetime.time.min)),
+                        ('date_start', '<=', datetime.datetime.combine(eff_date_to, datetime.time.max)),
+                    ]
+                absent_entries = WEModel.sudo().search(we_domain)
+                for we in absent_entries:
+                    dur = getattr(we, 'duration', 8.0) or 8.0
+                    total_undertime += dur
 
             gross_ot = round(total_ot, 2)
             gross_ut = round(total_undertime, 2)
