@@ -10,6 +10,7 @@
     ],
     "data": [
         "views/hr_payslip_views.xml",
+        "views/hr_payslip_run_views.xml",
     ],
     "installable": True,
     "application": False,

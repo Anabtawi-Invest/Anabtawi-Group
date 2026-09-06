@@ -19,6 +19,13 @@ class HrPayslip(models.Model):
             "target": "self",
         }
 
+    def action_export_payrun_excel(self):
+        payrun = self.mapped("payslip_run_id")[:1]
+        if payrun:
+            return payrun.action_export_payrun_excel()
+        raise ValidationError(_("Selected payslips do not belong to a Pay Run."))
+
+
     def _generate_payslips_xlsx(self):
         import xlsxwriter  # pylint: disable=import-outside-toplevel
 

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 1. Header Button on Payslips List View inside Pay Run -->
+    <record id="view_hr_payslip_list_payrun_audit" model="ir.ui.view">
+        <field name="name">hr.payslip.list.payrun.audit</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list/header" position="inside">
+                <button string="PayRun Audit"
+                        name="action_export_payrun_excel"
+                        type="object"
+                        class="btn-primary"
+                        groups="hr_payroll.group_hr_payroll_user"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 2. Server Action on Pay Run Action Menu (Form & List View) -->
+    <record id="action_payrun_excel_report_server" model="ir.actions.server">
+        <field name="name">PayRun Audit</field>
+        <field name="model_id" ref="hr_payroll.model_hr_payslip_run"/>
+        <field name="binding_model_id" ref="hr_payroll.model_hr_payslip_run"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">
+action = records.action_export_payrun_excel()
+        </field>
+    </record>
+</odoo>
