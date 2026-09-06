@@ -275,9 +275,11 @@ class HrAttendance(models.Model):
                         sched_start = 8.0
                         sched_end = 16.5
 
-                # Lateness (Check-In delay vs Scheduled Start)
+                # Lateness (Check-In delay vs Scheduled Start + Early Departure vs Scheduled End)
                 late_delay = max(0.0, actual_in_hour - sched_start)
-                undertime = round(late_delay, 2) if late_delay >= min_lateness_threshold else 0.0
+                early_leave = max(0.0, sched_end - actual_out_hour) if attendance.check_out else 0.0
+                total_fixed_undertime = late_delay + early_leave
+                undertime = round(total_fixed_undertime, 2) if total_fixed_undertime >= min_lateness_threshold else 0.0
 
                 # Overtime (Check-Out delay vs Scheduled End)
                 if attendance.check_out:
