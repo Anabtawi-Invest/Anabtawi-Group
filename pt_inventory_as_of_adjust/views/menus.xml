@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_inventory_as_of_batch"
+              name="As-of Inventory Adjustment"
+              parent="stock.menu_stock_adjustments"
+              action="action_inventory_as_of_batch"
+              sequence="20"
+              groups="stock.group_stock_user"/>
+</odoo>

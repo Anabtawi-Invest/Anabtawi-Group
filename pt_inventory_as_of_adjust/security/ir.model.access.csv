@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_inventory_as_of_batch_user,inventory.as.of.batch user,model_inventory_as_of_batch,stock.group_stock_user,1,0,0,0
+access_inventory_as_of_line_user,inventory.as.of.line user,model_inventory_as_of_line,stock.group_stock_user,1,0,0,0
+access_inventory_as_of_batch_manager,inventory.as.of.batch manager,model_inventory_as_of_batch,stock.group_stock_manager,1,1,1,1
+access_inventory_as_of_line_manager,inventory.as.of.line manager,model_inventory_as_of_line,stock.group_stock_manager,1,1,1,1
