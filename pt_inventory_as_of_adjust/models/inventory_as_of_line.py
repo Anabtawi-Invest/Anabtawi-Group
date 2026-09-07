@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import traceback
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
@@ -26,7 +27,8 @@ class InventoryAsOfLine(models.Model):
         "stock.location",
         string="Location",
         required=True,
-        domain="[('usage', 'in', ('internal', 'transit'))]",
+        domain="[('usage', 'in', ('internal', 'transit')), '|', ('company_id', '=', False), ('company_id', '=', company_id)]",
+        check_company=True,
     )
     counted_as_of = fields.Float(string="Counted As Of", digits="Product Unit")
     qty_as_of = fields.Float(
@@ -138,20 +140,40 @@ class InventoryAsOfLine(models.Model):
                 continue
             line.write({"state": "to_apply", "error_message": False})
 
-    def _apply_inventory_adjustment(self, as_of_datetime, accounting_date, inventory_name):
+    def _get_or_prepare_quant(self, accounting_date):
+        """Find/create the quant and set inventory_quantity for apply."""
         self.ensure_one()
-        if self.state != "to_apply":
-            return
         if not self.product_id or not self.location_id:
             raise UserError(_("Line %(row)s is missing product or location.") % {"row": self.row_number})
 
-        product = self.product_id
-        location = self.location_id
-        Quant = self.env["stock.quant"].with_context(inventory_mode=True).sudo()
+        company = self.company_id
+        if self.location_id.company_id and self.location_id.company_id != company:
+            raise UserError(
+                _(
+                    "Line %(row)s location %(location)s belongs to company %(loc_company)s, "
+                    "but the batch company is %(batch_company)s."
+                )
+                % {
+                    "row": self.row_number,
+                    "location": self.location_id.complete_name,
+                    "loc_company": self.location_id.company_id.display_name,
+                    "batch_company": company.display_name,
+                }
+            )
+
+        Quant = (
+            self.env["stock.quant"]
+            .with_company(company)
+            .with_context(
+                inventory_mode=True,
+                allowed_company_ids=company.ids,
+            )
+            .sudo()
+        )
         quant = Quant.search(
             [
-                ("product_id", "=", product.id),
-                ("location_id", "=", location.id),
+                ("product_id", "=", self.product_id.id),
+                ("location_id", "=", self.location_id.id),
                 ("lot_id", "=", False),
                 ("package_id", "=", False),
                 ("owner_id", "=", False),
@@ -161,8 +183,8 @@ class InventoryAsOfLine(models.Model):
         if not quant:
             quant = Quant.create(
                 {
-                    "product_id": product.id,
-                    "location_id": location.id,
+                    "product_id": self.product_id.id,
+                    "location_id": self.location_id.id,
                     "inventory_quantity": self.counted_to_apply,
                 }
             )
@@ -171,56 +193,135 @@ class InventoryAsOfLine(models.Model):
 
         if accounting_date:
             quant.accounting_date = accounting_date
+        quant.invalidate_recordset(["inventory_diff_quantity", "inventory_quantity_set"])
+        return quant
+
+    def _apply_inventory_adjustment(self, as_of_datetime, accounting_date, inventory_name):
+        """Apply one line (wrapper). Prefer batch apply for a shared journal entry."""
+        self.ensure_one()
+        self._apply_inventory_adjustments(
+            as_of_datetime=as_of_datetime,
+            accounting_date=accounting_date,
+            inventory_name=inventory_name,
+        )
+
+    def _apply_inventory_adjustments(self, as_of_datetime, accounting_date, inventory_name):
+        """Apply lines together so Odoo creates one JE for many inventory stock moves.
+
+        Same behavior as Physical Inventory "Apply" on multiple quants:
+        separate stock.move per quant, one shared account.move.
+        """
+        lines = self.filtered(lambda l: l.state == "to_apply")
+        if not lines:
+            return
+
+        prepared = {}  # line_id -> (quant, qty_before)
+        for line in lines:
+            try:
+                quant = line._get_or_prepare_quant(accounting_date)
+                prepared[line.id] = (quant, quant.quantity)
+            except Exception as exc:
+                _logger.exception(
+                    "As-of inventory prepare failed for line %s", line.id
+                )
+                line.write(
+                    {
+                        "state": "error",
+                        "error_message": "%s\n%s" % (exc, traceback.format_exc()),
+                    }
+                )
+
+        ok_lines = lines.filtered(lambda l: l.id in prepared)
+        if not ok_lines:
+            return
+
+        # Unique quants in stable order.
+        quants = self.env["stock.quant"]
+        seen = set()
+        for line in ok_lines:
+            quant = prepared[line.id][0]
+            if quant.id not in seen:
+                seen.add(quant.id)
+                quants |= quant
+
+        Move = self.env["stock.move"].sudo()
+        last_move_id = Move.search([("is_inventory", "=", True)], order="id desc", limit=1).id or 0
 
         ctx = {
             "inventory_name": inventory_name,
             "force_period_date": accounting_date,
+            "allowed_company_ids": ok_lines.mapped("company_id").ids,
         }
-        # Capture moves created by this apply (search-by-date/reference is brittle).
-        Move = self.env["stock.move"].sudo()
-        last_move_id = (
-            Move.search(
-                [("product_id", "=", product.id), ("is_inventory", "=", True)],
-                order="id desc",
-                limit=1,
-            ).id
-            or 0
-        )
-        quant_qty_before = quant.quantity
-        quant.invalidate_recordset(["inventory_diff_quantity", "inventory_quantity_set"])
-        # Prefer direct apply to avoid conflict wizard in cron.
-        quant.with_context(**ctx)._apply_inventory(as_of_datetime)
+        # Use batch/line company so company-dependent Inventory Location
+        # (property_stock_inventory) and category valuation accounts resolve correctly.
+        company = ok_lines[:1].company_id
+        apply_quants = quants.with_company(company).with_context(**ctx)
+        try:
+            # Pass date positionally AND as both known kw names for inherited overrides.
+            try:
+                apply_quants._apply_inventory(as_of_datetime)
+            except TypeError:
+                apply_quants._apply_inventory(date=as_of_datetime)
+        except Exception as exc:
+            _logger.exception(
+                "As-of inventory batch apply failed for lines %s", ok_lines.ids
+            )
+            ok_lines.write(
+                {
+                    "state": "error",
+                    "error_message": "%s\n%s" % (exc, traceback.format_exc()),
+                }
+            )
+            return
 
-        stock_move = self._find_inventory_stock_move(
-            as_of_datetime=as_of_datetime,
-            inventory_name=inventory_name,
-            after_move_id=last_move_id,
+        new_moves = Move.search(
+            [("is_inventory", "=", True), ("id", ">", last_move_id)],
+            order="id asc",
         )
-        account_move = stock_move.account_move_id if stock_move else self.env["account.move"]
-        diag = self._diagnose_valuation_journal(
-            stock_move=stock_move,
-            accounting_date=accounting_date,
-            quant_qty_before=quant_qty_before,
-            counted_to_apply=self.counted_to_apply,
-        )
-        _logger.info(
-            "As-of inventory line %s product=%s location=%s stock_move=%s account_move=%s diag=%s",
-            self.id,
-            product.id,
-            location.complete_name,
-            stock_move.id if stock_move else False,
-            account_move.id if account_move else False,
-            diag,
-        )
-        self.write(
-            {
-                "state": "applied",
-                "error_message": False,
-                "note": diag,
-                "stock_move_id": stock_move.id if stock_move else False,
-                "account_move_id": account_move.id if account_move else False,
-            }
-        )
+        # Ensure backdated move date (some _apply_inventory overrides drop the date arg).
+        if as_of_datetime and new_moves:
+            new_moves.write({"date": as_of_datetime})
+            new_moves.move_line_ids.write({"date": as_of_datetime})
+        # All moves from one _action_done share the same account.move when JE is created.
+        shared_account_move = new_moves.mapped("account_move_id")[:1]
+
+        for line in ok_lines:
+            quant, qty_before = prepared[line.id]
+            stock_move = new_moves.filtered(
+                lambda m, loc=line.location_id, product=line.product_id: m.product_id == product
+                and (m.location_id == loc or m.location_dest_id == loc)
+            )[:1]
+            if not stock_move and len(ok_lines) == 1 and len(new_moves) == 1:
+                stock_move = new_moves
+            account_move = (
+                stock_move.account_move_id
+                if stock_move and stock_move.account_move_id
+                else shared_account_move
+            )
+            diag = line._diagnose_valuation_journal(
+                stock_move=stock_move,
+                accounting_date=accounting_date,
+                quant_qty_before=qty_before,
+                counted_to_apply=line.counted_to_apply,
+            )
+            _logger.info(
+                "As-of inventory line %s product=%s location=%s stock_move=%s account_move=%s diag=%s",
+                line.id,
+                line.product_id.id,
+                line.location_id.complete_name,
+                stock_move.id if stock_move else False,
+                account_move.id if account_move else False,
+                diag,
+            )
+            line.write(
+                {
+                    "state": "applied",
+                    "error_message": False,
+                    "note": diag,
+                    "stock_move_id": stock_move.id if stock_move else False,
+                    "account_move_id": account_move.id if account_move else False,
+                }
+            )
 
     def action_open_account_move(self):
         self.ensure_one()
@@ -313,10 +414,12 @@ class InventoryAsOfLine(models.Model):
 
         move = stock_move
         valuation = product.with_company(self.company_id).valuation
+        # Resolve Inventory Location / valuation accounts in the batch company.
+        inv_loc = product.with_company(self.company_id).property_stock_inventory
         is_storable = bool(product.is_storable)
         is_valued = bool(move.is_valued)
-        src_acc = move.location_id.valuation_account_id
-        dest_acc = move.location_dest_id.valuation_account_id
+        src_acc = move.location_id.with_company(self.company_id).valuation_account_id
+        dest_acc = move.location_dest_id.with_company(self.company_id).valuation_account_id
         has_loc_valuation_acc = bool(src_acc or dest_acc)
         should_create = False
         should_create_error = False
@@ -343,6 +446,11 @@ class InventoryAsOfLine(models.Model):
                 "acc": dest_acc.display_name if dest_acc else False,
             },
             _("product.valuation=%(val)s (need real_time)") % {"val": valuation},
+            _("product.property_stock_inventory@%(company)s=%(loc)s")
+            % {
+                "company": self.company_id.display_name,
+                "loc": inv_loc.complete_name if inv_loc else False,
+            },
             _("is_storable=%(s)s is_valued=%(v)s has_location_valuation_account=%(h)s")
             % {"s": is_storable, "v": is_valued, "h": has_loc_valuation_acc},
             _("_should_create_account_move=%(r)s") % {"r": should_create},

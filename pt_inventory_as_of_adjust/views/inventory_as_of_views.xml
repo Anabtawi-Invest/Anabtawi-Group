@@ -42,8 +42,10 @@
             <form>
                 <header>
                     <button name="action_mark_to_apply" type="object" string="Mark To Apply"
+                            groups="pt_inventory_as_of_adjust.group_inventory_as_of_user"
                             invisible="state not in ('skip', 'error') or not product_id"/>
                     <button name="action_mark_skip" type="object" string="Skip"
+                            groups="pt_inventory_as_of_adjust.group_inventory_as_of_user"
                             invisible="state not in ('to_apply', 'error')"/>
                     <button name="action_open_account_move" type="object" string="Open Journal Entry"
                             class="btn-secondary"
@@ -140,13 +142,16 @@
                 <header>
                     <button name="action_load_recompute_lines" type="object" string="Load / Recompute Lines"
                             class="btn-primary"
+                            groups="pt_inventory_as_of_adjust.group_inventory_as_of_user"
                             invisible="state == 'applying'"
                             confirm="Reload will replace existing review lines. Continue?"/>
                     <button name="action_confirm_apply" type="object" string="Confirm Apply"
                             class="btn-primary"
+                            groups="pt_inventory_as_of_adjust.group_inventory_as_of_user"
                             invisible="state not in ('ready', 'error') or to_apply_count == 0"
                             confirm="Apply all 'To Apply' lines in background chunks with the as-of date?"/>
                     <button name="action_reset_draft" type="object" string="Reset to Draft"
+                            groups="pt_inventory_as_of_adjust.group_inventory_as_of_user"
                             invisible="state in ('applying', 'draft') or applied_count"/>
                     <field name="state" widget="statusbar"
                             statusbar_visible="draft,ready,applying,done"/>

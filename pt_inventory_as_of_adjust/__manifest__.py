@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "PT Inventory As-of Adjustment",
-    "version": "19.0.1.0.5",
+    "version": "19.0.1.0.11",
     "category": "Inventory",
     "summary": "Import counted qty as of a past date, review, and apply in batches",
     "description": """
@@ -17,6 +17,7 @@ past counting/accounting date.
         "stock_account",
     ],
     "data": [
+        "security/inventory_as_of_security.xml",
         "security/ir.model.access.csv",
         "data/ir_cron.xml",
         "views/inventory_as_of_views.xml",

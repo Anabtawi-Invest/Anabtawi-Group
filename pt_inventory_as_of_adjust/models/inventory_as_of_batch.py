@@ -33,7 +33,8 @@ class InventoryAsOfBatch(models.Model):
         "stock.location",
         string="Default Location",
         required=True,
-        domain="[('usage', 'in', ('internal', 'transit'))]",
+        domain="[('usage', 'in', ('internal', 'transit')), '|', ('company_id', '=', False), ('company_id', '=', company_id)]",
+        check_company=True,
         help="Used when the CSV has no location column (or blank location).",
     )
     accounting_date = fields.Date(
@@ -205,26 +206,27 @@ class InventoryAsOfBatch(models.Model):
             return
 
         accounting_date = self.accounting_date or fields.Date.to_date(self.as_of_datetime)
-        for line in lines:
-            try:
-                line._apply_inventory_adjustment(
-                    as_of_datetime=self.as_of_datetime,
-                    accounting_date=accounting_date,
-                    inventory_name=self.inventory_reason or "As-of Physical Inventory",
-                )
-            except Exception as exc:
-                _logger.exception(
-                    "As-of inventory apply failed for line %s (batch %s)",
-                    line.id,
-                    self.id,
-                )
-                line.write(
-                    {
-                        "state": "error",
-                        "error_message": "%s\n%s" % (exc, traceback.format_exc()),
-                    }
-                )
-            self.env.cr.commit()
+        inventory_name = self.inventory_reason or "As-of Physical Inventory"
+        try:
+            # One _apply_inventory for the whole chunk → separate stock.move, one journal entry.
+            lines._apply_inventory_adjustments(
+                as_of_datetime=self.as_of_datetime,
+                accounting_date=accounting_date,
+                inventory_name=inventory_name,
+            )
+        except Exception as exc:
+            _logger.exception(
+                "As-of inventory apply failed for batch %s lines %s",
+                self.id,
+                lines.ids,
+            )
+            lines.filtered(lambda l: l.state == "to_apply").write(
+                {
+                    "state": "error",
+                    "error_message": "%s\n%s" % (exc, traceback.format_exc()),
+                }
+            )
+        self.env.cr.commit()
 
         remaining = self.line_ids.filtered(lambda l: l.state == "to_apply")
         if remaining:
@@ -361,33 +363,40 @@ class InventoryAsOfBatch(models.Model):
             return product
         return Product.search([("default_code", "=ilike", raw_key)], limit=1)
 
+    def _company_location_domain(self, extra_domain=None):
+        """Restrict locations to the batch company (or shared company-less locs)."""
+        self.ensure_one()
+        domain = [
+            "|",
+            ("company_id", "=", False),
+            ("company_id", "=", self.company_id.id),
+        ]
+        if extra_domain:
+            domain = list(extra_domain) + domain
+        return domain
+
     def _resolve_location(self, location_name):
+        self.ensure_one()
         if not location_name:
             return self.location_id
         Location = self.env["stock.location"]
+        base = self._company_location_domain(
+            [("usage", "in", ("internal", "transit"))]
+        )
         location = Location.search(
-            [
-                ("complete_name", "=", location_name),
-                ("usage", "in", ("internal", "transit")),
-            ],
+            [("complete_name", "=", location_name)] + base,
             limit=1,
         )
         if location:
             return location
         location = Location.search(
-            [
-                ("complete_name", "ilike", location_name),
-                ("usage", "in", ("internal", "transit")),
-            ],
+            [("complete_name", "ilike", location_name)] + base,
             limit=1,
         )
         if location:
             return location
         return Location.search(
-            [
-                ("name", "=", location_name),
-                ("usage", "in", ("internal", "transit")),
-            ],
+            [("name", "=", location_name)] + base,
             limit=1,
         )
 
