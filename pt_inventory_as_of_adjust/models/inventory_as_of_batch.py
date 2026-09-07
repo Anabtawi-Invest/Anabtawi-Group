@@ -15,7 +15,19 @@ _logger = logging.getLogger(__name__)
 SKU_HEADERS = {"sku", "barcode", "default_code", "internal_reference", "defaultcode"}
 PRODUCT_ID_HEADERS = {"product_id", "productid", "variant_id", "product_variant_id"}
 QTY_HEADERS = {"quantity", "qty", "counted", "counted_qty", "count"}
-LOCATION_HEADERS = {"location", "location_name", "complete_name"}
+LOCATION_HEADERS = {
+    "location",
+    "location_name",
+    "complete_name",
+    "location_id",
+    # Odoo export/import style headers (e.g. Google Sheet "Lines/Location")
+    "lines/location",
+    "lines/location_id",
+    "line_ids/location",
+    "line_ids/location_id",
+    "line_ids/location_id/id",
+    "line_ids/location_id/complete_name",
+}
 
 
 class InventoryAsOfBatch(models.Model):
@@ -287,7 +299,8 @@ class InventoryAsOfBatch(models.Model):
     def _prepare_line_vals(self, row_number, row):
         self.ensure_one()
         raw_sku = (row.get("product_key") or "").strip()
-        location = self._resolve_location(row.get("location") or "")
+        location_name = (row.get("location") or "").strip()
+        location = self._resolve_location(location_name)
         product = self._resolve_product(
             raw_sku, match_by_id=bool(row.get("match_by_id"))
         )
@@ -308,6 +321,12 @@ class InventoryAsOfBatch(models.Model):
         if not product:
             state = "error"
             error_message = _("Product not found for '%s'") % raw_sku
+        elif location_name and not location:
+            state = "error"
+            error_message = _(
+                "Location not found for '%(loc)s'. "
+                "Use the full location path (e.g. Salt 1/Stock), or leave blank to use Default Location."
+            ) % {"loc": location_name}
         elif not location:
             state = "error"
             error_message = _("Location not found.")
@@ -383,8 +402,16 @@ class InventoryAsOfBatch(models.Model):
         base = self._company_location_domain(
             [("usage", "in", ("internal", "transit"))]
         )
+        # Exact complete name (preferred): "Salt 1/Stock"
         location = Location.search(
             [("complete_name", "=", location_name)] + base,
+            limit=1,
+        )
+        if location:
+            return location
+        # Ends-with match helps when sheet has short or slightly different path.
+        location = Location.search(
+            [("complete_name", "=ilike", "%%%s" % location_name)] + base,
             limit=1,
         )
         if location:
@@ -395,10 +422,26 @@ class InventoryAsOfBatch(models.Model):
         )
         if location:
             return location
-        return Location.search(
+        location = Location.search(
             [("name", "=", location_name)] + base,
             limit=1,
         )
+        if location:
+            return location
+        # External id / xml id style (rare in sheets)
+        if "." in location_name and "/" not in location_name:
+            try:
+                return self.env.ref(location_name)
+            except ValueError:
+                pass
+        _logger.warning(
+            "As-of CSV location not found: %r (batch=%s company=%s) → using default %s",
+            location_name,
+            self.id,
+            self.company_id.display_name,
+            self.location_id.complete_name,
+        )
+        return self.env["stock.location"]
 
     @api.model
     def _parse_quantity(self, value):
@@ -413,20 +456,35 @@ class InventoryAsOfBatch(models.Model):
             raise UserError(_("Invalid quantity: %s") % value) from exc
 
     @api.model
+    def _normalize_header(self, name):
+        """Normalize CSV header: 'Lines/Location' -> 'lines/location'."""
+        key = str(name or "").strip().lower()
+        key = key.replace(" ", "_").replace("\\", "/")
+        while "__" in key:
+            key = key.replace("__", "_")
+        return key
+
+    @api.model
     def _map_headers(self, fieldnames):
         mapping = {}
         for name in fieldnames or []:
             if not name:
                 continue
-            key = str(name).strip().lower().replace(" ", "_")
-            if key in PRODUCT_ID_HEADERS and "product_id" not in mapping:
-                mapping["product_id"] = name
-            elif key in SKU_HEADERS and "sku" not in mapping:
-                mapping["sku"] = name
-            elif key in QTY_HEADERS and "quantity" not in mapping:
-                mapping["quantity"] = name
-            elif key in LOCATION_HEADERS and "location" not in mapping:
-                mapping["location"] = name
+            key = self._normalize_header(name)
+            # Also accept bare last segment: "foo/location" -> try "location"
+            last = key.rsplit("/", 1)[-1]
+            if key in PRODUCT_ID_HEADERS or last in PRODUCT_ID_HEADERS:
+                if "product_id" not in mapping:
+                    mapping["product_id"] = name
+            elif key in SKU_HEADERS or last in SKU_HEADERS:
+                if "sku" not in mapping:
+                    mapping["sku"] = name
+            elif key in QTY_HEADERS or last in QTY_HEADERS:
+                if "quantity" not in mapping:
+                    mapping["quantity"] = name
+            elif key in LOCATION_HEADERS or last in LOCATION_HEADERS:
+                if "location" not in mapping:
+                    mapping["location"] = name
         return mapping
 
     def _get_csv_raw_bytes(self):

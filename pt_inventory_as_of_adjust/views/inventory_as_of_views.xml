@@ -256,7 +256,9 @@
                 Create a batch, upload a CSV of counted quantities as of a past date, review, then apply.
             </p>
             <p>
-                CSV columns: <code>product_id</code> (or sku / barcode / default_code), <code>quantity</code>, optional <code>location</code>.
+                CSV columns: <code>product_id</code> (or sku / barcode / default_code), <code>quantity</code>,
+                optional <code>location</code> (also accepts <code>Lines/Location</code>).
+                If location is empty or the column is missing, Default Location is used.
             </p>
         </field>
     </record>
