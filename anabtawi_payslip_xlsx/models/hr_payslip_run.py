@@ -181,8 +181,31 @@ class HrPayslipRun(models.Model):
             (_("SSC Company Contrib"), 20),
             (_("SSC Employee Contrib"), 20),
             (_("Company Loan"), 16),
-            (_("Other Deductions"), 18),
         ]
+
+        # Discover all unique Deduction Salary Rules present across selected payslips (excluding fixed columns)
+        all_ded_lines = payslips.mapped("line_ids").filtered(
+            lambda l: (
+                (l.category_id and l.category_id.code in ("DED", "Deduction", "DEDUCTION", "Social Security Deduction"))
+                or (l.category_id and "deduction" in (l.category_id.name or "").lower())
+            )
+            and not (l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in (l.name or ""))
+            and not (l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in (l.name or "") and "موظف" in (l.name or "")))
+            and not (l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in (l.name or "") and "شركة" in (l.name or "")))
+            and not (l.code in ("COMPANY", "COMLON", "adv_pay", "adve", "LOAN", "LOANS", "ADVANCE") or "سلفة" in (l.name or "") or "سلفيات" in (l.name or ""))
+        )
+
+        ded_rules = {}
+        for line in all_ded_lines:
+            rule_key = line.salary_rule_id.id if line.salary_rule_id else line.code
+            rule_name = line.name or (line.salary_rule_id.name if line.salary_rule_id else line.code) or _("Deduction")
+            if rule_key not in ded_rules:
+                ded_rules[rule_key] = rule_name
+
+        ded_cols = []
+        for r_key, r_name in sorted(ded_rules.items(), key=lambda item: item[1]):
+            col_name = f"Deduction: {r_name}" if not r_name.lower().startswith("deduction") else r_name
+            ded_cols.append((col_name, max(18, len(col_name) + 4), r_key))
 
         # Discover all unique Salary Input Types present across selected payslips
         input_types = payslips.mapped("input_line_ids.input_type_id").sorted(key=lambda t: t.name or "")
@@ -204,7 +227,12 @@ class HrPayslipRun(models.Model):
             (_("Note / Description"), 30),
         ]
 
-        all_columns = base_cols_before + [(name, width) for name, width, _ in input_cols] + base_cols_after
+        all_columns = (
+            base_cols_before
+            + [(name, width) for name, width, _ in ded_cols]
+            + [(name, width) for name, width, _ in input_cols]
+            + base_cols_after
+        )
 
         for col_idx, (col_name, width) in enumerate(all_columns):
             sheet1.set_column(col_idx, col_idx, width)
@@ -298,11 +326,7 @@ class HrPayslipRun(models.Model):
                     input_vals.append(in_val)
                     rendered_inputs_total += in_val
 
-                # 12. Other Deductions (Deduction category lines: HIE, OUTCON, penalties, Court, sickness_ded, cash_deficit, truncation, CLEDGER minus tax, ssce, loan, and input deductions)
-                all_ded = sum(lines.filtered(lambda l: (l.category_id and l.category_id.code in ("DED", "Deduction", "DEDUCTION", "Social Security Deduction")) or (l.category_id and "deduction" in (l.category_id.name or "").lower())).mapped("total"))
-                other_ded = max(0.0, all_ded - tax_val - ssce_val - loan_val - rendered_inputs_total)
-
-                # 13. Net Salary (Rule code: NET)
+                # 12. Net Salary (Rule code: NET)
                 net_sal = payslip.net_wage if hasattr(payslip, "net_wage") and payslip.net_wage else sum(lines.filtered(lambda l: l.code == "NET" or (l.category_id and l.category_id.code in ("NET", "Net"))).mapped("total"))
 
                 if net_sal < 0:
@@ -328,7 +352,7 @@ class HrPayslipRun(models.Model):
                 else:
                     note_val = base_note
 
-                # Write Base Before Columns (0..17)
+                # Write Base Before Columns (0..16)
                 sheet1.write(data_row, 0, emp_id_val, text_center_fmt)
                 sheet1.write(data_row, 1, emp_name_val, text_left_fmt)
                 sheet1.write(data_row, 2, dept_val, text_left_fmt)
@@ -347,10 +371,19 @@ class HrPayslipRun(models.Model):
                 sheet1.write_number(data_row, 14, sscc_val, number_fmt)
                 sheet1.write_number(data_row, 15, ssce_val, number_fmt)
                 sheet1.write_number(data_row, 16, loan_val, number_fmt)
-                sheet1.write_number(data_row, 17, other_ded, number_fmt)
+
+                # Write Dynamic Individual Deduction Rule Columns
+                col_curr = len(base_cols_before)
+                for _d_name, _d_width, r_key in ded_cols:
+                    if isinstance(r_key, int):
+                        matching_ded_lines = lines.filtered(lambda l: l.salary_rule_id and l.salary_rule_id.id == r_key)
+                    else:
+                        matching_ded_lines = lines.filtered(lambda l: l.code == r_key)
+                    d_val = sum(l.total for l in matching_ded_lines)
+                    sheet1.write_number(data_row, col_curr, d_val, number_fmt)
+                    col_curr += 1
 
                 # Write Dynamic Salary Input Columns
-                col_curr = len(base_cols_before)
                 for in_val in input_vals:
                     sheet1.write_number(data_row, col_curr, in_val, number_fmt)
                     col_curr += 1
@@ -384,12 +417,12 @@ class HrPayslipRun(models.Model):
         for c in range(1, 7):
             sheet1.write(data_row, c, "", total_label_fmt)
 
-        total_num_cols = len(base_cols_before) + len(input_cols) + 4
+        total_num_cols = len(base_cols_before) + len(ded_cols) + len(input_cols) + 4
         for col_idx in range(7, total_num_cols):
             col_letter = xlsxwriter.utility.xl_col_to_name(col_idx)
             formula = f"=SUM({col_letter}{table_start_row + 1}:{col_letter}{data_row})"
             
-            att_days_col_idx = len(base_cols_before) + len(input_cols) + 1
+            att_days_col_idx = len(base_cols_before) + len(ded_cols) + len(input_cols) + 1
             fmt = total_int_fmt if col_idx == att_days_col_idx else total_num_fmt
             sheet1.write_formula(data_row, col_idx, formula, fmt)
 
