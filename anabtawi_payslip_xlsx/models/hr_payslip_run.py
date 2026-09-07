@@ -160,6 +160,9 @@ class HrPayslipRun(models.Model):
         # -------------------------------------------------------------
         # Dynamic Columns Setup for Salary Inputs
         # -------------------------------------------------------------
+        # -------------------------------------------------------------
+        # Dynamic Columns Setup for Salary Inputs
+        # -------------------------------------------------------------
         base_cols_before = [
             (_("Employee ID"), 14),
             (_("Employee Name"), 28),
@@ -169,6 +172,7 @@ class HrPayslipRun(models.Model):
             (_("Period From"), 14),
             (_("Period To"), 14),
             (_("Basic Salary"), 16),
+            (_("Actual Salary"), 16),
             (_("Remaining Leaves Comp"), 20),
             (_("Gross Attendance / OT"), 20),
             (_("Other Earnings"), 16),
@@ -249,37 +253,40 @@ class HrPayslipRun(models.Model):
                 # Line helper strictly matching exact system codes from Odoo salary rules
                 lines = payslip.line_ids
 
-                # 1. Basic Salary (Rule codes: BASIC, SALARY, FULL_WAGE or category BASIC)
-                basic_sal = sum(lines.filtered(lambda l: l.code in ("BASIC", "SALARY", "FULL_WAGE") or (l.category_id and l.category_id.code in ("BASIC", "Basic")) or (l.category_id and l.category_id.name in ("BASIC", "Basic", "Basic Salary"))).mapped("total"))
+                # 1. Basic Salary (Rule codes: BASIC, SALARY or category BASIC)
+                basic_sal = sum(lines.filtered(lambda l: l.code in ("BASIC", "SALARY") or (l.category_id and l.category_id.code in ("BASIC", "Basic")) or (l.category_id and l.category_id.name in ("BASIC", "Basic", "Basic Salary"))).mapped("total"))
 
-                # 2. Remaining Leaves Compensation (Rule codes: vacation_leave, remain_lev, REM_LEAVE, LEAVE_COMP, ANNUAL_LEAVE)
+                # 2. Actual Salary (Rule codes: FULL_WAGE, ACTUAL_SALARY, ACTUAL)
+                actual_sal = sum(lines.filtered(lambda l: l.code in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in (l.name or "").lower() or "الراتب الفعلي" in (l.name or "")).mapped("total"))
+
+                # 3. Remaining Leaves Compensation (Rule codes: vacation_leave, remain_lev, REM_LEAVE, LEAVE_COMP, ANNUAL_LEAVE)
                 rem_leave = sum(lines.filtered(lambda l: l.code in ("vacation_leave", "remain_lev", "REM_LEAVE", "LEAVE_COMP", "ANNUAL_LEAVE")).mapped("total"))
                 
-                # 3. Gross Attendance / Overtime (Rule codes: OT_NET, ETH_NET, RD-S, OVERTIME, GROSS_ATT, OT_COMP, EXTRA_HOURS)
+                # 4. Gross Attendance / Overtime (Rule codes: OT_NET, ETH_NET, RD-S, OVERTIME, GROSS_ATT, OT_COMP, EXTRA_HOURS)
                 gross_att_ot = sum(lines.filtered(lambda l: l.code in ("OT_NET", "ETH_NET", "RD-S", "OVERTIME", "GROSS_ATT", "OT_COMP", "EXTRA_HOURS")).mapped("total"))
 
-                # 4. Other Earnings (All Allowance category lines: HOU_ALLOW, TRAALLOW, month_alw, expatriation_alw, diff, car_alw, eos_benefit, sales, etc.)
+                # 5. Other Earnings (All Allowance category lines: HOU_ALLOW, TRAALLOW, month_alw, expatriation_alw, diff, car_alw, eos_benefit, sales, etc.)
                 all_alw = sum(lines.filtered(lambda l: (l.category_id and l.category_id.code in ("ALW", "Allowance", "ALLOWANCE")) or (l.category_id and "allowance" in (l.category_id.name or "").lower())).mapped("total"))
                 other_earnings = max(0.0, all_alw - basic_sal - rem_leave - gross_att_ot)
 
-                # 5. Gross Salary
+                # 6. Gross Salary
                 gross_sal = payslip.gross_wage if hasattr(payslip, "gross_wage") and payslip.gross_wage else sum(lines.filtered(lambda l: l.code == "GROSS" or (l.category_id and l.category_id.code in ("GROSS", "Gross"))).mapped("total"))
                 if not gross_sal:
                     gross_sal = basic_sal + rem_leave + gross_att_ot + other_earnings
 
-                # 6. Income Tax (Rule code: INCOME_TAX)
+                # 7. Income Tax (Rule code: INCOME_TAX)
                 tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in l.name).mapped("total"))
                 
-                # 7. SSC Company (Rule code: SSC)
+                # 8. SSC Company (Rule code: SSC)
                 sscc_val = sum(lines.filtered(lambda l: l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in l.name and "شركة" in l.name)).mapped("total"))
                 
-                # 8. SSC Employee (Rule code: SSE)
+                # 9. SSC Employee (Rule code: SSE)
                 ssce_val = sum(lines.filtered(lambda l: l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in l.name and "موظف" in l.name)).mapped("total"))
                 
-                # 9. Company Loan (Rule codes: COMPANY, COMLON, adv_pay, adve)
+                # 10. Company Loan (Rule codes: COMPANY, COMLON, adv_pay, adve)
                 loan_val = sum(lines.filtered(lambda l: l.code in ("COMPANY", "COMLON", "adv_pay", "adve", "LOAN", "LOANS", "ADVANCE") or "سلفة" in l.name or "سلفيات" in l.name).mapped("total"))
 
-                # 10. Salary Input Values rendered in dedicated input columns
+                # 11. Salary Input Values rendered in dedicated input columns
                 rendered_inputs_total = 0.0
                 input_vals = []
                 for _name, _width, itype in input_cols:
@@ -291,11 +298,11 @@ class HrPayslipRun(models.Model):
                     input_vals.append(in_val)
                     rendered_inputs_total += in_val
 
-                # 11. Other Deductions (Deduction category lines: HIE, OUTCON, penalties, Court, sickness_ded, cash_deficit, truncation, CLEDGER minus tax, ssce, loan, and input deductions)
+                # 12. Other Deductions (Deduction category lines: HIE, OUTCON, penalties, Court, sickness_ded, cash_deficit, truncation, CLEDGER minus tax, ssce, loan, and input deductions)
                 all_ded = sum(lines.filtered(lambda l: (l.category_id and l.category_id.code in ("DED", "Deduction", "DEDUCTION", "Social Security Deduction")) or (l.category_id and "deduction" in (l.category_id.name or "").lower())).mapped("total"))
                 other_ded = max(0.0, all_ded - tax_val - ssce_val - loan_val - rendered_inputs_total)
 
-                # 12. Net Salary (Rule code: NET)
+                # 13. Net Salary (Rule code: NET)
                 net_sal = payslip.net_wage if hasattr(payslip, "net_wage") and payslip.net_wage else sum(lines.filtered(lambda l: l.code == "NET" or (l.category_id and l.category_id.code in ("NET", "Net"))).mapped("total"))
 
                 if net_sal < 0:
@@ -321,7 +328,7 @@ class HrPayslipRun(models.Model):
                 else:
                     note_val = base_note
 
-                # Write Base Before Columns (0..16)
+                # Write Base Before Columns (0..17)
                 sheet1.write(data_row, 0, emp_id_val, text_center_fmt)
                 sheet1.write(data_row, 1, emp_name_val, text_left_fmt)
                 sheet1.write(data_row, 2, dept_val, text_left_fmt)
@@ -331,15 +338,16 @@ class HrPayslipRun(models.Model):
                 sheet1.write(data_row, 6, period_to_val, text_center_fmt)
                 
                 sheet1.write_number(data_row, 7, basic_sal, number_fmt)
-                sheet1.write_number(data_row, 8, rem_leave, number_fmt)
-                sheet1.write_number(data_row, 9, gross_att_ot, number_fmt)
-                sheet1.write_number(data_row, 10, other_earnings, number_fmt)
-                sheet1.write_number(data_row, 11, gross_sal, number_fmt)
-                sheet1.write_number(data_row, 12, tax_val, number_fmt)
-                sheet1.write_number(data_row, 13, sscc_val, number_fmt)
-                sheet1.write_number(data_row, 14, ssce_val, number_fmt)
-                sheet1.write_number(data_row, 15, loan_val, number_fmt)
-                sheet1.write_number(data_row, 16, other_ded, number_fmt)
+                sheet1.write_number(data_row, 8, actual_sal, number_fmt)
+                sheet1.write_number(data_row, 9, rem_leave, number_fmt)
+                sheet1.write_number(data_row, 10, gross_att_ot, number_fmt)
+                sheet1.write_number(data_row, 11, other_earnings, number_fmt)
+                sheet1.write_number(data_row, 12, gross_sal, number_fmt)
+                sheet1.write_number(data_row, 13, tax_val, number_fmt)
+                sheet1.write_number(data_row, 14, sscc_val, number_fmt)
+                sheet1.write_number(data_row, 15, ssce_val, number_fmt)
+                sheet1.write_number(data_row, 16, loan_val, number_fmt)
+                sheet1.write_number(data_row, 17, other_ded, number_fmt)
 
                 # Write Dynamic Salary Input Columns
                 col_curr = len(base_cols_before)
