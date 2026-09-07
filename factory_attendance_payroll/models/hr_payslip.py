@@ -260,38 +260,41 @@ class HrPayslip(models.Model):
             total_ot = 0.0
             total_undertime = 0.0
 
-            for att_date, raw_hrs in daily_hours.items():
-                if raw_hrs >= 6.0:
-                    net_hrs = max(0.0, raw_hrs - break_hrs)
-                elif raw_hrs > 4.0:
-                    net_hrs = max(0.0, raw_hrs - (break_hrs / 2.0))
-                else:
-                    net_hrs = raw_hrs
+            if allow_ot:
+                for att_date in set(att.check_in.date() for att in emp_attendances if att.check_in):
+                    matching_atts = [a for a in emp_attendances if a.check_in and a.check_in.date() == att_date]
+                    is_holiday = att_date in public_holiday_dates or any(getattr(a, 'is_public_holiday', False) for a in matching_atts)
+                    is_approved = (
+                        approved_ot_by_emp_date.get((emp_id, att_date), 0.0) > 0 or
+                        any(getattr(a, 'overtime_status', False) == 'approved' or getattr(a, 'validated_overtime_hours', 0.0) > 0 for a in matching_atts)
+                    )
 
-                is_holiday = att_date in public_holiday_dates
-                matching_atts = [a for a in emp_attendances if a.check_in.date() == att_date]
-                is_approved = (
-                    approved_ot_by_emp_date.get((emp_id, att_date), 0.0) > 0 or
-                    any(getattr(a, 'overtime_status', False) == 'approved' or getattr(a, 'validated_overtime_hours', 0.0) > 0 for a in matching_atts)
-                )
+                    if not is_approved:
+                        continue
 
-                if is_holiday:
-                    if allow_ot and net_hrs > 0 and is_approved:
-                        total_ot += (net_hrs * 1.5)
-                    continue
+                    if is_holiday:
+                        net_hol_hrs = sum(getattr(a, 'net_worked_hours', 0.0) or a.worked_hours for a in matching_atts)
+                        if net_hol_hrs > 0:
+                            total_ot += (net_hol_hrs * 1.5)
+                    else:
+                        app_ot_line = approved_ot_by_emp_date.get((emp_id, att_date), 0.0)
+                        if app_ot_line > 0:
+                            total_ot += (app_ot_line * 1.25)
+                        else:
+                            day_ot = sum(
+                                getattr(a, 'validated_overtime_hours', 0.0) or getattr(a, 'daily_overtime_hours', 0.0)
+                                for a in matching_atts
+                                if getattr(a, 'overtime_status', False) == 'approved' or getattr(a, 'validated_overtime_hours', 0.0) > 0 or getattr(a, 'daily_overtime_hours', 0.0) >= min_ot_threshold
+                            )
+                            if day_ot >= min_ot_threshold:
+                                total_ot += (day_ot * 1.25)
 
-                standard_target = 8.0
-                if net_hrs > standard_target:
-                    ot_excess = net_hrs - standard_target
-                    if ot_excess >= min_ot_threshold and allow_ot and is_approved:
-                        approved_hrs = approved_ot_by_emp_date.get((emp_id, att_date), 0.0)
-                        if not approved_hrs:
-                            approved_hrs = ot_excess
-                        total_ot += (approved_hrs * 1.25)
-                elif net_hrs < standard_target:
-                    shortfall = standard_target - net_hrs
-                    if shortfall > min_lateness_threshold:
-                        total_undertime += shortfall
+            # Sum official schedule-aware & break-aware daily undertime directly from Attendance records
+            daily_punch_lateness = sum(
+                att.daily_undertime_hours for att in emp_attendances
+                if not getattr(att, 'is_public_holiday', False) and hasattr(att, 'daily_undertime_hours') and att.daily_undertime_hours
+            )
+            total_undertime += daily_punch_lateness
 
             # Bound calculation to active contract overlapping dates within payslip period
             contract_versions = payslip.employee_id._get_versions_with_contract_overlap_with_period(payslip.date_from, payslip.date_to)
