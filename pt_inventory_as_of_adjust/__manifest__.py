@@ -2,7 +2,7 @@
 {
     "name": "PT Inventory As-of Adjustment",
 <<<<<<< HEAD
-    "version": "19.0.1.0.5",
+    "version": "19.0.1.0.6",
     "category": "Inventory",
     "summary": "Import counted qty as of a past date, review, and apply in batches",
     "description": """
