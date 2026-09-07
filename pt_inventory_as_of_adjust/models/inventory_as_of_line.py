@@ -285,6 +285,8 @@ class InventoryAsOfLine(models.Model):
         # All moves from one _action_done share the same account.move when JE is created.
         shared_account_move = new_moves.mapped("account_move_id")[:1]
 
+        with_je = 0
+        without_je = 0
         for line in ok_lines:
             quant, qty_before = prepared[line.id]
             stock_move = new_moves.filtered(
@@ -304,15 +306,36 @@ class InventoryAsOfLine(models.Model):
                 quant_qty_before=qty_before,
                 counted_to_apply=line.counted_to_apply,
             )
-            _logger.info(
-                "As-of inventory line %s product=%s location=%s stock_move=%s account_move=%s diag=%s",
-                line.id,
-                line.product_id.id,
-                line.location_id.complete_name,
-                stock_move.id if stock_move else False,
-                account_move.id if account_move else False,
-                diag,
-            )
+            reason = line._journal_skip_reason(stock_move)
+            if account_move:
+                with_je += 1
+                _logger.info(
+                    "As-of JE OK | line=%s batch=%s product=%s [%s] location=%s "
+                    "stock_move=%s account_move=%s | %s",
+                    line.id,
+                    line.batch_id.id,
+                    line.product_id.default_code or line.product_id.id,
+                    line.product_id.display_name,
+                    line.location_id.complete_name,
+                    stock_move.id if stock_move else False,
+                    account_move.id,
+                    diag,
+                )
+            else:
+                without_je += 1
+                _logger.warning(
+                    "As-of JE MISSING | reason=%s | line=%s batch=%s product=%s [%s] "
+                    "location=%s correction=%s stock_move=%s | %s",
+                    reason,
+                    line.id,
+                    line.batch_id.id,
+                    line.product_id.default_code or line.product_id.id,
+                    line.product_id.display_name,
+                    line.location_id.complete_name,
+                    line.correction,
+                    stock_move.id if stock_move else False,
+                    diag,
+                )
             line.write(
                 {
                     "state": "applied",
@@ -322,6 +345,17 @@ class InventoryAsOfLine(models.Model):
                     "account_move_id": account_move.id if account_move else False,
                 }
             )
+
+        _logger.info(
+            "As-of inventory apply done | batch_lines=%s new_stock_moves=%s "
+            "shared_account_move=%s with_je=%s without_je=%s accounting_date=%s",
+            len(ok_lines),
+            len(new_moves),
+            shared_account_move.id if shared_account_move else False,
+            with_je,
+            without_je,
+            accounting_date,
+        )
 
     def action_open_account_move(self):
         self.ensure_one()
@@ -384,6 +418,34 @@ class InventoryAsOfLine(models.Model):
         if moves:
             return moves
         return Move.search(base, order="id desc", limit=1)
+
+    def _journal_skip_reason(self, stock_move):
+        """Short machine-readable reason when no account.move was created."""
+        self.ensure_one()
+        product = self.product_id
+        if not stock_move:
+            return "no_stock_move"
+        if stock_move.account_move_id:
+            return "ok"
+        valuation = product.with_company(self.company_id).valuation
+        src_acc = stock_move.location_id.with_company(self.company_id).valuation_account_id
+        dest_acc = stock_move.location_dest_id.with_company(self.company_id).valuation_account_id
+        if not product.is_storable:
+            return "product_not_storable"
+        if not (src_acc or dest_acc):
+            return "missing_location_valuation_account"
+        if valuation != "real_time":
+            return "valuation_not_real_time(%s)" % valuation
+        if not stock_move.is_valued:
+            return "move_not_valued"
+        if float_is_zero(stock_move.quantity, precision_rounding=stock_move.product_uom.rounding):
+            return "zero_quantity"
+        try:
+            if not stock_move._should_create_account_move():
+                return "should_create_account_move_false"
+        except Exception as exc:
+            return "should_create_error(%s)" % exc
+        return "should_create_true_but_no_account_move_linked"
 
     def _diagnose_valuation_journal(
         self, stock_move, accounting_date, quant_qty_before=None, counted_to_apply=None
