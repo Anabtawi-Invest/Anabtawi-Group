@@ -1,11 +1,19 @@
 # -*- coding: utf-8 -*-
 {
     "name": "PT Inventory As-of Adjustment",
-    "version": "19.0.1.0.4",
+<<<<<<< HEAD
+    "version": "19.0.1.0.5",
     "category": "Inventory",
     "summary": "Import counted qty as of a past date, review, and apply in batches",
     "description": """
 Upload a CSV of counted quantities as of a specific date (by product_id or sku).
+=======
+    "version": "19.0.1.0.0",
+    "category": "Inventory",
+    "summary": "Import counted qty as of a past date, review, and apply in batches",
+    "description": """
+Upload a CSV of counted quantities as of a specific date.
+>>>>>>> origin/StagingisStaging
 The module computes the correction against historical on-hand, lets you
 review lines, then applies inventory adjustments in cron chunks with that
 past counting/accounting date.
