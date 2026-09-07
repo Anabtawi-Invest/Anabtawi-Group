@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_stock_backdate_inventory_wizard_form" model="ir.ui.view">
+        <field name="name">stock.backdate.inventory.wizard.form</field>
+        <field name="model">stock.backdate.inventory.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Apply Backdated Count">
+                <div class="alert alert-info" role="alert">
+                    Counted quantities are compared against the on-hand
+                    quantity <strong>as it was on the count date</strong>.
+                    Movements between the count date and today are preserved,
+                    and the adjustment plus its accounting entry are posted in
+                    the count date's period. An Excel audit file downloads when
+                    you apply.
+                </div>
+                <group>
+                    <field name="source" widget="radio"/>
+                    <field name="count_date"/>
+                    <field name="reason"/>
+                </group>
+                <group string="Excel Upload" invisible="source != 'excel'">
+                    <field name="import_file" filename="import_filename"/>
+                    <field name="import_filename" invisible="1"/>
+                    <field name="location_id"/>
+                    <button name="action_download_template" type="object"
+                            string="Download Template" class="btn-link"
+                            icon="fa-download"/>
+                    <button name="action_load_to_screen" type="object"
+                            string="Load Counts to Screen (review before apply)"
+                            class="btn-secondary" icon="fa-upload"
+                            invisible="not import_file"/>
+                </group>
+                <group invisible="source != 'selection'">
+                    <field name="line_count"/>
+                    <field name="skipped_no_count"/>
+                </group>
+                <div class="alert alert-warning" role="alert"
+                     invisible="source != 'selection' or line_count">
+                    None of the selected lines have a counted quantity. Enter
+                    values in the 'Counted' column first.
+                </div>
+                <footer>
+                    <button name="action_apply" type="object"
+                            string="Apply &amp; Download Audit"
+                            class="btn-primary"
+                            invisible="source == 'selection' and not line_count"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_stock_backdate_inventory_import" model="ir.actions.act_window">
+        <field name="name">Import Backdated Count</field>
+        <field name="res_model">stock.backdate.inventory.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_source': 'excel'}</field>
+    </record>
+
+    <menuitem id="menu_stock_backdate_inventory_import"
+              name="Import Backdated Count"
+              parent="stock.menu_stock_config_settings"
+              action="action_stock_backdate_inventory_import"
+              groups="group_inventory_backdate_manager"
+              sequence="98"/>
+
+    <record id="action_stock_backdate_inventory" model="ir.actions.server">
+        <field name="name">Apply Backdated Count</field>
+        <field name="model_id" ref="stock.model_stock_quant"/>
+        <field name="binding_model_id" ref="stock.model_stock_quant"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = {
+    'type': 'ir.actions.act_window',
+    'name': 'Apply Backdated Count',
+    'res_model': 'stock.backdate.inventory.wizard',
+    'view_mode': 'form',
+    'target': 'new',
+    'context': dict(env.context, active_model='stock.quant', active_ids=records.ids, default_source='selection'),
+}</field>
+        <field name="group_ids" eval="[(4, ref('group_inventory_backdate_manager'))]"/>
+    </record>
+</odoo>
