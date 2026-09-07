@@ -176,17 +176,32 @@ class InventoryAsOfLine(models.Model):
             "inventory_name": inventory_name,
             "force_period_date": accounting_date,
         }
+        # Capture moves created by this apply (search-by-date/reference is brittle).
+        Move = self.env["stock.move"].sudo()
+        last_move_id = (
+            Move.search(
+                [("product_id", "=", product.id), ("is_inventory", "=", True)],
+                order="id desc",
+                limit=1,
+            ).id
+            or 0
+        )
+        quant_qty_before = quant.quantity
+        quant.invalidate_recordset(["inventory_diff_quantity", "inventory_quantity_set"])
         # Prefer direct apply to avoid conflict wizard in cron.
         quant.with_context(**ctx)._apply_inventory(as_of_datetime)
 
         stock_move = self._find_inventory_stock_move(
             as_of_datetime=as_of_datetime,
             inventory_name=inventory_name,
+            after_move_id=last_move_id,
         )
         account_move = stock_move.account_move_id if stock_move else self.env["account.move"]
         diag = self._diagnose_valuation_journal(
             stock_move=stock_move,
             accounting_date=accounting_date,
+            quant_qty_before=quant_qty_before,
+            counted_to_apply=self.counted_to_apply,
         )
         _logger.info(
             "As-of inventory line %s product=%s location=%s stock_move=%s account_move=%s diag=%s",
@@ -236,33 +251,65 @@ class InventoryAsOfLine(models.Model):
             "target": "current",
         }
 
-    def _find_inventory_stock_move(self, as_of_datetime, inventory_name):
+    def _find_inventory_stock_move(self, as_of_datetime, inventory_name, after_move_id=0):
         self.ensure_one()
         Move = self.env["stock.move"].sudo()
+        loc = self.location_id
+        base = [
+            ("product_id", "=", self.product_id.id),
+            ("is_inventory", "=", True),
+            ("state", "=", "done"),
+            "|",
+            ("location_id", "=", loc.id),
+            ("location_dest_id", "=", loc.id),
+        ]
+        if after_move_id:
+            move = Move.search(base + [("id", ">", after_move_id)], order="id desc", limit=1)
+            if move:
+                return move
+
+        # Fallbacks: exact date+reason, then latest inventory move on location.
         moves = Move.search(
-            [
-                ("product_id", "=", self.product_id.id),
-                ("is_inventory", "=", True),
-                ("state", "=", "done"),
+            base
+            + [
                 ("date", "=", as_of_datetime),
+                "|",
                 ("reference", "=", inventory_name),
+                ("inventory_name", "=", inventory_name),
             ],
             order="id desc",
-            limit=10,
+            limit=1,
         )
-        loc_moves = moves.filtered(
-            lambda m: m.location_id == self.location_id or m.location_dest_id == self.location_id
-        )
-        return (loc_moves[:1] or moves[:1])[:1]
+        if moves:
+            return moves
+        return Move.search(base, order="id desc", limit=1)
 
-    def _diagnose_valuation_journal(self, stock_move, accounting_date):
+    def _diagnose_valuation_journal(
+        self, stock_move, accounting_date, quant_qty_before=None, counted_to_apply=None
+    ):
         """Explain why an account.move was or was not created for this adjustment."""
         self.ensure_one()
         product = self.product_id
         if not stock_move:
+            before = quant_qty_before
+            target = counted_to_apply if counted_to_apply is not None else self.counted_to_apply
+            if before is not None and float_is_zero(
+                (target or 0.0) - before, precision_rounding=product.uom_id.rounding
+            ):
+                return _(
+                    "No stock.move created: on-hand on this exact location quant "
+                    "(%(before)s) already equals counted to apply (%(target)s). "
+                    "Note: On Hand Today can include child locations, so it may differ."
+                ) % {"before": before, "target": target}
             return _(
-                "No inventory stock.move found after apply (product=%(product)s)."
-            ) % {"product": product.display_name}
+                "No inventory stock.move found after apply (product=%(product)s, "
+                "location=%(location)s, quant_before=%(before)s, counted_to_apply=%(target)s)."
+            ) % {
+                "product": product.display_name,
+                "location": self.location_id.complete_name,
+                "before": before,
+                "target": target,
+            }
 
         move = stock_move
         valuation = product.with_company(self.company_id).valuation
