@@ -214,7 +214,8 @@ class PosOrderLine(models.Model):
             if line.online_discount_amount:
                 if line.discount < 100:
                     expected = currency.round(abs(line.price_subtotal) * line.discount / (100.0 - line.discount))
-                    if currency.compare_amounts(expected, line.online_discount_amount) != 0:
+                    diff = abs(expected - line.online_discount_amount)
+                    if currency.compare_amounts(expected, line.online_discount_amount) != 0 and diff > currency.rounding + 1e-4:
                         raise ValidationError(_("Campaign audit amount does not match the tax-exclusive POS line discount."))
                 split = currency.round(
                     line.aggregator_contribution_amount + line.company_contribution_amount

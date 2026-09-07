@@ -7,9 +7,23 @@ import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 
 const { DateTime } = luxon;
 
+function getLinePriceIncl(line) {
+    if (typeof line.get_price_with_tax === "function") {
+        return Math.abs(line.get_price_with_tax() || 0);
+    }
+    return Math.abs(line.price_subtotal_incl ?? line.priceIncl ?? 0);
+}
+
+function getLinePriceExcl(line) {
+    if (typeof line.get_price_without_tax === "function") {
+        return Math.abs(line.get_price_without_tax() || 0);
+    }
+    return Math.abs(line.price_subtotal ?? line.priceExcl ?? 0);
+}
+
 function taxExclusiveDiscountBase(line, taxIncludedDiscount, round) {
-    const paidIncl = Math.abs(line.priceIncl || 0);
-    const paidExcl = Math.abs(line.priceExcl || 0);
+    const paidIncl = getLinePriceIncl(line);
+    const paidExcl = getLinePriceExcl(line);
     if (paidIncl && paidExcl) {
         return round((taxIncludedDiscount * paidExcl) / paidIncl);
     }
@@ -17,7 +31,9 @@ function taxExclusiveDiscountBase(line, taxIncludedDiscount, round) {
 }
 
 function commissionBaseAmount(line, commissionBase) {
-    return Math.abs(commissionBase === "before_tax" ? (line.priceExcl || 0) : (line.priceIncl || 0));
+    const paidExcl = getLinePriceExcl(line);
+    const paidIncl = getLinePriceIncl(line);
+    return Math.abs(commissionBase === "before_tax" ? paidExcl : paidIncl);
 }
 
 function normalizeRelationId(candidate) {
