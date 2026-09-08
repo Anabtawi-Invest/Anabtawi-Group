@@ -144,16 +144,14 @@ class HrPayslipRun(models.Model):
         sheet1.write(row, 0, _("Total Gross (JOD)"), card_header_fmt)
         sheet1.write(row, 1, _("Total Tax (JOD)"), card_header_fmt)
         sheet1.write(row, 2, _("Total SSC (JOD)"), card_header_fmt)
-        sheet1.write(row, 3, _("Total Loans (JOD)"), card_header_fmt)
-        sheet1.write(row, 4, _("Total Net (JOD)"), card_header_fmt)
-        sheet1.write(row, 5, _("Avg Net / Emp (JOD)"), card_header_fmt)
+        sheet1.write(row, 3, _("Total Net (JOD)"), card_header_fmt)
+        sheet1.write(row, 4, _("Avg Net / Emp (JOD)"), card_header_fmt)
 
         sheet1.write_number(row + 1, 0, total_gross_val, card_val_fmt)
         sheet1.write_number(row + 1, 1, total_tax, card_val_fmt)
         sheet1.write_number(row + 1, 2, total_ssc, card_val_fmt)
-        sheet1.write_number(row + 1, 3, total_loan, card_val_fmt)
-        sheet1.write_number(row + 1, 4, total_net_val, card_val_fmt)
-        sheet1.write_number(row + 1, 5, avg_net, card_val_fmt)
+        sheet1.write_number(row + 1, 3, total_net_val, card_val_fmt)
+        sheet1.write_number(row + 1, 4, avg_net, card_val_fmt)
 
         row += 3
 
@@ -180,9 +178,7 @@ class HrPayslipRun(models.Model):
             (_("Income Tax"), 16),
             (_("SSC Company Contrib"), 20),
             (_("SSC Employee Contrib"), 20),
-            (_("Company Loan"), 16),
         ]
-
         # Discover all unique Deduction Salary Rules present across selected payslips (excluding fixed columns)
         all_ded_lines = payslips.mapped("line_ids").filtered(
             lambda l: (
@@ -192,7 +188,6 @@ class HrPayslipRun(models.Model):
             and not (l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in (l.name or ""))
             and not (l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in (l.name or "") and "موظف" in (l.name or "")))
             and not (l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in (l.name or "") and "شركة" in (l.name or "")))
-            and not (l.code in ("COMPANY", "COMLON", "adv_pay", "adve", "LOAN", "LOANS", "ADVANCE") or "سلفة" in (l.name or "") or "سلفيات" in (l.name or ""))
         )
 
         ded_rules = {}
@@ -370,7 +365,6 @@ class HrPayslipRun(models.Model):
                 sheet1.write_number(data_row, 13, tax_val, number_fmt)
                 sheet1.write_number(data_row, 14, sscc_val, number_fmt)
                 sheet1.write_number(data_row, 15, ssce_val, number_fmt)
-                sheet1.write_number(data_row, 16, loan_val, number_fmt)
 
                 # Write Dynamic Individual Deduction Rule Columns
                 col_curr = len(base_cols_before)
