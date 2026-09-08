@@ -205,14 +205,22 @@ class HrPayslipRun(models.Model):
         # Discover all unique Salary Input Types present across selected payslips
         input_types = payslips.mapped("input_line_ids.input_type_id").sorted(key=lambda t: t.name or "")
         
+        # Exclude input types that already have a corresponding Deduction salary rule to prevent duplicate columns
+        existing_ded_names = {r_name.lower().strip() for r_name in ded_rules.values()}
+        
         input_cols = []
         if input_types:
             for itype in input_types:
-                t_name = itype.name or _("Salary Input")
-                col_name = f"Input: {t_name}" if not t_name.lower().startswith("input") else t_name
-                input_cols.append((col_name, max(18, len(col_name) + 4), itype))
-        else:
-            input_cols.append((_("Salary Inputs"), 18, None))
+                t_name = (itype.name or _("Salary Input")).strip()
+                t_norm = t_name.lower()
+                # Skip if this input type is already represented by a deduction column (e.g. Advances, Loan, City Ledger, Penalties, etc.)
+                is_duplicate = any(
+                    t_norm == d_name or t_norm in d_name or d_name in t_norm or d_name.replace("two", "2") in t_norm or t_norm.replace("2", "two") in d_name
+                    for d_name in existing_ded_names
+                )
+                if not is_duplicate:
+                    col_name = f"Input: {t_name}" if not t_name.lower().startswith("input") else t_name
+                    input_cols.append((col_name, max(18, len(col_name) + 4), itype))
 
         base_cols_after = [
             (_("Net Salary"), 18),
