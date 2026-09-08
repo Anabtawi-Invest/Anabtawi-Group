@@ -4,6 +4,7 @@ import { _t } from "@web/core/l10n/translation";
 import { makeAwaitable } from "@point_of_sale/app/utils/make_awaitable_dialog";
 import { OnSitePricePopup } from "@pos_onsite_price/js/onsite_price_popup";
 import { applySiteServiceToPosOrder } from "@pos_advance_order/js/site_service_utils";
+import { applyOnsitePledgeLinesToPosOrder } from "@pos_onsite_price/js/onsite_pledge_lines";
 
 export function normalizeId(value) {
     if (!value) {
@@ -407,6 +408,20 @@ export async function promptAndApplyOnsitePricing({
         if (siteServiceResult.missingProduct) {
             notification.add(
                 _t("Site service product is not available in this Point of Sale."),
+                { type: "warning" }
+            );
+        }
+        // No on-site → add mapped pledge product lines (pledge_amount required).
+        // On-site → never add pledge (auto lines removed inside apply).
+        const pledgeResult = await applyOnsitePledgeLinesToPosOrder(
+            pos,
+            order,
+            payload.isOnSite
+        );
+        logOnsite(`${source}: onsite pledge lines`, pledgeResult);
+        if (pledgeResult.missingProducts?.length) {
+            notification.add(
+                _t("A mapped pledge product is not available in this Point of Sale."),
                 { type: "warning" }
             );
         }

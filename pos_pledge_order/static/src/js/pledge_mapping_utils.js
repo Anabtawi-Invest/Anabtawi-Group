@@ -5,7 +5,7 @@
  * Pledge is determined ONLY by pledge_product_id on site service menu lines.
  */
 
-function normalizeProductId(value) {
+export function normalizeProductId(value) {
     if (!value) {
         return null;
     }
@@ -51,15 +51,13 @@ export function menuProductHasPledgeMapping(pos, menuProduct) {
     return menuProductId ? getMenuPledgeMap(pos).has(menuProductId) : false;
 }
 
+/** Unit pledge amount: configured pledge_amount only (no lst_price fallback). */
 export function resolvePledgeUnitAmount(pledgeProduct) {
     if (!pledgeProduct) {
         return 0;
     }
     const configured = Number(pledgeProduct.pledge_amount || 0);
-    if (configured > 0) {
-        return configured;
-    }
-    return Number(pledgeProduct.lst_price || 0);
+    return configured > 0 ? configured : 0;
 }
 
 export function getLineProduct(line) {

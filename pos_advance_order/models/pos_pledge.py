@@ -150,7 +150,7 @@ class PosAdvanceOrderPledge(models.Model):
 
     @api.model
     def _resolve_pledge_unit_amount(self, product):
-        """Pledge unit amount from the mapped pledge product (pledge_amount, then lst_price)."""
+        """Pledge unit amount from product.pledge_amount only (no lst_price fallback)."""
         SiteLine = self.env["pos.site.service.product.line"]
         return SiteLine.resolve_pledge_unit_amount(product)
 

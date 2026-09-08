@@ -235,6 +235,28 @@ class InventoryAsOfLine(models.Model):
         if not ok_lines:
             return
 
+        # Pre-check stock_location_negative_block: one bad quant must not fail the whole chunk.
+        blocked_line_ids = set()
+        for line in ok_lines:
+            quant = prepared[line.id][0]
+            blocked_msg = line._negative_block_error(quant)
+            if blocked_msg:
+                blocked_line_ids.add(line.id)
+                line.write({"state": "error", "error_message": blocked_msg})
+                _logger.warning(
+                    "As-of apply blocked (negative) | line=%s product=%s location=%s "
+                    "current=%s counted_to_apply=%s",
+                    line.id,
+                    line.product_id.display_name,
+                    line.location_id.complete_name,
+                    quant.quantity,
+                    line.counted_to_apply,
+                )
+
+        ok_lines = ok_lines.filtered(lambda l: l.id not in blocked_line_ids)
+        if not ok_lines:
+            return
+
         # Unique quants in stable order.
         quants = self.env["stock.quant"]
         seen = set()
@@ -257,27 +279,117 @@ class InventoryAsOfLine(models.Model):
         company = ok_lines[:1].company_id
         apply_quants = quants.with_company(company).with_context(**ctx)
         try:
-            # Pass date positionally AND as both known kw names for inherited overrides.
+            # Pass date positionally; inherited overrides may use date= or inventory_date=.
             try:
                 apply_quants._apply_inventory(as_of_datetime)
             except TypeError:
-                apply_quants._apply_inventory(date=as_of_datetime)
+                try:
+                    apply_quants._apply_inventory(date=as_of_datetime)
+                except TypeError:
+                    apply_quants._apply_inventory(inventory_date=as_of_datetime)
         except Exception as exc:
             _logger.exception(
-                "As-of inventory batch apply failed for lines %s", ok_lines.ids
+                "As-of inventory batch apply failed for lines %s — retrying per line",
+                ok_lines.ids,
             )
-            ok_lines.write(
-                {
-                    "state": "error",
-                    "error_message": "%s\n%s" % (exc, traceback.format_exc()),
-                }
-            )
+            # Isolate failures: apply each remaining line alone so one product
+            # cannot mark the whole chunk as error.
+            for line in ok_lines:
+                try:
+                    line._apply_inventory_adjustments_one(
+                        as_of_datetime=as_of_datetime,
+                        accounting_date=accounting_date,
+                        inventory_name=inventory_name,
+                        prepared_quant=prepared[line.id],
+                    )
+                except Exception as line_exc:
+                    _logger.exception(
+                        "As-of inventory per-line apply failed for line %s", line.id
+                    )
+                    line.write(
+                        {
+                            "state": "error",
+                            "error_message": "%s\n%s"
+                            % (line_exc, traceback.format_exc()),
+                        }
+                    )
             return
 
+        self._post_apply_link_moves(
+            ok_lines=ok_lines,
+            prepared=prepared,
+            new_moves=Move.search(
+                [("is_inventory", "=", True), ("id", ">", last_move_id)],
+                order="id asc",
+            ),
+            as_of_datetime=as_of_datetime,
+            accounting_date=accounting_date,
+        )
+
+    def _apply_inventory_adjustments_one(
+        self, as_of_datetime, accounting_date, inventory_name, prepared_quant
+    ):
+        """Apply a single already-prepared line (used as chunk-failure fallback)."""
+        self.ensure_one()
+        quant, qty_before = prepared_quant
+        Move = self.env["stock.move"].sudo()
+        last_move_id = Move.search([("is_inventory", "=", True)], order="id desc", limit=1).id or 0
+        company = self.company_id
+        ctx = {
+            "inventory_name": inventory_name,
+            "force_period_date": accounting_date,
+            "allowed_company_ids": company.ids,
+        }
+        apply_quant = quant.with_company(company).with_context(**ctx)
+        try:
+            apply_quant._apply_inventory(as_of_datetime)
+        except TypeError:
+            try:
+                apply_quant._apply_inventory(date=as_of_datetime)
+            except TypeError:
+                apply_quant._apply_inventory(inventory_date=as_of_datetime)
         new_moves = Move.search(
             [("is_inventory", "=", True), ("id", ">", last_move_id)],
             order="id asc",
         )
+        self._post_apply_link_moves(
+            ok_lines=self,
+            prepared={self.id: (quant, qty_before)},
+            new_moves=new_moves,
+            as_of_datetime=as_of_datetime,
+            accounting_date=accounting_date,
+        )
+
+    def _negative_block_error(self, quant):
+        """Return error text if location forbids resulting negative on-hand."""
+        self.ensure_one()
+        location = quant.location_id
+        if not location or not getattr(location, "restrict_negative", False):
+            return False
+        counted_qty = quant.inventory_quantity
+        if counted_qty is False:
+            return False
+        # After apply, on-hand becomes the counted quantity.
+        if counted_qty < 0:
+            return _(
+                "Blocked by Restrict Negative Stock on %(location)s.\n\n"
+                "Product: %(product)s\n"
+                "Current Quantity: %(current)s\n"
+                "Counted To Apply: %(counted)s\n\n"
+                "This line would set stock below zero. "
+                "Fix the counted qty, skip this line, or temporarily disable "
+                "'Restrict Negative Stock' on the location."
+            ) % {
+                "location": location.complete_name,
+                "product": self.product_id.display_name,
+                "current": quant.quantity,
+                "counted": counted_qty,
+            }
+        return False
+
+    def _post_apply_link_moves(
+        self, ok_lines, prepared, new_moves, as_of_datetime, accounting_date
+    ):
         # Ensure backdated move date (some _apply_inventory overrides drop the date arg).
         if as_of_datetime and new_moves:
             new_moves.write({"date": as_of_datetime})

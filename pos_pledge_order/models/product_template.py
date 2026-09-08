@@ -14,7 +14,7 @@ class ProductTemplate(models.Model):
         string="Pledge Amount",
         currency_field="pledge_currency_id",
         default=0.0,
-        help="Deposit amount when this product is used as a Site Service pledge product.",
+        help="Deposit amount required on the pledge product. If unset/zero, no pledge is created.",
     )
     # Kept so leftover/old product form views still load. Pledge is driven by
     # Site Service menu mapping, not this flag.

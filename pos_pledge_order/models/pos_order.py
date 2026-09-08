@@ -548,6 +548,22 @@ class PosOrder(models.Model):
             )
         return line
 
+    def _has_mapped_pledge_product_sale_lines(self):
+        """True when the order already sells mapped pledge products as POS lines.
+
+        In that case cash is collected via normal POS payment; do not post a
+        separate pledge deposit journal entry (avoids double collection).
+        """
+        self.ensure_one()
+        mapping = self._get_menu_pledge_map()
+        pledge_ids = {p.id for p in mapping.values() if p}
+        if not pledge_ids:
+            return False
+        return any(
+            line.product_id and line.product_id.id in pledge_ids
+            for line in self.lines
+        )
+
     def _post_pledge_deposit_move(self):
         """Dr liquidity (same journal as POS payments) / Cr pledge liability — pledge not in pos.payment totals."""
         self.ensure_one()
@@ -558,6 +574,12 @@ class PosOrder(models.Model):
                 self.name,
                 advance.name if advance else False,
                 bool(advance.site_service) if advance else False,
+            )
+            return self.env["account.move"]
+        if self._has_mapped_pledge_product_sale_lines():
+            _logger.info(
+                "[PLEDGE] skip _post_pledge_deposit_move order=%s reason=pledge_sold_as_pos_line",
+                self.name,
             )
             return self.env["account.move"]
         if self.pledge_deposit_move_id:
@@ -941,109 +963,118 @@ class PosOrder(models.Model):
             return False
 
     def action_pos_order_invoice(self):
-        """
-        Create invoices normally - pledge products appear with their product price
-        Virtual pledge amounts are ONLY on receipts, NOT in invoices
-        """
-        _logger.info("[PLEDGE] Creating invoice - pledge products included with product price only")
-        # Create invoice normally - no filtering of pledge products
+        """Create invoices including pledge product sale lines when present on the order."""
+        _logger.info("[PLEDGE] Creating invoice - including pledge product lines when sold on the order")
         return super(PosOrder, self).action_pos_order_invoice()
 
     def _prepare_invoice_vals(self):
-        """Override to exclude pledge/employee/delivery products from invoice"""
         vals = super()._prepare_invoice_vals()
         return vals
 
     def _prepare_invoice_lines(self, move_type):
-        """
-        Override to filter out pledge/employee/delivery products from invoice lines
-        We override the entire method to have full control over line creation
-        """
+        """Build invoice lines; keep pledge products, exclude employee/delivery helpers."""
         invoice_lines = []
         excluded_count = 0
-        
+
         for order in self:
             line_values_list = order.with_context(invoicing=True)._prepare_tax_base_line_values()
-            
+
             for line_values in line_values_list:
-                line = line_values['record']
+                line = line_values["record"]
                 product = line.product_id
-                
-                # Skip employee service products
+
                 if product.is_employee_service:
-                    _logger.info("[PLEDGE] Excluding employee service product '%s' from invoice", product.display_name)
+                    _logger.info(
+                        "[PLEDGE] Excluding employee service product '%s' from invoice",
+                        product.display_name,
+                    )
                     excluded_count += 1
                     continue
-                
-                # Skip delivery products
+
                 if product.is_delivery_product:
-                    _logger.info("[PLEDGE] Excluding delivery product '%s' from invoice", product.display_name)
+                    _logger.info(
+                        "[PLEDGE] Excluding delivery product '%s' from invoice",
+                        product.display_name,
+                    )
                     excluded_count += 1
                     continue
-                
-                # Include all other products (including pledge products at product price only)
-                # Virtual pledge amounts are ONLY on receipts, NOT in invoices
-                
-                # Get invoice line values
+
+                # Pledge products sold as POS lines stay on the customer invoice.
+
                 invoice_lines_values = order._get_invoice_lines_values(line_values, line, move_type)
-                if invoice_lines_values:  # Only add if not empty
+                if invoice_lines_values:
                     invoice_lines.append((0, None, invoice_lines_values))
-                
-                # Add price discount note if applicable
+
                 is_percentage = order.pricelist_id and any(
-                    order.pricelist_id.item_ids.filtered(
-                        lambda rule: rule.compute_price == "percentage")
+                    order.pricelist_id.item_ids.filtered(lambda rule: rule.compute_price == "percentage")
                 )
-                if is_percentage and self.env['decimal.precision'].precision_get('Product Price'):
-                    precision = self.env['decimal.precision'].precision_get('Product Price')
+                if is_percentage and self.env["decimal.precision"].precision_get("Product Price"):
+                    precision = self.env["decimal.precision"].precision_get("Product Price")
                     if float_compare(line.price_unit, line.product_id.lst_price, precision_digits=precision) < 0:
-                        invoice_lines.append((0, None, {
-                            'name': _('Price discount from %(original_price)s to %(discounted_price)s',
-                                    original_price=float_repr(line.product_id.lst_price, order.currency_id.decimal_places),
-                                    discounted_price=float_repr(line.price_unit, order.currency_id.decimal_places)),
-                            'display_type': 'line_note',
-                        }))
-                
-                # Add customer note if applicable
+                        invoice_lines.append(
+                            (
+                                0,
+                                None,
+                                {
+                                    "name": _(
+                                        "Price discount from %(original_price)s to %(discounted_price)s",
+                                        original_price=float_repr(
+                                            line.product_id.lst_price,
+                                            order.currency_id.decimal_places,
+                                        ),
+                                        discounted_price=float_repr(
+                                            line.price_unit,
+                                            order.currency_id.decimal_places,
+                                        ),
+                                    ),
+                                    "display_type": "line_note",
+                                },
+                            )
+                        )
+
                 if line.customer_note:
-                    invoice_lines.append((0, None, {
-                        'name': line.customer_note,
-                        'display_type': 'line_note',
-                    }))
-            
-            # Add general customer note
+                    invoice_lines.append(
+                        (
+                            0,
+                            None,
+                            {
+                                "name": line.customer_note,
+                                "display_type": "line_note",
+                            },
+                        )
+                    )
+
             if order.general_customer_note:
-                invoice_lines.append((0, None, {
-                    'name': order.general_customer_note,
-                    'display_type': 'line_note',
-                }))
-        
+                invoice_lines.append(
+                    (
+                        0,
+                        None,
+                        {
+                            "name": order.general_customer_note,
+                            "display_type": "line_note",
+                        },
+                    )
+                )
+
         _logger.info(
-            "[PLEDGE] Invoice lines prepared: %d lines (excluded %d employee/delivery products)",
-            len(invoice_lines), excluded_count
+            "[PLEDGE] Invoice lines prepared: %d lines (excluded %d employee/delivery helpers)",
+            len(invoice_lines),
+            excluded_count,
         )
-        
+
         return invoice_lines
 
     def _get_invoice_lines_to_invoice(self):
-        """
-        Filter out pledge, employee, and delivery products from invoice
-        This ensures invoices only contain regular products
-        """
+        """Keep pledge product sale lines; exclude employee/delivery helpers only."""
         lines = super()._get_invoice_lines_to_invoice()
-        
-        mapping = self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
-        pledge_product_ids = {p.id for p in mapping.values()}
         filtered_lines = lines.filtered(
-            lambda l: l.product_id.id not in pledge_product_ids
+            lambda l: not (l.product_id.is_employee_service or l.product_id.is_delivery_product)
         )
-        
         _logger.info(
-            "[PLEDGE] Filtered invoice lines: %d regular items (excluded %d pledge items)",
+            "[PLEDGE] Invoice lines kept: %d (excluded %d employee/delivery helpers)",
             len(filtered_lines),
-            len(lines) - len(filtered_lines)
+            len(lines) - len(filtered_lines),
         )
-        
         return filtered_lines
 
 

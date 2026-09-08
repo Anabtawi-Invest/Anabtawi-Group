@@ -6,7 +6,9 @@ from odoo.exceptions import UserError
 class StockQuant(models.Model):
     _inherit = 'stock.quant'
 
-    def _apply_inventory(self, inventory_date=None):
+    def _apply_inventory(self, date=None, inventory_date=None):
+        # Odoo 19 core uses date=; some custom modules used inventory_date=.
+        apply_date = date if date is not None else inventory_date
 
         for quant in self:
             location = quant.location_id
@@ -46,4 +48,4 @@ class StockQuant(models.Model):
                         counted_qty,
                     ))
 
-        return super()._apply_inventory(inventory_date)
+        return super()._apply_inventory(date=apply_date)
