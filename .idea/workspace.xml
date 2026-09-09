@@ -4,11 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="ff91cf09-53c1-432b-a3ac-e17dadc05f42" name="Changes" comment="[ADD] Restrict Change Product Qty in Pos Frontend">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pos_restrict_qty_change/__manifest__.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos_restrict_qty_change/__manifest__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pos_restrict_qty_change/static/src/app/order_summary.js" beforeDir="false" afterPath="$PROJECT_DIR$/pos_restrict_qty_change/static/src/app/order_summary.js" afterDir="false" />
-    </list>
+    <list default="true" id="944fd99f-8697-48e8-95eb-10322de70995" name="Changes" comment="[ADD] inventory adjustment" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -18,9 +14,10 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
   &quot;associatedIndex&quot;: 8
 }</component>
-  <component name="ProjectId" id="3Ho0Zb5bAeZnjJQGrowXVWKk3Xt" />
+  <component name="ProjectId" id="3IzbORVTc9k3eE2VQyndFBQRmy1" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -48,51 +45,57 @@
   </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
-      <changelist id="ff91cf09-53c1-432b-a3ac-e17dadc05f42" name="Changes" comment="" />
-      <created>1786798438981</created>
+      <changelist id="944fd99f-8697-48e8-95eb-10322de70995" name="Changes" comment="[ADD] Restrict Change Product Qty in Pos Frontend" />
+      <created>1788770330845</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
-      <updated>1786798438981</updated>
+      <updated>1788770330845</updated>
     </task>
-    <task id="LOCAL؜-٠٠٠٠١" summary="[ADD] Restrict Change Product Qty">
+    <task id="LOCAL؜-٠٠٠٠١" summary="[ADD] inventory adjustment">
       <option name="closed" value="true" />
-      <created>1786800007487</created>
+      <created>1788770463312</created>
       <option name="number" value="٠٠٠٠١" />
       <option name="presentableId" value="LOCAL؜-٠٠٠٠١" />
       <option name="project" value="LOCAL؜" />
-      <updated>1786800007487</updated>
+      <updated>1788770463312</updated>
     </task>
-    <task id="LOCAL؜-٠٠٠٠٢" summary="[MOD] Restrict Change Product Qty">
+    <task id="LOCAL؜-٠٠٠٠٢" summary="[ADD] inventory adjustment">
       <option name="closed" value="true" />
-      <created>1786800638073</created>
+      <created>1788770602369</created>
       <option name="number" value="٠٠٠٠٢" />
       <option name="presentableId" value="LOCAL؜-٠٠٠٠٢" />
       <option name="project" value="LOCAL؜" />
-      <updated>1786800638073</updated>
+      <updated>1788770602369</updated>
     </task>
-    <task id="LOCAL؜-٠٠٠٠٣" summary="[ADD] Restrict Change Product Qty in Pos Frontend">
+    <task id="LOCAL؜-٠٠٠٠٣" summary="[ADD] inventory adjustment">
       <option name="closed" value="true" />
-      <created>1786861689076</created>
+      <created>1788770658869</created>
       <option name="number" value="٠٠٠٠٣" />
       <option name="presentableId" value="LOCAL؜-٠٠٠٠٣" />
       <option name="project" value="LOCAL؜" />
-      <updated>1786861689076</updated>
+      <updated>1788770658869</updated>
     </task>
-    <task id="LOCAL؜-٠٠٠٠٤" summary="[ADD] Restrict Change Product Qty in Pos Frontend">
+    <task id="LOCAL؜-٠٠٠٠٤" summary="[ADD] inventory adjustment">
       <option name="closed" value="true" />
-      <created>1786863026966</created>
+      <created>1788771014671</created>
       <option name="number" value="٠٠٠٠٤" />
       <option name="presentableId" value="LOCAL؜-٠٠٠٠٤" />
       <option name="project" value="LOCAL؜" />
-      <updated>1786863026970</updated>
+      <updated>1788771014671</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL؜-٠٠٠٠٥" summary="[ADD] inventory adjustment">
+      <option name="closed" value="true" />
+      <created>1788786591751</created>
+      <option name="number" value="٠٠٠٠٥" />
+      <option name="presentableId" value="LOCAL؜-٠٠٠٠٥" />
+      <option name="project" value="LOCAL؜" />
+      <updated>1788786591751</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="[ADD] Restrict Change Product Qty" />
-    <MESSAGE value="[MOD] Restrict Change Product Qty" />
-    <MESSAGE value="[ADD] Restrict Change Product Qty in Pos Frontend" />
-    <option name="LAST_COMMIT_MESSAGE" value="[ADD] Restrict Change Product Qty in Pos Frontend" />
+    <MESSAGE value="[ADD] inventory adjustment" />
+    <option name="LAST_COMMIT_MESSAGE" value="[ADD] inventory adjustment" />
   </component>
 </project>
