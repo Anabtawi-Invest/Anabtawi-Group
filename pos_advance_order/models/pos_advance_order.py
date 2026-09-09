@@ -1135,6 +1135,14 @@ class PosAdvanceOrder(models.Model):
             if hasattr(order, "_sync_site_service_pledge_records"):
                 order._sync_site_service_pledge_records()
 
+    def action_refresh_pledge_display_amounts(self):
+        """Recompute pledge qty/unit/subtotal for the Complete popup Pledges section."""
+        for order in self:
+            if hasattr(order, "_sync_site_service_pledge_records"):
+                order._sync_site_service_pledge_records()
+            order.pledge_line_ids._refresh_pledge_unit_amounts()
+        return True
+
     def write(self, vals):
         business_fields = {
             "partner_id",

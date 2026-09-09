@@ -150,15 +150,41 @@ class PosAdvanceOrderPledge(models.Model):
 
     @api.model
     def _resolve_pledge_unit_amount(self, product):
-        """Pledge unit amount from product.pledge_amount only (no lst_price fallback)."""
-        SiteLine = self.env["pos.site.service.product.line"]
-        return SiteLine.resolve_pledge_unit_amount(product)
+        """Unit amount for pledge rows: pledge_amount if set, else lst_price.
+
+        Matches the auto-added advance order product line (which uses lst_price).
+        """
+        if not product:
+            return 0.0
+        amount = float(getattr(product, "pledge_amount", 0.0) or 0.0)
+        if amount <= 0 and product.product_tmpl_id:
+            amount = float(product.product_tmpl_id.pledge_amount or 0.0)
+        if amount > 0:
+            return amount
+        return float(product.lst_price or 0.0)
 
     def _refresh_pledge_unit_amounts(self):
-        """Align stored pledge unit amounts with the product configuration."""
+        """Align stored pledge unit amounts with product config / sale line price."""
         for pledge in self:
             unit = pledge._resolve_pledge_unit_amount(pledge.product_id)
-            if unit and unit != (pledge.pledge_amount_unit or 0.0):
+            # Prefer the auto pledge product line price when present on the advance order.
+            order = pledge.order_id
+            if order:
+                sale_line = order.line_ids.filtered(
+                    lambda l: l.product_id == pledge.product_id
+                    and getattr(l, "is_site_service_pledge_line", False)
+                )[:1]
+                if sale_line and sale_line.price_unit:
+                    unit = sale_line.price_unit
+                    if sale_line.product_qty and sale_line.product_qty != (pledge.pledge_qty or 0.0):
+                        pledge.sudo().write(
+                            {
+                                "pledge_qty": sale_line.product_qty,
+                                "pledge_amount_unit": unit,
+                            }
+                        )
+                        continue
+            if unit != (pledge.pledge_amount_unit or 0.0):
                 pledge.sudo().write({"pledge_amount_unit": unit})
 
     @api.depends(

@@ -178,13 +178,17 @@ class PosSiteServiceProductLine(models.Model):
 
     @api.model
     def resolve_pledge_unit_amount(self, pledge_product):
-        """Pledge unit amount from product.pledge_amount only (no lst_price fallback).
+        """Pledge unit amount: product.pledge_amount if set, otherwise lst_price.
 
-        If pledge_amount is not set / zero, there is no pledge for that product.
+        lst_price fallback keeps the Pledges section in sync with the auto-added
+        advance order product line (which is priced from lst_price).
         """
         if not pledge_product:
             return 0.0
-        return float(pledge_product.pledge_amount or 0.0)
+        amount = float(pledge_product.pledge_amount or 0.0)
+        if amount > 0:
+            return amount
+        return float(pledge_product.lst_price or 0.0)
 
     @api.model
     def menu_product_has_pledge_mapping(self, menu_product):

@@ -93,6 +93,22 @@ class PosAdvanceOrderSiteServicePledge(models.Model):
                 unit = self.env["pos.advance.order.pledge"]._resolve_pledge_unit_amount(
                     pledge_product
                 )
+                qty = menu_line.product_qty or 0.0
+                # Keep Pledges section aligned with the auto-added product line.
+                pledge_sale_line = order.line_ids.filtered(
+                    lambda l: l.is_site_service_pledge_line
+                    and l.product_id.id == pledge_product.id
+                    and (
+                        not l.source_menu_product_id
+                        or l.source_menu_product_id.id == menu_line.product_id.id
+                    )
+                )[:1]
+                if pledge_sale_line:
+                    qty = pledge_sale_line.product_qty or qty
+                    if pledge_sale_line.price_unit:
+                        unit = pledge_sale_line.price_unit
+                if qty <= 0 or unit <= 0:
+                    continue
                 existing = Pledge.search(
                     [
                         ("order_id", "=", order.id),
@@ -105,7 +121,7 @@ class PosAdvanceOrderSiteServicePledge(models.Model):
                     "product_id": pledge_product.id,
                     "source_product_id": menu_line.product_id.id,
                     "advance_line_id": menu_line.id,
-                    "pledge_qty": menu_line.product_qty,
+                    "pledge_qty": qty,
                     "pledge_amount_unit": unit,
                     "state": "pending",
                 }

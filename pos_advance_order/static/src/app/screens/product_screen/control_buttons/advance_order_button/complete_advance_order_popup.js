@@ -338,6 +338,12 @@ export class CompleteAdvanceOrderPopup extends Component {
         this.state.detail_lines = [];
         this.state.detail_pledges = [];
         try {
+            // Refresh pledge qty/unit from the auto product line before reading.
+            await this.orm.call(
+                "pos.advance.order",
+                "action_refresh_pledge_display_amounts",
+                [[orderId]]
+            );
             const [lines, pledges] = await Promise.all([
                 this.orm.searchRead(
                     "pos.advance.order.line",
