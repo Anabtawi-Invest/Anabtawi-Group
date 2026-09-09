@@ -427,12 +427,12 @@ export async function promptAndApplyOnsitePricing({
                 );
             } else if (pledgeResult.missingProducts?.length) {
                 notification.add(
-                    _t("A mapped pledge product is not available in this Point of Sale. Enable it for POS."),
+                    _t("Mapped pledge product is not loaded in this POS. Open Products, ensure Available in POS, then reload the POS session."),
                     { type: "warning" }
                 );
             } else if (pledgeResult.skippedNoAmount?.length) {
                 notification.add(
-                    _t("Mapped pledge product has no Pledge Amount / sales price."),
+                    _t("Mapped pledge product price is zero. Set Sales Price or Pledge Amount on the pledge product."),
                     { type: "warning" }
                 );
             } else if (pledgeResult.added) {

@@ -15,7 +15,7 @@ patch(PosOrderline.prototype, {
     },
 });
 
-/** Prefer product.pledge_amount; fall back to lst_price (same as advance order product line). */
+/** Prefer product.pledge_amount; fall back to sales price fields used in POS. */
 function resolveConfiguredPledgeAmount(pledgeProduct) {
     if (!pledgeProduct) {
         return 0;
@@ -24,7 +24,14 @@ function resolveConfiguredPledgeAmount(pledgeProduct) {
     if (configured > 0) {
         return configured;
     }
-    return Number(pledgeProduct.lst_price || 0);
+    const salesPrice = Number(
+        pledgeProduct.lst_price ||
+            pledgeProduct.list_price ||
+            pledgeProduct.product_tmpl_id?.list_price ||
+            pledgeProduct.product_tmpl_id?.lst_price ||
+            0
+    );
+    return salesPrice > 0 ? salesPrice : 0;
 }
 
 function normalizeId(value) {
@@ -65,8 +72,53 @@ async function resolveMenuPledgeMap(pos) {
         return map;
     }
     const orm = pos?.data?.orm || pos?.env?.services?.orm;
-    map = await fetchMenuPledgeMapFromServer(orm);
-    return map;
+    return await fetchMenuPledgeMapFromServer(orm);
+}
+
+async function ensurePledgeProductLoaded(pos, pledgeProductId) {
+    let pledgeProduct = pos.models?.["product.product"]?.get(pledgeProductId);
+    if (pledgeProduct?.product_tmpl_id) {
+        return pledgeProduct;
+    }
+    try {
+        if (pos.data?.read) {
+            const records = await pos.data.read("product.product", [pledgeProductId]);
+            pledgeProduct =
+                (Array.isArray(records) ? records[0] : null) ||
+                pos.models?.["product.product"]?.get(pledgeProductId);
+        }
+        if (!pledgeProduct && pos.data?.searchRead) {
+            await pos.data.searchRead("product.product", [["id", "=", pledgeProductId]]);
+            pledgeProduct = pos.models?.["product.product"]?.get(pledgeProductId);
+        }
+        if (!pledgeProduct) {
+            const orm = pos?.data?.orm || pos?.env?.services?.orm;
+            if (orm) {
+                const rows = await orm.searchRead(
+                    "product.product",
+                    [["id", "=", pledgeProductId]],
+                    ["id", "lst_price", "list_price", "pledge_amount", "display_name", "product_tmpl_id"]
+                );
+                if (rows?.length) {
+                    // Soft fallback object when product is not connectable into POS models.
+                    return {
+                        id: rows[0].id,
+                        lst_price: rows[0].lst_price,
+                        list_price: rows[0].list_price,
+                        pledge_amount: rows[0].pledge_amount,
+                        display_name: rows[0].display_name,
+                        product_tmpl_id: Array.isArray(rows[0].product_tmpl_id)
+                            ? { id: rows[0].product_tmpl_id[0] }
+                            : rows[0].product_tmpl_id,
+                        _fromServerFallback: true,
+                    };
+                }
+            }
+        }
+    } catch (error) {
+        console.warn("[ONSITE_PLEDGE] Failed to load pledge product", pledgeProductId, error);
+    }
+    return pledgeProduct || null;
 }
 
 export function removeAutoOnsitePledgeLines(order) {
@@ -86,7 +138,7 @@ export function removeAutoOnsitePledgeLines(order) {
  * - On-site Yes  → never add pledge lines (remove auto ones).
  * - On-site No   → add mapped pledge product lines.
  *
- * price_unit = pledge_amount if set, else lst_price
+ * price_unit = pledge_amount if set, else sales price (lst_price)
  * qty        = sum of mapped menu product quantities
  */
 export async function applyOnsitePledgeLinesToPosOrder(pos, order, isOnSite) {
@@ -103,7 +155,9 @@ export async function applyOnsitePledgeLinesToPosOrder(pos, order, isOnSite) {
 
     const qtyByPledgeId = new Map();
     const skippedNoAmount = [];
+    const missingProducts = [];
     const lines = order.getOrderlines?.() || order.lines || [];
+
     for (const line of lines) {
         if (line.is_onsite_auto_pledge_line || line.is_site_service_auto) {
             continue;
@@ -117,43 +171,56 @@ export async function applyOnsitePledgeLinesToPosOrder(pos, order, isOnSite) {
         if (!pledgeProductId) {
             continue;
         }
-        let pledgeProduct = pos.models?.["product.product"]?.get(pledgeProductId);
+
+        const qty = Number(line.get_quantity?.() ?? line.getQuantity?.() ?? line.qty ?? 0);
+        if (qty <= 0) {
+            continue;
+        }
+
+        const prev = qtyByPledgeId.get(pledgeProductId) || {
+            qty: 0,
+            unitAmount: 0,
+            pledgeProduct: null,
+        };
+        prev.qty += qty;
+        qtyByPledgeId.set(pledgeProductId, prev);
+    }
+
+    // Resolve products / prices after aggregating quantities.
+    for (const [pledgeProductId, info] of qtyByPledgeId.entries()) {
+        const pledgeProduct = await ensurePledgeProductLoaded(pos, pledgeProductId);
         if (!pledgeProduct) {
-            // Product may not be in the local POS cache; try loading by id via models.
-            pledgeProduct = pos.models?.["product.product"]?.getAll?.()?.find(
-                (p) => normalizeProductId(p) === pledgeProductId
-            );
+            missingProducts.push(pledgeProductId);
+            continue;
         }
         const unitAmount = resolveConfiguredPledgeAmount(pledgeProduct);
         if (!unitAmount) {
             skippedNoAmount.push(pledgeProductId);
             continue;
         }
-        const qty = Number(line.get_quantity?.() ?? line.getQuantity?.() ?? line.qty ?? 0);
-        if (qty <= 0) {
-            continue;
+        info.pledgeProduct = pledgeProduct;
+        info.unitAmount = unitAmount;
+    }
+
+    // Drop entries that could not be priced / loaded.
+    for (const pledgeProductId of [...qtyByPledgeId.keys()]) {
+        const info = qtyByPledgeId.get(pledgeProductId);
+        if (!info?.pledgeProduct || !info.unitAmount) {
+            qtyByPledgeId.delete(pledgeProductId);
         }
-        const prev = qtyByPledgeId.get(pledgeProductId) || {
-            qty: 0,
-            unitAmount,
-            pledgeProduct,
-        };
-        prev.qty += qty;
-        prev.unitAmount = unitAmount;
-        prev.pledgeProduct = pledgeProduct || prev.pledgeProduct;
-        qtyByPledgeId.set(pledgeProductId, prev);
     }
 
     if (!qtyByPledgeId.size) {
-        console.warn("[ONSITE_PLEDGE] Mapping found but no pledge lines to add.", {
+        console.warn("[ONSITE_PLEDGE] Nothing to add after resolving products.", {
             mapSize: menuToPledge.size,
+            missingProducts,
             skippedNoAmount,
         });
         return {
             added: false,
             lineCount: 0,
+            missingProducts,
             skippedNoAmount,
-            noMatchingCartProducts: skippedNoAmount.length === 0,
         };
     }
 
@@ -164,20 +231,24 @@ export async function applyOnsitePledgeLinesToPosOrder(pos, order, isOnSite) {
     );
 
     let addedCount = 0;
-    const missingProducts = [];
     for (const [pledgeProductId, info] of qtyByPledgeId.entries()) {
         if (existingProductIds.has(pledgeProductId)) {
             continue;
         }
         const pledgeProduct = info.pledgeProduct;
-        if (!pledgeProduct?.product_tmpl_id) {
+        const template =
+            pledgeProduct.product_tmpl_id ||
+            (pledgeProduct.product_tmpl_id?.id
+                ? pledgeProduct.product_tmpl_id
+                : null);
+        if (!template) {
             missingProducts.push(pledgeProductId);
-            console.warn("[ONSITE_PLEDGE] Pledge product not loaded in POS:", pledgeProductId);
+            console.warn("[ONSITE_PLEDGE] Pledge product has no template:", pledgeProductId);
             continue;
         }
         const newLine = await pos.addLineToCurrentOrder(
             {
-                product_tmpl_id: pledgeProduct.product_tmpl_id,
+                product_tmpl_id: template,
                 qty: info.qty,
                 price_unit: info.unitAmount,
                 price_type: "manual",
