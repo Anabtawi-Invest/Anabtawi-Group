@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="online_campaigns_discount.OnlineCampaignDashboard" owl="1">
+        <div class="o_online_campaign_dashboard_wrapper">
+            <!-- Header & Filter Toolbar -->
+            <div class="o_dashboard_header mb-3 p-3 bg-white border rounded shadow-sm">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                    <div class="o_dashboard_title">
+                        <h3 class="mb-0 text-dark fw-bold">
+                            <i class="fa fa-tachometer text-primary me-2"/> Aggregator &amp; Campaign Executive Dashboard
+                        </h3>
+                        <span class="text-muted fs-6">
+                            Channel Performance, Discount Splits &amp; Store Sales Share Analysis
+                        </span>
+                    </div>
+
+                    <!-- Quick Date Range Buttons -->
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'today'}" t-on-click="() => this.setPeriod('today')">Today</button>
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'yesterday'}" t-on-click="() => this.setPeriod('yesterday')">Yesterday</button>
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'this_week'}" t-on-click="() => this.setPeriod('this_week')">This Week</button>
+                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'this_month'}" t-on-click="() => this.setPeriod('this_month')">This Month</button>
+                    </div>
+                </div>
+
+                <!-- Dropdown Filter Toolbar -->
+                <div class="row g-2 align-items-center">
+                    <!-- Aggregator Filter -->
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label mb-1 fw-bold small text-muted">
+                            <i class="fa fa-globe text-primary me-1"/> Aggregator Filter
+                        </label>
+                        <select class="form-select form-select-sm" t-on-change="onAggregatorChange">
+                            <option value="">All Aggregators</option>
+                            <t t-foreach="data.all_aggregators" t-as="agg" t-key="agg.id">
+                                <option t-att-value="agg.id" t-att-selected="state.aggregator_id == agg.id">
+                                    <t t-esc="agg.name"/>
+                                </option>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- Campaign Filter -->
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label mb-1 fw-bold small text-muted">
+                            <i class="fa fa-tags text-warning me-1"/> Campaign Filter
+                        </label>
+                        <select class="form-select form-select-sm" t-on-change="onCampaignChange">
+                            <option value="">All Campaigns</option>
+                            <t t-foreach="data.all_campaigns" t-as="camp" t-key="camp.id">
+                                <option t-att-value="camp.id" t-att-selected="state.campaign_id == camp.id">
+                                    <t t-esc="camp.name"/>
+                                </option>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- POS Branch Filter -->
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label mb-1 fw-bold small text-muted">
+                            <i class="fa fa-building-o text-success me-1"/> POS Branch Filter
+                        </label>
+                        <select class="form-select form-select-sm" t-on-change="onBranchChange">
+                            <option value="">All POS Branches</option>
+                            <t t-foreach="data.all_branches" t-as="branch" t-key="branch.id">
+                                <option t-att-value="branch.id" t-att-selected="state.config_ids.includes(branch.id)">
+                                    <t t-esc="branch.name"/>
+                                </option>
+                            </t>
+                        </select>
+                    </div>
+
+                    <!-- Date From & To + Refresh -->
+                    <div class="col-md-3 col-sm-6 d-flex align-items-end gap-2">
+                        <div class="flex-grow-1">
+                            <input type="datetime-local" class="form-control form-control-sm" t-model="state.date_from"/>
+                        </div>
+                        <div class="flex-grow-1">
+                            <input type="datetime-local" class="form-control form-control-sm" t-model="state.date_to"/>
+                        </div>
+                        <button class="btn btn-sm btn-primary text-nowrap" t-on-click="fetchDashboardData">
+                            <i class="fa fa-refresh me-1"/> Apply
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading Spinner -->
+            <t t-if="state.loading">
+                <div class="text-center p-5 bg-white rounded border">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Loading Aggregator Analytics...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Calculating Aggregator &amp; Campaign Analytics...</p>
+                </div>
+            </t>
+
+            <!-- Main Body -->
+            <t t-else="">
+                <!-- KPI Grid Row -->
+                <div class="row g-3 mb-4">
+                    <!-- Total Store Sales (All POS) -->
+                    <div class="col-lg-4 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm o_kpi_card bg-light-primary clickable_kpi" t-on-click="() => this.onKpiClick('store_sales')">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-uppercase fw-bold text-muted small">Total Store Sales (POS)</span>
+                                    <i class="fa fa-shopping-bag fa-2x text-primary opacity-50"/>
+                                </div>
+                                <h2 class="fw-bold mb-1 text-primary"><t t-esc="formatCurrency(data.kpis.total_store_sales)"/></h2>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                    <span class="badge bg-primary text-white"><t t-esc="data.kpis.total_store_orders"/> Total Store Orders</span>
+                                    <span class="small text-muted"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Aggregator Sales & Store Percentage Share -->
+                    <div class="col-lg-4 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm o_kpi_card bg-light-success clickable_kpi" t-on-click="() => this.onKpiClick('aggregator_sales')">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-uppercase fw-bold text-muted small">Aggregator Sales Volume</span>
+                                    <i class="fa fa-globe fa-2x text-success opacity-50"/>
+                                </div>
+                                <h2 class="fw-bold mb-1 text-success"><t t-esc="formatCurrency(data.kpis.aggregator_sales)"/></h2>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                    <span class="badge bg-success text-white px-2 py-1 fs-6">
+                                        <i class="fa fa-pie-chart me-1"/> <t t-esc="data.kpis.aggregator_share_percent"/>% of Store Sales
+                                    </span>
+                                    <span class="small text-muted"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Aggregator Orders & AOV -->
+                    <div class="col-lg-4 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm o_kpi_card bg-light-info clickable_kpi" t-on-click="() => this.onKpiClick('aggregator_sales')">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-uppercase fw-bold text-muted small">Aggregator Orders &amp; AOV</span>
+                                    <i class="fa fa-shopping-cart fa-2x text-info opacity-50"/>
+                                </div>
+                                <h2 class="fw-bold mb-1 text-info"><t t-esc="data.kpis.order_count"/> <span class="fs-5 text-muted">Orders</span></h2>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                    <span class="badge bg-info text-dark">Avg Order: <t t-esc="formatCurrency(data.kpis.avg_order_value)"/></span>
+                                    <span class="small text-muted"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Total Campaign Discounts -->
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm o_kpi_card bg-light-warning clickable_kpi" t-on-click="() => this.onKpiClick('aggregator_sales')">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-uppercase fw-bold text-muted small">Total Discounts</span>
+                                    <i class="fa fa-tag text-warning"/>
+                                </div>
+                                <h3 class="fw-bold mb-1 text-warning"><t t-esc="formatCurrency(data.kpis.discount_amount)"/></h3>
+                                <span class="small text-muted">Total Campaign Discounts Granted</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Company Share (Contribution) -->
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm o_kpi_card bg-light-danger clickable_kpi" t-on-click="() => this.onKpiClick('aggregator_sales')">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-uppercase fw-bold text-muted small">Company Share</span>
+                                    <i class="fa fa-building text-danger"/>
+                                </div>
+                                <h3 class="fw-bold mb-1 text-danger"><t t-esc="formatCurrency(data.kpis.company_contribution)"/></h3>
+                                <span class="small text-muted">Company-Funded Discount Expense</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Aggregator Share (Contribution) -->
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm o_kpi_card bg-light-secondary clickable_kpi" t-on-click="() => this.onKpiClick('aggregator_sales')">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-uppercase fw-bold text-muted small">Aggregator Share</span>
+                                    <i class="fa fa-handshake-o text-secondary"/>
+                                </div>
+                                <h3 class="fw-bold mb-1 text-dark"><t t-esc="formatCurrency(data.kpis.aggregator_contribution)"/></h3>
+                                <span class="small text-muted">Aggregator-Funded Contribution</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Aggregator Commission -->
+                    <div class="col-lg-3 col-md-6">
+                        <div class="card h-100 border-0 shadow-sm o_kpi_card bg-light-dark clickable_kpi" t-on-click="() => this.onKpiClick('aggregator_sales')">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-uppercase fw-bold text-muted small">Aggregator Commission</span>
+                                    <i class="fa fa-percent text-dark"/>
+                                </div>
+                                <h3 class="fw-bold mb-1 text-dark"><t t-esc="formatCurrency(data.kpis.estimated_commission)"/></h3>
+                                <span class="small text-muted">Estimated Channel Commission</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aggregator Sales & Store Share Breakdown Table -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="mb-0 fw-bold text-dark">
+                            <i class="fa fa-pie-chart text-success me-2"/> Aggregator Sales &amp; Store Percentage Breakdown
+                        </h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Aggregator</th>
+                                    <th class="text-end">Sales Amount</th>
+                                    <th class="text-center" style="width: 220px;">% of Store Sales</th>
+                                    <th class="text-center">Orders</th>
+                                    <th class="text-end">Discounts</th>
+                                    <th class="text-end">Commission</th>
+                                    <th class="text-end">Estimated Net Proceeds</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="!data.aggregators.length">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">
+                                            <i class="fa fa-folder-open-o fa-2x mb-2 d-block"/>
+                                            No aggregator records found for the selected filter period.
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-else="">
+                                    <t t-foreach="data.aggregators" t-as="agg" t-key="agg.id">
+                                        <tr>
+                                            <td class="fw-bold">
+                                                <i class="fa fa-globe text-primary me-2"/>
+                                                <t t-esc="agg.name"/>
+                                            </td>
+                                            <td class="text-end fw-bold text-success">
+                                                <t t-esc="formatCurrency(agg.gross_amount)"/>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div class="progress flex-grow-1" style="height: 8px;">
+                                                        <div class="progress-bar bg-success" role="progressbar" t-att-style="'width: ' + agg.store_share_percent + '%'"/>
+                                                    </div>
+                                                    <span class="badge bg-success text-white" style="min-width: 55px;">
+                                                        <t t-esc="agg.store_share_percent"/>%
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td class="text-center fw-bold"><t t-esc="agg.order_count"/></td>
+                                            <td class="text-end text-warning"><t t-esc="formatCurrency(agg.discount_amount)"/></td>
+                                            <td class="text-end text-danger"><t t-esc="formatCurrency(agg.estimated_commission)"/></td>
+                                            <td class="text-end fw-bold text-primary"><t t-esc="formatCurrency(agg.estimated_net_proceeds)"/></td>
+                                        </tr>
+                                    </t>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Campaign Performance Table -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="mb-0 fw-bold text-dark">
+                            <i class="fa fa-tags text-warning me-2"/> Active Campaign Performance &amp; Contribution Split
+                        </h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Campaign</th>
+                                    <th>Aggregator</th>
+                                    <th class="text-end">Gross Sales</th>
+                                    <th class="text-center">Orders</th>
+                                    <th class="text-end">Total Discount</th>
+                                    <th class="text-end">Company Share</th>
+                                    <th class="text-end">Aggregator Share</th>
+                                    <th class="text-end">Commission</th>
+                                    <th class="text-end">Net Proceeds</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="!data.campaigns.length">
+                                    <tr>
+                                        <td colspan="9" class="text-center py-4 text-muted">
+                                            <i class="fa fa-info-circle me-1"/>
+                                            No active campaign orders recorded for the selected period.
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-else="">
+                                    <t t-foreach="data.campaigns" t-as="camp" t-key="camp.id">
+                                        <tr>
+                                            <td class="fw-bold">
+                                                <i class="fa fa-tag text-warning me-2"/>
+                                                <t t-esc="camp.name"/>
+                                            </td>
+                                            <td><t t-esc="camp.aggregator_name"/></td>
+                                            <td class="text-end fw-bold"><t t-esc="formatCurrency(camp.gross_amount)"/></td>
+                                            <td class="text-center"><t t-esc="camp.order_count"/></td>
+                                            <td class="text-end text-warning fw-bold"><t t-esc="formatCurrency(camp.discount_amount)"/></td>
+                                            <td class="text-end text-danger"><t t-esc="formatCurrency(camp.company_contribution)"/></td>
+                                            <td class="text-end text-secondary"><t t-esc="formatCurrency(camp.aggregator_contribution)"/></td>
+                                            <td class="text-end"><t t-esc="formatCurrency(camp.estimated_commission)"/></td>
+                                            <td class="text-end fw-bold text-success"><t t-esc="formatCurrency(camp.estimated_net_proceeds)"/></td>
+                                        </tr>
+                                    </t>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

@@ -1,6 +1,6 @@
 {
     "name": "Online Campaigns Discount",
-    "version": "19.0.5.7.0",
+    "version": "19.0.5.6.0",
     "category": "Sales/Point of Sale",
     "summary": "Enterprise aggregator campaigns, commissions, settlements, and POS reporting",
     "author": "Anabtawi Sweets",
@@ -16,6 +16,11 @@
         "views/menu.xml",
     ],
     "assets": {
+        "web.assets_backend": [
+            "online_campaigns_discount/static/src/scss/online_campaign_dashboard.scss",
+            "online_campaigns_discount/static/src/js/online_campaign_dashboard.js",
+            "online_campaigns_discount/static/src/xml/online_campaign_dashboard.xml",
+        ],
         "point_of_sale._assets_pos": [
             "online_campaigns_discount/static/src/js/online_campaign_loader.js",
             "online_campaigns_discount/static/src/js/online_discount_logic.js",

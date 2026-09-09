@@ -140,12 +140,8 @@
         <field name="context">{'search_default_group_aggregator': 1, 'search_default_group_month': 1}</field>
     </record>
 
-    <record id="action_online_campaign_dashboard" model="ir.actions.act_window">
+    <record id="action_online_campaign_dashboard" model="ir.actions.client">
         <field name="name">Aggregator Dashboard</field>
-        <field name="res_model">online.campaign.performance.report</field>
-        <field name="view_mode">graph,pivot,list</field>
-        <field name="view_id" ref="view_online_campaign_performance_graph"/>
-        <field name="search_view_id" ref="view_online_campaign_performance_search"/>
-        <field name="context">{'graph_mode': 'bar', 'group_by': ['aggregator_id']}</field>
+        <field name="tag">online_campaign_dashboard_main</field>
     </record>
 </odoo>
