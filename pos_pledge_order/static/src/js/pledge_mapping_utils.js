@@ -51,13 +51,16 @@ export function menuProductHasPledgeMapping(pos, menuProduct) {
     return menuProductId ? getMenuPledgeMap(pos).has(menuProductId) : false;
 }
 
-/** Unit pledge amount: configured pledge_amount only (no lst_price fallback). */
+/** Unit pledge amount: pledge_amount if set, otherwise lst_price. */
 export function resolvePledgeUnitAmount(pledgeProduct) {
     if (!pledgeProduct) {
         return 0;
     }
     const configured = Number(pledgeProduct.pledge_amount || 0);
-    return configured > 0 ? configured : 0;
+    if (configured > 0) {
+        return configured;
+    }
+    return Number(pledgeProduct.lst_price || 0);
 }
 
 export function getLineProduct(line) {

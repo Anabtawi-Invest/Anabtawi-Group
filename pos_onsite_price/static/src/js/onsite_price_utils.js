@@ -411,7 +411,7 @@ export async function promptAndApplyOnsitePricing({
                 { type: "warning" }
             );
         }
-        // No on-site → add mapped pledge product lines (pledge_amount required).
+        // No on-site → add mapped pledge product lines.
         // On-site → never add pledge (auto lines removed inside apply).
         const pledgeResult = await applyOnsitePledgeLinesToPosOrder(
             pos,
@@ -419,16 +419,35 @@ export async function promptAndApplyOnsitePricing({
             payload.isOnSite
         );
         logOnsite(`${source}: onsite pledge lines`, pledgeResult);
-        if (pledgeResult.missingProducts?.length) {
-            notification.add(
-                _t("A mapped pledge product is not available in this Point of Sale."),
-                { type: "warning" }
-            );
+        if (!payload.isOnSite) {
+            if (pledgeResult.missingMapping) {
+                notification.add(
+                    _t("Site Service pledge mapping is not loaded. Check Site Service config and reload POS."),
+                    { type: "warning" }
+                );
+            } else if (pledgeResult.missingProducts?.length) {
+                notification.add(
+                    _t("A mapped pledge product is not available in this Point of Sale. Enable it for POS."),
+                    { type: "warning" }
+                );
+            } else if (pledgeResult.skippedNoAmount?.length) {
+                notification.add(
+                    _t("Mapped pledge product has no Pledge Amount / sales price."),
+                    { type: "warning" }
+                );
+            } else if (pledgeResult.added) {
+                // Ensure cashier sees the new lines even when prices also changed.
+                changes = changes.length ? changes : [{ pledgeLinesAdded: pledgeResult.lineCount }];
+            }
         }
     }
     if (changes.length) {
+        const onlyPledges =
+            changes.length === 1 && changes[0]?.pledgeLinesAdded;
         notification.add(
-            stayMessage || _t("On-site prices applied. Check the new prices."),
+            onlyPledges
+                ? _t("Pledge lines added. Press Payment again to continue.")
+                : stayMessage || _t("On-site prices applied. Check the new prices."),
             { type: "success" }
         );
         return { applied: true, isOnSite: payload.isOnSite, changes };
