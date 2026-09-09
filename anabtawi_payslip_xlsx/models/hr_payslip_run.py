@@ -202,8 +202,33 @@ class HrPayslipRun(models.Model):
             col_name = f"Deduction: {r_name}" if not r_name.lower().startswith("deduction") else r_name
             ded_cols.append((col_name, max(18, len(col_name) + 4), r_key))
 
-        # Do not add any dynamic Salary Input columns to the Excel export
+        # Discover all unique Salary Input Types present across selected payslips
+        input_types = payslips.mapped("input_line_ids.input_type_id").sorted(key=lambda t: t.name or "")
+        
+        # Gather all Deduction Rule names present on the payslips to prevent duplication
+        ded_rule_names = {r_name.lower().strip() for r_name in ded_rules.values()}
+        
         input_cols = []
+        if input_types:
+            for itype in input_types:
+                t_name = (itype.name or _("Salary Input")).strip()
+                t_norm = t_name.lower()
+                t_code = (getattr(itype, "code", "") or "").lower()
+
+                # Check if this input type is a Deduction Input (matches deduction rule or deduction category)
+                is_deduction_input = (
+                    "deduction" in t_norm
+                    or "ded" in t_code
+                    or any(
+                        t_norm in d_name or d_name in t_norm or d_name.replace("two", "2") in t_norm or t_norm.replace("2", "two") in d_name
+                        for d_name in ded_rule_names
+                    )
+                )
+
+                # Include ONLY Allowance / Earning Inputs (non-deduction inputs)
+                if not is_deduction_input:
+                    col_name = f"Input: {t_name}" if not t_name.lower().startswith("input") else t_name
+                    input_cols.append((col_name, max(18, len(col_name) + 4), itype))
 
         base_cols_after = [
             (_("Net Salary"), 18),
