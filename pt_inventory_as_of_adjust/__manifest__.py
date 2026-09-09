@@ -10,8 +10,8 @@ The module computes the correction against historical on-hand, lets you
 review lines, then applies inventory adjustments in cron chunks with that
 past counting/accounting date.
     """,
-    "author": "Peerless Technology",
-    "website": "https://www.peerlesstec.com",
+    "author": "Anabtawi Jordan",
+
     "depends": [
         "stock",
         "stock_account",
