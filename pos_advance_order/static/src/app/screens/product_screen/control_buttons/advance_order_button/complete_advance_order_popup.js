@@ -32,7 +32,6 @@ export class CompleteAdvanceOrderPopup extends Component {
             amount_tendered: 0,
             advance_orders: [],
             detail_lines: [],
-            detail_pledges: [],
             payment_methods: paymentMethods,
             selected_payment_method_id: defaultPmId,
         });
@@ -167,16 +166,8 @@ export class CompleteAdvanceOrderPopup extends Component {
         return this._tr("Order Lines", "بنود الطلب");
     }
 
-    get pledgesSectionLabel() {
-        return this._tr("Pledges", "العهد");
-    }
-
     get noLinesText() {
         return this._tr("No product lines on this order.", "لا توجد بنود منتجات في هذا الطلب.");
-    }
-
-    get noPledgesText() {
-        return this._tr("No pledges on this order.", "لا توجد عهد على هذا الطلب.");
     }
 
     get siteServiceLabel() {
@@ -336,49 +327,25 @@ export class CompleteAdvanceOrderPopup extends Component {
     async _loadOrderDetail(orderId) {
         this.state.detailLoading = true;
         this.state.detail_lines = [];
-        this.state.detail_pledges = [];
         try {
-            // Refresh pledge qty/unit from the auto product line before reading.
-            await this.orm.call(
-                "pos.advance.order",
-                "action_refresh_pledge_display_amounts",
-                [[orderId]]
+            const lines = await this.orm.searchRead(
+                "pos.advance.order.line",
+                [["order_id", "=", orderId]],
+                [
+                    "id",
+                    "product_id",
+                    "product_qty",
+                    "price_unit",
+                    "discount",
+                    "price_subtotal_incl",
+                    "display_type",
+                    "sequence",
+                ],
+                { order: "sequence, id" }
             );
-            const [lines, pledges] = await Promise.all([
-                this.orm.searchRead(
-                    "pos.advance.order.line",
-                    [["order_id", "=", orderId]],
-                    [
-                        "id",
-                        "product_id",
-                        "product_qty",
-                        "price_unit",
-                        "discount",
-                        "price_subtotal_incl",
-                        "display_type",
-                        "sequence",
-                    ],
-                    { order: "sequence, id" }
-                ),
-                this.orm.searchRead(
-                    "pos.advance.order.pledge",
-                    [["order_id", "=", orderId]],
-                    [
-                        "id",
-                        "product_id",
-                        "source_product_id",
-                        "pledge_qty",
-                        "pledge_amount_unit",
-                        "pledge_subtotal",
-                        "state",
-                    ],
-                    { order: "id" }
-                ),
-            ]);
             this.state.detail_lines = (lines || []).filter(
                 (line) => !line.display_type && line.product_id
             );
-            this.state.detail_pledges = pledges || [];
         } catch (error) {
             this.notification.add(
                 error?.message ||
@@ -444,7 +411,6 @@ export class CompleteAdvanceOrderPopup extends Component {
     goBackToList() {
         this.state.view = "list";
         this.state.detail_lines = [];
-        this.state.detail_pledges = [];
     }
 
     confirm() {

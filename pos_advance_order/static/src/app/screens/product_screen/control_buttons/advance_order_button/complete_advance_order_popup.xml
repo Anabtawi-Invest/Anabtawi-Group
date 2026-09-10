@@ -160,37 +160,6 @@
                                     </table>
                                 </div>
                             </div>
-
-                            <div class="mb-3">
-                                <strong class="d-block mb-2" t-esc="pledgesSectionLabel"/>
-                                <div class="table-responsive border rounded" style="max-height: 160px; overflow: auto;">
-                                    <table class="table table-sm mb-0">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th t-esc="colProductLabel"/>
-                                                <th class="text-center" t-esc="colQtyLabel"/>
-                                                <th class="text-end" t-esc="colUnitPriceLabel"/>
-                                                <th class="text-end" t-esc="colSubtotalLabel"/>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <t t-if="!state.detail_pledges.length">
-                                                <tr>
-                                                    <td colspan="4" class="text-center text-muted py-2" t-esc="noPledgesText"/>
-                                                </tr>
-                                            </t>
-                                            <t t-foreach="state.detail_pledges" t-as="pledge" t-key="pledge.id">
-                                                <tr>
-                                                    <td t-esc="pledge.product_id and pledge.product_id[1] or ''"/>
-                                                    <td class="text-center" t-esc="pledge.pledge_qty"/>
-                                                    <td class="text-end" t-esc="_fmtMoney(pledge.pledge_amount_unit)"/>
-                                                    <td class="text-end" t-esc="_fmtMoney(pledge.pledge_subtotal)"/>
-                                                </tr>
-                                            </t>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
                         </t>
 
                         <div class="form-group mb-3">
