@@ -66,7 +66,7 @@ class OnlineCampaignDashboard(models.AbstractModel):
         if campaign_id:
             report_domain.append(("campaign_id", "=", int(campaign_id)))
         if config_ids:
-            report_domain.append(("session_id.config_id", "in", config_ids))
+            report_domain.append(("config_id", "in", config_ids))
 
         reports = self.env["online.campaign.performance.report"].search(report_domain)
 
@@ -199,7 +199,7 @@ class OnlineCampaignDashboard(models.AbstractModel):
         if campaign_id:
             domain.append(("campaign_id", "=", int(campaign_id)))
         if config_ids:
-            domain.append(("session_id.config_id", "in", config_ids))
+            domain.append(("config_id", "in", config_ids))
 
         if metric_type == "store_sales":
             pos_domain = [("company_id", "=", self.env.company.id), ("state", "in", ["paid", "done"])]

@@ -43,6 +43,7 @@
                 <field name="date"/>
                 <field name="aggregator_id"/>
                 <field name="campaign_id"/>
+                <field name="config_id" string="Branch"/>
                 <field name="is_campaign_order" string="Campaign Order" optional="show"/>
                 <field name="session_id" optional="hide"/>
                 <field name="order_count" sum="Orders"/>
@@ -56,7 +57,7 @@
                 <field name="estimated_net_proceeds" widget="monetary" sum="Net Proceeds"/>
                 <field name="estimated_campaign_cost" widget="monetary" sum="Campaign Cost"/>
                 <field name="currency_id" column_invisible="True"/>
-                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
             </list>
         </field>
     </record>
@@ -67,6 +68,7 @@
         <field name="arch" type="xml">
             <pivot string="Aggregator Profitability">
                 <field name="aggregator_id" type="row"/>
+                <field name="config_id" type="row"/>
                 <field name="campaign_id" type="row"/>
                 <field name="date" interval="month" type="col"/>
                 <field name="gross_amount" type="measure"/>
@@ -99,6 +101,7 @@
             <search>
                 <field name="aggregator_id"/>
                 <field name="campaign_id"/>
+                <field name="config_id" string="Branch"/>
                 <field name="is_campaign_order"/>
                 <field name="date"/>
                 <field name="session_id"/>
@@ -106,6 +109,7 @@
                 <filter name="campaign_orders" string="Campaign Orders" domain="[('is_campaign_order', '=', True)]"/>
                 <filter name="non_campaign_orders" string="Non-Campaign Aggregator Orders" domain="[('is_campaign_order', '=', False)]"/>
                 <separator/>
+                <filter name="group_branch" string="Branch" context="{'group_by': 'config_id'}"/>
                 <filter name="group_campaign" string="Campaign" context="{'group_by': 'campaign_id'}"/>
                 <filter name="group_sale_type" string="Campaign / Non-Campaign" context="{'group_by': 'is_campaign_order'}"/>
                 <filter name="group_month" string="Month" context="{'group_by': 'date:month'}"/>
