@@ -1,5 +1,6 @@
 /** @odoo-module **/
 
+import { whenReady } from "@odoo/owl";
 import { rpc } from "@web/core/network/rpc";
 
 function qs(sel, root = document) {
@@ -14,6 +15,7 @@ function money(n) {
     return (Number(n) || 0).toFixed(2);
 }
 
+whenReady().then(start);
 document.addEventListener("DOMContentLoaded", start);
 if (document.readyState !== "loading") {
     start();
@@ -29,6 +31,19 @@ function start() {
         initCreatePage(createRoot);
     }
     initDetailPage();
+}
+
+async function fetchPartners(term) {
+    try {
+        return await rpc("/my/sales/api/partners", { term });
+    } catch (e1) {
+        const url = `/my/sales/api/partners/http?term=${encodeURIComponent(term)}`;
+        const response = await fetch(url, { credentials: "same-origin" });
+        if (!response.ok) {
+            throw e1;
+        }
+        return await response.json();
+    }
 }
 
 function initCreatePage(root) {
@@ -62,6 +77,12 @@ function initCreatePage(root) {
 
     let searchTimer = null;
     let productTimer = null;
+    let searchSeq = 0;
+
+    if (!partnerSearch || !partnerResults) {
+        console.error("portal_sale_order_create: partner search elements missing");
+        return;
+    }
 
     function openModal() {
         if (!modalEl) {
@@ -86,6 +107,10 @@ function initCreatePage(root) {
         }
     }
 
+    function hidePartnerResults() {
+        partnerResults.innerHTML = "";
+    }
+
     function selectPartner(partner) {
         state.partner = partner;
         selectedLabel.textContent = `${partner.name}${partner.phone ? " — " + partner.phone : ""}${partner.email ? " — " + partner.email : ""}`;
@@ -93,11 +118,6 @@ function initCreatePage(root) {
         partnerSearch.value = "";
         newForm.classList.add("d-none");
         hidePartnerResults();
-    }
-
-    function hidePartnerResults() {
-        partnerResults.classList.add("d-none");
-        partnerResults.innerHTML = "";
     }
 
     function renderCart() {
@@ -154,10 +174,13 @@ function initCreatePage(root) {
     }
 
     async function searchPartners(term) {
-        partnerResults.classList.remove("d-none");
+        const seq = ++searchSeq;
         partnerResults.innerHTML = `<div class="list-group-item text-muted">Searching...</div>`;
         try {
-            const partners = await rpc("/my/sales/api/partners", { term });
+            const partners = await fetchPartners(term);
+            if (seq !== searchSeq) {
+                return;
+            }
             if (!partners.length) {
                 partnerResults.innerHTML = `<div class="list-group-item text-muted">No customers found</div>`;
                 return;
@@ -173,7 +196,7 @@ function initCreatePage(root) {
             };
             partnerResults.innerHTML = partners
                 .map(
-                    (p) => `<button type="button" class="list-group-item list-group-item-action"
+                    (p) => `<button type="button" class="list-group-item list-group-item-action text-start"
                         data-id="${p.id}" data-name="${escapeAttr(p.name)}"
                         data-phone="${escapeAttr(p.phone)}" data-email="${escapeAttr(p.email)}">
                         <strong>${highlight(p.name)}</strong>
@@ -185,7 +208,8 @@ function initCreatePage(root) {
                 )
                 .join("");
             qsa("button", partnerResults).forEach((btn) => {
-                btn.addEventListener("click", () => {
+                btn.addEventListener("mousedown", (ev) => {
+                    ev.preventDefault();
                     selectPartner({
                         id: parseInt(btn.dataset.id, 10),
                         name: btn.dataset.name,
@@ -195,8 +219,21 @@ function initCreatePage(root) {
                 });
             });
         } catch (e) {
+            if (seq !== searchSeq) {
+                return;
+            }
             partnerResults.innerHTML = `<div class="list-group-item text-danger">${escapeHtml(extractError(e))}</div>`;
         }
+    }
+
+    function schedulePartnerSearch() {
+        clearTimeout(searchTimer);
+        const term = partnerSearch.value.trim();
+        if (term.length < 1) {
+            hidePartnerResults();
+            return;
+        }
+        searchTimer = setTimeout(() => searchPartners(term), 120);
     }
 
     function bindProductCard(card, product) {
@@ -291,30 +328,10 @@ function initCreatePage(root) {
         updateProductMeta(hasMore);
     }
 
-    partnerSearch.addEventListener("input", () => {
-        clearTimeout(searchTimer);
-        const term = partnerSearch.value.trim();
-        if (term.length < 1) {
-            hidePartnerResults();
-            return;
-        }
-        // Show choices as soon as the user types the first letter(s)
-        searchTimer = setTimeout(() => searchPartners(term), 150);
-    });
-
-    partnerSearch.addEventListener("focus", () => {
-        const term = partnerSearch.value.trim();
-        if (term.length >= 1) {
-            searchPartners(term);
-        }
-    });
-
-    document.addEventListener("click", (ev) => {
-        const box = qs(".o_portal_partner_autocomplete", root);
-        if (box && !box.contains(ev.target)) {
-            hidePartnerResults();
-        }
-    });
+    partnerSearch.addEventListener("input", schedulePartnerSearch);
+    partnerSearch.addEventListener("keyup", schedulePartnerSearch);
+    partnerSearch.addEventListener("compositionend", schedulePartnerSearch);
+    partnerSearch.addEventListener("focus", schedulePartnerSearch);
 
     qs("#btn_new_partner", root).addEventListener("click", () => {
         newForm.classList.toggle("d-none");
@@ -362,7 +379,6 @@ function initCreatePage(root) {
         loadMoreBtn.addEventListener("click", () => loadProducts({ reset: false }));
     }
 
-    // Explicit close handlers — no Bootstrap Modal
     if (doneBtn) {
         doneBtn.addEventListener("click", (ev) => {
             ev.preventDefault();

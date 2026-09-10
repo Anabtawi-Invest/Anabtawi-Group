@@ -84,38 +84,59 @@ class PortalSaleOrderCreate(http.Controller):
     # JSON API
     # ------------------------------------------------------------------
 
-    @http.route("/my/sales/api/partners", type="jsonrpc", auth="user", website=True)
+    @http.route(["/my/sales/api/partners", "/my/sales/api/partners/json"], type="jsonrpc", auth="user", website=True)
     def api_partners(self, term="", **kwargs):
         self._ensure_sales_portal()
+        return self._search_partners(term)
+
+    @http.route("/my/sales/api/partners/http", type="http", auth="user", website=True, methods=["GET"], csrf=False)
+    def api_partners_http(self, term="", **kwargs):
+        """HTTP fallback for autocomplete (avoids jsonrpc issues on some builds)."""
+        self._ensure_sales_portal()
+        return request.make_json_response(self._search_partners(term))
+
+    def _search_partners(self, term):
         term = (term or "").strip()
         if len(term) < 1:
             return []
 
         Partner = request.env["res.partner"].sudo()
         digits = re.sub(r"\D", "", term)
+        partner_ids = []
 
-        # Match name / phone / mobile / email as the user types
-        or_domain = [
+        # Standard Odoo name search (name / ref / email / vat depending on version)
+        for pid, _name in Partner.name_search(name=term, operator="ilike", limit=25):
+            partner_ids.append(pid)
+
+        # Explicit name + phone/mobile match (important for typing phone digits)
+        or_clauses = [
             ("name", "ilike", term),
-            ("display_name", "ilike", term),
             ("phone", "ilike", term),
             ("mobile", "ilike", term),
             ("email", "ilike", term),
         ]
-        # Extra digit-only match helps when phone is stored with spaces/+/-
         if len(digits) >= 2:
-            or_domain += [
+            or_clauses += [
                 ("phone", "ilike", digits),
                 ("mobile", "ilike", digits),
             ]
-
         domain = ["&", ("active", "=", True)]
-        # Build (... OR ... OR ...)
-        for _ in range(len(or_domain) - 1):
+        for _ in range(len(or_clauses) - 1):
             domain.append("|")
-        domain.extend(or_domain)
+        domain.extend(or_clauses)
+        partner_ids.extend(Partner.search(domain, limit=25).ids)
 
-        partners = Partner.search(domain, limit=25, order="name, id")
+        # Keep order, unique
+        seen = set()
+        ordered_ids = []
+        for pid in partner_ids:
+            if pid not in seen:
+                seen.add(pid)
+                ordered_ids.append(pid)
+            if len(ordered_ids) >= 25:
+                break
+
+        partners = Partner.browse(ordered_ids)
         return [
             {
                 "id": p.id,
