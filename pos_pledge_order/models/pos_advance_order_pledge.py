@@ -315,25 +315,17 @@ class PosAdvanceOrderPledgeReturn(models.Model):
                     ("state", "=", "active"),
                 ]
             )
-            if len(all_active) > len(related_lines):
-                raise UserError(
-                    _(
-                        "Order %(order)s has %(total)s active pledge(s). "
-                        "Return all active pledges on this order in one operation.",
-                        order=collection_order.display_name,
-                        total=len(all_active),
-                    )
-                )
 
             deposit_move = self.env["account.move"]
-            for line in related_lines:
+            # Prefer a deposit move linked to the selected lines, then any active line / order.
+            for line in related_lines | all_active:
                 candidate = line._get_pledge_deposit_move(collection_order)
                 if candidate:
                     deposit_move = candidate
                     break
 
-            # No deposit JE: if pledge was sold as a POS product line, refund like a normal
-            # POS product return. Keep the accounting reversal path when a deposit JE exists.
+            # No deposit JE: allow returning selected pledge product lines via POS refund
+            # (partial return is OK, same as refunding one product from an order).
             if not deposit_move or deposit_move.state != "posted":
                 if self._pledge_was_sold_as_pos_line(collection_order, related_lines):
                     results.append(
@@ -351,6 +343,17 @@ class PosAdvanceOrderPledgeReturn(models.Model):
                         "and the pledge product was not found as a refundable POS line. "
                         "Cannot return pledge deposit.",
                         order=collection_order.display_name,
+                    )
+                )
+
+            # Deposit JE path: one JE covers the order — return all active pledges together.
+            if len(all_active) > len(related_lines):
+                raise UserError(
+                    _(
+                        "Order %(order)s has %(total)s active pledge(s) linked to one deposit entry. "
+                        "Return all active pledges on this order in one operation.",
+                        order=collection_order.display_name,
+                        total=len(all_active),
                     )
                 )
 
