@@ -217,6 +217,68 @@ class PosAdvanceOrderPledgeReturn(models.Model):
         )
         return move
 
+    @api.model
+    def _pledge_was_sold_as_pos_line(self, collection_order, pledges):
+        """True when pledge products exist as positive (sale) lines on the origin POS order."""
+        if not collection_order or not pledges:
+            return False
+        product_ids = set(pledges.mapped("product_id").ids)
+        if not product_ids:
+            return False
+        return any(
+            line.product_id
+            and line.product_id.id in product_ids
+            and (line.qty or 0.0) > 0
+            for line in collection_order.lines
+        )
+
+    @api.model
+    def _action_return_pledges_via_pos_refund(
+        self,
+        pledges,
+        collection_order,
+        pos_payment_method_id=None,
+        pos_session_id=None,
+    ):
+        """Return pledges collected as POS product lines via a normal POS refund order."""
+        session = pledges[:1]._resolve_return_session(collection_order, pos_session_id)
+        return_pm = pledges[:1]._resolve_return_payment_method(
+            collection_order,
+            pos_payment_method_id,
+            pos_session_id=pos_session_id,
+        )
+        refund_order = self._create_pledge_refund_pos_order_for_pledges(
+            pledges, session, return_pm, collection_order
+        )
+        pledges.write(
+            {
+                "state": "returned",
+                "return_date": fields.Datetime.now(),
+                "return_payment_method_id": return_pm.id,
+                "return_pos_session_id": session.id,
+                "return_pos_order_id": refund_order.id,
+                "pos_order_id": collection_order.id,
+                "return_move_id": False,
+            }
+        )
+        _logger.info(
+            "[PLEDGE] Returned %s pledge(s) via POS refund order %s pm=%s session=%s origin=%s",
+            len(pledges),
+            refund_order.name,
+            return_pm.display_name,
+            session.name,
+            collection_order.name,
+        )
+        return {
+            "pledge_ids": pledges.ids,
+            "refund_order_id": refund_order.id,
+            "refund_order_name": refund_order.name,
+            "origin_order_name": collection_order.name,
+            "payment_method_name": return_pm.display_name,
+            "amount": abs(refund_order.amount_total),
+            "return_via": "pos_refund",
+        }
+
     def _action_return_pledges_accounting(self, pledges, pos_payment_method_id=None, pos_session_id=None):
         """Clear pledge liability and credit the return POS cash/bank (avoids cross-branch shortage)."""
         PledgeLine = self.env["pos.advance.order.pledge"]
@@ -269,10 +331,24 @@ class PosAdvanceOrderPledgeReturn(models.Model):
                 if candidate:
                     deposit_move = candidate
                     break
+
+            # No deposit JE: if pledge was sold as a POS product line, refund like a normal
+            # POS product return. Keep the accounting reversal path when a deposit JE exists.
             if not deposit_move or deposit_move.state != "posted":
+                if self._pledge_was_sold_as_pos_line(collection_order, related_lines):
+                    results.append(
+                        self._action_return_pledges_via_pos_refund(
+                            related_lines,
+                            collection_order,
+                            pos_payment_method_id=pos_payment_method_id,
+                            pos_session_id=pos_session_id,
+                        )
+                    )
+                    continue
                 raise UserError(
                     _(
-                        "No posted pledge journal entry is linked to order %(order)s. "
+                        "No posted pledge journal entry is linked to order %(order)s, "
+                        "and the pledge product was not found as a refundable POS line. "
                         "Cannot return pledge deposit.",
                         order=collection_order.display_name,
                     )
@@ -363,7 +439,7 @@ class PosAdvanceOrderPledgeReturn(models.Model):
         }
 
     def action_return_pledges(self, pledge_ids=None, pos_payment_method_id=None, pos_session_id=None):
-        """Return pledges: clear liability, credit current POS liquidity (not blind deposit reverse)."""
+        """Return pledges: deposit JE reverse if present, else POS product refund."""
         ctx = self.env.context
         if pos_payment_method_id is None:
             pos_payment_method_id = ctx.get("pos_payment_method_id")
@@ -386,7 +462,7 @@ class PosAdvanceOrderPledgeReturn(models.Model):
         )
 
     def action_return_pledge(self, pos_payment_method_id=None, pos_session_id=None):
-        """Return selected pledge(s) via accounting reversal."""
+        """Return selected pledge(s) via accounting reversal or POS refund."""
         return self.action_return_pledges(
             pledge_ids=self.ids,
             pos_payment_method_id=pos_payment_method_id,

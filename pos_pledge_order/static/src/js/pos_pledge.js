@@ -239,8 +239,17 @@ patch(ControlButtons.prototype, {
             );
 
             const pledgeCount = selection.pledge_ids.length;
-            const batchCount = result?.count || (result?.return_move_name ? 1 : 0);
-            if (batchCount > 1) {
+            const batchCount = result?.count || (result?.return_move_name || result?.refund_order_name ? 1 : 0);
+            if (result?.return_via === "pos_refund" || result?.refund_order_name) {
+                this.notification.add(
+                    _t(
+                        "%s pledge(s) returned via POS refund order %s.",
+                        pledgeCount,
+                        result.refund_order_name || ""
+                    ),
+                    { type: "success" }
+                );
+            } else if (batchCount > 1) {
                 this.notification.add(
                     _t(
                         "%s pledge(s) returned. Reversal entries created.",
