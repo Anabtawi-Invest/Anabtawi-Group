@@ -62,7 +62,7 @@
                                 <label class="form-label">Search customer</label>
                                 <div class="o_portal_partner_autocomplete">
                                     <input type="text" class="form-control" id="partner_search"
-                                           placeholder="Type name or phone..."
+                                           placeholder="Type name, phone or email..."
                                            autocomplete="off"/>
                                     <div id="partner_results" class="o_portal_partner_results list-group mt-2"></div>
                                 </div>
@@ -251,7 +251,7 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <p class="mb-1"><strong>Customer:</strong> <t t-esc="order.partner_id.name"/></p>
-                                <p class="mb-1"><strong>Phone:</strong> <t t-esc="order.partner_id.phone or order.partner_id.mobile or '-'"/></p>
+                                <p class="mb-1"><strong>Phone:</strong> <t t-esc="order.partner_id.phone or '-'"/></p>
                                 <p class="mb-0"><strong>Email:</strong> <t t-esc="order.partner_id.email or '-'"/></p>
                             </div>
                             <div class="col-md-6">

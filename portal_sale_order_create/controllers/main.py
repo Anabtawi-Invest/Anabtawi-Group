@@ -96,56 +96,43 @@ class PortalSaleOrderCreate(http.Controller):
         return request.make_json_response(self._search_partners(term))
 
     def _search_partners(self, term):
+        """Search customers by name, phone, or email only."""
         term = (term or "").strip()
         if len(term) < 1:
             return []
 
-        Partner = request.env["res.partner"].sudo()
-        digits = re.sub(r"\D", "", term)
-        partner_ids = []
+        try:
+            Partner = request.env["res.partner"].sudo()
+            digits = re.sub(r"\D", "", term)
 
-        # Standard Odoo name search (name / ref / email / vat depending on version)
-        for pid, _name in Partner.name_search(name=term, operator="ilike", limit=25):
-            partner_ids.append(pid)
-
-        # Explicit name + phone/mobile match (important for typing phone digits)
-        or_clauses = [
-            ("name", "ilike", term),
-            ("phone", "ilike", term),
-            ("mobile", "ilike", term),
-            ("email", "ilike", term),
-        ]
-        if len(digits) >= 2:
-            or_clauses += [
-                ("phone", "ilike", digits),
-                ("mobile", "ilike", digits),
+            # Do NOT use name_search here: some DBs still inject 'mobile' and crash on Odoo 19.
+            or_clauses = [
+                ("name", "ilike", term),
+                ("phone", "ilike", term),
+                ("email", "ilike", term),
             ]
-        domain = ["&", ("active", "=", True)]
-        for _ in range(len(or_clauses) - 1):
-            domain.append("|")
-        domain.extend(or_clauses)
-        partner_ids.extend(Partner.search(domain, limit=25).ids)
+            if len(digits) >= 2:
+                or_clauses.append(("phone", "ilike", digits))
 
-        # Keep order, unique
-        seen = set()
-        ordered_ids = []
-        for pid in partner_ids:
-            if pid not in seen:
-                seen.add(pid)
-                ordered_ids.append(pid)
-            if len(ordered_ids) >= 25:
-                break
+            domain = ["&", ("active", "=", True)]
+            for _ in range(len(or_clauses) - 1):
+                domain.append("|")
+            domain.extend(or_clauses)
 
-        partners = Partner.browse(ordered_ids)
-        return [
-            {
-                "id": p.id,
-                "name": p.display_name or p.name,
-                "phone": p.phone or p.mobile or "",
-                "email": p.email or "",
-            }
-            for p in partners
-        ]
+            partners = Partner.search(domain, limit=25, order="name, id")
+            return [
+                {
+                    "id": p.id,
+                    "name": p.display_name or p.name,
+                    "phone": p.phone or "",
+                    "email": p.email or "",
+                }
+                for p in partners
+            ]
+        except Exception:
+            _logger.exception("portal_sale_order_create: partner search failed for term=%r", term)
+            return []
+
 
     @http.route("/my/sales/api/partner/create", type="jsonrpc", auth="user", website=True)
     def api_partner_create(self, name="", phone="", email="", **kwargs):
@@ -332,7 +319,7 @@ class PortalSaleOrderCreate(http.Controller):
         if not invoice:
             return False
         partner = invoice.partner_id
-        phone = partner.mobile or partner.phone or ""
+        phone = partner.phone or ""
         digits = re.sub(r"\D", "", phone)
         if not digits:
             return False

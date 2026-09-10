@@ -175,14 +175,25 @@ function initCreatePage(root) {
 
     async function searchPartners(term) {
         const seq = ++searchSeq;
-        partnerResults.innerHTML = `<div class="list-group-item text-muted">Searching...</div>`;
+        partnerResults.innerHTML = `<div class="list-group-item text-muted">جاري البحث... / Searching...</div>`;
         try {
             const partners = await fetchPartners(term);
             if (seq !== searchSeq) {
                 return;
             }
             if (!partners.length) {
-                partnerResults.innerHTML = `<div class="list-group-item text-muted">No customers found</div>`;
+                partnerResults.innerHTML = `
+                    <div class="list-group-item o_portal_partner_empty">
+                        <div class="fw-semibold mb-1">لا يوجد عميل مطابق</div>
+                        <div class="small text-muted mb-0">
+                            لم يتم العثور على عميل بهذا الاسم أو رقم الهاتف أو الإيميل.
+                            يمكنك إنشاء عميل جديد من الزر بجانب البحث.
+                        </div>
+                        <div class="small text-muted mt-1 mb-0">
+                            No matching customer found by name, phone, or email.
+                            You can create a new customer using the button next to the search.
+                        </div>
+                    </div>`;
                 return;
             }
             const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -222,7 +233,15 @@ function initCreatePage(root) {
             if (seq !== searchSeq) {
                 return;
             }
-            partnerResults.innerHTML = `<div class="list-group-item text-danger">${escapeHtml(extractError(e))}</div>`;
+            // Never show raw technical errors to the salesperson
+            partnerResults.innerHTML = `
+                <div class="list-group-item o_portal_partner_empty">
+                    <div class="fw-semibold mb-1">لا يوجد عميل مطابق</div>
+                    <div class="small text-muted mb-0">
+                        لم يتم العثور على نتائج. جرّب اسمًا أو رقم هاتف أو إيميل آخر،
+                        أو أنشئ عميلًا جديدًا.
+                    </div>
+                </div>`;
         }
     }
 

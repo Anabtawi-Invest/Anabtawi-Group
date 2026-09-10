@@ -96,6 +96,12 @@
     padding: 0;
 }
 
+.o_portal_partner_empty {
+    background: #fff8f1;
+    border-color: #f5d0a9 !important;
+    color: #7c2d12;
+}
+
 /* Custom product dialog — independent of Bootstrap Modal */
 .o_portal_sale_dialog {
     position: fixed;
