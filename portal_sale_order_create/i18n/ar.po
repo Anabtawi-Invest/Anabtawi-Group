@@ -29,26 +29,26 @@ msgid "Sales Portal User"
 msgstr "مستخدم بوابة المبيعات"
 
 #. module: portal_sale_order_create
-#: model:portal.entry,name:portal_sale_order_create.portal_entry_create_sale_order
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_breadcrumbs_sale
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_my_home_sale_cards
 msgid "Create Sale Order"
 msgstr "إنشاء أمر بيع"
 
 #. module: portal_sale_order_create
-#: model:portal.entry,description:portal_sale_order_create.portal_entry_create_sale_order
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_my_home_sale_cards
 msgid "Create a sale order and invoice for a customer"
 msgstr "إنشاء أمر بيع وفاتورة للعميل"
 
 #. module: portal_sale_order_create
-#: model:portal.entry,name:portal_sale_order_create.portal_entry_my_sale_orders
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_orders
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_breadcrumbs_sale
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_my_home_sale_cards
 msgid "My Sale Orders"
 msgstr "أوامر البيع الخاصة بي"
 
 #. module: portal_sale_order_create
-#: model:portal.entry,description:portal_sale_order_create.portal_entry_my_sale_orders
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_my_home_sale_cards
 msgid "View and cancel sale orders you created"
 msgstr "عرض وإلغاء أوامر البيع التي قمت بإنشائها"
 
@@ -338,13 +338,3 @@ msgstr "إلغاء %s"
 #: code:addons/portal_sale_order_create/controllers/main.py:0
 msgid "Hello %(name)s, your invoice %(invoice)s: %(link)s"
 msgstr "مرحباً %(name)s، فاتورتك %(invoice)s: %(link)s"
-
-#. module: portal_sale_order_create
-#: model:ir.model.fields,field_description:portal_sale_order_create.field_portal_entry__required_group_xmlid
-msgid "Required Group XML ID"
-msgstr "معرف مجموعة XML المطلوب"
-
-#. module: portal_sale_order_create
-#: model:ir.model.fields,help:portal_sale_order_create.field_portal_entry__required_group_xmlid
-msgid "If set, the card is shown only to users in this group."
-msgstr "إذا تم تعيينه، تظهر البطاقة فقط للمستخدمين في هذه المجموعة."
