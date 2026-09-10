@@ -52,3 +52,97 @@
 .o_portal_sale_section .list-group-item:hover {
     background: #f1f5f9;
 }
+
+.o_portal_partner_autocomplete {
+    z-index: 20;
+}
+
+.o_portal_partner_results {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 2px);
+    z-index: 30;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+    background: #fff;
+}
+
+.o_portal_partner_results .list-group-item {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0 !important;
+}
+
+.o_portal_partner_results .list-group-item:first-child {
+    border-top: 0;
+}
+
+.o_portal_partner_results mark {
+    background: #fef08a;
+    padding: 0;
+}
+
+/* Custom product dialog — independent of Bootstrap Modal */
+.o_portal_sale_dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.o_portal_sale_dialog.d-none {
+    display: none !important;
+}
+
+.o_portal_sale_dialog_backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.o_portal_sale_dialog_panel {
+    position: relative;
+    z-index: 1;
+    width: min(1100px, 96vw);
+    max-height: 90vh;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.o_portal_sale_dialog_header,
+.o_portal_sale_dialog_footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid #e5e7eb;
+    background: #fff;
+}
+
+.o_portal_sale_dialog_footer {
+    justify-content: flex-end;
+    border-bottom: 0;
+    border-top: 1px solid #e5e7eb;
+}
+
+.o_portal_sale_dialog_body {
+    padding: 1rem 1.1rem;
+    overflow-y: auto;
+    flex: 1 1 auto;
+}
+
+body.o_portal_sale_dialog_open {
+    overflow: hidden;
+}

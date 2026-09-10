@@ -88,22 +88,38 @@ class PortalSaleOrderCreate(http.Controller):
     def api_partners(self, term="", **kwargs):
         self._ensure_sales_portal()
         term = (term or "").strip()
-        domain = [("parent_id", "=", False), ("active", "=", True)]
-        if term:
-            domain += [
-                "|",
-                "|",
-                "|",
-                ("name", "ilike", term),
-                ("phone", "ilike", term),
-                ("mobile", "ilike", term),
-                ("email", "ilike", term),
+        if len(term) < 1:
+            return []
+
+        Partner = request.env["res.partner"].sudo()
+        digits = re.sub(r"\D", "", term)
+
+        # Match name / phone / mobile / email as the user types
+        or_domain = [
+            ("name", "ilike", term),
+            ("display_name", "ilike", term),
+            ("phone", "ilike", term),
+            ("mobile", "ilike", term),
+            ("email", "ilike", term),
+        ]
+        # Extra digit-only match helps when phone is stored with spaces/+/-
+        if len(digits) >= 2:
+            or_domain += [
+                ("phone", "ilike", digits),
+                ("mobile", "ilike", digits),
             ]
-        partners = request.env["res.partner"].sudo().search(domain, limit=20, order="name")
+
+        domain = ["&", ("active", "=", True)]
+        # Build (... OR ... OR ...)
+        for _ in range(len(or_domain) - 1):
+            domain.append("|")
+        domain.extend(or_domain)
+
+        partners = Partner.search(domain, limit=25, order="name, id")
         return [
             {
                 "id": p.id,
-                "name": p.name,
+                "name": p.display_name or p.name,
                 "phone": p.phone or p.mobile or "",
                 "email": p.email or "",
             }
@@ -132,13 +148,30 @@ class PortalSaleOrderCreate(http.Controller):
         }
 
     @http.route("/my/sales/api/products", type="jsonrpc", auth="user", website=True)
-    def api_products(self, term="", **kwargs):
+    def api_products(self, term="", offset=0, limit=60, **kwargs):
         self._ensure_sales_portal()
         term = (term or "").strip()
+        try:
+            offset = max(int(offset or 0), 0)
+        except (TypeError, ValueError):
+            offset = 0
+        try:
+            limit = min(max(int(limit or 60), 1), 200)
+        except (TypeError, ValueError):
+            limit = 60
+
         domain = [("sale_ok", "=", True), ("active", "=", True)]
         if term:
-            domain += ["|", ("name", "ilike", term), ("default_code", "ilike", term)]
-        products = request.env["product.product"].sudo().search(domain, limit=40, order="name")
+            domain += [
+                "|",
+                "|",
+                ("name", "ilike", term),
+                ("default_code", "ilike", term),
+                ("barcode", "ilike", term),
+            ]
+        Product = request.env["product.product"].sudo()
+        total = Product.search_count(domain)
+        products = Product.search(domain, limit=limit, offset=offset, order="default_code, name, id")
         company = request.env.company
         currency = company.currency_id
         result = []
@@ -154,7 +187,13 @@ class PortalSaleOrderCreate(http.Controller):
                     "uom": product.uom_id.name,
                 }
             )
-        return result
+        return {
+            "products": result,
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "has_more": offset + len(result) < total,
+        }
 
     @http.route("/my/sales/api/confirm", type="jsonrpc", auth="user", website=True)
     def api_confirm(self, partner_id=None, lines=None, **kwargs):

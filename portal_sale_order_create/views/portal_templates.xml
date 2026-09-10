@@ -60,9 +60,12 @@
                         <div class="row g-2 align-items-end">
                             <div class="col-md-6">
                                 <label class="form-label">Search customer</label>
-                                <input type="text" class="form-control" id="partner_search"
-                                       placeholder="Name, phone or email"/>
-                                <div id="partner_results" class="list-group mt-2"></div>
+                                <div class="o_portal_partner_autocomplete position-relative">
+                                    <input type="text" class="form-control" id="partner_search"
+                                           placeholder="Type name or phone..."
+                                           autocomplete="off"/>
+                                    <div id="partner_results" class="o_portal_partner_results list-group d-none"></div>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <button type="button" class="btn btn-outline-primary" id="btn_new_partner">
@@ -144,22 +147,27 @@
                 </div>
             </div>
 
-            <!-- Product dialog -->
-            <div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Choose products</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"/>
+            <!-- Product dialog (custom overlay — no Bootstrap Modal dependency) -->
+            <div id="productModal" class="o_portal_sale_dialog d-none" aria-hidden="true">
+                <div class="o_portal_sale_dialog_backdrop" id="btn_close_products_backdrop"></div>
+                <div class="o_portal_sale_dialog_panel" role="dialog" aria-modal="true">
+                    <div class="o_portal_sale_dialog_header">
+                        <h5 class="mb-0">Choose products</h5>
+                        <button type="button" class="btn btn-sm btn-light border" id="btn_close_products" aria-label="Close">✕</button>
+                    </div>
+                    <div class="o_portal_sale_dialog_body">
+                        <input type="text" class="form-control mb-3" id="product_search"
+                               placeholder="Search products..."/>
+                        <div id="product_count" class="small text-muted mb-2"></div>
+                        <div id="product_grid" class="o_portal_product_grid"/>
+                        <div class="text-center mt-3">
+                            <button type="button" class="btn btn-outline-primary d-none" id="btn_load_more_products">
+                                Load more products
+                            </button>
                         </div>
-                        <div class="modal-body">
-                            <input type="text" class="form-control mb-3" id="product_search"
-                                   placeholder="Search products..."/>
-                            <div id="product_grid" class="o_portal_product_grid"/>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Done</button>
-                        </div>
+                    </div>
+                    <div class="o_portal_sale_dialog_footer">
+                        <button type="button" class="btn btn-primary" id="btn_done_products">Done</button>
                     </div>
                 </div>
             </div>

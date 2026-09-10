@@ -163,13 +163,18 @@ msgstr "تأكيد وإنشاء فاتورة"
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
-msgid "Search products..."
-msgstr "بحث عن منتجات..."
+msgid "Done"
+msgstr "تم"
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
-msgid "Done"
-msgstr "تم"
+msgid "Load more products"
+msgstr "تحميل المزيد من المنتجات"
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "Search products..."
+msgstr "بحث عن منتجات..."
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_orders

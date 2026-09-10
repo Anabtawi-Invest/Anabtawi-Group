@@ -34,7 +34,10 @@ function start() {
 function initCreatePage(root) {
     const state = {
         partner: null,
-        cart: {}, // product_id -> {id,name,price,qty}
+        cart: {},
+        productOffset: 0,
+        productTerm: "",
+        productTotal: 0,
     };
 
     const partnerSearch = qs("#partner_search", root);
@@ -49,18 +52,52 @@ function initCreatePage(root) {
     const confirmError = qs("#confirm_error", root);
     const productGrid = qs("#product_grid");
     const productSearch = qs("#product_search");
+    const productCount = qs("#product_count");
+    const loadMoreBtn = qs("#btn_load_more_products");
+    const doneBtn = qs("#btn_done_products");
+    const closeBtn = qs("#btn_close_products");
+    const closeBackdrop = qs("#btn_close_products_backdrop");
     const modalEl = qs("#productModal");
+    const PAGE_SIZE = 60;
 
     let searchTimer = null;
     let productTimer = null;
+
+    function openModal() {
+        if (!modalEl) {
+            return;
+        }
+        modalEl.classList.remove("d-none");
+        modalEl.setAttribute("aria-hidden", "false");
+        document.body.classList.add("o_portal_sale_dialog_open");
+    }
+
+    function closeModal() {
+        if (!modalEl) {
+            return;
+        }
+        modalEl.classList.add("d-none");
+        modalEl.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("o_portal_sale_dialog_open");
+        renderCart();
+        const productsSection = qs(".o_portal_sale_section #cart_table_wrap", root) || qs(".o_portal_sale_section", root);
+        if (productsSection) {
+            productsSection.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    }
 
     function selectPartner(partner) {
         state.partner = partner;
         selectedLabel.textContent = `${partner.name}${partner.phone ? " — " + partner.phone : ""}${partner.email ? " — " + partner.email : ""}`;
         selectedBox.classList.remove("d-none");
-        partnerResults.innerHTML = "";
         partnerSearch.value = "";
         newForm.classList.add("d-none");
+        hidePartnerResults();
+    }
+
+    function hidePartnerResults() {
+        partnerResults.classList.add("d-none");
+        partnerResults.innerHTML = "";
     }
 
     function renderCart() {
@@ -117,80 +154,166 @@ function initCreatePage(root) {
     }
 
     async function searchPartners(term) {
-        const partners = await rpc("/my/sales/api/partners", { term });
-        if (!partners.length) {
-            partnerResults.innerHTML = `<div class="list-group-item text-muted">No customers found</div>`;
-            return;
-        }
-        partnerResults.innerHTML = partners
-            .map(
-                (p) => `<button type="button" class="list-group-item list-group-item-action"
-                    data-id="${p.id}" data-name="${escapeAttr(p.name)}"
-                    data-phone="${escapeAttr(p.phone)}" data-email="${escapeAttr(p.email)}">
-                    <strong>${escapeHtml(p.name)}</strong>
-                    <div class="small text-muted">${escapeHtml(p.phone || "")} ${escapeHtml(p.email || "")}</div>
-                </button>`
-            )
-            .join("");
-        qsa("button", partnerResults).forEach((btn) => {
-            btn.addEventListener("click", () => {
-                selectPartner({
-                    id: parseInt(btn.dataset.id, 10),
-                    name: btn.dataset.name,
-                    phone: btn.dataset.phone,
-                    email: btn.dataset.email,
+        partnerResults.classList.remove("d-none");
+        partnerResults.innerHTML = `<div class="list-group-item text-muted">Searching...</div>`;
+        try {
+            const partners = await rpc("/my/sales/api/partners", { term });
+            if (!partners.length) {
+                partnerResults.innerHTML = `<div class="list-group-item text-muted">No customers found</div>`;
+                return;
+            }
+            const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const re = safeTerm ? new RegExp(`(${safeTerm})`, "ig") : null;
+            const highlight = (text) => {
+                const value = String(text || "");
+                if (!re || !value) {
+                    return escapeHtml(value);
+                }
+                return escapeHtml(value).replace(re, "<mark>$1</mark>");
+            };
+            partnerResults.innerHTML = partners
+                .map(
+                    (p) => `<button type="button" class="list-group-item list-group-item-action"
+                        data-id="${p.id}" data-name="${escapeAttr(p.name)}"
+                        data-phone="${escapeAttr(p.phone)}" data-email="${escapeAttr(p.email)}">
+                        <strong>${highlight(p.name)}</strong>
+                        <div class="small text-muted">
+                            ${p.phone ? highlight(p.phone) : ""}
+                            ${p.email ? " · " + highlight(p.email) : ""}
+                        </div>
+                    </button>`
+                )
+                .join("");
+            qsa("button", partnerResults).forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    selectPartner({
+                        id: parseInt(btn.dataset.id, 10),
+                        name: btn.dataset.name,
+                        phone: btn.dataset.phone,
+                        email: btn.dataset.email,
+                    });
                 });
             });
+        } catch (e) {
+            partnerResults.innerHTML = `<div class="list-group-item text-danger">${escapeHtml(extractError(e))}</div>`;
+        }
+    }
+
+    function bindProductCard(card, product) {
+        qs(".product-add", card).addEventListener("click", () => {
+            const qty = parseFloat(qs(".product-qty", card).value) || 1;
+            state.cart[product.id] = {
+                id: product.id,
+                name: product.name,
+                price: product.price,
+                qty,
+            };
+            renderCart();
+            const addBtn = qs(".product-add", card);
+            addBtn.textContent = "Added";
+            addBtn.classList.remove("btn-primary");
+            addBtn.classList.add("btn-success");
         });
     }
 
-    async function loadProducts(term = "") {
-        productGrid.innerHTML = `<div class="text-muted">Loading...</div>`;
-        const products = await rpc("/my/sales/api/products", { term });
-        if (!products.length) {
+    function productCardHtml(p) {
+        const inCart = state.cart[p.id];
+        return `<div class="o_portal_product_card" data-id="${p.id}">
+            <img src="${p.image_url}" alt="" loading="lazy"/>
+            <div class="o_product_name">${escapeHtml(p.name)}</div>
+            <div class="o_product_price">${escapeHtml(p.price_display)}</div>
+            <div class="o_qty_row">
+                <input type="number" min="1" step="1" value="${inCart ? inCart.qty : 1}" class="form-control form-control-sm product-qty"/>
+                <button type="button" class="btn btn-sm ${inCart ? "btn-success" : "btn-primary"} product-add">
+                    ${inCart ? "Added" : "Add"}
+                </button>
+            </div>
+        </div>`;
+    }
+
+    function updateProductMeta(hasMore) {
+        if (productCount) {
+            const shown = productGrid.querySelectorAll(".o_portal_product_card").length;
+            productCount.textContent = state.productTotal
+                ? `Showing ${shown} of ${state.productTotal} products`
+                : "";
+        }
+        if (loadMoreBtn) {
+            loadMoreBtn.classList.toggle("d-none", !hasMore);
+            loadMoreBtn.disabled = false;
+            loadMoreBtn.textContent = "Load more products";
+        }
+    }
+
+    async function loadProducts({ reset = true } = {}) {
+        if (reset) {
+            state.productOffset = 0;
+            productGrid.innerHTML = `<div class="text-muted">Loading...</div>`;
+            if (loadMoreBtn) {
+                loadMoreBtn.classList.add("d-none");
+            }
+        } else if (loadMoreBtn) {
+            loadMoreBtn.disabled = true;
+            loadMoreBtn.textContent = "Loading...";
+        }
+
+        const payload = await rpc("/my/sales/api/products", {
+            term: state.productTerm,
+            offset: state.productOffset,
+            limit: PAGE_SIZE,
+        });
+        const products = Array.isArray(payload) ? payload : payload.products || [];
+        const total = Array.isArray(payload) ? products.length : payload.total || 0;
+        const hasMore = Array.isArray(payload) ? false : Boolean(payload.has_more);
+
+        state.productTotal = total;
+        state.productOffset += products.length;
+
+        if (reset && !products.length) {
             productGrid.innerHTML = `<div class="text-muted">No products found</div>`;
+            updateProductMeta(false);
             return;
         }
-        productGrid.innerHTML = products
-            .map((p) => {
-                const inCart = state.cart[p.id];
-                return `<div class="o_portal_product_card" data-id="${p.id}">
-                    <img src="${p.image_url}" alt=""/>
-                    <div class="o_product_name">${escapeHtml(p.name)}</div>
-                    <div class="o_product_price">${escapeHtml(p.price_display)}</div>
-                    <div class="o_qty_row">
-                        <input type="number" min="1" step="1" value="${inCart ? inCart.qty : 1}" class="form-control form-control-sm product-qty"/>
-                        <button type="button" class="btn btn-sm btn-primary product-add">Add</button>
-                    </div>
-                </div>`;
-            })
-            .join("");
 
-        qsa(".o_portal_product_card", productGrid).forEach((card) => {
-            const product = products.find((p) => String(p.id) === card.dataset.id);
-            qs(".product-add", card).addEventListener("click", () => {
-                const qty = parseFloat(qs(".product-qty", card).value) || 1;
-                state.cart[product.id] = {
-                    id: product.id,
-                    name: product.name,
-                    price: product.price,
-                    qty,
-                };
-                renderCart();
-                qs(".product-add", card).textContent = "Added";
-                qs(".product-add", card).classList.replace("btn-primary", "btn-success");
-            });
+        const html = products.map(productCardHtml).join("");
+        if (reset) {
+            productGrid.innerHTML = html;
+        } else {
+            productGrid.insertAdjacentHTML("beforeend", html);
+        }
+
+        products.forEach((product) => {
+            const card = productGrid.querySelector(`.o_portal_product_card[data-id="${product.id}"]`);
+            if (card) {
+                bindProductCard(card, product);
+            }
         });
+        updateProductMeta(hasMore);
     }
 
     partnerSearch.addEventListener("input", () => {
         clearTimeout(searchTimer);
         const term = partnerSearch.value.trim();
         if (term.length < 1) {
-            partnerResults.innerHTML = "";
+            hidePartnerResults();
             return;
         }
-        searchTimer = setTimeout(() => searchPartners(term), 300);
+        // Show choices as soon as the user types the first letter(s)
+        searchTimer = setTimeout(() => searchPartners(term), 150);
+    });
+
+    partnerSearch.addEventListener("focus", () => {
+        const term = partnerSearch.value.trim();
+        if (term.length >= 1) {
+            searchPartners(term);
+        }
+    });
+
+    document.addEventListener("click", (ev) => {
+        const box = qs(".o_portal_partner_autocomplete", root);
+        if (box && !box.contains(ev.target)) {
+            hidePartnerResults();
+        }
     });
 
     qs("#btn_new_partner", root).addEventListener("click", () => {
@@ -220,18 +343,50 @@ function initCreatePage(root) {
     });
 
     qs("#btn_open_products", root).addEventListener("click", async () => {
-        if (window.bootstrap && modalEl) {
-            bootstrap.Modal.getOrCreateInstance(modalEl).show();
-        } else {
-            modalEl.classList.add("show");
-            modalEl.style.display = "block";
-        }
-        await loadProducts();
+        openModal();
+        state.productTerm = (productSearch?.value || "").trim();
+        await loadProducts({ reset: true });
     });
 
-    productSearch.addEventListener("input", () => {
-        clearTimeout(productTimer);
-        productTimer = setTimeout(() => loadProducts(productSearch.value.trim()), 300);
+    if (productSearch) {
+        productSearch.addEventListener("input", () => {
+            clearTimeout(productTimer);
+            productTimer = setTimeout(() => {
+                state.productTerm = productSearch.value.trim();
+                loadProducts({ reset: true });
+            }, 300);
+        });
+    }
+
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener("click", () => loadProducts({ reset: false }));
+    }
+
+    // Explicit close handlers — no Bootstrap Modal
+    if (doneBtn) {
+        doneBtn.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            closeModal();
+        });
+    }
+    if (closeBtn) {
+        closeBtn.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            closeModal();
+        });
+    }
+    if (closeBackdrop) {
+        closeBackdrop.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            closeModal();
+        });
+    }
+    document.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape" && modalEl && !modalEl.classList.contains("d-none")) {
+            closeModal();
+        }
     });
 
     qs("#btn_confirm_order", root).addEventListener("click", async () => {
