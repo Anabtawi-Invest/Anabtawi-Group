@@ -30,11 +30,6 @@
     line-height: 1.2;
 }
 
-.o_portal_product_card .o_product_price {
-    color: #0f766e;
-    font-weight: 600;
-}
-
 .o_portal_product_card .o_qty_row {
     display: flex;
     gap: 0.35rem;
@@ -45,65 +40,41 @@
     width: 70px;
 }
 
-.o_portal_sale_section .list-group-item {
-    cursor: pointer;
-}
-
-.o_portal_sale_section .list-group-item:hover {
-    background: #f1f5f9;
-}
-
-.o_portal_partner_autocomplete {
-    z-index: 20;
-}
-
-.o_portal_sale_section.card,
-.o_portal_sale_section .card-body {
+.o_portal_transfer_section.card,
+.o_portal_transfer_section .card-body {
     overflow: visible !important;
 }
 
-.o_portal_partner_results:empty {
+.o_portal_loc_results:empty {
     display: none;
 }
 
-.o_portal_partner_results {
-    max-height: 280px;
+.o_portal_loc_results {
+    max-height: 240px;
     overflow-y: auto;
     border: 1px solid #d1d5db;
     border-radius: 0.5rem;
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
     background: #fff;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
 }
 
-.o_portal_partner_results .list-group-item {
+.o_portal_loc_results .list-group-item {
+    cursor: pointer;
     border-left: 0;
     border-right: 0;
     border-radius: 0 !important;
-    cursor: pointer;
 }
 
-.o_portal_partner_results .list-group-item:hover,
-.o_portal_partner_results .list-group-item:focus {
+.o_portal_loc_results .list-group-item:hover {
     background: #f8fafc;
 }
 
-.o_portal_partner_results .list-group-item:first-child {
-    border-top: 0;
-}
-
-.o_portal_partner_results mark {
+.o_portal_loc_results mark {
     background: #fef08a;
     padding: 0;
 }
 
-.o_portal_partner_empty {
-    background: #fff8f1;
-    border-color: #f5d0a9 !important;
-    color: #7c2d12;
-}
-
-/* Custom product dialog — independent of Bootstrap Modal */
-.o_portal_sale_dialog {
+.o_portal_transfer_dialog {
     position: fixed;
     inset: 0;
     z-index: 2000;
@@ -113,17 +84,17 @@
     padding: 1rem;
 }
 
-.o_portal_sale_dialog.d-none {
+.o_portal_transfer_dialog.d-none {
     display: none !important;
 }
 
-.o_portal_sale_dialog_backdrop {
+.o_portal_transfer_dialog_backdrop {
     position: absolute;
     inset: 0;
     background: rgba(15, 23, 42, 0.55);
 }
 
-.o_portal_sale_dialog_panel {
+.o_portal_transfer_dialog_panel {
     position: relative;
     z-index: 1;
     width: min(1100px, 96vw);
@@ -136,8 +107,8 @@
     overflow: hidden;
 }
 
-.o_portal_sale_dialog_header,
-.o_portal_sale_dialog_footer {
+.o_portal_transfer_dialog_header,
+.o_portal_transfer_dialog_footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -147,18 +118,18 @@
     background: #fff;
 }
 
-.o_portal_sale_dialog_footer {
+.o_portal_transfer_dialog_footer {
     justify-content: flex-end;
     border-bottom: 0;
     border-top: 1px solid #e5e7eb;
 }
 
-.o_portal_sale_dialog_body {
+.o_portal_transfer_dialog_body {
     padding: 1rem 1.1rem;
     overflow-y: auto;
     flex: 1 1 auto;
 }
 
-body.o_portal_sale_dialog_open {
+body.o_portal_transfer_dialog_open {
     overflow: hidden;
 }

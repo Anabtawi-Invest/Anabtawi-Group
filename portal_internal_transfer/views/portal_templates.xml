@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="portal_my_home_transfer_cards" inherit_id="portal.portal_my_home" priority="51">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <div t-if="request.env.user.has_group('portal_internal_transfer.group_portal_internal_transfer')"
+                 class="o_portal_category row g-2 mt-3" id="portal_transfer_category">
+                <div class="col-12 col-md-6">
+                    <a href="/my/transfers/create"
+                       class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none border bg-white">
+                        <div>
+                            <h5 class="mb-0">Create Internal Transfer</h5>
+                            <p class="mt-1 mb-0 opacity-75">Move products between internal locations</p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-12 col-md-6">
+                    <a href="/my/transfers"
+                       class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none border bg-white">
+                        <div>
+                            <h5 class="mb-0">My Internal Transfers</h5>
+                            <p class="mt-1 mb-0 opacity-75">View and cancel transfers you created</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </xpath>
+    </template>
+
+    <template id="portal_breadcrumbs_transfer" inherit_id="portal.portal_breadcrumbs">
+        <xpath expr="//ol" position="inside">
+            <li t-if="page_name == 'portal_transfer_create'" class="breadcrumb-item">
+                <a href="/my/transfers/create">Create Internal Transfer</a>
+            </li>
+            <li t-if="page_name == 'portal_transfer_list'" class="breadcrumb-item">
+                <a href="/my/transfers">My Internal Transfers</a>
+            </li>
+            <li t-if="page_name == 'portal_transfer_detail'" class="breadcrumb-item">
+                <a href="/my/transfers">My Internal Transfers</a>
+            </li>
+            <li t-if="page_name == 'portal_transfer_detail' and picking" class="breadcrumb-item active">
+                <t t-esc="picking.name"/>
+            </li>
+        </xpath>
+    </template>
+
+    <template id="portal_transfer_create" name="Create Internal Transfer">
+        <t t-call="portal.portal_layout">
+            <div class="container o_portal_transfer_create py-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h3 class="mb-0">Create Internal Transfer</h3>
+                    <a href="/my/transfers" class="btn btn-secondary">My Internal Transfers</a>
+                </div>
+
+                <div class="card mb-3 o_portal_transfer_section">
+                    <div class="card-header fw-bold">1. Locations</div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Source location</label>
+                                <div class="o_portal_loc_autocomplete">
+                                    <input type="text" class="form-control" id="location_src_search"
+                                           placeholder="Type location name..." autocomplete="off"/>
+                                    <div id="location_src_results" class="o_portal_loc_results list-group mt-2"></div>
+                                </div>
+                                <div id="selected_location_src" class="alert alert-success mt-2 d-none mb-0">
+                                    <strong>From:</strong> <span id="selected_location_src_label"/>
+                                    <button type="button" class="btn btn-sm btn-link" id="btn_clear_location_src">Change</button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Destination location</label>
+                                <div class="o_portal_loc_autocomplete">
+                                    <input type="text" class="form-control" id="location_dest_search"
+                                           placeholder="Type location name..." autocomplete="off"/>
+                                    <div id="location_dest_results" class="o_portal_loc_results list-group mt-2"></div>
+                                </div>
+                                <div id="selected_location_dest" class="alert alert-success mt-2 d-none mb-0">
+                                    <strong>To:</strong> <span id="selected_location_dest_label"/>
+                                    <button type="button" class="btn btn-sm btn-link" id="btn_clear_location_dest">Change</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3 o_portal_transfer_section">
+                    <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+                        <span>2. Products</span>
+                        <button type="button" class="btn btn-primary btn-sm" id="btn_open_products">
+                            Choose products
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="cart_empty" class="text-muted">No products added yet.</div>
+                        <div class="table-responsive d-none" id="cart_table_wrap">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th class="text-center" style="width:120px">Qty</th>
+                                        <th/>
+                                    </tr>
+                                </thead>
+                                <tbody id="cart_body"/>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3 o_portal_transfer_section">
+                    <div class="card-header fw-bold">3. Confirm</div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            Confirming will create the internal transfer and confirm it.
+                        </p>
+                        <button type="button" class="btn btn-success btn-lg" id="btn_confirm_transfer">
+                            Confirm Transfer
+                        </button>
+                        <div id="confirm_error" class="alert alert-danger mt-3 d-none mb-0"/>
+                    </div>
+                </div>
+            </div>
+
+            <div id="productModal" class="o_portal_transfer_dialog d-none" aria-hidden="true">
+                <div class="o_portal_transfer_dialog_backdrop" id="btn_close_products_backdrop"></div>
+                <div class="o_portal_transfer_dialog_panel" role="dialog" aria-modal="true">
+                    <div class="o_portal_transfer_dialog_header">
+                        <h5 class="mb-0">Choose products</h5>
+                        <button type="button" class="btn btn-sm btn-light border" id="btn_close_products" aria-label="Close">✕</button>
+                    </div>
+                    <div class="o_portal_transfer_dialog_body">
+                        <input type="text" class="form-control mb-3" id="product_search"
+                               placeholder="Search products..."/>
+                        <div id="product_count" class="small text-muted mb-2"></div>
+                        <div id="product_grid" class="o_portal_product_grid"/>
+                        <div class="text-center mt-3">
+                            <button type="button" class="btn btn-outline-primary d-none" id="btn_load_more_products">
+                                Load more products
+                            </button>
+                        </div>
+                    </div>
+                    <div class="o_portal_transfer_dialog_footer">
+                        <button type="button" class="btn btn-primary" id="btn_done_products">Done</button>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_transfer_list" name="My Internal Transfers">
+        <t t-call="portal.portal_layout">
+            <div class="container py-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h3 class="mb-0">My Internal Transfers</h3>
+                    <a href="/my/transfers/create" class="btn btn-primary">Create Internal Transfer</a>
+                </div>
+                <t t-if="not pickings">
+                    <div class="alert alert-info">You have not created any internal transfers yet.</div>
+                </t>
+                <t t-else="">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Transfer</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th/>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="pickings" t-as="picking">
+                                    <td>
+                                        <a t-att-href="'/my/transfers/%s' % picking.id">
+                                            <t t-esc="picking.name"/>
+                                        </a>
+                                    </td>
+                                    <td><t t-esc="picking.location_id.complete_name"/></td>
+                                    <td><t t-esc="picking.location_dest_id.complete_name"/></td>
+                                    <td><span t-field="picking.create_date" t-options='{"widget": "datetime"}'/></td>
+                                    <td>
+                                        <span t-attf-class="badge #{'text-bg-success' if picking.state == 'done' else 'text-bg-secondary' if picking.state == 'cancel' else 'text-bg-warning'}">
+                                            <t t-esc="dict(picking._fields['state'].selection).get(picking.state)"/>
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a t-att-href="'/my/transfers/%s' % picking.id" class="btn btn-sm btn-outline-primary">View</a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div t-if="pager" class="o_portal_pager d-flex justify-content-center my-3">
+                        <t t-call="portal.pager"/>
+                    </div>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_transfer_detail" name="Internal Transfer Detail">
+        <t t-call="portal.portal_layout">
+            <div class="container py-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h3 class="mb-0">Transfer <t t-esc="picking.name"/></h3>
+                    <a href="/my/transfers" class="btn btn-secondary">Back to list</a>
+                </div>
+
+                <div t-if="picking.state == 'cancel'" class="alert alert-warning">This transfer is cancelled.</div>
+                <div t-elif="picking.state not in ('draft', 'cancel')" class="alert alert-success">
+                    Transfer confirmed successfully.
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>From:</strong> <t t-esc="picking.location_id.complete_name"/></p>
+                                <p class="mb-0"><strong>To:</strong> <t t-esc="picking.location_dest_id.complete_name"/></p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Date:</strong>
+                                    <span t-field="picking.create_date" t-options='{"widget": "datetime"}'/>
+                                </p>
+                                <p class="mb-0"><strong>Status:</strong>
+                                    <t t-esc="dict(picking._fields['state'].selection).get(picking.state)"/>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th class="text-end">Demand Qty</th>
+                                <th class="text-end">Done Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="picking.move_ids" t-as="move">
+                                <td><t t-esc="move.product_id.display_name"/></td>
+                                <td class="text-end"><t t-esc="move.product_uom_qty"/> <t t-esc="move.uom_id.name"/></td>
+                                <td class="text-end"><t t-esc="move.quantity"/> <t t-esc="move.uom_id.name"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div t-if="picking.state not in ('cancel', 'done')">
+                    <button type="button" class="btn btn-outline-danger" id="btn_cancel_transfer"
+                            t-att-data-picking-id="picking.id">
+                        Cancel Transfer
+                    </button>
+                </div>
+                <div id="detail_message" class="alert mt-3 d-none mb-0"/>
+            </div>
+        </t>
+    </template>
+</odoo>
