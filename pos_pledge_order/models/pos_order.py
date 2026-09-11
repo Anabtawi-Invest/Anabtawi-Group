@@ -3,6 +3,7 @@ from odoo import models, api, fields, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.fields import Command
 from odoo.tools import float_compare, float_repr
+import json
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -82,21 +83,52 @@ class PosOrder(models.Model):
     )
 
     @api.model
+    def _coerce_many2one_id(self, value):
+        """POS UI sometimes sends a record dict instead of an integer ID."""
+        if isinstance(value, dict):
+            record_id = value.get("id")
+            return record_id if isinstance(record_id, int) else False
+        if isinstance(value, (list, tuple)) and value:
+            first = value[0]
+            if isinstance(first, int):
+                return first
+            if isinstance(first, dict):
+                record_id = first.get("id")
+                return record_id if isinstance(record_id, int) else False
+        return value
+
+    @api.model
+    def _sanitize_pos_ui_order(self, order):
+        """Prevent psycopg2 'can't adapt type dict' on pos.order create from UI sync."""
+        if not isinstance(order, dict):
+            return order
+        for field_name, field in self._fields.items():
+            if field_name not in order:
+                continue
+            value = order[field_name]
+            if field.type == "many2one" and isinstance(value, (dict, list, tuple)):
+                order[field_name] = self._coerce_many2one_id(value)
+            elif field.type == "char" and isinstance(value, (dict, list)):
+                order[field_name] = json.dumps(value)
+        return order
+
+    @api.model
     def _order_fields(self, ui_order):
         """Read employee_id from UI order"""
         vals = super()._order_fields(ui_order)
-        # Get employee_id from UI order
-        employee_id = ui_order.get('employee_id', False)
+        employee_id = self._coerce_many2one_id(ui_order.get("employee_id", False))
         if employee_id:
-            vals['employee_id'] = employee_id
+            vals["employee_id"] = employee_id
         _logger.info("[PLEDGE] _order_fields: employee_id = %s", employee_id)
         return vals
 
-    @api.depends('lines.product_id.has_pledge', 'total_pledge_amount')
+    @api.depends('lines.product_id', 'total_pledge_amount')
     def _compute_has_pledge(self):
+        mapping = self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
         for order in self:
             has_line_pledge = any(
-                line.product_id and line.product_id.has_pledge for line in order.lines
+                line.product_id and line.product_id.id in mapping
+                for line in order.lines
             )
             has_snapshot = (order.total_pledge_amount or 0.0) > 0
             order.has_pledge = has_line_pledge or has_snapshot
@@ -124,23 +156,29 @@ class PosOrder(models.Model):
         except (TypeError, ValueError):
             return 0.0
 
+    def _get_menu_pledge_map(self):
+        return self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
+
     def _compute_pledge_from_lines(self):
-        """Return (total_pledge_amount, pledge_product_ids, total_pledge_qty) from pledged order lines."""
+        """Return pledge totals from site service menu → pledge product mapping."""
         self.ensure_one()
+        mapping = self._get_menu_pledge_map()
+        SiteLine = self.env["pos.site.service.product.line"]
         total_pledge_amount = 0.0
         pledge_product_ids = []
         total_pledge_qty = 0.0
         for line in self.lines.filtered(lambda l: l.product_id):
-            if not line.product_id.has_pledge:
+            pledge_product = mapping.get(line.product_id.id)
+            if not pledge_product:
                 continue
             qty = line.qty or 0.0
-            unit_pledge = line.product_id.pledge_amount or 0.0
+            unit_pledge = SiteLine.resolve_pledge_unit_amount(pledge_product)
             line_pledge = qty * unit_pledge
             if line_pledge <= 0:
                 continue
             total_pledge_amount += line_pledge
             total_pledge_qty += qty
-            pledge_product_ids.append(line.product_id.id)
+            pledge_product_ids.append(pledge_product.id)
         return total_pledge_amount, list(set(pledge_product_ids)), total_pledge_qty
 
     def _is_site_service_pledge_blocked(self):
@@ -152,6 +190,8 @@ class PosOrder(models.Model):
         if getattr(advance, "site_service", False):
             return True
         if hasattr(advance, "_pledge_applies") and not advance._pledge_applies():
+            return True
+        if advance.pledge_line_ids:
             return True
         return False
 
@@ -176,7 +216,8 @@ class PosOrder(models.Model):
             "pledge_totals_qty": pledge_totals[2],
             "pledge_totals_products": pledge_totals[1],
             "has_pledge_product_lines": any(
-                line.product_id.has_pledge for line in self.lines.filtered(lambda l: l.product_id)
+                line.product_id.id in self._get_menu_pledge_map()
+                for line in self.lines.filtered(lambda l: l.product_id)
             ),
         }
 
@@ -267,7 +308,8 @@ class PosOrder(models.Model):
             pids_snap,
         )
         if len(pids_snap) == 1 and qty_snap > 0:
-            unit = float(self.env["product.product"].browse(pids_snap[0]).pledge_amount or 0.0)
+            pledge_product = self.env["product.product"].browse(pids_snap[0])
+            unit = self.env["pos.site.service.product.line"].resolve_pledge_unit_amount(pledge_product)
             if unit > 0:
                 je_amt = cur.round(qty_snap * unit)
                 if je_amt > 0:
@@ -286,6 +328,8 @@ class PosOrder(models.Model):
         with their natural sale price.
         """
         Product = self.env["product.product"].sudo()
+        SiteLine = self.env["pos.site.service.product.line"]
+        mapping = SiteLine._get_menu_pledge_product_map()
         meta = {"total": 0.0, "product_ids": [], "qty": 0.0}
         is_refund = order.get("is_refund") or (order.get("amount_total") or 0) < 0
         if is_refund:
@@ -305,38 +349,24 @@ class PosOrder(models.Model):
             if not pid:
                 continue
             prod = Product.browse(pid)
-            if prod.exists() and prod.has_pledge:
-                qty = self._pledge_sync_line_qty(vals)
-                line_pledge = 0.0
-                # Prefer canonical pledge definition first.
-                if qty > 0:
-                    unit_pledge = float(prod.pledge_amount or 0.0)
-                    if unit_pledge > 0:
-                        line_pledge = currency.round(qty * unit_pledge)
-                # Fallback for legacy data where pledge_amount is not configured.
-                if line_pledge <= 0:
-                    for key in ("price_subtotal_incl", "price_subtotal"):
-                        raw = vals.get(key)
-                        if raw is not None:
-                            try:
-                                cand = float(raw)
-                            except (TypeError, ValueError):
-                                cand = 0.0
-                            if cand > 0:
-                                line_pledge = cand
-                                break
-                if line_pledge > 0:
-                    meta["total"] += line_pledge
-                    meta["qty"] += qty
-                    meta["product_ids"].append(pid)
-                    _logger.info(
-                        "[PLEDGE][TRACE] payload line %s keeps pledged product id=%s qty=%s sale_subtotal=%s pledge_snapshot=%s",
-                        index,
-                        pid,
-                        qty,
-                        vals.get("price_subtotal_incl", vals.get("price_subtotal")),
-                        line_pledge,
-                    )
+            pledge_product = mapping.get(prod.id) if prod.exists() else False
+            if not pledge_product:
+                continue
+            qty = self._pledge_sync_line_qty(vals)
+            unit_pledge = SiteLine.resolve_pledge_unit_amount(pledge_product)
+            line_pledge = currency.round(qty * unit_pledge) if qty > 0 and unit_pledge > 0 else 0.0
+            if line_pledge > 0:
+                meta["total"] += line_pledge
+                meta["qty"] += qty
+                meta["product_ids"].append(pledge_product.id)
+                _logger.info(
+                    "[PLEDGE][TRACE] payload line %s menu_product=%s pledge_product=%s qty=%s pledge_snapshot=%s",
+                    index,
+                    prod.id,
+                    pledge_product.id,
+                    qty,
+                    line_pledge,
+                )
                 continue
 
         if meta["total"] <= 0:
@@ -375,8 +405,9 @@ class PosOrder(models.Model):
             "payment_ids": order.get("payment_ids") or [],
             "is_refund": order.get("is_refund", False),
         }
-        if order.get("partner_id"):
-            vals_for_new["partner_id"] = order["partner_id"]
+        partner_id = self._coerce_many2one_id(order.get("partner_id"))
+        if partner_id:
+            vals_for_new["partner_id"] = partner_id
         stub = self.new(vals_for_new)
         stub._compute_prices()
         order["amount_tax"] = stub.amount_tax
@@ -387,6 +418,7 @@ class PosOrder(models.Model):
 
     @api.model
     def _process_order(self, order, existing_order):
+        self._sanitize_pos_ui_order(order)
         pledge_meta = self._pledge_strip_ui_order(order)
         pos_order = self
         if pledge_meta["total"] > 0:
@@ -405,7 +437,9 @@ class PosOrder(models.Model):
             "[PLEDGE][TRACE] _process_order done order=%s lines=%s pledge_lines=%s snapshot_total=%s",
             po.name,
             len(po.lines),
-            len(po.lines.filtered(lambda l: l.product_id.has_pledge)),
+            len(po.lines.filtered(
+                lambda l: l.product_id and l.product_id.id in self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
+            )),
             pledge_meta["total"],
         )
         if pledge_meta["total"] > 0:
@@ -514,6 +548,22 @@ class PosOrder(models.Model):
             )
         return line
 
+    def _has_mapped_pledge_product_sale_lines(self):
+        """True when the order already sells mapped pledge products as POS lines.
+
+        In that case cash is collected via normal POS payment; do not post a
+        separate pledge deposit journal entry (avoids double collection).
+        """
+        self.ensure_one()
+        mapping = self._get_menu_pledge_map()
+        pledge_ids = {p.id for p in mapping.values() if p}
+        if not pledge_ids:
+            return False
+        return any(
+            line.product_id and line.product_id.id in pledge_ids
+            for line in self.lines
+        )
+
     def _post_pledge_deposit_move(self):
         """Dr liquidity (same journal as POS payments) / Cr pledge liability — pledge not in pos.payment totals."""
         self.ensure_one()
@@ -524,6 +574,12 @@ class PosOrder(models.Model):
                 self.name,
                 advance.name if advance else False,
                 bool(advance.site_service) if advance else False,
+            )
+            return self.env["account.move"]
+        if self._has_mapped_pledge_product_sale_lines():
+            _logger.info(
+                "[PLEDGE] skip _post_pledge_deposit_move order=%s reason=pledge_sold_as_pos_line",
+                self.name,
             )
             return self.env["account.move"]
         if self.pledge_deposit_move_id:
@@ -583,8 +639,6 @@ class PosOrder(models.Model):
         })
         move.action_post()
         self.pledge_deposit_move_id = move.id
-        if self.session_id:
-            self.session_id._invalidate_open_sessions_cash_balance()
         _logger.info(
             "[PLEDGE] Posted pledge deposit move %s for order %s (amount=%s)",
             move.id,
@@ -909,108 +963,118 @@ class PosOrder(models.Model):
             return False
 
     def action_pos_order_invoice(self):
-        """
-        Create invoices normally - pledge products appear with their product price
-        Virtual pledge amounts are ONLY on receipts, NOT in invoices
-        """
-        _logger.info("[PLEDGE] Creating invoice - pledge products included with product price only")
-        # Create invoice normally - no filtering of pledge products
+        """Create invoices including pledge product sale lines when present on the order."""
+        _logger.info("[PLEDGE] Creating invoice - including pledge product lines when sold on the order")
         return super(PosOrder, self).action_pos_order_invoice()
 
     def _prepare_invoice_vals(self):
-        """Override to exclude pledge/employee/delivery products from invoice"""
         vals = super()._prepare_invoice_vals()
         return vals
 
     def _prepare_invoice_lines(self, move_type):
-        """
-        Override to filter out pledge/employee/delivery products from invoice lines
-        We override the entire method to have full control over line creation
-        """
+        """Build invoice lines; keep pledge products, exclude employee/delivery helpers."""
         invoice_lines = []
         excluded_count = 0
-        
+
         for order in self:
             line_values_list = order.with_context(invoicing=True)._prepare_tax_base_line_values()
-            
+
             for line_values in line_values_list:
-                line = line_values['record']
+                line = line_values["record"]
                 product = line.product_id
-                
-                # Skip employee service products
+
                 if product.is_employee_service:
-                    _logger.info("[PLEDGE] Excluding employee service product '%s' from invoice", product.display_name)
+                    _logger.info(
+                        "[PLEDGE] Excluding employee service product '%s' from invoice",
+                        product.display_name,
+                    )
                     excluded_count += 1
                     continue
-                
-                # Skip delivery products
+
                 if product.is_delivery_product:
-                    _logger.info("[PLEDGE] Excluding delivery product '%s' from invoice", product.display_name)
+                    _logger.info(
+                        "[PLEDGE] Excluding delivery product '%s' from invoice",
+                        product.display_name,
+                    )
                     excluded_count += 1
                     continue
-                
-                # Include all other products (including pledge products at product price only)
-                # Virtual pledge amounts are ONLY on receipts, NOT in invoices
-                
-                # Get invoice line values
+
+                # Pledge products sold as POS lines stay on the customer invoice.
+
                 invoice_lines_values = order._get_invoice_lines_values(line_values, line, move_type)
-                if invoice_lines_values:  # Only add if not empty
+                if invoice_lines_values:
                     invoice_lines.append((0, None, invoice_lines_values))
-                
-                # Add price discount note if applicable
+
                 is_percentage = order.pricelist_id and any(
-                    order.pricelist_id.item_ids.filtered(
-                        lambda rule: rule.compute_price == "percentage")
+                    order.pricelist_id.item_ids.filtered(lambda rule: rule.compute_price == "percentage")
                 )
-                if is_percentage and self.env['decimal.precision'].precision_get('Product Price'):
-                    precision = self.env['decimal.precision'].precision_get('Product Price')
+                if is_percentage and self.env["decimal.precision"].precision_get("Product Price"):
+                    precision = self.env["decimal.precision"].precision_get("Product Price")
                     if float_compare(line.price_unit, line.product_id.lst_price, precision_digits=precision) < 0:
-                        invoice_lines.append((0, None, {
-                            'name': _('Price discount from %(original_price)s to %(discounted_price)s',
-                                    original_price=float_repr(line.product_id.lst_price, order.currency_id.decimal_places),
-                                    discounted_price=float_repr(line.price_unit, order.currency_id.decimal_places)),
-                            'display_type': 'line_note',
-                        }))
-                
-                # Add customer note if applicable
+                        invoice_lines.append(
+                            (
+                                0,
+                                None,
+                                {
+                                    "name": _(
+                                        "Price discount from %(original_price)s to %(discounted_price)s",
+                                        original_price=float_repr(
+                                            line.product_id.lst_price,
+                                            order.currency_id.decimal_places,
+                                        ),
+                                        discounted_price=float_repr(
+                                            line.price_unit,
+                                            order.currency_id.decimal_places,
+                                        ),
+                                    ),
+                                    "display_type": "line_note",
+                                },
+                            )
+                        )
+
                 if line.customer_note:
-                    invoice_lines.append((0, None, {
-                        'name': line.customer_note,
-                        'display_type': 'line_note',
-                    }))
-            
-            # Add general customer note
+                    invoice_lines.append(
+                        (
+                            0,
+                            None,
+                            {
+                                "name": line.customer_note,
+                                "display_type": "line_note",
+                            },
+                        )
+                    )
+
             if order.general_customer_note:
-                invoice_lines.append((0, None, {
-                    'name': order.general_customer_note,
-                    'display_type': 'line_note',
-                }))
-        
+                invoice_lines.append(
+                    (
+                        0,
+                        None,
+                        {
+                            "name": order.general_customer_note,
+                            "display_type": "line_note",
+                        },
+                    )
+                )
+
         _logger.info(
-            "[PLEDGE] Invoice lines prepared: %d lines (excluded %d employee/delivery products)",
-            len(invoice_lines), excluded_count
+            "[PLEDGE] Invoice lines prepared: %d lines (excluded %d employee/delivery helpers)",
+            len(invoice_lines),
+            excluded_count,
         )
-        
+
         return invoice_lines
 
     def _get_invoice_lines_to_invoice(self):
-        """
-        Filter out pledge, employee, and delivery products from invoice
-        This ensures invoices only contain regular products
-        """
+        """Keep pledge product sale lines; exclude employee/delivery helpers only."""
         lines = super()._get_invoice_lines_to_invoice()
-        
-        # Exclude pledge products
         filtered_lines = lines.filtered(
-            lambda l: not l.product_id.has_pledge
+            lambda l: not (l.product_id.is_employee_service or l.product_id.is_delivery_product)
         )
-        
         _logger.info(
-            "[PLEDGE] Filtered invoice lines: %d regular items (excluded %d pledge items)",
+            "[PLEDGE] Invoice lines kept: %d (excluded %d employee/delivery helpers)",
             len(filtered_lines),
-            len(lines) - len(filtered_lines)
+            len(lines) - len(filtered_lines),
         )
-        
         return filtered_lines
 
 
@@ -1023,7 +1087,10 @@ class PosOrderLine(models.Model):
         store=True
     )
 
-    @api.depends('product_id.has_pledge')
+    @api.depends('product_id')
     def _compute_pledge_related(self):
+        mapping = self.env["pos.site.service.product.line"]._get_menu_pledge_product_map()
         for line in self:
-            line.is_pledge_related = line.product_id.has_pledge
+            line.is_pledge_related = bool(
+                line.product_id and line.product_id.id in mapping
+            )

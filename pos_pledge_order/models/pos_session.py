@@ -221,17 +221,19 @@ class PosSession(models.Model):
         )
 
     @api.depends(
-        'payment_method_ids',
-        'order_ids',
-        'cash_register_balance_start',
-        'cash_register_balance_end_real',
-        'statement_line_ids.amount',
-        'order_ids.pledge_deposit_move_id',
-        'order_ids.total_pledge_amount',
-        'order_ids.advance_pledge_line_ids.state',
-        'order_ids.advance_pledge_line_ids.return_move_id.state',
+        "payment_method_ids",
+        "order_ids",
+        "cash_register_balance_start",
+        "cash_register_balance_end_real",
+        "statement_line_ids.amount",
+        "order_ids.pledge_deposit_move_id",
+        "order_ids.total_pledge_amount",
+        "order_ids.advance_pledge_line_ids.state",
+        "order_ids.advance_pledge_line_ids.return_move_id",
+        "order_ids.advance_pledge_line_ids.return_pos_session_id",
     )
     def _compute_cash_balance(self):
+        """Include pledge deposits/returns so closing theoretical cash matches the drawer."""
         super()._compute_cash_balance()
         for session in self:
             extra = session._get_pledge_deposit_closing_summary()["cash"]
@@ -242,20 +244,6 @@ class PosSession(models.Model):
             )
             session.cash_register_difference = session.currency_id.round(
                 session.cash_register_balance_end_real - session.cash_register_balance_end
-            )
-
-    def _invalidate_open_sessions_cash_balance(self):
-        """When pledge JEs change outside payment flow, refresh theoretical cash."""
-        sessions = self.env["pos.session"].sudo().search(
-            [
-                ("config_id", "in", self.mapped("config_id").ids),
-                ("company_id", "in", self.mapped("company_id").ids),
-                ("state", "in", ("opened", "closing_control")),
-            ]
-        )
-        if sessions:
-            sessions.invalidate_recordset(
-                ["cash_register_balance_end", "cash_register_difference"]
             )
 
     def get_closing_control_data(self):
@@ -295,3 +283,18 @@ class PosSession(models.Model):
             patched.append(r)
         data["non_cash_payment_methods"] = patched
         return data
+
+    def _get_pledge_account_moves(self):
+        """Journal entries for pledge deposits/returns linked to this session."""
+        self.ensure_one()
+        moves = self.env["account.move"]
+        for order in self._get_closed_orders():
+            if order.pledge_deposit_move_id:
+                moves |= order.pledge_deposit_move_id
+        for pledge_line in self._get_pledge_return_lines_for_closing():
+            if pledge_line.return_move_id:
+                moves |= pledge_line.return_move_id
+        return moves
+
+    def _get_related_account_moves(self):
+        return super()._get_related_account_moves() | self._get_pledge_account_moves()

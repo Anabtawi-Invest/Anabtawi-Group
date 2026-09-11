@@ -4,13 +4,15 @@
         <field name="name">pos.advance.order.pledge.list</field>
         <field name="model">pos.advance.order.pledge</field>
         <field name="arch" type="xml">
-            <list string="Pledges" decoration-muted="state == 'returned'" decoration-danger="state == 'cancelled'">
+            <list string="Pledges" decoration-muted="state in ('returned', 'cancelled')" decoration-info="state == 'pending'">
                 <field name="partner_id"/>
                 <field name="employee_id" optional="hide"/>
                 <field name="pos_order_id"/>
                 <field name="order_id" optional="hide"/>
+                <field name="source_product_id" optional="show"/>
                 <field name="product_id"/>
                 <field name="state" widget="badge"
+                    decoration-info="state == 'pending'"
                     decoration-success="state == 'active'"
                     decoration-warning="state == 'returned'"
                     decoration-danger="state == 'cancelled'"/>
@@ -33,9 +35,9 @@
                     <button name="action_return_pledge" type="object" string="Return Pledge" class="btn-primary"
                         invisible="state != 'active'"/>
                     <button name="action_cancel" type="object" string="Cancel" class="btn-secondary"
-                        invisible="state != 'active'"/>
+                        invisible="state not in ('pending', 'active')"/>
                     <field name="state" widget="statusbar"
-                        statusbar_visible="active,returned,cancelled"/>
+                        statusbar_visible="pending,active,returned,cancelled"/>
                 </header>
                 <sheet>
                     <group>
@@ -43,6 +45,7 @@
                         <field name="employee_id" readonly="1" invisible="not employee_id"/>
                         <field name="pos_order_id"/>
                         <field name="order_id" invisible="not order_id"/>
+                        <field name="source_product_id" readonly="1"/>
                         <field name="product_id" required="1"/>
                     </group>
                     <group string="Schedule">
@@ -59,7 +62,9 @@
                         <field name="pledge_move_id" readonly="1"/>
                         <field name="return_move_id" readonly="1"/>
                         <field name="return_payment_method_id" readonly="1"/>
+                        <field name="receive_pos_session_id" readonly="1"/>
                         <field name="return_pos_session_id" readonly="1"/>
+                        <field name="return_pos_order_id" readonly="1"/>
                     </group>
                 </sheet>
             </form>
@@ -77,6 +82,7 @@
                 <field name="pos_order_id"/>
                 <field name="product_id"/>
                 <field name="state"/>
+                <filter string="Pending" name="pending_pledges" domain="[('state', '=', 'pending')]"/>
                 <filter string="Active" name="active_pledges" domain="[('state', '=', 'active')]"/>
                 <filter string="Returned" name="returned_pledges" domain="[('state', '=', 'returned')]"/>
                 <filter string="Cancelled" name="cancelled_pledges" domain="[('state', '=', 'cancelled')]"/>

@@ -39,7 +39,7 @@ class PosPledge(models.Model):
     pledge_products = fields.Many2many(
         "product.product",
         string="Pledge Products",
-        domain=[("has_pledge", "=", True)],
+        domain=[("available_in_pos", "=", True), ("sale_ok", "=", True)],
     )
     employee_product_id = fields.Many2one(
         "product.product",
@@ -181,11 +181,6 @@ class PosPledge(models.Model):
                 "return_date": fields.Datetime.now(),
                 "return_move_id": reverse_moves[:1].id,
             })
-            po = pledge.pos_order_id
-            if po and po.session_id and po.session_id.state in ("opened", "closing_control"):
-                po.session_id.invalidate_recordset(
-                    ["cash_register_balance_end", "cash_register_difference"]
-                )
         return True
 
     def action_link_payments(self):

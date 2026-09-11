@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pos_onsite_price_menu_user,pos.onsite.price.menu.user,model_pos_onsite_price_menu,point_of_sale.group_pos_user,1,0,0,0
+access_pos_onsite_price_menu_manager,pos.onsite.price.menu.manager,model_pos_onsite_price_menu,point_of_sale.group_pos_manager,1,1,1,1
+access_pos_onsite_price_range_user,pos.onsite.price.range.user,model_pos_onsite_price_range,point_of_sale.group_pos_user,1,0,0,0
+access_pos_onsite_price_range_manager,pos.onsite.price.range.manager,model_pos_onsite_price_range,point_of_sale.group_pos_manager,1,1,1,1
+access_pos_onsite_price_product_user,pos.onsite.price.product.user,model_pos_onsite_price_product,point_of_sale.group_pos_user,1,0,0,0
+access_pos_onsite_price_product_manager,pos.onsite.price.product.manager,model_pos_onsite_price_product,point_of_sale.group_pos_manager,1,1,1,1

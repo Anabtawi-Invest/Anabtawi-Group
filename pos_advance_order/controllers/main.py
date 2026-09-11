@@ -146,6 +146,7 @@ class PosAdvanceOrderController(http.Controller):
 
         if not payment_method_id:
             raise ValidationError(_("Please select a payment method."))
+
         pm = request.env["pos.payment.method"].sudo().browse(int(payment_method_id))
         self._validate_advance_payment_method(pm, from_pos_config)
 
@@ -225,13 +226,16 @@ class PosAdvanceOrderController(http.Controller):
             deposit_ctx,
         )
 
-        AdvanceOrder = (
-            request.env["pos.advance.order"]
-            .sudo()
-            .with_context(**deposit_ctx, allowed_company_ids=company.ids)
-            .with_company(company)
-        )
+        AdvanceOrder = request.env["pos.advance.order"].sudo().with_context(
+            **deposit_ctx, allowed_company_ids=company.ids
+        ).with_company(company)
+        if not site_service:
+            line_vals = AdvanceOrder._expand_line_vals_with_site_service_pledges(line_vals, False)
+            create_vals["line_ids"] = line_vals
+
         order = AdvanceOrder.create(create_vals)
+        if not site_service:
+            order._sync_site_service_pledge_records()
         order.with_context(**deposit_ctx).action_confirm()
 
         if order.advance_amount > 0:
@@ -270,8 +274,10 @@ class PosAdvanceOrderController(http.Controller):
 
     @http.route("/pos/complete_advance_order", type="jsonrpc", auth="user")
     def complete_advance_order(self, data=None, **kwargs):
+        """Complete advance order from POS and return receipt payload for printing."""
         self._ensure_pos_user()
-        payload = data or kwargs or {}
+        payload = data if isinstance(data, dict) else kwargs
+
         advance_order_id = payload.get("advance_order_id")
         pos_config_id = payload.get("pos_config_id")
         payment_method_id = payload.get("payment_method_id")
@@ -293,11 +299,32 @@ class PosAdvanceOrderController(http.Controller):
         if not order:
             raise ValidationError(_("Advance order not found."))
 
-        result = order.action_create_remaining_payment(
-            pos_payment_method_id=int(payment_method_id),
-            pos_config_id=int(pos_config_id),
-            amount_tendered=amount_tendered,
+        pos_config = request.env["pos.config"].sudo().browse(int(pos_config_id)).exists()
+        if not pos_config:
+            raise ValidationError(_("Invalid POS configuration."))
+
+        pm = request.env["pos.payment.method"].sudo().browse(int(payment_method_id))
+        if not pm.exists():
+            raise ValidationError(_("Invalid payment method."))
+        if pm not in pos_config.payment_method_ids:
+            raise ValidationError(
+                _("This payment method is not available on the current Point of Sale.")
+            )
+
+        tendered = float(amount_tendered) if amount_tendered is not None else None
+        order.action_create_remaining_payment(
+            pos_payment_method_id=pm.id,
+            pos_config_id=pos_config.id,
+            amount_tendered=tendered,
         )
-        if isinstance(result, dict) and result.get("name"):
-            return result
-        return order.get_completion_receipt_data()
+        if order.state != "fully_paid":
+            raise UserError(_("Advance order could not be completed."))
+
+        receipt = order._completion_receipt_vals(completion_pm=pm)
+        _logger.info(
+            "[ADV_TRACE] complete_advance_order done advance=%s state=%s pos_order=%s",
+            order.name,
+            order.state,
+            order.remaining_pos_order_id.name if order.remaining_pos_order_id else False,
+        )
+        return receipt

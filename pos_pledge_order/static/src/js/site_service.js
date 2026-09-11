@@ -4,9 +4,9 @@ import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 import { patch } from "@web/core/utils/patch";
 
 /**
- * Site Service is never auto-added on regular POS payment.
- * It is only applied when the cashier explicitly enables it while creating
- * an Advance Order (pos_advance_order + site_service_utils.js).
+ * Site Service on regular POS payment:
+ * - After the on-site Yes/No popup, Yes adds the cutting service when score < threshold.
+ * - Advance Order uses the same scoring via pos_advance_order (see appendSiteServiceLineIfNeeded).
  */
 patch(PosOrderline.prototype, {
     setup(vals) {

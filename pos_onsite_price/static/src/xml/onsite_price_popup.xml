@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pos_onsite_price.OnSitePricePopup" owl="1">
+        <Dialog size="'md'" title="popupTitle">
+            <div class="o_pos_onsite_price_popup" t-on-click.stop="">
+                <div class="rounded px-3 py-3 mb-3 bg-primary text-white">
+                    <span class="fw-bold" t-esc="popupTitle"/>
+                    <small class="d-block opacity-75" t-esc="popupSubtitle"/>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success btn-lg flex-fill py-4" t-on-click.stop="() => this.confirm(true)">
+                        <t t-esc="yesLabel"/>
+                    </button>
+                    <button class="btn btn-secondary btn-lg flex-fill py-4" t-on-click.stop="() => this.confirm(false)">
+                        <t t-esc="noLabel"/>
+                    </button>
+                </div>
+            </div>
+            <t t-set-slot="footer">
+                <button class="btn btn-light" t-on-click.stop="cancel" t-esc="cancelLabel"/>
+            </t>
+        </Dialog>
+    </t>
+</templates>
