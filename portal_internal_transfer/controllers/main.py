@@ -28,6 +28,10 @@ class PortalInternalTransfer(http.Controller):
             raise AccessError(_("Transfer not found or access denied."))
         return picking
 
+    def _move_uom_field(self):
+        """Odoo 19 renamed stock.move.product_uom to uom_id; staging may still have product_uom."""
+        return "uom_id" if "uom_id" in request.env["stock.move"]._fields else "product_uom"
+
     def _get_internal_picking_type(self):
         PickingType = request.env["stock.picking.type"].sudo()
         company = request.env.company
@@ -214,19 +218,14 @@ class PortalInternalTransfer(http.Controller):
             product = request.env["product.product"].sudo().browse(product_id).exists()
             if not product or not product.is_storable:
                 raise ValidationError(_("Invalid product selected."))
-            move_commands.append(
-                (
-                    0,
-                    0,
-                    {
-                        "product_id": product.id,
-                        "product_uom_qty": qty,
-                        "uom_id": product.uom_id.id,
-                        "location_id": source.id,
-                        "location_dest_id": dest.id,
-                    },
-                )
-            )
+            move_vals = {
+                "product_id": product.id,
+                "product_uom_qty": qty,
+                "location_id": source.id,
+                "location_dest_id": dest.id,
+            }
+            move_vals[self._move_uom_field()] = product.uom_id.id
+            move_commands.append((0, 0, move_vals))
         if not move_commands:
             raise ValidationError(_("Please add at least one product with quantity."))
 

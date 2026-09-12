@@ -244,8 +244,8 @@
                         <tbody>
                             <tr t-foreach="picking.move_ids" t-as="move">
                                 <td><t t-esc="move.product_id.display_name"/></td>
-                                <td class="text-end"><t t-esc="move.product_uom_qty"/> <t t-esc="move.uom_id.name"/></td>
-                                <td class="text-end"><t t-esc="move.quantity"/> <t t-esc="move.uom_id.name"/></td>
+                                <td class="text-end"><t t-esc="move.product_uom_qty"/> <t t-esc="(move.product_uom if 'product_uom' in move._fields else move.uom_id).name"/></td>
+                                <td class="text-end"><t t-esc="move.quantity"/> <t t-esc="(move.product_uom if 'product_uom' in move._fields else move.uom_id).name"/></td>
                             </tr>
                         </tbody>
                     </table>
