@@ -1,0 +1,155 @@
+.o_portal_product_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+}
+
+.o_portal_product_card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 0.75rem;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    height: 100%;
+}
+
+.o_portal_product_card img {
+    width: 100%;
+    height: 120px;
+    object-fit: contain;
+    background: #f8fafc;
+    border-radius: 8px;
+}
+
+.o_portal_product_card .o_product_name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    min-height: 2.4em;
+    line-height: 1.2;
+}
+
+.o_portal_product_card .o_product_price {
+    color: #0f766e;
+    font-weight: 600;
+}
+
+.o_portal_product_card .o_qty_row {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.o_portal_product_card .o_qty_row input {
+    width: 70px;
+}
+
+.o_portal_sale_section .list-group-item {
+    cursor: pointer;
+}
+
+.o_portal_sale_section .list-group-item:hover {
+    background: #f1f5f9;
+}
+
+.o_portal_sale_section.card,
+.o_portal_sale_section .card-body {
+    overflow: visible !important;
+}
+
+.o_portal_partner_results:empty {
+    display: none;
+}
+
+.o_portal_partner_results {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+    background: #fff;
+}
+
+.o_portal_partner_results .list-group-item {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0 !important;
+    cursor: pointer;
+}
+
+.o_portal_partner_results .list-group-item:hover,
+.o_portal_partner_results .list-group-item:focus {
+    background: #f8fafc;
+}
+
+.o_portal_partner_results mark {
+    background: #fef08a;
+    padding: 0;
+}
+
+.o_portal_partner_empty {
+    background: #fff8f1;
+    border-color: #f5d0a9 !important;
+    color: #7c2d12;
+}
+
+.o_portal_sale_dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.o_portal_sale_dialog.d-none {
+    display: none !important;
+}
+
+.o_portal_sale_dialog_backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.o_portal_sale_dialog_panel {
+    position: relative;
+    z-index: 1;
+    width: min(1100px, 96vw);
+    max-height: 90vh;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.o_portal_sale_dialog_header,
+.o_portal_sale_dialog_footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid #e5e7eb;
+    background: #fff;
+}
+
+.o_portal_sale_dialog_footer {
+    justify-content: flex-end;
+    border-bottom: 0;
+    border-top: 1px solid #e5e7eb;
+}
+
+.o_portal_sale_dialog_body {
+    padding: 1rem 1.1rem;
+    overflow-y: auto;
+    flex: 1 1 auto;
+}
+
+body.o_portal_sale_dialog_open {
+    overflow: hidden;
+}
