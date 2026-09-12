@@ -219,7 +219,6 @@ class PortalInternalTransfer(http.Controller):
                     0,
                     0,
                     {
-                        "name": product.display_name,
                         "product_id": product.id,
                         "product_uom_qty": qty,
                         "uom_id": product.uom_id.id,
