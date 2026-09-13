@@ -225,9 +225,10 @@ class HrPayslipRun(models.Model):
 
         alw_map = {}
         for line in all_alw_lines:
-            rule_key = line.salary_rule_id.id if line.salary_rule_id else line.code
-            rule_name = (line.name or (line.salary_rule_id.name if line.salary_rule_id else line.code) or _("Allowance")).strip()
-            norm_key = rule_name.lower().strip()
+            rule = line.salary_rule_id
+            rule_key = rule.id if rule else line.code
+            rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Allowance"))).strip()
+            norm_key = (rule.name.lower().strip() if rule and rule.name else (line.code or rule_name).lower().strip())
             if norm_key not in alw_map:
                 alw_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
             alw_map[norm_key]["rule_keys"].add(rule_key)
@@ -245,9 +246,10 @@ class HrPayslipRun(models.Model):
 
         ded_map = {}
         for line in all_ded_lines:
-            rule_key = line.salary_rule_id.id if line.salary_rule_id else line.code
-            rule_name = (line.name or (line.salary_rule_id.name if line.salary_rule_id else line.code) or _("Deduction")).strip()
-            norm_key = rule_name.lower().strip()
+            rule = line.salary_rule_id
+            rule_key = rule.id if rule else line.code
+            rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Deduction"))).strip()
+            norm_key = (rule.name.lower().strip() if rule and rule.name else (line.code or rule_name).lower().strip())
             if norm_key not in ded_map:
                 ded_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
             ded_map[norm_key]["rule_keys"].add(rule_key)
