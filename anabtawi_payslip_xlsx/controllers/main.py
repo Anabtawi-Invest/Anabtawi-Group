@@ -45,7 +45,7 @@ class PayslipXlsxController(http.Controller):
         type="http",
         auth="user",
     )
-    def download_payrun_xlsx(self, payrun_id=None, **kwargs):
+    def download_payrun_xlsx(self, payrun_id=None, payslip_ids=None, **kwargs):
         if (
             not request.env.user.has_group("hr_payroll.group_hr_payroll_user")
             or not payrun_id
@@ -61,7 +61,14 @@ class PayslipXlsxController(http.Controller):
         if not payrun.exists():
             return request.not_found()
 
-        xlsx_content = payrun._generate_payrun_xlsx()
+        parsed_payslip_ids = None
+        if payslip_ids and isinstance(payslip_ids, str):
+            try:
+                parsed_payslip_ids = [int(x) for x in payslip_ids.split(",") if x.strip().isdigit()]
+            except ValueError:
+                parsed_payslip_ids = None
+
+        xlsx_content = payrun._generate_payrun_xlsx(payslip_ids=parsed_payslip_ids)
         period_str = payrun.date_start.strftime("%Y%m") if payrun.date_start else ""
         if period_str:
             filename = f"PayRun_Audit_{period_str}"

@@ -22,8 +22,16 @@ class HrPayslip(models.Model):
     def action_export_payrun_excel(self):
         payrun = self.mapped("payslip_run_id")[:1]
         if payrun:
-            return payrun.action_export_payrun_excel()
+            selected_ids = ",".join(str(i) for i in self.ids)
+            url = f"/anabtawi_payroll/payrun/xlsx?payrun_id={payrun.id}&payslip_ids={selected_ids}"
+            return {
+                "name": "PayRun Audit",
+                "type": "ir.actions.act_url",
+                "url": url,
+                "target": "self",
+            }
         raise ValidationError(_("Selected payslips do not belong to a Pay Run."))
+
 
 
     def _generate_payslips_xlsx(self):
