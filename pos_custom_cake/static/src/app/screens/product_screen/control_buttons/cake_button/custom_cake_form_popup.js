@@ -273,7 +273,7 @@ export class CustomCakeFormPopup extends Component {
         const costAfterOverhead = roundCurrency(totalCost / overheadDivisor, currency);
         const priceBeforeTax = roundCurrency(costAfterOverhead / divisor, currency);
         const taxAmount = roundCurrency(priceBeforeTax * taxRate, currency);
-        const finalPrice = roundCurrency(priceBeforeTax + taxAmount, currency);
+        const finalPrice = Math.round(priceBeforeTax + taxAmount);
         return {
             components_cost: componentsCost,
             cake_base_cost: cakeBaseCost,

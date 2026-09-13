@@ -133,7 +133,7 @@ class PosCakeOrder(models.Model):
         cost_after_overhead = float_round(total_cost / overhead_divisor, precision_rounding=rounding)
         price_before_tax = float_round(cost_after_overhead / divisor, precision_rounding=rounding)
         tax_amount = float_round(price_before_tax * (tax_rate / 100.0), precision_rounding=rounding)
-        final_price = float_round(price_before_tax + tax_amount, precision_rounding=rounding)
+        final_price = float_round(price_before_tax + tax_amount, precision_rounding=1.0)
         return total_cost, price_before_tax, tax_amount, final_price
 
     @api.model
