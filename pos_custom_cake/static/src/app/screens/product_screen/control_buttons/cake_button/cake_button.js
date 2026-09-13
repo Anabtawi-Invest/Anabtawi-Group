@@ -68,7 +68,7 @@ patch(ControlButtons.prototype, {
         if (partner) {
             return partner;
         }
-        const records = await this.orm.read("res.partner", [partnerId], ["name", "phone", "mobile"]);
+        const records = await this.orm.read("res.partner", [partnerId], ["name", "phone"]);
         if (records?.length) {
             partner = this.pos.models["res.partner"].create(records[0]);
         }

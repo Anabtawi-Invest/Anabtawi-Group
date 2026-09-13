@@ -389,3 +389,13 @@ msgstr "اسم الفئة (عربي)"
 #. module: pos_custom_cake
 msgid "Category Name (English)"
 msgstr "اسم الفئة (إنجليزي)"
+
+#. module: pos_custom_cake
+#: model:ir.model.fields,field_description:pos_custom_cake.field_mrp_production__custom_cake_note
+msgid "Custom Cake Note"
+msgstr "ملاحظة الكعكة المخصصة"
+
+#. module: pos_custom_cake
+#: model_terms:ir.ui.view,arch_db:pos_custom_cake.report_mrporder_cake_note
+msgid "Custom Cake Note:"
+msgstr "ملاحظة الكعكة المخصصة:"

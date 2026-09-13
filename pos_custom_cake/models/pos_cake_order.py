@@ -336,6 +336,7 @@ class PosCakeOrder(models.Model):
             "location_src_id": picking_type.default_location_src_id.id,
             "location_dest_id": picking_type.default_location_dest_id.id,
             "move_raw_ids": move_raw_vals,
+            "custom_cake_note": self.note or False,
         }
         if not mo_vals["location_src_id"] or not mo_vals["location_dest_id"]:
             raise UserError(

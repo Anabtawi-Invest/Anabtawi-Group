@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_mrporder_cake_note" inherit_id="mrp.report_mrporder">
+        <xpath expr="//div[hasclass('page')]/div[hasclass('row')][last()]" position="after">
+            <div t-if="o.custom_cake_note" class="row mt32 mb32">
+                <div class="col-12">
+                    <strong>Custom Cake Note:</strong><br/>
+                    <span t-field="o.custom_cake_note"/>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>
