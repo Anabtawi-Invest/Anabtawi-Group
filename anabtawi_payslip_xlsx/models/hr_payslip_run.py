@@ -294,18 +294,52 @@ class HrPayslipRun(models.Model):
                         disp_name = f"Input: {t_name}" if not t_name.lower().startswith("input") else t_name
                         alw_map[clean_input_norm] = {"name": disp_name, "rule_keys": set(), "input_type_ids": {itype.id}}
 
-        # Order dynamic columns deterministically by display name
+        # Order dynamic columns deterministically by display name and include ONLY non-zero total columns
         dynamic_alw_cols = []
         for norm_k in sorted(alw_map.keys(), key=lambda k: alw_map[k]["name"]):
             col_info = alw_map[norm_k]
             c_name = col_info["name"]
-            dynamic_alw_cols.append((c_name, max(18, len(c_name) + 4), col_info["rule_keys"], col_info["input_type_ids"]))
+            rule_keys = col_info["rule_keys"]
+            input_type_ids = col_info["input_type_ids"]
+
+            # Calculate total across all selected payslips
+            col_total = 0.0
+            if rule_keys:
+                r_lines = payslips.mapped("line_ids").filtered(
+                    lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys
+                )
+                col_total += sum(r_lines.mapped("total"))
+            if input_type_ids:
+                in_lines = payslips.mapped("input_line_ids").filtered(
+                    lambda l: l.input_type_id and l.input_type_id.id in input_type_ids
+                )
+                col_total += sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+
+            if abs(col_total) > 0.0001:
+                dynamic_alw_cols.append((c_name, max(18, len(c_name) + 4), rule_keys, input_type_ids))
 
         dynamic_ded_cols = []
         for norm_k in sorted(ded_map.keys(), key=lambda k: ded_map[k]["name"]):
             col_info = ded_map[norm_k]
             c_name = col_info["name"]
-            dynamic_ded_cols.append((c_name, max(18, len(c_name) + 4), col_info["rule_keys"], col_info["input_type_ids"]))
+            rule_keys = col_info["rule_keys"]
+            input_type_ids = col_info["input_type_ids"]
+
+            # Calculate total across all selected payslips
+            col_total = 0.0
+            if rule_keys:
+                r_lines = payslips.mapped("line_ids").filtered(
+                    lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys
+                )
+                col_total += sum(r_lines.mapped("total"))
+            if input_type_ids:
+                in_lines = payslips.mapped("input_line_ids").filtered(
+                    lambda l: l.input_type_id and l.input_type_id.id in input_type_ids
+                )
+                col_total += sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+
+            if abs(col_total) > 0.0001:
+                dynamic_ded_cols.append((c_name, max(18, len(c_name) + 4), rule_keys, input_type_ids))
 
         # --- 4. Column Layout Assembly ---
         gross_col = (_("Gross Salary (before tax)"), 22)
