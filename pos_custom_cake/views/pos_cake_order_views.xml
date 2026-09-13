@@ -35,6 +35,7 @@
                             <field name="pos_session_id"/>
                             <field name="pos_order_id"/>
                             <field name="production_id"/>
+                            <field name="upload_session_id" invisible="1"/>
                         </group>
                     </group>
                     <group string="Pricing">
@@ -59,6 +60,20 @@
                                     <field name="total_cost"/>
                                     <field name="is_sugar_paste"/>
                                 </list>
+                            </field>
+                        </page>
+                        <page string="Images" name="images">
+                            <field name="image_ids">
+                                <list editable="bottom">
+                                    <field name="image" widget="image"/>
+                                    <field name="name"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <field name="image" widget="image"/>
+                                        <field name="name"/>
+                                    </group>
+                                </form>
                             </field>
                         </page>
                     </notebook>

@@ -2,7 +2,7 @@
 {
     "name": "POS Custom Cake",
     "author": "Anabtawi",
-    "version": "19.0.1.0.31",
+    "version": "19.0.1.0.32",
     "category": "Point of Sale",
     "summary": "Custom cake ordering with POS, MRP and dynamic pricing",
     "license": "LGPL-3",
@@ -24,6 +24,7 @@
         "views/res_config_settings_views.xml",
         "views/mrp_production_views.xml",
         "views/menu.xml",
+        "views/cake_upload_templates.xml",
         "report/mrp_production_templates.xml",
     ],
     "assets": {

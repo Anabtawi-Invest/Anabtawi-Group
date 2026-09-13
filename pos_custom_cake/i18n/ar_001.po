@@ -399,3 +399,90 @@ msgstr "ملاحظة الكعكة المخصصة"
 #: model_terms:ir.ui.view,arch_db:pos_custom_cake.report_mrporder_cake_note
 msgid "Custom Cake Note:"
 msgstr "ملاحظة الكعكة المخصصة:"
+
+#. module: pos_custom_cake
+#. odoo-javascript
+#: code:addons/pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup.js:0
+msgid "Scan to upload cake photos"
+msgstr "امسح لرفع صور الكعكة"
+
+#. module: pos_custom_cake
+#. odoo-javascript
+#: code:addons/pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup.js:0
+msgid "Customer scans this QR with their phone and uploads one or more photos."
+msgstr "يقوم الزبون بمسح رمز QR من هاتفه ويرفع صورة أو أكثر."
+
+#. module: pos_custom_cake
+#. odoo-javascript
+#: code:addons/pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup.js:0
+msgid "Photos"
+msgstr "الصور"
+
+#. module: pos_custom_cake
+#. odoo-javascript
+#: code:addons/pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup.js:0
+msgid "No photos yet."
+msgstr "لا توجد صور بعد."
+
+#. module: pos_custom_cake
+#. odoo-javascript
+#: code:addons/pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup.js:0
+msgid "This QR code has expired. Close and open the form again."
+msgstr "انتهت صلاحية رمز QR. أغلق النموذج وافتحه مرة أخرى."
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Upload Cake Photos"
+msgstr "رفع صور الكعكة"
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Add photos of the cake design from your phone."
+msgstr "أضف صور تصميم الكعكة من هاتفك."
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Add photos"
+msgstr "إضافة صور"
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Upload"
+msgstr "رفع"
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Delete"
+msgstr "حذف"
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "No photos uploaded yet."
+msgstr "لم يتم رفع أي صور بعد."
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "This upload link has expired."
+msgstr "انتهت صلاحية رابط الرفع."
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Ask the cashier to open the cake form again and scan a new QR code."
+msgstr "اطلب من الكاشير فتح نموذج الكعكة مرة أخرى ومسح رمز QR جديد."
+
+#. module: pos_custom_cake
+#: model:ir.model.fields,field_description:pos_custom_cake.field_pos_cake_order__image_ids
+msgid "Cake Images"
+msgstr "صور الكعكة"
+
+#. module: pos_custom_cake
+msgid "Images"
+msgstr "الصور"

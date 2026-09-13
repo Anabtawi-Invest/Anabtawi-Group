@@ -95,6 +95,13 @@ class PosCakeOrder(models.Model):
     )
     pos_config_id = fields.Many2one("pos.config", string="POS Config", readonly=True)
     note = fields.Text(string="Note", readonly=True)
+    upload_session_id = fields.Many2one(
+        "pos.cake.upload.session",
+        string="Image Upload Session",
+        readonly=True,
+        copy=False,
+    )
+    image_ids = fields.One2many("pos.cake.image", "order_id", string="Cake Images")
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -189,6 +196,7 @@ class PosCakeOrder(models.Model):
         pos_config_id = payload.get("pos_config_id")
         pos_session_id = payload.get("pos_session_id")
         note = (payload.get("note") or "").strip()
+        upload_session_token = (payload.get("upload_session_token") or "").strip()
 
         if not partner_id:
             raise ValidationError(_("Customer is required."))
@@ -267,6 +275,10 @@ class PosCakeOrder(models.Model):
             "component_line_ids": [Command.create(vals) for vals in component_vals],
         }
         cake_order = self.sudo().create(order_vals)
+        if upload_session_token:
+            session = self.env["pos.cake.upload.session"].get_by_token(upload_session_token)
+            if session:
+                session.attach_to_order(cake_order)
         cake_order.flush_recordset(["product_id"])
         production = cake_order._create_manufacturing_order()
         cake_order.write({"production_id": production.id})
