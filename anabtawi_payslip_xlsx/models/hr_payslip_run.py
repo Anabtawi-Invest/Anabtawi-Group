@@ -302,18 +302,18 @@ class HrPayslipRun(models.Model):
             rule_keys = col_info["rule_keys"]
             input_type_ids = col_info["input_type_ids"]
 
-            # Calculate total across all selected payslips
+            # Calculate total across all selected payslips prioritizing computed rule lines over input lines
             col_total = 0.0
-            if rule_keys:
-                r_lines = payslips.mapped("line_ids").filtered(
-                    lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys
-                )
-                col_total += sum(r_lines.mapped("total"))
-            if input_type_ids:
-                in_lines = payslips.mapped("input_line_ids").filtered(
-                    lambda l: l.input_type_id and l.input_type_id.id in input_type_ids
-                )
-                col_total += sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+            for payslip in payslips:
+                lines = payslip.line_ids
+                val = 0.0
+                r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                if r_lines:
+                    val = sum(r_lines.mapped("total"))
+                elif input_type_ids:
+                    in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
+                    val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                col_total += val
 
             if abs(col_total) > 0.0001:
                 dynamic_alw_cols.append((c_name, max(18, len(c_name) + 4), rule_keys, input_type_ids))
@@ -325,18 +325,18 @@ class HrPayslipRun(models.Model):
             rule_keys = col_info["rule_keys"]
             input_type_ids = col_info["input_type_ids"]
 
-            # Calculate total across all selected payslips
+            # Calculate total across all selected payslips prioritizing computed rule lines over input lines
             col_total = 0.0
-            if rule_keys:
-                r_lines = payslips.mapped("line_ids").filtered(
-                    lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys
-                )
-                col_total += sum(r_lines.mapped("total"))
-            if input_type_ids:
-                in_lines = payslips.mapped("input_line_ids").filtered(
-                    lambda l: l.input_type_id and l.input_type_id.id in input_type_ids
-                )
-                col_total += sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+            for payslip in payslips:
+                lines = payslip.line_ids
+                val = 0.0
+                r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                if r_lines:
+                    val = sum(r_lines.mapped("total"))
+                elif input_type_ids:
+                    in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
+                    val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                col_total += val
 
             if abs(col_total) > 0.0001:
                 dynamic_ded_cols.append((c_name, max(18, len(c_name) + 4), rule_keys, input_type_ids))
@@ -458,16 +458,16 @@ class HrPayslipRun(models.Model):
                 rem_leave = sum(lines.filtered(lambda l: l.code in ("vacation_leave", "remain_lev", "REM_LEAVE", "LEAVE_COMP", "ANNUAL_LEAVE")).mapped("total"))
                 gross_att_ot = sum(lines.filtered(lambda l: l.code in ("OT_NET", "ETH_NET", "RD-S", "OVERTIME", "GROSS_ATT", "OT_COMP", "EXTRA_HOURS")).mapped("total"))
 
-                # Dynamic Allowance Values
+                # Dynamic Allowance Values (Prioritize computed rule lines over raw input lines to avoid double counting)
                 dyn_alw_vals = []
                 for _c_name, _w, rule_keys, input_type_ids in dynamic_alw_cols:
                     val = 0.0
-                    if rule_keys:
-                        r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
-                        val += sum(r_lines.mapped("total"))
-                    if input_type_ids:
+                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                    if r_lines:
+                        val = sum(r_lines.mapped("total"))
+                    elif input_type_ids:
                         in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                        val += sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
                     dyn_alw_vals.append(val)
 
                 # Gross Salary
@@ -479,16 +479,16 @@ class HrPayslipRun(models.Model):
                 tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in l.name).mapped("total"))
                 ssce_val = sum(lines.filtered(lambda l: l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in l.name and "موظف" in l.name)).mapped("total"))
 
-                # Dynamic Deduction Values
+                # Dynamic Deduction Values (Prioritize computed rule lines over raw input lines to avoid double counting)
                 dyn_ded_vals = []
                 for _c_name, _w, rule_keys, input_type_ids in dynamic_ded_cols:
                     val = 0.0
-                    if rule_keys:
-                        r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
-                        val += sum(r_lines.mapped("total"))
-                    if input_type_ids:
+                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                    if r_lines:
+                        val = sum(r_lines.mapped("total"))
+                    elif input_type_ids:
                         in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                        val += sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
                     dyn_ded_vals.append(val)
 
                 # Net Salary
