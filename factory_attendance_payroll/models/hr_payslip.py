@@ -400,8 +400,8 @@ class HrPayslip(models.Model):
             hourly_rate = w / 240.0
             daily_rate = w / 30.0
 
-            # 1. CLEAR_EXTRA (Termination: Extra Hours Settlement)
-            ot_hrs = round(slip.remaining_extra_hours_balance or slip.total_extra_hours_available, 2)
+            # 1. CLEAR_EXTRA (Termination: Extra Days / Overtime Settlement)
+            ot_hrs = max(0.0, round(slip.remaining_extra_hours_balance, 2))
             ot_amount = round(ot_hrs * hourly_rate, 3)
             ot_type = self.env['hr.payslip.input.type'].sudo().search([('code', '=', 'CLEAR_EXTRA')], limit=1)
             if ot_type:
@@ -502,26 +502,30 @@ class HrPayslip(models.Model):
                         taken = getattr(a, 'leaves_taken', 0.0) or 0.0
                         pto_leave_days += max(0.0, rem - taken)
 
+            # Deduct Step 2 lateness covered by annual leave (converted from hours to days) to reflect post-reconciliation balance
+            lateness_annual_days = (slip.lateness_covered_by_annual_leave or 0.0) / 8.0
+            post_recon_annual_leave_days = max(0.0, round(annual_leave_days - lateness_annual_days, 4))
+
             # 2. CLEAR_ANNUAL (Termination: Annual Leave Settlement)
             annual_type = self.env['hr.payslip.input.type'].sudo().search([('code', '=', 'CLEAR_ANNUAL')], limit=1)
             if annual_type:
-                annual_amount = round(annual_leave_days * daily_rate, 3)
+                annual_amount = round(post_recon_annual_leave_days * daily_rate, 3)
                 annual_line = slip.input_line_ids.filtered(lambda l: l.input_type_id == annual_type)
                 if annual_line:
-                    annual_line.write({'quantity': annual_leave_days, 'amount': annual_amount})
+                    annual_line.write({'quantity': post_recon_annual_leave_days, 'amount': annual_amount})
                 else:
                     if slip.id:
                         input_model.create({
                             'payslip_id': slip.id,
                             'input_type_id': annual_type.id,
-                            'quantity': annual_leave_days,
+                            'quantity': post_recon_annual_leave_days,
                             'amount': annual_amount,
                         })
                     else:
                         slip.input_line_ids += input_model.new({
                             'payslip_id': slip.id,
                             'input_type_id': annual_type.id,
-                            'quantity': annual_leave_days,
+                            'quantity': post_recon_annual_leave_days,
                             'amount': annual_amount,
                         })
 
@@ -550,6 +554,7 @@ class HrPayslip(models.Model):
 
     @api.onchange('termination_clearance', 'employee_id', 'struct_id')
     def _onchange_termination_clearance(self):
+        self._compute_attendance_reconciliation_fields()
         self._apply_termination_clearance_inputs()
 
     def action_payslip_done(self):
@@ -741,10 +746,15 @@ class HrPayslip(models.Model):
                         we_date = getattr(we, 'date', False) or (we.date_start.date() if hasattr(we, 'date_start') and we.date_start else False)
                         if isinstance(we_date, datetime.datetime):
                             we_date = we_date.date()
-                        if we_date:
-                            slip_worked_dates.add(we_date)
+                # Calculate rest day quota based on number of Mondays in the payslip period (4 Mondays -> 4 rest days, 5 Mondays -> 5 rest days)
+                num_mondays = 0
+                curr_d = payslip.date_from
+                while curr_d <= payslip.date_to:
+                    if curr_d.weekday() == 0:  # 0 is Monday
+                        num_mondays += 1
+                    curr_d += datetime.timedelta(days=1)
 
-                allowed_rest_days = len(slip_worked_dates) // 6
+                allowed_rest_days = max(num_mondays, len(slip_worked_dates) // 6)
                 converted_count = 0
                 for we in emp_work_entries:
                     code = (we.work_entry_type_id.code or '').strip()
@@ -915,6 +925,16 @@ class HrPayslip(models.Model):
             payslip._create_or_update_settlement_leave('Extra Hours', payslip.lateness_covered_by_extra_hours, 'Extra Hours Settlement')
             payslip._create_or_update_settlement_leave('Annual Leave', payslip.lateness_covered_by_annual_leave, 'Annual Leave Settlement')
 
+            # Overtime Balance Syncing: update employee profile directly post-reconciliation
+            emp = payslip.employee_id
+            updated_ot_balance = round(payslip.remaining_extra_hours_balance, 2)
+            for field_name in ['total_overtime', 'total_extra_hours', 'extra_hours_balance', 'overtime_balance']:
+                if field_name in emp._fields:
+                    try:
+                        emp.sudo().write({field_name: updated_ot_balance})
+                    except Exception as e:
+                        _logger.warning("Could not sync %s to employee %s: %s", field_name, emp.id, e)
+
     def _revert_reconciliation_settlements(self):
         Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
         Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
@@ -929,6 +949,17 @@ class HrPayslip(models.Model):
 
             if 'is_reconciled' in payslip._fields and payslip.is_reconciled:
                 payslip.with_context(skip_reconcile_revert=True).sudo().write({'is_reconciled': False})
+
+            # Overtime Balance Syncing: revert employee profile overtime balance when payslip is reset/cancelled
+            emp = payslip.employee_id
+            if emp:
+                pre_recon_ot = round(payslip.total_extra_hours_available, 2)
+                for field_name in ['total_overtime', 'total_extra_hours', 'extra_hours_balance', 'overtime_balance']:
+                    if field_name in emp._fields:
+                        try:
+                            emp.sudo().write({field_name: pre_recon_ot})
+                        except Exception as e:
+                            _logger.warning("Could not revert %s on employee %s: %s", field_name, emp.id, e)
 
             if Leave:
                 try:
