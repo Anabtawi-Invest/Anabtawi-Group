@@ -378,12 +378,46 @@ class HrPayslip(models.Model):
         if valid_slips:
             valid_slips._compute_attendance_reconciliation_fields()
             valid_slips._apply_termination_clearance_inputs()
+            valid_slips._normalize_public_holiday_work_entries()
 
         self._convert_flexible_rest_days_to_ars()
 
         res = super().compute_sheet()
         self.write({'is_reconciled': True})
         return res
+
+    def _normalize_public_holiday_work_entries(self):
+        valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to)
+        if not valid_slips or 'hr.work.entry' not in self.env:
+            return
+
+        emp_ids = valid_slips.mapped('employee_id').ids
+        min_date = min(valid_slips.mapped('date_from'))
+        max_date = max(valid_slips.mapped('date_to'))
+
+        WEModel = self.env['hr.work.entry']
+        we_domain = [
+            ('employee_id', 'in', emp_ids),
+            ('state', '!=', 'cancelled'),
+            '|', '|', ('work_entry_type_id.code', 'in', ['PHD', 'GTO', 'HOLIDAY', 'LEAVE110']),
+            ('work_entry_type_id.display_code', 'in', ['PHD', 'GTO', 'HOLIDAY', 'LEAVE110']),
+            ('work_entry_type_id.name', 'ilike', 'Public Holiday'),
+        ]
+        if 'date' in WEModel._fields:
+            we_domain += [('date', '>=', min_date), ('date', '<=', max_date)]
+        elif 'date_start' in WEModel._fields:
+            we_domain += [
+                ('date_start', '>=', datetime.datetime.combine(min_date, datetime.time.min)),
+                ('date_start', '<=', datetime.datetime.combine(max_date, datetime.time.max)),
+            ]
+
+        ph_entries = WEModel.sudo().search(we_domain)
+        to_fix = ph_entries.filtered(lambda w: getattr(w, 'duration', 0.0) > 8.0)
+        if to_fix:
+            draft_fix = to_fix.filtered(lambda w: hasattr(w, 'state') and w.state == 'validated')
+            if draft_fix:
+                draft_fix.sudo().write({'state': 'draft'})
+            to_fix.sudo().write({'duration': 8.0})
 
     def _apply_termination_clearance_inputs(self):
         input_model = self.env["hr.payslip.input"]
@@ -668,10 +702,11 @@ class HrPayslip(models.Model):
                         line['number_of_days'] = round(weighted_hol_hrs / 8.0, 2)
                         line['amount'] = round(weighted_hol_hrs * hourly_rate, 3)
                     else:
-                        base_hrs = line.get('number_of_hours') or 8.0
+                        actual_hol_days = len(holiday_dates) if holiday_dates else 1.0
+                        base_hrs = round(actual_hol_days * 8.0, 2)
                         line['number_of_hours'] = base_hrs
-                        line['number_of_days'] = round(base_hrs / 8.0, 2)
-                        line['amount'] = round(base_hrs * hourly_rate, 3)
+                        line['number_of_days'] = round(actual_hol_days, 2)
+                        line['amount'] = 0.0
                     filtered_lines.append(line)
 
                 elif code in ['OVERTIME', 'EXTRA', 'OUT'] or 'overtime' in we_name or 'extra' in we_name:
