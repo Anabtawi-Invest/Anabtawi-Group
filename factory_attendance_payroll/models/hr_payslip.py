@@ -413,11 +413,16 @@ class HrPayslip(models.Model):
 
         ph_entries = WEModel.sudo().search(we_domain)
         to_fix = ph_entries.filtered(lambda w: getattr(w, 'duration', 0.0) > 8.0)
-        if to_fix:
-            draft_fix = to_fix.filtered(lambda w: hasattr(w, 'state') and w.state == 'validated')
-            if draft_fix:
-                draft_fix.sudo().write({'state': 'draft'})
-            to_fix.sudo().write({'duration': 8.0})
+        for we in to_fix:
+            try:
+                if hasattr(we, 'state') and we.state == 'validated':
+                    we.sudo().write({'state': 'draft'})
+                vals = {'duration': 8.0}
+                if hasattr(we, 'date_start') and we.date_start and hasattr(we, 'date_stop'):
+                    vals['date_stop'] = we.date_start + datetime.timedelta(hours=8.0)
+                we.sudo().write(vals)
+            except Exception:
+                pass
 
     def _apply_termination_clearance_inputs(self):
         input_model = self.env["hr.payslip.input"]
