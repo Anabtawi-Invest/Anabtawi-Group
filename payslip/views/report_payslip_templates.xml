@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- The standard language/batch wrapper remains in charge of iterating docs.
+         Verify both XPath targets against the installed Enterprise view in staging.
+         Localized reports may inherit a different primary template. See README. -->
+    <template id="report_payslip_custom" inherit_id="hr_payroll.report_payslip"
+              name="Bilingual three-column payslip" priority="90">
+        <!-- A body-owned logo avoids the unrelated company address/header block. -->
+        <xpath expr="//t[@t-call='web.external_layout']" position="attributes">
+            <attribute name="t-call">web.basic_layout</attribute>
+        </xpath>
+        <xpath expr="//div[hasclass('page')]" position="replace">
+            <div class="page cpr" dir="ltr">
+                <!-- SITE CONFIGURATION: these are exact codes, never display names.
+                     Rule XML IDs below come from the supplied 68-rule export.
+                     They identify records across structures, including duplicate BASIC/diff codes.
+                     Optional metadata fields must be Char/Text; numeric snapshots must be Float.
+                     The module does not create Studio fields or salary rules.
+                     deduction_sign: -1 for stored negative deductions; +1 for positive.
+                     False optional field names render an em dash, not a fake zero.
+                     Optional balance/basis fields belong to hr.payslip (snapshots).
+                     Other optional fields belong to hr.employee. -->
+                <t t-set="cfg" t-value="{'rule_refs': {'basic': ['__export__.hr_salary_rule_399_375cf288', '__export__.hr_salary_rule_317_0aa15768'],
+               'actual': ['__export__.hr_salary_rule_150_2311a4a3', '__export__.hr_salary_rule_401_f96d95be'],
+               'allowance': ['__export__.hr_salary_rule_151_2d5025f0',
+                             '__export__.hr_salary_rule_152_c0a8a59e',
+                             '__export__.hr_salary_rule_153_a8226eda',
+                             '__export__.hr_salary_rule_154_fa496657',
+                             '__export__.hr_salary_rule_157_fa8f6a16',
+                             '__export__.hr_salary_rule_435_2876139f',
+                             '__export__.hr_salary_rule_437_8f861957',
+                             '__export__.hr_salary_rule_158_cff528f8',
+                             '__export__.hr_salary_rule_159_e41d69fc',
+                             '__export__.hr_salary_rule_160_9a356161',
+                             '__export__.hr_salary_rule_161_5ecfbb6c',
+                             '__export__.hr_salary_rule_162_13596c1a',
+                             '__export__.hr_salary_rule_418_78ffd78d',
+                             '__export__.hr_salary_rule_318_65621b26',
+                             '__export__.hr_salary_rule_319_d248ba81',
+                             '__export__.hr_salary_rule_320_f36adb0a',
+                             '__export__.hr_salary_rule_321_a816a137',
+                             '__export__.hr_salary_rule_324_e176634f',
+                             '__export__.hr_salary_rule_325_bc11d073',
+                             '__export__.hr_salary_rule_326_4ff9b9ea',
+                             '__export__.hr_salary_rule_327_18ae4292',
+                             '__export__.hr_salary_rule_328_4e18ebd7',
+                             '__export__.hr_salary_rule_329_9a4aa607'],
+               'deduction': ['__export__.hr_salary_rule_170_32cda360',
+                             'factory_attendance_payroll.rule_net_undertime_deduction',
+                             '__export__.hr_salary_rule_444_df0b4671',
+                             '__export__.hr_salary_rule_443_8c1aed56',
+                             '__export__.hr_salary_rule_165_5e45dfb2',
+                             '__export__.hr_salary_rule_167_c32cdc74',
+                             '__export__.hr_salary_rule_168_86af6556',
+                             '__export__.hr_salary_rule_445_9309a550',
+                             '__export__.hr_salary_rule_446_3c61547a',
+                             '__export__.hr_salary_rule_173_1f5f0e8c',
+                             '__export__.hr_salary_rule_439_3966f813',
+                             '__export__.hr_salary_rule_174_41c06510',
+                             '__export__.hr_salary_rule_175_aab55180',
+                             '__export__.hr_salary_rule_176_aa737de6',
+                             '__export__.hr_salary_rule_348_8f739fe1',
+                             '__export__.hr_salary_rule_349_9f21e1a4',
+                             '__export__.hr_salary_rule_441_3abedd16',
+                             '__export__.hr_salary_rule_354_9c9e364c',
+                             '__export__.hr_salary_rule_434_435a0a05',
+                             '__export__.hr_salary_rule_545_5bd0a308',
+                             '__export__.hr_salary_rule_544_4b469704',
+                             '__export__.hr_salary_rule_332_b4cfae68',
+                             '__export__.hr_salary_rule_334_f44285a2',
+                             '__export__.hr_salary_rule_335_cb5257db',
+                             '__export__.hr_salary_rule_337_6a4a485e',
+                             '__export__.hr_salary_rule_340_37c7a678',
+                             '__export__.hr_salary_rule_341_1e07919f',
+                             '__export__.hr_salary_rule_342_955a1411',
+                             '__export__.hr_salary_rule_343_1f9addca',
+                             '__export__.hr_salary_rule_352_fe5ee6a5',
+                             '__export__.hr_salary_rule_353_64f58005',
+                             '__export__.hr_salary_rule_356_2410fb95',
+                             '__export__.hr_salary_rule_362_be0218b6'],
+               'net': ['__export__.hr_salary_rule_179_448a912a', '__export__.hr_salary_rule_346_981c5d03'],
+               'information': ['factory_attendance_payroll.rule_reconciled_attendance_hours',
+                               'factory_attendance_payroll.rule_net_overtime_allowance'],
+               'employer': ['__export__.hr_salary_rule_166_261c837b',
+                            '__export__.hr_salary_rule_169_8eaf54d0',
+                            '__export__.hr_salary_rule_333_931c954b',
+                            '__export__.hr_salary_rule_336_b9300a71']},
+ 'allowance_categories': ['ALW'],
+ 'deduction_categories': ['DED'],
+ 'excluded_categories': [],
+ 'allowance_codes': [],
+ 'deduction_codes': [],
+ 'excluded_codes': [],
+ 'gross_codes': ['GROSS'],
+ 'deduction_sign': 1,
+ 'worked_codes': ['WORK100', 'ATTENDANCE', 'A'],
+ 'unpaid_codes': ['UNP', 'LEAVE90', 'UNPAID', 'ABSENT'],
+ 'time_deduction_codes': ['OUTCON', 'DED_UNDERTIME', 'DED_UNPAID', 'DED_BFV', 'DED_TRV'],
+ 'employee_number_field': 'barcode',
+ 'arabic_name_field': False,
+ 'english_name_field': False,
+ 'branch_field': False,
+ 'section_field': False,
+ 'annual_balance_field': False,
+ 'basis_days_field': False,
+ 'basis_hours_field': False,
+ 'minimum_rows': 10}"/>
+                <t t-set="company" t-value="o.company_id"/>
+                <t t-set="currency" t-value="company.currency_id"/>
+                <t t-set="precision" t-value="currency.decimal_places"/>
+                <t t-set="version" t-value="o.version_id if 'version_id' in o._fields else False"/>
+                <t t-set="employee" t-value="o.employee_id.with_context(version_id=version.id) if version else o.employee_id"/>
+                <t t-set="bank" t-value="employee.primary_bank_account_id"/>
+                <t t-set="lines" t-value="o.line_ids.sorted('sequence')"/>
+                <t t-set="visible_lines" t-value="lines.filtered(lambda l: l.salary_rule_id.appears_on_payslip)"/>
+                <t t-set="rule_ids" t-value="{role: [rule.id for ref in refs for rule in [o.env.ref(ref, raise_if_not_found=False)] if rule] for role, refs in cfg['rule_refs'].items()}"/>
+                <t t-set="basic" t-value="lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['basic'])"/>
+                <t t-set="actual" t-value="lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['actual'])"/>
+                <t t-set="gross" t-value="lines.filtered(lambda l: l.code in cfg['gross_codes'])"/>
+                <t t-set="net" t-value="lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['net'])"/>
+                <t t-set="information" t-value="visible_lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['information'])"/>
+                <t t-set="reserved" t-value="basic | actual | gross | net | information"/>
+                <!-- child_of includes any depth of category descendants. -->
+                <t t-set="categories" t-value="lines.mapped('salary_rule_id.category_id')"/>
+                <t t-set="allowance_categories" t-value="categories.search([('id', 'child_of', categories.search([('code', 'in', cfg['allowance_categories'])]).ids)])"/>
+                <t t-set="deduction_categories" t-value="categories.search([('id', 'child_of', categories.search([('code', 'in', cfg['deduction_categories'])]).ids)])"/>
+                <t t-set="excluded_categories" t-value="categories.search([('id', 'child_of', categories.search([('code', 'in', cfg['excluded_categories'])]).ids)])"/>
+                <t t-set="excluded" t-value="visible_lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['employer'] or l.code in cfg['excluded_codes'] or l.salary_rule_id.category_id in excluded_categories)"/>
+                <t t-set="candidates" t-value="(visible_lines - reserved - excluded).filtered(lambda l: l.total != 0)"/>
+                <t t-set="allowance_candidates" t-value="candidates.filtered(lambda l: l.total &gt; 0 and (l.salary_rule_id.id in rule_ids['allowance'] or l.code in cfg['allowance_codes'] or l.salary_rule_id.category_id in allowance_categories))"/>
+                <t t-set="deduction_candidates" t-value="candidates.filtered(lambda l: l.salary_rule_id.id in rule_ids['deduction'] or l.code in cfg['deduction_codes'] or l.salary_rule_id.category_id in deduction_categories)"/>
+                <t t-set="conflicts" t-value="allowance_candidates &amp; deduction_candidates"/>
+                <t t-set="allowances" t-value="allowance_candidates - conflicts"/>
+                <t t-set="deductions" t-value="deduction_candidates - conflicts"/>
+                <t t-set="unmapped" t-value="candidates - allowances - deductions"/>
+                <t t-set="allowance_total" t-value="sum(allowances.mapped('total'))"/>
+                <t t-set="deduction_total" t-value="cfg['deduction_sign'] * sum(deductions.mapped('total'))"/>
+                <t t-set="time_deductions" t-value="deductions.filtered(lambda l: l.code in cfg['time_deduction_codes'])"/>
+                <!-- No GROSS rule exists in the supplied export. A presentation-only
+                     gross is NET plus the displayed employee deductions. No payroll
+                     rule or accounting value is created/recomputed by this template. -->
+                <t t-set="gross_available" t-value="len(gross) == 1 or (not gross and len(net) == 1 and not unmapped)"/>
+                <t t-set="gross_amount" t-value="gross.total if len(gross) == 1 else (net.total + deduction_total if gross_available else 0.0)"/>
+                <t t-set="worked" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['worked_codes'])"/>
+                <t t-set="unpaid" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['unpaid_codes'])"/>
+                <t t-set="rows" t-value="max(cfg['minimum_rows'], len(allowances), len(deductions))"/>
+                <style>
+                    .cpr { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 10px; color: #151515; }
+                    .cpr table { width: 100%; border-collapse: collapse; table-layout: fixed; direction: ltr; }
+                    .cpr .plain, .cpr .plain > tbody > tr > td { border: 0 !important; background: transparent !important; }
+                    .cpr td, .cpr th { padding: 4px; vertical-align: top; overflow-wrap: break-word; }
+                    .cpr .ar { direction: rtl; unicode-bidi: embed; }
+                    .cpr .num { direction: ltr; unicode-bidi: embed; text-align: right; white-space: nowrap; }
+                    .cpr .center { text-align: center; }
+                    .cpr .muted { color: #555; font-size: 9px; }
+                    .cpr .logo { max-width: 120px; max-height: 75px; }
+                    .cpr .title { font-size: 20px; font-weight: normal; margin: 12px 0; }
+                    .cpr .license { text-align: right; font-size: 10px; }
+                    .cpr .meta { margin: 14px 0 12px; }
+                    .cpr .meta .label { font-weight: bold; width: 20%; }
+                    .cpr .balance { border-top: 1px solid #555; border-bottom: 1px solid #555; padding: 8px 4px; margin: 10px 0 14px; }
+                    .cpr .split > tbody > tr > td { width: 33.333%; padding: 0 5px; }
+                    .cpr .split > tbody > tr > td:first-child { padding-left: 0; }
+                    .cpr .split > tbody > tr > td:last-child { padding-right: 0; }
+                    .cpr .section-title { font-weight: bold; font-size: 11px; min-height: 32px; }
+                    .cpr .grid th, .cpr .grid td { border: 1px solid #333; padding: 3px 4px; }
+                    .cpr .grid th { background: #f3f3f3; font-size: 9px; }
+                    .cpr .grid tbody tr { height: 23px; }
+                    .cpr .grid tr, .cpr .summary, .cpr .meta { page-break-inside: avoid; }
+                    .cpr .grid thead { display: table-header-group; }
+                    .cpr .total td { font-weight: bold; background: #f3f3f3; }
+                    .cpr .summary { margin-top: 14px; }
+                    .cpr .summary td { border: 1px solid #333; padding: 8px; vertical-align: middle; }
+                    .cpr .net { font-size: 14px; font-weight: bold; background: #f1f1f1; }
+                    .cpr .notice { border: 1px solid #888; padding: 6px; margin: 8px 0; }
+                    .cpr .extra { margin-top: 14px; }
+                </style>
+                <table class="plain">
+                    <tr>
+                        <td style="width:25%"><img t-if="company.logo" class="logo" t-att-src="image_data_uri(company.logo)" alt="Company logo"/></td>
+                        <td style="width:35%" class="center"><div class="title" t-out="o.date_from.strftime('%m/%Y') if o.date_from else '—'"/></td>
+                        <td style="width:40%">
+                            <div class="license">Licensed To: <span t-field="company.name"/></div>
+                            <div class="title ar" lang="ar">قسيمة راتب شهر / Payslip</div>
+                        </td>
+                    </tr>
+                </table>
+                <div class="muted center">
+                    Pay period / الفترة:
+                    <span t-field="o.date_from" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                    — <span t-field="o.date_to" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                    <span> | </span><span t-field="o.name"/>
+                </div>
+                <div t-if="o.state not in ('done', 'paid')" class="notice center">
+                    Unvalidated / cancelled payslip — <span class="ar">قسيمة غير معتمدة أو ملغاة</span>
+                </div>
+                <table class="plain meta">
+                    <tr>
+                        <td class="label">Employee / الموظف</td>
+                        <td style="width:30%">
+                            <span t-out="(employee[cfg['employee_number_field']] or '—') if cfg['employee_number_field'] in employee._fields else '—'"/>
+                            <div dir="auto" t-field="employee.name"/>
+                            <div t-if="cfg['english_name_field'] in employee._fields" dir="ltr" t-out="employee[cfg['english_name_field']]"/>
+                            <div t-if="cfg['arabic_name_field'] in employee._fields" class="ar" t-out="employee[cfg['arabic_name_field']]"/>
+                        </td>
+                        <td class="label">Department / الدائرة</td>
+                        <td style="width:30%" dir="auto"><span t-field="employee.department_id"/></td>
+                    </tr>
+                    <tr>
+                        <td class="label">Employee Type / نوع الموظف</td>
+                        <td><span t-field="employee.employee_type"/></td>
+                        <td class="label">Section / القسم</td>
+                        <td dir="auto"><span t-if="cfg['section_field'] in employee._fields" t-out="employee[cfg['section_field']]"/><span t-else="">—</span></td>
+                    </tr>
+                    <tr>
+                        <td class="label">Contract Type / نوع العقد</td>
+                        <td><span t-if="version" t-field="version.contract_type_id"/><span t-else="">—</span></td>
+                        <td class="label">Branch / الفرع</td>
+                        <td dir="auto"><span t-if="cfg['branch_field'] in employee._fields" t-out="employee[cfg['branch_field']]"/><span t-else="">—</span></td>
+                    </tr>
+                    <tr>
+                        <td class="label">Start Date / بداية العقد</td>
+                        <td><span t-if="version" t-field="version.contract_date_start" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/><span t-else="">—</span></td>
+                        <td class="label">Bank / البنك</td>
+                        <td dir="auto"><span t-if="bank" t-field="bank.bank_id"/><span t-else="">—</span></td>
+                    </tr>
+                    <tr>
+                        <td class="label">Currency / العملة</td><td><span t-field="currency.name"/></td>
+                        <td class="label">Primary Account / الحساب الرئيسي</td>
+                        <td style="word-break:break-all" dir="ltr"><span t-if="bank" t-field="bank.acc_number"/><span t-else="">—</span></td>
+                    </tr>
+                </table>
+                <div class="balance">
+                    <strong>Vacation Balances / أرصدة الإجازات: </strong>
+                    <span>Annual (days) / سنوية (أيام): </span>
+                    <span t-if="cfg['annual_balance_field'] in o._fields" t-out="o[cfg['annual_balance_field']]" t-options="{'widget': 'float', 'precision': 2}"/>
+                    <span t-else="">—</span>
+                    <div class="muted">Balance at payslip date / الرصيد المسجل بتاريخ القسيمة</div>
+                </div>
+                <table class="plain split">
+                    <tr>
+                        <td>
+                            <div class="section-title">Salary Basis &amp; Work<br/><span class="ar">الراتب وأيام وساعات العمل</span></div>
+                            <table class="grid">
+                                <colgroup><col style="width:40%"/><col style="width:17%"/><col style="width:17%"/><col style="width:26%"/></colgroup>
+                                <thead><tr><th>البند</th><th>Days<br/>أيام</th><th>Hours<br/>ساعات</th><th>Amount<br/>المبلغ</th></tr></thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Basic Salary<br/><span class="ar">الراتب الأساسي</span></td>
+                                        <td class="num"><span t-if="cfg['basis_days_field'] in o._fields" t-out="o[cfg['basis_days_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-if="cfg['basis_hours_field'] in o._fields" t-out="o[cfg['basis_hours_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-if="len(basic) == 1" t-out="basic.total" t-options="{'widget': 'float', 'precision': precision}"/><span t-else="">—</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Unpaid Time<br/><span class="ar">أيام وساعات الخصم</span></td>
+                                        <td class="num"><span t-if="cfg['unpaid_codes']" t-out="sum(unpaid.mapped('number_of_days'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-if="cfg['unpaid_codes']" t-out="sum(unpaid.mapped('number_of_hours'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-out="cfg['deduction_sign'] * sum(time_deductions.mapped('total'))" t-options="{'widget': 'float', 'precision': precision}"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Actual Salary<br/><span class="ar">الراتب الفعلي</span></td>
+                                        <td class="num"><span t-if="cfg['worked_codes']" t-out="sum(worked.mapped('number_of_days'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-if="cfg['worked_codes']" t-out="sum(worked.mapped('number_of_hours'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-if="len(actual) == 1" t-out="actual.total" t-options="{'widget': 'float', 'precision': precision}"/><span t-else="">—</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td>
+                            <div class="section-title">Allowances<br/><span class="ar">العلاوات والإضافات</span></div>
+                            <table class="grid">
+                                <colgroup><col style="width:66%"/><col style="width:34%"/></colgroup>
+                                <thead><tr><th>Allowance / العلاوة</th><th>Amount / المبلغ</th></tr></thead>
+                                <tbody>
+                                    <tr t-foreach="allowances" t-as="line"><td dir="auto"><span t-field="line.name"/></td><td class="num"><span t-field="line.total" t-options="{'widget': 'float', 'precision': precision}"/></td></tr>
+                                    <tr t-foreach="range(max(0, rows - len(allowances)))" t-as="blank"><td>&#160;</td><td>&#160;</td></tr>
+                                    <tr class="total"><td>Total / المجموع</td><td class="num"><span t-out="allowance_total" t-options="{'widget': 'float', 'precision': precision}"/></td></tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td>
+                            <div class="section-title">Deductions<br/><span class="ar">الخصومات والاستقطاعات</span></div>
+                            <table class="grid">
+                                <colgroup><col style="width:66%"/><col style="width:34%"/></colgroup>
+                                <thead><tr><th>Deduction / الخصم</th><th>Amount / المبلغ</th></tr></thead>
+                                <tbody>
+                                    <tr t-foreach="deductions" t-as="line"><td dir="auto"><span t-field="line.name"/></td><td class="num"><span t-out="cfg['deduction_sign'] * line.total" t-options="{'widget': 'float', 'precision': precision}"/></td></tr>
+                                    <tr t-foreach="range(max(0, rows - len(deductions)))" t-as="blank"><td>&#160;</td><td>&#160;</td></tr>
+                                    <tr class="total"><td>Total / المجموع</td><td class="num"><span t-out="deduction_total" t-options="{'widget': 'float', 'precision': precision}"/></td></tr>
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+                <table class="summary">
+                    <tr>
+                        <td><strong>Gross Salary<br/><span class="ar">إجمالي الراتب</span></strong></td>
+                        <td class="num"><span t-if="gross_available" t-out="gross_amount" t-options="{'widget': 'float', 'precision': precision}"/><span t-else="">—</span></td>
+                        <td class="net">Net Salary<br/><span class="ar">صافي الراتب</span></td>
+                        <td class="num net"><span t-if="len(net) == 1" t-out="net.total" t-options="{'widget': 'float', 'precision': precision}"/><span t-else="">—</span></td>
+                    </tr>
+                </table>
+                <div t-if="not gross_available or len(net) != 1 or len(basic) != 1 or len(actual) != 1" class="notice">
+                    Some salary totals are unavailable or ambiguous. / بعض مجاميع الراتب غير متاحة أو غير محددة.
+                </div>
+                <div class="muted" style="margin-top:6px">
+                    Work time: attendance work-entry lines only. Time deductions are included in the deductions table.
+                    <br/><span class="ar">الأيام والساعات من سطور الحضور بالقسيمة؛ خصومات الوقت مدرجة أيضاً في جدول الخصومات.</span>
+                </div>
+                <div t-if="not gross and gross_available" class="muted">
+                    Gross = Net + listed deductions / الإجمالي = الصافي + الخصومات المعروضة
+                </div>
+                <div t-if="information" class="muted" style="margin-top:6px">
+                    <span t-foreach="information" t-as="line"><span t-field="line.name"/>: <span t-field="line.total" t-options="{'widget': 'float', 'precision': precision}"/>; </span>
+                </div>
+                <!-- Preserve visible unclassified/negative correction lines for review.
+                     Never infer an allowance solely from a positive total. -->
+                <div t-if="unmapped" class="extra">
+                    <strong>Other lines — review classification / بنود أخرى — يلزم مراجعة التصنيف</strong>
+                    <table class="grid">
+                        <thead><tr><th style="width:22%">Code / الرمز</th><th>Line / البند</th><th style="width:24%">Stored Amount / المبلغ المسجل</th></tr></thead>
+                        <tbody><tr t-foreach="unmapped" t-as="line"><td t-field="line.code"/><td dir="auto" t-field="line.name"/><td class="num"><span t-field="line.total" t-options="{'widget': 'float', 'precision': precision}"/></td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>
