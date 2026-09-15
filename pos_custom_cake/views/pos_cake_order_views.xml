@@ -65,13 +65,15 @@
                         <page string="Images" name="images">
                             <field name="image_ids">
                                 <list editable="bottom">
-                                    <field name="image" widget="image"/>
+                                    <field name="image" widget="image" options="{'size': [128, 128]}"/>
                                     <field name="name"/>
+                                    <field name="production_id" optional="hide"/>
                                 </list>
                                 <form>
                                     <group>
                                         <field name="image" widget="image"/>
                                         <field name="name"/>
+                                        <field name="production_id"/>
                                     </group>
                                 </form>
                             </field>

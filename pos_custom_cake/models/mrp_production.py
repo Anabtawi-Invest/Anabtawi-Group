@@ -15,6 +15,11 @@ class MrpProduction(models.Model):
         compute="_compute_is_custom_cake",
     )
     custom_cake_note = fields.Text(string="Custom Cake Note", copy=False)
+    custom_cake_image_ids = fields.One2many(
+        "pos.cake.image",
+        "production_id",
+        string="Custom Cake Images",
+    )
 
     @api.depends("cake_order_ids")
     def _compute_is_custom_cake(self):

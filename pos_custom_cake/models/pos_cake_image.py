@@ -135,7 +135,10 @@ class PosCakeUploadSession(models.Model):
     def attach_to_order(self, order):
         self.ensure_one()
         if self.image_ids:
-            self.image_ids.write({"order_id": order.id})
+            vals = {"order_id": order.id}
+            if order.production_id:
+                vals["production_id"] = order.production_id.id
+            self.image_ids.write(vals)
         self.cake_order_id = order.id
         order.upload_session_id = self.id
         return True
@@ -163,6 +166,11 @@ class PosCakeUploadSession(models.Model):
                 {
                     "session_id": self.id,
                     "order_id": self.cake_order_id.id if self.cake_order_id else False,
+                    "production_id": (
+                        self.cake_order_id.production_id.id
+                        if self.cake_order_id and self.cake_order_id.production_id
+                        else False
+                    ),
                     "name": filename,
                     "image": base64.b64encode(content),
                 }
@@ -201,3 +209,28 @@ class PosCakeImage(models.Model):
         ondelete="cascade",
         index=True,
     )
+    production_id = fields.Many2one(
+        "mrp.production",
+        string="Manufacturing Order",
+        ondelete="set null",
+        index=True,
+        copy=False,
+    )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        Order = self.env["pos.cake.order"]
+        for vals in vals_list:
+            if vals.get("order_id") and not vals.get("production_id"):
+                order = Order.browse(vals["order_id"]).exists()
+                if order and order.production_id:
+                    vals["production_id"] = order.production_id.id
+        return super().create(vals_list)
+
+    def write(self, vals):
+        res = super().write(vals)
+        if "order_id" in vals and not vals.get("production_id"):
+            for image in self:
+                if image.order_id and image.order_id.production_id and not image.production_id:
+                    image.production_id = image.order_id.production_id.id
+        return res

@@ -282,6 +282,8 @@ class PosCakeOrder(models.Model):
         cake_order.flush_recordset(["product_id"])
         production = cake_order._create_manufacturing_order()
         cake_order.write({"production_id": production.id})
+        if cake_order.image_ids:
+            cake_order.image_ids.write({"production_id": production.id})
         return cake_order._prepare_pos_response()
 
     def _get_manufacturing_picking_type(self):
@@ -363,6 +365,8 @@ class PosCakeOrder(models.Model):
             .with_company(self.company_id)
             .create(mo_vals)
         )
+        if self.image_ids:
+            self.image_ids.write({"production_id": production.id})
         production.action_confirm()
         _logger.info(
             "Manufacturing order %s created for cake order %s",
