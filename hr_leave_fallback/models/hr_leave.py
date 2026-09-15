@@ -143,7 +143,7 @@ class HrLeave(models.Model):
             raise UserError(_("Please configure Annual Leave Type in Time Off Fallback settings."))
 
         target_date = fields.Date.to_date(vals.get("request_date_from")) or fields.Date.today()
-        hours_per_day = employee._get_hours_per_day(target_date) or 8.0
+        hours_per_day = 8.0
         requested_hours = self._fallback_get_requested_hours(vals)
         if float_is_zero(requested_hours, precision_digits=2):
             return [vals]
