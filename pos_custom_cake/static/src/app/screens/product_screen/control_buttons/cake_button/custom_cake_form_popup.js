@@ -160,11 +160,12 @@ export class CustomCakeFormPopup extends Component {
             noProductsFound: _t("No products match your search."),
             note: _t("Note"),
             notePlaceholder: _t("Add special instructions..."),
-            scanQr: _t("Scan to upload cake photos"),
-            scanQrHelp: _t("Customer scans this QR with their phone and uploads one or more photos."),
+            scanQr: _t("Scan fixed QR, then enter this code"),
+            scanQrHelp: _t("Customer scans the same QR every time, then types this code on their phone."),
+            uploadCode: _t("Upload code"),
             photos: _t("Photos"),
             noPhotos: _t("No photos yet."),
-            qrExpired: _t("This QR code has expired. Close and open the form again."),
+            qrExpired: _t("This upload code has expired. Close and open the form again."),
         };
     }
 

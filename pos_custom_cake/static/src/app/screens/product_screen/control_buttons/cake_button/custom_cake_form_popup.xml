@@ -17,11 +17,19 @@
                         <div class="text-muted small mb-2">
                             <t t-esc="labels.scanQrHelp"/>
                         </div>
-                        <t t-if="state.uploadSession and state.uploadSession.qr_image and state.uploadSession.is_valid">
-                            <div class="text-center">
-                                <img t-att-src="'data:image/png;base64,' + state.uploadSession.qr_image"
-                                     alt="QR"
-                                     style="width: 180px; height: 180px; background: #fff; padding: 8px;"/>
+                        <t t-if="state.uploadSession and state.uploadSession.is_valid">
+                            <div class="d-flex flex-wrap align-items-center gap-3">
+                                <t t-if="state.uploadSession.qr_image">
+                                    <img t-att-src="'data:image/png;base64,' + state.uploadSession.qr_image"
+                                         alt="QR"
+                                         style="width: 140px; height: 140px; background: #fff; padding: 6px;"/>
+                                </t>
+                                <div class="text-center flex-grow-1">
+                                    <div class="text-muted small mb-1" t-esc="labels.uploadCode"/>
+                                    <div class="fw-bold"
+                                         style="font-size: 2.4rem; letter-spacing: 0.25em; color: #c2185b;"
+                                         t-esc="state.uploadSession.code"/>
+                                </div>
                             </div>
                         </t>
                         <t t-elif="state.uploadSession and !state.uploadSession.is_valid">

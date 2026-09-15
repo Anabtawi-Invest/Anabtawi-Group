@@ -16,6 +16,9 @@ ALLOWED_MIMETYPES = {
     "image/webp",
     "image/gif",
 }
+# Easy to type on a phone (no 0/O, 1/I).
+CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+CODE_LENGTH = 4
 
 
 class PosCakeUploadSession(models.Model):
@@ -24,31 +27,22 @@ class PosCakeUploadSession(models.Model):
     _order = "id desc"
 
     token = fields.Char(required=True, index=True, copy=False, readonly=True)
+    code = fields.Char(string="Upload Code", required=True, index=True, copy=False, readonly=True)
     expiration_date = fields.Datetime(required=True, readonly=True)
     pos_config_id = fields.Many2one("pos.config", string="POS Config", readonly=True)
     pos_session_id = fields.Many2one("pos.session", string="POS Session", readonly=True)
     cake_order_id = fields.Many2one("pos.cake.order", string="Cake Order", readonly=True, copy=False)
     image_ids = fields.One2many("pos.cake.image", "session_id", string="Images")
     image_count = fields.Integer(compute="_compute_image_count")
-    upload_url = fields.Char(compute="_compute_upload_url")
-    qr_image = fields.Binary(string="QR Code", readonly=True, attachment=False)
     is_valid = fields.Boolean(compute="_compute_is_valid")
 
     _token_uniq = models.Constraint("unique(token)", "The upload token must be unique.")
+    _code_uniq = models.Constraint("unique(code)", "The upload code must be unique.")
 
     @api.depends("image_ids")
     def _compute_image_count(self):
         for session in self:
             session.image_count = len(session.image_ids)
-
-    @api.depends("token")
-    def _compute_upload_url(self):
-        for session in self:
-            session.upload_url = (
-                f"{session.get_base_url()}/pos/custom_cake/upload/{session.token}"
-                if session.token
-                else False
-            )
 
     @api.depends("expiration_date")
     def _compute_is_valid(self):
@@ -56,28 +50,36 @@ class PosCakeUploadSession(models.Model):
         for session in self:
             session.is_valid = bool(session.expiration_date and session.expiration_date > now)
 
+    @api.model
+    def _generate_unique_code(self):
+        for _attempt in range(50):
+            code = "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
+            if not self.sudo().search_count([("code", "=", code)]):
+                return code
+        raise UserError(_("Could not generate a unique upload code. Please try again."))
+
+    @api.model
+    def get_fixed_upload_url(self):
+        return f"{self.get_base_url()}/pos/custom_cake/upload"
+
+    @api.model
+    def get_fixed_qr_image(self):
+        qr_bytes = self.env["ir.actions.report"].barcode(
+            "QR",
+            self.get_fixed_upload_url(),
+            width=300,
+            height=300,
+        )
+        return base64.b64encode(qr_bytes).decode()
+
     @api.model_create_multi
     def create(self, vals_list):
         now = fields.Datetime.now()
         for vals in vals_list:
             vals.setdefault("token", secrets.token_urlsafe(32))
+            vals.setdefault("code", self._generate_unique_code())
             vals.setdefault("expiration_date", now + timedelta(hours=SESSION_HOURS))
-        sessions = super().create(vals_list)
-        for session in sessions:
-            session.qr_image = session._generate_qr_image()
-        return sessions
-
-    def _generate_qr_image(self):
-        self.ensure_one()
-        if not self.upload_url:
-            return False
-        qr_bytes = self.env["ir.actions.report"].barcode(
-            "QR",
-            self.upload_url,
-            width=300,
-            height=300,
-        )
-        return base64.b64encode(qr_bytes)
+        return super().create(vals_list)
 
     @api.model
     def create_for_pos(self, pos_config_id=None, pos_session_id=None):
@@ -90,10 +92,21 @@ class PosCakeUploadSession(models.Model):
         return session._prepare_pos_data()
 
     @api.model
+    def normalize_code(self, code):
+        return "".join(str(code or "").upper().split())
+
+    @api.model
     def get_by_token(self, token):
         if not token:
             return self.browse()
         return self.sudo().search([("token", "=", token)], limit=1)
+
+    @api.model
+    def get_by_code(self, code):
+        code = self.normalize_code(code)
+        if not code:
+            return self.browse()
+        return self.sudo().search([("code", "=", code)], limit=1)
 
     def _prepare_images_data(self):
         self.ensure_one()
@@ -108,14 +121,12 @@ class PosCakeUploadSession(models.Model):
 
     def _prepare_pos_data(self):
         self.ensure_one()
-        qr_image = self.qr_image
-        if isinstance(qr_image, bytes):
-            qr_image = qr_image.decode()
         return {
             "id": self.id,
             "token": self.token,
-            "upload_url": self.upload_url,
-            "qr_image": qr_image or False,
+            "code": self.code,
+            "upload_url": self.get_fixed_upload_url(),
+            "qr_image": self.get_fixed_qr_image(),
             "expiration_date": fields.Datetime.to_string(self.expiration_date),
             "is_valid": self.is_valid,
             "images": self._prepare_images_data(),
@@ -132,7 +143,7 @@ class PosCakeUploadSession(models.Model):
     def add_uploaded_file(self, uploaded_file):
         self.ensure_one()
         if not self.is_valid:
-            raise ValidationError(_("This upload link has expired."))
+            raise ValidationError(_("This upload code has expired."))
         if len(self.image_ids) >= MAX_IMAGES:
             raise ValidationError(_("You can upload a maximum of %s photos.") % MAX_IMAGES)
         if not uploaded_file:
@@ -163,7 +174,7 @@ class PosCakeUploadSession(models.Model):
     def remove_image(self, image_id):
         self.ensure_one()
         if not self.is_valid:
-            raise ValidationError(_("This upload link has expired."))
+            raise ValidationError(_("This upload code has expired."))
         image = self.image_ids.filtered(lambda img: img.id == int(image_id))
         if not image:
             raise ValidationError(_("Photo not found."))

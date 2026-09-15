@@ -10,7 +10,7 @@ msgstr ""
 "PO-Revision-Date: 2026-07-27 00:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: Arabic\n"
-"Language: ar_001\n"
+"Language: ar\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -403,14 +403,20 @@ msgstr "ملاحظة الكعكة المخصصة:"
 #. module: pos_custom_cake
 #. odoo-javascript
 #: code:addons/pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup.js:0
-msgid "Scan to upload cake photos"
-msgstr "امسح لرفع صور الكعكة"
+msgid "Scan fixed QR, then enter this code"
+msgstr "امسح رمز QR الثابت ثم أدخل هذا الرمز"
 
 #. module: pos_custom_cake
 #. odoo-javascript
 #: code:addons/pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup.js:0
-msgid "Customer scans this QR with their phone and uploads one or more photos."
-msgstr "يقوم الزبون بمسح رمز QR من هاتفه ويرفع صورة أو أكثر."
+msgid "Customer scans the same QR every time, then types this code on their phone."
+msgstr "يقوم الزبون بمسح نفس رمز QR في كل مرة، ثم يكتب هذا الرمز على هاتفه."
+
+#. module: pos_custom_cake
+#. odoo-javascript
+#: code:addons/pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup.js:0
+msgid "Upload code"
+msgstr "رمز الرفع"
 
 #. module: pos_custom_cake
 #. odoo-javascript
@@ -427,8 +433,8 @@ msgstr "لا توجد صور بعد."
 #. module: pos_custom_cake
 #. odoo-javascript
 #: code:addons/pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/custom_cake_form_popup.js:0
-msgid "This QR code has expired. Close and open the form again."
-msgstr "انتهت صلاحية رمز QR. أغلق النموذج وافتحه مرة أخرى."
+msgid "This upload code has expired. Close and open the form again."
+msgstr "انتهت صلاحية رمز الرفع. أغلق النموذج وافتحه مرة أخرى."
 
 #. module: pos_custom_cake
 #. odoo-python
@@ -439,8 +445,26 @@ msgstr "رفع صور الكعكة"
 #. module: pos_custom_cake
 #. odoo-python
 #: code:addons/pos_custom_cake/controllers/upload.py:0
-msgid "Add photos of the cake design from your phone."
-msgstr "أضف صور تصميم الكعكة من هاتفك."
+msgid "Enter the code shown on the cashier screen, then upload your photos."
+msgstr "أدخل الرمز الظاهر على شاشة الكاشير، ثم ارفع صورك."
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Upload code"
+msgstr "رمز الرفع"
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Example: A3K9"
+msgstr "مثال: A3K9"
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Continue"
+msgstr "متابعة"
 
 #. module: pos_custom_cake
 #. odoo-python
@@ -469,14 +493,32 @@ msgstr "لم يتم رفع أي صور بعد."
 #. module: pos_custom_cake
 #. odoo-python
 #: code:addons/pos_custom_cake/controllers/upload.py:0
-msgid "This upload link has expired."
-msgstr "انتهت صلاحية رابط الرفع."
+msgid "This upload code has expired."
+msgstr "انتهت صلاحية رمز الرفع."
 
 #. module: pos_custom_cake
 #. odoo-python
 #: code:addons/pos_custom_cake/controllers/upload.py:0
-msgid "Ask the cashier to open the cake form again and scan a new QR code."
-msgstr "اطلب من الكاشير فتح نموذج الكعكة مرة أخرى ومسح رمز QR جديد."
+msgid "Ask the cashier to open the cake form again and give you a new code."
+msgstr "اطلب من الكاشير فتح نموذج الكعكة مرة أخرى وإعطائك رمزاً جديداً."
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Invalid or expired upload code. Please check the code on the cashier screen."
+msgstr "رمز الرفع غير صالح أو منتهي. يرجى التحقق من الرمز على شاشة الكاشير."
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Use another code"
+msgstr "استخدم رمزاً آخر"
+
+#. module: pos_custom_cake
+#. odoo-python
+#: code:addons/pos_custom_cake/controllers/upload.py:0
+msgid "Ask the cashier for the 4-character code."
+msgstr "اطلب من الكاشير الرمز المكوّن من 4 أحرف."
 
 #. module: pos_custom_cake
 #: model:ir.model.fields,field_description:pos_custom_cake.field_pos_cake_order__image_ids
