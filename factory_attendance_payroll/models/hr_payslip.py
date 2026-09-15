@@ -921,9 +921,14 @@ class HrPayslip(models.Model):
         This is what the employee Time Off dashboard card must show.
         """
         self.ensure_one()
-        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
-        if not Allocation or not self.employee_id or not self.date_to:
+        # NOTE: never use `if not self.env['model']` — empty recordset is falsy in Odoo
+        if 'hr.leave.allocation' not in self.env or not self.employee_id or not self.date_to:
+            _logger.warning(
+                "[ExtraHoursRecon][BALANCE] skip emp=%s: missing allocation model/employee/date_to",
+                self.employee_id.name if self.employee_id else False,
+            )
             return 0.0
+        Allocation = self.env['hr.leave.allocation'].sudo()
 
         leave_type = self._get_extra_hours_leave_type()
         if not leave_type:
@@ -1291,8 +1296,8 @@ class HrPayslip(models.Model):
             )
 
     def _revert_reconciliation_settlements(self):
-        Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
-        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
+        has_leave = 'hr.leave' in self.env
+        has_allocation = 'hr.leave.allocation' in self.env
 
         for payslip in self:
             if not payslip.employee_id or not payslip.date_to:
@@ -1316,8 +1321,9 @@ class HrPayslip(models.Model):
                         except Exception as e:
                             _logger.warning("Could not revert %s on employee %s: %s", field_name, emp.id, e)
 
-            if Leave:
+            if has_leave:
                 try:
+                    Leave = self.env['hr.leave'].sudo()
                     month_leaves = Leave.search([
                         ('employee_id', '=', payslip.employee_id.id),
                         ('name', 'ilike', 'Lateness Settlement'),
@@ -1330,8 +1336,9 @@ class HrPayslip(models.Model):
                 except Exception:
                     pass
 
-            if Allocation:
+            if has_allocation:
                 try:
+                    Allocation = self.env['hr.leave.allocation'].sudo()
                     month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
                     alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
                     month_allocs = Allocation.search([
