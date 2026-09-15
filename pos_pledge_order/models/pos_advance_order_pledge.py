@@ -346,17 +346,8 @@ class PosAdvanceOrderPledgeReturn(models.Model):
                     )
                 )
 
-            # Deposit JE path: one JE covers the order — return all active pledges together.
-            if len(all_active) > len(related_lines):
-                raise UserError(
-                    _(
-                        "Order %(order)s has %(total)s active pledge(s) linked to one deposit entry. "
-                        "Return all active pledges on this order in one operation.",
-                        order=collection_order.display_name,
-                        total=len(all_active),
-                    )
-                )
-
+            # Deposit JE path: allow partial return of selected pledges only.
+            # Post a return JE for the selected amount; remaining active pledges stay open.
             sess = False
             if pos_session_id:
                 refund_session = (
@@ -378,10 +369,25 @@ class PosAdvanceOrderPledgeReturn(models.Model):
 
             amount = sum(abs(line.pledge_subtotal or 0.0) for line in related_lines)
             currency = collection_order.currency_id or self.env.company.currency_id
+            # Only fall back to the full deposit amount when returning every remaining
+            # active pledge; never use the full deposit for a partial selection.
             if float_is_zero(amount, precision_rounding=currency.rounding):
-                amount = abs(
-                    sum(deposit_move.line_ids.filtered(lambda l: l.credit > 0).mapped("credit"))
-                )
+                if len(related_lines) >= len(all_active):
+                    amount = abs(
+                        sum(
+                            deposit_move.line_ids.filtered(lambda l: l.credit > 0).mapped(
+                                "credit"
+                            )
+                        )
+                    )
+                else:
+                    raise UserError(
+                        _(
+                            "Cannot determine return amount for the selected pledge(s) on order %s. "
+                            "Set pledge amounts on those lines, or return all remaining pledges together."
+                        )
+                        % collection_order.display_name
+                    )
             if float_is_zero(amount, precision_rounding=currency.rounding):
                 raise UserError(
                     _("Pledge return amount is zero for order %s.")
@@ -442,7 +448,7 @@ class PosAdvanceOrderPledgeReturn(models.Model):
         }
 
     def action_return_pledges(self, pledge_ids=None, pos_payment_method_id=None, pos_session_id=None):
-        """Return pledges: deposit JE reverse if present, else POS product refund."""
+        """Return selected pledges (partial OK): deposit JE payout and/or POS product refund."""
         ctx = self.env.context
         if pos_payment_method_id is None:
             pos_payment_method_id = ctx.get("pos_payment_method_id")
