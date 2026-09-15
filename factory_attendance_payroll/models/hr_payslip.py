@@ -34,7 +34,8 @@ class HrPayslip(models.Model):
         string="Remaining Extra Hours Balance",
         compute="_compute_attendance_reconciliation_fields",
         store=True,
-        help="Remaining Extra Hours available after settling Step 1 Lateness (Total Available minus Step 1 Settled Lateness)."
+        help="Remaining Extra Hours after Step 1 lateness settlement. On payslip confirm, "
+             "Time Off Extra Hours is set to this value in days (hours ÷ 8)."
     )
 
     # 3-Step Lateness Settlement Audit Breakdown Fields
@@ -372,6 +373,32 @@ class HrPayslip(models.Model):
             payslip.remaining_extra_hours_balance = round(max(0.0, total_extra_avail - covered_extra), 2)
             payslip.lateness_covered_by_annual_leave = covered_annual_leave
             payslip.undertime_cash_deduction_hours = rem_lateness
+
+            rem_bal = payslip.remaining_extra_hours_balance
+            rem_days = round(rem_bal / 8.0, 4) if rem_bal else 0.0
+            leave_days_now = payslip._get_extra_hours_leave_days_available()
+            _logger.info(
+                "[ExtraHoursRecon][COMPUTE] emp=%s slip=%s period=%s→%s | "
+                "prior_alloc_h=%.2f prior_ot_line_h=%.2f prev_extra_h=%.2f | "
+                "gross_ot=%.2f gross_ut=%.2f total_avail=%.2f covered_extra=%.2f | "
+                "remaining_h=%.2f remaining_as_days(÷8)=%.4f | "
+                "time_off_extra_hours_days_now=%.4f | "
+                "On Confirm: Time Off Extra Hours will be forced to remaining_as_days",
+                payslip.employee_id.name,
+                payslip.id or 'NEW',
+                payslip.date_from,
+                payslip.date_to,
+                prior_alloc_extra,
+                prior_ot_line_extra,
+                prev_extra_hours,
+                gross_ot,
+                gross_ut,
+                total_extra_avail,
+                covered_extra,
+                rem_bal,
+                rem_days,
+                leave_days_now,
+            )
 
     def compute_sheet(self):
         valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to)
@@ -812,42 +839,305 @@ class HrPayslip(models.Model):
                 draft_we.sudo().write({'state': 'draft'})
             to_update.sudo().write({'work_entry_type_id': rest_type.id})
 
+    def _get_extra_hours_leave_type(self):
+        """Return Extra Hours leave type (hr.leave.type) or work entry type (Odoo 19)."""
+        self.ensure_one()
+        domain = [
+            '|', '|',
+            ('name', '=', 'Extra Hours'),
+            ('name', 'ilike', 'Extra Hours'),
+            ('name', 'ilike', 'إضافي'),
+        ]
+        if 'hr.leave.type' in self.env:
+            leave_type = self.env['hr.leave.type'].sudo().search(domain, limit=1)
+            if leave_type:
+                return leave_type
+        if 'hr.work.entry.type' in self.env:
+            return self.env['hr.work.entry.type'].sudo().search(domain, limit=1)
+        return False
+
+    def _get_extra_hours_leave_days_available(self):
+        """Snapshot Extra Hours leave days currently available on Time Off dashboard."""
+        self.ensure_one()
+        if not self.employee_id:
+            return 0.0
+        leave_type = self._get_extra_hours_leave_type()
+        if not leave_type:
+            return 0.0
+        emp = self.employee_id
+        days = 0.0
+        try:
+            if hasattr(emp, '_get_consumed_leaves'):
+                consumed_data, _ = emp._get_consumed_leaves(
+                    leave_type, target_date=self.date_to or fields.Date.today()
+                )
+                leave_content = consumed_data.get(emp, {}).get(leave_type, {})
+                if isinstance(leave_content, dict):
+                    val = leave_content.get('virtual_remaining_leaves') or leave_content.get('remaining_leaves') or 0.0
+                    if not val:
+                        val = sum(
+                            v.get('virtual_remaining_leaves', 0.0)
+                            for v in leave_content.values()
+                            if isinstance(v, dict)
+                        )
+                    days = float(val or 0.0)
+        except Exception as exc:
+            _logger.warning(
+                "[ExtraHoursRecon] Could not read Extra Hours leave days for emp=%s type=%s: %s",
+                emp.name, leave_type.name, exc,
+            )
+        return round(days, 4)
+
+    def _prepare_extra_hours_allocation_vals(self, alloc_name, leave_type, number_of_days):
+        """Build allocation vals compatible with hr.leave.type or work.entry.type."""
+        self.ensure_one()
+        vals = {
+            'name': alloc_name,
+            'employee_id': self.employee_id.id,
+            'number_of_days': number_of_days,
+            'state': 'validate',
+        }
+        Allocation = self.env['hr.leave.allocation']
+        if 'holiday_type' in Allocation._fields:
+            vals['holiday_type'] = 'employee'
+        if leave_type._name == 'hr.leave.type' and 'holiday_status_id' in Allocation._fields:
+            vals['holiday_status_id'] = leave_type.id
+        elif 'work_entry_type_id' in Allocation._fields:
+            wet = leave_type if leave_type._name == 'hr.work.entry.type' else False
+            if not wet and 'hr.work.entry.type' in self.env:
+                wet = self.env['hr.work.entry.type'].sudo().search([
+                    '|', '|',
+                    ('name', '=', 'Extra Hours'),
+                    ('name', 'ilike', 'Extra Hours'),
+                    ('name', 'ilike', 'إضافي'),
+                ], limit=1)
+            if wet:
+                vals['work_entry_type_id'] = wet.id
+        return vals
+
+    def _sync_extra_hours_time_off_to_remaining(self):
+        """
+        Force Time Off 'Extra Hours' available days = remaining_extra_hours_balance / 8.
+        This is what the employee Time Off dashboard card must show.
+        """
+        self.ensure_one()
+        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
+        if not Allocation or not self.employee_id or not self.date_to:
+            return 0.0
+
+        leave_type = self._get_extra_hours_leave_type()
+        if not leave_type:
+            _logger.warning(
+                "[ExtraHoursRecon][BALANCE] Extra Hours leave type not found for emp=%s",
+                self.employee_id.name,
+            )
+            return 0.0
+
+        target_days = round(max(0.0, self.remaining_extra_hours_balance or 0.0) / 8.0, 4)
+        current_days = self._get_extra_hours_leave_days_available()
+        delta_days = round(target_days - current_days, 4)
+
+        month_str = self.date_to.strftime('%B %Y')
+        alloc_name = f"Extra Hours Reconciliation: {month_str} - {self.employee_id.name}"
+
+        domain = [
+            ('employee_id', '=', self.employee_id.id),
+            ('name', '=', alloc_name),
+        ]
+        if leave_type._name == 'hr.leave.type' and 'holiday_status_id' in Allocation._fields:
+            domain.append(('holiday_status_id', '=', leave_type.id))
+        elif 'work_entry_type_id' in Allocation._fields and leave_type._name == 'hr.work.entry.type':
+            domain.append(('work_entry_type_id', '=', leave_type.id))
+
+        existing_alloc = Allocation.search(domain, limit=1)
+
+        _logger.info(
+            "[ExtraHoursRecon][BALANCE] emp=%s | remaining_h=%.2f target_days=%.4f "
+            "current_time_off_days=%.4f delta=%.4f | alloc=%s",
+            self.employee_id.name,
+            self.remaining_extra_hours_balance or 0.0,
+            target_days,
+            current_days,
+            delta_days,
+            existing_alloc.id if existing_alloc else False,
+        )
+
+        if abs(delta_days) < 0.01:
+            if existing_alloc and existing_alloc.number_of_days <= 0.01:
+                try:
+                    existing_alloc.write({'state': 'draft'})
+                    existing_alloc.unlink()
+                except Exception:
+                    pass
+            self.extra_hours_allocated_days = existing_alloc.number_of_days if existing_alloc and existing_alloc.exists() else 0.0
+            return target_days
+
+        ctx = dict(
+            employee_id=self.employee_id.id,
+            mail_create_nolog=True,
+            mail_notrack=True,
+            tracking_disable=True,
+            leave_fast_create=True,
+        )
+
+        if delta_days > 0.01:
+            old_days = existing_alloc.number_of_days if existing_alloc else 0.0
+            new_days = round(old_days + delta_days, 4)
+            alloc_vals = self._prepare_extra_hours_allocation_vals(alloc_name, leave_type, new_days)
+            try:
+                if existing_alloc:
+                    existing_alloc.with_context(**ctx).write(alloc_vals)
+                    _logger.info(
+                        "[ExtraHoursRecon][BALANCE] UPDATED alloc id=%s days %.4f → %.4f (+%.4f)",
+                        existing_alloc.id,
+                        old_days,
+                        new_days,
+                        delta_days,
+                    )
+                else:
+                    existing_alloc = Allocation.with_context(**ctx).create(alloc_vals)
+                    _logger.info(
+                        "[ExtraHoursRecon][BALANCE] CREATED alloc id=%s days=%.4f (to reach target %.4f)",
+                        existing_alloc.id, new_days, target_days,
+                    )
+                self.extra_hours_allocated_days = new_days
+            except Exception as exc:
+                _logger.exception(
+                    "[ExtraHoursRecon][BALANCE] FAILED to increase Extra Hours alloc for emp=%s: %s",
+                    self.employee_id.name, exc,
+                )
+        else:
+            # Need to reduce Time Off balance down to target
+            cut = -delta_days
+            if existing_alloc:
+                if existing_alloc.number_of_days + 0.01 >= cut:
+                    new_days = round(existing_alloc.number_of_days - cut, 4)
+                    try:
+                        if new_days <= 0.01:
+                            existing_alloc.write({'state': 'draft'})
+                            existing_alloc.unlink()
+                            self.extra_hours_allocated_days = 0.0
+                            _logger.info(
+                                "[ExtraHoursRecon][BALANCE] REMOVED alloc (cut %.4f days)",
+                                cut,
+                            )
+                        else:
+                            existing_alloc.with_context(**ctx).write({'number_of_days': new_days, 'state': 'validate'})
+                            self.extra_hours_allocated_days = new_days
+                            _logger.info(
+                                "[ExtraHoursRecon][BALANCE] REDUCED alloc to %.4f days (cut %.4f)",
+                                new_days, cut,
+                            )
+                        cut = 0.0
+                    except Exception as exc:
+                        _logger.exception(
+                            "[ExtraHoursRecon][BALANCE] FAILED to reduce alloc for emp=%s: %s",
+                            self.employee_id.name, exc,
+                        )
+                else:
+                    cut = round(cut - existing_alloc.number_of_days, 4)
+                    try:
+                        existing_alloc.write({'state': 'draft'})
+                        existing_alloc.unlink()
+                        self.extra_hours_allocated_days = 0.0
+                    except Exception:
+                        pass
+            if cut > 0.01:
+                # Extra settlement leave to burn remaining surplus on Time Off
+                _logger.info(
+                    "[ExtraHoursRecon][BALANCE] Extra cut via settlement leave: %.4f days (%.2fh)",
+                    cut, cut * 8.0,
+                )
+                self._create_or_update_settlement_leave('Extra Hours', cut * 8.0, 'Extra Hours Balance Sync')
+
+        final_days = self._get_extra_hours_leave_days_available()
+        _logger.info(
+            "[ExtraHoursRecon][BALANCE] DONE emp=%s | Time Off Extra Hours=%.4f days (target=%.4f)",
+            self.employee_id.name, final_days, target_days,
+        )
+        return final_days
+
     def _create_or_update_settlement_leave(self, leave_type_name, hours, leave_desc):
         self.ensure_one()
         if hours <= 0.01 or 'hr.leave' not in self.env:
+            _logger.info(
+                "[ExtraHoursRecon][SETTLEMENT] skip emp=%s type=%s hours=%.2f (nothing to deduct)",
+                self.employee_id.name if self.employee_id else False,
+                leave_type_name,
+                hours or 0.0,
+            )
             return
 
         Leave = self.env['hr.leave'].sudo()
-        LeaveType = self.env['hr.leave.type'].sudo()
+        LeaveType = self.env['hr.leave.type'].sudo() if 'hr.leave.type' in self.env else None
         company = self.company_id or self.env.company
         comp_domain = [('company_id', 'in', [False, company.id])]
 
+        leave_type = False
         if leave_type_name == 'Extra Hours':
-            leave_types = LeaveType.search(comp_domain + ['|', '|', ('name', '=', 'Extra Hours'), ('name', 'ilike', 'Extra Hours'), ('name', 'ilike', 'إضافي')])
-        elif leave_type_name == 'Annual Leave':
+            leave_type = self._get_extra_hours_leave_type()
+        elif LeaveType and leave_type_name == 'Annual Leave':
             leave_types = LeaveType.search(comp_domain + ['|', '|', ('name', '=', 'Annual Leave'), ('name', 'ilike', 'Annual Leave'), ('name', 'ilike', 'سنوي')])
-        else:
+            leave_type = leave_types[0] if leave_types else None
+        elif LeaveType:
             leave_types = LeaveType.search(comp_domain + [('name', '=', leave_type_name)])
+            leave_type = leave_types[0] if leave_types else None
 
-        leave_type = leave_types[0] if leave_types else None
         if not leave_type:
+            _logger.warning(
+                "[ExtraHoursRecon][SETTLEMENT] leave type not found emp=%s type=%s hours=%.2f",
+                self.employee_id.name, leave_type_name, hours,
+            )
             return
 
-        prev_settlement_leaves = Leave.search([
+        days_before = self._get_extra_hours_leave_days_available() if leave_type_name == 'Extra Hours' else None
+        settlement_days = round(hours / 8.0, 4)
+        _logger.info(
+            "[ExtraHoursRecon][SETTLEMENT] START emp=%s type=%s hours=%.2f days=%.4f | "
+            "extra_hours_days_BEFORE=%.4f",
+            self.employee_id.name,
+            leave_type_name,
+            hours,
+            settlement_days,
+            days_before if days_before is not None else -1.0,
+        )
+
+        leave_type_domain_field = 'holiday_status_id' if 'holiday_status_id' in Leave._fields else 'work_entry_type_id'
+        # If leave_type is hr.leave.type but leaves use work_entry_type_id, resolve work entry type
+        leave_type_ref = leave_type
+        if leave_type_domain_field == 'work_entry_type_id' and leave_type._name == 'hr.leave.type':
+            wet = self.env['hr.work.entry.type'].sudo().search([
+                '|', '|',
+                ('name', '=', leave_type.name),
+                ('name', 'ilike', leave_type_name),
+                ('name', 'ilike', 'إضافي' if leave_type_name == 'Extra Hours' else 'سنوي'),
+            ], limit=1)
+            leave_type_ref = wet or leave_type
+
+        settle_domain = [
             ('employee_id', '=', self.employee_id.id),
-            ('holiday_status_id', '=', leave_type.id),
             ('request_date_from', '>=', self.date_from),
             ('request_date_to', '<=', self.date_to),
             ('name', 'ilike', 'Lateness Settlement'),
-        ])
+            ('name', 'ilike', leave_type_name),
+        ]
+        if leave_type_domain_field in Leave._fields and leave_type_ref and leave_type_ref._name in ('hr.leave.type', 'hr.work.entry.type'):
+            settle_domain.append((leave_type_domain_field, '=', leave_type_ref.id))
+        prev_settlement_leaves = Leave.search(settle_domain)
         if prev_settlement_leaves:
             prev_settlement_leaves.unlink()
 
-        alloc = self.env['hr.leave.allocation'].sudo().search([
+        alloc_domain = [
             ('employee_id', '=', self.employee_id.id),
-            ('holiday_status_id', '=', leave_type.id),
             ('state', '=', 'validate'),
-        ], order='date_to desc, id desc', limit=1)
+        ]
+        if 'holiday_status_id' in self.env['hr.leave.allocation']._fields and leave_type._name == 'hr.leave.type':
+            alloc_domain.append(('holiday_status_id', '=', leave_type.id))
+        elif 'work_entry_type_id' in self.env['hr.leave.allocation']._fields:
+            wet_id = leave_type_ref.id if leave_type_ref._name == 'hr.work.entry.type' else False
+            if wet_id:
+                alloc_domain.append(('work_entry_type_id', '=', wet_id))
+        alloc = self.env['hr.leave.allocation'].sudo().search(alloc_domain, order='date_to desc, id desc', limit=1)
 
         ctx_leave = Leave.with_context(
             employee_id=self.employee_id.id,
@@ -862,8 +1152,11 @@ class HrPayslip(models.Model):
             skip_payslip_validation=True,
             payslip_skip_leave_check=True,
             leave_fast_create=True,
+            skip_allocation_check=True,
         )
 
+        created_days = 0.0
+        failed = 0
         remaining_hours = hours
         curr_d = self.date_from
         while curr_d <= self.date_to and remaining_hours >= 7.99:
@@ -873,7 +1166,6 @@ class HrPayslip(models.Model):
             vals = {
                 'name': full_name,
                 'employee_id': self.employee_id.id,
-                'holiday_status_id': leave_type.id,
                 'request_date_from': curr_d,
                 'request_date_to': curr_d,
                 'date_from': dt_start,
@@ -881,13 +1173,22 @@ class HrPayslip(models.Model):
                 'number_of_days': 1.0,
                 'state': 'validate',
             }
+            if 'holiday_status_id' in Leave._fields and leave_type._name == 'hr.leave.type':
+                vals['holiday_status_id'] = leave_type.id
+            elif 'work_entry_type_id' in Leave._fields and leave_type_ref._name == 'hr.work.entry.type':
+                vals['work_entry_type_id'] = leave_type_ref.id
             if alloc and 'holiday_allocation_id' in Leave._fields:
                 vals['holiday_allocation_id'] = alloc.id
             try:
                 new_lve = ctx_leave.create(vals)
                 new_lve.sudo().write({'state': 'validate'})
-            except Exception:
-                pass
+                created_days += 1.0
+            except Exception as exc:
+                failed += 1
+                _logger.exception(
+                    "[ExtraHoursRecon][SETTLEMENT] FAILED full-day leave emp=%s date=%s: %s",
+                    self.employee_id.name, curr_d, exc,
+                )
             remaining_hours -= 8.0
             curr_d += datetime.timedelta(days=1)
 
@@ -900,7 +1201,6 @@ class HrPayslip(models.Model):
             vals = {
                 'name': full_name,
                 'employee_id': self.employee_id.id,
-                'holiday_status_id': leave_type.id,
                 'request_date_from': curr_d,
                 'request_date_to': curr_d,
                 'date_from': dt_start,
@@ -908,64 +1208,68 @@ class HrPayslip(models.Model):
                 'number_of_days': frac_days,
                 'state': 'validate',
             }
+            if 'holiday_status_id' in Leave._fields and leave_type._name == 'hr.leave.type':
+                vals['holiday_status_id'] = leave_type.id
+            elif 'work_entry_type_id' in Leave._fields and leave_type_ref._name == 'hr.work.entry.type':
+                vals['work_entry_type_id'] = leave_type_ref.id
             if alloc and 'holiday_allocation_id' in Leave._fields:
                 vals['holiday_allocation_id'] = alloc.id
             try:
                 new_lve = ctx_leave.create(vals)
                 new_lve.sudo().write({'state': 'validate'})
-            except Exception:
-                pass
+                created_days += frac_days
+            except Exception as exc:
+                failed += 1
+                _logger.exception(
+                    "[ExtraHoursRecon][SETTLEMENT] FAILED fractional leave emp=%s date=%s hours=%.2f: %s",
+                    self.employee_id.name, curr_d, frac_hours, exc,
+                )
+
+        days_after = self._get_extra_hours_leave_days_available() if leave_type_name == 'Extra Hours' else None
+        _logger.info(
+            "[ExtraHoursRecon][SETTLEMENT] END emp=%s type=%s created_days=%.4f failed=%s | "
+            "extra_hours_days_AFTER=%.4f",
+            self.employee_id.name,
+            leave_type_name,
+            created_days,
+            failed,
+            days_after if days_after is not None else -1.0,
+        )
 
     def _sync_reconciliation_settlements(self):
-        LeaveType = self.env['hr.leave.type'].sudo() if 'hr.leave.type' in self.env else None
-        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
-
         for payslip in self:
             if not payslip.employee_id or not payslip.date_to:
                 continue
 
             month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
+            rem_h = payslip.remaining_extra_hours_balance or 0.0
+            rem_days = round(rem_h / 8.0, 4)
+            leave_days_before = payslip._get_extra_hours_leave_days_available()
+            covered_h = payslip.lateness_covered_by_extra_hours or 0.0
+            covered_days = round(covered_h / 8.0, 4)
 
-            if Allocation and LeaveType:
-                extra_types = LeaveType.search(['|', '|', ('name', '=', 'Extra Hours'), ('name', 'ilike', 'Extra Hours'), ('name', 'ilike', 'إضافي')])
-                extra_type = extra_types[0] if extra_types else None
-                if extra_type:
-                    alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
-                    existing_alloc = Allocation.search([
-                        ('employee_id', '=', payslip.employee_id.id),
-                        ('holiday_status_id', '=', extra_type.id),
-                        ('name', '=', alloc_name),
-                    ], limit=1)
+            _logger.info(
+                "[ExtraHoursRecon][SYNC] START emp=%s slip=%s month=%s | "
+                "payslip_remaining_h=%.2f → target Time Off days=%.4f | "
+                "time_off_extra_hours_days_BEFORE=%.4f | lateness_deduct_h=%.2f (%.4f days)",
+                payslip.employee_id.name,
+                payslip.id,
+                month_str,
+                rem_h,
+                rem_days,
+                leave_days_before,
+                covered_h,
+                covered_days,
+            )
 
-                    prev_bal = payslip._get_previous_extra_hours_balance()
-                    net_ot_hours = round(max(0.0, payslip.remaining_extra_hours_balance - prev_bal), 4) if payslip.remaining_extra_hours_balance > prev_bal else 0.0
-
-                    if net_ot_hours > 0.01:
-                        ot_days = round(net_ot_hours / 8.0, 4)
-                        alloc_vals = {
-                            'name': alloc_name,
-                            'holiday_type': 'employee',
-                            'employee_id': payslip.employee_id.id,
-                            'holiday_status_id': extra_type.id,
-                            'number_of_days': ot_days,
-                            'state': 'validate',
-                        }
-                        if existing_alloc:
-                            existing_alloc.write(alloc_vals)
-                        else:
-                            Allocation.with_context(
-                                employee_id=payslip.employee_id.id,
-                                mail_create_nolog=True,
-                                mail_notrack=True,
-                                tracking_disable=True,
-                            ).create(alloc_vals)
-                    elif existing_alloc:
-                        existing_alloc.unlink()
-
+            # 1) Audit settlement leaves for lateness consumption
             payslip._create_or_update_settlement_leave('Extra Hours', payslip.lateness_covered_by_extra_hours, 'Extra Hours Settlement')
             payslip._create_or_update_settlement_leave('Annual Leave', payslip.lateness_covered_by_annual_leave, 'Annual Leave Settlement')
 
-            # Overtime Balance Syncing: update employee profile directly post-reconciliation
+            # 2) Force Time Off Extra Hours card = Remaining Extra Hours Balance in days
+            leave_days_after = payslip._sync_extra_hours_time_off_to_remaining()
+
+            # 3) Sync employee profile hour fields
             emp = payslip.employee_id
             updated_ot_balance = round(payslip.remaining_extra_hours_balance, 2)
             for field_name in ['total_overtime', 'total_extra_hours', 'extra_hours_balance', 'overtime_balance']:
@@ -974,6 +1278,17 @@ class HrPayslip(models.Model):
                         emp.sudo().write({field_name: updated_ot_balance})
                     except Exception as e:
                         _logger.warning("Could not sync %s to employee %s: %s", field_name, emp.id, e)
+
+            _logger.info(
+                "[ExtraHoursRecon][SYNC] END emp=%s | "
+                "BEFORE=%.4f → AFTER Time Off Extra Hours=%.4f days | "
+                "TARGET (remaining_h/8)=%.4f | emp_profile_ot_balance_h=%.2f",
+                payslip.employee_id.name,
+                leave_days_before,
+                leave_days_after if leave_days_after is not None else payslip._get_extra_hours_leave_days_available(),
+                rem_days,
+                updated_ot_balance,
+            )
 
     def _revert_reconciliation_settlements(self):
         Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
