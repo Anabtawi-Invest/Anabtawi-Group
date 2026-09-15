@@ -1,5 +1,5 @@
 import io
-from datetime import datetime
+from datetime import datetime, time
 
 from odoo import _, fields, models, exceptions
 from odoo.tools.misc import format_date
@@ -501,15 +501,22 @@ class HrPayslipRun(models.Model):
 
                 # Attendance metrics
                 worked_days = payslip.worked_days_line_ids
-                att_lines = worked_days.filtered(lambda wd: (
-                    (wd.code or '').strip() in ['WORK100', 'A', 'ATTENDANCE']
-                    or ('attendance' in (wd.name or '').lower() and 'extra' not in (wd.name or '').lower())
-                    or (
-                        ((wd.code or '').strip() in ['GTO', 'PHD', 'HOLIDAY', 'LEAVE110', 'PHW', 'HOLIDAY_WORKED'] or 'holiday' in (wd.name or '').lower())
-                        and wd.amount > 0.001
-                    )
-                ))
-                att_days = sum(att_lines.mapped("number_of_days"))
+                if emp and payslip.date_from and payslip.date_to:
+                    att_records = payslip.env['hr.attendance'].sudo().search([
+                        ('employee_id', '=', emp.id),
+                        ('check_in', '>=', datetime.combine(payslip.date_from, time.min)),
+                        ('check_in', '<=', datetime.combine(payslip.date_to, time.max))
+                    ])
+                    if att_records:
+                        att_days = len(set(a.check_in.date() for a in att_records if a.check_in))
+                    else:
+                        att_lines = worked_days.filtered(lambda wd: (
+                            (wd.code or '').strip() in ['WORK100', 'A', 'ATTENDANCE']
+                            or ('attendance' in (wd.name or '').lower() and 'extra' not in (wd.name or '').lower())
+                        ))
+                        att_days = sum(att_lines.mapped("number_of_days"))
+                else:
+                    att_days = sum(worked_days.filtered(lambda wd: (wd.code or '').strip() in ['WORK100', 'A', 'ATTENDANCE']).mapped("number_of_days"))
                 worked_hrs = sum(worked_days.mapped("number_of_hours"))
                 ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
 
