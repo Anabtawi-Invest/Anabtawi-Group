@@ -704,7 +704,7 @@ class HrPayslip(models.Model):
                     if total_holiday_worked_hrs > 0.01:
                         weighted_hol_hrs = round(total_holiday_worked_hrs * 1.5, 2)
                         line['number_of_hours'] = weighted_hol_hrs
-                        line['number_of_days'] = round(weighted_hol_hrs / 8.0, 2)
+                        line['number_of_days'] = float(len(set(att.check_in.date() for att in holiday_attendances))) if holiday_attendances else round(weighted_hol_hrs / 8.0, 2)
                         line['amount'] = round(weighted_hol_hrs * hourly_rate, 3)
                     else:
                         actual_hol_days = len(holiday_dates) if holiday_dates else 1.0
