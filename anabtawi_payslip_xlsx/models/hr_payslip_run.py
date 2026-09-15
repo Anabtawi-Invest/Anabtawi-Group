@@ -501,9 +501,17 @@ class HrPayslipRun(models.Model):
 
                 # Attendance metrics
                 worked_days = payslip.worked_days_line_ids
-                att_days = sum(worked_days.mapped("number_of_days"))
+                att_lines = worked_days.filtered(lambda wd: (
+                    (wd.code or '').strip() in ['WORK100', 'A', 'ATTENDANCE']
+                    or ('attendance' in (wd.name or '').lower() and 'extra' not in (wd.name or '').lower())
+                    or (
+                        ((wd.code or '').strip() in ['GTO', 'PHD', 'HOLIDAY', 'LEAVE110', 'PHW', 'HOLIDAY_WORKED'] or 'holiday' in (wd.name or '').lower())
+                        and wd.amount > 0.001
+                    )
+                ))
+                att_days = sum(att_lines.mapped("number_of_days"))
                 worked_hrs = sum(worked_days.mapped("number_of_hours"))
-                ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower()).mapped("number_of_hours"))
+                ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
 
                 # Gather notes
                 input_notes = []
