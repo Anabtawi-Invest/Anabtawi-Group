@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""Backward-compatible ZK entrypoint.
+"""SQL Server attendance bridge entrypoint.
 
-Prefer:
-  SOURCE_TYPE=zk python3 agent.py
-
-This wrapper keeps existing scripts working.
+Reads new punches from SQL Server and pushes them to the existing Odoo bridge API.
 """
 
 from __future__ import annotations
@@ -15,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-os.environ.setdefault("SOURCE_TYPE", "zk")
+os.environ.setdefault("SOURCE_TYPE", "sql")
 
 from agent import main
 
