@@ -889,17 +889,23 @@ class HrPayslip(models.Model):
         return round(days, 4)
 
     def _prepare_extra_hours_allocation_vals(self, alloc_name, leave_type, number_of_days):
-        """Build allocation vals compatible with hr.leave.type or work.entry.type."""
+        """Build allocation vals compatible with hr.leave.type or work.entry.type.
+
+        Odoo 19 forbids creating allocations directly in 'validate' state
+        ('Incorrect state for new allocation'). Create as 'confirm', then approve.
+        """
         self.ensure_one()
         vals = {
             'name': alloc_name,
             'employee_id': self.employee_id.id,
             'number_of_days': number_of_days,
-            'state': 'validate',
+            'state': 'confirm',
         }
         Allocation = self.env['hr.leave.allocation']
         if 'holiday_type' in Allocation._fields:
             vals['holiday_type'] = 'employee'
+        if 'date_from' in Allocation._fields and self.date_from:
+            vals['date_from'] = self.date_from
         if leave_type._name == 'hr.leave.type' and 'holiday_status_id' in Allocation._fields:
             vals['holiday_status_id'] = leave_type.id
         elif 'work_entry_type_id' in Allocation._fields:
@@ -914,6 +920,55 @@ class HrPayslip(models.Model):
             if wet:
                 vals['work_entry_type_id'] = wet.id
         return vals
+
+    def _validate_extra_hours_allocation(self, allocation):
+        """Approve/validate a newly created Extra Hours reconciliation allocation."""
+        self.ensure_one()
+        if not allocation:
+            return allocation
+        allocation = allocation.sudo()
+        ctx = dict(
+            mail_create_nolog=True,
+            mail_notrack=True,
+            tracking_disable=True,
+            leave_fast_create=True,
+        )
+        try:
+            if allocation.state == 'confirm':
+                if hasattr(allocation, 'action_approve'):
+                    allocation.with_context(**ctx).action_approve()
+                elif hasattr(allocation, 'action_validate'):
+                    allocation.with_context(**ctx).action_validate()
+                elif hasattr(allocation, '_action_validate'):
+                    allocation.with_context(**ctx)._action_validate()
+                else:
+                    allocation.with_context(**ctx).write({'state': 'validate'})
+        except Exception as exc:
+            _logger.warning(
+                "[ExtraHoursRecon][BALANCE] action_approve failed for alloc %s, forcing validate: %s",
+                allocation.id, exc,
+            )
+            try:
+                allocation.with_context(**ctx).write({'state': 'validate'})
+            except Exception as exc2:
+                _logger.exception(
+                    "[ExtraHoursRecon][BALANCE] force validate failed for alloc %s: %s",
+                    allocation.id, exc2,
+                )
+        return allocation
+
+    def _unlink_extra_hours_allocation(self, allocation):
+        """Safely remove a validated Extra Hours reconciliation allocation."""
+        if not allocation:
+            return
+        try:
+            allocation.with_context(allocation_skip_state_check=True).sudo().write({'state': 'confirm'})
+            allocation.with_context(allocation_skip_state_check=True).sudo().unlink()
+        except Exception as exc:
+            _logger.warning(
+                "[ExtraHoursRecon] Could not unlink Extra Hours alloc %s: %s",
+                allocation.id, exc,
+            )
 
     def _sync_extra_hours_time_off_to_remaining(self):
         """
@@ -969,11 +1024,7 @@ class HrPayslip(models.Model):
 
         if abs(delta_days) < 0.01:
             if existing_alloc and existing_alloc.number_of_days <= 0.01:
-                try:
-                    existing_alloc.write({'state': 'draft'})
-                    existing_alloc.unlink()
-                except Exception:
-                    pass
+                self._unlink_extra_hours_allocation(existing_alloc)
             self.extra_hours_allocated_days = existing_alloc.number_of_days if existing_alloc and existing_alloc.exists() else 0.0
             return target_days
 
@@ -983,15 +1034,16 @@ class HrPayslip(models.Model):
             mail_notrack=True,
             tracking_disable=True,
             leave_fast_create=True,
+            allocation_skip_state_check=True,
         )
 
         if delta_days > 0.01:
             old_days = existing_alloc.number_of_days if existing_alloc else 0.0
             new_days = round(old_days + delta_days, 4)
-            alloc_vals = self._prepare_extra_hours_allocation_vals(alloc_name, leave_type, new_days)
             try:
                 if existing_alloc:
-                    existing_alloc.with_context(**ctx).write(alloc_vals)
+                    # Do not rewrite state=validate on existing validated allocs
+                    existing_alloc.with_context(**ctx).write({'number_of_days': new_days, 'name': alloc_name})
                     _logger.info(
                         "[ExtraHoursRecon][BALANCE] UPDATED alloc id=%s days %.4f → %.4f (+%.4f)",
                         existing_alloc.id,
@@ -1000,10 +1052,12 @@ class HrPayslip(models.Model):
                         delta_days,
                     )
                 else:
+                    alloc_vals = self._prepare_extra_hours_allocation_vals(alloc_name, leave_type, new_days)
                     existing_alloc = Allocation.with_context(**ctx).create(alloc_vals)
+                    existing_alloc = self._validate_extra_hours_allocation(existing_alloc)
                     _logger.info(
-                        "[ExtraHoursRecon][BALANCE] CREATED alloc id=%s days=%.4f (to reach target %.4f)",
-                        existing_alloc.id, new_days, target_days,
+                        "[ExtraHoursRecon][BALANCE] CREATED+VALIDATED alloc id=%s days=%.4f state=%s (target %.4f)",
+                        existing_alloc.id, new_days, existing_alloc.state, target_days,
                     )
                 self.extra_hours_allocated_days = new_days
             except Exception as exc:
@@ -1019,15 +1073,14 @@ class HrPayslip(models.Model):
                     new_days = round(existing_alloc.number_of_days - cut, 4)
                     try:
                         if new_days <= 0.01:
-                            existing_alloc.write({'state': 'draft'})
-                            existing_alloc.unlink()
+                            self._unlink_extra_hours_allocation(existing_alloc)
                             self.extra_hours_allocated_days = 0.0
                             _logger.info(
                                 "[ExtraHoursRecon][BALANCE] REMOVED alloc (cut %.4f days)",
                                 cut,
                             )
                         else:
-                            existing_alloc.with_context(**ctx).write({'number_of_days': new_days, 'state': 'validate'})
+                            existing_alloc.with_context(**ctx).write({'number_of_days': new_days})
                             self.extra_hours_allocated_days = new_days
                             _logger.info(
                                 "[ExtraHoursRecon][BALANCE] REDUCED alloc to %.4f days (cut %.4f)",
@@ -1041,12 +1094,8 @@ class HrPayslip(models.Model):
                         )
                 else:
                     cut = round(cut - existing_alloc.number_of_days, 4)
-                    try:
-                        existing_alloc.write({'state': 'draft'})
-                        existing_alloc.unlink()
-                        self.extra_hours_allocated_days = 0.0
-                    except Exception:
-                        pass
+                    self._unlink_extra_hours_allocation(existing_alloc)
+                    self.extra_hours_allocated_days = 0.0
             if cut > 0.01:
                 # Extra settlement leave to burn remaining surplus on Time Off
                 _logger.info(
@@ -1346,8 +1395,8 @@ class HrPayslip(models.Model):
                         ('name', '=', alloc_name),
                     ])
                     if month_allocs:
-                        month_allocs.write({'state': 'draft'})
-                        month_allocs.unlink()
+                        month_allocs.with_context(allocation_skip_state_check=True).write({'state': 'confirm'})
+                        month_allocs.with_context(allocation_skip_state_check=True).unlink()
                 except Exception:
                     pass
 
