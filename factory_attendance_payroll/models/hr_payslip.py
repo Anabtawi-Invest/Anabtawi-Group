@@ -379,6 +379,8 @@ class HrPayslip(models.Model):
             valid_slips._compute_attendance_reconciliation_fields()
             valid_slips._apply_termination_clearance_inputs()
             valid_slips._normalize_public_holiday_work_entries()
+            # Unlink existing worked_days_line_ids so compute_sheet regenerates them with latest attendance logic
+            valid_slips.mapped('worked_days_line_ids').unlink()
 
         self._convert_flexible_rest_days_to_ars()
 
