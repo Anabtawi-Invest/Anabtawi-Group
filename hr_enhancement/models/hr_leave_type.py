@@ -34,32 +34,33 @@ class HrLeaveType(models.Model):
         for employee in employees:
             rows = allocation_data.get(employee)
             if not rows:
+                _logger.debug(
+                    "hr_enhancement TimeOff: no allocation rows employee_id=%s ref_date=%s",
+                    getattr(employee, "id", None),
+                    ref_date,
+                )
                 continue
-
+            hours_per_day = self._get_dashboard_hours_per_day(employee, ref_date)
+            _logger.debug(
+                "hr_enhancement TimeOff: employee_id=%s ref_date=%s dashboard_hours_per_day=%s rows=%s",
+                employee.id,
+                ref_date,
+                hours_per_day,
+                len(rows),
+            )
+            if not hours_per_day:
+                _logger.warning(
+                    "hr_enhancement TimeOff: hours_per_day is falsy for employee_id=%s; skip injecting hours_per_day",
+                    employee.id,
+                )
+                continue
             for _name, info, _requires, lt_id in rows:
-                leave_type = self.browse(lt_id) if lt_id else None
-                lt_name = (leave_type.name if leave_type else _name or '').lower()
-                
-                if 'extra' in lt_name or 'إضافي' in lt_name or 'overtime' in lt_name:
-                    total_ot_hours = getattr(employee, 'total_overtime', 0.0) or getattr(employee, 'total_extra_hours', 0.0)
-                    if not total_ot_hours and 'hr.leave.allocation' in self.env:
-                        allocs = self.env['hr.leave.allocation'].sudo().search([
-                            ('employee_id', '=', employee.id),
-                            ('holiday_status_id', '=', lt_id),
-                            ('state', '=', 'validate')
-                        ])
-                        total_ot_hours = sum(
-                            getattr(a, 'number_of_hours_display', 0.0) or (a.number_of_days * 9.4468)
-                            for a in allocs
-                        )
-                    
-                    if total_ot_hours > 0.001:
-                        equiv_days = round(total_ot_hours / 8.0, 2)
-                        info["virtual_remaining_leaves"] = equiv_days
-                        info["max_leaves"] = equiv_days
-                        info["hours_per_day"] = 8.0
-                else:
-                    hours_per_day = self._get_dashboard_hours_per_day(employee, ref_date)
-                    if hours_per_day:
-                        info["hours_per_day"] = round(float(hours_per_day), 2)
+                if info.get("request_unit") == "hour":
+                    info["hours_per_day"] = round(float(hours_per_day), 2)
+                    _logger.debug(
+                        "hr_enhancement TimeOff: leave_type_id=%s virtual_remaining=%s hours_per_day=%s (in payload)",
+                        lt_id,
+                        info.get("virtual_remaining_leaves"),
+                        info["hours_per_day"],
+                    )
         return allocation_data
