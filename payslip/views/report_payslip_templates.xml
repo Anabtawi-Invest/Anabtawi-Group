@@ -113,10 +113,12 @@
                 <t t-set="lines" t-value="o.line_ids.sorted('sequence')"/>
                 <t t-set="visible_lines" t-value="lines.filtered(lambda l: l.salary_rule_id.appears_on_payslip)"/>
                 <t t-set="rule_ids" t-value="{role: [rule.id for xmlid in refs for rule in [o.env.ref(xmlid, raise_if_not_found=False)] if rule] for role, refs in cfg['rule_refs'].items()}"/>
-                <t t-set="basic" t-value="lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['basic'])"/>
-                <t t-set="actual" t-value="lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['actual'])"/>
-                <t t-set="gross" t-value="lines.filtered(lambda l: l.code in cfg['gross_codes'])"/>
-                <t t-set="net" t-value="lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['net'])"/>
+                <t t-set="basic" t-value="lines.filtered(lambda l: l.code in ('BASIC', 'BASIC_SALARY') or l.salary_rule_id.id in rule_ids['basic'])"/>
+                <t t-set="actual" t-value="lines.filtered(lambda l: l.code in ('FULL_WAGE', 'ACTUAL', 'ACTUAL_SALARY', 'WAGE') or l.salary_rule_id.id in rule_ids['actual'])"/>
+                <t t-set="gross" t-value="lines.filtered(lambda l: l.code in ('GROSS', 'GROSS_SALARY') or l.code in cfg['gross_codes'])"/>
+                <t t-set="net" t-value="lines.filtered(lambda l: l.code in ('NET', 'NET_SALARY') or l.salary_rule_id.id in rule_ids['net'])"/>
+                <t t-set="basic_amount" t-value="sum(basic.mapped('total')) if basic else (o.contract_id.wage if o.contract_id else 0.0)"/>
+                <t t-set="actual_amount" t-value="sum(actual.mapped('total')) if actual else 0.0"/>
                 <t t-set="information" t-value="visible_lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['information'])"/>
                 <t t-set="reserved" t-value="basic | actual | gross | net | information"/>
                 <!-- child_of includes any depth of category descendants. -->
@@ -138,8 +140,8 @@
                 <!-- No GROSS rule exists in the supplied export. A presentation-only
                      gross is NET plus the displayed employee deductions. No payroll
                      rule or accounting value is created/recomputed by this template. -->
-                <t t-set="gross_available" t-value="len(gross) == 1 or (not gross and len(net) == 1 and not unmapped)"/>
-                <t t-set="gross_amount" t-value="gross.total if len(gross) == 1 else (net.total + deduction_total if gross_available else 0.0)"/>
+                <t t-set="net_amount" t-value="sum(net.mapped('total')) if net else (o.net_wage if 'net_wage' in o._fields else 0.0)"/>
+                <t t-set="gross_amount" t-value="sum(gross.mapped('total')) if gross else (net_amount + deduction_total if net else basic_amount)"/>
                 <t t-set="worked" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['worked_codes'])"/>
                 <t t-set="unpaid" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['unpaid_codes'])"/>
                 <t t-set="rows" t-value="max(cfg['minimum_rows'], len(allowances), len(deductions))"/>
@@ -176,11 +178,13 @@
                 </style>
                 <table class="plain">
                     <tr>
-                        <td style="width:25%"><img t-if="company.logo" class="logo" t-att-src="image_data_uri(company.logo)" alt="Company logo"/></td>
-                        <td style="width:35%" class="center"><div class="title" t-out="o.date_from.strftime('%m/%Y') if o.date_from else '—'"/></td>
-                        <td style="width:40%">
+                        <td style="width:35%"><img t-if="company.logo" class="logo" t-att-src="image_data_uri(company.logo)" alt="Company logo"/></td>
+                        <td style="width:65%; text-align: right;">
                             <div class="license">Licensed To: <span t-field="company.name"/></div>
-                            <div class="title ar" lang="ar">قسيمة راتب شهر / Payslip</div>
+                            <div class="title ar" lang="ar">
+                                <span>مخالصة / TERMINATION</span>
+                                <span dir="ltr" style="margin-right: 8px; margin-left: 8px;" t-out="o.date_from.strftime('%m/%Y') if o.date_from else '—'"/>
+                            </div>
                         </td>
                     </tr>
                 </table>
@@ -190,9 +194,7 @@
                     — <span t-field="o.date_to" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
                     <span> | </span><span t-field="o.name"/>
                 </div>
-                <div t-if="o.state not in ('done', 'paid')" class="notice center">
-                    Unvalidated / cancelled payslip — <span class="ar">قسيمة غير معتمدة أو ملغاة</span>
-                </div>
+
                 <table class="plain meta">
                     <tr>
                         <td class="label">Employee / الموظف</td>
@@ -246,9 +248,9 @@
                                 <tbody>
                                     <tr>
                                         <td>Basic Salary<br/><span class="ar">الراتب الأساسي</span></td>
-                                        <td class="num"><span t-if="cfg['basis_days_field'] in o._fields" t-out="o[cfg['basis_days_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
-                                        <td class="num"><span t-if="cfg['basis_hours_field'] in o._fields" t-out="o[cfg['basis_hours_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
-                                        <td class="num"><span t-if="len(basic) == 1" t-out="basic.total" t-options="{'widget': 'float', 'precision': precision}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-if="cfg['basis_days_field'] in o._fields and o[cfg['basis_days_field']]" t-out="o[cfg['basis_days_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="" t-out="(o.date_to - o.date_from).days + 1 if (o.date_from and o.date_to) else 30.0" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                        <td class="num"><span t-if="cfg['basis_hours_field'] in o._fields and o[cfg['basis_hours_field']]" t-out="o[cfg['basis_hours_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-out="basic_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                     <tr>
                                         <td>Unpaid Time<br/><span class="ar">أيام وساعات الخصم</span></td>
@@ -260,7 +262,7 @@
                                         <td>Actual Salary<br/><span class="ar">الراتب الفعلي</span></td>
                                         <td class="num"><span t-if="cfg['worked_codes']" t-out="sum(worked.mapped('number_of_days'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
                                         <td class="num"><span t-if="cfg['worked_codes']" t-out="sum(worked.mapped('number_of_hours'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
-                                        <td class="num"><span t-if="len(actual) == 1" t-out="actual.total" t-options="{'widget': 'float', 'precision': precision}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-out="actual_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -294,33 +296,11 @@
                 <table class="summary">
                     <tr>
                         <td><strong>Gross Salary<br/><span class="ar">إجمالي الراتب</span></strong></td>
-                        <td class="num"><span t-if="gross_available" t-out="gross_amount" t-options="{'widget': 'float', 'precision': precision}"/><span t-else="">—</span></td>
+                        <td class="num"><span t-out="gross_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                         <td class="net">Net Salary<br/><span class="ar">صافي الراتب</span></td>
-                        <td class="num net"><span t-if="len(net) == 1" t-out="net.total" t-options="{'widget': 'float', 'precision': precision}"/><span t-else="">—</span></td>
+                        <td class="num net"><span t-out="net_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                     </tr>
                 </table>
-                <div t-if="not gross_available or len(net) != 1 or len(basic) != 1 or len(actual) != 1" class="notice">
-                    Some salary totals are unavailable or ambiguous. / بعض مجاميع الراتب غير متاحة أو غير محددة.
-                </div>
-                <div class="muted" style="margin-top:6px">
-                    Work time: attendance work-entry lines only. Time deductions are included in the deductions table.
-                    <br/><span class="ar">الأيام والساعات من سطور الحضور بالقسيمة؛ خصومات الوقت مدرجة أيضاً في جدول الخصومات.</span>
-                </div>
-                <div t-if="not gross and gross_available" class="muted">
-                    Gross = Net + listed deductions / الإجمالي = الصافي + الخصومات المعروضة
-                </div>
-                <div t-if="information" class="muted" style="margin-top:6px">
-                    <span t-foreach="information" t-as="line"><span t-field="line.name"/>: <span t-field="line.total" t-options="{'widget': 'float', 'precision': precision}"/>; </span>
-                </div>
-                <!-- Preserve visible unclassified/negative correction lines for review.
-                     Never infer an allowance solely from a positive total. -->
-                <div t-if="unmapped" class="extra">
-                    <strong>Other lines — review classification / بنود أخرى — يلزم مراجعة التصنيف</strong>
-                    <table class="grid">
-                        <thead><tr><th style="width:22%">Code / الرمز</th><th>Line / البند</th><th style="width:24%">Stored Amount / المبلغ المسجل</th></tr></thead>
-                        <tbody><tr t-foreach="unmapped" t-as="line"><td><span t-field="line.code"/></td><td dir="auto"><span t-field="line.name"/></td><td class="num"><span t-field="line.total" t-options="{'widget': 'float', 'precision': precision}"/></td></tr></tbody>
-                    </table>
-                </div>
             </div>
                 </t>
             </t>
