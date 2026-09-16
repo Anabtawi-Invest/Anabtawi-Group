@@ -113,7 +113,7 @@
                 <t t-set="lines" t-value="o.line_ids.sorted('sequence')"/>
                 <t t-set="visible_lines" t-value="lines.filtered(lambda l: l.salary_rule_id.appears_on_payslip)"/>
                 <t t-set="rule_ids" t-value="{role: [rule.id for xmlid in refs for rule in [o.env.ref(xmlid, raise_if_not_found=False)] if rule] for role, refs in cfg['rule_refs'].items()}"/>
-                <t t-set="basic" t-value="(lines.filtered(lambda l: l.code == 'BASIC') or lines.filtered(lambda l: l.code in ('BASIC', 'BASIC_SALARY') or l.salary_rule_id.id in rule_ids['basic']))[:1]"/>
+                <t t-set="basic" t-value="(visible_lines.filtered(lambda l: l.code == 'BASIC') or visible_lines.filtered(lambda l: l.code in ('BASIC', 'BASIC_SALARY') or l.salary_rule_id.id in rule_ids['basic']) or lines.filtered(lambda l: l.code == 'BASIC'))[:1]"/>
                 <t t-set="actual" t-value="(lines.filtered(lambda l: l.code == 'FULL_WAGE') or lines.filtered(lambda l: l.code in ('FULL_WAGE', 'ACTUAL', 'ACTUAL_SALARY', 'WAGE') or l.salary_rule_id.id in rule_ids['actual']))[:1]"/>
                 <t t-set="gross" t-value="(lines.filtered(lambda l: l.code in ('GROSS', 'GROSS_SALARY') or l.code in cfg['gross_codes']))[:1]"/>
                 <t t-set="net" t-value="(lines.filtered(lambda l: l.code == 'NET') or lines.filtered(lambda l: l.code in ('NET', 'NET_SALARY') or l.salary_rule_id.id in rule_ids['net']))[:1]"/>
@@ -262,27 +262,24 @@
                 <table class="plain split">
                     <tr>
                         <td>
-                            <div class="section-title">Salary Basis &amp; Work<br/><span class="ar">الراتب وأيام وساعات العمل</span></div>
+                            <div class="section-title">Salary Basis &amp; Work<br/><span class="ar">الراتب وأيام العمل</span></div>
                             <table class="grid">
-                                <colgroup><col style="width:40%"/><col style="width:17%"/><col style="width:17%"/><col style="width:26%"/></colgroup>
-                                <thead><tr><th>البند</th><th>Days<br/>أيام</th><th>Hours<br/>ساعات</th><th>Amount<br/>المبلغ</th></tr></thead>
+                                <colgroup><col style="width:50%"/><col style="width:20%"/><col style="width:30%"/></colgroup>
+                                <thead><tr><th>البند</th><th>Days<br/>أيام</th><th>Amount<br/>المبلغ</th></tr></thead>
                                 <tbody>
                                     <tr>
                                         <td>Basic Salary<br/><span class="ar">الراتب الأساسي</span></td>
                                         <td class="num"><span t-if="cfg['basis_days_field'] in o._fields and o[cfg['basis_days_field']]" t-out="o[cfg['basis_days_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="" t-out="(o.date_to - o.date_from).days + 1 if (o.date_from and o.date_to) else 30.0" t-options="{'widget': 'float', 'precision': 2}"/></td>
-                                        <td class="num"><span t-if="cfg['basis_hours_field'] in o._fields and o[cfg['basis_hours_field']]" t-out="o[cfg['basis_hours_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
                                         <td class="num"><span t-out="basic_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                     <tr>
-                                        <td>Unpaid Time<br/><span class="ar">أيام وساعات الخصم</span></td>
+                                        <td>Unpaid Time<br/><span class="ar">أيام الخصم</span></td>
                                         <td class="num"><span t-if="cfg['unpaid_codes']" t-out="sum(unpaid.mapped('number_of_days'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
-                                        <td class="num"><span t-if="cfg['unpaid_codes']" t-out="sum(unpaid.mapped('number_of_hours'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
                                         <td class="num"><span t-out="cfg['deduction_sign'] * sum(time_deductions.mapped('total'))" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                     <tr>
                                         <td>Actual Salary<br/><span class="ar">الراتب الفعلي</span></td>
                                         <td class="num"><span t-if="cfg['worked_codes']" t-out="sum(worked.mapped('number_of_days'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
-                                        <td class="num"><span t-if="cfg['worked_codes']" t-out="sum(worked.mapped('number_of_hours'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
                                         <td class="num"><span t-out="actual_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                 </tbody>
