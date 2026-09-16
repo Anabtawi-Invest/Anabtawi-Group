@@ -113,10 +113,10 @@
                 <t t-set="lines" t-value="o.line_ids.sorted('sequence')"/>
                 <t t-set="visible_lines" t-value="lines.filtered(lambda l: l.salary_rule_id.appears_on_payslip)"/>
                 <t t-set="rule_ids" t-value="{role: [rule.id for xmlid in refs for rule in [o.env.ref(xmlid, raise_if_not_found=False)] if rule] for role, refs in cfg['rule_refs'].items()}"/>
-                <t t-set="basic" t-value="(lines.filtered(lambda l: l.code == 'BASIC'))[:1]"/>
-                <t t-set="actual" t-value="lines.filtered(lambda l: l.code == 'FULL_WAGE')[:1]"/>
-                <t t-set="gross" t-value="lines.filtered(lambda l: l.code in ('GROSS', 'GROSS_SALARY') or l.code in cfg['gross_codes'])[:1]"/>
-                <t t-set="net" t-value="lines.filtered(lambda l: l.code == 'NET')[:1] or lines.filtered(lambda l: l.code in ('NET', 'NET_SALARY') or l.salary_rule_id.id in rule_ids['net'])[:1]"/>
+                <t t-set="basic" t-value="lines.filtered(lambda l: l.salary_rule_id.code == 'BASIC')[:1]"/>
+                <t t-set="actual" t-value="(lines.filtered(lambda l: l.salary_rule_id.code == 'FULL_WAGE') or lines.filtered(lambda l: (l.name or '') == 'Actual Salary'))[:1]"/>
+                <t t-set="gross" t-value="lines.filtered(lambda l: l.salary_rule_id.code in ('GROSS', 'GROSS_SALARY') or l.salary_rule_id.code in cfg['gross_codes'])[:1]"/>
+                <t t-set="net" t-value="lines.filtered(lambda l: l.salary_rule_id.code in ('NET', 'NET_SALARY') or l.salary_rule_id.id in rule_ids['net'])[:1]"/>
                 <t t-set="basic_amount" t-value="o.employee_id.wage if 'wage' in o.employee_id._fields else 0.0"/>
                 <t t-set="actual_amount" t-value="actual.total if actual else 0.0"/>
                 <t t-set="information" t-value="visible_lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['information'])"/>
