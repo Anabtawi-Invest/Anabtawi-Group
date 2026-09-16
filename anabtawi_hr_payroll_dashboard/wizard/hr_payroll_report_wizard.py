@@ -24,7 +24,7 @@ class HrPayrollReportWizard(models.TransientModel):
     date_from = fields.Date(string="Date From", required=True, default=lambda self: fields.Date.today().replace(day=1))
     date_to = fields.Date(string="Date To", required=True, default=lambda self: (fields.Date.today().replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1))
     payrun_id = fields.Many2one("hr.payslip.run", string="Payrun Batch", help="Filter by specific payroll batch")
-    company_id = fields.Many2one("res.company", string="Company", default=lambda self: self.env.company, required=True)
+    company_id = fields.Many2one("res.company", string="Company", default=lambda self: self.env.company, required=False)
     department_ids = fields.Many2many("hr.department", string="Departments")
     report_type = fields.Selection([
         ("all", "Complete HR & Payroll Package (All 4 Sheets)"),
@@ -62,8 +62,12 @@ class HrPayrollReportWizard(models.TransientModel):
 
         slip_domain = [
             ("state", "not in", ["cancel"]),
-            ("company_id", "=", self.company_id.id),
         ]
+        if self.company_id:
+            slip_domain.append(("company_id", "=", self.company_id.id))
+        else:
+            slip_domain.append(("company_id", "in", self.env.user.company_ids.ids))
+
         if self.payrun_id:
             slip_domain.append(("payslip_run_id", "=", self.payrun_id.id))
         else:
@@ -73,7 +77,12 @@ class HrPayrollReportWizard(models.TransientModel):
             ])
 
         if self.department_ids:
-            slip_domain.append(("department_id", "in", self.department_ids.ids))
+            all_target_dep_ids = self.env["hr.department"].search([("id", "child_of", self.department_ids.ids)]).ids
+            slip_domain.extend([
+                "|",
+                ("department_id", "in", all_target_dep_ids),
+                ("employee_id.department_id", "in", all_target_dep_ids),
+            ])
 
         payslips = self.env["hr.payslip"].search(slip_domain, order="department_id, employee_id")
         if not payslips:
@@ -453,17 +462,33 @@ class HrPayrollReportWizard(models.TransientModel):
                 emp = slip.employee_id
                 dept_name = (slip.department_id or emp.department_id).name or ""
 
-                w_days = 30.0
+                w_days = 0.0
+                sched_hrs = 0.0
                 ot_hrs = 0.0
                 late_hrs = 0.0
 
                 if hasattr(slip, "worked_days_line_ids") and slip.worked_days_line_ids:
-                    w_days = sum(wd.number_of_days for wd in slip.worked_days_line_ids if wd.code != "OUT") or 30.0
-                    ot_hrs = sum(wd.number_of_hours for wd in slip.worked_days_line_ids if "OT" in (wd.code or "").upper() or "EXTRA" in (wd.code or "").upper() or "اضافي" in (wd.name or ""))
-                    late_hrs = sum(wd.number_of_hours for wd in slip.worked_days_line_ids if "LATE" in (wd.code or "").upper() or "تأخير" in (wd.name or "") or "خصم" in (wd.name or ""))
+                    for wd in slip.worked_days_line_ids:
+                        code = (wd.code or "").upper().strip()
+                        name = (wd.name or "").lower()
+                        hrs = wd.number_of_hours or 0.0
+                        days = wd.number_of_days or 0.0
 
-                sched_hrs = round(w_days * 8.0, 2)
-                approved_hrs = round(sched_hrs + ot_hrs - late_hrs, 2)
+                        is_ot = any(k in code for k in ["OT", "EXTRA", "OVERTIME"]) or any(k in name for k in ["إضافي", "اضافي"])
+                        is_late = any(k in code for k in ["LATE", "UNPAID", "ABSENT", "SHORT", "DELAY", "DED_HOURS"]) or any(k in name for k in ["تأخير", "تاخير", "خصم ساعات", "غياب", "مغادرة"])
+
+                        if is_ot:
+                            ot_hrs += hrs
+                        elif is_late:
+                            late_hrs += hrs
+                        else:
+                            if code not in ["OUT"]:
+                                w_days += days
+                                sched_hrs += hrs if hrs > 0 else (days * 8.0)
+
+                if not sched_hrs:
+                    sched_hrs = (w_days * 8.0) if w_days else 240.0
+                approved_hrs = round(max(sched_hrs + ot_hrs - late_hrs, 0.0), 2)
                 recon_hrs = round(ot_hrs - late_hrs, 2)
 
                 def _fmt_hrs(val):

@@ -17,8 +17,8 @@ class HrPayrollDashboard(models.AbstractModel):
     def get_dashboard_data(self, date_from=None, date_to=None, payrun_id=None, company_id=None, department_ids=None):
         """Calculates and aggregates comprehensive HR, Payroll, Overtime, and Attendance metrics."""
         self = self.sudo()
-        user_company = self.env.company
-        target_company_id = int(company_id) if company_id else user_company.id
+        user_companies = self.env.user.company_ids
+        target_company_id = int(company_id) if company_id and int(company_id) > 0 else 0
 
         # Determine date ranges
         today = fields.Date.today()
@@ -39,8 +39,11 @@ class HrPayrollDashboard(models.AbstractModel):
         # Base Domain for Payslips
         slip_domain = [
             ("state", "not in", ["cancel"]),
-            ("company_id", "=", target_company_id),
         ]
+        if target_company_id > 0:
+            slip_domain.append(("company_id", "=", target_company_id))
+        else:
+            slip_domain.append(("company_id", "in", user_companies.ids))
 
         if payrun_id and int(payrun_id) > 0:
             slip_domain.append(("payslip_run_id", "=", int(payrun_id)))
@@ -50,17 +53,22 @@ class HrPayrollDashboard(models.AbstractModel):
                 ("date_to", ">=", start_date),
             ])
 
+        # Resolve selected departments and all their child departments (hierarchical)
         if department_ids:
-            dep_ids = [int(d) for d in department_ids if int(d) > 0]
-            if dep_ids:
-                slip_domain.append(("department_id", "in", dep_ids))
+            raw_dep_ids = [int(d) for d in department_ids if int(d) > 0]
+            if raw_dep_ids:
+                all_target_dep_ids = self.env["hr.department"].search([("id", "child_of", raw_dep_ids)]).ids
+                slip_domain.extend([
+                    "|",
+                    ("department_id", "in", all_target_dep_ids),
+                    ("employee_id.department_id", "in", all_target_dep_ids),
+                ])
 
         payslips = self.env["hr.payslip"].search(slip_domain)
 
         # Retrieve payrun batches for dropdown
-        payruns = self.env["hr.payslip.run"].search([
-            ("company_id", "=", target_company_id),
-        ], order="date_start desc", limit=20)
+        payrun_domain = [("company_id", "=", target_company_id)] if target_company_id > 0 else [("company_id", "in", user_companies.ids)]
+        payruns = self.env["hr.payslip.run"].search(payrun_domain, order="date_start desc", limit=30)
         payrun_batches = [{
             "id": p.id,
             "name": p.name or _("Batch %s") % p.id,
@@ -69,19 +77,54 @@ class HrPayrollDashboard(models.AbstractModel):
             "state": p.state if hasattr(p, "state") else "",
         } for p in payruns]
 
-        # Retrieve all active departments for pills
-        all_departments = self.env["hr.department"].search_read(
-            [("company_id", "in", [False, target_company_id])],
-            ["id", "name"],
-            order="name asc",
-        )
-
         # Retrieve allowed companies
-        allowed_companies = self.env["res.company"].search_read(
-            [("id", "in", self.env.user.company_ids.ids)],
-            ["id", "name"],
-            order="name asc",
-        )
+        allowed_companies = [{"id": 0, "name": _("All Companies (جميع الشركات)")}]
+        allowed_companies.extend([
+            {"id": c.id, "name": c.name} for c in user_companies
+        ])
+
+        # Retrieve departments hierarchically
+        dept_domain = [("company_id", "in", [False, target_company_id])] if target_company_id > 0 else [("company_id", "in", [False] + user_companies.ids)]
+        raw_departments = self.env["hr.department"].search(dept_domain, order="name asc")
+
+        # Build department tree (parent departments and their children)
+        # Find all parent departments (no parent or parent not in current set)
+        dept_ids_set = set(raw_departments.ids)
+        parent_departments = []
+        children_by_parent = {}
+
+        for dep in raw_departments:
+            p_id = dep.parent_id.id if dep.parent_id and dep.parent_id.id in dept_ids_set else 0
+            if p_id == 0:
+                parent_departments.append({
+                    "id": dep.id,
+                    "name": dep.name,
+                    "company_id": dep.company_id.id if dep.company_id else 0,
+                    "child_count": 0,
+                    "children": [],
+                })
+            else:
+                if p_id not in children_by_parent:
+                    children_by_parent[p_id] = []
+                children_by_parent[p_id].append({
+                    "id": dep.id,
+                    "name": dep.name,
+                    "parent_id": p_id,
+                    "company_id": dep.company_id.id if dep.company_id else 0,
+                })
+
+        # Attach children and counts to parents
+        for p in parent_departments:
+            c_list = children_by_parent.get(p["id"], [])
+            p["children"] = c_list
+            p["child_count"] = len(c_list)
+
+        # Flat department list for quick reference
+        all_departments_flat = [{
+            "id": d.id,
+            "name": d.name,
+            "parent_id": d.parent_id.id if d.parent_id else 0,
+        } for d in raw_departments]
 
         # Aggregate KPI totals
         total_basic_salary = 0.0
@@ -97,6 +140,7 @@ class HrPayrollDashboard(models.AbstractModel):
         total_overtime_hours = 0.0
         total_lateness_hours = 0.0
         total_lateness_amount = 0.0
+        total_scheduled_hours = 0.0
         total_working_days = 0.0
 
         bank_count = 0
@@ -148,11 +192,52 @@ class HrPayrollDashboard(models.AbstractModel):
             slip_gross = 0.0
             slip_allowances = 0.0
             slip_deductions = 0.0
-            slip_ssc = 0.0
+            slip_ssc_emp = 0.0
+            slip_ssc_comp = 0.0
             slip_tax = 0.0
             slip_ot_amount = 0.0
             slip_late_amount = 0.0
 
+            # Worked Days Analysis (Exact Hours)
+            slip_days = 0.0
+            slip_sched_hours = 0.0
+            slip_ot_hours = 0.0
+            slip_late_hours = 0.0
+            slip_wd_ot_amount = 0.0
+            slip_wd_late_amount = 0.0
+
+            if hasattr(slip, "worked_days_line_ids") and slip.worked_days_line_ids:
+                for wd in slip.worked_days_line_ids:
+                    code = (wd.code or "").upper().strip()
+                    name = (wd.name or "").lower()
+                    hrs = wd.number_of_hours or 0.0
+                    days = wd.number_of_days or 0.0
+                    amt = getattr(wd, "amount", 0.0) or 0.0
+
+                    is_ot = any(k in code for k in ["OT", "EXTRA", "OVERTIME"]) or any(k in name for k in ["إضافي", "اضافي", "ساعات إضافية"])
+                    is_late = any(k in code for k in ["LATE", "UNPAID", "ABSENT", "SHORT", "DELAY", "DED_HOURS"]) or any(k in name for k in ["تأخير", "تاخير", "خصم ساعات", "غياب", "مغادرة"])
+
+                    if is_ot:
+                        slip_ot_hours += hrs
+                        if amt > 0:
+                            slip_wd_ot_amount += amt
+                    elif is_late:
+                        slip_late_hours += hrs
+                        if amt:
+                            slip_wd_late_amount += abs(amt)
+                    else:
+                        # Regular / scheduled worked days
+                        if code not in ["OUT"]:
+                            slip_days += days
+                            slip_sched_hours += hrs if hrs > 0 else (days * 8.0)
+
+            # Fallback for scheduled hours if not tracked on lines
+            if not slip_sched_hours and slip_days:
+                slip_sched_hours = slip_days * 8.0
+            elif not slip_sched_hours and not slip_days:
+                slip_sched_hours = 240.0
+
+            # Salary Rule Line Analysis
             if hasattr(slip, "line_ids") and slip.line_ids:
                 for line in slip.line_ids:
                     code = (line.code or "").upper().strip()
@@ -162,77 +247,86 @@ class HrPayrollDashboard(models.AbstractModel):
 
                     if code == "NET":
                         slip_net = amt
-                    elif code in ["GROSS", "GRS"]:
+                    elif code in ["GROSS", "GRS", "TOTAL_GROSS"]:
                         slip_gross = amt
-                    elif code in ["BASIC", "BASE"] and not slip_basic:
+                    elif code in ["BASIC", "BASE", "WAGE"] and not slip_basic:
                         slip_basic = amt
 
-                    # Allowance Categories
-                    if cat_code in ["ALW", "ALLOWANCE"] or code in ["ALW", "BONUS", "COMMISSION", "ALLW", "OVERTIME", "OT"] or any(k in name for k in ["علاوة", "مكافأة", "إضافي", "اضافي", "بدل"]):
-                        if code not in ["GROSS", "NET", "BASIC"]:
-                            slip_allowances += amt
-
-                    # Deductions Categories
-                    if cat_code in ["DED", "DEDUCTION"] or code in ["DED", "LOAN", "UNPAID", "LATE", "PENALTY", "INS"] or any(k in name for k in ["خصم", "سلفة", "قرض", "عقوبة", "تأمين", "تامين", "مخالفة"]):
-                        if code not in ["NET", "GROSS"]:
-                            slip_deductions += abs(amt)
-
-                    # Social Security
-                    if "SS" in code or "SSC" in code or "ضمان" in name:
-                        if "COMP" in code or "شركة" in name:
-                            total_social_security_comp += abs(amt)
-                        else:
-                            slip_ssc += abs(amt)
-
-                    # Income Tax
-                    if "TAX" in code or "ITAX" in code or "ضريبة" in name:
-                        slip_tax += abs(amt)
-
-                    # Overtime
-                    if "OT" in code or "OVERTIME" in code or "اضافي" in name or "إضافي" in name:
+                    # Overtime Salary Rule
+                    is_ot_line = any(k in code for k in ["OT", "OVERTIME", "EXTRA"]) or any(k in name for k in ["اضافي", "إضافي", "عمل إضافي", "عمل اضافي"])
+                    if is_ot_line:
                         slip_ot_amount += amt
 
-                    # Lateness
-                    if "LATE" in code or "تأخير" in name or "تاخير" in name or "خصم ساعات" in name:
+                    # Lateness / Deduction Hours Salary Rule
+                    is_late_line = any(k in code for k in ["LATE", "DELAY", "SHORTAGE", "DED_HOURS", "UNPAID", "ABS"]) or any(k in name for k in ["تأخير", "تاخير", "خصم ساعات", "خصم تأخير"])
+                    if is_late_line:
                         slip_late_amount += abs(amt)
+
+                    # Social Security Analysis
+                    is_ss = any(k in code for k in ["SS", "SSC", "GOSI"]) or "ضمان" in name
+                    if is_ss:
+                        is_comp = any(k in code for k in ["COMP", "COMPANY", "ER", "SSCCO", "SSCP"]) or any(k in name for k in ["شركة", "صاحب العمل"])
+                        if is_comp:
+                            slip_ssc_comp += abs(amt)
+                        else:
+                            slip_ssc_emp += abs(amt)
+
+                    # Income Tax
+                    is_tax = any(k in code for k in ["TAX", "ITAX", "INCOME_TAX"]) or any(k in name for k in ["ضريبة", "دخل"])
+                    if is_tax:
+                        slip_tax += abs(amt)
+
+                    # Allowances
+                    is_alw = cat_code in ["ALW", "ALLOWANCE", "ALW_RECURRING"] or code in ["ALW", "BONUS", "COMMISSION", "ALLW", "TAKLEEF", "TAKLEF", "TRANS", "HOUSING"] or any(k in name for k in ["علاوة", "مكافأة", "مكافاه", "بدل", "تكليف", "تنقل"])
+                    if is_alw and code not in ["GROSS", "NET", "BASIC"]:
+                        slip_allowances += amt
+
+                    # Deductions
+                    is_ded = cat_code in ["DED", "DEDUCTION"] or code in ["DED", "LOAN", "UNPAID", "PENALTY", "INS", "ADV", "ADVANCE", "DIFF"] or any(k in name for k in ["خصم", "سلفة", "قرض", "عقوبة", "جزاء", "تأمين", "تامين", "مخالفة"])
+                    if is_ded and code not in ["NET", "GROSS"]:
+                        # Avoid double counting if already tracked in tax or social security
+                        if not is_ss and not is_tax:
+                            slip_deductions += abs(amt)
             else:
                 slip_net = getattr(slip, "net_wage", 0.0) or getattr(slip, "total_amount", 0.0) or 0.0
                 slip_gross = getattr(slip, "gross_wage", 0.0) or slip_basic
 
-            # Fallbacks
-            if not slip_net:
-                slip_net = getattr(slip, "net_wage", 0.0) or getattr(slip, "total_amount", 0.0) or slip_basic
+            # Fallbacks for Overtime Amount if rule didn't compute an amount
+            hourly_rate = (slip_basic / 240.0) if slip_basic else 0.0
+            if not slip_ot_amount:
+                if slip_wd_ot_amount:
+                    slip_ot_amount = slip_wd_ot_amount
+                elif slip_ot_hours > 0 and hourly_rate > 0:
+                    slip_ot_amount = round(slip_ot_hours * hourly_rate * 1.25, 3)
+
+            # Fallbacks for Lateness Amount
+            if not slip_late_amount:
+                if slip_wd_late_amount:
+                    slip_late_amount = slip_wd_late_amount
+                elif slip_late_hours > 0 and hourly_rate > 0:
+                    slip_late_amount = round(slip_late_hours * hourly_rate, 3)
+
+            # Fallbacks for Gross & Net
             if not slip_gross:
-                slip_gross = getattr(slip, "gross_wage", 0.0) or slip_basic
-
-            # Worked Days Analysis
-            slip_days = 0.0
-            slip_ot_hours = 0.0
-            slip_late_hours = 0.0
-
-            if hasattr(slip, "worked_days_line_ids") and slip.worked_days_line_ids:
-                for wd in slip.worked_days_line_ids:
-                    code = (wd.code or "").upper().strip()
-                    name = (wd.name or "").lower()
-                    if code not in ["OUT"]:
-                        slip_days += wd.number_of_days or 0.0
-                    if "OT" in code or "EXTRA" in code or "اضافي" in name or "إضافي" in name:
-                        slip_ot_hours += wd.number_of_hours or 0.0
-                    if "LATE" in code or "تأخير" in name or "تاخير" in name or "خصم" in name:
-                        slip_late_hours += wd.number_of_hours or 0.0
+                slip_gross = getattr(slip, "gross_wage", 0.0) or (slip_basic + slip_allowances + slip_ot_amount)
+            if not slip_net:
+                total_all_deductions = slip_deductions + slip_ssc_emp + slip_tax + slip_late_amount
+                slip_net = getattr(slip, "net_wage", 0.0) or max(slip_gross - total_all_deductions, 0.0)
 
             # Accumulate global totals
             total_basic_salary += slip_basic
             total_gross_salary += slip_gross
             total_net_salary += slip_net
             total_allowances += slip_allowances
-            total_deductions += slip_deductions
-            total_social_security_emp += slip_ssc
+            total_deductions += (slip_deductions + slip_late_amount)
+            total_social_security_emp += slip_ssc_emp
+            total_social_security_comp += slip_ssc_comp
             total_income_tax += slip_tax
             total_overtime_amount += slip_ot_amount
             total_overtime_hours += slip_ot_hours
             total_lateness_hours += slip_late_hours
             total_lateness_amount += slip_late_amount
+            total_scheduled_hours += slip_sched_hours
             total_working_days += slip_days
 
             # Bank vs Cash Payment analysis
@@ -255,8 +349,8 @@ class HrPayrollDashboard(models.AbstractModel):
             dep_row["gross_salary"] += slip_gross
             dep_row["net_salary"] += slip_net
             dep_row["allowances"] += slip_allowances
-            dep_row["deductions"] += slip_deductions
-            dep_row["social_security"] += slip_ssc
+            dep_row["deductions"] += (slip_deductions + slip_late_amount)
+            dep_row["social_security"] += slip_ssc_emp
             dep_row["income_tax"] += slip_tax
             dep_row["overtime_amount"] += slip_ot_amount
             dep_row["overtime_hours"] += slip_ot_hours
@@ -277,8 +371,7 @@ class HrPayrollDashboard(models.AbstractModel):
         top_late_departments = sorted(department_list, key=lambda x: x["lateness_hours"], reverse=True)[:5]
         top_headcount_departments = sorted(department_list, key=lambda x: x["headcount"], reverse=True)[:5]
 
-        scheduled_hours = total_working_days * 8.0
-        approved_hours = max(scheduled_hours + total_overtime_hours - total_lateness_hours, 0.0)
+        approved_hours = max(total_scheduled_hours + total_overtime_hours - total_lateness_hours, 0.0)
 
         data = {
             "date_from": str(start_date),
@@ -286,7 +379,8 @@ class HrPayrollDashboard(models.AbstractModel):
             "selected_company_id": target_company_id,
             "selected_payrun_id": int(payrun_id) if payrun_id else 0,
             "payrun_batches": payrun_batches,
-            "all_departments": all_departments,
+            "all_departments": all_departments_flat,
+            "parent_departments": parent_departments,
             "all_companies": allowed_companies,
             "kpis": {
                 "total_net_salary": round(total_net_salary, 3),
@@ -328,7 +422,7 @@ class HrPayrollDashboard(models.AbstractModel):
                 },
             ],
             "operational_highlights": {
-                "scheduled_hours": round(scheduled_hours, 2),
+                "scheduled_hours": round(total_scheduled_hours, 2),
                 "approved_hours": round(approved_hours, 2),
                 "extra_ot_hours": round(total_overtime_hours, 2),
                 "subtracted_late_hours": round(total_lateness_hours, 2),
@@ -341,9 +435,9 @@ class HrPayrollDashboard(models.AbstractModel):
 
     @api.model
     def open_kpi_drilldown(self, metric_type, date_from=None, date_to=None, payrun_id=None, company_id=None, department_ids=None):
-        """Returns window action with pre-filtered domain corresponding to clicked KPI card."""
-        user_company = self.env.company
-        target_company_id = int(company_id) if company_id else user_company.id
+        """Returns window action with pre-filtered domain and explicit views array for Odoo 19 web client."""
+        user_companies = self.env.user.company_ids
+        target_company_id = int(company_id) if company_id and int(company_id) > 0 else 0
 
         today = fields.Date.today()
         if not date_from or not date_to:
@@ -356,8 +450,12 @@ class HrPayrollDashboard(models.AbstractModel):
 
         slip_domain = [
             ("state", "not in", ["cancel"]),
-            ("company_id", "=", target_company_id),
         ]
+        if target_company_id > 0:
+            slip_domain.append(("company_id", "=", target_company_id))
+        else:
+            slip_domain.append(("company_id", "in", user_companies.ids))
+
         if payrun_id and int(payrun_id) > 0:
             slip_domain.append(("payslip_run_id", "=", int(payrun_id)))
         else:
@@ -367,9 +465,14 @@ class HrPayrollDashboard(models.AbstractModel):
             ])
 
         if department_ids:
-            dep_ids = [int(d) for d in department_ids if int(d) > 0]
-            if dep_ids:
-                slip_domain.append(("department_id", "in", dep_ids))
+            raw_dep_ids = [int(d) for d in department_ids if int(d) > 0]
+            if raw_dep_ids:
+                all_target_dep_ids = self.env["hr.department"].search([("id", "child_of", raw_dep_ids)]).ids
+                slip_domain.extend([
+                    "|",
+                    ("department_id", "in", all_target_dep_ids),
+                    ("employee_id.department_id", "in", all_target_dep_ids),
+                ])
 
         payslips = self.env["hr.payslip"].search(slip_domain)
         slip_ids = payslips.ids
@@ -381,6 +484,7 @@ class HrPayrollDashboard(models.AbstractModel):
                 "type": "ir.actions.act_window",
                 "res_model": "hr.employee",
                 "view_mode": "list,kanban,form",
+                "views": [[False, "list"], [False, "kanban"], [False, "form"]],
                 "domain": [("id", "in", emp_ids)],
                 "context": {"create": False},
                 "target": "current",
@@ -392,6 +496,7 @@ class HrPayrollDashboard(models.AbstractModel):
                 "type": "ir.actions.act_window",
                 "res_model": "hr.payslip.worked_days",
                 "view_mode": "list,pivot,graph",
+                "views": [[False, "list"], [False, "pivot"], [False, "graph"]],
                 "domain": [
                     ("payslip_id", "in", slip_ids),
                     "|", "|",
@@ -409,6 +514,7 @@ class HrPayrollDashboard(models.AbstractModel):
                 "type": "ir.actions.act_window",
                 "res_model": "hr.payslip.worked_days",
                 "view_mode": "list,pivot,graph",
+                "views": [[False, "list"], [False, "pivot"], [False, "graph"]],
                 "domain": [
                     ("payslip_id", "in", slip_ids),
                     "|", "|",
@@ -426,6 +532,7 @@ class HrPayrollDashboard(models.AbstractModel):
                 "type": "ir.actions.act_window",
                 "res_model": "hr.payslip.line",
                 "view_mode": "list,pivot,graph",
+                "views": [[False, "list"], [False, "pivot"], [False, "graph"]],
                 "domain": [
                     ("slip_id", "in", slip_ids),
                     "|", "|",
@@ -443,6 +550,7 @@ class HrPayrollDashboard(models.AbstractModel):
                 "type": "ir.actions.act_window",
                 "res_model": "hr.payslip.line",
                 "view_mode": "list,pivot,graph",
+                "views": [[False, "list"], [False, "pivot"], [False, "graph"]],
                 "domain": [
                     ("slip_id", "in", slip_ids),
                     "|",
@@ -460,6 +568,7 @@ class HrPayrollDashboard(models.AbstractModel):
                 "type": "ir.actions.act_window",
                 "res_model": "hr.payslip.line",
                 "view_mode": "list,pivot,graph",
+                "views": [[False, "list"], [False, "pivot"], [False, "graph"]],
                 "domain": [
                     ("slip_id", "in", slip_ids),
                     ("category_id.code", "=", cat_code),
@@ -477,6 +586,7 @@ class HrPayrollDashboard(models.AbstractModel):
                 "type": "ir.actions.act_window",
                 "res_model": "hr.payslip",
                 "view_mode": "list,kanban,form",
+                "views": [[False, "list"], [False, "kanban"], [False, "form"]],
                 "domain": [("id", "in", bank_slip_ids)],
                 "context": {"create": False},
                 "target": "current",
@@ -487,6 +597,7 @@ class HrPayrollDashboard(models.AbstractModel):
             "type": "ir.actions.act_window",
             "res_model": "hr.payslip",
             "view_mode": "list,kanban,pivot,graph,form",
+            "views": [[False, "list"], [False, "kanban"], [False, "pivot"], [False, "graph"], [False, "form"]],
             "domain": [("id", "in", slip_ids)],
             "context": {"create": False},
             "target": "current",

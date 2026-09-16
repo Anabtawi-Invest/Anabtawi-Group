@@ -10,6 +10,7 @@ export class HrPayrollDashboard extends Component {
     setup() {
         this.orm = useService("orm");
         this.actionService = useService("action");
+        this.notification = useService("notification");
 
         const now = new Date();
         const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -22,10 +23,12 @@ export class HrPayrollDashboard extends Component {
             payrun_id: 0,
             company_id: 0,
             department_ids: [],
+            expandedParents: [],
             searchQuery: "",
             sortKey: "net_salary",
             sortOrder: "desc",
             loading: true,
+            exportingExcel: false,
         });
 
         this.data = useState({
@@ -35,6 +38,7 @@ export class HrPayrollDashboard extends Component {
             selected_payrun_id: 0,
             payrun_batches: [],
             all_departments: [],
+            parent_departments: [],
             all_companies: [],
             kpis: {},
             departments: [],
@@ -77,6 +81,7 @@ export class HrPayrollDashboard extends Component {
             this.data.selected_payrun_id = res.selected_payrun_id;
             this.data.payrun_batches = res.payrun_batches || [];
             this.data.all_departments = res.all_departments || [];
+            this.data.parent_departments = res.parent_departments || [];
             this.data.all_companies = res.all_companies || [];
             this.data.kpis = res.kpis || {};
             this.data.departments = res.departments || [];
@@ -84,6 +89,12 @@ export class HrPayrollDashboard extends Component {
             this.data.operational_highlights = res.operational_highlights || {};
         } catch (error) {
             console.error("Failed to load HR & Payroll dashboard data", error);
+            if (this.notification) {
+                this.notification.add(
+                    "Error loading dashboard: " + (error.data?.message || error.message || error),
+                    { type: "danger" }
+                );
+            }
         } finally {
             this.state.loading = false;
         }
@@ -122,18 +133,82 @@ export class HrPayrollDashboard extends Component {
         this.fetchDashboardData();
     }
 
-    onCompanyChange(ev) {
-        const val = parseInt(ev.target.value) || 0;
-        this.state.company_id = val;
+    selectCompany(compId) {
+        this.state.company_id = parseInt(compId) || 0;
+        this.state.department_ids = [];
+        this.state.expandedParents = [];
         this.fetchDashboardData();
     }
 
-    selectDepartment(deptId) {
-        if (deptId === "all") {
-            this.state.department_ids = [];
-        } else {
-            this.state.department_ids = [deptId];
+    isCompanySelected(compId) {
+        return (this.state.company_id || 0) === (parseInt(compId) || 0);
+    }
+
+    // Toggle expand/fold of a parent department's child branches
+    toggleParentExpand(parentId, ev) {
+        if (ev) {
+            ev.stopPropagation();
         }
+        const pId = parseInt(parentId);
+        const idx = this.state.expandedParents.indexOf(pId);
+        if (idx > -1) {
+            this.state.expandedParents.splice(idx, 1);
+        } else {
+            this.state.expandedParents.push(pId);
+        }
+    }
+
+    isParentExpanded(parentId) {
+        return this.state.expandedParents.includes(parseInt(parentId));
+    }
+
+    // Multi-Select Department toggle
+    toggleDepartment(deptId, ev) {
+        if (ev) {
+            ev.stopPropagation();
+        }
+        const id = parseInt(deptId);
+        const current = [...this.state.department_ids];
+        const idx = current.indexOf(id);
+
+        if (idx > -1) {
+            current.splice(idx, 1);
+        } else {
+            current.push(id);
+        }
+        this.state.department_ids = current;
+        this.fetchDashboardData();
+    }
+
+    // Select or toggle parent and all its children together
+    toggleParentWithChildren(parentDept, ev) {
+        if (ev) {
+            ev.stopPropagation();
+        }
+        const parentId = parseInt(parentDept.id);
+        const childIds = (parentDept.children || []).map(c => parseInt(c.id));
+        const allIds = [parentId, ...childIds];
+
+        const current = [...this.state.department_ids];
+        const allAlreadySelected = allIds.every(id => current.includes(id));
+
+        if (allAlreadySelected) {
+            // Deselect all
+            this.state.department_ids = current.filter(id => !allIds.includes(id));
+        } else {
+            // Select all
+            const newSet = new Set([...current, ...allIds]);
+            this.state.department_ids = Array.from(newSet);
+            // Also expand parent if not already expanded so user sees the branches
+            if (!this.state.expandedParents.includes(parentId)) {
+                this.state.expandedParents.push(parentId);
+            }
+        }
+        this.fetchDashboardData();
+    }
+
+    selectAllDepartments() {
+        this.state.department_ids = [];
         this.fetchDashboardData();
     }
 
@@ -141,7 +216,32 @@ export class HrPayrollDashboard extends Component {
         if (deptId === "all") {
             return !this.state.department_ids || this.state.department_ids.length === 0;
         }
-        return this.state.department_ids && this.state.department_ids.length === 1 && this.state.department_ids[0] === deptId;
+        return this.state.department_ids && this.state.department_ids.includes(parseInt(deptId));
+    }
+
+    isParentPartiallySelected(parentDept) {
+        if (!this.state.department_ids || this.state.department_ids.length === 0) return false;
+        const parentId = parseInt(parentDept.id);
+        const childIds = (parentDept.children || []).map(c => parseInt(c.id));
+        const allIds = [parentId, ...childIds];
+        const hasSome = allIds.some(id => this.state.department_ids.includes(id));
+        const hasAll = allIds.every(id => this.state.department_ids.includes(id));
+        return hasSome && !hasAll;
+    }
+
+    isParentFullySelected(parentDept) {
+        if (!this.state.department_ids || this.state.department_ids.length === 0) return false;
+        const parentId = parseInt(parentDept.id);
+        const childIds = (parentDept.children || []).map(c => parseInt(c.id));
+        const allIds = [parentId, ...childIds];
+        return allIds.every(id => this.state.department_ids.includes(id));
+    }
+
+    getSelectedCountForParent(parentDept) {
+        if (!this.state.department_ids || this.state.department_ids.length === 0) return 0;
+        const childIds = (parentDept.children || []).map(c => parseInt(c.id));
+        const allIds = [parseInt(parentDept.id), ...childIds];
+        return allIds.filter(id => this.state.department_ids.includes(id)).length;
     }
 
     sortBy(key) {
@@ -217,14 +317,34 @@ export class HrPayrollDashboard extends Component {
             );
 
             if (action) {
-                this.actionService.doAction(action);
+                // Safeguard against missing action.views which causes TypeError in Odoo web client
+                if (!action.views && action.view_mode) {
+                    action.views = action.view_mode.split(",").map(v => [false, v.trim()]);
+                }
+                await this.actionService.doAction(action);
             }
         } catch (error) {
             console.error("Failed to open HR KPI drilldown action", error);
+            if (this.notification) {
+                this.notification.add(
+                    "Could not open drilldown: " + (error.data?.message || error.message || error),
+                    { type: "danger" }
+                );
+            }
         }
     }
 
     async exportExcel() {
+        if (this.state.exportingExcel) return;
+        this.state.exportingExcel = true;
+
+        if (this.notification) {
+            this.notification.add(
+                "Generating unified HR & Payroll Excel package...",
+                { type: "info" }
+            );
+        }
+
         try {
             const wizardVals = {
                 date_from: this.state.date_from,
@@ -238,20 +358,42 @@ export class HrPayrollDashboard extends Component {
                 wizardVals.company_id = this.state.company_id;
             }
             if (this.state.department_ids && this.state.department_ids.length > 0) {
-                wizardVals.department_ids = [[6, 0, this.state.department_ids]];
+                wizardVals.department_ids = [[6, 0, this.state.department_ids.map(Number)]];
             }
 
-            const wizard = await this.orm.create("hr.payroll.report.wizard", [wizardVals]);
+            const wizardRes = await this.orm.create("hr.payroll.report.wizard", [wizardVals]);
+            const wizardId = Array.isArray(wizardRes) ? wizardRes[0] : wizardRes;
 
             const action = await this.orm.call(
                 "hr.payroll.report.wizard",
                 "action_export_xlsx",
-                [wizard[0]]
+                [wizardId]
             );
 
-            this.actionService.doAction(action);
+            if (action && action.type === "ir.actions.act_url" && action.url) {
+                window.location.href = action.url;
+                if (this.notification) {
+                    this.notification.add(
+                        "Excel file exported successfully.",
+                        { type: "success" }
+                    );
+                }
+            } else if (action) {
+                if (!action.views && action.view_mode) {
+                    action.views = action.view_mode.split(",").map(v => [false, v.trim()]);
+                }
+                await this.actionService.doAction(action);
+            }
         } catch (error) {
             console.error("Failed to export unified HR & Payroll Excel report", error);
+            if (this.notification) {
+                this.notification.add(
+                    "Export failed: " + (error.data?.message || error.message || error),
+                    { type: "danger" }
+                );
+            }
+        } finally {
+            this.state.exportingExcel = false;
         }
     }
 }

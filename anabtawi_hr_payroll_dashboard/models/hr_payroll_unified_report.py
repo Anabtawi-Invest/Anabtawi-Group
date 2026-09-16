@@ -43,6 +43,7 @@ class HrPayrollUnifiedReport(models.TransientModel):
                 "res_model": "hr.payslip",
                 "res_id": self.payslip_id.id,
                 "view_mode": "form",
+                "views": [[False, "form"]],
                 "target": "current",
             }
         return False

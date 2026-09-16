@@ -5,7 +5,7 @@
             <!-- Header & Filter Toolbar -->
             <div class="o_hr_dashboard_header">
                 <div class="o_dashboard_title">
-                    <h2><i class="fa fa-users text-primary"/> HR &amp; Payroll Executive Dashboard</h2>
+                    <h2><i class="fa fa-users text-primary me-2"/> HR &amp; Payroll Executive Dashboard</h2>
                     <span class="subtitle">
                         Unified corporate payroll, overtime, attendance &amp; bank payment analytics
                         <t t-if="data.date_from and data.date_to">
@@ -16,14 +16,14 @@
                 <div class="o_dashboard_filters">
                     <!-- Quick Date Range Buttons -->
                     <div class="btn-group btn-group-period" role="group">
-                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'this_month'}" t-on-click="() => this.setPeriod('this_month')">This Month</button>
-                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'prev_month'}" t-on-click="() => this.setPeriod('prev_month')">Prev Month</button>
-                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'this_quarter'}" t-on-click="() => this.setPeriod('this_quarter')">Quarter</button>
-                        <button type="button" class="btn btn-outline-primary" t-att-class="{'active': state.period === 'this_year'}" t-on-click="() => this.setPeriod('this_year')">This Year</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'this_month'}" t-on-click="() => this.setPeriod('this_month')">This Month</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'prev_month'}" t-on-click="() => this.setPeriod('prev_month')">Prev Month</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'this_quarter'}" t-on-click="() => this.setPeriod('this_quarter')">Quarter</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'this_year'}" t-on-click="() => this.setPeriod('this_year')">This Year</button>
                     </div>
 
                     <!-- Payrun Batch Selector Dropdown -->
-                    <select class="form-select filter_select" t-on-change="onPayrunChange">
+                    <select class="form-select form-select-sm filter_select" t-on-change="onPayrunChange">
                         <option value="0">-- All / Custom Range --</option>
                         <t t-foreach="data.payrun_batches" t-as="batch" t-key="batch.id">
                             <option t-att-value="batch.id" t-att-selected="state.payrun_id === batch.id">
@@ -33,35 +33,142 @@
                     </select>
 
                     <div class="d-flex align-items-center gap-2">
-                        <input type="date" class="form-control filter_input" t-model="state.date_from"/>
-                        <span class="text-muted">to</span>
-                        <input type="date" class="form-control filter_input" t-model="state.date_to"/>
-                        <button class="btn btn-primary" t-on-click="fetchDashboardData">
+                        <input type="date" class="form-control form-control-sm filter_input" t-model="state.date_from"/>
+                        <span class="text-muted small">to</span>
+                        <input type="date" class="form-control form-control-sm filter_input" t-model="state.date_to"/>
+                        <button class="btn btn-primary btn-sm text-nowrap" t-on-click="fetchDashboardData">
                             <i class="fa fa-refresh me-1"/> Apply
                         </button>
-                        <button class="btn btn-success ms-1" t-on-click="exportExcel">
+                        <button class="btn btn-success btn-sm text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="exportExcel">
                             <i class="fa fa-file-excel-o me-1"/> Export Full Excel Package
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Department Selector Tabs -->
-            <div class="o_department_selector_bar mb-4">
-                <ul class="nav nav-pills department_pills">
-                    <li class="nav-item">
-                        <button type="button" class="nav-link" t-att-class="{'active': isDeptSelected('all')}" t-on-click="() => this.selectDepartment('all')">
-                            <i class="fa fa-th-large me-1"/> All Departments (<t t-esc="data.departments.length"/>)
-                        </button>
-                    </li>
-                    <t t-foreach="data.all_departments" t-as="dept_item" t-key="dept_item.id">
-                        <li class="nav-item">
-                            <button type="button" class="nav-link" t-att-class="{'active': isDeptSelected(dept_item.id)}" t-on-click="() => this.selectDepartment(dept_item.id)">
-                                <i class="fa fa-building me-1"/> <t t-esc="dept_item.name"/>
+            <!-- Organization Controls: 1) Companies Bar -->
+            <div class="o_organization_filter_section mb-3">
+                <div class="o_filter_row company_row">
+                    <span class="filter_row_label">
+                        <i class="fa fa-sitemap text-primary me-1"/> Companies (الشركات):
+                    </span>
+                    <div class="filter_pills_container">
+                        <t t-foreach="data.all_companies" t-as="comp" t-key="comp.id">
+                            <button type="button" 
+                                    class="btn btn-sm btn-company-pill"
+                                    t-att-class="{'active': isCompanySelected(comp.id)}"
+                                    t-on-click="() => this.selectCompany(comp.id)">
+                                <i class="fa fa-building-o me-1"/> <t t-esc="comp.name"/>
                             </button>
-                        </li>
+                        </t>
+                    </div>
+                </div>
+
+                <!-- Organization Controls: 2) Hierarchical Departments Bar -->
+                <div class="o_filter_row department_row mt-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="filter_row_label">
+                            <i class="fa fa-cubes text-purple me-1"/> Departments (الأقسام والهيكلية):
+                        </span>
+                        <t t-if="state.department_ids and state.department_ids.length > 0">
+                            <button type="button" class="btn btn-xs btn-outline-danger btn-clear-filter" t-on-click="() => this.selectAllDepartments()">
+                                <i class="fa fa-times me-1"/> Selected (<t t-esc="state.department_ids.length"/>) - Reset to All
+                            </button>
+                        </t>
+                    </div>
+
+                    <div class="filter_pills_container parent_pills">
+                        <!-- All Departments Pill -->
+                        <button type="button" 
+                                class="btn btn-sm btn-dept-pill btn-dept-all"
+                                t-att-class="{'active': isDeptSelected('all')}"
+                                t-on-click="() => this.selectAllDepartments()">
+                            <i class="fa fa-th-large me-1"/> All Departments (<t t-esc="data.all_departments.length"/>)
+                        </button>
+
+                        <!-- Parent Departments List -->
+                        <t t-foreach="data.parent_departments" t-as="parent" t-key="parent.id">
+                            <div class="btn-group btn-parent-group me-2 mb-2" role="group">
+                                <!-- Main Parent Selection Button -->
+                                <button type="button"
+                                        class="btn btn-sm btn-dept-pill btn-parent-main"
+                                        t-att-class="{
+                                            'active': isParentFullySelected(parent) or isDeptSelected(parent.id),
+                                            'partially-active': isParentPartiallySelected(parent)
+                                        }"
+                                        t-on-click="(ev) => this.toggleParentWithChildren(parent, ev)"
+                                        t-att-title="parent.child_count > 0 ? 'Click to select ' + parent.name + ' and all ' + parent.child_count + ' branches' : 'Click to select ' + parent.name">
+                                    <i class="fa fa-folder text-warning me-1" t-if="parent.child_count > 0"/>
+                                    <i class="fa fa-briefcase me-1" t-else=""/>
+                                    <span class="parent_title"><t t-esc="parent.name"/></span>
+                                    <t t-if="parent.child_count > 0">
+                                        <span class="badge bg-light text-dark border ms-1 branch_counter" title="Child branches">
+                                            <t t-esc="parent.child_count"/>
+                                        </span>
+                                    </t>
+                                    <t t-if="getSelectedCountForParent(parent) > 0">
+                                        <span class="badge bg-primary text-white ms-1" title="Selected from this group">
+                                            <i class="fa fa-check"/> <t t-esc="getSelectedCountForParent(parent)"/>
+                                        </span>
+                                    </t>
+                                </button>
+
+                                <!-- Fold/Unfold Toggle Chevron (if parent has child departments) -->
+                                <t t-if="parent.child_count > 0">
+                                    <button type="button"
+                                            class="btn btn-sm btn-dept-pill btn-parent-toggle"
+                                            t-att-class="{'active-toggle': isParentExpanded(parent.id)}"
+                                            t-on-click="(ev) => this.toggleParentExpand(parent.id, ev)"
+                                            t-att-title="isParentExpanded(parent.id) ? 'Fold (طي الفروع)' : 'Unfold / Expand ' + parent.child_count + ' branches (فتح الفروع)'">
+                                        <i class="fa fa-chevron-up" t-if="isParentExpanded(parent.id)"/>
+                                        <i class="fa fa-chevron-down" t-else=""/>
+                                    </button>
+                                </t>
+                            </div>
+                        </t>
+                    </div>
+
+                    <!-- Collapsible Sub-Department Trays (Branches) -->
+                    <t t-foreach="data.parent_departments" t-as="parent" t-key="'tray_' + parent.id">
+                        <t t-if="parent.child_count > 0 and isParentExpanded(parent.id)">
+                            <div class="o_subdept_tray p-3 mb-3 animate__animated animate__fadeIn">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="subdept_tray_title">
+                                        <i class="fa fa-level-down text-primary me-2"/>
+                                        <strong><t t-esc="parent.name"/> Branches &amp; Units (<t t-esc="parent.child_count"/> فرع وقسم تابع):</strong>
+                                        <span class="text-muted small ms-2">Click any branch to toggle multi-selection</span>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-xs btn-outline-primary" t-on-click="(ev) => this.toggleParentWithChildren(parent, ev)">
+                                            <t t-if="isParentFullySelected(parent)">
+                                                <i class="fa fa-square-o me-1"/> Deselect All Branches
+                                            </t>
+                                            <t t-else="">
+                                                <i class="fa fa-check-square-o me-1"/> Select All Branches
+                                            </t>
+                                        </button>
+                                        <button type="button" class="btn btn-xs btn-outline-secondary" t-on-click="(ev) => this.toggleParentExpand(parent.id, ev)">
+                                            <i class="fa fa-minus me-1"/> Fold (طي)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="filter_pills_container child_pills">
+                                    <t t-foreach="parent.children" t-as="child" t-key="child.id">
+                                        <button type="button"
+                                                class="btn btn-sm btn-child-pill"
+                                                t-att-class="{'active': isDeptSelected(child.id)}"
+                                                t-on-click="(ev) => this.toggleDepartment(child.id, ev)">
+                                            <i class="fa fa-check-circle text-primary me-1" t-if="isDeptSelected(child.id)"/>
+                                            <i class="fa fa-circle-o text-muted me-1" t-else=""/>
+                                            <t t-esc="child.name"/>
+                                        </button>
+                                    </t>
+                                </div>
+                            </div>
+                        </t>
                     </t>
-                </ul>
+                </div>
             </div>
 
             <!-- Loader -->
@@ -114,7 +221,7 @@
                     <!-- Total Allowances -->
                     <div class="o_kpi_card card-alw clickable_kpi" t-on-click="() => this.onKpiClick('allowances')" title="Click to view allowance lines">
                         <div class="kpi_icon"><i class="fa fa-gift text-success"/></div>
-                        <div class="kpi_title">Total Allowances (العلاوات والمكافآت)</div>
+                        <div class="kpi_title">Total Allowances (العلاوات والبدلات)</div>
                         <div class="kpi_value text-success"><t t-esc="formatCurrency(data.kpis.total_allowances)"/> <span class="fs-6 fw-normal text-muted">JOD</span></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <span class="badge bg-success badge_sub">Takleef &amp; Bonus</span>
@@ -139,7 +246,7 @@
                         <div class="kpi_title">Social Security (الضمان الاجتماعي)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_social_security)"/> <span class="fs-6 fw-normal text-muted">JOD</span></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <span class="badge bg-warning text-dark badge_sub">Employee Share</span>
+                            <span class="badge bg-warning text-dark badge_sub">Emp: <t t-esc="formatCurrency(data.kpis.total_social_security)"/></span>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
@@ -274,7 +381,7 @@
                         </div>
                         <div class="d-flex gap-2 align-items-center">
                             <input type="text" class="form-control form-control-sm" placeholder="Search department..." t-model="state.searchQuery" style="max-width: 220px;"/>
-                            <button class="btn btn-sm btn-outline-success" t-on-click="exportExcel">
+                            <button class="btn btn-sm btn-outline-success text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="exportExcel">
                                 <i class="fa fa-file-excel-o me-1"/> Export to Excel
                             </button>
                         </div>
