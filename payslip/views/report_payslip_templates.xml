@@ -112,7 +112,7 @@
                 <t t-set="bank" t-value="employee.primary_bank_account_id"/>
                 <t t-set="lines" t-value="o.line_ids.sorted('sequence')"/>
                 <t t-set="visible_lines" t-value="lines.filtered(lambda l: l.salary_rule_id.appears_on_payslip)"/>
-                <t t-set="rule_ids" t-value="{role: [rule.id for ref in refs for rule in [o.env.ref(ref, raise_if_not_found=False)] if rule] for role, refs in cfg['rule_refs'].items()}"/>
+                <t t-set="rule_ids" t-value="{role: [rule.id for xmlid in refs for rule in [o.env.ref(xmlid, raise_if_not_found=False)] if rule] for role, refs in cfg['rule_refs'].items()}"/>
                 <t t-set="basic" t-value="lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['basic'])"/>
                 <t t-set="actual" t-value="lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['actual'])"/>
                 <t t-set="gross" t-value="lines.filtered(lambda l: l.code in cfg['gross_codes'])"/>
