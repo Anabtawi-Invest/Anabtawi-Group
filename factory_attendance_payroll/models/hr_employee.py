@@ -286,12 +286,15 @@ class HrEmployee(models.Model):
                     current += timedelta(days=1)
 
                 # Monthly Grace Threshold Rule:
-                # Count Mondays in month (4 or 5); first 4 or 5 unpunched days in month forgiven, 5th/6th+ day receives ABSENT entry
-                num_mondays_in_month = sum(
-                    1 for d_idx in range((m_to - m_from).days + 1)
-                    if (m_from + timedelta(days=d_idx)).weekday() == 0
-                )
-                allowed_grace_days = max(4, num_mondays_in_month)
+                # Retail: fixed 4-day rest day rule. Factory: count Mondays in month (4 or 5).
+                if employee.employee_work_station == "retail":
+                    allowed_grace_days = 4
+                else:
+                    num_mondays_in_month = sum(
+                        1 for d_idx in range((m_to - m_from).days + 1)
+                        if (m_from + timedelta(days=d_idx)).weekday() == 0
+                    )
+                    allowed_grace_days = max(4, num_mondays_in_month)
                 forgiven_days = [d[0] for d in candidate_unpunched_days[:allowed_grace_days]]
                 if forgiven_days:
                     WEModel = self.env["hr.work.entry"]
