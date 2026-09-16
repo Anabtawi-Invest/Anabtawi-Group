@@ -123,7 +123,7 @@ patch(ControlButtons.prototype, {
             false
         );
 
-        order.setPosCakeOrderId(result.id);
+        order.setPosCakeOrderId(result.id, result.product_id);
         return true;
     },
 

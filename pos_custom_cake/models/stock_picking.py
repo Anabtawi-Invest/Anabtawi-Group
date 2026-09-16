@@ -11,12 +11,15 @@ class StockPicking(models.Model):
 
     def _get_cake_order_for_pos_line(self, line):
         order = line.order_id
-        if order.pos_cake_order_id:
-            return order.pos_cake_order_id
-        return self.env["pos.cake.order"].search(
-            [("pos_order_id", "=", order.id)],
-            limit=1,
-        )
+        cake_order = order.pos_cake_order_id
+        if not cake_order:
+            cake_order = self.env["pos.cake.order"].search(
+                [("pos_order_id", "=", order.id)],
+                limit=1,
+            )
+        if cake_order and cake_order.product_id and line.product_id != cake_order.product_id:
+            return self.env["pos.cake.order"]
+        return cake_order
 
     def _prepare_stock_move_vals(self, first_line, order_lines):
         vals = super()._prepare_stock_move_vals(first_line, order_lines)
