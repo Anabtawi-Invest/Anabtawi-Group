@@ -318,7 +318,7 @@
                     <strong>Other lines — review classification / بنود أخرى — يلزم مراجعة التصنيف</strong>
                     <table class="grid">
                         <thead><tr><th style="width:22%">Code / الرمز</th><th>Line / البند</th><th style="width:24%">Stored Amount / المبلغ المسجل</th></tr></thead>
-                        <tbody><tr t-foreach="unmapped" t-as="line"><td t-field="line.code"/><td dir="auto" t-field="line.name"/><td class="num"><span t-field="line.total" t-options="{'widget': 'float', 'precision': precision}"/></td></tr></tbody>
+                        <tbody><tr t-foreach="unmapped" t-as="line"><td><span t-field="line.code"/></td><td dir="auto"><span t-field="line.name"/></td><td class="num"><span t-field="line.total" t-options="{'widget': 'float', 'precision': precision}"/></td></tr></tbody>
                     </table>
                 </div>
             </div>
