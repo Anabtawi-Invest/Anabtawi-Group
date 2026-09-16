@@ -1,33 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-<record id="portfolio_view" model="ir.ui.view"><field name="name">Anabtawi Invest — Portfolio</field><field name="type">qweb</field><field name="key">Anabtawi_invest_web_new_2.portfolio</field><field name="website_id" ref="website_invest"/><field name="arch" type="xml"><t t-name="Anabtawi_invest_web_new_2.portfolio"><t t-call="website.layout"><t t-set="additional_title">Anabtawi Invest | Diversified Companies, Unified Vision</t><div id="wrap" class="oe_structure invest-page" dir="ltr" lang="en"><div id="invest-main" tabindex="-1"></div>
+<record id="portfolio_view" model="ir.ui.view">
+<field name="name">Anabtawi Invest — Portfolio</field>
+<field name="type">qweb</field>
+<field name="key">Anabtawi_invest_web_new_2.portfolio</field>
+<field name="website_id" ref="website_invest"/>
+<field name="arch" type="xml">
+<t t-name="Anabtawi_invest_web_new_2.portfolio">
+<t t-call="website.layout">
+<t t-set="additional_title">Anabtawi Invest | Diversified Companies, Unified Vision</t>
 
+<div id="wrap" class="oe_structure invest-page" dir="ltr" lang="en">
+<div id="invest-main" tabindex="-1"></div>
+
+<!-- Hero Section -->
 <section class="invest-site invest-hero" id="top-hero" data-name="Invest hero" data-snippet="s_invest_hero">
  <div class="invest-container invest-hero-grid">
- <div class="invest-hero-copy">
-  <p class="invest-eyebrow"><span></span> <strong id="hero-brand-name">ANABTAWI INVEST</strong> <b dir="ltr" id="hero-brand-sub">EST. 1954</b></p>
-  <h1 data-i18n="hero_h1">Deep Roots.<br/><em>Renewed Horizons.</em></h1>
-  <p class="invest-hero-description" data-i18n="hero_desc">From the authenticity of fine food to future-facing enterprise.<br/>A diversified business group uniting heritage, excellence, and forward growth.</p>
-  <div class="invest-hero-actions">
-   <a class="invest-button" href="/invest#companies" data-i18n="hero_cta1">Explore Companies <span aria-hidden="true" class="arrow-dir">↘</span></a>
-   <a class="invest-quiet-link" href="/invest#about" data-i18n="hero_cta2">Our Legacy Story <span aria-hidden="true" class="arrow-sub">→</span></a>
+  <div class="invest-hero-copy">
+   <p class="invest-eyebrow"><span></span> <strong id="hero-brand-name">ANABTAWI INVEST</strong> <b dir="ltr" id="hero-brand-sub">EST. 1954</b></p>
+   <h1 data-i18n="hero_h1">Deep Roots.<br/><em>Renewed Horizons.</em></h1>
+   <p class="invest-hero-description" data-i18n="hero_desc">From the authenticity of fine food to future-facing enterprise.<br/>A diversified business group uniting heritage, excellence, and forward growth.</p>
+   <div class="invest-hero-actions">
+    <a class="invest-button" href="/invest#companies" data-i18n="hero_cta1">Explore Companies <span aria-hidden="true" class="arrow-dir">↘</span></a>
+    <a class="invest-quiet-link" href="/invest#about" data-i18n="hero_cta2">Our Legacy Story <span aria-hidden="true" class="arrow-sub">→</span></a>
+   </div>
+   <div class="invest-hero-foot"><span class="invest-small-line"></span><span data-i18n="hero_foot">Diversified ventures, unified identity.</span></div>
   </div>
-  <div class="invest-hero-foot"><span class="invest-small-line"></span><span data-i18n="hero_foot">Diversified ventures, unified identity.</span></div>
- </div>
- <div class="invest-orbit" aria-label="Group companies in food, agriculture, and tech">
-  <div class="invest-orbit-ring invest-ring-one"></div><div class="invest-orbit-ring invest-ring-two"></div><div class="invest-orbit-ring invest-ring-three"></div>
-  <div class="invest-orbit-core"><img src="/Anabtawi_invest_web_new_2/static/src/img/content/logo.png" width="480" height="198" alt="Anabtawi Invest"/><span dir="ltr">A WORLD OF POSSIBILITIES</span></div>
-  <a class="invest-orbit-item invest-orbit-1" href="/invest#companies" aria-label="Anabtawi Sweets"><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-1.png" alt="Anabtawi Sweets" width="201" height="199"/></a>
-  <a class="invest-orbit-item invest-orbit-2" href="/invest#companies" aria-label="Tryaq Honey"><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-4.png" alt="Tryaq Honey" width="201" height="199"/></a>
-  <a class="invest-orbit-item invest-orbit-3" href="/invest#companies" aria-label="Najeeb Arabians"><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-9.png" alt="Najeeb Arabians" width="201" height="199"/></a>
-  <a class="invest-orbit-item invest-orbit-4" href="/invest#companies" aria-label="Al-Baseera"><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-8.png" alt="Al-Baseera" width="201" height="199"/></a>
-  <a class="invest-orbit-item invest-orbit-5" href="/invest#companies" aria-label="Belad Al-Cham"><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-5.png" alt="Belad Al-Cham" width="201" height="199"/></a>
-  <span class="invest-orbit-caption" dir="ltr">DIVERSITY · HERITAGE · AMBITION</span>
- </div>
+
+  <div class="invest-orbit" aria-label="Group companies in food, agriculture, and tech">
+   <div class="invest-orbit-ring invest-ring-one"></div>
+   <div class="invest-orbit-ring invest-ring-two"></div>
+   <div class="invest-orbit-ring invest-ring-three"></div>
+   <div class="invest-orbit-core">
+    <img src="/Anabtawi_invest_web_new_2/static/src/img/content/logo.png" width="480" height="198" alt="Anabtawi Invest"/>
+    <span dir="ltr">A WORLD OF POSSIBILITIES</span>
+   </div>
+   <a class="invest-orbit-item invest-orbit-1" href="/invest#companies" aria-label="Anabtawi Sweets"><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-1.png" alt="Anabtawi Sweets" width="201" height="199"/></a>
+   <a class="invest-orbit-item invest-orbit-2" href="/invest#companies" aria-label="Tryaq Honey"><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-4.png" alt="Tryaq Honey" width="201" height="199"/></a>
+   <a class="invest-orbit-item invest-orbit-3" href="/invest#companies" aria-label="Najeeb Arabians"><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-9.png" alt="Najeeb Arabians" width="201" height="199"/></a>
+   <a class="invest-orbit-item invest-orbit-4" href="/invest#companies" aria-label="Al-Baseera"><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-8.png" alt="Al-Baseera" width="201" height="199"/></a>
+   <a class="invest-orbit-item invest-orbit-5" href="/invest#companies" aria-label="Belad Al-Cham"><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-5.png" alt="Belad Al-Cham" width="201" height="199"/></a>
+   <span class="invest-orbit-caption" dir="ltr">DIVERSITY · HERITAGE · AMBITION</span>
+  </div>
  </div>
  <div class="invest-container invest-hero-bottom"><span dir="ltr">1 / THE GROUP</span><a href="/invest#about" data-i18n="hero_scroll_more">Discover More <span aria-hidden="true">↓</span></a><span data-i18n="hq_location">Amman, Jordan</span></div>
 </section>
 
+<!-- About Section -->
 <section class="invest-site invest-about" id="about" data-name="About the group" data-snippet="s_text_block">
  <div class="invest-container invest-about-grid">
   <div><p class="invest-eyebrow" data-i18n="about_eyebrow">THE GROUP / ABOUT US</p><h2 data-i18n="about_h2">Diversity in Enterprise.<br/><em>Integrity in Vision.</em></h2></div>
@@ -44,6 +63,7 @@
  </div>
 </section>
 
+<!-- Portfolio Section with Right-to-Left Passing Companies -->
 <section class="invest-site invest-portfolio" id="companies" data-name="Group companies" data-snippet="s_invest_companies">
  <div class="invest-container">
   <div class="invest-section-heading">
@@ -64,19 +84,183 @@
   </div>
  </div>
 
+ <!-- Continuous Flowing Marquee Track (Right to Left) -->
  <div class="invest-marquee-outer" id="portfolio-flow-view">
   <div class="invest-marquee-track" id="marquee-track">
-   <!-- Flowing Marquee Items populated dynamically -->
+   <!-- Set A -->
+   <article class="invest-company" data-sector="food" id="company-1">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Arabic Sweets" data-i18n-ar="حلويات عربية">Arabic Sweets</span><span class="invest-card-number">1</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-1.png" alt="Anabtawi Sweets" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Anabtawi Sweets</p><h3 data-i18n-en="Anabtawi Sweets" data-i18n-ar="عنبتاوي للحلويات">Anabtawi Sweets</h3><p class="invest-card-tagline" data-i18n-en="Authentic taste and master craftsmanship." data-i18n-ar="أصالة المذاق، وحِرفة التفاصيل.">Authentic taste and master craftsmanship.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="A wide assortment of traditional Arabic sweets, meticulously crafted with premium ingredients for your finest moments." data-i18n-ar="تشكيلة من الحلويات العربية التقليدية، تُحضّر بعناية وبمكونات مختارة لترافق مناسباتكم.">A wide assortment of traditional Arabic sweets, meticulously crafted with premium ingredients for your finest moments.</p><a class="invest-text-link" href="http://www.anabtawisweets.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food" id="company-2">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Luxury Confectionery" data-i18n-ar="حلويات فاخرة">Luxury Confectionery</span><span class="invest-card-number">2</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-2.png" alt="Holyland Sweets" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Holyland Sweets</p><h3 data-i18n-en="Holyland Sweets" data-i18n-ar="هولي لاند">Holyland Sweets</h3><p class="invest-card-tagline" data-i18n-en="Taste elevating every special occasion." data-i18n-ar="مذاق يرتقي بكل مناسبة.">Taste elevating every special occasion.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="Fine Arabic pastries prepared to premium standards, catering to leading hotels and discerning dessert lovers." data-i18n-ar="حلويات عربية بمكونات عالية الجودة، تلبي احتياجات الفنادق والعملاء الباحثين عن تجربة مميزة.">Fine Arabic pastries prepared to premium standards, catering to leading hotels and discerning dessert lovers.</p><a class="invest-text-link" href="http://www.holylandsweets.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food" id="company-3">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Trading &amp; Import" data-i18n-ar="تجارة واستيراد">Trading &amp; Import</span><span class="invest-card-number">3</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-3.png" alt="United Food Trading" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">United Food Trading</p><h3 data-i18n-en="United Food Trading" data-i18n-ar="المتحدة لتجارة المواد الغذائية">United Food Trading</h3><p class="invest-card-tagline" data-i18n-en="Connecting quality directly to its source." data-i18n-ar="نصل الجودة بمصادرها.">Connecting quality directly to its source.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="Importing oils, premium butter, dairy products, quality cheeses, pistachios, and selected international foodstuffs." data-i18n-ar="استيراد الزيوت والدهون والزبدة والأجبان ومنتجات الألبان، إلى جانب الفستق والتمور.">Importing oils, premium butter, dairy products, quality cheeses, pistachios, and selected international foodstuffs.</p><a class="invest-text-link" href="http://www.unitedfood-jo.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="agri" id="company-4">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Honey &amp; Apiaries" data-i18n-ar="عسل ومنتجات طبيعية">Honey &amp; Apiaries</span><span class="invest-card-number">4</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-4.png" alt="Tryaq Honey" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Tryaq Honey</p><h3 data-i18n-en="Tryaq Honey" data-i18n-ar="عسل ترياق">Tryaq Honey</h3><p class="invest-card-tagline" data-i18n-en="From nature, in its purest integrity." data-i18n-ar="من الطبيعة، بكل نقائها.">From nature, in its purest integrity.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="Beekeeping roots dating back to Anabta in 1910, producing authentic pure natural honey from Jordanian blossoms." data-i18n-ar="جذور في تربية النحل تعود إلى عنبتا في فلسطين عام 1910، وحضور في عمّان تحت اسم ترياق منذ عام 1990.">Beekeeping roots dating back to Anabta in 1910, producing authentic pure natural honey from Jordanian blossoms.</p><a class="invest-text-link" href="http://www.tryaqhoney.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food" id="company-5">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Cheese Manufacturing" data-i18n-ar="صناعة الأجبان">Cheese Manufacturing</span><span class="invest-card-number">5</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-5.png" alt="Belad Al-Cham" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Belad Al-Cham</p><h3 data-i18n-en="Belad Al-Cham" data-i18n-ar="بلاد الشام">Belad Al-Cham</h3><p class="invest-card-tagline" data-i18n-en="Local artisanal craft, authentic excellence." data-i18n-ar="حِرفة محلية، وجودة أصيلة.">Local artisanal craft, authentic excellence.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="A specialized facility crafting traditional white cheeses including Akkawi, Halloumi, and braided cheese." data-i18n-ar="مصنع متخصص في إنتاج أصناف الأجبان البيضاء، ومنها العكاوي والحلوم والمشلّلة، بعناية بجودة التصنيع.">A specialized facility crafting traditional white cheeses including Akkawi, Halloumi, and braided cheese.</p></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food" id="company-6">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Food Processing" data-i18n-ar="تصنيع غذائي">Food Processing</span><span class="invest-card-number">6</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-6.png" alt="Maser Al-Khair" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Maser Al-Khair</p><h3 data-i18n-en="Maser Al-Khair" data-i18n-ar="ماسر الخير">Maser Al-Khair</h3><p class="invest-card-tagline" data-i18n-en="Proven expertise across the food supply chain." data-i18n-ar="خبرة في عالم الغذاء.">Proven expertise across the food supply chain.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="Specialized food production meeting highest international standards to serve Middle Eastern markets." data-i18n-ar="أعمال متخصصة في مجالات التصنيع الغذائي، مع اهتمام بخدمة أسواق الشرق الأوسط.">Specialized food production meeting highest international standards to serve Middle Eastern markets.</p><a class="invest-text-link" href="http://www.alsalam-co.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="agri" id="company-7">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Agriculture &amp; Livestock" data-i18n-ar="زراعة وثروة حيوانية">Agriculture &amp; Livestock</span><span class="invest-card-number">7</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-7.png" alt="Ein Jaloot" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Ein Jaloot</p><h3 data-i18n-en="Ein Jaloot" data-i18n-ar="عين جالوت">Ein Jaloot</h3><p class="invest-card-tagline" data-i18n-en="Caring for the land and its abundance." data-i18n-ar="عناية بالأرض وما تمنحه.">Caring for the land and its abundance.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="A sprawling 22,000 sq m sheep and livestock farm near Amman, founded in 2012 adhering to top veterinary standards." data-i18n-ar="مزرعة لتربية الأغنام في منطقة موبص بالقرب من عمّان، تأسست عام 2012 وتمتد على مساحة 22 ألف متر مربع.">A sprawling 22,000 sq m sheep and livestock farm near Amman, founded in 2012 adhering to top veterinary standards.</p><a class="invest-text-link" href="http://www.einjaloot.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="tech" id="company-8">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Enterprise Tech Solutions" data-i18n-ar="تقنية وحلول أعمال">Enterprise Tech Solutions</span><span class="invest-card-number">8</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-8.png" alt="Al-Baseera Solutions" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Al-Baseera Solutions</p><h3 data-i18n-en="Al-Baseera Solutions" data-i18n-ar="البصيرة لحلول الأعمال">Al-Baseera Solutions</h3><p class="invest-card-tagline" data-i18n-en="Smarter, interconnected business operations." data-i18n-ar="أعمال أكثر ترابطًا.">Smarter, interconnected business operations.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="End-to-end ERP, CRM, and supply chain software solutions empowering manufacturing, retail, and food distribution." data-i18n-ar="حلول تخطيط موارد المؤسسات وإدارة علاقات العملاء وسلاسل الإمداد لقطاعات التصنيع والتوزيع والأغذية والخدمات.">End-to-end ERP, CRM, and supply chain software solutions empowering manufacturing, retail, and food distribution.</p><a class="invest-text-link" href="http://www.insightesolutions.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="agri" id="company-9">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Purebred Arabians" data-i18n-ar="خيول عربية">Purebred Arabians</span><span class="invest-card-number">9</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-9.png" alt="Najeeb Arabians" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Najeeb Arabians</p><h3 data-i18n-en="Najeeb Arabians" data-i18n-ar="نجيب للخيول العربية">Najeeb Arabians</h3><p class="invest-card-tagline" data-i18n-en="Passion for pedigree, beauty, and heritage." data-i18n-ar="شغف بالأصالة والجمال.">Passion for pedigree, beauty, and heritage.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="Dedicated to preserving authentic Straight Egyptian and Arabian bloodlines, located in the rolling hills of Amman." data-i18n-ar="شغف بالخيول العربية الأصيلة، ومزرعة في عمّان ترحب بالمهتمين بهذا الإرث العريق.">Dedicated to preserving authentic Straight Egyptian and Arabian bloodlines, located in the rolling hills of Amman.</p><a class="invest-text-link" href="http://www.najeebarabians.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <!-- Set B (Duplication for continuous infinite loop without gaps) -->
+   <article class="invest-company" data-sector="food">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Arabic Sweets" data-i18n-ar="حلويات عربية">Arabic Sweets</span><span class="invest-card-number">1</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-1.png" alt="Anabtawi Sweets" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Anabtawi Sweets</p><h3 data-i18n-en="Anabtawi Sweets" data-i18n-ar="عنبتاوي للحلويات">Anabtawi Sweets</h3><p class="invest-card-tagline" data-i18n-en="Authentic taste and master craftsmanship." data-i18n-ar="أصالة المذاق، وحِرفة التفاصيل.">Authentic taste and master craftsmanship.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="A wide assortment of traditional Arabic sweets, meticulously crafted with premium ingredients for your finest moments." data-i18n-ar="تشكيلة من الحلويات العربية التقليدية، تُحضّر بعناية وبمكونات مختارة لترافق مناسباتكم.">A wide assortment of traditional Arabic sweets, meticulously crafted with premium ingredients for your finest moments.</p><a class="invest-text-link" href="http://www.anabtawisweets.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Luxury Confectionery" data-i18n-ar="حلويات فاخرة">Luxury Confectionery</span><span class="invest-card-number">2</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-2.png" alt="Holyland Sweets" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Holyland Sweets</p><h3 data-i18n-en="Holyland Sweets" data-i18n-ar="هولي لاند">Holyland Sweets</h3><p class="invest-card-tagline" data-i18n-en="Taste elevating every special occasion." data-i18n-ar="مذاق يرتقي بكل مناسبة.">Taste elevating every special occasion.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="Fine Arabic pastries prepared to premium standards, catering to leading hotels and discerning dessert lovers." data-i18n-ar="حلويات عربية بمكونات عالية الجودة، تلبي احتياجات الفنادق والعملاء الباحثين عن تجربة مميزة.">Fine Arabic pastries prepared to premium standards, catering to leading hotels and discerning dessert lovers.</p><a class="invest-text-link" href="http://www.holylandsweets.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Trading &amp; Import" data-i18n-ar="تجارة واستيراد">Trading &amp; Import</span><span class="invest-card-number">3</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-3.png" alt="United Food Trading" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">United Food Trading</p><h3 data-i18n-en="United Food Trading" data-i18n-ar="المتحدة لتجارة المواد الغذائية">United Food Trading</h3><p class="invest-card-tagline" data-i18n-en="Connecting quality directly to its source." data-i18n-ar="نصل الجودة بمصادرها.">Connecting quality directly to its source.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="Importing oils, premium butter, dairy products, quality cheeses, pistachios, and selected international foodstuffs." data-i18n-ar="استيراد الزيوت والدهون والزبدة والأجبان ومنتجات الألبان، إلى جانب الفستق والتمور.">Importing oils, premium butter, dairy products, quality cheeses, pistachios, and selected international foodstuffs.</p><a class="invest-text-link" href="http://www.unitedfood-jo.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="agri">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Honey &amp; Apiaries" data-i18n-ar="عسل ومنتجات طبيعية">Honey &amp; Apiaries</span><span class="invest-card-number">4</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-4.png" alt="Tryaq Honey" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Tryaq Honey</p><h3 data-i18n-en="Tryaq Honey" data-i18n-ar="عسل ترياق">Tryaq Honey</h3><p class="invest-card-tagline" data-i18n-en="From nature, in its purest integrity." data-i18n-ar="من الطبيعة، بكل نقائها.">From nature, in its purest integrity.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="Beekeeping roots dating back to Anabta in 1910, producing authentic pure natural honey from Jordanian blossoms." data-i18n-ar="جذور في تربية النحل تعود إلى عنبتا في فلسطين عام 1910، وحضور في عمّان تحت اسم ترياق منذ عام 1990.">Beekeeping roots dating back to Anabta in 1910, producing authentic pure natural honey from Jordanian blossoms.</p><a class="invest-text-link" href="http://www.tryaqhoney.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Cheese Manufacturing" data-i18n-ar="صناعة الأجبان">Cheese Manufacturing</span><span class="invest-card-number">5</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-5.png" alt="Belad Al-Cham" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Belad Al-Cham</p><h3 data-i18n-en="Belad Al-Cham" data-i18n-ar="بلاد الشام">Belad Al-Cham</h3><p class="invest-card-tagline" data-i18n-en="Local artisanal craft, authentic excellence." data-i18n-ar="حِرفة محلية، وجودة أصيلة.">Local artisanal craft, authentic excellence.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="A specialized facility crafting traditional white cheeses including Akkawi, Halloumi, and braided cheese." data-i18n-ar="مصنع متخصص في إنتاج أصناف الأجبان البيضاء، ومنها العكاوي والحلوم والمشلّلة، بعناية بجودة التصنيع.">A specialized facility crafting traditional white cheeses including Akkawi, Halloumi, and braided cheese.</p></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Food Processing" data-i18n-ar="تصنيع غذائي">Food Processing</span><span class="invest-card-number">6</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-6.png" alt="Maser Al-Khair" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Maser Al-Khair</p><h3 data-i18n-en="Maser Al-Khair" data-i18n-ar="ماسر الخير">Maser Al-Khair</h3><p class="invest-card-tagline" data-i18n-en="Proven expertise across the food supply chain." data-i18n-ar="خبرة في عالم الغذاء.">Proven expertise across the food supply chain.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="Specialized food production meeting highest international standards to serve Middle Eastern markets." data-i18n-ar="أعمال متخصصة في مجالات التصنيع الغذائي، مع اهتمام بخدمة أسواق الشرق الأوسط.">Specialized food production meeting highest international standards to serve Middle Eastern markets.</p><a class="invest-text-link" href="http://www.alsalam-co.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="agri">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Agriculture &amp; Livestock" data-i18n-ar="زراعة وثروة حيوانية">Agriculture &amp; Livestock</span><span class="invest-card-number">7</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-7.png" alt="Ein Jaloot" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Ein Jaloot</p><h3 data-i18n-en="Ein Jaloot" data-i18n-ar="عين جالوت">Ein Jaloot</h3><p class="invest-card-tagline" data-i18n-en="Caring for the land and its abundance." data-i18n-ar="عناية بالأرض وما تمنحه.">Caring for the land and its abundance.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="A sprawling 22,000 sq m sheep and livestock farm near Amman, founded in 2012 adhering to top veterinary standards." data-i18n-ar="مزرعة لتربية الأغنام في منطقة موبص بالقرب من عمّان، تأسست عام 2012 وتمتد على مساحة 22 ألف متر مربع.">A sprawling 22,000 sq m sheep and livestock farm near Amman, founded in 2012 adhering to top veterinary standards.</p><a class="invest-text-link" href="http://www.einjaloot.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="tech">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Enterprise Tech Solutions" data-i18n-ar="تقنية وحلول أعمال">Enterprise Tech Solutions</span><span class="invest-card-number">8</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-8.png" alt="Al-Baseera Solutions" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Al-Baseera Solutions</p><h3 data-i18n-en="Al-Baseera Solutions" data-i18n-ar="البصيرة لحلول الأعمال">Al-Baseera Solutions</h3><p class="invest-card-tagline" data-i18n-en="Smarter, interconnected business operations." data-i18n-ar="أعمال أكثر ترابطًا.">Smarter, interconnected business operations.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="End-to-end ERP, CRM, and supply chain software solutions empowering manufacturing, retail, and food distribution." data-i18n-ar="حلول تخطيط موارد المؤسسات وإدارة علاقات العملاء وسلاسل الإمداد لقطاعات التصنيع والتوزيع والأغذية والخدمات.">End-to-end ERP, CRM, and supply chain software solutions empowering manufacturing, retail, and food distribution.</p><a class="invest-text-link" href="http://www.insightesolutions.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="agri">
+    <div class="invest-card-top"><span class="invest-card-category" data-i18n-en="Purebred Arabians" data-i18n-ar="خيول عربية">Purebred Arabians</span><span class="invest-card-number">9</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-9.png" alt="Najeeb Arabians" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Najeeb Arabians</p><h3 data-i18n-en="Najeeb Arabians" data-i18n-ar="نجيب للخيول العربية">Najeeb Arabians</h3><p class="invest-card-tagline" data-i18n-en="Passion for pedigree, beauty, and heritage." data-i18n-ar="شغف بالأصالة والجمال.">Passion for pedigree, beauty, and heritage.</p><details class="invest-company-details"><summary><span data-i18n="card_about_btn">About Company</span> <span aria-hidden="true">+</span></summary><div><p data-i18n-en="Dedicated to preserving authentic Straight Egyptian and Arabian bloodlines, located in the rolling hills of Amman." data-i18n-ar="شغف بالخيول العربية الأصيلة، ومزرعة في عمّان ترحب بالمهتمين بهذا الإرث العريق.">Dedicated to preserving authentic Straight Egyptian and Arabian bloodlines, located in the rolling hills of Amman.</p><a class="invest-text-link" href="http://www.najeebarabians.com/" target="_blank" rel="noopener noreferrer"><span data-i18n="card_visit_site">Visit Website</span> ↗</a></div></details></div>
+   </article>
   </div>
  </div>
 
+ <!-- Grid View Alternative -->
  <div class="invest-container" id="portfolio-grid-view" style="display: none;">
   <div class="invest-companies-grid" id="companies-grid-container">
-   <!-- Grid cards -->
+   <!-- Set of 9 cards for grid -->
+   <article class="invest-company" data-sector="food">
+    <div class="invest-card-top"><span class="invest-card-category">Arabic Sweets</span><span class="invest-card-number">1</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-1.png" alt="Anabtawi Sweets" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Anabtawi Sweets</p><h3>Anabtawi Sweets</h3><p class="invest-card-tagline">Authentic taste and master craftsmanship.</p><details class="invest-company-details"><summary>About Company <span aria-hidden="true">+</span></summary><div><p>A wide assortment of traditional Arabic sweets, meticulously crafted with premium ingredients for your finest moments.</p><a class="invest-text-link" href="http://www.anabtawisweets.com/" target="_blank" rel="noopener noreferrer">Visit Website ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food">
+    <div class="invest-card-top"><span class="invest-card-category">Luxury Confectionery</span><span class="invest-card-number">2</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-2.png" alt="Holyland Sweets" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Holyland Sweets</p><h3>Holyland Sweets</h3><p class="invest-card-tagline">Taste elevating every special occasion.</p><details class="invest-company-details"><summary>About Company <span aria-hidden="true">+</span></summary><div><p>Fine Arabic pastries prepared to premium standards, catering to leading hotels and discerning dessert lovers.</p><a class="invest-text-link" href="http://www.holylandsweets.com/" target="_blank" rel="noopener noreferrer">Visit Website ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food">
+    <div class="invest-card-top"><span class="invest-card-category">Trading &amp; Import</span><span class="invest-card-number">3</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-3.png" alt="United Food Trading" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">United Food Trading</p><h3>United Food Trading</h3><p class="invest-card-tagline">Connecting quality directly to its source.</p><details class="invest-company-details"><summary>About Company <span aria-hidden="true">+</span></summary><div><p>Importing oils, premium butter, dairy products, quality cheeses, pistachios, and selected international foodstuffs.</p><a class="invest-text-link" href="http://www.unitedfood-jo.com/" target="_blank" rel="noopener noreferrer">Visit Website ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="agri">
+    <div class="invest-card-top"><span class="invest-card-category">Honey &amp; Apiaries</span><span class="invest-card-number">4</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-4.png" alt="Tryaq Honey" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Tryaq Honey</p><h3>Tryaq Honey</h3><p class="invest-card-tagline">From nature, in its purest integrity.</p><details class="invest-company-details"><summary>About Company <span aria-hidden="true">+</span></summary><div><p>Beekeeping roots dating back to Anabta in 1910, producing authentic pure natural honey from Jordanian blossoms.</p><a class="invest-text-link" href="http://www.tryaqhoney.com/" target="_blank" rel="noopener noreferrer">Visit Website ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food">
+    <div class="invest-card-top"><span class="invest-card-category">Cheese Manufacturing</span><span class="invest-card-number">5</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-5.png" alt="Belad Al-Cham" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Belad Al-Cham</p><h3>Belad Al-Cham</h3><p class="invest-card-tagline">Local artisanal craft, authentic excellence.</p><details class="invest-company-details"><summary>About Company <span aria-hidden="true">+</span></summary><div><p>A specialized facility crafting traditional white cheeses including Akkawi, Halloumi, and braided cheese.</p></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="food">
+    <div class="invest-card-top"><span class="invest-card-category">Food Processing</span><span class="invest-card-number">6</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-6.png" alt="Maser Al-Khair" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Maser Al-Khair</p><h3>Maser Al-Khair</h3><p class="invest-card-tagline">Proven expertise across the food supply chain.</p><details class="invest-company-details"><summary>About Company <span aria-hidden="true">+</span></summary><div><p>Specialized food production meeting highest international standards to serve Middle Eastern markets.</p><a class="invest-text-link" href="http://www.alsalam-co.com/" target="_blank" rel="noopener noreferrer">Visit Website ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="agri">
+    <div class="invest-card-top"><span class="invest-card-category">Agriculture &amp; Livestock</span><span class="invest-card-number">7</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-7.png" alt="Ein Jaloot" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Ein Jaloot</p><h3>Ein Jaloot</h3><p class="invest-card-tagline">Caring for the land and its abundance.</p><details class="invest-company-details"><summary>About Company <span aria-hidden="true">+</span></summary><div><p>A sprawling 22,000 sq m sheep and livestock farm near Amman, founded in 2012 adhering to top veterinary standards.</p><a class="invest-text-link" href="http://www.einjaloot.com/" target="_blank" rel="noopener noreferrer">Visit Website ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="tech">
+    <div class="invest-card-top"><span class="invest-card-category">Enterprise Tech Solutions</span><span class="invest-card-number">8</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-8.png" alt="Al-Baseera Solutions" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Al-Baseera Solutions</p><h3>Al-Baseera Solutions</h3><p class="invest-card-tagline">Smarter, interconnected business operations.</p><details class="invest-company-details"><summary>About Company <span aria-hidden="true">+</span></summary><div><p>End-to-end ERP, CRM, and supply chain software solutions empowering manufacturing, retail, and food distribution.</p><a class="invest-text-link" href="http://www.insightesolutions.com/" target="_blank" rel="noopener noreferrer">Visit Website ↗</a></div></details></div>
+   </article>
+
+   <article class="invest-company" data-sector="agri">
+    <div class="invest-card-top"><span class="invest-card-category">Purebred Arabians</span><span class="invest-card-number">9</span></div>
+    <div class="invest-company-visual"><span class="invest-card-halo"></span><img src="/Anabtawi_invest_web_new_2/static/src/img/content/splash-thumb-9.png" alt="Najeeb Arabians" width="201" height="199" loading="lazy"/></div>
+    <div class="invest-card-content"><p class="invest-company-en" dir="ltr">Najeeb Arabians</p><h3>Najeeb Arabians</h3><p class="invest-card-tagline">Passion for pedigree, beauty, and heritage.</p><details class="invest-company-details"><summary>About Company <span aria-hidden="true">+</span></summary><div><p>Dedicated to preserving authentic Straight Egyptian and Arabian bloodlines, located in the rolling hills of Amman.</p><a class="invest-text-link" href="http://www.najeebarabians.com/" target="_blank" rel="noopener noreferrer">Visit Website ↗</a></div></details></div>
+   </article>
   </div>
  </div>
 </section>
 
+<!-- Sectors Section -->
 <section class="invest-site invest-sectors" id="sectors" data-name="Our sectors" data-snippet="s_three_columns">
  <div class="invest-container">
   <div class="invest-section-heading">
@@ -167,13 +351,16 @@
       <textarea id="form-message" rows="4" class="invest-form-textarea" required="required" placeholder="Tell us how we can collaborate..."></textarea>
      </div>
      <button type="submit" class="invest-button invest-form-submit" data-i18n="form_btn"><span>Send Message</span> <span aria-hidden="true" class="arrow-dir">↘</span></button>
-     <div class="invest-form-alert success" id="form-success-alert" data-i18n="form_success">✓ Thank you. Your message has been received. Our team will reach out promptly.</div>
+     
+     <!-- Success Alert: Hidden by default -->
+     <div class="invest-form-alert" id="form-success-alert" style="display: none !important;" data-i18n="form_success">✓ Thank you. Your message has been received. Our team will reach out promptly.</div>
     </form>
    </div>
   </div>
  </div>
 </section>
 
+<!-- Closing CTA -->
 <section class="invest-site invest-closing" data-name="Explore the group" data-snippet="s_call_to_action">
  <div class="invest-container">
   <p class="invest-eyebrow" id="closing-brand-name">ANABTAWI INVEST</p>
@@ -183,5 +370,9 @@
  </div>
 </section>
 
-</div></t></t></field></record>
+</div>
+</t>
+</t>
+</field>
+</record>
 </odoo>

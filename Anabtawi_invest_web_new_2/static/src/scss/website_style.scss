@@ -1,4 +1,10 @@
-/* Plain CSS is intentional: directly valid SCSS and identical in the offline preview. */
+html, body {
+  scroll-behavior: smooth !important;
+}
+section[id], div[id], [id] {
+  scroll-margin-top: 100px !important;
+}
+
 .invest-site {
   box-sizing: border-box;
   font-family: 'Outfit', Tahoma, Arial, sans-serif;
@@ -25,9 +31,28 @@ html[lang="ar"] .invest-site h1, html[lang="ar"] .invest-site h2, html[lang="ar"
 .invest-site [hidden] { display: none !important; }
 .invest-container { width: calc(100% - 112px); max-width: 1280px; margin-inline: auto; }
 .invest-shell { background: #171713; }
-.invest-shell > footer { background: #171713 !important; }
-.invest-shell .o_footer_copyright { display: none; }
+.invest-shell > footer { background: #171713 !important; border-top: none !important; }
 .invest-shell #wrap { background: #171713; }
+
+/* Completely hide Odoo default copyright and language footer */
+.o_footer_copyright,
+footer .o_footer_copyright,
+#bottom .o_footer_copyright,
+.invest-shell .o_footer_copyright,
+.invest-shell #bottom .o_footer_copyright,
+.invest-shell footer .o_footer_copyright,
+div.o_footer_copyright {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  line-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
 
 /* Sticky Header with Glassmorphism */
 .invest-header-shell {
@@ -221,27 +246,39 @@ html[lang="ar"] .invest-facts .invest-fact-word { font-family: 'Cairo', Tahoma, 
 .invest-filters button span { margin-inline-start: 8px; font-size: 11px; }
 
 /* Infinite Marquee Track (Right to Left) */
+/*rtl:ignore*/
 .invest-marquee-outer {
   width: 100%;
   overflow: hidden;
   position: relative;
-  padding-block: 15px;
-  mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+  padding-block: 20px;
+  direction: ltr !important;
+  min-height: 440px;
 }
+/*rtl:ignore*/
 .invest-marquee-track {
-  display: flex;
-  width: max-content;
-  direction: ltr;
-  animation: invest-flow-rtl 38s linear infinite;
+  display: flex !important;
+  width: max-content !important;
+  direction: ltr !important;
+  animation: invest-flow-rtl 38s linear infinite !important;
+  -webkit-animation: invest-flow-rtl 38s linear infinite !important;
   gap: 26px;
+  will-change: transform;
 }
-.invest-marquee-outer:hover .invest-marquee-track {
-  animation-play-state: paused;
+.invest-marquee-outer:hover .invest-marquee-track,
+.invest-marquee-track:hover {
+  animation-play-state: paused !important;
+  -webkit-animation-play-state: paused !important;
 }
+/*rtl:ignore*/
 @keyframes invest-flow-rtl {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+/*rtl:ignore*/
+@-webkit-keyframes invest-flow-rtl {
+  0% { -webkit-transform: translate3d(0, 0, 0); }
+  100% { -webkit-transform: translate3d(-50%, 0, 0); }
 }
 
 /* Company Card */
@@ -320,8 +357,20 @@ html[lang="ar"] .invest-contact-card:hover { transform: translateX(-6px); }
 .invest-form-input:focus, .invest-form-select:focus, .invest-form-textarea:focus { outline: none; border-color: var(--invest-gold); background: #191b13; box-shadow: 0 0 12px rgba(195,165,108,.25); }
 .invest-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .invest-form-submit { width: 100%; margin-top: 10px; cursor: pointer; }
-.invest-form-alert { padding: 14px 18px; margin-top: 20px; border-radius: 2px; font-size: 14px; display: none; animation: invest-appear .4s ease; }
-.invest-form-alert.success { display: block; background: rgba(35, 80, 45, 0.4); border: 1px solid #388e3c; color: #a5d6a7; }
+.invest-form-alert {
+  padding: 14px 18px;
+  margin-top: 20px;
+  border-radius: 2px;
+  font-size: 14px;
+  display: none !important;
+  background: rgba(35, 80, 45, 0.4);
+  border: 1px solid #388e3c;
+  color: #a5d6a7;
+  animation: invest-appear .4s ease;
+}
+.invest-form-alert.is-visible {
+  display: block !important;
+}
 
 /* Closing CTA */
 .invest-closing { position: relative; overflow: hidden; background: radial-gradient(ellipse at 50% 120%,#43402b,transparent 65%),#1e2019; text-align: center; padding-block: 95px 105px; }
