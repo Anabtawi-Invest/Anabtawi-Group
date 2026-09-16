@@ -142,6 +142,17 @@
                      rule or accounting value is created/recomputed by this template. -->
                 <t t-set="net_amount" t-value="sum(net.mapped('total')) if net else (o.net_wage if 'net_wage' in o._fields else 0.0)"/>
                 <t t-set="gross_amount" t-value="sum(gross.mapped('total')) if gross else (net_amount + deduction_total if net else basic_amount)"/>
+                <t t-set="dept_str" t-value="employee.department_id.display_name or employee.department_id.name or ''"/>
+                <t t-set="dept_parts" t-value="[p.strip() for p in dept_str.split('/')] if dept_str else []"/>
+                <t t-set="dept_display" t-value="dept_parts[0] if len(dept_parts) &gt; 0 else '—'"/>
+                <t t-set="section_display" t-value="dept_parts[1] if len(dept_parts) &gt; 1 else ((employee[cfg['section_field']] or '—') if cfg['section_field'] in employee._fields else '—')"/>
+                <t t-set="branch_display" t-value="' / '.join(dept_parts[2:]) if len(dept_parts) &gt; 2 else ((employee[cfg['branch_field']] or '—') if cfg['branch_field'] in employee._fields else '—')"/>
+                <t t-set="annual_input" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code in ('CLEAR_ANNUAL', 'REM_LEAVE') or 'annual leave' in (l.name or '').lower())"/>
+                <t t-set="pto_input" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code == 'CLEAR_PTO' or 'paid time off' in (l.name or '').lower())"/>
+                <t t-set="extra_input" t-value="o.input_line_ids.filtered(lambda l: l.input_type_id.code in ('CLEAR_EXTRA', 'ETH_PAY_EOC') or 'extra' in (l.name or '').lower())"/>
+                <t t-set="annual_days" t-value="annual_input[0].quantity if annual_input and 'quantity' in annual_input._fields else 0.0"/>
+                <t t-set="pto_days" t-value="pto_input[0].quantity if pto_input and 'quantity' in pto_input._fields else 0.0"/>
+                <t t-set="extra_hrs" t-value="extra_input[0].quantity if extra_input and 'quantity' in extra_input._fields else (o.employee_extra_hours_balance if 'employee_extra_hours_balance' in o._fields else 0.0)"/>
                 <t t-set="worked" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['worked_codes'])"/>
                 <t t-set="unpaid" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['unpaid_codes'])"/>
                 <t t-set="rows" t-value="max(cfg['minimum_rows'], len(allowances), len(deductions))"/>
@@ -183,7 +194,7 @@
                             <div class="license">Licensed To: <span t-field="company.name"/></div>
                             <div class="title ar" lang="ar">
                                 <span>مخالصة / TERMINATION</span>
-                                <span dir="ltr" style="margin-right: 8px; margin-left: 8px;" t-out="o.date_from.strftime('%m/%Y') if o.date_from else '—'"/>
+                                <span dir="ltr" style="margin-right: 8px; margin-left: 8px;"><t t-out="o.date_from.strftime('%d/%m/%Y') if o.date_from else ''"/> — <t t-out="o.date_to.strftime('%d/%m/%Y') if o.date_to else ''"/></span>
                             </div>
                         </td>
                     </tr>
@@ -205,19 +216,19 @@
                             <div t-if="cfg['arabic_name_field'] in employee._fields" class="ar" t-out="employee[cfg['arabic_name_field']]"/>
                         </td>
                         <td class="label">Department / الدائرة</td>
-                        <td style="width:30%" dir="auto"><span t-field="employee.department_id"/></td>
+                        <td style="width:30%" dir="auto"><span t-out="dept_display"/></td>
                     </tr>
                     <tr>
                         <td class="label">Employee Type / نوع الموظف</td>
                         <td><span t-field="employee.employee_type"/></td>
                         <td class="label">Section / القسم</td>
-                        <td dir="auto"><span t-if="cfg['section_field'] in employee._fields" t-out="employee[cfg['section_field']]"/><span t-else="">—</span></td>
+                        <td dir="auto"><span t-out="section_display"/></td>
                     </tr>
                     <tr>
                         <td class="label">Contract Type / نوع العقد</td>
                         <td><span t-if="version" t-field="version.contract_type_id"/><span t-else="">—</span></td>
                         <td class="label">Branch / الفرع</td>
-                        <td dir="auto"><span t-if="cfg['branch_field'] in employee._fields" t-out="employee[cfg['branch_field']]"/><span t-else="">—</span></td>
+                        <td dir="auto"><span t-out="branch_display"/></td>
                     </tr>
                     <tr>
                         <td class="label">Start Date / بداية العقد</td>
@@ -232,11 +243,21 @@
                     </tr>
                 </table>
                 <div class="balance">
-                    <strong>Vacation Balances / أرصدة الإجازات: </strong>
-                    <span>Annual (days) / سنوية (أيام): </span>
-                    <span t-if="cfg['annual_balance_field'] in o._fields" t-out="o[cfg['annual_balance_field']]" t-options="{'widget': 'float', 'precision': 2}"/>
-                    <span t-else="">—</span>
-                    <div class="muted">Balance at payslip date / الرصيد المسجل بتاريخ القسيمة</div>
+                    <strong>Vacation &amp; Leave Balances / أرصدة الإجازات والمستحقات: </strong>
+                    <span style="margin-left: 10px; margin-right: 10px;">
+                        <strong>Annual Leave / سنوية: </strong>
+                        <span t-out="annual_days" t-options="{'widget': 'float', 'precision': 2}"/> يوم / Days
+                    </span>
+                    <span> | </span>
+                    <span style="margin-left: 10px; margin-right: 10px;">
+                        <strong>Paid Time Off / إجازة مدفوعة: </strong>
+                        <span t-out="pto_days" t-options="{'widget': 'float', 'precision': 2}"/> يوم / Days
+                    </span>
+                    <span> | </span>
+                    <span style="margin-left: 10px; margin-right: 10px;">
+                        <strong>Extra Hours / ساعات إضافية: </strong>
+                        <span t-out="extra_hrs" t-options="{'widget': 'float', 'precision': 2}"/> ساعة / Hours
+                    </span>
                 </div>
                 <table class="plain split">
                     <tr>
