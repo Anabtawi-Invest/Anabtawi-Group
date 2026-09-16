@@ -210,8 +210,8 @@
                     <tr>
                         <td class="label">Employee / الموظف</td>
                         <td style="width:30%">
-                            <span t-out="(employee[cfg['employee_number_field']] or '—') if cfg['employee_number_field'] in employee._fields else '—'"/>
                             <div dir="auto" t-field="employee.name"/>
+                            <div t-if="'employee_number' in employee._fields and employee.employee_number" dir="ltr" style="color:#555; font-size:0.9em;" t-out="employee.employee_number"/>
                             <div t-if="cfg['english_name_field'] in employee._fields" dir="ltr" t-out="employee[cfg['english_name_field']]"/>
                             <div t-if="cfg['arabic_name_field'] in employee._fields" class="ar" t-out="employee[cfg['arabic_name_field']]"/>
                         </td>
