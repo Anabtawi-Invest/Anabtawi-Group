@@ -117,7 +117,7 @@
                 <t t-set="actual" t-value="lines.filtered(lambda l: l.code == 'FULL_WAGE')[:1]"/>
                 <t t-set="gross" t-value="lines.filtered(lambda l: l.code in ('GROSS', 'GROSS_SALARY') or l.code in cfg['gross_codes'])[:1]"/>
                 <t t-set="net" t-value="lines.filtered(lambda l: l.code == 'NET')[:1] or lines.filtered(lambda l: l.code in ('NET', 'NET_SALARY') or l.salary_rule_id.id in rule_ids['net'])[:1]"/>
-                <t t-set="basic_amount" t-value="o.contract_id.wage if o.contract_id else 0.0"/>
+                <t t-set="basic_amount" t-value="o.employee_id.wage if 'wage' in o.employee_id._fields else 0.0"/>
                 <t t-set="actual_amount" t-value="actual.total if actual else 0.0"/>
                 <t t-set="information" t-value="visible_lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['information'])"/>
                 <t t-set="reserved" t-value="basic | actual | gross | net | information"/>
