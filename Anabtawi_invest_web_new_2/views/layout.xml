@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<record id="invest_layout" model="ir.ui.view">
+ <field name="name">Anabtawi Invest — scoped layout</field><field name="type">qweb</field><field name="inherit_id" ref="website.layout"/>
+ <field name="website_id" ref="website_invest"/><field name="priority">90</field><field name="key">anabtawi_invest_website.invest_layout</field>
+ <field name="arch" type="xml">
+ <xpath expr="//header" position="replace"><header id="top" data-anchor="true" class="invest-header-shell"><div class="invest-site invest-header" dir="ltr" lang="en">
+ <a href="#invest-main" class="invest-skip">Skip to content</a>
+ <div class="invest-container invest-nav">
+ <a class="invest-brand" href="/invest" aria-label="Anabtawi Invest"><div class="invest-brand-visual"><img src="/anabtawi_invest_website/static/src/img/content/logo.png" width="480" height="198" alt="Anabtawi Invest"/></div></a>
+ <nav class="invest-desktop-nav" aria-label="Main Navigation">
+  <a href="/invest#about">About Us</a>
+  <a href="/invest#companies">Our Companies</a>
+  <a href="/invest#sectors">Sectors</a>
+  <a href="/invest#contact">Contact Us</a>
+ </nav>
+ <div class="invest-nav-actions">
+  <button type="button" class="invest-lang-btn" id="lang-toggle-btn" aria-label="Switch Language"><span class="lang-icon">🌐</span> <span id="lang-btn-text">العربية</span></button>
+  <a href="/invest#companies" class="invest-nav-cta">Explore Portfolio <span aria-hidden="true">↘</span></a>
+  <details class="invest-mobile-menu"><summary aria-label="Open navigation menu"><span aria-hidden="true">☰</span></summary><nav aria-label="Mobile Navigation"><a href="/invest#about">About Us</a><a href="/invest#companies">Our Companies</a><a href="/invest#sectors">Sectors</a><a href="/invest#contact">Contact Us</a></nav></details>
+ </div>
+ </div></div></header></xpath>
+ <xpath expr="//div[@id='footer']" position="replace"><div id="footer" class="oe_structure oe_structure_solo" t-if="not no_footer"><div class="invest-site invest-footer" dir="ltr" lang="en"><div class="invest-container">
+ <div class="invest-footer-top"><a href="/invest" aria-label="Anabtawi Invest"><img src="/anabtawi_invest_website/static/src/img/content/logo.png" width="480" height="198" alt="Anabtawi Invest" loading="lazy"/></a><p>Diversified Ventures.<br/><span>Unified Vision.</span></p><a class="invest-text-link" href="/invest#companies">Discover Our Companies <span aria-hidden="true">→</span></a></div>
+ <div class="invest-footer-bottom"><span>© Anabtawi Invest. All rights reserved.</span><span dir="ltr">ANABTAWI INVEST · JORDAN</span><a href="/invest#top">Back to top ↑</a></div>
+ </div></div></div></xpath>
+ <xpath expr="//div[@id='wrapwrap']" position="attributes"><attribute name="class" add="invest-shell" separator=" "/></xpath>
+ </field></record>
+</odoo>

@@ -1,0 +1,9 @@
+/* Scoped tokens: do not override the palettes of other Odoo websites. */
+.invest-site {
+ --invest-bg: #171713;
+ --invest-surface: #20211b;
+ --invest-gold: #c3a56c;
+ --invest-light: #f4f0e7;
+ --invest-muted: #a6a59a;
+ --invest-line: rgba(195,165,108,.22);
+}

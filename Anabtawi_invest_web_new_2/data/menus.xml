@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<data noupdate="1">
+ <record id="menu_about" model="website.menu"><field name="name">عن المجموعة</field><field name="url">/invest#about</field><field name="website_id" ref="website_invest"/><field name="parent_id" search="[('website_id', '=', ref('website_invest')), ('parent_id', '=', False)]"/><field name="sequence">20</field></record>
+ <record id="menu_companies" model="website.menu"><field name="name">شركاتنا</field><field name="url">/invest#companies</field><field name="website_id" ref="website_invest"/><field name="parent_id" search="[('website_id', '=', ref('website_invest')), ('parent_id', '=', False)]"/><field name="sequence">30</field></record>
+ <record id="menu_sectors" model="website.menu"><field name="name">قطاعاتنا</field><field name="url">/invest#sectors</field><field name="website_id" ref="website_invest"/><field name="parent_id" search="[('website_id', '=', ref('website_invest')), ('parent_id', '=', False)]"/><field name="sequence">40</field></record>
+ <record id="menu_contact" model="website.menu"><field name="name">تواصل معنا</field><field name="url">/invest#contact</field><field name="website_id" ref="website_invest"/><field name="parent_id" search="[('website_id', '=', ref('website_invest')), ('parent_id', '=', False)]"/><field name="sequence">50</field></record>
+</data>
+</odoo>

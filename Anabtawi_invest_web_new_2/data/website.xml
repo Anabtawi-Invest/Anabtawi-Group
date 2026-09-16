@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<data noupdate="1"><record id="website_invest" model="website">
+ <field name="name">Anabtawi Invest</field><field name="sequence">80</field>
+ <field name="homepage_url">/invest</field><field name="configurator_done" eval="True"/>
+ <field name="logo" type="base64" file="anabtawi_invest_website/static/src/img/content/logo.png"/>
+ </record></data>
+</odoo>

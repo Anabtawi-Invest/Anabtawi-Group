@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<record id="page_portfolio" model="website.page"><field name="name">عنبتاوي إنفيست</field><field name="url">/invest</field><field name="view_id" ref="portfolio_view"/><field name="website_id" ref="website_invest"/><field name="is_published" eval="True"/><field name="website_indexed" eval="True"/><field name="website_meta_title">عنبتاوي إنفيست | شركات متنوعة، رؤية واحدة</field><field name="website_meta_description">تعرّف على مجموعة عنبتاوي إنفيست وشركاتها في قطاعات الغذاء والتجارة والزراعة وحلول الأعمال.</field></record>
+</odoo>

@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<record id="portfolio_view" model="ir.ui.view"><field name="name">Anabtawi Invest — Portfolio</field><field name="type">qweb</field><field name="key">anabtawi_invest_website.portfolio</field><field name="website_id" ref="website_invest"/><field name="arch" type="xml"><t t-name="anabtawi_invest_website.portfolio"><t t-call="website.layout"><t t-set="additional_title">Anabtawi Invest | Diversified Companies, Unified Vision</t><div id="wrap" class="oe_structure invest-page" dir="ltr" lang="en"><div id="invest-main" tabindex="-1"></div>
+
+<section class="invest-site invest-hero" id="top-hero" data-name="Invest hero" data-snippet="s_invest_hero">
+ <div class="invest-container invest-hero-grid">
+ <div class="invest-hero-copy">
+  <p class="invest-eyebrow"><span></span> <strong id="hero-brand-name">ANABTAWI INVEST</strong> <b dir="ltr" id="hero-brand-sub">EST. 1954</b></p>
+  <h1 data-i18n="hero_h1">Deep Roots.<br/><em>Renewed Horizons.</em></h1>
+  <p class="invest-hero-description" data-i18n="hero_desc">From the authenticity of fine food to future-facing enterprise.<br/>A diversified business group uniting heritage, excellence, and forward growth.</p>
+  <div class="invest-hero-actions">
+   <a class="invest-button" href="/invest#companies" data-i18n="hero_cta1">Explore Companies <span aria-hidden="true" class="arrow-dir">↘</span></a>
+   <a class="invest-quiet-link" href="/invest#about" data-i18n="hero_cta2">Our Legacy Story <span aria-hidden="true" class="arrow-sub">→</span></a>
+  </div>
+  <div class="invest-hero-foot"><span class="invest-small-line"></span><span data-i18n="hero_foot">Diversified ventures, unified identity.</span></div>
+ </div>
+ <div class="invest-orbit" aria-label="Group companies in food, agriculture, and tech">
+  <div class="invest-orbit-ring invest-ring-one"></div><div class="invest-orbit-ring invest-ring-two"></div><div class="invest-orbit-ring invest-ring-three"></div>
+  <div class="invest-orbit-core"><img src="/anabtawi_invest_website/static/src/img/content/logo.png" width="480" height="198" alt="Anabtawi Invest"/><span dir="ltr">A WORLD OF POSSIBILITIES</span></div>
+  <a class="invest-orbit-item invest-orbit-1" href="/invest#companies" aria-label="Anabtawi Sweets"><img src="/anabtawi_invest_website/static/src/img/content/splash-thumb-1.png" alt="Anabtawi Sweets" width="201" height="199"/></a>
+  <a class="invest-orbit-item invest-orbit-2" href="/invest#companies" aria-label="Tryaq Honey"><img src="/anabtawi_invest_website/static/src/img/content/splash-thumb-4.png" alt="Tryaq Honey" width="201" height="199"/></a>
+  <a class="invest-orbit-item invest-orbit-3" href="/invest#companies" aria-label="Najeeb Arabians"><img src="/anabtawi_invest_website/static/src/img/content/splash-thumb-9.png" alt="Najeeb Arabians" width="201" height="199"/></a>
+  <a class="invest-orbit-item invest-orbit-4" href="/invest#companies" aria-label="Al-Baseera"><img src="/anabtawi_invest_website/static/src/img/content/splash-thumb-8.png" alt="Al-Baseera" width="201" height="199"/></a>
+  <a class="invest-orbit-item invest-orbit-5" href="/invest#companies" aria-label="Belad Al-Cham"><img src="/anabtawi_invest_website/static/src/img/content/splash-thumb-5.png" alt="Belad Al-Cham" width="201" height="199"/></a>
+  <span class="invest-orbit-caption" dir="ltr">DIVERSITY · HERITAGE · AMBITION</span>
+ </div>
+ </div>
+ <div class="invest-container invest-hero-bottom"><span dir="ltr">1 / THE GROUP</span><a href="/invest#about" data-i18n="hero_scroll_more">Discover More <span aria-hidden="true">↓</span></a><span data-i18n="hq_location">Amman, Jordan</span></div>
+</section>
+
+<section class="invest-site invest-about" id="about" data-name="About the group" data-snippet="s_text_block">
+ <div class="invest-container invest-about-grid">
+  <div><p class="invest-eyebrow" data-i18n="about_eyebrow">THE GROUP / ABOUT US</p><h2 data-i18n="about_h2">Diversity in Enterprise.<br/><em>Integrity in Vision.</em></h2></div>
+  <div class="invest-about-copy">
+   <p data-i18n="about_p1">Anabtawi Invest brings together a resilient portfolio of companies across food industries, commercial trading, agriculture, and enterprise solutions. Each company carries its distinct expertise and heritage, united by a shared vision of quality and ambition.</p>
+   <p class="invest-muted" data-i18n="about_p2">From traditional Arab sweets, pure honey, and artisanal cheeses, to livestock, Arabian horses, and enterprise ERP systems; our diversity reflects the growing footprint of our group.</p>
+   <a class="invest-text-link" href="/invest#companies" data-i18n="about_link">Explore Anabtawi's World <span aria-hidden="true" class="arrow-sub">→</span></a>
+  </div>
+ </div>
+ <div class="invest-container invest-facts">
+  <div><strong>9</strong><span data-i18n="fact_companies">Companies in Our Portfolio</span></div>
+  <div><strong>3</strong><span data-i18n="fact_sectors">Core Business Sectors</span></div>
+  <div><strong class="invest-fact-word" data-i18n="fact_vision_title">One Vision</strong><span data-i18n="fact_vision_desc">Uniting our expertise and ambition</span></div>
+ </div>
+</section>
+
+<section class="invest-site invest-portfolio" id="companies" data-name="Group companies" data-snippet="s_invest_companies">
+ <div class="invest-container">
+  <div class="invest-section-heading">
+   <div><p class="invest-eyebrow" data-i18n="portfolio_eyebrow">PORTFOLIO / SUBSIDIARIES</p><h2 data-i18n="portfolio_h2">A World of <em>Expertise.</em></h2></div>
+   <p data-i18n="portfolio_desc">Distinct brand identities, synergistic value.<br/>Discover the companies that define our group.</p>
+  </div>
+  <div class="invest-portfolio-controls">
+   <div class="invest-mode-toggles">
+    <button type="button" class="invest-mode-btn active" id="btn-mode-flow" data-i18n="mode_flow"><span>⇄</span> Continuous Flow</button>
+    <button type="button" class="invest-mode-btn" id="btn-mode-grid" data-i18n="mode_grid"><span>⊞</span> Grid View</button>
+   </div>
+   <div class="invest-filters" role="group" aria-label="Filter companies by sector">
+    <button type="button" data-filter="all" aria-pressed="true"><span data-i18n="filter_all">All Companies</span> (9)</button>
+    <button type="button" data-filter="food" aria-pressed="false" data-i18n="filter_food">Food &amp; Trade</button>
+    <button type="button" data-filter="agri" aria-pressed="false" data-i18n="filter_agri">Agri &amp; Nature</button>
+    <button type="button" data-filter="tech" aria-pressed="false" data-i18n="filter_tech">Business Solutions</button>
+   </div>
+  </div>
+ </div>
+
+ <div class="invest-marquee-outer" id="portfolio-flow-view">
+  <div class="invest-marquee-track" id="marquee-track">
+   <!-- Flowing Marquee Items populated dynamically / mirrored -->
+  </div>
+ </div>
+
+ <div class="invest-container" id="portfolio-grid-view" style="display: none;">
+  <div class="invest-companies-grid" id="companies-grid-container">
+   <!-- Grid cards -->
+  </div>
+ </div>
+</section>
+
+<section class="invest-site invest-sectors" id="sectors" data-name="Our sectors" data-snippet="s_three_columns">
+ <div class="invest-container">
+  <div class="invest-section-heading">
+   <div><p class="invest-eyebrow" data-i18n="sectors_eyebrow">OUR SECTORS / BUSINESS DOMAINS</p><h2 data-i18n="sectors_h2">Multiple Domains.<br/><em>Broader Horizons.</em></h2></div>
+   <p data-i18n="sectors_desc">From fertile land to advanced industry, from handcrafted food to digital technology.<br/>Cross-disciplinary expertise creating enduring value.</p>
+  </div>
+  <div class="invest-sector-grid">
+   <a href="/invest#companies" class="invest-sector" data-sector-link="food">
+    <span class="invest-sector-icon" aria-hidden="true">◇</span><span class="invest-sector-index">1</span>
+    <h3 data-i18n="sector1_title">Food &amp; Commerce</h3>
+    <p data-i18n="sector1_desc">Traditional and luxury confectionery, cheese manufacturing, food processing, and wholesale trade.</p>
+    <span class="invest-text-link" data-i18n="explore_companies">Explore Companies <span class="arrow-sub">→</span></span>
+   </a>
+   <a href="/invest#companies" class="invest-sector" data-sector-link="agri">
+    <span class="invest-sector-icon" aria-hidden="true">❋</span><span class="invest-sector-index">2</span>
+    <h3 data-i18n="sector2_title">Agriculture &amp; Nature</h3>
+    <p data-i18n="sector2_desc">Pure apiculture and honey production, sustainable livestock farming, and purebred Arabian horses.</p>
+    <span class="invest-text-link" data-i18n="explore_companies">Explore Companies <span class="arrow-sub">→</span></span>
+   </a>
+   <a href="/invest#companies" class="invest-sector" data-sector-link="tech">
+    <span class="invest-sector-icon" aria-hidden="true">⌘</span><span class="invest-sector-index">3</span>
+    <h3 data-i18n="sector3_title">Tech &amp; Business Solutions</h3>
+    <p data-i18n="sector3_desc">Enterprise Resource Planning (ERP), CRM systems, and integrated supply chain management solutions.</p>
+    <span class="invest-text-link" data-i18n="explore_companies">Explore Companies <span class="arrow-sub">→</span></span>
+   </a>
+  </div>
+ </div>
+</section>
+
+<!-- Contact Us Section -->
+<section class="invest-site invest-contact" id="contact" data-name="Contact us">
+ <div class="invest-container">
+  <div class="invest-contact-grid">
+   <div class="invest-contact-info-col">
+    <p class="invest-eyebrow" data-i18n="contact_eyebrow">CONNECT / CONTACT US</p>
+    <h2 data-i18n="contact_h2">Let's Build the Future Together.</h2>
+    <p class="invest-contact-lead" data-i18n="contact_lead">We welcome strategic partnerships, investment inquiries, and institutional collaborations across our diverse portfolio.</p>
+    <div class="invest-contact-cards">
+     <div class="invest-contact-card">
+      <div class="invest-card-icon">📍</div>
+      <div class="invest-card-data"><strong data-i18n="card_hq_title">Headquarters</strong><span data-i18n="card_hq_val">Amman, Jordan · King Abdullah II St., Commercial District</span></div>
+     </div>
+     <div class="invest-contact-card">
+      <div class="invest-card-icon">📞</div>
+      <div class="invest-card-data"><strong data-i18n="card_phone_title">Direct Line</strong><a href="tel:+96265800000" dir="ltr">+962 6 580 0000</a> / <a href="tel:+962791234567" dir="ltr">+962 79 123 4567</a></div>
+     </div>
+     <div class="invest-contact-card">
+      <div class="invest-card-icon">✉️</div>
+      <div class="invest-card-data"><strong data-i18n="card_email_title">General Inquiries</strong><a href="mailto:info@anabtawiinvest.com">info@anabtawiinvest.com</a></div>
+     </div>
+     <div class="invest-contact-card">
+      <div class="invest-card-icon">⏱️</div>
+      <div class="invest-card-data"><strong data-i18n="card_hours_title">Working Hours</strong><span data-i18n="card_hours_val">Sunday – Thursday: 8:30 AM – 5:00 PM</span></div>
+     </div>
+    </div>
+   </div>
+   <div class="invest-contact-form-col">
+    <h3 class="invest-form-title" data-i18n="form_title">Send Us an Inquiry</h3>
+    <form id="invest-contact-form">
+     <div class="invest-form-row">
+      <div class="invest-form-group">
+       <label for="form-name" data-i18n="form_lbl_name">Full Name *</label>
+       <input type="text" id="form-name" class="invest-form-input" required="required" placeholder="John Doe"/>
+      </div>
+      <div class="invest-form-group">
+       <label for="form-email" data-i18n="form_lbl_email">Email Address *</label>
+       <input type="email" id="form-email" class="invest-form-input" required="required" placeholder="john@company.com"/>
+      </div>
+     </div>
+     <div class="invest-form-row">
+      <div class="invest-form-group">
+       <label for="form-phone" data-i18n="form_lbl_phone">Phone Number</label>
+       <input type="tel" id="form-phone" class="invest-form-input" placeholder="+962 79 000 0000"/>
+      </div>
+      <div class="invest-form-group">
+       <label for="form-sector" data-i18n="form_lbl_sector">Sector of Interest</label>
+       <select id="form-sector" class="invest-form-select">
+        <option value="general" data-i18n="opt_general">General Inquiries</option>
+        <option value="food" data-i18n="opt_food">Food &amp; Confectionery</option>
+        <option value="agri" data-i18n="opt_agri">Agriculture &amp; Livestock</option>
+        <option value="tech" data-i18n="opt_tech">Enterprise &amp; Technology</option>
+        <option value="partnership" data-i18n="opt_partner">Investment &amp; Partnerships</option>
+       </select>
+      </div>
+     </div>
+     <div class="invest-form-group">
+      <label for="form-message" data-i18n="form_lbl_msg">Your Message *</label>
+      <textarea id="form-message" rows="4" class="invest-form-textarea" required="required" placeholder="Tell us how we can collaborate..."></textarea>
+     </div>
+     <button type="submit" class="invest-button invest-form-submit" data-i18n="form_btn"><span>Send Message</span> <span aria-hidden="true" class="arrow-dir">↘</span></button>
+     <div class="invest-form-alert success" id="form-success-alert" data-i18n="form_success">✓ Thank you. Your message has been received. Our team will reach out promptly.</div>
+    </form>
+   </div>
+  </div>
+ </div>
+</section>
+
+<section class="invest-site invest-closing" data-name="Explore the group" data-snippet="s_call_to_action">
+ <div class="invest-container">
+  <p class="invest-eyebrow" id="closing-brand-name">ANABTAWI INVEST</p>
+  <h2 data-i18n="closing_h2">Proud of Our Heritage.<br/><em>Looking Far Beyond.</em></h2>
+  <a href="/invest#companies" class="invest-button" data-i18n="closing_btn">Explore the Group <span aria-hidden="true" class="arrow-dir">↘</span></a>
+  <span class="invest-closing-watermark" aria-hidden="true" dir="ltr">ANABTAWI</span>
+ </div>
+</section>
+
+</div></t></t></field></record>
+</odoo>
