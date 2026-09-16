@@ -12,4 +12,4 @@ class InvestPortfolio extends Interaction {
         this.cleanupPortfolio?.();
     }
 }
-registry.category('public.interactions').add('anabtawi_invest_website.portfolio', InvestPortfolio);
+registry.category('public.interactions').add('Anabtawi_invest_web_new_2.portfolio', InvestPortfolio);

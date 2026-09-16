@@ -118,7 +118,7 @@ html[lang="ar"] .invest-site h1, html[lang="ar"] .invest-site h2, html[lang="ar"
 .invest-hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; align-items: center; gap: 50px; min-height: 650px; padding-block: 65px; }
 .invest-eyebrow {
   color: var(--invest-gold) !important;
-  font-size: 13px; /* enlarged +2px */
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: .06em;
   margin-bottom: 24px !important;
@@ -129,7 +129,7 @@ html[lang="ar"] .invest-site h1, html[lang="ar"] .invest-site h2, html[lang="ar"
 }
 .invest-eyebrow > span { width: 26px; height: 1px; background: var(--invest-gold); }
 .invest-eyebrow b {
-  font-size: 11px; /* enlarged +2px */
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 2px;
   border-inline-start: 1px solid #565044;
@@ -146,7 +146,7 @@ html[lang="ar"] .invest-site h1, html[lang="ar"] .invest-site h2, html[lang="ar"
   background: var(--invest-gold);
   color: #1d2118 !important;
   padding: 14px 28px;
-  font-size: 15px; /* enlarged */
+  font-size: 15px;
   font-weight: 700;
   border: 1px solid var(--invest-gold);
   transition: all .25s ease;
@@ -194,7 +194,7 @@ html[lang="ar"] .invest-site h1, html[lang="ar"] .invest-site h2, html[lang="ar"
 .invest-about .invest-text-link, .invest-sectors .invest-text-link { color: #73582c !important; }
 .invest-text-link:hover { opacity: .75; }
 
-/* Facts Row (Zero removed, enlarged typography) */
+/* Facts Row */
 .invest-facts { display: grid; grid-template-columns: 1fr 1fr 1fr; margin-top: 70px; border-top: 1px solid #d4d0c4; }
 .invest-facts > div { display: flex; gap: 20px; align-items: center; justify-content: center; padding: 34px 15px; }
 .invest-facts > div + div { border-inline-start: 1px solid #d4d0c4; }
@@ -203,7 +203,7 @@ html[lang="ar"] .invest-site h1, html[lang="ar"] .invest-site h2, html[lang="ar"
 html[lang="ar"] .invest-facts .invest-fact-word { font-family: 'Cairo', Tahoma, sans-serif; font-size: 24px; }
 .invest-facts span { color: #686b5f; font-size: 13px; font-weight: 500; line-height: 1.4; max-width: 140px; }
 
-/* Portfolio & Right-to-Left Passing of Companies (Marquee) */
+/* Portfolio & Right-to-Left Marquee */
 .invest-portfolio { padding-block: 95px 105px; background: #171713; overflow: hidden; }
 .invest-section-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 45px; margin-bottom: 44px; }
 .invest-section-heading > p { font-size: 15px; color: #a6a59a; line-height: 2; max-width: 420px; }

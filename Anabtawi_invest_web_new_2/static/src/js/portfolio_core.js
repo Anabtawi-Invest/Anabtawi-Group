@@ -3,7 +3,6 @@
 /** Shared by the Odoo Interaction and the generated standalone preview. */
 export function mountInvestPortfolio(root) {
     const header = document.querySelector('.invest-header-shell') || root.querySelector('.invest-header-shell');
-    const langBtn = document.getElementById('lang-toggle-btn') || root.querySelector('#lang-toggle-btn');
     const brandContainers = document.querySelectorAll('.invest-brand, .invest-orbit-core, .invest-footer-top a');
     const contactForm = document.getElementById('invest-contact-form') || root.querySelector('#invest-contact-form');
     const successAlert = document.getElementById('form-success-alert') || root.querySelector('#form-success-alert');
