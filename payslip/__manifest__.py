@@ -1,6 +1,6 @@
 {
     "name": "Custom Payslip Report",
-    "version": "19.0.1.13.0",
+    "version": "19.0.1.14.0",
     "summary": "Bilingual Arabic / English payslip with three salary sections (Conditional on Termination Clearance)",
     "category": "Human Resources/Payroll",
     "license": "LGPL-3",

@@ -211,35 +211,37 @@
                         <td class="label">Employee / الموظف</td>
                         <td style="width:30%">
                             <div dir="auto" t-field="employee.name"/>
-                            <div t-if="'employee_number' in employee._fields and employee.employee_number" dir="ltr" style="color:#555; font-size:0.9em;" t-out="employee.employee_number"/>
-                            <div t-if="cfg['english_name_field'] in employee._fields" dir="ltr" t-out="employee[cfg['english_name_field']]"/>
-                            <div t-if="cfg['arabic_name_field'] in employee._fields" class="ar" t-out="employee[cfg['arabic_name_field']]"/>
                         </td>
                         <td class="label">Department / الدائرة</td>
                         <td style="width:30%" dir="auto"><span t-out="dept_display"/></td>
                     </tr>
                     <tr>
-                        <td class="label">Employee Type / نوع الموظف</td>
-                        <td><span t-field="employee.employee_type"/></td>
+                        <td class="label">Employee Number / الرقم الوظيفي</td>
+                        <td dir="ltr"><span t-if="'employee_number' in employee._fields" t-out="employee.employee_number or '—'"/><span t-else="">—</span></td>
                         <td class="label">Section / القسم</td>
                         <td dir="auto"><span t-out="section_display"/></td>
                     </tr>
                     <tr>
-                        <td class="label">Contract Type / نوع العقد</td>
-                        <td><span t-if="version" t-field="version.contract_type_id"/><span t-else="">—</span></td>
+                        <td class="label">Employee Type / نوع الموظف</td>
+                        <td><span t-field="employee.employee_type"/></td>
                         <td class="label">Branch / الفرع</td>
                         <td dir="auto"><span t-out="branch_display"/></td>
                     </tr>
                     <tr>
+                        <td class="label">Contract Type / نوع العقد</td>
+                        <td><span t-if="version" t-field="version.contract_type_id"/><span t-else="">—</span></td>
                         <td class="label">Start Date / بداية العقد</td>
                         <td><span t-if="version" t-field="version.contract_date_start" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/><span t-else="">—</span></td>
+                    </tr>
+                    <tr>
                         <td class="label">Bank / البنك</td>
                         <td dir="auto"><span t-if="bank" t-field="bank.bank_id"/><span t-else="">—</span></td>
+                        <td class="label">Primary Account / الحساب الرئيسي</td>
+                        <td style="word-break:break-all" dir="ltr"><span t-if="bank" t-field="bank.acc_number"/><span t-else="">—</span></td>
                     </tr>
                     <tr>
                         <td class="label">Currency / العملة</td><td><span t-field="currency.name"/></td>
-                        <td class="label">Primary Account / الحساب الرئيسي</td>
-                        <td style="word-break:break-all" dir="ltr"><span t-if="bank" t-field="bank.acc_number"/><span t-else="">—</span></td>
+                        <td></td><td></td>
                     </tr>
                 </table>
                 <div class="balance">
