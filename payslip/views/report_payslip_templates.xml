@@ -113,12 +113,12 @@
                 <t t-set="lines" t-value="o.line_ids.sorted('sequence')"/>
                 <t t-set="visible_lines" t-value="lines.filtered(lambda l: l.salary_rule_id.appears_on_payslip)"/>
                 <t t-set="rule_ids" t-value="{role: [rule.id for xmlid in refs for rule in [o.env.ref(xmlid, raise_if_not_found=False)] if rule] for role, refs in cfg['rule_refs'].items()}"/>
-                <t t-set="basic" t-value="lines.filtered(lambda l: l.code in ('BASIC', 'BASIC_SALARY') or l.salary_rule_id.id in rule_ids['basic'])"/>
-                <t t-set="actual" t-value="lines.filtered(lambda l: l.code in ('FULL_WAGE', 'ACTUAL', 'ACTUAL_SALARY', 'WAGE') or l.salary_rule_id.id in rule_ids['actual'])"/>
-                <t t-set="gross" t-value="lines.filtered(lambda l: l.code in ('GROSS', 'GROSS_SALARY') or l.code in cfg['gross_codes'])"/>
-                <t t-set="net" t-value="lines.filtered(lambda l: l.code in ('NET', 'NET_SALARY') or l.salary_rule_id.id in rule_ids['net'])"/>
-                <t t-set="basic_amount" t-value="sum(basic.mapped('total')) if basic else (o.contract_id.wage if o.contract_id else 0.0)"/>
-                <t t-set="actual_amount" t-value="sum(actual.mapped('total')) if actual else 0.0"/>
+                <t t-set="basic" t-value="(lines.filtered(lambda l: l.code == 'BASIC') or lines.filtered(lambda l: l.code in ('BASIC', 'BASIC_SALARY') or l.salary_rule_id.id in rule_ids['basic']))[:1]"/>
+                <t t-set="actual" t-value="(lines.filtered(lambda l: l.code == 'FULL_WAGE') or lines.filtered(lambda l: l.code in ('FULL_WAGE', 'ACTUAL', 'ACTUAL_SALARY', 'WAGE') or l.salary_rule_id.id in rule_ids['actual']))[:1]"/>
+                <t t-set="gross" t-value="(lines.filtered(lambda l: l.code in ('GROSS', 'GROSS_SALARY') or l.code in cfg['gross_codes']))[:1]"/>
+                <t t-set="net" t-value="(lines.filtered(lambda l: l.code == 'NET') or lines.filtered(lambda l: l.code in ('NET', 'NET_SALARY') or l.salary_rule_id.id in rule_ids['net']))[:1]"/>
+                <t t-set="basic_amount" t-value="basic.total if basic else (o.contract_id.wage if o.contract_id else 0.0)"/>
+                <t t-set="actual_amount" t-value="actual.total if actual else 0.0"/>
                 <t t-set="information" t-value="visible_lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['information'])"/>
                 <t t-set="reserved" t-value="basic | actual | gross | net | information"/>
                 <!-- child_of includes any depth of category descendants. -->
@@ -140,8 +140,8 @@
                 <!-- No GROSS rule exists in the supplied export. A presentation-only
                      gross is NET plus the displayed employee deductions. No payroll
                      rule or accounting value is created/recomputed by this template. -->
-                <t t-set="net_amount" t-value="sum(net.mapped('total')) if net else (o.net_wage if 'net_wage' in o._fields else 0.0)"/>
-                <t t-set="gross_amount" t-value="sum(gross.mapped('total')) if gross else (net_amount + deduction_total if net else basic_amount)"/>
+                <t t-set="net_amount" t-value="net.total if net else (o.net_wage if 'net_wage' in o._fields else 0.0)"/>
+                <t t-set="gross_amount" t-value="gross.total if gross else (net_amount + deduction_total if net else basic_amount)"/>
                 <t t-set="dept_str" t-value="employee.department_id.display_name or employee.department_id.name or ''"/>
                 <t t-set="dept_parts" t-value="[p.strip() for p in dept_str.split('/')] if dept_str else []"/>
                 <t t-set="dept_display" t-value="dept_parts[0] if len(dept_parts) &gt; 0 else '—'"/>
