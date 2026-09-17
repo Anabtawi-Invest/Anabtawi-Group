@@ -511,6 +511,10 @@ class HrPayslipRun(models.Model):
                     'overtime' not in (wd.name or '').lower()
                 ))
                 att_days = sum(paid_lines.mapped("number_of_days"))
+                if payslip.date_from and payslip.date_to:
+                    days_in_period = (payslip.date_to - payslip.date_from).days + 1
+                    if att_days > days_in_period:
+                        att_days = days_in_period
                 worked_hrs = sum(worked_days.mapped("number_of_hours"))
                 ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
 
