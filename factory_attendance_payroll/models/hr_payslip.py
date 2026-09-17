@@ -697,7 +697,7 @@ class HrPayslip(models.Model):
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
                         physical_attendance_days = len(set(att.check_in.date() for att in regular_attendances)) if regular_attendances else round(total_regular_attendance_hrs / 8.0, 2)
-                        earned_rest_days = 4 if (emp and emp.employee_work_station == 'retail') else int(physical_attendance_days // 6)
+                        earned_rest_days = int(physical_attendance_days // 6)
                         line['number_of_days'] = float(physical_attendance_days + earned_rest_days)
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
@@ -783,12 +783,7 @@ class HrPayslip(models.Model):
                     if payslip.date_from <= d <= payslip.date_to
                 )
                 physical_attendance_days = len(slip_worked_dates)
-
-                # Calculate rest day quota: Retail gets fixed 4 days, Factory gets earned rest days (every 6 physical attendance days = 1 rest day: physical_attendance_days // 6)
-                if payslip.employee_id.employee_work_station == 'retail':
-                    allowed_rest_days = 4
-                else:
-                    allowed_rest_days = physical_attendance_days // 6
+                allowed_rest_days = physical_attendance_days // 6
                 converted_count = 0
                 for we in emp_work_entries:
                     code = (we.work_entry_type_id.code or '').strip().upper()
