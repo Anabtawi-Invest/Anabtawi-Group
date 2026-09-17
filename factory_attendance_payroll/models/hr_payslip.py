@@ -690,32 +690,36 @@ class HrPayslip(models.Model):
                 if 'settlement' in line_name or 'lateness coverage' in line_name or 'monthly lateness' in line_name:
                     continue
 
-                elif code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
-                    WEModel = self.env['hr.work.entry']
-                    we_dom = [
-                        ('employee_id', '=', emp.id),
-                        ('state', '!=', 'cancelled'),
-                        ('work_entry_type_id.code', 'in', ['ARS', 'REST', 'RESTDAY']),
-                    ]
-                    if 'date' in WEModel._fields:
-                        we_dom += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
-                    elif 'date_start' in WEModel._fields:
-                        we_dom += [
-                            ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
-                            ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
-                        ]
-                    ars_entries = WEModel.sudo().search(we_dom)
-                    ars_days = float(len(ars_entries))
-                    if ars_days > 0.01:
-                        line['number_of_hours'] = round(ars_days * 8.0, 2)
-                        line['number_of_days'] = round(ars_days, 2)
-                        line['amount'] = 0.0
-                        filtered_lines.append(line)
+                if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
+                    continue
 
                 if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
-                        line['number_of_days'] = float(len(set(att.check_in.date() for att in regular_attendances))) if regular_attendances else float(round(total_regular_attendance_hrs / 8.0, 2))
+                        physical_attendance_days = len(set(att.check_in.date() for att in regular_attendances)) if regular_attendances else round(total_regular_attendance_hrs / 8.0, 2)
+                        holiday_days = len(set(att.check_in.date() for att in holiday_attendances)) if holiday_attendances else (len(holiday_dates) if holiday_dates else 0)
+
+                        WEModel = self.env['hr.work.entry']
+                        we_dom = [
+                            ('employee_id', '=', emp.id),
+                            ('state', '!=', 'cancelled'),
+                        ]
+                        if 'date' in WEModel._fields:
+                            we_dom += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
+                        elif 'date_start' in WEModel._fields:
+                            we_dom += [
+                                ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                                ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                            ]
+                        emp_we = WEModel.sudo().search(we_dom)
+                        paid_leave_days = sum(
+                            1 for w in emp_we
+                            if w.work_entry_type_id and w.work_entry_type_id.is_leave and (w.work_entry_type_id.code or '').strip().upper() not in ['UNPAID', 'UNP', 'ABSENT', 'ABS', 'LEAVE500']
+                        )
+
+                        effective_days = physical_attendance_days + holiday_days + paid_leave_days
+                        earned_rest_days = 4 if (emp and emp.employee_work_station == 'retail') else int(effective_days // 6)
+                        line['number_of_days'] = float(physical_attendance_days + earned_rest_days)
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
