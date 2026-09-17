@@ -158,6 +158,8 @@
                 <t t-set="rows" t-value="max(cfg['minimum_rows'], len(allowances), len(deductions))"/>
                 <t t-set="ref_date" t-value="o.date_to or o.date_from"/>
                 <t t-set="month_total_days" t-value="((29 if (ref_date.year % 4 == 0 and (ref_date.year % 100 != 0 or ref_date.year % 400 == 0)) else 28) if ref_date.month == 2 else (30 if ref_date.month in (4, 6, 9, 11) else 31)) if ref_date else 30.0"/>
+                <t t-set="worked_days_count" t-value="sum(worked.mapped('number_of_days')) if cfg['worked_codes'] else (sum(o.worked_days_line_ids.mapped('number_of_days')) or 0.0)"/>
+                <t t-set="unpaid_days_count" t-value="max(0.0, month_total_days - worked_days_count)"/>
                 <style>
                     .cpr { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 10px; color: #151515; }
                     .cpr table { width: 100%; border-collapse: collapse; table-layout: fixed; direction: ltr; }
@@ -313,12 +315,12 @@
                                     </tr>
                                     <tr>
                                         <td>Unpaid Time<br/><span class="ar">أيام الخصم</span></td>
-                                        <td class="num"><span t-if="cfg['unpaid_codes']" t-out="sum(unpaid.mapped('number_of_days'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-out="unpaid_days_count" t-options="{'widget': 'float', 'precision': 2}"/></td>
                                         <td class="num"><span t-out="cfg['deduction_sign'] * sum(time_deductions.mapped('total'))" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                     <tr>
                                         <td>Actual Salary<br/><span class="ar">الراتب الفعلي</span></td>
-                                        <td class="num"><span t-if="cfg['worked_codes']" t-out="sum(worked.mapped('number_of_days'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-out="worked_days_count" t-options="{'widget': 'float', 'precision': 2}"/></td>
                                         <td class="num"><span t-out="actual_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                 </tbody>
