@@ -242,6 +242,7 @@ class HrPayslipRun(models.Model):
             and not (l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in (l.name or ""))
             and not (l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in (l.name or "") and "موظف" in (l.name or "")))
             and not (l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in (l.name or "") and "شركة" in (l.name or "")))
+            and not ("salary advance 2" in (l.name or "").lower() or "salary advances 2" in (l.name or "").lower() or (l.salary_rule_id and ("salary advance 2" in (l.salary_rule_id.name or "").lower() or "salary advances 2" in (l.salary_rule_id.name or "").lower())))
         )
 
         ded_map = {}
@@ -264,11 +265,15 @@ class HrPayslipRun(models.Model):
                 t_norm = t_name.lower().strip()
                 t_code = (getattr(itype, "code", "") or "").lower()
 
+                # Completely ignore 'Salary Advance 2' / 'Salary Advances 2' inputs
+                if "salary advance 2" in t_norm or "salary advances 2" in t_norm:
+                    continue
+
                 is_deduction_input = (
                     "deduction" in t_norm
                     or "ded" in t_code
                     or any(
-                        t_norm in d_name or d_name in t_norm or d_name.replace("two", "2") in t_norm or t_norm.replace("2", "two") in d_name
+                        t_norm in d_name or d_name in t_norm
                         for d_name in ded_rule_names
                     )
                 )
