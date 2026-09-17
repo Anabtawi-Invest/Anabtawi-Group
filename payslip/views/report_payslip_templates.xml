@@ -156,6 +156,8 @@
                 <t t-set="worked" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['worked_codes'])"/>
                 <t t-set="unpaid" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['unpaid_codes'])"/>
                 <t t-set="rows" t-value="max(cfg['minimum_rows'], len(allowances), len(deductions))"/>
+                <t t-set="ref_date" t-value="o.date_to or o.date_from"/>
+                <t t-set="month_total_days" t-value="((29 if (ref_date.year % 4 == 0 and (ref_date.year % 100 != 0 or ref_date.year % 400 == 0)) else 28) if ref_date.month == 2 else (30 if ref_date.month in (4, 6, 9, 11) else 31)) if ref_date else 30.0"/>
                 <style>
                     .cpr { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 10px; color: #151515; }
                     .cpr table { width: 100%; border-collapse: collapse; table-layout: fixed; direction: ltr; }
@@ -306,7 +308,7 @@
                                 <tbody>
                                     <tr>
                                         <td>Basic Salary<br/><span class="ar">الراتب الأساسي</span></td>
-                                        <td class="num"><span t-if="cfg['basis_days_field'] in o._fields and o[cfg['basis_days_field']]" t-out="o[cfg['basis_days_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="" t-out="(o.date_to - o.date_from).days + 1 if (o.date_from and o.date_to) else 30.0" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                        <td class="num"><span t-if="cfg['basis_days_field'] in o._fields and o[cfg['basis_days_field']]" t-out="o[cfg['basis_days_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="" t-out="month_total_days" t-options="{'widget': 'float', 'precision': 2}"/></td>
                                         <td class="num"><span t-out="basic_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                     <tr>
