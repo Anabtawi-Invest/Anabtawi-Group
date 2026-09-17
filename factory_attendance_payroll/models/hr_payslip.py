@@ -696,7 +696,7 @@ class HrPayslip(models.Model):
                 if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
-                        physical_attendance_days = len(set(att.check_in.date() for att in attendances)) if attendances else round(total_regular_attendance_hrs / 8.0, 2)
+                        physical_attendance_days = len(attendances) if attendances else round(total_regular_attendance_hrs / 8.0, 2)
                         earned_rest_days = int(physical_attendance_days // 6)
                         line['number_of_days'] = float(physical_attendance_days + earned_rest_days)
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
