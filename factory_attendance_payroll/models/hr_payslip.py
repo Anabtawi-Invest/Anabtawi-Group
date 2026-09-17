@@ -779,14 +779,22 @@ class HrPayslip(models.Model):
                     d for d in worked_dates_by_emp.get(emp_id, set())
                     if payslip.date_from <= d <= payslip.date_to
                 )
-                emp_work_entries = we_by_emp.get(emp_id, [])
+                # Count distinct paid leave dates (Annual, Sick, etc., excluding unpaid/absent)
+                slip_paid_leave_dates = set()
                 for we in emp_work_entries:
-                    code = (we.work_entry_type_id.code or '').strip()
-                    if not we.work_entry_type_id.is_leave and code not in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS']:
+                    if not we.work_entry_type_id:
+                        continue
+                    code = (we.work_entry_type_id.code or '').strip().upper()
+                    if we.work_entry_type_id.is_leave and code not in ['LEAVE500', 'UNPAID', 'UNP', 'ABSENT', 'ABS']:
                         we_date = getattr(we, 'date', False) or (we.date_start.date() if hasattr(we, 'date_start') and we.date_start else False)
                         if isinstance(we_date, datetime.datetime):
                             we_date = we_date.date()
-                # Calculate rest day quota: Retail gets fixed 4 days, Factory gets Monday-based quota (4 or 5 days)
+                        if we_date and payslip.date_from <= we_date <= payslip.date_to:
+                            slip_paid_leave_dates.add(we_date)
+
+                effective_attendance_days = len(slip_worked_dates) + len(slip_paid_leave_dates)
+
+                # Calculate rest day quota: Retail gets fixed 4 days, Factory gets max(Mondays, effective_attendance_days // 7)
                 if payslip.employee_id.employee_work_station == 'retail':
                     allowed_rest_days = 4
                 else:
@@ -796,7 +804,7 @@ class HrPayslip(models.Model):
                         if curr_d.weekday() == 0:  # 0 is Monday
                             num_mondays += 1
                         curr_d += datetime.timedelta(days=1)
-                    allowed_rest_days = max(num_mondays, len(slip_worked_dates) // 6)
+                    allowed_rest_days = max(num_mondays, effective_attendance_days // 7)
                 converted_count = 0
                 for we in emp_work_entries:
                     code = (we.work_entry_type_id.code or '').strip()
