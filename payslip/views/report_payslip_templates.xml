@@ -95,15 +95,15 @@
  'worked_codes': ['WORK100', 'ATTENDANCE', 'A'],
  'unpaid_codes': ['UNP', 'LEAVE90', 'UNPAID', 'ABSENT'],
  'time_deduction_codes': ['OUTCON', 'DED_UNDERTIME', 'DED_UNPAID', 'DED_BFV', 'DED_TRV'],
- 'employee_number_field': 'barcode',
- 'arabic_name_field': False,
- 'english_name_field': False,
- 'branch_field': False,
- 'section_field': False,
- 'annual_balance_field': False,
- 'basis_days_field': False,
- 'basis_hours_field': False,
- 'minimum_rows': 10}"/>
+  'employee_number_field': 'barcode',
+  'arabic_name_field': 'name_arabic',
+  'english_name_field': 'name',
+  'branch_field': False,
+  'section_field': False,
+  'annual_balance_field': False,
+  'basis_days_field': False,
+  'basis_hours_field': False,
+  'minimum_rows': 10}"/>
                 <t t-set="company" t-value="o.company_id"/>
                 <t t-set="currency" t-value="company.currency_id"/>
                 <t t-set="precision" t-value="currency.decimal_places"/>
@@ -192,16 +192,10 @@
                     .cpr .employee-signature { direction: rtl; text-align: right; margin: 14px 0 16px; font-size: 11px; font-weight: bold; }
                     .cpr .print-footer { font-size: 9px; color: #333; border-top: 1px solid #ccc; padding-top: 4px; margin-top: 16px; }
                 </style>
-                <t t-set="ar_field" t-value="cfg.get('arabic_name_field')"/>
-                <t t-set="en_field" t-value="cfg.get('english_name_field')"/>
-                <t t-set="ar_attr" t-value="(employee[ar_field] if (ar_field and ar_field in employee._fields) else False) or next((employee[f] for f in ['arabic_name', 'name_ar', 'name_arabic', 'x_arabic_name', 'x_studio_arabic_name', 'x_studio_name_ar'] if f in employee._fields and employee[f]), False) or employee.with_context(lang='ar_001').name or employee.with_context(lang='ar_AA').name or employee.with_context(lang='ar_SY').name or False"/>
-                <t t-set="en_attr" t-value="(employee[en_field] if (en_field and en_field in employee._fields) else False) or next((employee[f] for f in ['english_name', 'name_en', 'name_english', 'x_english_name', 'x_studio_english_name', 'x_studio_name_en'] if f in employee._fields and employee[f]), False) or employee.with_context(lang='en_US').name or employee.with_context(lang='en_GB').name or False"/>
-                <t t-set="emp_raw" t-value="employee.name or ''"/>
-                <t t-set="emp_raw_parts" t-value="[p.strip() for p in emp_raw.replace('/', '\n').split('\n') if p.strip()]"/>
-                <t t-set="emp_part_en" t-value="next((p for p in emp_raw_parts if any(c.isalpha() and ord(c) &lt; 128 for c in p)), False)"/>
-                <t t-set="emp_part_ar" t-value="next((p for p in emp_raw_parts if any(u'\u0600' &lt;= c &lt;= u'\u06FF' for c in p)), False)"/>
-                <t t-set="emp_name_en" t-value="en_attr if (en_attr and any(c.isalpha() and ord(c) &lt; 128 for c in en_attr)) else (emp_part_en or (emp_raw if any(c.isalpha() and ord(c) &lt; 128 for c in emp_raw) else ''))"/>
-                <t t-set="emp_name_ar" t-value="ar_attr if (ar_attr and any(u'\u0600' &lt;= c &lt;= u'\u06FF' for c in ar_attr)) else (emp_part_ar or (emp_raw if any(u'\u0600' &lt;= c &lt;= u'\u06FF' for c in emp_raw) else ''))"/>
+                <t t-set="ar_field" t-value="cfg.get('arabic_name_field') or 'name_arabic'"/>
+                <t t-set="en_field" t-value="cfg.get('english_name_field') or 'name'"/>
+                <t t-set="emp_name_ar" t-value="(employee[ar_field] if (ar_field and ar_field in employee._fields and employee[ar_field]) else False) or (employee.name_arabic if ('name_arabic' in employee._fields and employee.name_arabic) else False) or False"/>
+                <t t-set="emp_name_en" t-value="(employee[en_field] if (en_field and en_field in employee._fields and employee[en_field]) else False) or employee.name"/>
                 <table class="plain">
                     <tr>
                         <td style="width:35%"><img t-if="company.logo" class="logo" t-att-src="image_data_uri(company.logo)" alt="Company logo"/></td>
