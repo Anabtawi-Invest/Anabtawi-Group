@@ -77,7 +77,7 @@ class ReconciledReportWizard(models.TransientModel):
             notes = []
             computed = bool(slip.is_reconciled)
             if not computed:
-                notes.append('Preview / stored values; use Compute Reconciliation & Export to refresh editable payslips.')
+                notes.append('Preview / stored values; payslip reconciliation not yet computed.')
             elif slip.state in ('draft', 'verify'):
                 notes.append('Computed; payslip not confirmed. Leave settlement is not certified by this report.')
             ot = slip.attendance_gross_overtime
