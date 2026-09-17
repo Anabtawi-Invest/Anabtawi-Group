@@ -499,24 +499,18 @@ class HrPayslipRun(models.Model):
                 if net_sal < 0:
                     issues.append(_("Negative Net Salary (%.2f JOD)") % net_sal)
 
-                # Attendance metrics
+                # Attendance metrics (Total calculated paid days = Attendance + Public Holidays + Paid Leaves)
                 worked_days = payslip.worked_days_line_ids
-                if emp and payslip.date_from and payslip.date_to:
-                    att_records = payslip.env['hr.attendance'].sudo().search([
-                        ('employee_id', '=', emp.id),
-                        ('check_in', '>=', datetime.combine(payslip.date_from, time.min)),
-                        ('check_in', '<=', datetime.combine(payslip.date_to, time.max))
-                    ])
-                    if att_records:
-                        att_days = len(set(a.check_in.date() for a in att_records if a.check_in))
-                    else:
-                        att_lines = worked_days.filtered(lambda wd: (
-                            (wd.code or '').strip() in ['WORK100', 'A', 'ATTENDANCE']
-                            or ('attendance' in (wd.name or '').lower() and 'extra' not in (wd.name or '').lower())
-                        ))
-                        att_days = sum(att_lines.mapped("number_of_days"))
-                else:
-                    att_days = sum(worked_days.filtered(lambda wd: (wd.code or '').strip() in ['WORK100', 'A', 'ATTENDANCE']).mapped("number_of_days"))
+                absence_codes = ['ABS', 'ABSENT', 'LEAVEUNPAID', 'un_paid', 'SICKLEAVE0', 'LAT']
+                extra_hours_codes = ['EXTRA', 'EXTRA_HOURS', 'OVERTIME', 'OVER_TIME', 'EXTRA100']
+
+                paid_lines = worked_days.filtered(lambda wd: (
+                    (wd.code or '').strip() not in absence_codes and
+                    (wd.code or '').strip() not in extra_hours_codes and
+                    'extra' not in (wd.name or '').lower() and
+                    'overtime' not in (wd.name or '').lower()
+                ))
+                att_days = sum(paid_lines.mapped("number_of_days"))
                 worked_hrs = sum(worked_days.mapped("number_of_hours"))
                 ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
 
