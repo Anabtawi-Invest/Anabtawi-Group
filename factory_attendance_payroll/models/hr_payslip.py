@@ -697,28 +697,7 @@ class HrPayslip(models.Model):
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
                         physical_attendance_days = len(set(att.check_in.date() for att in regular_attendances)) if regular_attendances else round(total_regular_attendance_hrs / 8.0, 2)
-                        holiday_days = len(set(att.check_in.date() for att in holiday_attendances)) if holiday_attendances else (len(holiday_dates) if holiday_dates else 0)
-
-                        WEModel = self.env['hr.work.entry']
-                        we_dom = [
-                            ('employee_id', '=', emp.id),
-                            ('state', '!=', 'cancelled'),
-                        ]
-                        if 'date' in WEModel._fields:
-                            we_dom += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
-                        elif 'date_start' in WEModel._fields:
-                            we_dom += [
-                                ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
-                                ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
-                            ]
-                        emp_we = WEModel.sudo().search(we_dom)
-                        paid_leave_days = sum(
-                            1 for w in emp_we
-                            if w.work_entry_type_id and w.work_entry_type_id.is_leave and (w.work_entry_type_id.code or '').strip().upper() not in ['UNPAID', 'UNP', 'ABSENT', 'ABS', 'LEAVE500']
-                        )
-
-                        effective_days = physical_attendance_days + holiday_days + paid_leave_days
-                        earned_rest_days = 4 if (emp and emp.employee_work_station == 'retail') else int(effective_days // 6)
+                        earned_rest_days = 4 if (emp and emp.employee_work_station == 'retail') else int(physical_attendance_days // 6)
                         line['number_of_days'] = float(physical_attendance_days + earned_rest_days)
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
@@ -803,26 +782,13 @@ class HrPayslip(models.Model):
                     d for d in worked_dates_by_emp.get(emp_id, set())
                     if payslip.date_from <= d <= payslip.date_to
                 )
-                # Count distinct paid leave dates (Annual, Sick, etc., excluding unpaid/absent)
-                slip_paid_leave_dates = set()
-                for we in emp_work_entries:
-                    if not we.work_entry_type_id:
-                        continue
-                    code = (we.work_entry_type_id.code or '').strip().upper()
-                    if we.work_entry_type_id.is_leave and code not in ['LEAVE500', 'UNPAID', 'UNP', 'ABSENT', 'ABS']:
-                        we_date = getattr(we, 'date', False) or (we.date_start.date() if hasattr(we, 'date_start') and we.date_start else False)
-                        if isinstance(we_date, datetime.datetime):
-                            we_date = we_date.date()
-                        if we_date and payslip.date_from <= we_date <= payslip.date_to:
-                            slip_paid_leave_dates.add(we_date)
+                physical_attendance_days = len(slip_worked_dates)
 
-                effective_attendance_days = len(slip_worked_dates) + len(slip_paid_leave_dates)
-
-                # Calculate rest day quota: Retail gets fixed 4 days, Factory gets earned rest days (every 6 worked days = 1 rest day: effective_attendance_days // 6)
+                # Calculate rest day quota: Retail gets fixed 4 days, Factory gets earned rest days (every 6 physical attendance days = 1 rest day: physical_attendance_days // 6)
                 if payslip.employee_id.employee_work_station == 'retail':
                     allowed_rest_days = 4
                 else:
-                    allowed_rest_days = effective_attendance_days // 6
+                    allowed_rest_days = physical_attendance_days // 6
                 converted_count = 0
                 for we in emp_work_entries:
                     code = (we.work_entry_type_id.code or '').strip().upper()

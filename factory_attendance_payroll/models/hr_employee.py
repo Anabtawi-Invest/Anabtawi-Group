@@ -286,11 +286,8 @@ class HrEmployee(models.Model):
                     current += timedelta(days=1)
 
                 # Monthly Grace Threshold Rule:
-                # Combined effective attendance days = Punched attendance days + Approved paid leave days
-                # Every 7 effective days earns 1 rest day (effective_days // 7, rounded down).
+                # Every 6 physical attendance days earns 1 rest day (emp_checked_in_count // 6, rounded down).
                 emp_checked_in_count = sum(1 for (e_id, d) in checked_in_keys if e_id == employee.id and m_from <= d <= eval_to)
-                emp_paid_leave_count = sum(1 for (e_id, d) in approved_leave_keys if e_id == employee.id and m_from <= d <= eval_to)
-                effective_days = emp_checked_in_count + emp_paid_leave_count
 
                 if employee.employee_work_station == "retail":
                     allowed_grace_days = 4
@@ -299,7 +296,7 @@ class HrEmployee(models.Model):
                         1 for d_idx in range((m_to - m_from).days + 1)
                         if (m_from + timedelta(days=d_idx)).weekday() == 0
                     )
-                    allowed_grace_days = max(num_mondays_in_month, effective_days // 6)
+                    allowed_grace_days = max(num_mondays_in_month, emp_checked_in_count // 6)
                 forgiven_days = [d[0] for d in candidate_unpunched_days[:allowed_grace_days]]
                 if forgiven_days:
                     WEModel = self.env["hr.work.entry"]
