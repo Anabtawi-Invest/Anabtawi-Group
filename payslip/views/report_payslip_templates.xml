@@ -95,15 +95,15 @@
  'worked_codes': ['WORK100', 'ATTENDANCE', 'A'],
  'unpaid_codes': ['UNP', 'LEAVE90', 'UNPAID', 'ABSENT'],
  'time_deduction_codes': ['OUTCON', 'DED_UNDERTIME', 'DED_UNPAID', 'DED_BFV', 'DED_TRV'],
- 'employee_number_field': 'barcode',
- 'arabic_name_field': False,
- 'english_name_field': False,
- 'branch_field': False,
- 'section_field': False,
- 'annual_balance_field': False,
- 'basis_days_field': False,
- 'basis_hours_field': False,
- 'minimum_rows': 10}"/>
+  'employee_number_field': 'barcode',
+  'arabic_name_field': 'name_arabic',
+  'english_name_field': 'name',
+  'branch_field': False,
+  'section_field': False,
+  'annual_balance_field': False,
+  'basis_days_field': False,
+  'basis_hours_field': False,
+  'minimum_rows': 10}"/>
                 <t t-set="company" t-value="o.company_id"/>
                 <t t-set="currency" t-value="company.currency_id"/>
                 <t t-set="precision" t-value="currency.decimal_places"/>
@@ -186,7 +186,16 @@
                     .cpr .net { font-size: 14px; font-weight: bold; background: #f1f1f1; }
                     .cpr .notice { border: 1px solid #888; padding: 6px; margin: 8px 0; }
                     .cpr .extra { margin-top: 14px; }
+                    .cpr .clearance-footer { margin-top: 18px; page-break-inside: avoid; }
+                    .cpr .clearance-signatures { width: 100%; margin-bottom: 14px; font-size: 11px; font-weight: bold; }
+                    .cpr .clearance-declaration { direction: rtl; text-align: justify; font-size: 10px; line-height: 1.6; margin: 12px 0; }
+                    .cpr .employee-signature { direction: rtl; text-align: right; margin: 14px 0 16px; font-size: 11px; font-weight: bold; }
+                    .cpr .print-footer { font-size: 9px; color: #333; border-top: 1px solid #ccc; padding-top: 4px; margin-top: 16px; }
                 </style>
+                <t t-set="ar_field" t-value="cfg.get('arabic_name_field') or 'name_arabic'"/>
+                <t t-set="en_field" t-value="cfg.get('english_name_field') or 'name'"/>
+                <t t-set="emp_name_ar" t-value="(employee[ar_field] if (ar_field and ar_field in employee._fields and employee[ar_field]) else False) or (employee.name_arabic if ('name_arabic' in employee._fields and employee.name_arabic) else False) or False"/>
+                <t t-set="emp_name_en" t-value="(employee[en_field] if (en_field and en_field in employee._fields and employee[en_field]) else False) or employee.name"/>
                 <table class="plain">
                     <tr>
                         <td style="width:35%"><img t-if="company.logo" class="logo" t-att-src="image_data_uri(company.logo)" alt="Company logo"/></td>
@@ -194,15 +203,14 @@
                             <div class="license">Licensed To: <span t-field="company.name"/></div>
                             <div class="title ar" lang="ar">
                                 <span>مخالصة / TERMINATION</span>
-                                <span dir="ltr" style="margin-right: 8px; margin-left: 8px;"><t t-out="o.date_from.strftime('%d/%m/%Y') if o.date_from else ''"/> — <t t-out="o.date_to.strftime('%d/%m/%Y') if o.date_to else ''"/></span>
+                                <span dir="ltr" style="margin-right: 8px; margin-left: 8px;"><t t-out="o.date_to.strftime('%d/%m/%Y') if o.date_to else ''"/></span>
                             </div>
                         </td>
                     </tr>
                 </table>
                 <div class="muted center">
-                    Pay period / الفترة:
-                    <span t-field="o.date_from" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
-                    — <span t-field="o.date_to" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                    Termination Date / تاريخ انتهاء الخدمة:
+                    <span t-field="o.date_to" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
                     <span> | </span><span t-field="o.name"/>
                 </div>
 
@@ -210,7 +218,9 @@
                     <tr>
                         <td class="label">Employee / الموظف</td>
                         <td style="width:30%">
-                            <div dir="auto" t-field="employee.name"/>
+                            <div t-if="emp_name_en" dir="ltr" style="font-weight: bold;"><t t-out="emp_name_en"/></div>
+                            <div t-if="emp_name_ar" dir="rtl" class="ar" style="font-weight: bold;"><t t-out="emp_name_ar"/></div>
+                            <div t-if="not emp_name_en and not emp_name_ar" dir="auto" t-field="employee.name"/>
                         </td>
                         <td class="label">Department / الدائرة</td>
                         <td style="width:30%" dir="auto"><span t-out="dept_display"/></td>
@@ -241,7 +251,8 @@
                     </tr>
                     <tr>
                         <td class="label">Currency / العملة</td><td><span t-field="currency.name"/></td>
-                        <td></td><td></td>
+                        <td class="label">Termination Date / تاريخ انتهاء الخدمة</td>
+                        <td><span t-field="o.date_to" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/></td>
                     </tr>
                 </table>
                 <div class="balance">
@@ -321,6 +332,44 @@
                         <td class="num net"><span t-out="net_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                     </tr>
                 </table>
+
+                <t t-set="logged_emp" t-value="o.env.user.employee_id if 'employee_id' in o.env.user._fields else False"/>
+                <t t-set="logged_user_code" t-value="(logged_emp.barcode if (logged_emp and 'barcode' in logged_emp._fields and logged_emp.barcode) else False) or (logged_emp.employee_number if (logged_emp and 'employee_number' in logged_emp._fields and logged_emp.employee_number) else False) or (logged_emp.pin if (logged_emp and 'pin' in logged_emp._fields and logged_emp.pin) else False) or o.env.user.login or ''"/>
+                <t t-set="logged_user_name" t-value="o.env.user.name or ''"/>
+                <t t-set="printed_by_str" t-value="(logged_user_code + '|' + logged_user_name) if logged_user_code else logged_user_name"/>
+                <t t-set="print_datetime" t-value="context_timestamp(datetime.datetime.now()).strftime('%d/%m/%Y %H:%M:%S')"/>
+
+                <div class="clearance-footer">
+                    <table class="plain clearance-signatures">
+                        <tr>
+                            <td style="width:50%; text-align:right; direction:rtl;" class="ar">
+                                <span>توقيع الموارد البشرية:.............................</span>
+                            </td>
+                            <td style="width:50%; text-align:left; direction:rtl;" class="ar">
+                                <span>توقيع الدائرة المالية:.............................</span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div class="clearance-declaration ar">
+                        أنا الموقع أدناه أقر بأنني استلمت جميع مستحقاتي ونهاية خدمتي كاملة وليس على الشركة أية مطالبات مستقبلية، وبهذه المخالصة تكون الشركة قد برأت ذمتها من أية مطالبة لي، وأقر بأنني قد وقعت على هذه المخالصة دون إكراه أو ضغط.
+                    </div>
+
+                    <div class="employee-signature ar">
+                        <span>توقيع الموظف:.............................</span>
+                    </div>
+
+                    <table class="plain print-footer">
+                        <tr>
+                            <td style="text-align:left; width:70%;">
+                                Printed On <t t-out="printed_by_str"/> <span style="margin-left: 8px;"><t t-out="print_datetime"/></span>
+                            </td>
+                            <td style="text-align:right; width:30%;">
+                                Page <span class="page"/> of <span class="topage"/>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
             </div>
                 </t>
             </t>
