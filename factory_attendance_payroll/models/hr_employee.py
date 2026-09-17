@@ -299,7 +299,7 @@ class HrEmployee(models.Model):
                         1 for d_idx in range((m_to - m_from).days + 1)
                         if (m_from + timedelta(days=d_idx)).weekday() == 0
                     )
-                    allowed_grace_days = max(num_mondays_in_month, effective_days // 7)
+                    allowed_grace_days = max(num_mondays_in_month, effective_days // 6)
                 forgiven_days = [d[0] for d in candidate_unpunched_days[:allowed_grace_days]]
                 if forgiven_days:
                     WEModel = self.env["hr.work.entry"]

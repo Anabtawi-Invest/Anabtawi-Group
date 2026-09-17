@@ -690,8 +690,27 @@ class HrPayslip(models.Model):
                 if 'settlement' in line_name or 'lateness coverage' in line_name or 'monthly lateness' in line_name:
                     continue
 
-                if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
-                    continue
+                elif code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
+                    WEModel = self.env['hr.work.entry']
+                    we_dom = [
+                        ('employee_id', '=', emp.id),
+                        ('state', '!=', 'cancelled'),
+                        ('work_entry_type_id.code', 'in', ['ARS', 'REST', 'RESTDAY']),
+                    ]
+                    if 'date' in WEModel._fields:
+                        we_dom += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
+                    elif 'date_start' in WEModel._fields:
+                        we_dom += [
+                            ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                            ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                        ]
+                    ars_entries = WEModel.sudo().search(we_dom)
+                    ars_days = float(len(ars_entries))
+                    if ars_days > 0.01:
+                        line['number_of_hours'] = round(ars_days * 8.0, 2)
+                        line['number_of_days'] = round(ars_days, 2)
+                        line['amount'] = 0.0
+                        filtered_lines.append(line)
 
                 if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
                     if total_regular_attendance_hrs > 0.01:
@@ -795,11 +814,11 @@ class HrPayslip(models.Model):
 
                 effective_attendance_days = len(slip_worked_dates) + len(slip_paid_leave_dates)
 
-                # Calculate rest day quota: Retail gets fixed 4 days, Factory gets earned rest days (effective_attendance_days // 7)
+                # Calculate rest day quota: Retail gets fixed 4 days, Factory gets earned rest days (every 6 worked days = 1 rest day: effective_attendance_days // 6)
                 if payslip.employee_id.employee_work_station == 'retail':
                     allowed_rest_days = 4
                 else:
-                    allowed_rest_days = effective_attendance_days // 7
+                    allowed_rest_days = effective_attendance_days // 6
                 converted_count = 0
                 for we in emp_work_entries:
                     code = (we.work_entry_type_id.code or '').strip().upper()
