@@ -775,6 +775,7 @@ class HrPayslip(models.Model):
         for payslip in valid_slips:
             try:
                 emp_id = payslip.employee_id.id
+                emp_work_entries = we_by_emp.get(emp_id, [])
                 slip_worked_dates = set(
                     d for d in worked_dates_by_emp.get(emp_id, set())
                     if payslip.date_from <= d <= payslip.date_to
@@ -794,27 +795,21 @@ class HrPayslip(models.Model):
 
                 effective_attendance_days = len(slip_worked_dates) + len(slip_paid_leave_dates)
 
-                # Calculate rest day quota: Retail gets fixed 4 days, Factory gets max(Mondays, effective_attendance_days // 7)
+                # Calculate rest day quota: Retail gets fixed 4 days, Factory gets earned rest days (effective_attendance_days // 7)
                 if payslip.employee_id.employee_work_station == 'retail':
                     allowed_rest_days = 4
                 else:
-                    num_mondays = 0
-                    curr_d = payslip.date_from
-                    while curr_d <= payslip.date_to:
-                        if curr_d.weekday() == 0:  # 0 is Monday
-                            num_mondays += 1
-                        curr_d += datetime.timedelta(days=1)
-                    allowed_rest_days = max(num_mondays, effective_attendance_days // 7)
+                    allowed_rest_days = effective_attendance_days // 7
                 converted_count = 0
                 for we in emp_work_entries:
-                    code = (we.work_entry_type_id.code or '').strip()
+                    code = (we.work_entry_type_id.code or '').strip().upper()
                     name = (we.work_entry_type_id.name or '').lower()
-                    if code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in name:
+                    if code in ['LEAVE500', 'UNPAID', 'UNP', 'ABSENT', 'ABS'] or 'absent' in name:
                         if converted_count < allowed_rest_days:
                             to_update |= we
                             converted_count += 1
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.error("Error in _convert_flexible_rest_days_to_ars for payslip %s: %s", payslip.id, e)
 
         if to_update:
             draft_we = to_update.filtered(lambda w: hasattr(w, 'state') and w.state == 'validated')
