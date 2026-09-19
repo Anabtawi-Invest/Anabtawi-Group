@@ -2,9 +2,9 @@
 {
     "name": "POS On-Site Prices",
     "author": "Anabtawi",
-    "version": "19.0.1.0.25",
+    "version": "19.0.1.0.26",
     "category": "Point of Sale",
-    "summary": "Quantity-range kilo pricing for on-site, cutting, and none POS orders",
+    "summary": "Quantity-range kilo pricing for on-site, cutting, and pledge POS orders",
     "license": "LGPL-3",
     "depends": [
         "point_of_sale",

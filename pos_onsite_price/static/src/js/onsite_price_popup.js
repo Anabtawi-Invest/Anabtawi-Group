@@ -51,8 +51,8 @@ export class OnSitePricePopup extends Component {
         return this._tr("Cutting Service", "خدمة تقطيع");
     }
 
-    get noneLabel() {
-        return this._tr("None", "لا شيء");
+    get pledgeLabel() {
+        return this._tr("Pledge", "رهن");
     }
 
     get confirmLabel() {

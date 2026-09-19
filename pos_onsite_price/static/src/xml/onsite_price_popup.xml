@@ -24,7 +24,7 @@
                         class="btn btn-lg py-3"
                         t-att-class="state.selected === 'none' ? 'btn-secondary' : 'btn-outline-secondary'"
                         t-on-click.stop="() => this.select('none')">
-                        <t t-esc="noneLabel"/>
+                        <t t-esc="pledgeLabel"/>
                     </button>
                 </div>
             </div>

@@ -59,28 +59,40 @@ Expected columns:
 - `TrxType` (ignored for In/Out)
 - `TrxDateTime`
 
+### Windows Authentication (recommended on the local DB PC)
+
+No `SQL_USER` / `SQL_PASSWORD`. The script uses the Windows account that runs it.
+
 ```bash
 export SOURCE_TYPE=sql
 export ODOO_URL="https://my-db.odoo.com"
 export BRIDGE_TOKEN="paste-token-here"
 export DEVICE_TIMEZONE="Asia/Amman"
 
-export SQL_HOST="192.168.1.10"
-export SQL_PORT="1433"
+export SQL_AUTH=windows
+export SQL_HOST=localhost
+export SQL_PORT=1433
 export SQL_DATABASE="your_database_name"
-export SQL_USER="readonly_user"
-export SQL_PASSWORD="secret"
-export SQL_TABLE="attenendad"
+export SQL_TABLE=attenendad
 export SQL_DRIVER="ODBC Driver 18 for SQL Server"
 
-# Optional
-export STATE_FILE="state.json"
-export BATCH_SIZE="500"
-export SQL_START_LOG_ID="0"
-export MACHINE_MAP='{"2":"SQL-ZK-02","3":"SQL-ZK-03"}'
-
 python3 sql_bridge_agent.py
-# or: python3 agent.py
+```
+
+If SSMS shows a named instance such as `.\SQLEXPRESS`, use:
+
+```bash
+export SQL_HOST="localhost\\SQLEXPRESS"
+```
+
+### SQL Login (optional)
+
+Only if you already have a SQL username/password:
+
+```bash
+export SQL_AUTH=sql
+export SQL_USER="existing_user"
+export SQL_PASSWORD="existing_password"
 ```
 
 ### Incremental sync

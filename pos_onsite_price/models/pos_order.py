@@ -14,7 +14,7 @@ class PosOrder(models.Model):
         selection=[
             ("on_site", "On Site"),
             ("cutting", "Cutting"),
-            ("none", "None"),
+            ("none", "Pledge"),
         ],
         string="On-Site Service Type",
         help="Cashier choice from the on-site pricing popup.",

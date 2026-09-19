@@ -1,0 +1,213 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following module:
+# 	* pos_onsite_price
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-19 00:00+0000\n"
+"PO-Revision-Date: 2026-09-19 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+#. module: pos_onsite_price
+msgid "POS On-Site Prices"
+msgstr "أسعار الخدمة بالموقع"
+
+#. module: pos_onsite_price
+msgid "Quantity-range kilo pricing for on-site, cutting, and pledge POS orders"
+msgstr "تسعير بالكيلو حسب الكمية لطلبات الموقع والتقطيع والرهن في نقطة البيع"
+
+#. module: pos_onsite_price
+msgid "On-Site Prices"
+msgstr "أسعار الموقع"
+
+#. module: pos_onsite_price
+msgid "Quantity Ranges"
+msgstr "نطاقات الكمية"
+
+#. module: pos_onsite_price
+msgid "Products"
+msgstr "المنتجات"
+
+#. module: pos_onsite_price
+msgid "Point of Sale"
+msgstr "نقطة البيع"
+
+#. module: pos_onsite_price
+msgid "Service Type"
+msgstr "نوع الخدمة"
+
+#. module: pos_onsite_price
+msgid "On Site"
+msgstr "بالموقع"
+
+#. module: pos_onsite_price
+msgid "Cutting"
+msgstr "تقطيع"
+
+#. module: pos_onsite_price
+msgid "Min Quantity"
+msgstr "الحد الأدنى للكمية"
+
+#. module: pos_onsite_price
+msgid "Max Quantity"
+msgstr "الحد الأقصى للكمية"
+
+#. module: pos_onsite_price
+msgid "Price Per Kilo"
+msgstr "السعر للكيلو"
+
+#. module: pos_onsite_price
+msgid "Service Price"
+msgstr "سعر الخدمة"
+
+#. module: pos_onsite_price
+msgid "Cutting Service"
+msgstr "خدمة تقطيع"
+
+#. module: pos_onsite_price
+msgid "Product"
+msgstr "المنتج"
+
+#. module: pos_onsite_price
+msgid "Multiple"
+msgstr "المعامل"
+
+#. module: pos_onsite_price
+msgid "On-Site Order"
+msgstr "طلب بالموقع"
+
+#. module: pos_onsite_price
+msgid "On-Site Service Type"
+msgstr "نوع خدمة الموقع"
+
+#. module: pos_onsite_price
+msgid "Pledge"
+msgstr "رهن"
+
+#. module: pos_onsite_price
+msgid "Site Service"
+msgstr "خدمة موقع"
+
+#. module: pos_onsite_price
+msgid "Choose one option for this order."
+msgstr "اختر خياراً واحداً لهذا الطلب."
+
+#. module: pos_onsite_price
+msgid "Confirm"
+msgstr "تأكيد"
+
+#. module: pos_onsite_price
+msgid "Cancel"
+msgstr "إلغاء"
+
+#. module: pos_onsite_price
+msgid "Please select a customer first."
+msgstr "يرجى اختيار العميل أولاً."
+
+#. module: pos_onsite_price
+msgid "On-site prices applied. Continue with the advance order."
+msgstr "تم تطبيق أسعار الموقع. تابع طلب العربون."
+
+#. module: pos_onsite_price
+msgid "Prices updated. Press Payment again to continue."
+msgstr "تم تحديث الأسعار. اضغط الدفع مرة أخرى للمتابعة."
+
+#. module: pos_onsite_price
+msgid "On-site prices applied. Check the new prices."
+msgstr "تم تطبيق أسعار الموقع. راجع الأسعار الجديدة."
+
+#. module: pos_onsite_price
+msgid "Pledge lines added. Press Payment again to continue."
+msgstr "تمت إضافة أسطر الرهن. اضغط الدفع مرة أخرى للمتابعة."
+
+#. module: pos_onsite_price
+msgid "Site service product is not available in this Point of Sale."
+msgstr "منتج خدمة الموقع غير متاح في نقطة البيع هذه."
+
+#. module: pos_onsite_price
+msgid "Cutting service product is not available in this Point of Sale."
+msgstr "منتج خدمة التقطيع غير متاح في نقطة البيع هذه."
+
+#. module: pos_onsite_price
+msgid "Site Service pledge mapping is not loaded. Check Site Service config and reload POS."
+msgstr "تعيين رهن خدمة الموقع غير محمّل. راجع إعداد خدمة الموقع وأعد تحميل نقطة البيع."
+
+#. module: pos_onsite_price
+msgid "Mapped pledge product is not loaded in this POS. Open Products, ensure Available in POS, then reload the POS session."
+msgstr "منتج الرهن المعيّن غير محمّل في نقطة البيع. افتح المنتجات وتأكد من إتاحتها في نقطة البيع ثم أعد تحميل الجلسة."
+
+#. module: pos_onsite_price
+msgid "Mapped pledge product price is zero. Set Sales Price or Pledge Amount on the pledge product."
+msgstr "سعر منتج الرهن المعيّن صفر. عيّن سعر البيع أو مبلغ الرهن على منتج الرهن."
+
+#. module: pos_onsite_price
+msgid "No on-site price range found for order total (effective qty: %s, type: %s)."
+msgstr "لم يتم العثور على نطاق سعر للموقع لإجمالي الطلب (الكمية الفعلية: %s، النوع: %s)."
+
+#. module: pos_onsite_price
+msgid "Min quantity cannot be negative."
+msgstr "الحد الأدنى للكمية لا يمكن أن يكون سالباً."
+
+#. module: pos_onsite_price
+msgid "Max quantity must be greater than or equal to min quantity."
+msgstr "الحد الأقصى للكمية يجب أن يكون أكبر من أو يساوي الحد الأدنى."
+
+#. module: pos_onsite_price
+msgid "Price per kilo cannot be negative."
+msgstr "السعر للكيلو لا يمكن أن يكون سالباً."
+
+#. module: pos_onsite_price
+msgid "Service price cannot be negative."
+msgstr "سعر الخدمة لا يمكن أن يكون سالباً."
+
+#. module: pos_onsite_price
+msgid "Cutting service price cannot be negative."
+msgstr "سعر خدمة التقطيع لا يمكن أن يكون سالباً."
+
+#. module: pos_onsite_price
+msgid "Quantity ranges for the same service type cannot overlap (%s and %s)."
+msgstr "نطاقات الكمية لنفس نوع الخدمة لا يمكن أن تتداخل (%s و %s)."
+
+#. module: pos_onsite_price
+msgid "Multiple must be greater than zero."
+msgstr "المعامل يجب أن يكون أكبر من صفر."
+
+#. module: pos_onsite_price
+msgid "Only one on-site price menu is allowed per Point of Sale."
+msgstr "يُسمح بقائمة أسعار موقع واحدة فقط لكل نقطة بيع."
+
+#. module: pos_onsite_price
+msgid "Each product can appear only once in an on-site price menu."
+msgstr "يمكن أن يظهر كل منتج مرة واحدة فقط في قائمة أسعار الموقع."
+
+#. module: pos_onsite_price
+msgid "Matched against the cashier popup choice (On Site / Cutting)."
+msgstr "يُطابق اختيار الكاشير في النافذة (بالموقع / تقطيع)."
+
+#. module: pos_onsite_price
+msgid "Unit price for the Site Service product when this range matches."
+msgstr "سعر الوحدة لمنتج خدمة الموقع عند تطابق هذا النطاق."
+
+#. module: pos_onsite_price
+msgid "Unit price for the Cutting Service product when this range matches."
+msgstr "سعر الوحدة لمنتج خدمة التقطيع عند تطابق هذا النطاق."
+
+#. module: pos_onsite_price
+msgid "Conversion factor: effective quantity = order quantity × multiple."
+msgstr "معامل التحويل: الكمية الفعلية = كمية الطلب × المعامل."
+
+#. module: pos_onsite_price
+msgid "True when the cashier chose On Site or Cutting (skips pledge)."
+msgstr "صحيح عندما يختار الكاشير بالموقع أو التقطيع (يتجاوز الرهن)."
+
+#. module: pos_onsite_price
+msgid "Cashier choice from the on-site pricing popup."
+msgstr "اختيار الكاشير من نافذة تسعير الموقع."

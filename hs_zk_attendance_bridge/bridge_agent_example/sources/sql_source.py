@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from config_utils import getenv, getenv_int, load_json_env
+from config_utils import getenv, getenv_bool, getenv_int, load_json_env
 
 _logger = logging.getLogger(__name__)
 
@@ -24,11 +24,23 @@ def _quote_ident(name: str) -> str:
     return f"[{name}]"
 
 
+def _parse_auth_mode(raw: str) -> str:
+    value = (raw or "windows").strip().lower()
+    if value in {"windows", "trusted", "integrated", "sspi"}:
+        return "windows"
+    if value in {"sql", "sqlserver", "uid", "password"}:
+        return "sql"
+    raise RuntimeError(
+        f"Unsupported SQL_AUTH={raw!r}. Use 'windows' or 'sql'."
+    )
+
+
 @dataclass
 class SqlSourceConfig:
     host: str
     port: int
     database: str
+    auth_mode: str
     user: str
     password: str
     table: str
@@ -44,12 +56,22 @@ class SqlSourceConfig:
 
     @classmethod
     def from_env(cls) -> "SqlSourceConfig":
+        auth_mode = _parse_auth_mode(getenv("SQL_AUTH", "windows"))
+        user = getenv("SQL_USER", "")
+        password = getenv("SQL_PASSWORD", "")
+        if auth_mode == "sql":
+            if not user:
+                raise RuntimeError("SQL_USER is required when SQL_AUTH=sql")
+            if not password:
+                raise RuntimeError("SQL_PASSWORD is required when SQL_AUTH=sql")
+
         return cls(
-            host=getenv("SQL_HOST", required=True),
+            host=getenv("SQL_HOST", "localhost"),
             port=getenv_int("SQL_PORT", "1433"),
             database=getenv("SQL_DATABASE", required=True),
-            user=getenv("SQL_USER", required=True),
-            password=getenv("SQL_PASSWORD", required=True),
+            auth_mode=auth_mode,
+            user=user,
+            password=password,
             table=getenv("SQL_TABLE", "attenendad"),
             driver=getenv("SQL_DRIVER", "ODBC Driver 18 for SQL Server"),
             batch_size=getenv_int("BATCH_SIZE", "500"),
@@ -58,12 +80,15 @@ class SqlSourceConfig:
             device_identifier=getenv("DEVICE_IDENTIFIER", ""),
             machine_map={str(k): str(v) for k, v in load_json_env("MACHINE_MAP", "{}").items()},
             start_log_id=getenv_int("SQL_START_LOG_ID", "0"),
-            encrypt=getenv("SQL_ENCRYPT", "yes").strip().lower() in {"1", "true", "yes"},
-            trust_server_certificate=getenv("SQL_TRUST_SERVER_CERTIFICATE", "yes")
-            .strip()
-            .lower()
-            in {"1", "true", "yes"},
+            encrypt=getenv_bool("SQL_ENCRYPT", "yes"),
+            trust_server_certificate=getenv_bool("SQL_TRUST_SERVER_CERTIFICATE", "yes"),
         )
+
+    def server_address(self) -> str:
+        # Named instances like localhost\SQLEXPRESS should not force ,port.
+        if "\\" in self.host or "," in self.host:
+            return self.host
+        return f"{self.host},{self.port}"
 
 
 class SqlAttendanceSource:
@@ -85,16 +110,22 @@ class SqlAttendanceSource:
 
         encrypt = "yes" if self.config.encrypt else "no"
         trust = "yes" if self.config.trust_server_certificate else "no"
-        conn_str = (
-            f"DRIVER={{{self.config.driver}}};"
-            f"SERVER={self.config.host},{self.config.port};"
-            f"DATABASE={self.config.database};"
-            f"UID={self.config.user};"
-            f"PWD={self.config.password};"
-            f"Encrypt={encrypt};"
-            f"TrustServerCertificate={trust};"
-        )
-        return pyodbc.connect(conn_str, timeout=30)
+        server = self.config.server_address()
+        parts = [
+            f"DRIVER={{{self.config.driver}}};",
+            f"SERVER={server};",
+            f"DATABASE={self.config.database};",
+            f"Encrypt={encrypt};",
+            f"TrustServerCertificate={trust};",
+        ]
+        if self.config.auth_mode == "windows":
+            _logger.info("Using Windows Authentication (Trusted_Connection)")
+            parts.append("Trusted_Connection=yes;")
+        else:
+            _logger.info("Using SQL Server Authentication")
+            parts.append(f"UID={self.config.user};")
+            parts.append(f"PWD={self.config.password};")
+        return pyodbc.connect("".join(parts), timeout=30)
 
     def _device_identifier(self, machine_id: Any) -> str:
         key = str(machine_id)
