@@ -368,7 +368,7 @@
                 <t t-set="print_datetime" t-value="context_timestamp(datetime.datetime.now()).strftime('%d/%m/%Y %H:%M:%S')"/>
 
                 <div class="clearance-footer">
-                    <table class="plain clearance-signatures">
+                    <table class="plain clearance-signatures" dir="rtl" style="width:100%; direction:rtl;">
                         <tr>
                             <td style="width:50%; text-align:right; direction:rtl;" class="ar">
                                 <span>توقيع الموارد البشرية:.............................</span>
