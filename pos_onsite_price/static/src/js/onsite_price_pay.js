@@ -4,7 +4,14 @@ import { patch } from "@web/core/utils/patch";
 import { _t } from "@web/core/l10n/translation";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
-import { promptAndApplyOnsitePricing, isOrderOnSite, logOnsite } from "@pos_onsite_price/js/onsite_price_utils";
+import {
+    promptAndApplyOnsitePricing,
+    isOrderOnSite,
+    getOrderServiceType,
+    getOnsiteUiState,
+    logOnsite,
+    SERVICE_TYPE,
+} from "@pos_onsite_price/js/onsite_price_utils";
 import { applySiteServiceToPosOrder } from "@pos_advance_order/js/site_service_utils";
 import { applyOnsitePledgeLinesToPosOrder } from "@pos_onsite_price/js/onsite_pledge_lines";
 
@@ -13,11 +20,20 @@ async function syncSiteServiceBeforePayment(pos) {
     if (!order) {
         return;
     }
-    const isOnSite = isOrderOnSite(order);
-    const result = await applySiteServiceToPosOrder(pos, order, isOnSite);
-    const pledgeResult = await applyOnsitePledgeLinesToPosOrder(pos, order, isOnSite);
-    logOnsite("pay: sync site service + pledge lines (skipped prompt)", {
-        isOnSite,
+    const serviceType = getOrderServiceType(order);
+    const state = getOnsiteUiState(order);
+    const options =
+        serviceType === SERVICE_TYPE.ON_SITE
+            ? { serviceType, unitPrice: Number(state?.servicePrice || 0) }
+            : serviceType === SERVICE_TYPE.CUTTING
+              ? { serviceType, unitPrice: Number(state?.cuttingServicePrice || 0) }
+              : { serviceType: SERVICE_TYPE.NONE };
+    const result = await applySiteServiceToPosOrder(pos, order, options);
+    const skipPledge = serviceType === SERVICE_TYPE.ON_SITE || serviceType === SERVICE_TYPE.CUTTING;
+    const pledgeResult = await applyOnsitePledgeLinesToPosOrder(pos, order, skipPledge);
+    logOnsite("pay: sync site/cutting service + pledge lines (skipped prompt)", {
+        serviceType,
+        options,
         result,
         pledgeResult,
     });

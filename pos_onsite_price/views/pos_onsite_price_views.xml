@@ -27,10 +27,12 @@
                         <page string="Quantity Ranges" name="ranges">
                             <field name="range_ids" nolabel="1">
                                 <list editable="bottom">
-                                    <field name="is_on_site"/>
+                                    <field name="service_type"/>
                                     <field name="min_qty"/>
                                     <field name="max_qty"/>
                                     <field name="price_per_kilo"/>
+                                    <field name="service_price"/>
+                                    <field name="cutting_service_price"/>
                                     <field name="currency_id" column_invisible="1"/>
                                 </list>
                             </field>

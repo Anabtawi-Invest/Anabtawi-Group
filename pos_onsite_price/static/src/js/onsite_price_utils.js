@@ -6,6 +6,12 @@ import { OnSitePricePopup } from "@pos_onsite_price/js/onsite_price_popup";
 import { applySiteServiceToPosOrder } from "@pos_advance_order/js/site_service_utils";
 import { applyOnsitePledgeLinesToPosOrder } from "@pos_onsite_price/js/onsite_pledge_lines";
 
+export const SERVICE_TYPE = {
+    ON_SITE: "on_site",
+    CUTTING: "cutting",
+    NONE: "none",
+};
+
 export function normalizeId(value) {
     if (!value) {
         return null;
@@ -25,6 +31,16 @@ export function normalizeId(value) {
 function toNumber(value, fallback = 0) {
     const num = Number(value);
     return Number.isFinite(num) ? num : fallback;
+}
+
+export function normalizeServiceType(value) {
+    if (value === SERVICE_TYPE.ON_SITE || value === SERVICE_TYPE.CUTTING || value === SERVICE_TYPE.NONE) {
+        return value;
+    }
+    if (value === true) {
+        return SERVICE_TYPE.ON_SITE;
+    }
+    return SERVICE_TYPE.NONE;
 }
 
 export function getOnsiteConfig(pos) {
@@ -49,7 +65,7 @@ export function getOnsiteConfig(pos) {
 
 export function getOnsiteProductLines(order) {
     return (order?.getOrderlines?.() || order?.lines || []).filter((line) => {
-        if (line.is_site_service_auto) {
+        if (line.is_site_service_auto || line.is_onsite_auto_pledge_line) {
             return false;
         }
         const qty = toNumber(line.getQuantity?.() ?? line.qty ?? 0);
@@ -190,9 +206,18 @@ export function computeOrderTotalEffectiveQty(order, productById) {
     return total;
 }
 
-export function findOnsiteRange(ranges, isOnSite, effectiveQty) {
+function rangeServiceType(rng) {
+    if (rng.service_type) {
+        return normalizeServiceType(rng.service_type);
+    }
+    // Legacy boolean field fallback before migration/reload
+    return rng.is_on_site ? SERVICE_TYPE.ON_SITE : SERVICE_TYPE.NONE;
+}
+
+export function findOnsiteRange(ranges, serviceType, effectiveQty) {
+    const type = normalizeServiceType(serviceType);
     return (ranges || []).find((rng) => {
-        if (Boolean(rng.is_on_site) !== Boolean(isOnSite)) {
+        if (rangeServiceType(rng) !== type) {
             return false;
         }
         const minQty = toNumber(rng.min_qty);
@@ -201,18 +226,21 @@ export function findOnsiteRange(ranges, isOnSite, effectiveQty) {
     });
 }
 
-export function applyOnsitePricesToOrder(order, isOnSite, config) {
+export function applyOnsitePricesToOrder(order, serviceType, config) {
+    const type = normalizeServiceType(serviceType);
     const productById = getOnsiteProductMultipleMap(config);
     const orderTotalEffectiveQty = computeOrderTotalEffectiveQty(order, productById);
-    const range = findOnsiteRange(config.ranges, isOnSite, orderTotalEffectiveQty);
+    const range = findOnsiteRange(config.ranges, type, orderTotalEffectiveQty);
     if (!range) {
         return {
             ok: false,
             error: _t(
-                "No on-site price range found for order total (effective qty: %s).",
-                orderTotalEffectiveQty
+                "No on-site price range found for order total (effective qty: %s, type: %s).",
+                orderTotalEffectiveQty,
+                type
             ),
             orderTotalEffectiveQty,
+            serviceType: type,
         };
     }
     const pricePerKilo = toNumber(range.price_per_kilo);
@@ -241,9 +269,19 @@ export function applyOnsitePricesToOrder(order, isOnSite, config) {
             pricePerKilo,
             unitPrice,
             lineAmount: unitPrice * qty,
+            serviceType: type,
         });
     }
-    return { ok: true, changes, orderTotalEffectiveQty, pricePerKilo };
+    return {
+        ok: true,
+        changes,
+        orderTotalEffectiveQty,
+        pricePerKilo,
+        range,
+        serviceType: type,
+        servicePrice: toNumber(range.service_price),
+        cuttingServicePrice: toNumber(range.cutting_service_price),
+    };
 }
 
 export function menuHasOnsiteProducts(config) {
@@ -260,15 +298,34 @@ export function getOnsiteUiState(order) {
     if (!order.uiState.onsitePricing) {
         order.uiState.onsitePricing = {
             applied: false,
+            serviceType: SERVICE_TYPE.NONE,
             isOnSite: false,
+            servicePrice: 0,
+            cuttingServicePrice: 0,
             signature: "",
         };
     }
     return order.uiState.onsitePricing;
 }
 
+export function getOrderServiceType(order) {
+    const state = order?.uiState?.onsitePricing;
+    if (state?.serviceType) {
+        return normalizeServiceType(state.serviceType);
+    }
+    if (order?.onsite_service_type) {
+        return normalizeServiceType(order.onsite_service_type);
+    }
+    if (state?.isOnSite || order?.is_onsite_order) {
+        return SERVICE_TYPE.ON_SITE;
+    }
+    return SERVICE_TYPE.NONE;
+}
+
+/** True for Site Service or Cutting (both skip pledge). */
 export function isOrderOnSite(order) {
-    return Boolean(order?.uiState?.onsitePricing?.isOnSite || order?.is_onsite_order);
+    const type = getOrderServiceType(order);
+    return type === SERVICE_TYPE.ON_SITE || type === SERVICE_TYPE.CUTTING;
 }
 
 export function shouldPromptOnsitePricing(order, config) {
@@ -280,16 +337,41 @@ export function shouldPromptOnsitePricing(order, config) {
     return !(state?.applied && state?.signature === signature);
 }
 
-function storeOnsiteAnswer(order, isOnSite, config) {
+function storeOnsiteAnswer(order, serviceType, config, priceInfo = {}) {
+    const type = normalizeServiceType(serviceType);
     const state = getOnsiteUiState(order);
     if (state) {
         state.applied = true;
-        state.isOnSite = isOnSite;
+        state.serviceType = type;
+        state.isOnSite = type === SERVICE_TYPE.ON_SITE || type === SERVICE_TYPE.CUTTING;
+        state.servicePrice = toNumber(priceInfo.servicePrice);
+        state.cuttingServicePrice = toNumber(priceInfo.cuttingServicePrice);
         state.signature = getOnsiteOrderSignature(order, config);
     }
     if (order?.model?.fields?.is_onsite_order) {
-        order.is_onsite_order = isOnSite;
+        order.is_onsite_order = type === SERVICE_TYPE.ON_SITE || type === SERVICE_TYPE.CUTTING;
     }
+    if (order?.model?.fields?.onsite_service_type) {
+        order.onsite_service_type = type;
+    }
+}
+
+function buildServiceLineOptions(order, serviceType) {
+    const type = normalizeServiceType(serviceType);
+    const state = getOnsiteUiState(order);
+    if (type === SERVICE_TYPE.ON_SITE) {
+        return {
+            serviceType: type,
+            unitPrice: toNumber(state?.servicePrice),
+        };
+    }
+    if (type === SERVICE_TYPE.CUTTING) {
+        return {
+            serviceType: type,
+            unitPrice: toNumber(state?.cuttingServicePrice),
+        };
+    }
+    return { serviceType: SERVICE_TYPE.NONE };
 }
 
 async function fetchOnsiteConfigFromServer(pos) {
@@ -315,7 +397,17 @@ async function fetchOnsiteConfigFromServer(pos) {
             orm.searchRead(
                 "pos.onsite.price.range",
                 [["menu_id", "=", menu.id]],
-                ["id", "menu_id", "name", "is_on_site", "min_qty", "max_qty", "price_per_kilo"]
+                [
+                    "id",
+                    "menu_id",
+                    "name",
+                    "service_type",
+                    "min_qty",
+                    "max_qty",
+                    "price_per_kilo",
+                    "service_price",
+                    "cutting_service_price",
+                ]
             ),
             orm.searchRead(
                 "pos.onsite.price.product",
@@ -376,25 +468,32 @@ export async function promptAndApplyOnsitePricing({
     if (skipReason) {
         return { skipped: true, reason: skipReason };
     }
-    logOnsite(`${source}: opening Yes/No popup`);
+    logOnsite(`${source}: opening service-type popup`);
     const payload = await makeAwaitable(dialog, OnSitePricePopup, { pos });
     logOnsite(`${source}: popup result`, payload);
-    if (!payload || typeof payload.isOnSite !== "boolean") {
+    if (!payload?.serviceType) {
         return { cancelled: true };
     }
+    const serviceType = normalizeServiceType(payload.serviceType);
     let changes = [];
+    let priceInfo = { servicePrice: 0, cuttingServicePrice: 0 };
     if (config && orderHasOnsiteProducts(order, config)) {
-        const result = applyOnsitePricesToOrder(order, payload.isOnSite, config);
+        const result = applyOnsitePricesToOrder(order, serviceType, config);
         if (!result.ok) {
             logOnsite(`${source}: price error`, result);
             notification.add(result.error, { type: "danger" });
             return { error: true };
         }
         changes = result.changes || [];
+        priceInfo = {
+            servicePrice: result.servicePrice,
+            cuttingServicePrice: result.cuttingServicePrice,
+        };
     }
-    storeOnsiteAnswer(order, payload.isOnSite, config);
+    storeOnsiteAnswer(order, serviceType, config, priceInfo);
     logOnsite(`${source}: stored answer`, {
-        isOnSite: payload.isOnSite,
+        serviceType,
+        priceInfo,
         changes,
         uiState: order?.uiState?.onsitePricing || null,
     });
@@ -402,24 +501,23 @@ export async function promptAndApplyOnsitePricing({
         const siteServiceResult = await applySiteServiceToPosOrder(
             pos,
             order,
-            payload.isOnSite
+            buildServiceLineOptions(order, serviceType)
         );
-        logOnsite(`${source}: site service`, siteServiceResult);
+        logOnsite(`${source}: site/cutting service`, siteServiceResult);
         if (siteServiceResult.missingProduct) {
             notification.add(
-                _t("Site service product is not available in this Point of Sale."),
+                serviceType === SERVICE_TYPE.CUTTING
+                    ? _t("Cutting service product is not available in this Point of Sale.")
+                    : _t("Site service product is not available in this Point of Sale."),
                 { type: "warning" }
             );
         }
-        // No on-site → add mapped pledge product lines.
-        // On-site → never add pledge (auto lines removed inside apply).
-        const pledgeResult = await applyOnsitePledgeLinesToPosOrder(
-            pos,
-            order,
-            payload.isOnSite
-        );
+        // Site Service or Cutting → never add pledge.
+        // None → add mapped pledge product lines.
+        const skipPledge = serviceType === SERVICE_TYPE.ON_SITE || serviceType === SERVICE_TYPE.CUTTING;
+        const pledgeResult = await applyOnsitePledgeLinesToPosOrder(pos, order, skipPledge);
         logOnsite(`${source}: onsite pledge lines`, pledgeResult);
-        if (!payload.isOnSite) {
+        if (!skipPledge) {
             if (pledgeResult.missingMapping) {
                 notification.add(
                     _t("Site Service pledge mapping is not loaded. Check Site Service config and reload POS."),
@@ -436,7 +534,6 @@ export async function promptAndApplyOnsitePricing({
                     { type: "warning" }
                 );
             } else if (pledgeResult.added) {
-                // Ensure cashier sees the new lines even when prices also changed.
                 changes = changes.length ? changes : [{ pledgeLinesAdded: pledgeResult.lineCount }];
             }
         }
@@ -450,7 +547,18 @@ export async function promptAndApplyOnsitePricing({
                 : stayMessage || _t("On-site prices applied. Check the new prices."),
             { type: "success" }
         );
-        return { applied: true, isOnSite: payload.isOnSite, changes };
+        return { applied: true, serviceType, isOnSite: skipPledgeForType(serviceType), changes };
     }
-    return { answered: true, applied: false, isOnSite: payload.isOnSite, changes };
+    return {
+        answered: true,
+        applied: false,
+        serviceType,
+        isOnSite: skipPledgeForType(serviceType),
+        changes,
+    };
+}
+
+function skipPledgeForType(serviceType) {
+    const type = normalizeServiceType(serviceType);
+    return type === SERVICE_TYPE.ON_SITE || type === SERVICE_TYPE.CUTTING;
 }

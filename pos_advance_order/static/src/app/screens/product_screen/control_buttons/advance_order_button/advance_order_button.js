@@ -125,25 +125,31 @@ patch(ControlButtons.prototype, {
             .filter(Boolean);
     },
 
-    _applySiteServiceToAdvanceLines(lines, siteServiceEnabled, siteServiceConfig) {
+    _applySiteServiceToAdvanceLines(lines, siteServiceEnabled, siteServiceConfig, options = {}) {
         if (!siteServiceEnabled) {
             return lines;
         }
-        const result = appendSiteServiceLineIfNeeded(lines, this.pos, siteServiceConfig);
+        const serviceType = options.serviceType || "on_site";
+        const result = appendSiteServiceLineIfNeeded(lines, this.pos, siteServiceConfig, {
+            serviceType,
+            unitPrice: options.unitPrice,
+        });
         if (result.missingProduct) {
             this.notification.add(
-                _t("Site service product is not available in this Point of Sale."),
+                serviceType === "cutting"
+                    ? _t("Cutting service product is not available in this Point of Sale.")
+                    : _t("Site service product is not available in this Point of Sale."),
                 { type: "warning" }
             );
             return result.lines;
         }
         if (result.added) {
             console.info(
-                `[SITE_SERVICE] Advance order: added service line (score=${result.score}, threshold=${result.menuConfig.threshold}).`
+                `[SITE_SERVICE] Advance order: added ${serviceType} line (score=${result.score}, threshold=${result.menuConfig.threshold}).`
             );
         } else if (result.menuConfig) {
             console.info(
-                `[SITE_SERVICE] Advance order: service waived (score=${result.score}, threshold=${result.menuConfig.threshold}).`
+                `[SITE_SERVICE] Advance order: ${serviceType} waived (score=${result.score}, threshold=${result.menuConfig.threshold}).`
             );
         }
         return result.lines;
@@ -246,7 +252,17 @@ patch(ControlButtons.prototype, {
         const lines = this._applySiteServiceToAdvanceLines(
             baseLines,
             popupPayload.site_service,
-            popupPayload.site_service_config
+            popupPayload.site_service_config,
+            {
+                serviceType:
+                    popupPayload.onsite_service_type &&
+                    popupPayload.onsite_service_type !== "none"
+                        ? popupPayload.onsite_service_type
+                        : popupPayload.site_service
+                          ? "on_site"
+                          : "none",
+                unitPrice: popupPayload.onsite_service_unit_price,
+            }
         );
         if (!lines.length) {
             this.notification.add(_t("Please add at least one product line."), { type: "warning" });
