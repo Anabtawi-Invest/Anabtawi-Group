@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, onMounted, useState } from "@odoo/owl";
+import { Component, onMounted, onWillUnmount, useState } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
@@ -36,11 +36,84 @@ export class CustomCakeFormPopup extends Component {
             selectedLines: {},
             categorySearch: {},
             note: "",
+            uploadSession: null,
+            images: [],
         });
+        this._imagePoll = null;
         onMounted(async () => {
             await this._loadConfig();
+            await this._createUploadSession();
+            this._startImagePoll();
             this.state.loading = false;
         });
+        onWillUnmount(() => {
+            this._stopImagePoll();
+        });
+    }
+
+    async _createUploadSession() {
+        try {
+            const data = await rpc("/pos/custom_cake/create_upload_session", {
+                pos_config_id: this.props.pos.config.id,
+                pos_session_id: this.props.pos.session?.id || false,
+            });
+            this.state.uploadSession = data;
+            this.state.images = data.images || [];
+        } catch (error) {
+            this.notification.add(error?.message || _t("Failed to create the photo upload QR."), {
+                type: "warning",
+            });
+        }
+    }
+
+    _startImagePoll() {
+        this._stopImagePoll();
+        this._imagePoll = setInterval(() => {
+            this._refreshImages();
+        }, 3000);
+    }
+
+    _stopImagePoll() {
+        if (this._imagePoll) {
+            clearInterval(this._imagePoll);
+            this._imagePoll = null;
+        }
+    }
+
+    async _refreshImages() {
+        const token = this.state.uploadSession?.token;
+        if (!token) {
+            return;
+        }
+        try {
+            const data = await rpc("/pos/custom_cake/get_upload_session", { token });
+            this.state.uploadSession = data;
+            this.state.images = data.images || [];
+            if (!data.is_valid) {
+                this._stopImagePoll();
+            }
+        } catch (_error) {
+            // Keep the popup usable if a poll request fails.
+        }
+    }
+
+    async onDeleteImage(imageId) {
+        const token = this.state.uploadSession?.token;
+        if (!token) {
+            return;
+        }
+        try {
+            const data = await rpc("/pos/custom_cake/delete_upload_image", {
+                token,
+                image_id: imageId,
+            });
+            this.state.uploadSession = data;
+            this.state.images = data.images || [];
+        } catch (error) {
+            this.notification.add(error?.message || _t("Failed to delete the photo."), {
+                type: "danger",
+            });
+        }
     }
 
     async _loadConfig() {
@@ -87,6 +160,12 @@ export class CustomCakeFormPopup extends Component {
             noProductsFound: _t("No products match your search."),
             note: _t("Note"),
             notePlaceholder: _t("Add special instructions..."),
+            scanQr: _t("Scan fixed QR, then enter this code"),
+            scanQrHelp: _t("Customer scans the same QR every time, then types this code on their phone."),
+            uploadCode: _t("Upload code"),
+            photos: _t("Photos"),
+            noPhotos: _t("No photos yet."),
+            qrExpired: _t("This upload code has expired. Close and open the form again."),
         };
     }
 
@@ -195,7 +274,7 @@ export class CustomCakeFormPopup extends Component {
         const costAfterOverhead = roundCurrency(totalCost / overheadDivisor, currency);
         const priceBeforeTax = roundCurrency(costAfterOverhead / divisor, currency);
         const taxAmount = roundCurrency(priceBeforeTax * taxRate, currency);
-        const finalPrice = roundCurrency(priceBeforeTax + taxAmount, currency);
+        const finalPrice = Math.round(priceBeforeTax + taxAmount);
         return {
             components_cost: componentsCost,
             cake_base_cost: cakeBaseCost,
@@ -300,6 +379,7 @@ export class CustomCakeFormPopup extends Component {
             pos_config_id: this.props.pos.config.id,
             pos_session_id: this.props.pos.session?.id || false,
             note: (this.state.note || "").trim(),
+            upload_session_token: this.state.uploadSession?.token || "",
         };
     }
 

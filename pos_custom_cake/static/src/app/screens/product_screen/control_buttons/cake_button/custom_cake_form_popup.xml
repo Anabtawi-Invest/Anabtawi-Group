@@ -10,6 +10,55 @@
                     </div>
                 </t>
                 <t t-else="">
+                    <div class="mb-3 border rounded p-3 bg-light">
+                        <div class="fw-bold mb-1">
+                            <t t-esc="labels.scanQr"/>
+                        </div>
+                        <div class="text-muted small mb-2">
+                            <t t-esc="labels.scanQrHelp"/>
+                        </div>
+                        <t t-if="state.uploadSession and state.uploadSession.is_valid">
+                            <div class="d-flex flex-wrap align-items-center gap-3">
+                                <t t-if="state.uploadSession.qr_image">
+                                    <img t-att-src="'data:image/png;base64,' + state.uploadSession.qr_image"
+                                         alt="QR"
+                                         style="width: 140px; height: 140px; background: #fff; padding: 6px;"/>
+                                </t>
+                                <div class="text-center flex-grow-1">
+                                    <div class="text-muted small mb-1" t-esc="labels.uploadCode"/>
+                                    <div class="fw-bold"
+                                         style="font-size: 2.4rem; letter-spacing: 0.25em; color: #c2185b;"
+                                         t-esc="state.uploadSession.code"/>
+                                </div>
+                            </div>
+                        </t>
+                        <t t-elif="state.uploadSession and !state.uploadSession.is_valid">
+                            <div class="alert alert-warning mb-0" t-esc="labels.qrExpired"/>
+                        </t>
+                        <div class="mt-2 fw-bold">
+                            <t t-esc="labels.photos"/>
+                            (<t t-esc="state.images.length"/>)
+                        </div>
+                        <t t-if="!state.images.length">
+                            <div class="text-muted small" t-esc="labels.noPhotos"/>
+                        </t>
+                        <div t-else="" class="d-flex flex-wrap gap-2 mt-2">
+                            <t t-foreach="state.images" t-as="image" t-key="image.id">
+                                <div class="position-relative">
+                                    <img t-att-src="image.url"
+                                         t-att-alt="image.name"
+                                         style="width: 72px; height: 72px; object-fit: cover; border-radius: 8px;"/>
+                                    <button type="button"
+                                            class="btn btn-sm btn-danger position-absolute top-0 end-0"
+                                            style="padding: 0 6px; line-height: 1.2;"
+                                            t-on-click="() => this.onDeleteImage(image.id)">
+                                        ×
+                                    </button>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label fw-bold">
                             <t t-esc="labels.customer"/> *

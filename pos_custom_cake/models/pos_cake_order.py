@@ -95,6 +95,13 @@ class PosCakeOrder(models.Model):
     )
     pos_config_id = fields.Many2one("pos.config", string="POS Config", readonly=True)
     note = fields.Text(string="Note", readonly=True)
+    upload_session_id = fields.Many2one(
+        "pos.cake.upload.session",
+        string="Image Upload Session",
+        readonly=True,
+        copy=False,
+    )
+    image_ids = fields.One2many("pos.cake.image", "order_id", string="Cake Images")
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -126,7 +133,7 @@ class PosCakeOrder(models.Model):
         cost_after_overhead = float_round(total_cost / overhead_divisor, precision_rounding=rounding)
         price_before_tax = float_round(cost_after_overhead / divisor, precision_rounding=rounding)
         tax_amount = float_round(price_before_tax * (tax_rate / 100.0), precision_rounding=rounding)
-        final_price = float_round(price_before_tax + tax_amount, precision_rounding=rounding)
+        final_price = float_round(price_before_tax + tax_amount, precision_rounding=1.0)
         return total_cost, price_before_tax, tax_amount, final_price
 
     @api.model
@@ -189,6 +196,7 @@ class PosCakeOrder(models.Model):
         pos_config_id = payload.get("pos_config_id")
         pos_session_id = payload.get("pos_session_id")
         note = (payload.get("note") or "").strip()
+        upload_session_token = (payload.get("upload_session_token") or "").strip()
 
         if not partner_id:
             raise ValidationError(_("Customer is required."))
@@ -267,9 +275,15 @@ class PosCakeOrder(models.Model):
             "component_line_ids": [Command.create(vals) for vals in component_vals],
         }
         cake_order = self.sudo().create(order_vals)
+        if upload_session_token:
+            session = self.env["pos.cake.upload.session"].get_by_token(upload_session_token)
+            if session:
+                session.attach_to_order(cake_order)
         cake_order.flush_recordset(["product_id"])
         production = cake_order._create_manufacturing_order()
         cake_order.write({"production_id": production.id})
+        if cake_order.image_ids:
+            cake_order.image_ids.write({"production_id": production.id})
         return cake_order._prepare_pos_response()
 
     def _get_manufacturing_picking_type(self):
@@ -351,6 +365,8 @@ class PosCakeOrder(models.Model):
             .with_company(self.company_id)
             .create(mo_vals)
         )
+        if self.image_ids:
+            self.image_ids.write({"production_id": production.id})
         production.action_confirm()
         _logger.info(
             "Manufacturing order %s created for cake order %s",

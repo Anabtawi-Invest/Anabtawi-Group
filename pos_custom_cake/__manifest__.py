@@ -2,7 +2,7 @@
 {
     "name": "POS Custom Cake",
     "author": "Anabtawi",
-    "version": "19.0.1.0.30",
+    "version": "19.0.1.0.37",
     "category": "Point of Sale",
     "summary": "Custom cake ordering with POS, MRP and dynamic pricing",
     "license": "LGPL-3",
@@ -24,11 +24,13 @@
         "views/res_config_settings_views.xml",
         "views/mrp_production_views.xml",
         "views/menu.xml",
+        "views/cake_upload_templates.xml",
         "report/mrp_production_templates.xml",
     ],
     "assets": {
         "point_of_sale._assets_pos": [
             "pos_custom_cake/static/src/app/models/pos_order_patch.js",
+            "pos_custom_cake/static/src/app/utils/order_payment_validation_patch.js",
             "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/cake_pay_later_receipt.js",
             "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/cake_pay_later_receipt.xml",
             "pos_custom_cake/static/src/app/screens/product_screen/control_buttons/cake_button/cake_pay_later_receipt_popup.js",

@@ -6,8 +6,29 @@
         <field name="inherit_id" ref="mrp.mrp_production_form_view"/>
         <field name="arch" type="xml">
             <div name="bom_div" position="after">
-                <field name="custom_cake_note" placeholder="Custom cake note..."/>
+                <field name="is_custom_cake" invisible="1"/>
+                <field name="custom_cake_note"
+                       placeholder="Custom cake note..."
+                       invisible="not is_custom_cake"/>
             </div>
+            <page name="miscellaneous" position="after">
+                <page string="Cake Images" name="custom_cake_images" invisible="not is_custom_cake">
+                    <field name="custom_cake_image_ids">
+                        <list editable="bottom" create="0" delete="0">
+                            <field name="image" widget="image" options="{'size': [128, 128]}"/>
+                            <field name="name"/>
+                            <field name="order_id" optional="show"/>
+                        </list>
+                        <form>
+                            <group>
+                                <field name="image" widget="image"/>
+                                <field name="name"/>
+                                <field name="order_id"/>
+                            </group>
+                        </form>
+                    </field>
+                </page>
+            </page>
         </field>
     </record>
 </odoo>

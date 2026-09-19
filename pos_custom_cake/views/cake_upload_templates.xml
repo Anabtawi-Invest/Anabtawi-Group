@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="cake_upload_page" name="Cake Image Upload">
+        <html t-att-lang="lang" t-att-dir="direction">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+                <title t-esc="labels['title']"/>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        background: #f6f3f7;
+                        margin: 0;
+                        color: #222;
+                    }
+                    .wrap { max-width: 560px; margin: 0 auto; padding: 16px; }
+                    .card {
+                        background: #fff;
+                        border-radius: 16px;
+                        padding: 20px;
+                        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+                    }
+                    h1 { font-size: 24px; margin: 0 0 8px; }
+                    .subtitle { color: #666; margin-bottom: 16px; }
+                    .alert {
+                        padding: 10px 12px;
+                        border-radius: 8px;
+                        margin-bottom: 12px;
+                    }
+                    .alert-error { background: #fde8e8; color: #9b1c1c; }
+                    .alert-ok { background: #e8f7ee; color: #146c2e; }
+                    .btn {
+                        display: inline-block;
+                        width: 100%;
+                        border: 0;
+                        border-radius: 10px;
+                        padding: 14px 16px;
+                        font-size: 16px;
+                        font-weight: 700;
+                        text-align: center;
+                        text-decoration: none;
+                        box-sizing: border-box;
+                    }
+                    .btn-primary { background: #e91e8c; color: #fff; }
+                    .btn-secondary { background: #eee; color: #333; margin-top: 8px; }
+                    .btn-danger { background: #c0392b; color: #fff; width: auto; padding: 8px 12px; }
+                    input[type=text], input[type=file] {
+                        width: 100%;
+                        margin: 8px 0 12px;
+                        padding: 12px;
+                        border: 1px solid #ddd;
+                        border-radius: 10px;
+                        font-size: 18px;
+                        box-sizing: border-box;
+                    }
+                    input[type=text] {
+                        letter-spacing: 0.2em;
+                        text-transform: uppercase;
+                        text-align: center;
+                        font-weight: 700;
+                    }
+                    .hint { color: #777; font-size: 13px; margin-top: 8px; }
+                    .code-badge {
+                        display: inline-block;
+                        background: #fff0f7;
+                        color: #c2185b;
+                        border: 1px dashed #e91e8c;
+                        border-radius: 10px;
+                        padding: 8px 14px;
+                        font-size: 22px;
+                        font-weight: 800;
+                        letter-spacing: 0.2em;
+                        margin-bottom: 12px;
+                    }
+                    .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+                    .photo {
+                        background: #fafafa;
+                        border: 1px solid #eee;
+                        border-radius: 12px;
+                        overflow: hidden;
+                    }
+                    .photo img { width: 100%; height: 160px; object-fit: cover; display: block; }
+                    .photo form { padding: 8px; }
+                    .empty { color: #888; text-align: center; padding: 16px 0; }
+                    label.field-label { font-weight: 700; display: block; }
+                </style>
+            </head>
+            <body>
+                <div class="wrap">
+                    <div class="card">
+                        <h1 t-esc="labels['title']"/>
+                        <p class="subtitle" t-esc="labels['subtitle']"/>
+                        <t t-if="error">
+                            <div class="alert alert-error" t-esc="error"/>
+                        </t>
+                        <t t-if="success">
+                            <div class="alert alert-ok" t-esc="success"/>
+                        </t>
+
+                        <!-- Step 1: enter code (fixed QR lands here) -->
+                        <t t-if="not has_session">
+                            <form action="/pos/custom_cake/upload" method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <label class="field-label" for="code" t-esc="labels['code_label']"/>
+                                <input id="code" type="text" name="code" maxlength="8"
+                                       autocomplete="off" autocapitalize="characters"
+                                       t-att-placeholder="labels['code_placeholder']"
+                                       t-att-value="code or ''"/>
+                                <button type="submit" class="btn btn-primary" t-esc="labels['continue']"/>
+                                <div class="hint" t-esc="labels['code_hint']"/>
+                            </form>
+                        </t>
+
+                        <!-- Step 2: upload photos for this code/session -->
+                        <t t-else="">
+                            <div class="code-badge" t-esc="code"/>
+                            <t t-if="not is_valid">
+                                <div class="alert alert-error">
+                                    <strong t-esc="labels['expired']"/>
+                                    <div t-esc="labels['expired_help']"/>
+                                </div>
+                                <a class="btn btn-secondary" href="/pos/custom_cake/upload" t-esc="labels['change_code']"/>
+                            </t>
+                            <t t-else="">
+                                <form t-att-action="'/pos/custom_cake/upload/' + token" method="post" enctype="multipart/form-data">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <label class="btn btn-primary" for="images" t-esc="labels['add_photos']"/>
+                                    <input id="images" type="file" name="images" accept="image/*" multiple="multiple"/>
+                                    <button type="submit" class="btn btn-primary" t-esc="labels['upload']"/>
+                                    <div class="hint" t-esc="labels['formats']"/>
+                                </form>
+                                <a class="btn btn-secondary" href="/pos/custom_cake/upload" t-esc="labels['change_code']"/>
+                            </t>
+                            <h3>
+                                <t t-esc="labels['count']"/>
+                                (<t t-esc="image_count"/>)
+                            </h3>
+                            <t t-if="not images">
+                                <div class="empty" t-esc="labels['no_photos']"/>
+                            </t>
+                            <div t-else="" class="gallery">
+                                <t t-foreach="images" t-as="image">
+                                    <div class="photo">
+                                        <img t-att-src="'/pos/custom_cake/upload/%s/image/%s' % (token, image.id)" t-att-alt="image.name"/>
+                                        <form t-if="is_valid" t-att-action="'/pos/custom_cake/upload/%s/delete/%s' % (token, image.id)" method="post">
+                                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                            <button type="submit" class="btn btn-danger" t-esc="labels['delete']"/>
+                                        </form>
+                                    </div>
+                                </t>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+            </body>
+        </html>
+    </template>
+</odoo>
