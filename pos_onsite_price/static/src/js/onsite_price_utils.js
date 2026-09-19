@@ -298,7 +298,7 @@ export function getOnsiteUiState(order) {
     if (!order.uiState.onsitePricing) {
         order.uiState.onsitePricing = {
             applied: false,
-            serviceType: SERVICE_TYPE.NONE,
+            serviceType: null,
             isOnSite: false,
             servicePrice: 0,
             cuttingServicePrice: 0,
@@ -310,22 +310,32 @@ export function getOnsiteUiState(order) {
 
 export function getOrderServiceType(order) {
     const state = order?.uiState?.onsitePricing;
-    if (state?.serviceType) {
+    // Only trust popup answer after the cashier confirmed.
+    if (state?.applied && state.serviceType) {
         return normalizeServiceType(state.serviceType);
     }
     if (order?.onsite_service_type) {
         return normalizeServiceType(order.onsite_service_type);
     }
-    if (state?.isOnSite || order?.is_onsite_order) {
+    if (order?.is_onsite_order) {
         return SERVICE_TYPE.ON_SITE;
     }
     return SERVICE_TYPE.NONE;
 }
 
-/** True for Site Service or Cutting (both skip pledge). */
-export function isOrderOnSite(order) {
+/** True when Site Service or Cutting was chosen — skip pledge lines/records. */
+export function shouldSkipPledge(order) {
+    const state = order?.uiState?.onsitePricing;
+    if (!state?.applied) {
+        return false;
+    }
     const type = getOrderServiceType(order);
     return type === SERVICE_TYPE.ON_SITE || type === SERVICE_TYPE.CUTTING;
+}
+
+/** True for Site Service or Cutting (both skip pledge). */
+export function isOrderOnSite(order) {
+    return shouldSkipPledge(order);
 }
 
 export function shouldPromptOnsitePricing(order, config) {
@@ -518,10 +528,15 @@ export async function promptAndApplyOnsitePricing({
             );
         }
         // Site Service or Cutting → never add pledge.
-        // None → add mapped pledge product lines.
-        const skipPledge = serviceType === SERVICE_TYPE.ON_SITE || serviceType === SERVICE_TYPE.CUTTING;
+        // None → always add mapped pledge product lines (same as old "No").
+        const skipPledge =
+            serviceType === SERVICE_TYPE.ON_SITE || serviceType === SERVICE_TYPE.CUTTING;
         const pledgeResult = await applyOnsitePledgeLinesToPosOrder(pos, order, skipPledge);
-        logOnsite(`${source}: onsite pledge lines`, pledgeResult);
+        logOnsite(`${source}: onsite pledge lines`, {
+            serviceType,
+            skipPledge,
+            pledgeResult,
+        });
         if (!skipPledge) {
             if (pledgeResult.missingMapping) {
                 notification.add(
@@ -540,6 +555,14 @@ export async function promptAndApplyOnsitePricing({
                 );
             } else if (pledgeResult.added) {
                 changes = changes.length ? changes : [{ pledgeLinesAdded: pledgeResult.lineCount }];
+            } else {
+                // None with no new lines: still pause if pledge lines are already on the cart.
+                const hasAutoPledge = (order.getOrderlines?.() || order.lines || []).some(
+                    (line) => line.is_onsite_auto_pledge_line
+                );
+                if (hasAutoPledge) {
+                    changes = changes.length ? changes : [{ pledgeLinesAdded: 1 }];
+                }
             }
         }
     }

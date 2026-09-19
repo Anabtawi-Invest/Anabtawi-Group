@@ -6,7 +6,7 @@ import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import {
     promptAndApplyOnsitePricing,
-    isOrderOnSite,
+    shouldSkipPledge,
     getOrderServiceType,
     getOnsiteUiState,
     logOnsite,
@@ -29,10 +29,12 @@ async function syncSiteServiceBeforePayment(pos) {
               ? { serviceType, unitPrice: Number(state?.cuttingServicePrice || 0) }
               : { serviceType: SERVICE_TYPE.NONE };
     const result = await applySiteServiceToPosOrder(pos, order, options);
-    const skipPledge = serviceType === SERVICE_TYPE.ON_SITE || serviceType === SERVICE_TYPE.CUTTING;
+    // None (and unanswered) → add pledges. Site Service / Cutting → remove/skip.
+    const skipPledge = shouldSkipPledge(order);
     const pledgeResult = await applyOnsitePledgeLinesToPosOrder(pos, order, skipPledge);
-    logOnsite("pay: sync site/cutting service + pledge lines (skipped prompt)", {
+    logOnsite("pay: sync site/cutting service + pledge lines", {
         serviceType,
+        skipPledge,
         options,
         result,
         pledgeResult,
@@ -52,11 +54,11 @@ patch(PosStore.prototype, {
             return;
         }
         if (result?.applied) {
+            // Stay on product screen so cashier sees new prices / pledge lines.
             return;
         }
-        if (result?.skipped) {
-            await syncSiteServiceBeforePayment(this);
-        }
+        // skipped or answered with no cart change — sync pledge/service before payment.
+        await syncSiteServiceBeforePayment(this);
         return await super.pay(...arguments);
     },
 
@@ -74,16 +76,15 @@ patch(PosStore.prototype, {
         if (result?.applied) {
             return;
         }
-        if (result?.skipped) {
-            await syncSiteServiceBeforePayment(this);
-        }
+        await syncSiteServiceBeforePayment(this);
         return await super.validateOrderFast(paymentMethod);
     },
 });
 
 patch(PaymentScreen.prototype, {
     _checkPledgeItems(order) {
-        if (isOrderOnSite(order)) {
+        // Only Site Service / Cutting skip pledge creation. None keeps pledges.
+        if (shouldSkipPledge(order)) {
             return false;
         }
         return super._checkPledgeItems(...arguments);
