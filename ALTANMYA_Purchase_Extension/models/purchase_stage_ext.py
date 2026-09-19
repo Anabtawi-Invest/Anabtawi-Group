@@ -73,25 +73,44 @@ class TanmyaPurchaseExt(models.Model):
             })
         self.process_stages()
 
-    @api.depends('amount_total', 'currency_id')
-    def _calc_stage(self):
-        # aux=self.purchasetype
-        # if self.state in ('draft','sent') and aux:
-        #     self.purchasetype=aux
-        # else:
-            tot =0
-            currid=0
-            for rec in self:
-                tot +=rec.amount_total
-                currid=rec.currency_id.id
+    def _get_stage_by_code(self, code):
+        """Resolve stage for this PO: prefer current template, then system stages."""
+        self.ensure_one()
+        if self.purchasetype:
+            stage = self.purchasetype.stages.filtered(lambda s: s.code == code)[:1]
+            if stage:
+                return stage
+        return self.env['tanmya.purchase.stage'].sudo().search([
+            ('code', '=', code),
+            ('issystem', '=', True),
+        ], limit=1)
 
-            ret_type= self.env['tanmya.purchase.stage.type'].search([('currency','=',currid),
-                                                           ('minrange','<=',tot),
-                                                           ('maxrange','>=',tot)],limit=1)
+    @api.depends('amount_total', 'currency_id', 'company_id')
+    def _calc_stage(self):
+        StageType = self.env['tanmya.purchase.stage.type']
+        for rec in self:
+            company = rec.company_id
+            tot = rec.amount_total
+            currid = rec.currency_id.id
+            domain_company = [('company_id', '=', company.id)] if company else []
+            ret_type = StageType.search(
+                domain_company + [
+                    ('currency', '=', currid),
+                    ('minrange', '<=', tot),
+                    ('maxrange', '>=', tot),
+                ],
+                limit=1,
+            )
             if not ret_type:
-                ret_type = self.env['tanmya.purchase.stage.type'].search([('currency','=',False),('minrange', '<=', tot),
-                                                                          ('maxrange', '>=', tot)], limit=1)
-            self.purchasetype=ret_type
+                ret_type = StageType.search(
+                    domain_company + [
+                        ('currency', '=', False),
+                        ('minrange', '<=', tot),
+                        ('maxrange', '>=', tot),
+                    ],
+                    limit=1,
+                )
+            rec.purchasetype = ret_type
 
 
 
@@ -159,8 +178,8 @@ class TanmyaPurchaseExt(models.Model):
           self.check_stage()
           # print('newstate')
           # print(self.state)
-          current_stage=self.env['tanmya.purchase.stage'].sudo().search([('code','=',self.state)],limit=1)
-          if current_stage.approvetype=='sequence' and oldstate==self.state:
+          current_stage = self._get_stage_by_code(self.state)
+          if current_stage and current_stage.approvetype == 'sequence' and oldstate == self.state:
                 rec_next=self.env['tanmya.purchase.order.pending'].search([('state', '=', self.state)
                                                                , ('purchaseorder', '=', self.id)
                                                                , ('status', '=', 'queue')]
@@ -197,7 +216,9 @@ class TanmyaPurchaseExt(models.Model):
         count_approve=self.env['tanmya.purchase.order.pending'].search_count([('state', '=', self.state)
                                                                , ('purchaseorder', '=', self.id)
                                                                , ('status', '=', 'approve')])
-        current_stage = self.env['tanmya.purchase.stage'].sudo().search([('code', '=', self.state)], limit=1)
+        current_stage = self._get_stage_by_code(self.state)
+        if not current_stage or not self.purchasetype:
+            return
         newlist = sorted(self.purchasetype.stages, key=lambda x: x.stageorder)
 
         if current_stage.approvetype == 'anyone':
@@ -225,7 +246,9 @@ class TanmyaPurchaseExt(models.Model):
 
 
     def process_stages(self):
-        current_stage = self.env['tanmya.purchase.stage'].sudo().search([('code', '=', self.state)], limit=1)
+        current_stage = self._get_stage_by_code(self.state)
+        if not current_stage:
+            return
         uorder = 0
         rec_id=self.env['ir.model'].sudo().search([('model','=','purchase.order')], limit=1)
        # print(rec_id)

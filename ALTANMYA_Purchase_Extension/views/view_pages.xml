@@ -8,18 +8,20 @@
 
                 <form>
                     <group>
-                        <field name="name" invisible="0" />
-                        <field name="currency" invisible="0" widget="selection" />
-                        <field name="minrange" invisible="0" />
-                        <field name="maxrange" invisible="0" />
+                        <field name="name"/>
+                        <field name="company_id"/>
+                        <field name="currency" widget="selection"/>
+                        <field name="minrange"/>
+                        <field name="maxrange"/>
                     </group>
                     <field name="stages" widget="one2many" context="{'show_attribute': False}">
-                        <list string="stages" editable="bottom" >
-                            <field name="code" invisible="0"/>
-                            <field name="name" invisible="0"/>
-                            <field name="approvetype" invisible="0" widget="selection" />
-                            <field name="stageusers" widget="many2many_tags" options="{'no_create_edit': True, 'color_field': 'color'}" />
-                            <field name="stageorder" />
+                        <list string="stages" editable="bottom">
+                            <field name="code"/>
+                            <field name="name"/>
+                            <field name="approvetype" widget="selection"/>
+                            <field name="stageusers" widget="many2many_tags" options="{'no_create_edit': True, 'color_field': 'color'}"/>
+                            <field name="stageorder"/>
+                            <field name="company_id" column_invisible="True"/>
                         </list>
                     </field>
                 </form>
@@ -36,9 +38,12 @@
         <field name="arch" type="xml">
 <!--            <notebook position="inside">-->
                 <field name="currency_id" position="after">
-                    <field name="purchasetype" invisible="0" widget="selection" readonly="not userisadmin" />
-                    <field name="showpending" invisible="1" />
-                    <field name="userisadmin" invisible="1" />
+                    <field name="purchasetype"
+                             widget="selection"
+                             readonly="not userisadmin"
+                             domain="[('company_id', '=', company_id)]"/>
+                    <field name="showpending" invisible="1"/>
+                    <field name="userisadmin" invisible="1"/>
 
                 </field>
                 <field name="state" position="before">

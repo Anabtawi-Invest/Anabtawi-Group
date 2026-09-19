@@ -2,16 +2,31 @@
 <odoo>
 <data>
    <record id="tanmya_purchase_stage_type_action" model="ir.actions.act_window">
-        <field name="name">tanmya.purchase.stage.type.list</field>
+        <field name="name">Purchase templates</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">tanmya.purchase.stage.type</field>
         <field name="view_mode">list,form</field>
+        <field name="context">{'default_company_id': allowed_company_ids[0]}</field>
     </record>
    <record id="tanmya_purchase_stage_type_stages_action" model="ir.actions.act_window">
-        <field name="name">tanmya.purchase.stage.list</field>
+        <field name="name">Purchase stages</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">tanmya.purchase.stage</field>
         <field name="view_mode">list,form</field>
     </record>
+
+   <record id="view_tanmya_purchase_stage_type_list" model="ir.ui.view">
+        <field name="name">tanmya.purchase.stage.type.list</field>
+        <field name="model">tanmya.purchase.stage.type</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="company_id"/>
+                <field name="currency"/>
+                <field name="minrange"/>
+                <field name="maxrange"/>
+            </list>
+        </field>
+   </record>
 </data>
 </odoo>

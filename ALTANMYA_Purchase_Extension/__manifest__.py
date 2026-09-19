@@ -19,7 +19,7 @@
 ###################################################################################
 {
     'name': 'MCGI-Purchase Order Extension',
-    'version': '1.0',
+    'version': '1.1.0',
     'summary': 'Parallel and sequential Approvals and Status',
     'description': "Parallel and sequential Approvals and Status",
     'category': 'Inventory/Purchase',

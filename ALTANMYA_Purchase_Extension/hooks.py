@@ -10,9 +10,22 @@ SYSTEM_STAGES = [
 def test_post_init_hook(env):
     stage_model = env['tanmya.purchase.stage'].sudo()
     for values in SYSTEM_STAGES:
-        if not stage_model.search([('code', '=', values['code'])], limit=1):
+        if not stage_model.search([('code', '=', values['code']), ('issystem', '=', True)], limit=1):
             stage_model.create(values)
 
+    # Ensure templates created before company support are assigned.
+    main_company = env.ref('base.main_company', raise_if_not_found=False)
+    if not main_company:
+        main_company = env['res.company'].search([], order='id', limit=1)
+    if main_company:
+        env['tanmya.purchase.stage.type'].sudo().search([
+            ('company_id', '=', False),
+        ]).write({'company_id': main_company.id})
+
+    env.cr.execute("""
+        ALTER TABLE IF EXISTS tanmya_purchase_stage
+        DROP CONSTRAINT IF EXISTS tanmya_purchase_stage_tanmya_stage_code_unique
+    """)
 
     env.cr.execute(""" DROP SEQUENCE IF EXISTS seq_tanmia_pstage_users
     """)
