@@ -22,9 +22,9 @@ class PosSiteServiceMenu(models.Model):
         "It is not added automatically on regular POS payment.",
     )
     threshold = fields.Float(
-        string="Threshold",
+        string="Threshold (legacy)",
         default=31.0,
-        help="Minimum score (sum of Quantity × Multiple) required to waive the cutting service.",
+        help="Deprecated: service amounts now come from On-Site Prices quantity ranges.",
     )
     service_product_id = fields.Many2one(
         "product.product",
@@ -66,8 +66,6 @@ class PosSiteServiceMenu(models.Model):
         for menu in self:
             if not menu.enable_site_service:
                 continue
-            if menu.threshold <= 0:
-                raise ValidationError(_("Site service threshold must be greater than zero."))
             if not menu.service_product_id and not menu.cutting_service_product_id:
                 raise ValidationError(
                     _("Please select a Site Service product and/or a Cutting Service product.")

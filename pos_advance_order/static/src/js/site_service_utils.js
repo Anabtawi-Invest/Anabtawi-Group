@@ -192,13 +192,9 @@ export function appendSiteServiceLineIfNeeded(lines, pos, menuConfig = null, opt
         return { lines: productLines, added: false, score: 0, menuConfig: config };
     }
     const productLines = (lines || []).filter((line) => !line.is_site_service_auto);
-    if (!hasListedSiteServiceProducts(productLines, config)) {
-        return { lines: productLines, added: false, score: 0, menuConfig: config, skipped: true };
-    }
+    // Price comes from the matching On-Site Prices range (qty × multiple + popup choice).
+    // No threshold: always add when Site Service or Cutting is selected.
     const score = computeSiteServiceScoreFromLines(productLines, config);
-    if (score >= config.threshold) {
-        return { lines: productLines, added: false, score, menuConfig: config };
-    }
     const target = resolveServiceLineTarget(config, { ...options, serviceType });
     if (!target.productId) {
         return { lines: productLines, added: false, score, menuConfig: config, missingProduct: true };
@@ -292,7 +288,7 @@ export async function applySiteServiceToPosOrder(pos, order, isOnSiteOrOptions, 
     if (!result.added) {
         if (result.menuConfig) {
             console.info(
-                `[SITE_SERVICE] Payment: service not added (type=${serviceType}, score=${result.score}, threshold=${result.menuConfig.threshold}, skipped=${Boolean(result.skipped)}).`
+                `[SITE_SERVICE] Payment: service not added (type=${serviceType}, score=${result.score}, skipped=${Boolean(result.skipped)}).`
             );
         }
         return { ...result, serviceType };
@@ -323,7 +319,7 @@ export async function applySiteServiceToPosOrder(pos, order, isOnSiteOrOptions, 
         }
     }
     console.info(
-        `[SITE_SERVICE] Payment: added ${serviceType} line (score=${result.score}, threshold=${config.threshold}, price=${target.unitPrice}).`
+        `[SITE_SERVICE] Payment: added ${serviceType} line (score=${result.score}, price=${target.unitPrice}).`
     );
     return { ...result, added: Boolean(newLine), serviceType };
 }

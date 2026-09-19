@@ -145,11 +145,11 @@ patch(ControlButtons.prototype, {
         }
         if (result.added) {
             console.info(
-                `[SITE_SERVICE] Advance order: added ${serviceType} line (score=${result.score}, threshold=${result.menuConfig.threshold}).`
+                `[SITE_SERVICE] Advance order: added ${serviceType} line (score=${result.score}).`
             );
         } else if (result.menuConfig) {
             console.info(
-                `[SITE_SERVICE] Advance order: ${serviceType} waived (score=${result.score}, threshold=${result.menuConfig.threshold}).`
+                `[SITE_SERVICE] Advance order: ${serviceType} not added (score=${result.score}).`
             );
         }
         return result.lines;

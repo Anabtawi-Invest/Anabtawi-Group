@@ -6,8 +6,8 @@ import { patch } from "@web/core/utils/patch";
 /**
  * Site / Cutting service lines on regular POS payment:
  * - After the service-type popup, On Site / Cutting adds the matching product
- *   when score < threshold (prices come from On-Site Prices ranges).
- * - Advance Order uses the same scoring via pos_advance_order
+ *   using the price from the On-Site Prices range that matches qty × multiple.
+ * - Advance Order uses the same helpers in pos_advance_order
  *   (see appendSiteServiceLineIfNeeded).
  */
 patch(PosOrderline.prototype, {

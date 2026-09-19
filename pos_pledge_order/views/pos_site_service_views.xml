@@ -12,7 +12,7 @@
                             <field name="enable_site_service"/>
                         </group>
                         <group invisible="not enable_site_service">
-                            <field name="threshold"/>
+                            <field name="threshold" invisible="1"/>
                             <field name="service_product_id"/>
                             <field name="cutting_service_product_id"/>
                             <field name="service_price" invisible="1"/>
