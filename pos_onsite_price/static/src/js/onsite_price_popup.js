@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component } from "@odoo/owl";
+import { Component, useState } from "@odoo/owl";
 import { Dialog } from "@web/core/dialog/dialog";
 import { _t } from "@web/core/l10n/translation";
 
@@ -12,6 +12,10 @@ export class OnSitePricePopup extends Component {
         getPayload: Function,
         pos: { type: Object, optional: true },
     };
+
+    setup() {
+        this.state = useState({ selected: null });
+    }
 
     _isArabicContext() {
         const urlLang = new URLSearchParams(window.location.search).get("lang") || "";
@@ -29,27 +33,45 @@ export class OnSitePricePopup extends Component {
     }
 
     get popupTitle() {
-        return this._tr("On Site Order", "طلب بالموقع");
+        return this._tr("Service Type", "نوع الخدمة");
     }
 
     get popupSubtitle() {
-        return this._tr("Is this order on site?", "هل هذا الطلب بالموقع؟");
+        return this._tr(
+            "Choose one option for this order.",
+            "اختر خياراً واحداً لهذا الطلب."
+        );
     }
 
-    get yesLabel() {
-        return this._tr("Yes", "نعم");
+    get onSiteLabel() {
+        return this._tr("Site Service", "خدمة موقع");
     }
 
-    get noLabel() {
-        return this._tr("No", "لا");
+    get cuttingLabel() {
+        return this._tr("Cutting Service", "خدمة تقطيع");
+    }
+
+    get pledgeLabel() {
+        return this._tr("Pledge", "رهن");
+    }
+
+    get confirmLabel() {
+        return this._tr("Confirm", "تأكيد");
     }
 
     get cancelLabel() {
         return this._tr("Cancel", "إلغاء");
     }
 
-    confirm(isOnSite) {
-        this.props.getPayload({ isOnSite });
+    select(serviceType) {
+        this.state.selected = serviceType;
+    }
+
+    confirm() {
+        if (!this.state.selected) {
+            return;
+        }
+        this.props.getPayload({ serviceType: this.state.selected });
         this.props.close();
     }
 

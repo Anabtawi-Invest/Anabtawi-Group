@@ -8,7 +8,16 @@ class PosOrder(models.Model):
     is_onsite_order = fields.Boolean(
         string="On-Site Order",
         default=False,
-        help="Set from the POS Yes/No popup. Yes skips pledge and uses site-service logic.",
+        help="True when the cashier chose On Site or Cutting (skips pledge).",
+    )
+    onsite_service_type = fields.Selection(
+        selection=[
+            ("on_site", "On Site"),
+            ("cutting", "Cutting"),
+            ("none", "Pledge"),
+        ],
+        string="On-Site Service Type",
+        help="Cashier choice from the on-site pricing popup.",
     )
 
     @api.model
@@ -18,19 +27,20 @@ class PosOrder(models.Model):
         # inherited fields (e.g. sh_pos_order_analytic_account) stay available.
         if not fields_list:
             return fields_list
-        if "is_onsite_order" not in fields_list:
-            fields_list.append("is_onsite_order")
+        for fname in ("is_onsite_order", "onsite_service_type"):
+            if fname not in fields_list:
+                fields_list.append(fname)
         return fields_list
 
     def _include_in_pledge_closing_summary(self):
         self.ensure_one()
-        if self.is_onsite_order:
+        if self.is_onsite_order or self.onsite_service_type in ("on_site", "cutting"):
             return False
         return super()._include_in_pledge_closing_summary()
 
     def _is_site_service_pledge_blocked(self):
         self.ensure_one()
-        if self.is_onsite_order:
+        if self.is_onsite_order or self.onsite_service_type in ("on_site", "cutting"):
             return True
         parent = super()
         method = getattr(parent, "_is_site_service_pledge_blocked", None)

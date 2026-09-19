@@ -4,9 +4,11 @@ import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 import { patch } from "@web/core/utils/patch";
 
 /**
- * Site Service on regular POS payment:
- * - After the on-site Yes/No popup, Yes adds the cutting service when score < threshold.
- * - Advance Order uses the same scoring via pos_advance_order (see appendSiteServiceLineIfNeeded).
+ * Site / Cutting service lines on regular POS payment:
+ * - After the service-type popup, On Site / Cutting adds the matching product
+ *   using the price from the On-Site Prices range that matches qty × multiple.
+ * - Advance Order uses the same helpers in pos_advance_order
+ *   (see appendSiteServiceLineIfNeeded).
  */
 patch(PosOrderline.prototype, {
     setup(vals) {

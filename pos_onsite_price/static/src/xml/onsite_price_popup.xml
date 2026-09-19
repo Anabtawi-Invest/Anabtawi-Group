@@ -7,17 +7,34 @@
                     <span class="fw-bold" t-esc="popupTitle"/>
                     <small class="d-block opacity-75" t-esc="popupSubtitle"/>
                 </div>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-success btn-lg flex-fill py-4" t-on-click.stop="() => this.confirm(true)">
-                        <t t-esc="yesLabel"/>
+                <div class="d-flex flex-column gap-2">
+                    <button
+                        class="btn btn-lg py-3"
+                        t-att-class="state.selected === 'on_site' ? 'btn-success' : 'btn-outline-success'"
+                        t-on-click.stop="() => this.select('on_site')">
+                        <t t-esc="onSiteLabel"/>
                     </button>
-                    <button class="btn btn-secondary btn-lg flex-fill py-4" t-on-click.stop="() => this.confirm(false)">
-                        <t t-esc="noLabel"/>
+                    <button
+                        class="btn btn-lg py-3"
+                        t-att-class="state.selected === 'cutting' ? 'btn-warning' : 'btn-outline-warning'"
+                        t-on-click.stop="() => this.select('cutting')">
+                        <t t-esc="cuttingLabel"/>
+                    </button>
+                    <button
+                        class="btn btn-lg py-3"
+                        t-att-class="state.selected === 'none' ? 'btn-secondary' : 'btn-outline-secondary'"
+                        t-on-click.stop="() => this.select('none')">
+                        <t t-esc="pledgeLabel"/>
                     </button>
                 </div>
             </div>
             <t t-set-slot="footer">
                 <button class="btn btn-light" t-on-click.stop="cancel" t-esc="cancelLabel"/>
+                <button
+                    class="btn btn-primary"
+                    t-att-disabled="!state.selected"
+                    t-on-click.stop="confirm"
+                    t-esc="confirmLabel"/>
             </t>
         </Dialog>
     </t>

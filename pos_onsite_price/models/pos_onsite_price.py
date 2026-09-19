@@ -7,6 +7,11 @@ from odoo.tools import float_compare
 
 _logger = logging.getLogger(__name__)
 
+SERVICE_TYPE_SELECTION = [
+    ("on_site", "On Site"),
+    ("cutting", "Cutting"),
+]
+
 
 class PosOnsitePosLoadMixin(models.AbstractModel):
     _name = "pos.onsite.pos.load.mixin"
@@ -82,7 +87,7 @@ class PosOnsitePriceRange(models.Model):
     _name = "pos.onsite.price.range"
     _description = "POS On-Site Price Range"
     _inherit = ["pos.load.mixin", "pos.onsite.pos.load.mixin"]
-    _order = "is_on_site desc, min_qty, id"
+    _order = "service_type, min_qty, id"
 
     menu_id = fields.Many2one(
         "pos.onsite.price.menu",
@@ -92,10 +97,12 @@ class PosOnsitePriceRange(models.Model):
         index=True,
     )
     name = fields.Char(compute="_compute_name", store=True)
-    is_on_site = fields.Boolean(
-        string="On Site",
-        default=True,
-        help="True: used when the cashier answers Yes. False: used when the cashier answers No.",
+    service_type = fields.Selection(
+        selection=SERVICE_TYPE_SELECTION,
+        string="Service Type",
+        required=True,
+        default="on_site",
+        help="Matched against the cashier popup choice (On Site / Cutting).",
     )
     min_qty = fields.Float(string="Min Quantity", required=True, default=0.0)
     max_qty = fields.Float(string="Max Quantity", required=True, default=0.0)
@@ -105,15 +112,28 @@ class PosOnsitePriceRange(models.Model):
         required=True,
         default=0.0,
     )
+    service_price = fields.Float(
+        string="Service Price",
+        digits="Product Price",
+        default=0.0,
+        help="Unit price for the Site Service product when this range matches.",
+    )
+    cutting_service_price = fields.Float(
+        string="Cutting Service",
+        digits="Product Price",
+        default=0.0,
+        help="Unit price for the Cutting Service product when this range matches.",
+    )
     currency_id = fields.Many2one(related="menu_id.currency_id", store=True, readonly=True)
 
-    @api.depends("min_qty", "max_qty", "is_on_site")
+    @api.depends("min_qty", "max_qty", "service_type")
     def _compute_name(self):
+        labels = dict(SERVICE_TYPE_SELECTION)
         for rng in self:
-            label = _("On Site") if rng.is_on_site else _("Not On Site")
+            label = labels.get(rng.service_type) or rng.service_type or ""
             rng.name = "%s: %s - %s" % (label, rng.min_qty or 0.0, rng.max_qty or 0.0)
 
-    @api.constrains("min_qty", "max_qty", "price_per_kilo")
+    @api.constrains("min_qty", "max_qty", "price_per_kilo", "service_price", "cutting_service_price")
     def _check_range_values(self):
         for rng in self:
             if float_compare(rng.min_qty, 0.0, precision_digits=4) < 0:
@@ -122,14 +142,18 @@ class PosOnsitePriceRange(models.Model):
                 raise ValidationError(_("Max quantity must be greater than or equal to min quantity."))
             if float_compare(rng.price_per_kilo, 0.0, precision_digits=4) < 0:
                 raise ValidationError(_("Price per kilo cannot be negative."))
+            if float_compare(rng.service_price, 0.0, precision_digits=4) < 0:
+                raise ValidationError(_("Service price cannot be negative."))
+            if float_compare(rng.cutting_service_price, 0.0, precision_digits=4) < 0:
+                raise ValidationError(_("Cutting service price cannot be negative."))
 
-    @api.constrains("menu_id", "is_on_site", "min_qty", "max_qty")
+    @api.constrains("menu_id", "service_type", "min_qty", "max_qty")
     def _check_ranges_do_not_overlap(self):
         for rng in self:
             siblings = self.search(
                 [
                     ("menu_id", "=", rng.menu_id.id),
-                    ("is_on_site", "=", rng.is_on_site),
+                    ("service_type", "=", rng.service_type),
                     ("id", "!=", rng.id),
                 ]
             )
@@ -140,7 +164,7 @@ class PosOnsitePriceRange(models.Model):
                 )
                 if overlap:
                     raise ValidationError(
-                        _("Quantity ranges for the same On Site value cannot overlap (%s and %s).")
+                        _("Quantity ranges for the same service type cannot overlap (%s and %s).")
                         % (rng.name or rng.id, other.name or other.id)
                     )
 
@@ -150,7 +174,17 @@ class PosOnsitePriceRange(models.Model):
 
     @api.model
     def _load_pos_data_fields(self, config):
-        return ["id", "menu_id", "name", "is_on_site", "min_qty", "max_qty", "price_per_kilo"]
+        return [
+            "id",
+            "menu_id",
+            "name",
+            "service_type",
+            "min_qty",
+            "max_qty",
+            "price_per_kilo",
+            "service_price",
+            "cutting_service_price",
+        ]
 
 
 class PosOnsitePriceProduct(models.Model):

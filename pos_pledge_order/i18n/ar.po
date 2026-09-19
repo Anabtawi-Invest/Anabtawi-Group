@@ -1000,3 +1000,37 @@ msgstr "ملاحظة:"
 #. module: pos_pledge_order
 msgid "Orders with pledge items will NOT automatically create customer invoices. Pledge orders will be tracked in the pledge menu automatically."
 msgstr "الطلبات التي تحتوي على عناصر رهن لن تُنشئ فواتير عملاء تلقائياً. سيتم تتبع طلبات الرهن في قائمة الرهونات تلقائياً."
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,field_description:pos_pledge_order.field_pos_site_service_menu__cutting_service_product_id
+msgid "Cutting Service Product"
+msgstr "منتج خدمة التقطيع"
+
+#. module: pos_pledge_order
+#: model:ir.model.fields,help:pos_pledge_order.field_pos_site_service_menu__cutting_service_product_id
+msgid "Product representing the cutting service. Price comes from On-Site Prices quantity ranges."
+msgstr "المنتج الذي يمثل خدمة التقطيع. السعر يأتي من نطاقات كمية أسعار الموقع."
+
+#. module: pos_pledge_order
+msgid "Please select a Site Service product and/or a Cutting Service product."
+msgstr "يرجى اختيار منتج خدمة الموقع و/أو منتج خدمة التقطيع."
+
+#. module: pos_pledge_order
+msgid "Service Price (legacy)"
+msgstr "سعر الخدمة (قديم)"
+
+#. module: pos_pledge_order
+msgid "Threshold (legacy)"
+msgstr "الحد الأدنى (قديم)"
+
+#. module: pos_pledge_order
+msgid "Deprecated: unit prices now come from On-Site Prices quantity ranges."
+msgstr "مهجور: أسعار الوحدة تأتي الآن من نطاقات كمية أسعار الموقع."
+
+#. module: pos_pledge_order
+msgid "Deprecated: service amounts now come from On-Site Prices quantity ranges."
+msgstr "مهجور: مبالغ الخدمة تأتي الآن من نطاقات كمية أسعار الموقع."
+
+#. module: pos_pledge_order
+msgid "Product representing the on-site service. Price comes from On-Site Prices ranges."
+msgstr "المنتج الذي يمثل خدمة الموقع. السعر يأتي من نطاقات أسعار الموقع."

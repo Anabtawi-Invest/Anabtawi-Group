@@ -22,20 +22,26 @@ class PosSiteServiceMenu(models.Model):
         "It is not added automatically on regular POS payment.",
     )
     threshold = fields.Float(
-        string="Threshold",
+        string="Threshold (legacy)",
         default=31.0,
-        help="Minimum score (sum of Quantity × Multiple) required to waive the cutting service.",
+        help="Deprecated: service amounts now come from On-Site Prices quantity ranges.",
     )
     service_product_id = fields.Many2one(
         "product.product",
         string="Service Product",
         domain=[("available_in_pos", "=", True), ("sale_ok", "=", True)],
-        help="Product representing the on-site cutting service.",
+        help="Product representing the on-site service. Price comes from On-Site Prices ranges.",
+    )
+    cutting_service_product_id = fields.Many2one(
+        "product.product",
+        string="Cutting Service Product",
+        domain=[("available_in_pos", "=", True), ("sale_ok", "=", True)],
+        help="Product representing the cutting service. Price comes from On-Site Prices ranges.",
     )
     service_price = fields.Float(
-        string="Service Price",
+        string="Service Price (legacy)",
         digits="Product Price",
-        help="Unit price used when the service product is added automatically.",
+        help="Deprecated: unit prices now come from On-Site Prices quantity ranges.",
     )
     line_ids = fields.One2many(
         "pos.site.service.product.line",
@@ -53,16 +59,17 @@ class PosSiteServiceMenu(models.Model):
         "enable_site_service",
         "threshold",
         "service_product_id",
+        "cutting_service_product_id",
         "service_price",
     )
     def _check_site_service_configuration(self):
         for menu in self:
             if not menu.enable_site_service:
                 continue
-            if menu.threshold <= 0:
-                raise ValidationError(_("Site service threshold must be greater than zero."))
-            if not menu.service_product_id:
-                raise ValidationError(_("Please select a service product for site service."))
+            if not menu.service_product_id and not menu.cutting_service_product_id:
+                raise ValidationError(
+                    _("Please select a Site Service product and/or a Cutting Service product.")
+                )
             if menu.service_price < 0:
                 raise ValidationError(_("Site service price cannot be negative."))
 
@@ -115,6 +122,7 @@ class PosSiteServiceMenu(models.Model):
             "enable_site_service",
             "threshold",
             "service_product_id",
+            "cutting_service_product_id",
             "service_price",
         ]
 
