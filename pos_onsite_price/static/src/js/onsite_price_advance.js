@@ -17,6 +17,14 @@ logOnsite("advance patch loaded");
 patch(ControlButtons.prototype, {
     async onClickAdvanceOrder() {
         logOnsite("Advance Order clicked");
+        const order = this.pos.getOrder?.() || this.pos.get_order?.();
+        const partner = order?.getPartner?.() || order?.partner || order?.partner_id || null;
+        if (!partner?.id) {
+            // Validate customer before the service-type popup so a failed Advance
+            // does not store "already answered" and skip the popup on retry.
+            this.notification.add(_t("Please select a customer first."), { type: "warning" });
+            return;
+        }
         const result = await promptAndApplyOnsitePricing({
             pos: this.pos,
             dialog: this.dialog,
