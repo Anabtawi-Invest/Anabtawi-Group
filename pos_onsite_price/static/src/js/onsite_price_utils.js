@@ -477,7 +477,12 @@ export async function promptAndApplyOnsitePricing({
     const serviceType = normalizeServiceType(payload.serviceType);
     let changes = [];
     let priceInfo = { servicePrice: 0, cuttingServicePrice: 0 };
-    if (config && orderHasOnsiteProducts(order, config)) {
+    // None: keep normal product prices, do not match ranges — only pledges (below).
+    if (
+        serviceType !== SERVICE_TYPE.NONE &&
+        config &&
+        orderHasOnsiteProducts(order, config)
+    ) {
         const result = applyOnsitePricesToOrder(order, serviceType, config);
         if (!result.ok) {
             logOnsite(`${source}: price error`, result);
