@@ -129,7 +129,7 @@ class HrAttendance(models.Model):
             old_atts.daily_variance_hours = 0.0
             old_atts.is_public_holiday = False
             for attendance in old_atts:
-                raw_hrs = attendance.worked_hours or 0.0
+                raw_hrs = (attendance.check_out - attendance.check_in).total_seconds() / 3600.0 if (attendance.check_in and attendance.check_out) else (attendance.worked_hours or 0.0)
                 b_hrs = 1.0 if raw_hrs >= 6.0 else 0.0
                 attendance.attendance_break_hours = b_hrs
                 attendance.net_worked_hours = max(0.0, raw_hrs - b_hrs)
@@ -162,7 +162,7 @@ class HrAttendance(models.Model):
                 }
             emp_info = emp_cache[emp_id]
 
-            raw_hrs = attendance.worked_hours or 0.0
+            raw_hrs = (attendance.check_out - attendance.check_in).total_seconds() / 3600.0 if (attendance.check_in and attendance.check_out) else (attendance.worked_hours or 0.0)
             break_hrs = emp_info['break_hrs']
 
             if raw_hrs >= 6.0:
@@ -470,7 +470,7 @@ class HrAttendance(models.Model):
 
         for att in valid_atts:
             try:
-                raw_hrs = att.worked_hours
+                raw_hrs = (att.check_out - att.check_in).total_seconds() / 3600.0 if (att.check_in and att.check_out) else (att.worked_hours or 0.0)
                 break_hrs = att.employee_id._get_lunch_break_duration()
 
                 if raw_hrs >= 6.0:

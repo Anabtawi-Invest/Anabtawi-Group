@@ -657,7 +657,9 @@ class HrPayslip(models.Model):
             holiday_attendances = attendances.filtered(lambda a: a.check_in.date() in holiday_dates)
 
             def _net_hrs(att):
-                raw = att.worked_hours or 0.0
+                if hasattr(att, 'net_worked_hours') and att.net_worked_hours:
+                    return att.net_worked_hours
+                raw = (att.check_out - att.check_in).total_seconds() / 3600.0 if (att.check_in and att.check_out) else (att.worked_hours or 0.0)
                 if raw >= 6.0:
                     return max(0.0, raw - break_hrs)
                 elif raw > 4.0:
