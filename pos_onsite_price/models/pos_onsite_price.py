@@ -10,7 +10,6 @@ _logger = logging.getLogger(__name__)
 SERVICE_TYPE_SELECTION = [
     ("on_site", "On Site"),
     ("cutting", "Cutting"),
-    ("none", "None"),
 ]
 
 
@@ -103,7 +102,7 @@ class PosOnsitePriceRange(models.Model):
         string="Service Type",
         required=True,
         default="on_site",
-        help="Matched against the cashier popup choice (On Site / Cutting / None).",
+        help="Matched against the cashier popup choice (On Site / Cutting).",
     )
     min_qty = fields.Float(string="Min Quantity", required=True, default=0.0)
     max_qty = fields.Float(string="Max Quantity", required=True, default=0.0)
