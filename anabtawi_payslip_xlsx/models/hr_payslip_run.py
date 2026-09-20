@@ -242,7 +242,6 @@ class HrPayslipRun(models.Model):
             and not (l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in (l.name or ""))
             and not (l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in (l.name or "") and "موظف" in (l.name or "")))
             and not (l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in (l.name or "") and "شركة" in (l.name or "")))
-            and not ("salary advance 2" in (l.name or "").lower() or "salary advances 2" in (l.name or "").lower() or (l.salary_rule_id and ("salary advance 2" in (l.salary_rule_id.name or "").lower() or "salary advances 2" in (l.salary_rule_id.name or "").lower())))
         )
 
         ded_map = {}
@@ -265,15 +264,19 @@ class HrPayslipRun(models.Model):
                 t_norm = t_name.lower().strip()
                 t_code = (getattr(itype, "code", "") or "").lower()
 
-                # Completely ignore 'Salary Advance 2' / 'Salary Advances 2' inputs
-                if "salary advance 2" in t_norm or "salary advances 2" in t_norm:
-                    continue
-
                 is_deduction_input = (
                     "deduction" in t_norm
                     or "ded" in t_code
+                    or "adv" in t_code
+                    or "saladv" in t_code
+                    or "sala2" in t_code
                     or any(
-                        t_norm in d_name or d_name in t_norm
+                        t_norm == d_name
+                        or d_name == t_norm
+                        or (
+                            (t_norm in d_name or d_name in t_norm)
+                            and not (("2" in d_name or "two" in d_name) != ("2" in t_norm or "two" in t_norm))
+                        )
                         for d_name in ded_rule_names
                     )
                 )
@@ -281,9 +284,14 @@ class HrPayslipRun(models.Model):
                 if is_deduction_input:
                     matched_key = None
                     for k in ded_map:
-                        if k == t_norm or k in t_norm or t_norm in k:
+                        if k == t_norm or (t_code and t_code == k):
                             matched_key = k
                             break
+                    if not matched_key:
+                        for k in ded_map:
+                            if (k in t_norm or t_norm in k) and not (("2" in k or "two" in k) != ("2" in t_norm or "two" in t_norm)):
+                                matched_key = k
+                                break
                     if matched_key:
                         ded_map[matched_key]["input_type_ids"].add(itype.id)
                     else:
@@ -292,9 +300,14 @@ class HrPayslipRun(models.Model):
                     matched_key = None
                     clean_input_norm = t_norm.replace("input:", "").strip()
                     for k in alw_map:
-                        if k == clean_input_norm or k in clean_input_norm or clean_input_norm in k:
+                        if k == clean_input_norm or (t_code and t_code == k):
                             matched_key = k
                             break
+                    if not matched_key:
+                        for k in alw_map:
+                            if (k in clean_input_norm or clean_input_norm in k) and not (("2" in k or "two" in k) != ("2" in clean_input_norm or "two" in clean_input_norm)):
+                                matched_key = k
+                                break
                     if matched_key:
                         alw_map[matched_key]["input_type_ids"].add(itype.id)
                     else:
