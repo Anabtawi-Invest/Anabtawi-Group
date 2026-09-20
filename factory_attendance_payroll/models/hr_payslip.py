@@ -18,6 +18,14 @@ class HrPayslip(models.Model):
         store=True,
         help="Total overtime hours earned from attendance during the month."
     )
+    rest_days_taken = fields.Float(
+        string="Rest Days Taken",
+        compute="_compute_attendance_reconciliation_fields",
+        store=True,
+        help="Weekly rest/off days taken this month (unworked days excluding public holidays "
+             "and approved leave). Monthly allowance is 4; each unused rest day adds "
+             "8 × 1.5 hours to Monthly Overtime Earned."
+    )
     attendance_gross_undertime = fields.Float(
         string="Monthly Lateness / Undertime",
         compute="_compute_attendance_reconciliation_fields",
@@ -94,6 +102,7 @@ class HrPayslip(models.Model):
     def _compute_attendance_reconciliation_fields(self):
         if not getattr(self.env.registry, 'ready', True) or self.env.context.get('install_mode') or self.env.context.get('module_installation') or self.env.context.get('tracking_disable'):
             self.attendance_gross_overtime = 0.0
+            self.rest_days_taken = 0.0
             self.attendance_gross_undertime = 0.0
             self.attendance_net_reconciled = 0.0
             self.total_extra_hours_available = 0.0
@@ -110,6 +119,7 @@ class HrPayslip(models.Model):
             empty_slips = other_slips.filtered(lambda s: not s.attendance_gross_overtime and not s.attendance_gross_undertime)
             if empty_slips:
                 empty_slips.attendance_gross_overtime = 0.0
+                empty_slips.rest_days_taken = 0.0
                 empty_slips.attendance_gross_undertime = 0.0
                 empty_slips.attendance_net_reconciled = 0.0
                 empty_slips.total_extra_hours_available = 0.0
@@ -163,6 +173,7 @@ class HrPayslip(models.Model):
         target_type_ids = list(extra_type_ids | annual_type_ids | pto_type_ids)
 
         alloc_hours_by_emp_type = defaultdict(float)
+        recon_alloc_hours_by_emp_name = {}
         if target_type_ids:
             allocations = self.env['hr.leave.allocation'].sudo().search([
                 ('employee_id', 'in', emp_ids),
@@ -170,8 +181,6 @@ class HrPayslip(models.Model):
                 ('holiday_status_id', 'in', target_type_ids)
             ])
             for alloc in allocations:
-                if 'Extra Hours Reconciliation' in (alloc.name or '') or 'Monthly Overtime Earned' in (alloc.name or ''):
-                    continue
                 hrs = 0.0
                 if hasattr(alloc, 'number_of_days') and alloc.number_of_days:
                     hrs = alloc.number_of_days * 8.0
@@ -182,12 +191,13 @@ class HrPayslip(models.Model):
                 elif hasattr(alloc, 'number_of_hours') and alloc.number_of_hours:
                     hrs = alloc.number_of_hours
                 alloc_hours_by_emp_type[(alloc.employee_id.id, alloc.holiday_status_id.id)] += hrs
+                if 'Extra Hours Reconciliation' in (alloc.name or '') or 'Monthly Overtime Earned' in (alloc.name or ''):
+                    recon_alloc_hours_by_emp_name[(alloc.employee_id.id, alloc.name or '')] = hrs
 
             taken_leaves = self.env['hr.leave'].sudo().search([
                 ('employee_id', 'in', emp_ids),
                 ('state', '=', 'validate'),
                 ('holiday_status_id', 'in', target_type_ids),
-                '!', ('name', 'ilike', 'Lateness Settlement')
             ])
             for lve in taken_leaves:
                 hrs = 0.0
@@ -218,9 +228,12 @@ class HrPayslip(models.Model):
                         leave_dates_by_emp[lve.employee_id.id].add(d_curr)
                     d_curr += datetime.timedelta(days=1)
 
+        monthly_rest_allowance = 4
+
         for payslip in valid_slips:
             if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
                 payslip.attendance_gross_overtime = 0.0
+                payslip.rest_days_taken = 0.0
                 payslip.attendance_gross_undertime = 0.0
                 payslip.attendance_net_reconciled = 0.0
                 payslip.total_extra_hours_available = 0.0
@@ -232,6 +245,7 @@ class HrPayslip(models.Model):
 
             if payslip.employee_id.is_manager_exempt():
                 payslip.attendance_gross_overtime = 0.0
+                payslip.rest_days_taken = 0.0
                 payslip.attendance_gross_undertime = 0.0
                 payslip.attendance_net_reconciled = 0.0
                 payslip.total_extra_hours_available = 0.0
@@ -340,15 +354,34 @@ class HrPayslip(models.Model):
                     dur = getattr(we, 'duration', 8.0) or 8.0
                     total_undertime += dur
 
+            # Weekly rest/off days: monthly allowance 4; unused × 8 × 1.5 → Monthly OT
+            worked_days_count = len(daily_hours)
+            emp_leave_dates = leave_dates_by_emp.get(emp_id, set())
+            approved_leave_days_count = sum(
+                1 for d in range(total_days_in_month)
+                if (payslip.date_from + datetime.timedelta(days=d)) not in daily_hours
+                and ((payslip.date_from + datetime.timedelta(days=d)) in emp_leave_dates or
+                     (payslip.date_from + datetime.timedelta(days=d)) in public_holiday_dates)
+            )
+            rest_days_taken = max(0, total_days_in_month - worked_days_count - approved_leave_days_count)
+            unused_rest_days = max(0, monthly_rest_allowance - rest_days_taken)
+            if allow_ot and unused_rest_days > 0:
+                total_ot += (unused_rest_days * 8.0 * 1.5)
+
             gross_ot = round(total_ot, 2)
             gross_ut = round(total_undertime, 2)
 
             payslip.attendance_gross_overtime = gross_ot
+            payslip.rest_days_taken = float(rest_days_taken)
             payslip.attendance_gross_undertime = gross_ut
             payslip.attendance_net_reconciled = round(gross_ot - gross_ut, 2)
 
             current_slip_allocated_hours = (payslip.extra_hours_allocated_days or 0.0) * 8.0
-            prior_alloc_extra = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in extra_type_ids) - current_slip_allocated_hours)
+            month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
+            current_recon_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
+            current_recon_hours = recon_alloc_hours_by_emp_name.get((emp_id, current_recon_name), 0.0)
+            exclude_current_hrs = max(current_slip_allocated_hours, current_recon_hours)
+            prior_alloc_extra = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in extra_type_ids) - exclude_current_hrs)
             prior_ot_line_extra = round(banked_extra_by_emp.get(emp_id, 0.0), 2)
             prev_extra_hours = max(prior_alloc_extra, prior_ot_line_extra)
 
@@ -597,30 +630,62 @@ class HrPayslip(models.Model):
         self._apply_termination_clearance_inputs()
 
     def action_payslip_done(self):
+        _logger.info(
+            "[FAP-RECON] action_payslip_done START slips=%s states=%s",
+            self.ids,
+            {s.id: s.state for s in self},
+        )
         res = super().action_payslip_done()
-        self._sync_reconciliation_settlements()
+        _logger.info(
+            "[FAP-RECON] action_payslip_done AFTER super slips=%s states=%s → sync",
+            self.ids,
+            {s.id: s.state for s in self},
+        )
+        try:
+            self.with_context(recon_synced_via_action=True)._sync_reconciliation_settlements()
+        except Exception:
+            _logger.exception("[FAP-RECON] action_payslip_done FAILED sync slips=%s", self.ids)
+            raise
+        _logger.info("[FAP-RECON] action_payslip_done DONE slips=%s", self.ids)
         return res
 
     def action_payslip_draft(self):
+        _logger.info("[FAP-RECON] action_payslip_draft → revert slips=%s", self.ids)
         self._revert_reconciliation_settlements()
         return super().action_payslip_draft()
 
     def action_payslip_cancel(self):
+        _logger.info("[FAP-RECON] action_payslip_cancel → revert slips=%s", self.ids)
         self._revert_reconciliation_settlements()
         return super().action_payslip_cancel()
 
     def action_cancel(self):
+        _logger.info("[FAP-RECON] action_cancel → revert slips=%s", self.ids)
         self._revert_reconciliation_settlements()
         return super().action_cancel() if hasattr(super(), 'action_cancel') else True
 
     def unlink(self):
+        _logger.info("[FAP-RECON] unlink → revert slips=%s", self.ids)
         self._revert_reconciliation_settlements()
         return super().unlink()
 
     def write(self, vals):
         if vals.get('state') == 'cancel' and not self._context.get('skip_reconcile_revert'):
+            _logger.info("[FAP-RECON] write(state=cancel) → revert slips=%s", self.ids)
             self.with_context(skip_reconcile_revert=True)._revert_reconciliation_settlements()
-        return super().write(vals)
+        going_done = vals.get('state') == 'done' and not self._context.get('skip_recon_sync')
+        already_done_ids = set(self.filtered(lambda s: s.state == 'done').ids) if going_done else set()
+        res = super().write(vals)
+        if going_done:
+            to_sync = self.filtered(lambda s: s.state == 'done' and s.id not in already_done_ids)
+            if to_sync and not self.env.context.get('recon_synced_via_action'):
+                _logger.info("[FAP-RECON] write(state=done) backup sync slips=%s", to_sync.ids)
+                try:
+                    to_sync.with_context(recon_synced_via_action=True)._sync_reconciliation_settlements()
+                except Exception:
+                    _logger.exception("[FAP-RECON] write(state=done) backup sync FAILED slips=%s", to_sync.ids)
+                    raise
+        return res
 
     def _round_days(self, work_entry_type, days):
         round_days = work_entry_type.round_days or 'NO'
@@ -973,65 +1038,236 @@ class HrPayslip(models.Model):
                 pass
 
     def _sync_reconciliation_settlements(self):
-        LeaveType = self.env['hr.leave.type'].sudo() if 'hr.leave.type' in self.env else None
-        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
+        _logger.info(
+            "[FAP-RECON] _sync_reconciliation_settlements START slips=%s",
+            self.ids,
+        )
+        has_leave_type = 'hr.leave.type' in self.env
+        has_allocation = 'hr.leave.allocation' in self.env
+        LeaveType = self.env['hr.leave.type'].sudo() if has_leave_type else None
+        Allocation = self.env['hr.leave.allocation'].sudo() if has_allocation else None
+        _logger.info(
+            "[FAP-RECON] has_leave_type=%s has_allocation=%s",
+            has_leave_type,
+            has_allocation,
+        )
 
         for payslip in self:
-            if not payslip.employee_id or not payslip.date_to:
-                continue
+            try:
+                _logger.info(
+                    "[FAP-RECON] slip=%s emp=%s(%s) period=%s→%s state=%s "
+                    "gross_ot=%s rest_days_taken=%s lateness=%s covered_extra=%s "
+                    "total_extra_avail=%s remaining_extra=%s allocated_days=%s",
+                    payslip.id,
+                    payslip.employee_id.id,
+                    payslip.employee_id.name,
+                    payslip.date_from,
+                    payslip.date_to,
+                    payslip.state,
+                    payslip.attendance_gross_overtime,
+                    getattr(payslip, 'rest_days_taken', None),
+                    payslip.attendance_gross_undertime,
+                    payslip.lateness_covered_by_extra_hours,
+                    payslip.total_extra_hours_available,
+                    payslip.remaining_extra_hours_balance,
+                    payslip.extra_hours_allocated_days,
+                )
+                if not payslip.employee_id or not payslip.date_to:
+                    _logger.warning("[FAP-RECON] slip=%s SKIP: missing employee or date_to", payslip.id)
+                    continue
 
-            month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
+                month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
+                company = payslip.company_id or self.env.company
+                allow_ot = getattr(company, 'enable_overtime_calculation', True)
 
-            if Allocation and LeaveType:
-                extra_types = LeaveType.search(['|', '|', ('name', '=', 'Extra Hours'), ('name', 'ilike', 'Extra Hours'), ('name', 'ilike', 'إضافي')])
-                extra_type = extra_types[0] if extra_types else None
-                if extra_type:
-                    alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
-                    existing_alloc = Allocation.search([
-                        ('employee_id', '=', payslip.employee_id.id),
-                        ('holiday_status_id', '=', extra_type.id),
-                        ('name', '=', alloc_name),
-                    ], limit=1)
+                if has_allocation and has_leave_type and Allocation is not None and LeaveType is not None:
+                    extra_types = LeaveType.search([
+                        '|', '|',
+                        ('name', '=', 'Extra Hours'),
+                        ('name', 'ilike', 'Extra Hours'),
+                        ('name', 'ilike', 'إضافي'),
+                    ])
+                    _logger.info(
+                        "[FAP-RECON] slip=%s Extra Hours types=%s names=%s",
+                        payslip.id,
+                        extra_types.ids,
+                        extra_types.mapped('name'),
+                    )
+                    extra_type = extra_types[0] if extra_types else None
+                    if not extra_type:
+                        _logger.error("[FAP-RECON] slip=%s NO Extra Hours leave type", payslip.id)
+                    else:
+                        alloc_name = f"Extra Hours Reconciliation: {month_str} - {payslip.employee_id.name}"
+                        existing_alloc = Allocation.search([
+                            ('employee_id', '=', payslip.employee_id.id),
+                            ('holiday_status_id', '=', extra_type.id),
+                            ('name', '=', alloc_name),
+                        ], limit=1)
 
-                    prev_bal = payslip._get_previous_extra_hours_balance()
-                    net_ot_hours = round(max(0.0, payslip.remaining_extra_hours_balance - prev_bal), 4) if payslip.remaining_extra_hours_balance > prev_bal else 0.0
+                        # Bank this month's Monthly Overtime Earned (includes unused rest-day bonus).
+                        ot_hours = round(payslip.attendance_gross_overtime or 0.0, 2) if allow_ot else 0.0
+                        _logger.info(
+                            "[FAP-RECON] slip=%s alloc_name=%r existing=%s ot_hours=%s",
+                            payslip.id,
+                            alloc_name,
+                            existing_alloc.ids,
+                            ot_hours,
+                        )
 
-                    if net_ot_hours > 0.01:
-                        ot_days = round(net_ot_hours / 8.0, 4)
-                        alloc_vals = {
-                            'name': alloc_name,
-                            'holiday_type': 'employee',
-                            'employee_id': payslip.employee_id.id,
-                            'holiday_status_id': extra_type.id,
-                            'number_of_days': ot_days,
-                            'state': 'validate',
-                        }
-                        if existing_alloc:
-                            existing_alloc.write(alloc_vals)
+                        if ot_hours > 0.01:
+                            ot_days = round(ot_hours / 8.0, 4)
+                            # Odoo 19 forbids create() with state != 'confirm'
+                            alloc_vals = {
+                                'name': alloc_name,
+                                'employee_id': payslip.employee_id.id,
+                                'holiday_status_id': extra_type.id,
+                                'number_of_days': ot_days,
+                                'date_from': payslip.date_from,
+                            }
+                            if 'holiday_type' in Allocation._fields:
+                                alloc_vals['holiday_type'] = 'employee'
+                            if 'allocation_type' in Allocation._fields:
+                                alloc_vals['allocation_type'] = 'regular'
+                            try:
+                                if existing_alloc:
+                                    existing_alloc.write({
+                                        'number_of_days': ot_days,
+                                        'date_from': payslip.date_from,
+                                        'name': alloc_name,
+                                    })
+                                    _logger.info(
+                                        "[FAP-RECON] slip=%s UPDATED alloc=%s days=%s",
+                                        payslip.id,
+                                        existing_alloc.id,
+                                        ot_days,
+                                    )
+                                    if existing_alloc.state != 'validate':
+                                        self._fap_validate_allocation(existing_alloc)
+                                else:
+                                    new_alloc = Allocation.with_context(
+                                        employee_id=payslip.employee_id.id,
+                                        mail_create_nolog=True,
+                                        mail_notrack=True,
+                                        tracking_disable=True,
+                                        leave_fast_create=True,
+                                        mail_activity_automation_skip=True,
+                                    ).create(alloc_vals)
+                                    _logger.info(
+                                        "[FAP-RECON] slip=%s CREATED alloc=%s state=%s days=%s date_from=%s",
+                                        payslip.id,
+                                        new_alloc.id,
+                                        new_alloc.state,
+                                        new_alloc.number_of_days,
+                                        new_alloc.date_from,
+                                    )
+                                    self._fap_validate_allocation(new_alloc)
+                                    _logger.info(
+                                        "[FAP-RECON] slip=%s AFTER validate alloc=%s state=%s",
+                                        payslip.id,
+                                        new_alloc.id,
+                                        new_alloc.state,
+                                    )
+                                payslip.with_context(skip_reconcile_revert=True).sudo().write({
+                                    'extra_hours_allocated_days': ot_days,
+                                })
+                            except Exception:
+                                _logger.exception(
+                                    "[FAP-RECON] slip=%s ALLOCATION FAILED ot_days=%s vals=%s",
+                                    payslip.id,
+                                    ot_days,
+                                    alloc_vals,
+                                )
+                                raise
+                        elif existing_alloc:
+                            _logger.info(
+                                "[FAP-RECON] slip=%s ot_hours=0 → unlink alloc=%s",
+                                payslip.id,
+                                existing_alloc.ids,
+                            )
+                            existing_alloc.write({'state': 'confirm'})
+                            existing_alloc.unlink()
+                            payslip.with_context(skip_reconcile_revert=True).sudo().write({
+                                'extra_hours_allocated_days': 0.0,
+                            })
                         else:
-                            Allocation.with_context(
-                                employee_id=payslip.employee_id.id,
-                                mail_create_nolog=True,
-                                mail_notrack=True,
-                                tracking_disable=True,
-                            ).create(alloc_vals)
-                    elif existing_alloc:
-                        existing_alloc.unlink()
+                            _logger.info("[FAP-RECON] slip=%s ot_hours=0 — nothing to bank", payslip.id)
+                else:
+                    _logger.error(
+                        "[FAP-RECON] slip=%s Allocation/LeaveType model missing — skip banking",
+                        payslip.id,
+                    )
 
-            payslip._create_or_update_settlement_leave('Extra Hours', payslip.lateness_covered_by_extra_hours, 'Extra Hours Settlement')
-            payslip._create_or_update_settlement_leave('Annual Leave', payslip.lateness_covered_by_annual_leave, 'Annual Leave Settlement')
+                _logger.info(
+                    "[FAP-RECON] slip=%s settlements extra=%s annual=%s",
+                    payslip.id,
+                    payslip.lateness_covered_by_extra_hours,
+                    payslip.lateness_covered_by_annual_leave,
+                )
+                payslip._create_or_update_settlement_leave(
+                    'Extra Hours', payslip.lateness_covered_by_extra_hours, 'Extra Hours Settlement'
+                )
+                payslip._create_or_update_settlement_leave(
+                    'Annual Leave', payslip.lateness_covered_by_annual_leave, 'Annual Leave Settlement'
+                )
 
-            # Overtime Balance Syncing: update employee profile directly post-reconciliation
-            emp = payslip.employee_id
-            updated_ot_balance = round(payslip.remaining_extra_hours_balance, 2)
-            for field_name in ['total_overtime', 'total_extra_hours', 'extra_hours_balance', 'overtime_balance']:
-                if field_name in emp._fields:
-                    try:
-                        emp.sudo().write({field_name: updated_ot_balance})
-                    except Exception as e:
-                        _logger.warning("Could not sync %s to employee %s: %s", field_name, emp.id, e)
+                # Optional: sync remaining hours onto employee profile fields if present
+                emp = payslip.employee_id
+                updated_ot_balance = round(payslip.remaining_extra_hours_balance, 2)
+                for field_name in ['total_overtime', 'total_extra_hours', 'extra_hours_balance', 'overtime_balance']:
+                    if field_name in emp._fields:
+                        try:
+                            emp.sudo().write({field_name: updated_ot_balance})
+                        except Exception as e:
+                            _logger.warning(
+                                "[FAP-RECON] Could not sync %s to employee %s: %s",
+                                field_name, emp.id, e,
+                            )
+                _logger.info("[FAP-RECON] slip=%s settlements done", payslip.id)
+            except Exception:
+                _logger.exception("[FAP-RECON] slip=%s FAILED in sync loop", payslip.id)
+                raise
+
+        _logger.info("[FAP-RECON] _sync_reconciliation_settlements END slips=%s", self.ids)
+
+    def _fap_validate_allocation(self, allocation):
+        """Approve allocation to validated state (Odoo 19-safe)."""
+        if not allocation:
+            return allocation
+        allocation = allocation.sudo()
+        _logger.info(
+            "[FAP-RECON] _fap_validate_allocation alloc=%s state=%s validation_type=%s",
+            allocation.id,
+            allocation.state,
+            getattr(allocation, 'validation_type', None),
+        )
+        try:
+            if allocation.state == 'validate':
+                return allocation
+            if hasattr(allocation, 'action_approve'):
+                try:
+                    allocation.action_approve()
+                    allocation.invalidate_recordset()
+                    if allocation.state == 'validate':
+                        _logger.info("[FAP-RECON] alloc=%s approved via action_approve", allocation.id)
+                        return allocation
+                    if allocation.state == 'validate1' and hasattr(allocation, '_action_validate'):
+                        allocation._action_validate()
+                        _logger.info("[FAP-RECON] alloc=%s validated via _action_validate", allocation.id)
+                        return allocation
+                except Exception:
+                    _logger.exception(
+                        "[FAP-RECON] alloc=%s action_approve failed — trying direct state write",
+                        allocation.id,
+                    )
+            allocation.with_context(tracking_disable=True, mail_notrack=True).write({'state': 'validate'})
+            _logger.info("[FAP-RECON] alloc=%s forced state=validate", allocation.id)
+        except Exception:
+            _logger.exception("[FAP-RECON] _fap_validate_allocation FAILED alloc=%s", allocation.id)
+            raise
+        return allocation
 
     def _revert_reconciliation_settlements(self):
+        _logger.info("[FAP-RECON] _revert_reconciliation_settlements START slips=%s", self.ids)
         Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
         Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
 
@@ -1040,13 +1276,19 @@ class HrPayslip(models.Model):
                 continue
 
             was_reconciled = getattr(payslip, 'is_reconciled', False)
+            _logger.info(
+                "[FAP-RECON] revert slip=%s state=%s is_reconciled=%s",
+                payslip.id,
+                payslip.state,
+                was_reconciled,
+            )
             if not was_reconciled and payslip.state in ['draft', 'verify']:
+                _logger.info("[FAP-RECON] revert slip=%s SKIP (not reconciled)", payslip.id)
                 continue
 
             if 'is_reconciled' in payslip._fields and payslip.is_reconciled:
                 payslip.with_context(skip_reconcile_revert=True).sudo().write({'is_reconciled': False})
 
-            # Overtime Balance Syncing: revert employee profile overtime balance when payslip is reset/cancelled
             emp = payslip.employee_id
             if emp:
                 pre_recon_ot = round(payslip.total_extra_hours_available, 2)
@@ -1055,7 +1297,10 @@ class HrPayslip(models.Model):
                         try:
                             emp.sudo().write({field_name: pre_recon_ot})
                         except Exception as e:
-                            _logger.warning("Could not revert %s on employee %s: %s", field_name, emp.id, e)
+                            _logger.warning(
+                                "[FAP-RECON] Could not revert %s on employee %s: %s",
+                                field_name, emp.id, e,
+                            )
 
             if Leave:
                 try:
@@ -1065,11 +1310,16 @@ class HrPayslip(models.Model):
                         ('date_from', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
                         ('date_to', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
                     ])
+                    _logger.info(
+                        "[FAP-RECON] revert slip=%s lateness leaves=%s",
+                        payslip.id,
+                        month_leaves.ids,
+                    )
                     if month_leaves:
                         month_leaves.write({'state': 'draft'})
                         month_leaves.unlink()
                 except Exception:
-                    pass
+                    _logger.exception("[FAP-RECON] revert slip=%s leave unlink failed", payslip.id)
 
             if Allocation:
                 try:
@@ -1079,15 +1329,77 @@ class HrPayslip(models.Model):
                         ('employee_id', '=', payslip.employee_id.id),
                         ('name', '=', alloc_name),
                     ])
+                    _logger.info(
+                        "[FAP-RECON] revert slip=%s recon allocs=%s name=%r",
+                        payslip.id,
+                        month_allocs.ids,
+                        alloc_name,
+                    )
                     if month_allocs:
-                        month_allocs.write({'state': 'draft'})
+                        month_allocs.write({'state': 'confirm'})
                         month_allocs.unlink()
                 except Exception:
-                    pass
+                    _logger.exception("[FAP-RECON] revert slip=%s alloc unlink failed", payslip.id)
+
+            if 'extra_hours_allocated_days' in payslip._fields:
+                payslip.with_context(skip_reconcile_revert=True).sudo().write({
+                    'extra_hours_allocated_days': 0.0,
+                })
+
+        _logger.info("[FAP-RECON] _revert_reconciliation_settlements END slips=%s", self.ids)
 
     def _get_previous_extra_hours_balance(self):
+        """Return Extra Hours available before this payslip (hours), from leave allocations."""
         self.ensure_one()
-        if not self.employee_id or 'hr.attendance.overtime.line' not in self.env:
+        if not self.employee_id:
+            return 0.0
+
+        LeaveType = self.env['hr.leave.type'].sudo() if 'hr.leave.type' in self.env else None
+        Allocation = self.env['hr.leave.allocation'].sudo() if 'hr.leave.allocation' in self.env else None
+        Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
+
+        if LeaveType is not None and Allocation is not None:
+            extra_types = LeaveType.search([
+                '|', '|',
+                ('name', '=', 'Extra Hours'),
+                ('name', 'ilike', 'Extra Hours'),
+                ('name', 'ilike', 'إضافي'),
+            ])
+            if extra_types:
+                month_str = self.date_to.strftime('%B %Y') if self.date_to else ''
+                current_alloc_name = f"Extra Hours Reconciliation: {month_str} - {self.employee_id.name}"
+
+                allocations = Allocation.search([
+                    ('employee_id', '=', self.employee_id.id),
+                    ('holiday_status_id', 'in', extra_types.ids),
+                    ('state', '=', 'validate'),
+                ])
+                hours = 0.0
+                for alloc in allocations:
+                    if (alloc.name or '') == current_alloc_name:
+                        continue
+                    if alloc.number_of_days:
+                        hours += alloc.number_of_days * 8.0
+                    elif getattr(alloc, 'number_of_hours_display', None):
+                        hours += alloc.number_of_hours_display
+
+                if Leave:
+                    leaves = Leave.search([
+                        ('employee_id', '=', self.employee_id.id),
+                        ('holiday_status_id', 'in', extra_types.ids),
+                        ('state', '=', 'validate'),
+                    ])
+                    for lve in leaves:
+                        if lve.number_of_days:
+                            hours -= lve.number_of_days * 8.0
+                        elif getattr(lve, 'number_of_hours', None):
+                            hours -= lve.number_of_hours
+                        elif getattr(lve, 'number_of_hours_display', None):
+                            hours -= lve.number_of_hours_display
+
+                return max(0.0, round(hours, 2))
+
+        if 'hr.attendance.overtime.line' not in self.env:
             return 0.0
         lines = self.env['hr.attendance.overtime.line'].sudo().search([
             ('employee_id', '=', self.employee_id.id),
