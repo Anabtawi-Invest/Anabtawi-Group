@@ -711,14 +711,20 @@ class HrPayslip(models.Model):
                 if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
-                        if attendances:
-                            physical_attendance_days = len(set(att.check_in.date() for att in attendances if att.check_in))
-                        else:
-                            physical_attendance_days = round(total_regular_attendance_hrs / 8.0, 2)
                         
+                        if regular_attendances:
+                            regular_physical_days = len(set(att.check_in.date() for att in regular_attendances if att.check_in))
+                        else:
+                            regular_physical_days = round(total_regular_attendance_hrs / 8.0, 2)
+
+                        if attendances:
+                            total_physical_days = len(set(att.check_in.date() for att in attendances if att.check_in))
+                        else:
+                            total_physical_days = regular_physical_days
+
                         is_flexible = getattr(emp.resource_calendar_id, 'flexible_hours', False) or getattr(emp, 'flexible_hours', False)
                         if is_flexible:
-                            earned_rest_days = int(physical_attendance_days // 6)
+                            earned_rest_days = int(total_physical_days // 6)
                         else:
                             c_start = payslip.date_from
                             c_end = payslip.date_to
@@ -737,7 +743,7 @@ class HrPayslip(models.Model):
 
                             earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
 
-                        line['number_of_days'] = float(physical_attendance_days + earned_rest_days)
+                        line['number_of_days'] = float(regular_physical_days + earned_rest_days)
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
