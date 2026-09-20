@@ -242,9 +242,6 @@ class HrPayslipRun(models.Model):
             and not (l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in (l.name or ""))
             and not (l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in (l.name or "") and "موظف" in (l.name or "")))
             and not (l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in (l.name or "") and "شركة" in (l.name or "")))
-            and not any(x in (l.name or "").lower() for x in ("salary advance 2", "salary advances 2", "salary advance two", "salary advances two"))
-            and not ((l.code or "").lower() in ("sala2",))
-            and not (l.salary_rule_id and any(x in (l.salary_rule_id.name or "").lower() for x in ("salary advance 2", "salary advances 2", "salary advance two", "salary advances two")))
         )
 
         ded_map = {}
@@ -257,6 +254,12 @@ class HrPayslipRun(models.Model):
                 ded_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
             ded_map[norm_key]["rule_keys"].add(rule_key)
 
+        # Helper to check if a name or code represents Advance #2
+        def _is_adv_2(text_name, code_str):
+            t = (text_name or "").lower()
+            c = (code_str or "").lower()
+            return c in ("sala2", "saladv2") or any(x in t for x in ("advance 2", "advances 2", "advance two", "advances two"))
+
         # --- 3. Process Salary Inputs (Classify & Deduplicate into Allowance vs Deduction) ---
         input_types = payslips.mapped("input_line_ids.input_type_id").sorted(key=lambda t: t.name or "")
         ded_rule_names = set(ded_map.keys())
@@ -266,22 +269,23 @@ class HrPayslipRun(models.Model):
                 t_name = (itype.name or _("Salary Input")).strip()
                 t_norm = t_name.lower().strip()
                 t_code = (getattr(itype, "code", "") or "").lower()
-
-                # Completely ignore 'Salary Advance 2' / 'Salary Advances Two' inputs
-                if any(x in t_norm for x in ("salary advance 2", "salary advances 2", "salary advance two", "salary advances two")) or t_code == "sala2":
-                    continue
+                itype_is_adv2 = _is_adv_2(t_norm, t_code)
 
                 is_deduction_input = (
                     "deduction" in t_norm
                     or "ded" in t_code
                     or "adv" in t_code
+                    or "advance" in t_norm
+                    or "advances" in t_norm
                     or "saladv" in t_code
+                    or "sala2" in t_code
+                    or itype_is_adv2
                     or any(
                         t_norm == d_name
                         or d_name == t_norm
                         or (
                             (t_norm in d_name or d_name in t_norm)
-                            and not (("2" in d_name or "two" in d_name) != ("2" in t_norm or "two" in t_norm))
+                            and (_is_adv_2(d_name, d_name) == itype_is_adv2)
                         )
                         for d_name in ded_rule_names
                     )
@@ -290,12 +294,15 @@ class HrPayslipRun(models.Model):
                 if is_deduction_input:
                     matched_key = None
                     for k in ded_map:
-                        if k == t_norm or (t_code and t_code == k):
-                            matched_key = k
-                            break
+                        k_is_adv2 = _is_adv_2(k, k)
+                        if k_is_adv2 == itype_is_adv2:
+                            if k == t_norm or (t_code and t_code == k):
+                                matched_key = k
+                                break
                     if not matched_key:
                         for k in ded_map:
-                            if (k in t_norm or t_norm in k) and not (("2" in k or "two" in k) != ("2" in t_norm or "two" in t_norm)):
+                            k_is_adv2 = _is_adv_2(k, k)
+                            if k_is_adv2 == itype_is_adv2 and (k in t_norm or t_norm in k):
                                 matched_key = k
                                 break
                     if matched_key:
@@ -306,12 +313,15 @@ class HrPayslipRun(models.Model):
                     matched_key = None
                     clean_input_norm = t_norm.replace("input:", "").strip()
                     for k in alw_map:
-                        if k == clean_input_norm or (t_code and t_code == k):
-                            matched_key = k
-                            break
+                        k_is_adv2 = _is_adv_2(k, k)
+                        if k_is_adv2 == itype_is_adv2:
+                            if k == clean_input_norm or (t_code and t_code == k):
+                                matched_key = k
+                                break
                     if not matched_key:
                         for k in alw_map:
-                            if (k in clean_input_norm or clean_input_norm in k) and not (("2" in k or "two" in k) != ("2" in clean_input_norm or "two" in clean_input_norm)):
+                            k_is_adv2 = _is_adv_2(k, k)
+                            if k_is_adv2 == itype_is_adv2 and (k in clean_input_norm or clean_input_norm in k):
                                 matched_key = k
                                 break
                     if matched_key:
@@ -333,12 +343,16 @@ class HrPayslipRun(models.Model):
             for payslip in payslips:
                 lines = payslip.line_ids
                 val = 0.0
-                r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
-                if r_lines:
-                    val = sum(r_lines.mapped("total"))
-                elif input_type_ids:
+                if rule_keys:
+                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
+                    if r_lines:
+                        val = sum(r_lines.mapped("total"))
+                if abs(val) < 0.0001 and input_type_ids:
                     in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                    val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                    if in_lines:
+                        in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        if abs(in_val) > 0.0001:
+                            val = in_val
                 col_total += val
 
             if abs(col_total) > 0.0001:
@@ -346,8 +360,6 @@ class HrPayslipRun(models.Model):
 
         dynamic_ded_cols = []
         for norm_k in sorted(ded_map.keys(), key=lambda k: ded_map[k]["name"]):
-            if any(x in norm_k for x in ("salary advance 2", "salary advances 2", "salary advance two", "salary advances two")):
-                continue
             col_info = ded_map[norm_k]
             c_name = col_info["name"]
             rule_keys = col_info["rule_keys"]
@@ -358,12 +370,16 @@ class HrPayslipRun(models.Model):
             for payslip in payslips:
                 lines = payslip.line_ids
                 val = 0.0
-                r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
-                if r_lines:
-                    val = sum(r_lines.mapped("total"))
-                elif input_type_ids:
+                if rule_keys:
+                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
+                    if r_lines:
+                        val = sum(r_lines.mapped("total"))
+                if abs(val) < 0.0001 and input_type_ids:
                     in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                    val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                    if in_lines:
+                        in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        if abs(in_val) > 0.0001:
+                            val = in_val
                 col_total += val
 
             if abs(col_total) > 0.0001:
@@ -490,12 +506,16 @@ class HrPayslipRun(models.Model):
                 dyn_alw_vals = []
                 for _c_name, _w, rule_keys, input_type_ids in dynamic_alw_cols:
                     val = 0.0
-                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
-                    if r_lines:
-                        val = sum(r_lines.mapped("total"))
-                    elif input_type_ids:
+                    if rule_keys:
+                        r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
+                        if r_lines:
+                            val = sum(r_lines.mapped("total"))
+                    if abs(val) < 0.0001 and input_type_ids:
                         in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                        val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        if in_lines:
+                            in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                            if abs(in_val) > 0.0001:
+                                val = in_val
                     dyn_alw_vals.append(val)
 
                 # Gross Salary
@@ -511,12 +531,16 @@ class HrPayslipRun(models.Model):
                 dyn_ded_vals = []
                 for _c_name, _w, rule_keys, input_type_ids in dynamic_ded_cols:
                     val = 0.0
-                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
-                    if r_lines:
-                        val = sum(r_lines.mapped("total"))
-                    elif input_type_ids:
+                    if rule_keys:
+                        r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
+                        if r_lines:
+                            val = sum(r_lines.mapped("total"))
+                    if abs(val) < 0.0001 and input_type_ids:
                         in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                        val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        if in_lines:
+                            in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                            if abs(in_val) > 0.0001:
+                                val = in_val
                     dyn_ded_vals.append(val)
 
                 # Net Salary
