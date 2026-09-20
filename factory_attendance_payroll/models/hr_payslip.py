@@ -724,7 +724,16 @@ class HrPayslip(models.Model):
 
                         is_flexible = getattr(emp.resource_calendar_id, 'flexible_hours', False) or getattr(emp, 'flexible_hours', False)
                         if is_flexible:
-                            earned_rest_days = int(total_physical_days // 6)
+                            contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or getattr(emp, 'contract_id', None)
+                            c_start = getattr(contract_obj, 'date_start', None) if contract_obj else None
+                            if c_start and c_start > payslip.date_from:
+                                active_m_from = max(payslip.date_from, c_start)
+                                earned_rest_days = sum(
+                                    1 for d_idx in range((payslip.date_to - active_m_from).days + 1)
+                                    if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == 0
+                                )
+                            else:
+                                earned_rest_days = int(total_physical_days // 6)
                         else:
                             c_start = payslip.date_from
                             c_end = payslip.date_to
@@ -832,7 +841,16 @@ class HrPayslip(models.Model):
                     if payslip.date_from <= d <= payslip.date_to
                 )
                 physical_attendance_days = len(slip_worked_dates)
-                allowed_rest_days = physical_attendance_days // 6
+                contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or getattr(emp, 'contract_id', None)
+                c_start = getattr(contract_obj, 'date_start', None) if contract_obj else None
+                if c_start and c_start > payslip.date_from:
+                    active_m_from = max(payslip.date_from, c_start)
+                    allowed_rest_days = sum(
+                        1 for d_idx in range((payslip.date_to - active_m_from).days + 1)
+                        if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == 0
+                    )
+                else:
+                    allowed_rest_days = physical_attendance_days // 6
                 converted_count = 0
                 for we in emp_work_entries:
                     code = (we.work_entry_type_id.code or '').strip().upper()

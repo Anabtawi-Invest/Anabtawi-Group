@@ -286,14 +286,25 @@ class HrEmployee(models.Model):
                     current += timedelta(days=1)
 
                 # Monthly Grace Threshold Rule:
-                # Every 6 physical attendance days earns 1 rest day (emp_checked_in_count // 6, rounded down).
-                emp_checked_in_count = sum(1 for (e_id, d) in checked_in_keys if e_id == employee.id and m_from <= d <= eval_to)
+                # For employees with Out of Contract days (start date after m_from), grace/rest days equal the count of Mondays on/after start date.
+                emp_contracts = cached_contracts.get(employee.id, [])
+                first_contract = emp_contracts[0] if emp_contracts else False
+                c_start = first_contract.date_start if (first_contract and first_contract.date_start) else m_from
 
-                num_mondays_in_month = sum(
-                    1 for d_idx in range((m_to - m_from).days + 1)
-                    if (m_from + timedelta(days=d_idx)).weekday() == 0
-                )
-                allowed_grace_days = max(num_mondays_in_month, emp_checked_in_count // 6)
+                if c_start > m_from:
+                    active_start = max(m_from, c_start)
+                    num_mondays_active = sum(
+                        1 for d_idx in range((m_to - active_start).days + 1)
+                        if (active_start + timedelta(days=d_idx)).weekday() == 0
+                    )
+                    allowed_grace_days = num_mondays_active
+                else:
+                    emp_checked_in_count = sum(1 for (e_id, d) in checked_in_keys if e_id == employee.id and m_from <= d <= eval_to)
+                    num_mondays_in_month = sum(
+                        1 for d_idx in range((m_to - m_from).days + 1)
+                        if (m_from + timedelta(days=d_idx)).weekday() == 0
+                    )
+                    allowed_grace_days = max(num_mondays_in_month, emp_checked_in_count // 6)
                 forgiven_days = [d[0] for d in candidate_unpunched_days[:allowed_grace_days]]
                 if forgiven_days:
                     WEModel = self.env["hr.work.entry"]
