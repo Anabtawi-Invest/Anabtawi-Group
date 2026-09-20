@@ -1131,6 +1131,148 @@ class HrPayslip(models.Model):
 
         _logger.info("[FAP-RECON] _sync_reconciliation_settlements END slips=%s", self.ids)
 
+    def _fap_log_extra_hours_snapshot(self, extra_type, label='SNAPSHOT'):
+        """Dump Extra Hours allocations + leaves so we can see why UI differs from FORCE calc."""
+        self.ensure_one()
+        emp = self.employee_id
+        if not emp or not extra_type:
+            _logger.info("[FAP-RECON] slip=%s %s skipped (no emp/type)", self.id, label)
+            return 0.0
+
+        Allocation = self.env['hr.leave.allocation'].sudo()
+        Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
+
+        hours_per_day = 8.0
+        try:
+            if hasattr(emp, '_get_hours_per_day'):
+                hours_per_day = emp._get_hours_per_day(self.date_to or fields.Date.context_today(self)) or 8.0
+        except Exception as e:
+            _logger.info("[FAP-RECON] slip=%s %s hours_per_day fallback 8.0 err=%s", self.id, label, e)
+            hours_per_day = 8.0
+
+        leave_type_unit = getattr(extra_type, 'request_unit', None) or 'day'
+        _logger.info(
+            "[FAP-RECON] slip=%s %s emp=%s extra_type=%s(%s) request_unit=%s hours_per_day=%s "
+            "target_remaining=%s payslip_total_avail=%s",
+            self.id,
+            label,
+            emp.id,
+            extra_type.id,
+            extra_type.name,
+            leave_type_unit,
+            hours_per_day,
+            self.remaining_extra_hours_balance,
+            self.total_extra_hours_available,
+        )
+
+        allocations = Allocation.search([
+            ('employee_id', '=', emp.id),
+            ('holiday_status_id', '=', extra_type.id),
+            ('state', '=', 'validate'),
+        ])
+        allocations.invalidate_recordset([
+            'virtual_remaining_leaves', 'leaves_taken', 'max_leaves',
+            'number_of_days', 'number_of_hours_display', 'type_request_unit',
+        ])
+
+        total_hours_via_virtual = 0.0
+        total_alloc_days = 0.0
+        total_virtual_days = 0.0
+        total_taken_days = 0.0
+
+        if not allocations:
+            _logger.info("[FAP-RECON] slip=%s %s NO validated Extra Hours allocations", self.id, label)
+        for alloc in allocations:
+            unit = getattr(alloc, 'type_request_unit', None) or leave_type_unit or 'day'
+            rem = float(getattr(alloc, 'virtual_remaining_leaves', 0.0) or 0.0)
+            taken = float(getattr(alloc, 'leaves_taken', 0.0) or 0.0)
+            max_l = float(getattr(alloc, 'max_leaves', 0.0) or 0.0)
+            nod = float(alloc.number_of_days or 0.0)
+            noh = float(getattr(alloc, 'number_of_hours_display', 0.0) or 0.0)
+            if unit == 'hour':
+                contrib_hours = rem
+                contrib_days = rem / hours_per_day if hours_per_day else 0.0
+            else:
+                contrib_hours = rem * hours_per_day
+                contrib_days = rem
+            total_hours_via_virtual += contrib_hours
+            total_alloc_days += nod
+            total_virtual_days += contrib_days
+            total_taken_days += taken if unit != 'hour' else (taken / hours_per_day if hours_per_day else 0.0)
+            _logger.info(
+                "[FAP-RECON] slip=%s %s ALLOC id=%s name=%r state=%s date_from=%s "
+                "number_of_days=%s number_of_hours_display=%s unit=%s "
+                "max_leaves=%s leaves_taken=%s virtual_remaining=%s "
+                "contrib_hours=%s contrib_days=%s",
+                self.id,
+                label,
+                alloc.id,
+                alloc.name,
+                alloc.state,
+                alloc.date_from,
+                nod,
+                noh,
+                unit,
+                max_l,
+                taken,
+                rem,
+                round(contrib_hours, 4),
+                round(contrib_days, 4),
+            )
+
+        if Leave:
+            leaves = Leave.search([
+                ('employee_id', '=', emp.id),
+                ('holiday_status_id', '=', extra_type.id),
+                ('state', 'in', ['confirm', 'validate', 'validate1']),
+            ], order='date_from desc', limit=30)
+            if not leaves:
+                _logger.info("[FAP-RECON] slip=%s %s NO Extra Hours leaves found", self.id, label)
+            for lve in leaves:
+                _logger.info(
+                    "[FAP-RECON] slip=%s %s LEAVE id=%s name=%r state=%s "
+                    "request=%s→%s number_of_days=%s number_of_hours=%s "
+                    "holiday_allocation_id=%s",
+                    self.id,
+                    label,
+                    lve.id,
+                    lve.name,
+                    lve.state,
+                    lve.request_date_from,
+                    lve.request_date_to,
+                    lve.number_of_days,
+                    getattr(lve, 'number_of_hours', None) or getattr(lve, 'number_of_hours_display', None),
+                    getattr(lve, 'holiday_allocation_id', None).id if getattr(lve, 'holiday_allocation_id', None) else False,
+                )
+            # Focus on settlement / sync leaves in payslip period
+            period_leaves = leaves.filtered(
+                lambda l: l.request_date_from and self.date_from <= l.request_date_from <= self.date_to
+            )
+            _logger.info(
+                "[FAP-RECON] slip=%s %s leaves_in_payslip_period=%s ids=%s",
+                self.id,
+                label,
+                len(period_leaves),
+                period_leaves.ids,
+            )
+
+        total_hours_via_virtual = round(total_hours_via_virtual, 2)
+        _logger.info(
+            "[FAP-RECON] slip=%s %s SUMMARY alloc_count=%s total_alloc_days=%s "
+            "total_virtual_days=%s total_taken_days=%s total_hours_via_virtual=%s "
+            "total_hours_if_alloc_days_x8=%s ui_likely_days=%s",
+            self.id,
+            label,
+            len(allocations),
+            round(total_alloc_days, 4),
+            round(total_virtual_days, 4),
+            round(total_taken_days, 4),
+            total_hours_via_virtual,
+            round(total_alloc_days * hours_per_day, 2),
+            round(total_virtual_days, 4),
+        )
+        return total_hours_via_virtual
+
     def _fap_get_extra_hours_balance_hours(self, extra_type, exclude_alloc_names=None):
         """Return Extra Hours available in hours using the same remaining as Time Off dashboard."""
         self.ensure_one()
@@ -1221,6 +1363,7 @@ class HrPayslip(models.Model):
 
         # Flush so virtual_remaining sees removals
         self.env.flush_all()
+        self._fap_log_extra_hours_snapshot(extra_type, label='BEFORE_FORCE')
         current_hours = self._fap_get_extra_hours_balance_hours(extra_type)
         gap_hours = round(target_hours - current_hours, 2)
         _logger.info(
@@ -1345,12 +1488,19 @@ class HrPayslip(models.Model):
             self.env.flush_all()
             final_hours = self._fap_get_extra_hours_balance_hours(extra_type)
 
+        self.env.flush_all()
+        snapshot_hours = self._fap_log_extra_hours_snapshot(extra_type, label='AFTER_FORCE')
+        final_hours = self._fap_get_extra_hours_balance_hours(extra_type)
         _logger.info(
-            "[FAP-RECON] slip=%s FORCE result Extra Hours hours=%s days=%s (target=%s)",
+            "[FAP-RECON] slip=%s FORCE result Extra Hours hours=%s days=%s (target=%s) "
+            "snapshot_hours=%s delta_vs_target=%s UI_days_if_virtual=%s",
             self.id,
             final_hours,
             round(final_hours / 8.0, 4),
             target_hours,
+            snapshot_hours,
+            round(final_hours - target_hours, 4),
+            round(snapshot_hours / 8.0, 4),
         )
 
     def _fap_create_balance_sync_leave(self, leave_type, hours):
@@ -1383,6 +1533,7 @@ class HrPayslip(models.Model):
 
         remaining_hours = hours
         curr_d = self.date_from
+        created_ids = []
         while curr_d <= self.date_to and remaining_hours >= 7.99:
             dt_start = datetime.datetime.combine(curr_d, datetime.time(8, 0, 0))
             dt_stop = datetime.datetime.combine(curr_d, datetime.time(17, 0, 0))
@@ -1402,8 +1553,19 @@ class HrPayslip(models.Model):
             try:
                 new_lve = ctx_leave.create(vals)
                 new_lve.sudo().write({'state': 'validate'})
+                created_ids.append(new_lve.id)
+                _logger.info(
+                    "[FAP-RECON] slip=%s Balance Sync FULL-DAY leave created id=%s days=1.0 state=%s",
+                    self.id,
+                    new_lve.id,
+                    new_lve.state,
+                )
             except Exception:
-                _logger.exception("[FAP-RECON] slip=%s balance sync full-day leave failed", self.id)
+                _logger.exception(
+                    "[FAP-RECON] slip=%s balance sync full-day leave FAILED vals=%s",
+                    self.id,
+                    vals,
+                )
             remaining_hours -= 8.0
             curr_d += datetime.timedelta(days=1)
 
@@ -1428,8 +1590,38 @@ class HrPayslip(models.Model):
             try:
                 new_lve = ctx_leave.create(vals)
                 new_lve.sudo().write({'state': 'validate'})
+                created_ids.append(new_lve.id)
+                _logger.info(
+                    "[FAP-RECON] slip=%s Balance Sync FRAC leave created id=%s "
+                    "hours=%s days=%s state=%s",
+                    self.id,
+                    new_lve.id,
+                    frac_hours,
+                    frac_days,
+                    new_lve.state,
+                )
             except Exception:
-                _logger.exception("[FAP-RECON] slip=%s balance sync fractional leave failed", self.id)
+                _logger.exception(
+                    "[FAP-RECON] slip=%s balance sync fractional leave FAILED vals=%s",
+                    self.id,
+                    vals,
+                )
+        elif remaining_hours > 0.01 and curr_d > self.date_to:
+            _logger.error(
+                "[FAP-RECON] slip=%s Balance Sync could not place remaining %sh — "
+                "no days left in payslip period %s→%s",
+                self.id,
+                remaining_hours,
+                self.date_from,
+                self.date_to,
+            )
+
+        _logger.info(
+            "[FAP-RECON] slip=%s Balance Sync DONE requested_hours=%s created_leave_ids=%s",
+            self.id,
+            hours,
+            created_ids,
+        )
 
     def _fap_validate_allocation(self, allocation):
         """Approve allocation to validated state (Odoo 19-safe)."""
