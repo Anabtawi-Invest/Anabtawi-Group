@@ -711,7 +711,10 @@ class HrPayslip(models.Model):
                 if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
-                        physical_attendance_days = len(attendances) if attendances else round(total_regular_attendance_hrs / 8.0, 2)
+                        if attendances:
+                            physical_attendance_days = len(set(att.check_in.date() for att in attendances if att.check_in))
+                        else:
+                            physical_attendance_days = round(total_regular_attendance_hrs / 8.0, 2)
                         
                         is_flexible = getattr(emp.resource_calendar_id, 'flexible_hours', False) or getattr(emp, 'flexible_hours', False)
                         if is_flexible:
