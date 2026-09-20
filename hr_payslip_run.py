@@ -1,0 +1,680 @@
+import io
+from datetime import datetime, time
+
+from odoo import _, fields, models, exceptions
+from odoo.tools.misc import format_date
+
+
+class HrPayslipRun(models.Model):
+    _inherit = "hr.payslip.run"
+
+    def action_export_payrun_excel(self):
+        self.ensure_one()
+        url = f"/anabtawi_payroll/payrun/xlsx?payrun_id={self.id}"
+        
+        ctx = self.env.context
+        if ctx.get("active_model") == "hr.payslip" and ctx.get("active_ids"):
+            selected_ids = ",".join(str(i) for i in ctx.get("active_ids"))
+            url += f"&payslip_ids={selected_ids}"
+
+        return {
+            "name": "PayRun Audit",
+            "type": "ir.actions.act_url",
+            "url": url,
+            "target": "self",
+        }
+
+    def _generate_payrun_xlsx(self, quick_audit=False, payslip_ids=None):
+        self.ensure_one()
+        import xlsxwriter  # pylint: disable=import-outside-toplevel
+
+        workbook_buffer = io.BytesIO()
+        workbook = xlsxwriter.Workbook(workbook_buffer, {"in_memory": True})
+
+        # Styling Definitions
+        title_fmt = workbook.add_format(
+            {"bold": True, "font_size": 15, "font_color": "#1F497D"}
+        )
+        meta_label_fmt = workbook.add_format(
+            {"bold": True, "bg_color": "#F2F4F8", "border": 1, "font_size": 10}
+        )
+        meta_val_fmt = workbook.add_format(
+            {"border": 1, "font_size": 10, "align": "left"}
+        )
+        
+        card_header_fmt = workbook.add_format(
+            {"bold": True, "bg_color": "#D9E1F2", "border": 1, "align": "center", "font_size": 10}
+        )
+        card_val_fmt = workbook.add_format(
+            {"bold": True, "border": 1, "align": "center", "font_size": 11, "num_format": "#,##0.00"}
+        )
+
+        header_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "font_color": "#FFFFFF",
+                "bg_color": "#1F497D",
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "text_wrap": True,
+                "font_size": 10,
+            }
+        )
+
+        group_header_alw_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "font_color": "#375623",
+                "bg_color": "#E2EFDA",
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "font_size": 11,
+            }
+        )
+
+        group_header_ded_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "font_color": "#FFFFFF",
+                "bg_color": "#C00000",
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "font_size": 11,
+            }
+        )
+
+        text_left_fmt = workbook.add_format({"border": 1, "align": "left", "font_size": 10})
+        text_center_fmt = workbook.add_format({"border": 1, "align": "center", "font_size": 10})
+        number_fmt = workbook.add_format({"border": 1, "align": "right", "num_format": "#,##0.00", "font_size": 10})
+        int_fmt = workbook.add_format({"border": 1, "align": "right", "num_format": "#,##0", "font_size": 10})
+
+        net_negative_fmt = workbook.add_format(
+            {"border": 1, "align": "right", "num_format": "#,##0.00", "font_size": 10, "bg_color": "#FCE4D6", "font_color": "#C00000", "bold": True}
+        )
+
+        total_label_fmt = workbook.add_format(
+            {"bold": True, "border": 1, "bg_color": "#E9ECEF", "align": "left", "font_size": 10}
+        )
+        total_num_fmt = workbook.add_format(
+            {"bold": True, "border": 1, "bg_color": "#E9ECEF", "align": "right", "num_format": "#,##0.00", "font_size": 10}
+        )
+        total_int_fmt = workbook.add_format(
+            {"bold": True, "border": 1, "bg_color": "#E9ECEF", "align": "right", "num_format": "#,##0", "font_size": 10}
+        )
+
+        audit_ok_fmt = workbook.add_format({"border": 1, "align": "center", "bg_color": "#E2EFDA", "font_color": "#375623", "bold": True})
+        audit_warn_fmt = workbook.add_format({"border": 1, "align": "center", "bg_color": "#FFF2CC", "font_color": "#7F6000", "bold": True})
+        audit_err_fmt = workbook.add_format({"border": 1, "align": "center", "bg_color": "#FCE4D6", "font_color": "#C00000", "bold": True})
+
+        # Filter payslips to only include selected employee payslips if specified
+        if payslip_ids:
+            payslips = self.env["hr.payslip"].browse(payslip_ids)
+        else:
+            payslips = self.slip_ids
+
+        # -------------------------------------------------------------
+        # SHEET 1: PayRun Audit
+        # -------------------------------------------------------------
+        sheet1_name = "PayRun Audit"
+
+        sheet1 = workbook.add_worksheet(sheet1_name)
+        sheet1.set_landscape()
+
+        # Write Metadata (Rows 0-5)
+        sheet1.write(0, 0, f"Odoo Payroll Report - PayRun Audit ({self.name or _('Pay Run')})", title_fmt)
+
+        meta_items = [
+            (_("Pay Run ID / Name"), self.name or "N/A"),
+            (_("Period From"), format_date(self.env, self.date_start) if self.date_start else "N/A"),
+            (_("Period To"), format_date(self.env, self.date_end) if self.date_end else "N/A"),
+            (_("Generated By"), self.env.user.name or "System"),
+            (_("Generated On"), fields.Datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            (_("Source System"), "Odoo 19 Payroll"),
+            (_("Template Version"), "v1.5 (Dynamic Allowances & Group Headers)"),
+        ]
+
+        row = 2
+        for i, (label, val) in enumerate(meta_items):
+            c_idx = (i % 2) * 3
+            r_idx = row + (i // 2)
+            sheet1.write(r_idx, c_idx, label, meta_label_fmt)
+            sheet1.write(r_idx, c_idx + 1, val, meta_val_fmt)
+
+        row = 7
+        # Write KPI / Summary block directly from computed payslip wages
+        total_gross_val = sum(payslips.mapped("gross_wage") if "gross_wage" in payslips._fields else [
+            sum(p.line_ids.filtered(lambda l: l.code == "GROSS" or l.category_id.code in ("GROSS", "Gross")).mapped("total")) for p in payslips
+        ])
+        total_net_val = sum(payslips.mapped("net_wage") if "net_wage" in payslips._fields else [
+            sum(p.line_ids.filtered(lambda l: l.code == "NET" or l.category_id.code in ("NET", "Net")).mapped("total")) for p in payslips
+        ])
+        
+        # Calculate summary metrics directly from exact system rule codes
+        all_lines = payslips.mapped("line_ids")
+        tax_lines = all_lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in l.name)
+        ssc_comp_lines = all_lines.filtered(lambda l: l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in l.name and "شركة" in l.name))
+        ssc_emp_lines = all_lines.filtered(lambda l: l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in l.name and "موظف" in l.name))
+        loan_lines = all_lines.filtered(lambda l: l.code in ("COMPANY", "COMLON", "adv_pay", "adve", "LOAN", "LOANS", "ADVANCE") or "سلفة" in l.name or "سلفيات" in l.name)
+        
+        total_tax = sum(tax_lines.mapped("total"))
+        total_ssc = sum(ssc_comp_lines.mapped("total")) + sum(ssc_emp_lines.mapped("total"))
+        emp_count = len(payslips)
+        avg_net = (total_net_val / emp_count) if emp_count > 0 else 0.0
+
+        sheet1.write(row, 0, _("Total Gross (JOD)"), card_header_fmt)
+        sheet1.write(row, 1, _("Total Tax (JOD)"), card_header_fmt)
+        sheet1.write(row, 2, _("Total SSC (JOD)"), card_header_fmt)
+        sheet1.write(row, 3, _("Total Net (JOD)"), card_header_fmt)
+        sheet1.write(row, 4, _("Avg Net / Emp (JOD)"), card_header_fmt)
+
+        sheet1.write_number(row + 1, 0, total_gross_val, card_val_fmt)
+        sheet1.write_number(row + 1, 1, total_tax, card_val_fmt)
+        sheet1.write_number(row + 1, 2, total_ssc, card_val_fmt)
+        sheet1.write_number(row + 1, 3, total_net_val, card_val_fmt)
+        sheet1.write_number(row + 1, 4, avg_net, card_val_fmt)
+
+        row += 3
+
+        # -------------------------------------------------------------
+        # Dynamic Columns Discovery & Grouping (Allowances & Deductions)
+        # -------------------------------------------------------------
+        info_cols = [
+            (_("Employee ID"), 14),
+            (_("Employee Name"), 28),
+            (_("Department"), 22),
+            (_("Job Title / Position"), 22),
+            (_("Internal Code"), 16),
+            (_("Period From"), 14),
+            (_("Period To"), 14),
+        ]
+
+        fixed_alw_cols = [
+            (_("Basic Salary"), 16),
+            (_("Actual Salary"), 16),
+            (_("Remaining Leaves Comp"), 20),
+            (_("Gross Attendance / OT"), 20),
+        ]
+
+        fixed_ded_cols = [
+            (_("Income Tax"), 16),
+            (_("SSC Employee Contrib"), 20),
+        ]
+
+        summary_cols = [
+            (_("Net Salary"), 18),
+            (_("Attendance Days"), 16),
+            (_("Worked Hours"), 15),
+            (_("Overtime Hours"), 15),
+            (_("Note / Description"), 30),
+        ]
+
+        # --- 1. Discover Dynamic Allowance Rules ---
+        all_alw_lines = payslips.mapped("line_ids").filtered(
+            lambda l: (
+                (l.category_id and l.category_id.code in ("ALW", "Allowance", "ALLOWANCE"))
+                or (l.category_id and "allowance" in (l.category_id.name or "").lower())
+            )
+            and not (l.code in ("BASIC", "SALARY") or (l.category_id and l.category_id.code in ("BASIC", "Basic")))
+            and not (l.code in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in (l.name or "").lower() or "الراتب الفعلي" in (l.name or ""))
+            and not (l.code in ("vacation_leave", "remain_lev", "REM_LEAVE", "LEAVE_COMP", "ANNUAL_LEAVE"))
+            and not (l.code in ("OT_NET", "ETH_NET", "RD-S", "OVERTIME", "GROSS_ATT", "OT_COMP", "EXTRA_HOURS"))
+        )
+
+        alw_map = {}
+        for line in all_alw_lines:
+            rule = line.salary_rule_id
+            rule_key = rule.id if rule else line.code
+            rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Allowance"))).strip()
+            norm_key = (rule.name.lower().strip() if rule and rule.name else (line.code or rule_name).lower().strip())
+            if norm_key not in alw_map:
+                alw_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
+            alw_map[norm_key]["rule_keys"].add(rule_key)
+
+        # --- 2. Discover Dynamic Deduction Rules ---
+        all_ded_lines = payslips.mapped("line_ids").filtered(
+            lambda l: (
+                (l.category_id and l.category_id.code in ("DED", "Deduction", "DEDUCTION", "Social Security Deduction"))
+                or (l.category_id and "deduction" in (l.category_id.name or "").lower())
+            )
+            and not (l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in (l.name or ""))
+            and not (l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in (l.name or "") and "موظف" in (l.name or "")))
+            and not (l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in (l.name or "") and "شركة" in (l.name or "")))
+        )
+
+        ded_map = {}
+        for line in all_ded_lines:
+            rule = line.salary_rule_id
+            rule_key = rule.id if rule else line.code
+            rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Deduction"))).strip()
+            norm_key = (rule.name.lower().strip() if rule and rule.name else (line.code or rule_name).lower().strip())
+            if norm_key not in ded_map:
+                ded_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
+            ded_map[norm_key]["rule_keys"].add(rule_key)
+
+        # Helper to check if a name or code represents Advance #2
+        def _is_adv_2(text_name, code_str):
+            t = (text_name or "").lower()
+            c = (code_str or "").lower()
+            return c in ("sala2", "saladv2") or any(x in t for x in ("advance 2", "advances 2", "advance two", "advances two"))
+
+        # --- 3. Process Salary Inputs (Classify & Deduplicate into Allowance vs Deduction) ---
+        input_types = payslips.mapped("input_line_ids.input_type_id").sorted(key=lambda t: t.name or "")
+        ded_rule_names = set(ded_map.keys())
+
+        if input_types:
+            for itype in input_types:
+                t_name = (itype.name or _("Salary Input")).strip()
+                t_norm = t_name.lower().strip()
+                t_code = (getattr(itype, "code", "") or "").lower()
+                itype_is_adv2 = _is_adv_2(t_norm, t_code)
+
+                is_deduction_input = (
+                    "deduction" in t_norm
+                    or "ded" in t_code
+                    or "adv" in t_code
+                    or "saladv" in t_code
+                    or "sala2" in t_code
+                    or any(
+                        t_norm == d_name
+                        or d_name == t_norm
+                        or (
+                            (t_norm in d_name or d_name in t_norm)
+                            and (_is_adv_2(d_name, d_name) == itype_is_adv2)
+                        )
+                        for d_name in ded_rule_names
+                    )
+                )
+
+                if is_deduction_input:
+                    matched_key = None
+                    for k in ded_map:
+                        k_is_adv2 = _is_adv_2(k, k)
+                        if k_is_adv2 == itype_is_adv2:
+                            if k == t_norm or (t_code and t_code == k):
+                                matched_key = k
+                                break
+                    if not matched_key:
+                        for k in ded_map:
+                            k_is_adv2 = _is_adv_2(k, k)
+                            if k_is_adv2 == itype_is_adv2 and (k in t_norm or t_norm in k):
+                                matched_key = k
+                                break
+                    if matched_key:
+                        ded_map[matched_key]["input_type_ids"].add(itype.id)
+                    else:
+                        ded_map[t_norm] = {"name": t_name, "rule_keys": set(), "input_type_ids": {itype.id}}
+                else:
+                    matched_key = None
+                    clean_input_norm = t_norm.replace("input:", "").strip()
+                    for k in alw_map:
+                        k_is_adv2 = _is_adv_2(k, k)
+                        if k_is_adv2 == itype_is_adv2:
+                            if k == clean_input_norm or (t_code and t_code == k):
+                                matched_key = k
+                                break
+                    if not matched_key:
+                        for k in alw_map:
+                            k_is_adv2 = _is_adv_2(k, k)
+                            if k_is_adv2 == itype_is_adv2 and (k in clean_input_norm or clean_input_norm in k):
+                                matched_key = k
+                                break
+                    if matched_key:
+                        alw_map[matched_key]["input_type_ids"].add(itype.id)
+                    else:
+                        disp_name = f"Input: {t_name}" if not t_name.lower().startswith("input") else t_name
+                        alw_map[clean_input_norm] = {"name": disp_name, "rule_keys": set(), "input_type_ids": {itype.id}}
+
+        # Order dynamic columns deterministically by display name and include ONLY non-zero total columns
+        dynamic_alw_cols = []
+        for norm_k in sorted(alw_map.keys(), key=lambda k: alw_map[k]["name"]):
+            col_info = alw_map[norm_k]
+            c_name = col_info["name"]
+            rule_keys = col_info["rule_keys"]
+            input_type_ids = col_info["input_type_ids"]
+
+            # Calculate total across all selected payslips prioritizing computed rule lines over input lines
+            col_total = 0.0
+            for payslip in payslips:
+                lines = payslip.line_ids
+                val = 0.0
+                r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                if r_lines:
+                    val = sum(r_lines.mapped("total"))
+                elif input_type_ids:
+                    in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
+                    val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                col_total += val
+
+            if abs(col_total) > 0.0001:
+                dynamic_alw_cols.append((c_name, max(18, len(c_name) + 4), rule_keys, input_type_ids))
+
+        dynamic_ded_cols = []
+        for norm_k in sorted(ded_map.keys(), key=lambda k: ded_map[k]["name"]):
+            col_info = ded_map[norm_k]
+            c_name = col_info["name"]
+            rule_keys = col_info["rule_keys"]
+            input_type_ids = col_info["input_type_ids"]
+
+            # Calculate total across all selected payslips prioritizing computed rule lines over input lines
+            col_total = 0.0
+            for payslip in payslips:
+                lines = payslip.line_ids
+                val = 0.0
+                r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                if r_lines:
+                    val = sum(r_lines.mapped("total"))
+                elif input_type_ids:
+                    in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
+                    val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                col_total += val
+
+            if abs(col_total) > 0.0001:
+                dynamic_ded_cols.append((c_name, max(18, len(c_name) + 4), rule_keys, input_type_ids))
+
+        # --- 4. Column Layout Assembly ---
+        gross_col = (_("Gross Salary (before tax)"), 22)
+
+        all_alw_headers = [c[0] for c in fixed_alw_cols] + [c[0] for c in dynamic_alw_cols] + [gross_col[0]]
+        all_alw_widths = [c[1] for c in fixed_alw_cols] + [c[1] for c in dynamic_alw_cols] + [gross_col[1]]
+
+        all_ded_headers = [c[0] for c in fixed_ded_cols] + [c[0] for c in dynamic_ded_cols]
+        all_ded_widths = [c[1] for c in fixed_ded_cols] + [c[1] for c in dynamic_ded_cols]
+
+        info_headers = [c[0] for c in info_cols]
+        summary_headers = [c[0] for c in summary_cols]
+
+        info_count = len(info_cols)
+        alw_count = len(all_alw_headers)
+        ded_count = len(all_ded_headers)
+        sum_count = len(summary_cols)
+
+        alw_start_col = info_count
+        alw_end_col = alw_start_col + alw_count - 1
+
+        ded_start_col = alw_end_col + 1
+        ded_end_col = ded_start_col + ded_count - 1
+
+        sum_start_col = ded_end_col + 1
+        sum_end_col = sum_start_col + sum_count - 1
+
+        total_num_cols = sum_end_col + 1
+
+        # Set Column Widths
+        all_col_widths = (
+            [c[1] for c in info_cols]
+            + all_alw_widths
+            + all_ded_widths
+            + [c[1] for c in summary_cols]
+        )
+        for col_idx, width in enumerate(all_col_widths):
+            sheet1.set_column(col_idx, col_idx, width)
+
+        # --- 5. Render 2-Tier Header Row ---
+        row_super = row
+        row_sub = row + 1
+
+        # Info Columns (Vertically merged across row_super and row_sub)
+        for c_idx, name in enumerate(info_headers):
+            sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, header_fmt)
+
+        # ALLOWANCE Group Super-Header & Sub-Headers
+        if alw_count > 1:
+            sheet1.merge_range(row_super, alw_start_col, row_super, alw_end_col, _("ALLOWANCE"), group_header_alw_fmt)
+        else:
+            sheet1.write(row_super, alw_start_col, _("ALLOWANCE"), group_header_alw_fmt)
+
+        for idx, name in enumerate(all_alw_headers):
+            sheet1.write(row_sub, alw_start_col + idx, name, header_fmt)
+
+        # DEDUCTION Group Super-Header & Sub-Headers
+        if ded_count > 1:
+            sheet1.merge_range(row_super, ded_start_col, row_super, ded_end_col, _("DEDUCTION"), group_header_ded_fmt)
+        else:
+            sheet1.write(row_super, ded_start_col, _("DEDUCTION"), group_header_ded_fmt)
+
+        for idx, name in enumerate(all_ded_headers):
+            sheet1.write(row_sub, ded_start_col + idx, name, header_fmt)
+
+        # Summary / Attendance Columns (Vertically merged across row_super and row_sub)
+        for idx, name in enumerate(summary_headers):
+            c_idx = sum_start_col + idx
+            sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, header_fmt)
+
+        table_start_row = row_sub + 1
+        data_row = table_start_row
+
+        audit_entries = []
+
+        if not payslips:
+            audit_entries.append({
+                "emp_id": "N/A",
+                "emp_name": "N/A",
+                "dept": "N/A",
+                "status": "WARNING",
+                "remarks": _("No employees included in this selection."),
+            })
+        else:
+            for payslip in payslips:
+                emp = payslip.employee_id
+                issues = []
+                
+                emp_id_val = (
+                    getattr(emp, "employee_number", False)
+                    or getattr(emp, "registration_number", False)
+                    or getattr(emp, "barcode", False)
+                    or (str(emp.id) if emp else "N/A")
+                )
+                if not emp:
+                    issues.append(_("Missing Employee record"))
+                elif not getattr(emp, "employee_number", False):
+                    issues.append(_("Missing Employee Number"))
+
+                emp_name_val = emp.legal_name or emp.name if emp else "N/A"
+                dept_val = emp.department_id.name if emp and emp.department_id else "N/A"
+                if emp and not emp.department_id:
+                    issues.append(_("Missing Department"))
+
+                job_val = emp.job_id.name if emp and emp.job_id else "N/A"
+                code_val = emp_id_val
+
+                period_from_val = format_date(self.env, payslip.date_from or self.date_start)
+                period_to_val = format_date(self.env, payslip.date_to or self.date_end)
+
+                lines = payslip.line_ids
+
+                # Base Allowances
+                basic_sal = sum(lines.filtered(lambda l: l.code in ("BASIC", "SALARY") or (l.category_id and l.category_id.code in ("BASIC", "Basic")) or (l.category_id and l.category_id.name in ("BASIC", "Basic", "Basic Salary"))).mapped("total"))
+                actual_sal = sum(lines.filtered(lambda l: l.code in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in (l.name or "").lower() or "الراتب الفعلي" in (l.name or "")).mapped("total"))
+                rem_leave = sum(lines.filtered(lambda l: l.code in ("vacation_leave", "remain_lev", "REM_LEAVE", "LEAVE_COMP", "ANNUAL_LEAVE")).mapped("total"))
+                gross_att_ot = sum(lines.filtered(lambda l: l.code in ("OT_NET", "ETH_NET", "RD-S", "OVERTIME", "GROSS_ATT", "OT_COMP", "EXTRA_HOURS")).mapped("total"))
+
+                # Dynamic Allowance Values (Prioritize computed rule lines over raw input lines to avoid double counting)
+                dyn_alw_vals = []
+                for _c_name, _w, rule_keys, input_type_ids in dynamic_alw_cols:
+                    val = 0.0
+                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                    if r_lines:
+                        val = sum(r_lines.mapped("total"))
+                    elif input_type_ids:
+                        in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
+                        val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                    dyn_alw_vals.append(val)
+
+                # Gross Salary
+                gross_sal = payslip.gross_wage if hasattr(payslip, "gross_wage") and payslip.gross_wage else sum(lines.filtered(lambda l: l.code == "GROSS" or (l.category_id and l.category_id.code in ("GROSS", "Gross"))).mapped("total"))
+                if not gross_sal:
+                    gross_sal = basic_sal + rem_leave + gross_att_ot + sum(dyn_alw_vals)
+
+                # Fixed Deductions
+                tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in l.name).mapped("total"))
+                ssce_val = sum(lines.filtered(lambda l: l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in l.name and "موظف" in l.name)).mapped("total"))
+
+                # Dynamic Deduction Values (Prioritize computed rule lines over raw input lines to avoid double counting)
+                dyn_ded_vals = []
+                for _c_name, _w, rule_keys, input_type_ids in dynamic_ded_cols:
+                    val = 0.0
+                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                    if r_lines:
+                        val = sum(r_lines.mapped("total"))
+                    elif input_type_ids:
+                        in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
+                        val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                    dyn_ded_vals.append(val)
+
+                # Net Salary
+                net_sal = payslip.net_wage if hasattr(payslip, "net_wage") and payslip.net_wage else sum(lines.filtered(lambda l: l.code == "NET" or (l.category_id and l.category_id.code in ("NET", "Net"))).mapped("total"))
+
+                if net_sal < 0:
+                    issues.append(_("Negative Net Salary (%.2f JOD)") % net_sal)
+
+                # Attendance metrics (Total calculated paid days = Attendance + Public Holidays + Paid Leaves)
+                worked_days = payslip.worked_days_line_ids
+                absence_codes = ['ABS', 'ABSENT', 'LEAVEUNPAID', 'UN_PAID', 'un_paid', 'SICKLEAVE0', 'LAT', 'OUT', 'UNP', 'OUTCON', 'OUT_OF_CONTRACT']
+                extra_hours_codes = ['EXTRA', 'EXTRA_HOURS', 'OVERTIME', 'OVER_TIME', 'EXTRA100']
+
+                paid_lines = worked_days.filtered(lambda wd: (
+                    (wd.code or '').strip() not in absence_codes and
+                    (wd.code or '').strip() not in extra_hours_codes and
+                    'extra' not in (wd.name or '').lower() and
+                    'overtime' not in (wd.name or '').lower() and
+                    'out of contract' not in (wd.name or '').lower() and
+                    'outcon' not in (wd.name or '').lower() and
+                    'خارج العقد' not in (wd.name or '').lower()
+                ))
+                att_days = sum(paid_lines.mapped("number_of_days"))
+                if payslip.date_from and payslip.date_to:
+                    days_in_period = (payslip.date_to - payslip.date_from).days + 1
+                    if att_days > days_in_period:
+                        att_days = days_in_period
+                worked_hrs = sum(worked_days.mapped("number_of_hours"))
+                ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
+
+                # Gather notes
+                input_notes = []
+                for input_line in payslip.input_line_ids:
+                    note_txt = input_line.name or getattr(input_line, "note", False)
+                    if note_txt:
+                        t_label = input_line.input_type_id.name or _("Input")
+                        input_notes.append(f"[{t_label}: {note_txt}]")
+
+                base_note = payslip.note or payslip.name or ""
+                if input_notes:
+                    note_val = f"{base_note} {' '.join(input_notes)}".strip()
+                else:
+                    note_val = base_note
+
+                # Write Info Columns (0..6)
+                sheet1.write(data_row, 0, emp_id_val, text_center_fmt)
+                sheet1.write(data_row, 1, emp_name_val, text_left_fmt)
+                sheet1.write(data_row, 2, dept_val, text_left_fmt)
+                sheet1.write(data_row, 3, job_val, text_left_fmt)
+                sheet1.write(data_row, 4, code_val, text_center_fmt)
+                sheet1.write(data_row, 5, period_from_val, text_center_fmt)
+                sheet1.write(data_row, 6, period_to_val, text_center_fmt)
+
+                # Write ALLOWANCE Section
+                col_curr = alw_start_col
+                sheet1.write_number(data_row, col_curr, basic_sal, number_fmt); col_curr += 1
+                sheet1.write_number(data_row, col_curr, actual_sal, number_fmt); col_curr += 1
+                sheet1.write_number(data_row, col_curr, rem_leave, number_fmt); col_curr += 1
+                sheet1.write_number(data_row, col_curr, gross_att_ot, number_fmt); col_curr += 1
+
+                for alw_val in dyn_alw_vals:
+                    sheet1.write_number(data_row, col_curr, alw_val, number_fmt)
+                    col_curr += 1
+
+                sheet1.write_number(data_row, col_curr, gross_sal, number_fmt); col_curr += 1
+
+                # Write DEDUCTION Section
+                sheet1.write_number(data_row, col_curr, tax_val, number_fmt); col_curr += 1
+                sheet1.write_number(data_row, col_curr, ssce_val, number_fmt); col_curr += 1
+
+                for ded_val in dyn_ded_vals:
+                    sheet1.write_number(data_row, col_curr, ded_val, number_fmt)
+                    col_curr += 1
+
+                # Write Summary / Attendance Section
+                net_style = net_negative_fmt if net_sal < 0 else number_fmt
+                sheet1.write_number(data_row, col_curr, net_sal, net_style); col_curr += 1
+                sheet1.write_number(data_row, col_curr, att_days, int_fmt); col_curr += 1
+                sheet1.write_number(data_row, col_curr, worked_hrs, number_fmt); col_curr += 1
+                sheet1.write_number(data_row, col_curr, ot_hrs, number_fmt); col_curr += 1
+                sheet1.write(data_row, col_curr, note_val, text_left_fmt)
+
+                if not lines and payslip.state != "cancel":
+                    issues.append(_("Payslip lines not computed"))
+
+                status = "ERROR" if any("Negative" in i or "not computed" in i for i in issues) else ("WARNING" if issues else "OK")
+                remarks = ", ".join(issues) if issues else _("Computation verified cleanly")
+
+                audit_entries.append({
+                    "emp_id": emp_id_val,
+                    "emp_name": emp_name_val,
+                    "dept": dept_val,
+                    "status": status,
+                    "remarks": remarks,
+                })
+
+                data_row += 1
+
+        # Write Bottom Summary Total Row
+        sheet1.write(data_row, 0, _("Total"), total_label_fmt)
+        for c in range(1, info_count):
+            sheet1.write(data_row, c, "", total_label_fmt)
+
+        att_days_col_idx = sum_start_col + 1
+
+        for col_idx in range(info_count, total_num_cols - 1):
+            col_letter = xlsxwriter.utility.xl_col_to_name(col_idx)
+            formula = f"=SUM({col_letter}{table_start_row + 1}:{col_letter}{data_row})"
+            fmt = total_int_fmt if col_idx == att_days_col_idx else total_num_fmt
+            sheet1.write_formula(data_row, col_idx, formula, fmt)
+
+        sheet1.write(data_row, total_num_cols - 1, "", total_label_fmt)
+
+        # -------------------------------------------------------------
+        # SHEET 2: Audit
+        # -------------------------------------------------------------
+        sheet2 = workbook.add_worksheet("Audit")
+        sheet2.set_column(0, 0, 14)
+        sheet2.set_column(1, 1, 28)
+        sheet2.set_column(2, 2, 22)
+        sheet2.set_column(3, 3, 16)
+        sheet2.set_column(4, 4, 45)
+
+        sheet2.write(0, 0, _("Pay Run Audit Trail & Exception Log"), title_fmt)
+        sheet2.write(1, 0, _("Pay Run: %s") % (self.name or ""), meta_val_fmt)
+
+        audit_headers = [
+            _("Employee ID"),
+            _("Employee Name"),
+            _("Department"),
+            _("Audit Status"),
+            _("Issue / Remarks"),
+        ]
+        for c_idx, h_text in enumerate(audit_headers):
+            sheet2.write(3, c_idx, h_text, header_fmt)
+
+        a_row = 4
+        for entry in audit_entries:
+            st = entry["status"]
+            st_fmt = audit_ok_fmt if st == "OK" else (audit_warn_fmt if st == "WARNING" else audit_err_fmt)
+
+            sheet2.write(a_row, 0, entry["emp_id"], text_center_fmt)
+            sheet2.write(a_row, 1, entry["emp_name"], text_left_fmt)
+            sheet2.write(a_row, 2, entry["dept"], text_left_fmt)
+            sheet2.write(a_row, 3, st, st_fmt)
+            sheet2.write(a_row, 4, entry["remarks"], text_left_fmt)
+            a_row += 1
+
+        sheet2.write(a_row, 0, _("Summary Total"), total_label_fmt)
+        sheet2.write(a_row, 1, _("Total Audited Records: %d") % len(audit_entries), total_label_fmt)
+        sheet2.write(a_row, 2, "", total_label_fmt)
+        sheet2.write(a_row, 3, "", total_label_fmt)
+        sheet2.write(a_row, 4, "", total_label_fmt)
+
+        workbook.close()
+        return workbook_buffer.getvalue()
