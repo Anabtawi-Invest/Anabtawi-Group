@@ -635,6 +635,19 @@ class HrPayslip(models.Model):
         )
         return rounded
 
+    def _get_fixed_schedule_rest_days(self, emp, start_date, end_date):
+        if not emp or not emp.resource_calendar_id or not start_date or not end_date:
+            return 0
+        cal = emp.resource_calendar_id
+        working_days_of_week = set(int(att.dayofweek) for att in cal.attendance_ids if att.dayofweek is not False and att.dayofweek is not None)
+        rest_count = 0
+        curr = start_date
+        while curr <= end_date:
+            if curr.weekday() not in working_days_of_week:
+                rest_count += 1
+            curr += datetime.timedelta(days=1)
+        return rest_count
+
     def _get_worked_day_lines(self, *args, **kwargs):
         res = super()._get_worked_day_lines(*args, **kwargs)
         for payslip in self:
@@ -699,7 +712,19 @@ class HrPayslip(models.Model):
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
                         physical_attendance_days = len(attendances) if attendances else round(total_regular_attendance_hrs / 8.0, 2)
-                        earned_rest_days = int(physical_attendance_days // 6)
+                        
+                        is_flexible = getattr(emp.resource_calendar_id, 'flexible_hours', False) or getattr(emp, 'flexible_hours', False)
+                        if is_flexible:
+                            earned_rest_days = int(physical_attendance_days // 6)
+                        else:
+                            c_start = payslip.date_from
+                            if emp.contract_id and emp.contract_id.date_start and emp.contract_id.date_start > payslip.date_from:
+                                c_start = emp.contract_id.date_start
+                            c_end = payslip.date_to
+                            if emp.contract_id and emp.contract_id.date_end and emp.contract_id.date_end < payslip.date_to:
+                                c_end = emp.contract_id.date_end
+                            earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
+
                         line['number_of_days'] = float(physical_attendance_days + earned_rest_days)
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
@@ -778,7 +803,11 @@ class HrPayslip(models.Model):
         to_update = self.env['hr.work.entry']
         for payslip in valid_slips:
             try:
-                emp_id = payslip.employee_id.id
+                emp = payslip.employee_id
+                is_flexible = getattr(emp.resource_calendar_id, 'flexible_hours', False) or getattr(emp, 'flexible_hours', False)
+                if not is_flexible:
+                    continue
+                emp_id = emp.id
                 emp_work_entries = we_by_emp.get(emp_id, [])
                 slip_worked_dates = set(
                     d for d in worked_dates_by_emp.get(emp_id, set())
