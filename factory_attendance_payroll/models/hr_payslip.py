@@ -718,11 +718,20 @@ class HrPayslip(models.Model):
                             earned_rest_days = int(physical_attendance_days // 6)
                         else:
                             c_start = payslip.date_from
-                            if emp.contract_id and emp.contract_id.date_start and emp.contract_id.date_start > payslip.date_from:
-                                c_start = emp.contract_id.date_start
                             c_end = payslip.date_to
-                            if emp.contract_id and emp.contract_id.date_end and emp.contract_id.date_end < payslip.date_to:
-                                c_end = emp.contract_id.date_end
+                            
+                            contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or getattr(emp, 'contract_id', None)
+                            if contract_obj and getattr(contract_obj, 'date_start', None) and contract_obj.date_start > payslip.date_from:
+                                c_start = contract_obj.date_start
+                            elif hasattr(emp, '_get_versions_with_contract_overlap_with_period'):
+                                c_vers = emp._get_versions_with_contract_overlap_with_period(payslip.date_from, payslip.date_to)
+                                c_starts = [c.date_start for c in c_vers if getattr(c, 'date_start', None)]
+                                if c_starts and max(c_starts) > payslip.date_from:
+                                    c_start = max(c_starts)
+
+                            if contract_obj and getattr(contract_obj, 'date_end', None) and contract_obj.date_end < payslip.date_to:
+                                c_end = contract_obj.date_end
+
                             earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
 
                         line['number_of_days'] = float(physical_attendance_days + earned_rest_days)
