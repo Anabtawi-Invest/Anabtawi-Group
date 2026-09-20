@@ -1078,15 +1078,15 @@ class HrPayslip(models.Model):
 
                 month_str = payslip.date_to.strftime('%B %Y') if payslip.date_to else ''
 
-                # 1) Lateness settlements first (Step 1 / Step 2 audit)
+                # 1) Annual Leave lateness settlement only.
+                # Extra Hours Step 1 is applied by forcing Time Off balance to Remaining
+                # (Remaining already has Step 1 deducted). Creating an Extra Hours lateness
+                # leave + force caused FIFO consumption on the newest allocation.
                 _logger.info(
-                    "[FAP-RECON] slip=%s settlements extra=%s annual=%s",
+                    "[FAP-RECON] slip=%s settlements extra=%s (skipped leave; force handles) annual=%s",
                     payslip.id,
                     payslip.lateness_covered_by_extra_hours,
                     payslip.lateness_covered_by_annual_leave,
-                )
-                payslip._create_or_update_settlement_leave(
-                    'Extra Hours', payslip.lateness_covered_by_extra_hours, 'Extra Hours Settlement'
                 )
                 payslip._create_or_update_settlement_leave(
                     'Annual Leave', payslip.lateness_covered_by_annual_leave, 'Annual Leave Settlement'
@@ -1219,7 +1219,7 @@ class HrPayslip(models.Model):
                 sync_leaves.write({'state': 'draft'})
                 sync_leaves.unlink()
 
-        # Flush settlement leaves so virtual_remaining sees them
+        # Flush so virtual_remaining sees removals
         self.env.flush_all()
         current_hours = self._fap_get_extra_hours_balance_hours(extra_type)
         gap_hours = round(target_hours - current_hours, 2)
@@ -1234,6 +1234,7 @@ class HrPayslip(models.Model):
             round(target_hours / 8.0, 4),
         )
 
+        recon_alloc = self.env['hr.leave.allocation']
         if gap_hours > 0.01:
             # Need more Extra Hours → create monthly reconciliation allocation
             ot_days = round(gap_hours / 8.0, 4)
@@ -1248,7 +1249,7 @@ class HrPayslip(models.Model):
                 alloc_vals['holiday_type'] = 'employee'
             if 'allocation_type' in Allocation._fields:
                 alloc_vals['allocation_type'] = 'regular'
-            new_alloc = Allocation.with_context(
+            recon_alloc = Allocation.with_context(
                 employee_id=self.employee_id.id,
                 mail_create_nolog=True,
                 mail_notrack=True,
@@ -1256,14 +1257,14 @@ class HrPayslip(models.Model):
                 leave_fast_create=True,
                 mail_activity_automation_skip=True,
             ).create(alloc_vals)
-            self._fap_validate_allocation(new_alloc)
+            self._fap_validate_allocation(recon_alloc)
             self.with_context(skip_reconcile_revert=True).sudo().write({
                 'extra_hours_allocated_days': ot_days,
             })
             _logger.info(
                 "[FAP-RECON] slip=%s FORCE added alloc=%s days=%s (+%sh)",
                 self.id,
-                new_alloc.id,
+                recon_alloc.id,
                 ot_days,
                 gap_hours,
             )
@@ -1285,8 +1286,65 @@ class HrPayslip(models.Model):
             })
             _logger.info("[FAP-RECON] slip=%s FORCE already matched (gap≈0)", self.id)
 
+        # Second pass: correct residual gap (FIFO leave consumption can skew first pass)
         self.env.flush_all()
         final_hours = self._fap_get_extra_hours_balance_hours(extra_type)
+        residual = round(target_hours - final_hours, 2)
+        if abs(residual) > 0.05:
+            _logger.info(
+                "[FAP-RECON] slip=%s FORCE residual=%s after first pass — correcting",
+                self.id,
+                residual,
+            )
+            if residual > 0.05:
+                # Increase recon allocation if we have one; else create
+                recon_alloc = Allocation.search([
+                    ('employee_id', '=', self.employee_id.id),
+                    ('holiday_status_id', '=', extra_type.id),
+                    ('name', '=', alloc_name),
+                ], limit=1)
+                add_days = round(residual / 8.0, 4)
+                if recon_alloc:
+                    new_days = round((recon_alloc.number_of_days or 0.0) + add_days, 4)
+                    recon_alloc.write({'number_of_days': new_days})
+                    self.with_context(skip_reconcile_revert=True).sudo().write({
+                        'extra_hours_allocated_days': new_days,
+                    })
+                    _logger.info(
+                        "[FAP-RECON] slip=%s FORCE 2nd pass increased alloc=%s to days=%s",
+                        self.id,
+                        recon_alloc.id,
+                        new_days,
+                    )
+                else:
+                    alloc_vals = {
+                        'name': alloc_name,
+                        'employee_id': self.employee_id.id,
+                        'holiday_status_id': extra_type.id,
+                        'number_of_days': add_days,
+                        'date_from': self.date_from,
+                    }
+                    if 'holiday_type' in Allocation._fields:
+                        alloc_vals['holiday_type'] = 'employee'
+                    if 'allocation_type' in Allocation._fields:
+                        alloc_vals['allocation_type'] = 'regular'
+                    recon_alloc = Allocation.with_context(
+                        employee_id=self.employee_id.id,
+                        mail_create_nolog=True,
+                        mail_notrack=True,
+                        tracking_disable=True,
+                        leave_fast_create=True,
+                        mail_activity_automation_skip=True,
+                    ).create(alloc_vals)
+                    self._fap_validate_allocation(recon_alloc)
+                    self.with_context(skip_reconcile_revert=True).sudo().write({
+                        'extra_hours_allocated_days': add_days,
+                    })
+            elif residual < -0.05:
+                self._fap_create_balance_sync_leave(extra_type, abs(residual))
+            self.env.flush_all()
+            final_hours = self._fap_get_extra_hours_balance_hours(extra_type)
+
         _logger.info(
             "[FAP-RECON] slip=%s FORCE result Extra Hours hours=%s days=%s (target=%s)",
             self.id,
