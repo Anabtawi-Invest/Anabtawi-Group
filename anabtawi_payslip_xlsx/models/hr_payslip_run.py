@@ -1,5 +1,5 @@
 import io
-from datetime import datetime
+from datetime import datetime, time
 
 from odoo import _, fields, models, exceptions
 from odoo.tools.misc import format_date
@@ -65,8 +65,8 @@ class HrPayslipRun(models.Model):
         group_header_alw_fmt = workbook.add_format(
             {
                 "bold": True,
-                "font_color": "#FFFFFF",
-                "bg_color": "#1F497D",
+                "font_color": "#375623",
+                "bg_color": "#E2EFDA",
                 "border": 1,
                 "align": "center",
                 "valign": "vcenter",
@@ -111,7 +111,7 @@ class HrPayslipRun(models.Model):
 
         # Filter payslips to only include selected employee payslips if specified
         if payslip_ids:
-            payslips = self.slip_ids.filtered(lambda p: p.id in payslip_ids)
+            payslips = self.env["hr.payslip"].browse(payslip_ids)
         else:
             payslips = self.slip_ids
 
@@ -225,9 +225,10 @@ class HrPayslipRun(models.Model):
 
         alw_map = {}
         for line in all_alw_lines:
-            rule_key = line.salary_rule_id.id if line.salary_rule_id else line.code
-            rule_name = (line.name or (line.salary_rule_id.name if line.salary_rule_id else line.code) or _("Allowance")).strip()
-            norm_key = rule_name.lower().strip()
+            rule = line.salary_rule_id
+            rule_key = rule.id if rule else line.code
+            rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Allowance"))).strip()
+            norm_key = (rule.name.lower().strip() if rule and rule.name else (line.code or rule_name).lower().strip())
             if norm_key not in alw_map:
                 alw_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
             alw_map[norm_key]["rule_keys"].add(rule_key)
@@ -245,12 +246,19 @@ class HrPayslipRun(models.Model):
 
         ded_map = {}
         for line in all_ded_lines:
-            rule_key = line.salary_rule_id.id if line.salary_rule_id else line.code
-            rule_name = (line.name or (line.salary_rule_id.name if line.salary_rule_id else line.code) or _("Deduction")).strip()
-            norm_key = rule_name.lower().strip()
+            rule = line.salary_rule_id
+            rule_key = rule.id if rule else line.code
+            rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Deduction"))).strip()
+            norm_key = (rule.name.lower().strip() if rule and rule.name else (line.code or rule_name).lower().strip())
             if norm_key not in ded_map:
                 ded_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
             ded_map[norm_key]["rule_keys"].add(rule_key)
+
+        # Helper to check if a name or code represents Advance #2
+        def _is_adv_2(text_name, code_str):
+            t = (text_name or "").lower()
+            c = (code_str or "").lower()
+            return c in ("sala2", "saladv2") or any(x in t for x in ("advance 2", "advances 2", "advance two", "advances two"))
 
         # --- 3. Process Salary Inputs (Classify & Deduplicate into Allowance vs Deduction) ---
         input_types = payslips.mapped("input_line_ids.input_type_id").sorted(key=lambda t: t.name or "")
@@ -261,12 +269,21 @@ class HrPayslipRun(models.Model):
                 t_name = (itype.name or _("Salary Input")).strip()
                 t_norm = t_name.lower().strip()
                 t_code = (getattr(itype, "code", "") or "").lower()
+                itype_is_adv2 = _is_adv_2(t_norm, t_code)
 
                 is_deduction_input = (
                     "deduction" in t_norm
                     or "ded" in t_code
+                    or "adv" in t_code
+                    or "saladv" in t_code
+                    or "sala2" in t_code
                     or any(
-                        t_norm in d_name or d_name in t_norm or d_name.replace("two", "2") in t_norm or t_norm.replace("2", "two") in d_name
+                        t_norm == d_name
+                        or d_name == t_norm
+                        or (
+                            (t_norm in d_name or d_name in t_norm)
+                            and (_is_adv_2(d_name, d_name) == itype_is_adv2)
+                        )
                         for d_name in ded_rule_names
                     )
                 )
@@ -274,9 +291,17 @@ class HrPayslipRun(models.Model):
                 if is_deduction_input:
                     matched_key = None
                     for k in ded_map:
-                        if k == t_norm or k in t_norm or t_norm in k:
-                            matched_key = k
-                            break
+                        k_is_adv2 = _is_adv_2(k, k)
+                        if k_is_adv2 == itype_is_adv2:
+                            if k == t_norm or (t_code and t_code == k):
+                                matched_key = k
+                                break
+                    if not matched_key:
+                        for k in ded_map:
+                            k_is_adv2 = _is_adv_2(k, k)
+                            if k_is_adv2 == itype_is_adv2 and (k in t_norm or t_norm in k):
+                                matched_key = k
+                                break
                     if matched_key:
                         ded_map[matched_key]["input_type_ids"].add(itype.id)
                     else:
@@ -285,27 +310,69 @@ class HrPayslipRun(models.Model):
                     matched_key = None
                     clean_input_norm = t_norm.replace("input:", "").strip()
                     for k in alw_map:
-                        if k == clean_input_norm or k in clean_input_norm or clean_input_norm in k:
-                            matched_key = k
-                            break
+                        k_is_adv2 = _is_adv_2(k, k)
+                        if k_is_adv2 == itype_is_adv2:
+                            if k == clean_input_norm or (t_code and t_code == k):
+                                matched_key = k
+                                break
+                    if not matched_key:
+                        for k in alw_map:
+                            k_is_adv2 = _is_adv_2(k, k)
+                            if k_is_adv2 == itype_is_adv2 and (k in clean_input_norm or clean_input_norm in k):
+                                matched_key = k
+                                break
                     if matched_key:
                         alw_map[matched_key]["input_type_ids"].add(itype.id)
                     else:
                         disp_name = f"Input: {t_name}" if not t_name.lower().startswith("input") else t_name
                         alw_map[clean_input_norm] = {"name": disp_name, "rule_keys": set(), "input_type_ids": {itype.id}}
 
-        # Order dynamic columns deterministically by display name
+        # Order dynamic columns deterministically by display name and include ONLY non-zero total columns
         dynamic_alw_cols = []
         for norm_k in sorted(alw_map.keys(), key=lambda k: alw_map[k]["name"]):
             col_info = alw_map[norm_k]
             c_name = col_info["name"]
-            dynamic_alw_cols.append((c_name, max(18, len(c_name) + 4), col_info["rule_keys"], col_info["input_type_ids"]))
+            rule_keys = col_info["rule_keys"]
+            input_type_ids = col_info["input_type_ids"]
+
+            # Calculate total across all selected payslips prioritizing computed rule lines over input lines
+            col_total = 0.0
+            for payslip in payslips:
+                lines = payslip.line_ids
+                val = 0.0
+                r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                if r_lines:
+                    val = sum(r_lines.mapped("total"))
+                elif input_type_ids:
+                    in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
+                    val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                col_total += val
+
+            if abs(col_total) > 0.0001:
+                dynamic_alw_cols.append((c_name, max(18, len(c_name) + 4), rule_keys, input_type_ids))
 
         dynamic_ded_cols = []
         for norm_k in sorted(ded_map.keys(), key=lambda k: ded_map[k]["name"]):
             col_info = ded_map[norm_k]
             c_name = col_info["name"]
-            dynamic_ded_cols.append((c_name, max(18, len(c_name) + 4), col_info["rule_keys"], col_info["input_type_ids"]))
+            rule_keys = col_info["rule_keys"]
+            input_type_ids = col_info["input_type_ids"]
+
+            # Calculate total across all selected payslips prioritizing computed rule lines over input lines
+            col_total = 0.0
+            for payslip in payslips:
+                lines = payslip.line_ids
+                val = 0.0
+                r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                if r_lines:
+                    val = sum(r_lines.mapped("total"))
+                elif input_type_ids:
+                    in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
+                    val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                col_total += val
+
+            if abs(col_total) > 0.0001:
+                dynamic_ded_cols.append((c_name, max(18, len(c_name) + 4), rule_keys, input_type_ids))
 
         # --- 4. Column Layout Assembly ---
         gross_col = (_("Gross Salary (before tax)"), 22)
@@ -424,16 +491,16 @@ class HrPayslipRun(models.Model):
                 rem_leave = sum(lines.filtered(lambda l: l.code in ("vacation_leave", "remain_lev", "REM_LEAVE", "LEAVE_COMP", "ANNUAL_LEAVE")).mapped("total"))
                 gross_att_ot = sum(lines.filtered(lambda l: l.code in ("OT_NET", "ETH_NET", "RD-S", "OVERTIME", "GROSS_ATT", "OT_COMP", "EXTRA_HOURS")).mapped("total"))
 
-                # Dynamic Allowance Values
+                # Dynamic Allowance Values (Prioritize computed rule lines over raw input lines to avoid double counting)
                 dyn_alw_vals = []
                 for _c_name, _w, rule_keys, input_type_ids in dynamic_alw_cols:
                     val = 0.0
-                    if rule_keys:
-                        r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
-                        val += sum(r_lines.mapped("total"))
-                    if input_type_ids:
+                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                    if r_lines:
+                        val = sum(r_lines.mapped("total"))
+                    elif input_type_ids:
                         in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                        val += sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
                     dyn_alw_vals.append(val)
 
                 # Gross Salary
@@ -445,16 +512,16 @@ class HrPayslipRun(models.Model):
                 tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in l.name).mapped("total"))
                 ssce_val = sum(lines.filtered(lambda l: l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in l.name and "موظف" in l.name)).mapped("total"))
 
-                # Dynamic Deduction Values
+                # Dynamic Deduction Values (Prioritize computed rule lines over raw input lines to avoid double counting)
                 dyn_ded_vals = []
                 for _c_name, _w, rule_keys, input_type_ids in dynamic_ded_cols:
                     val = 0.0
-                    if rule_keys:
-                        r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
-                        val += sum(r_lines.mapped("total"))
-                    if input_type_ids:
+                    r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys) if rule_keys else False
+                    if r_lines:
+                        val = sum(r_lines.mapped("total"))
+                    elif input_type_ids:
                         in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                        val += sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                        val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
                     dyn_ded_vals.append(val)
 
                 # Net Salary
@@ -463,11 +530,27 @@ class HrPayslipRun(models.Model):
                 if net_sal < 0:
                     issues.append(_("Negative Net Salary (%.2f JOD)") % net_sal)
 
-                # Attendance metrics
+                # Attendance metrics (Total calculated paid days = Attendance + Public Holidays + Paid Leaves)
                 worked_days = payslip.worked_days_line_ids
-                att_days = sum(worked_days.mapped("number_of_days"))
+                absence_codes = ['ABS', 'ABSENT', 'LEAVEUNPAID', 'UN_PAID', 'un_paid', 'SICKLEAVE0', 'LAT', 'OUT', 'UNP', 'OUTCON', 'OUT_OF_CONTRACT']
+                extra_hours_codes = ['EXTRA', 'EXTRA_HOURS', 'OVERTIME', 'OVER_TIME', 'EXTRA100']
+
+                paid_lines = worked_days.filtered(lambda wd: (
+                    (wd.code or '').strip() not in absence_codes and
+                    (wd.code or '').strip() not in extra_hours_codes and
+                    'extra' not in (wd.name or '').lower() and
+                    'overtime' not in (wd.name or '').lower() and
+                    'out of contract' not in (wd.name or '').lower() and
+                    'outcon' not in (wd.name or '').lower() and
+                    'خارج العقد' not in (wd.name or '').lower()
+                ))
+                att_days = sum(paid_lines.mapped("number_of_days"))
+                if payslip.date_from and payslip.date_to:
+                    days_in_period = (payslip.date_to - payslip.date_from).days + 1
+                    if att_days > days_in_period:
+                        att_days = days_in_period
                 worked_hrs = sum(worked_days.mapped("number_of_hours"))
-                ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower()).mapped("number_of_hours"))
+                ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
 
                 # Gather notes
                 input_notes = []
