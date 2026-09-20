@@ -21,16 +21,17 @@ class HrPayslip(models.Model):
 
     def action_export_payrun_excel(self):
         payrun = self.mapped("payslip_run_id")[:1]
+        selected_ids = ",".join(str(i) for i in self.ids)
         if payrun:
-            selected_ids = ",".join(str(i) for i in self.ids)
             url = f"/anabtawi_payroll/payrun/xlsx?payrun_id={payrun.id}&payslip_ids={selected_ids}"
-            return {
-                "name": "PayRun Audit",
-                "type": "ir.actions.act_url",
-                "url": url,
-                "target": "self",
-            }
-        raise ValidationError(_("Selected payslips do not belong to a Pay Run."))
+        else:
+            url = f"/anabtawi_payroll/payrun/xlsx?payslip_ids={selected_ids}"
+        return {
+            "name": "PayRun Audit",
+            "type": "ir.actions.act_url",
+            "url": url,
+            "target": "self",
+        }
 
 
 

@@ -111,7 +111,7 @@ class HrPayslipRun(models.Model):
 
         # Filter payslips to only include selected employee payslips if specified
         if payslip_ids:
-            payslips = self.slip_ids.filtered(lambda p: p.id in payslip_ids)
+            payslips = self.env["hr.payslip"].browse(payslip_ids)
         else:
             payslips = self.slip_ids
 
