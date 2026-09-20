@@ -48,17 +48,8 @@ class PayslipXlsxController(http.Controller):
     def download_payrun_xlsx(self, payrun_id=None, payslip_ids=None, **kwargs):
         if (
             not request.env.user.has_group("hr_payroll.group_hr_payroll_user")
-            or not payrun_id
+            or (not payrun_id and not payslip_ids)
         ):
-            return request.not_found()
-
-        try:
-            payrun_id = int(payrun_id)
-        except (ValueError, TypeError):
-            return request.not_found()
-
-        payrun = request.env["hr.payslip.run"].browse(payrun_id)
-        if not payrun.exists():
             return request.not_found()
 
         parsed_payslip_ids = None
@@ -67,6 +58,25 @@ class PayslipXlsxController(http.Controller):
                 parsed_payslip_ids = [int(x) for x in payslip_ids.split(",") if x.strip().isdigit()]
             except ValueError:
                 parsed_payslip_ids = None
+
+        payrun = None
+        if payrun_id:
+            try:
+                payrun = request.env["hr.payslip.run"].browse(int(payrun_id))
+                if not payrun.exists():
+                    payrun = None
+            except (ValueError, TypeError):
+                payrun = None
+
+        if not payrun and parsed_payslip_ids:
+            payslips = request.env["hr.payslip"].browse(parsed_payslip_ids)
+            if payslips.exists():
+                payrun = payslips.mapped("payslip_run_id")[:1]
+                if not payrun:
+                    payrun = request.env["hr.payslip.run"].sudo().search([], limit=1)
+
+        if not payrun:
+            return request.not_found()
 
         xlsx_content = payrun._generate_payrun_xlsx(payslip_ids=parsed_payslip_ids)
         period_str = payrun.date_start.strftime("%Y%m") if payrun.date_start else ""
