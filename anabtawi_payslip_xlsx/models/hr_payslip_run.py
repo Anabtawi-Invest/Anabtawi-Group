@@ -244,15 +244,11 @@ class HrPayslipRun(models.Model):
             and not (l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in (l.name or "") and "شركة" in (l.name or "")))
         )
 
-        ded_map = {}
-        for line in all_ded_lines:
-            rule = line.salary_rule_id
-            rule_key = rule.id if rule else line.code
-            rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Deduction"))).strip()
-            norm_key = (rule.name.lower().strip() if rule and rule.name else (line.code or rule_name).lower().strip())
-            if norm_key not in ded_map:
-                ded_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
-            ded_map[norm_key]["rule_keys"].add(rule_key)
+        def _normalize_key(text_or_rule_name):
+            if not text_or_rule_name:
+                return ""
+            s = text_or_rule_name.lower().strip()
+            return s.replace("advance two", "advance 2").replace("advances two", "advances 2")
 
         # Helper to check if a name or code represents Advance #2
         def _is_adv_2(text_name, code_str):
@@ -260,14 +256,26 @@ class HrPayslipRun(models.Model):
             c = (code_str or "").lower()
             return c in ("sala2", "saladv2") or any(x in t for x in ("advance 2", "advances 2", "advance two", "advances two"))
 
+        ded_map = {}
+        for line in all_ded_lines:
+            rule = line.salary_rule_id
+            rule_key = rule.id if rule else line.code
+            raw_rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Deduction"))).strip()
+            rule_name = raw_rule_name.replace("Advances Two", "Advances 2").replace("Advance Two", "Advance 2")
+            norm_key = _normalize_key(rule.name if rule and rule.name else (line.code or rule_name))
+            if norm_key not in ded_map:
+                ded_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
+            ded_map[norm_key]["rule_keys"].add(rule_key)
+
         # --- 3. Process Salary Inputs (Classify & Deduplicate into Allowance vs Deduction) ---
         input_types = payslips.mapped("input_line_ids.input_type_id").sorted(key=lambda t: t.name or "")
         ded_rule_names = set(ded_map.keys())
 
         if input_types:
             for itype in input_types:
-                t_name = (itype.name or _("Salary Input")).strip()
-                t_norm = t_name.lower().strip()
+                raw_t_name = (itype.name or _("Salary Input")).strip()
+                t_name = raw_t_name.replace("Advances Two", "Advances 2").replace("Advance Two", "Advance 2")
+                t_norm = _normalize_key(t_name)
                 t_code = (getattr(itype, "code", "") or "").lower()
                 itype_is_adv2 = _is_adv_2(t_norm, t_code)
 
