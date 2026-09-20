@@ -401,6 +401,11 @@
             &.card-ot { border-left-color: #ec4899; }
             &.card-late { border-left-color: #f97316; }
             &.card-headcount { border-left-color: #14b8a6; }
+            &.card-daily { border-left-color: #0284c7; }
+            &.card-daily-emp { border-left-color: #0d9488; }
+            &.card-tce { border-left-color: #4f46e5; }
+            &.card-sales-roi { border-left-color: #16a34a; }
+            &.card-prod-efficiency { border-left-color: #d97706; }
         }
     }
 
@@ -430,7 +435,7 @@
             }
 
             .highlight_stat_box {
-                background: #1e293b;
+                background: #0f172a;
                 color: #ffffff;
                 border-radius: 8px;
                 padding: 14px 16px;
@@ -438,12 +443,13 @@
 
                 .stat_label {
                     font-size: 0.8rem;
-                    color: #94a3b8;
+                    color: #cbd5e1;
                     display: block;
+                    font-weight: 600;
                 }
                 .stat_value {
                     font-size: 1.25rem;
-                    font-weight: 700;
+                    font-weight: 800;
                     color: #38bdf8;
                 }
             }
@@ -467,7 +473,7 @@
 
             h4 {
                 margin: 0;
-                font-weight: 700;
+                font-weight: 800;
                 font-size: 1.15rem;
                 color: #0f172a;
             }
@@ -484,25 +490,26 @@
             font-size: 0.88rem;
 
             th {
-                background-color: #f8fafc;
-                color: #475569;
-                font-weight: 700;
+                background-color: #f1f5f9;
+                color: #0f172a;
+                font-weight: 800;
                 padding: 12px 14px;
-                border-bottom: 2px solid #e2e8f0;
+                border-bottom: 2px solid #cbd5e1;
                 white-space: nowrap;
                 cursor: pointer;
                 user-select: none;
 
                 &:hover {
-                    background-color: #f1f5f9;
-                    color: #0f172a;
+                    background-color: #e2e8f0;
+                    color: #000000;
                 }
             }
 
             td {
                 padding: 12px 14px;
-                border-bottom: 1px solid #f1f5f9;
-                color: #1e293b;
+                border-bottom: 1px solid #e2e8f0;
+                color: #0f172a;
+                font-weight: 500;
                 vertical-align: middle;
             }
 
@@ -510,18 +517,20 @@
                 transition: background-color 0.15s ease;
 
                 &:hover {
-                    background-color: #f8fafc;
+                    background-color: #f1f5f9;
                 }
             }
 
             tfoot tr {
-                background-color: #f1f5f9;
-                font-weight: 700;
+                background-color: #e2e8f0;
+                font-weight: 800;
+                color: #0f172a;
                 td {
-                    border-top: 2px solid #cbd5e1;
-                    border-bottom: 2px solid #cbd5e1;
+                    border-top: 2px solid #94a3b8;
+                    border-bottom: 2px solid #94a3b8;
                 }
             }
         }
     }
 }
+

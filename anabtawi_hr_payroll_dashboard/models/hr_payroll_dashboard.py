@@ -126,6 +126,11 @@ class HrPayrollDashboard(models.AbstractModel):
             "parent_id": d.parent_id.id if d.parent_id else 0,
         } for d in raw_departments]
 
+        # Calendar days in selected month period
+        calendar_days = (end_date - start_date).days + 1
+        if calendar_days <= 0:
+            calendar_days = 30
+
         # Aggregate KPI totals
         total_basic_salary = 0.0
         total_actual_salary = 0.0
@@ -142,6 +147,7 @@ class HrPayrollDashboard(models.AbstractModel):
         total_lateness_amount = 0.0
         total_scheduled_hours = 0.0
         total_working_days = 0.0
+        total_daily_cost = 0.0
 
         bank_count = 0
         bank_amount = 0.0
@@ -150,6 +156,48 @@ class HrPayrollDashboard(models.AbstractModel):
 
         distinct_employee_ids = set()
         department_dict = {}
+
+        # Pre-fetch POS Sales data for retail branches if available
+        pos_sales_by_dept = defaultdict(float)
+        if "pos.order" in self.env:
+            try:
+                pos_domain = [
+                    ("state", "in", ["paid", "done", "invoiced"]),
+                    ("date_order", ">=", datetime.combine(start_date, datetime.min.time())),
+                    ("date_order", "<=", datetime.combine(end_date, datetime.max.time())),
+                ]
+                if target_company_id > 0:
+                    pos_domain.append(("company_id", "=", target_company_id))
+                pos_orders = self.env["pos.order"].sudo().search(pos_domain)
+                for p_order in pos_orders:
+                    d_id = 0
+                    if p_order.config_id and hasattr(p_order.config_id, "department_id") and p_order.config_id.department_id:
+                        d_id = p_order.config_id.department_id.id
+                    elif p_order.session_id and hasattr(p_order.session_id.config_id, "department_id") and p_order.session_id.config_id.department_id:
+                        d_id = p_order.session_id.config_id.department_id.id
+                    if d_id:
+                        pos_sales_by_dept[d_id] += p_order.amount_total
+            except Exception as e:
+                _logger.warning("POS Order search skipped in payroll dashboard: %s", e)
+
+        # Pre-fetch Manufacturing Output data for factory lines if available
+        mrp_qty_by_dept = defaultdict(float)
+        if "mrp.production" in self.env:
+            try:
+                mrp_domain = [
+                    ("state", "=", "done"),
+                    ("date_finished", ">=", datetime.combine(start_date, datetime.min.time())),
+                    ("date_finished", "<=", datetime.combine(end_date, datetime.max.time())),
+                ]
+                if target_company_id > 0:
+                    mrp_domain.append(("company_id", "=", target_company_id))
+                mrp_orders = self.env["mrp.production"].sudo().search(mrp_domain)
+                for m_order in mrp_orders:
+                    m_dept = getattr(m_order, "department_id", False)
+                    if m_dept:
+                        mrp_qty_by_dept[m_dept.id] += getattr(m_order, "qty_produced", 0.0) or 0.0
+            except Exception as e:
+                _logger.warning("MRP Production search skipped in payroll dashboard: %s", e)
 
         for slip in payslips:
             emp = slip.employee_id
@@ -175,8 +223,10 @@ class HrPayrollDashboard(models.AbstractModel):
                     "lateness_amount": 0.0,
                     "deductions": 0.0,
                     "social_security": 0.0,
+                    "social_security_comp": 0.0,
                     "income_tax": 0.0,
                     "working_days": 0.0,
+                    "daily_cost": 0.0,
                 }
 
             department_dict[dep_id]["employee_ids"].add(emp.id)
@@ -284,7 +334,6 @@ class HrPayrollDashboard(models.AbstractModel):
                     # Deductions
                     is_ded = cat_code in ["DED", "DEDUCTION"] or code in ["DED", "LOAN", "UNPAID", "PENALTY", "INS", "ADV", "ADVANCE", "DIFF"] or any(k in name for k in ["خصم", "سلفة", "قرض", "عقوبة", "جزاء", "تأمين", "تامين", "مخالفة"])
                     if is_ded and code not in ["NET", "GROSS"]:
-                        # Avoid double counting if already tracked in tax or social security
                         if not is_ss and not is_tax:
                             slip_deductions += abs(amt)
             else:
@@ -313,6 +362,9 @@ class HrPayrollDashboard(models.AbstractModel):
                 total_all_deductions = slip_deductions + slip_ssc_emp + slip_tax + slip_late_amount
                 slip_net = getattr(slip, "net_wage", 0.0) or max(slip_gross - total_all_deductions, 0.0)
 
+            # Calendar-Exact Employee Daily Cost
+            slip_daily_cost = (slip_gross + slip_ssc_comp) / float(calendar_days)
+
             # Accumulate global totals
             total_basic_salary += slip_basic
             total_gross_salary += slip_gross
@@ -328,6 +380,7 @@ class HrPayrollDashboard(models.AbstractModel):
             total_lateness_amount += slip_late_amount
             total_scheduled_hours += slip_sched_hours
             total_working_days += slip_days
+            total_daily_cost += slip_daily_cost
 
             # Bank vs Cash Payment analysis
             has_bank = False
@@ -351,18 +404,36 @@ class HrPayrollDashboard(models.AbstractModel):
             dep_row["allowances"] += slip_allowances
             dep_row["deductions"] += (slip_deductions + slip_late_amount)
             dep_row["social_security"] += slip_ssc_emp
+            dep_row["social_security_comp"] += slip_ssc_comp
             dep_row["income_tax"] += slip_tax
             dep_row["overtime_amount"] += slip_ot_amount
             dep_row["overtime_hours"] += slip_ot_hours
             dep_row["lateness_hours"] += slip_late_hours
             dep_row["lateness_amount"] += slip_late_amount
             dep_row["working_days"] += slip_days
+            dep_row["daily_cost"] += slip_daily_cost
 
         # Finalize department rows
         department_list = []
         for d_id, row in department_dict.items():
             row["headcount"] = len(row["employee_ids"])
             del row["employee_ids"]
+            row["calendar_days"] = calendar_days
+            row["daily_cost"] = round(row["daily_cost"], 3)
+            row["avg_daily_cost_per_emp"] = round(row["daily_cost"] / row["headcount"], 3) if row["headcount"] else 0.0
+
+            # POS Sales & Labor Cost % for Retail Branches
+            pos_sales = pos_sales_by_dept.get(d_id, 0.0)
+            row["pos_sales"] = round(pos_sales, 3)
+            monthly_dept_cost = row["daily_cost"] * float(calendar_days)
+            row["pos_labor_cost_pct"] = round((monthly_dept_cost / pos_sales * 100.0), 1) if pos_sales else 0.0
+            row["sales_per_jod_labor"] = round((pos_sales / monthly_dept_cost), 2) if monthly_dept_cost else 0.0
+
+            # Factory Production Output Ratios
+            mrp_qty = mrp_qty_by_dept.get(d_id, 0.0)
+            row["mrp_qty"] = round(mrp_qty, 2)
+            row["labor_cost_per_unit"] = round((monthly_dept_cost / mrp_qty), 3) if mrp_qty else 0.0
+
             department_list.append(row)
 
         department_list.sort(key=lambda x: x["net_salary"], reverse=True)
@@ -372,10 +443,13 @@ class HrPayrollDashboard(models.AbstractModel):
         top_headcount_departments = sorted(department_list, key=lambda x: x["headcount"], reverse=True)[:5]
 
         approved_hours = max(total_scheduled_hours + total_overtime_hours - total_lateness_hours, 0.0)
+        total_employer_payroll_expense = round(total_gross_salary + total_social_security_comp, 3)
+        overtime_cost_ratio = round((total_overtime_amount / total_gross_salary * 100.0), 1) if total_gross_salary else 0.0
 
         data = {
             "date_from": str(start_date),
             "date_to": str(end_date),
+            "calendar_days": calendar_days,
             "selected_company_id": target_company_id,
             "selected_payrun_id": int(payrun_id) if payrun_id else 0,
             "payrun_batches": payrun_batches,
@@ -403,6 +477,10 @@ class HrPayrollDashboard(models.AbstractModel):
                 "cash_count": cash_count,
                 "cash_amount": round(cash_amount, 3),
                 "avg_salary_per_emp": round(total_net_salary / len(distinct_employee_ids), 3) if distinct_employee_ids else 0.0,
+                "total_daily_cost": round(total_daily_cost, 3),
+                "avg_daily_cost_per_emp": round(total_daily_cost / len(distinct_employee_ids), 3) if distinct_employee_ids else 0.0,
+                "total_employer_expense": total_employer_payroll_expense,
+                "overtime_cost_ratio": overtime_cost_ratio,
             },
             "departments": department_list,
             "channels": [
@@ -432,6 +510,7 @@ class HrPayrollDashboard(models.AbstractModel):
             }
         }
         return data
+
 
     @api.model
     def open_kpi_drilldown(self, metric_type, date_from=None, date_to=None, payrun_id=None, company_id=None, department_ids=None):

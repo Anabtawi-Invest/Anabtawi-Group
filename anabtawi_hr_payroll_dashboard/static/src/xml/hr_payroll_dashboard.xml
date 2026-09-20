@@ -294,6 +294,50 @@
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
+
+                    <!-- Total Daily Payroll Cost -->
+                    <div class="o_kpi_card card-daily">
+                        <div class="kpi_icon"><i class="fa fa-calculator text-primary"/></div>
+                        <div class="kpi_title">Daily Payroll Cost (التكلفة اليومية)</div>
+                        <div class="kpi_value text-primary"><t t-esc="formatCurrency(data.kpis.total_daily_cost)"/> <span class="fs-6 fw-normal text-muted">JOD/Day</span></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-primary text-white badge_sub">Calendar: <t t-esc="data.calendar_days"/> Days</span>
+                            <span class="fw-bold text-dark">Exact Rate</span>
+                        </div>
+                    </div>
+
+                    <!-- Avg Daily Cost per Employee -->
+                    <div class="o_kpi_card card-daily-emp">
+                        <div class="kpi_icon"><i class="fa fa-id-card-o text-teal"/></div>
+                        <div class="kpi_title">Avg Daily / Emp (متوسط الموظف اليومي)</div>
+                        <div class="kpi_value text-teal"><t t-esc="formatCurrency(data.kpis.avg_daily_cost_per_emp)"/> <span class="fs-6 fw-normal text-muted">JOD/Emp</span></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-info text-white badge_sub">Per Head/Day</span>
+                            <span class="fw-bold text-dark">Manpower Cost</span>
+                        </div>
+                    </div>
+
+                    <!-- Total Employer Payroll Expense -->
+                    <div class="o_kpi_card card-tce">
+                        <div class="kpi_icon"><i class="fa fa-pie-chart text-indigo"/></div>
+                        <div class="kpi_title">Employer Expense (عبء الرواتب)</div>
+                        <div class="kpi_value text-indigo"><t t-esc="formatCurrency(data.kpis.total_employer_expense)"/> <span class="fs-6 fw-normal text-muted">JOD</span></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-indigo text-white badge_sub">Gross + Employer SS</span>
+                            <span class="fw-bold text-dark">Total Liability</span>
+                        </div>
+                    </div>
+
+                    <!-- Overtime Cost Ratio -->
+                    <div class="o_kpi_card card-ot">
+                        <div class="kpi_icon"><i class="fa fa-line-chart text-danger"/></div>
+                        <div class="kpi_title">Overtime Ratio (نسبة الإضافي)</div>
+                        <div class="kpi_value text-danger"><t t-esc="data.kpis.overtime_cost_ratio"/> <span class="fs-6 fw-normal text-muted">%</span></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-danger text-white badge_sub">% of Gross</span>
+                            <span class="fw-bold text-dark">OT vs Gross</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Highlights & Operations Row -->
@@ -377,7 +421,7 @@
                     <div class="table_header_controls">
                         <div>
                             <h4><i class="fa fa-table text-primary me-2"/> Departmental Payroll &amp; Operations Breakdown</h4>
-                            <span class="text-muted small">Comprehensive breakdown by department with sorting, search, and totals</span>
+                            <span class="text-muted small">Comprehensive breakdown by department with daily cost, retail POS sales ROI &amp; factory productivity</span>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
                             <input type="text" class="form-control form-control-sm" placeholder="Search department..." t-model="state.searchQuery" style="max-width: 220px;"/>
@@ -392,10 +436,16 @@
                             <thead>
                                 <tr>
                                     <th t-on-click="() => this.sortBy('department_name')">
-                                        Department <i class="fa fa-sort ms-1"/>
+                                        Department / Branch <i class="fa fa-sort ms-1"/>
                                     </th>
                                     <th class="text-center" t-on-click="() => this.sortBy('headcount')">
                                         Headcount <i class="fa fa-sort ms-1"/>
+                                    </th>
+                                    <th class="text-end" t-on-click="() => this.sortBy('daily_cost')">
+                                        Daily Cost (JOD/Day) <i class="fa fa-sort ms-1"/>
+                                    </th>
+                                    <th class="text-end" t-on-click="() => this.sortBy('avg_daily_cost_per_emp')">
+                                        Avg Cost/Emp <i class="fa fa-sort ms-1"/>
                                     </th>
                                     <th class="text-end" t-on-click="() => this.sortBy('basic_salary')">
                                         Basic Wage <i class="fa fa-sort ms-1"/>
@@ -409,17 +459,14 @@
                                     <th class="text-end" t-on-click="() => this.sortBy('gross_salary')">
                                         Gross Salary <i class="fa fa-sort ms-1"/>
                                     </th>
-                                    <th class="text-end" t-on-click="() => this.sortBy('deductions')">
-                                        Deductions <i class="fa fa-sort ms-1"/>
-                                    </th>
-                                    <th class="text-end" t-on-click="() => this.sortBy('social_security')">
-                                        Social Security <i class="fa fa-sort ms-1"/>
-                                    </th>
-                                    <th class="text-end" t-on-click="() => this.sortBy('income_tax')">
-                                        Income Tax <i class="fa fa-sort ms-1"/>
+                                    <th class="text-end" t-on-click="() => this.sortBy('social_security_comp')">
+                                        Company SS <i class="fa fa-sort ms-1"/>
                                     </th>
                                     <th class="text-end" t-on-click="() => this.sortBy('net_salary')">
                                         Net Salary <i class="fa fa-sort ms-1"/>
+                                    </th>
+                                    <th class="text-end" t-on-click="() => this.sortBy('pos_sales')">
+                                        POS Sales / Output <i class="fa fa-sort ms-1"/>
                                     </th>
                                 </tr>
                             </thead>
@@ -433,6 +480,8 @@
                                         <td class="text-center">
                                             <span class="badge bg-light text-dark border px-2 py-1"><t t-esc="d.headcount"/></span>
                                         </td>
+                                        <td class="text-end fw-bold text-info"><t t-esc="formatCurrency(d.daily_cost)"/></td>
+                                        <td class="text-end text-teal fw-bold"><t t-esc="formatCurrency(d.avg_daily_cost_per_emp)"/></td>
                                         <td class="text-end"><t t-esc="formatCurrency(d.basic_salary)"/></td>
                                         <td class="text-end text-success"><t t-esc="formatCurrency(d.allowances)"/></td>
                                         <td class="text-end text-primary">
@@ -440,10 +489,21 @@
                                             <div class="small text-muted"><t t-esc="formatDecimal(d.overtime_hours, 1)"/> hrs</div>
                                         </td>
                                         <td class="text-end fw-bold"><t t-esc="formatCurrency(d.gross_salary)"/></td>
-                                        <td class="text-end text-danger"><t t-esc="formatCurrency(d.deductions)"/></td>
-                                        <td class="text-end text-warning"><t t-esc="formatCurrency(d.social_security)"/></td>
-                                        <td class="text-end text-info"><t t-esc="formatCurrency(d.income_tax)"/></td>
+                                        <td class="text-end text-warning"><t t-esc="formatCurrency(d.social_security_comp)"/></td>
                                         <td class="text-end fw-bold text-primary fs-6"><t t-esc="formatCurrency(d.net_salary)"/></td>
+                                        <td class="text-end fw-bold">
+                                            <t t-if="d.pos_sales > 0">
+                                                <span class="text-success"><t t-esc="formatCurrency(d.pos_sales)"/> JOD</span>
+                                                <div class="small text-muted"><t t-esc="d.pos_labor_cost_pct"/>% Labor Ratio</div>
+                                            </t>
+                                            <t t-elif="d.mrp_qty > 0">
+                                                <span class="text-primary"><t t-esc="formatDecimal(d.mrp_qty, 1)"/> Output</span>
+                                                <div class="small text-muted"><t t-esc="formatCurrency(d.labor_cost_per_unit)"/> JOD/Unit</div>
+                                            </t>
+                                            <t t-else="">
+                                                <span class="text-muted small">N/A</span>
+                                            </t>
+                                        </td>
                                     </tr>
                                 </t>
                             </tbody>
@@ -451,19 +511,25 @@
                                 <tr>
                                     <td>Grand Total</td>
                                     <td class="text-center"><t t-esc="data.kpis.headcount"/></td>
+                                    <td class="text-end text-info fw-bold"><t t-esc="formatCurrency(data.kpis.total_daily_cost)"/></td>
+                                    <td class="text-end text-teal fw-bold"><t t-esc="formatCurrency(data.kpis.avg_daily_cost_per_emp)"/></td>
                                     <td class="text-end"><t t-esc="formatCurrency(data.kpis.total_basic_salary)"/></td>
                                     <td class="text-end text-success"><t t-esc="formatCurrency(data.kpis.total_allowances)"/></td>
                                     <td class="text-end text-primary"><t t-esc="formatCurrency(data.kpis.total_overtime_amount)"/></td>
                                     <td class="text-end"><t t-esc="formatCurrency(data.kpis.total_gross_salary)"/></td>
-                                    <td class="text-end text-danger"><t t-esc="formatCurrency(data.kpis.total_deductions)"/></td>
-                                    <td class="text-end text-warning"><t t-esc="formatCurrency(data.kpis.total_social_security)"/></td>
-                                    <td class="text-end text-info"><t t-esc="formatCurrency(data.kpis.total_income_tax)"/></td>
+                                    <td class="text-end text-warning"><t t-esc="formatCurrency(data.kpis.total_social_security_company)"/></td>
                                     <td class="text-end text-primary fs-6"><t t-esc="formatCurrency(data.kpis.total_net_salary)"/></td>
+                                    <td class="text-end fw-bold text-dark">-</td>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
                 </div>
+            </t>
+        </div>
+    </t>
+</templates>
+
             </t>
         </div>
     </t>

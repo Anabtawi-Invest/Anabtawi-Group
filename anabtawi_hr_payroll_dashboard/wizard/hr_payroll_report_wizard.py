@@ -142,7 +142,7 @@ class HrPayrollReportWizard(models.TransientModel):
 
             cols = [
                 "Property", "دائرة", "قسم", "فرع", "Emp No.", "Emp Name", 
-                "Working Days", "Basic Salary", "Actual basic salary", "Due Salary",
+                "Calendar Days", "Working Days", "Daily Rate (JOD/Day)", "Basic Salary", "Actual basic salary", "Due Salary",
                 "علاوة تكليف", "مكافأة مالية-شهرية", "عمل اضافي", "بدل تنقلات", "عائد ضمان", "علاوات أخرى", "Total Allowances",
                 "Gross Salary",
                 "دفعة أولى", "دفعة ثانية", "فرق راتب", "قرض شركة", "City Ledger", "برنامج وطني", "تأمين صحي", "عقوبات وغرامات",
@@ -157,6 +157,9 @@ class HrPayrollReportWizard(models.TransientModel):
                 cell.border = border_all
 
             row_idx = 7
+            cal_days = (self.date_to - self.date_from).days + 1 if self.date_to and self.date_from else 30
+            if cal_days <= 0: cal_days = 30
+
             for slip in payslips:
                 emp = slip.employee_id
                 dept_name = (slip.department_id or emp.department_id).name or _("Unassigned")
@@ -227,6 +230,8 @@ class HrPayrollReportWizard(models.TransientModel):
                 if not gross_val: gross_val = basic_w + tot_alw
                 if not net_val: net_val = gross_val - tot_ded
 
+                daily_rate = round((gross_val + (ded_ss * 1.9)) / float(cal_days), 3)
+
                 w_days = 30.0
                 if hasattr(slip, "worked_days_line_ids") and slip.worked_days_line_ids:
                     w_days = sum(wd.number_of_days for wd in slip.worked_days_line_ids if wd.code != "OUT") or 30.0
@@ -238,7 +243,9 @@ class HrPayrollReportWizard(models.TransientModel):
                     branch_name,
                     self._get_emp_code(emp),
                     emp.name,
+                    cal_days,
                     round(w_days, 2),
+                    daily_rate,
                     round(basic_w, 3),
                     round(actual_w, 3),
                     round(due_w, 3),
@@ -266,6 +273,7 @@ class HrPayrollReportWizard(models.TransientModel):
                     round(tot_ded, 3),
                     round(net_val, 3),
                 ]
+
 
                 for col_i, val in enumerate(row_values, start=1):
                     c = ws_pay.cell(row=row_idx, column=col_i, value=val)
