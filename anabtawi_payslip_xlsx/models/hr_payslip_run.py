@@ -242,6 +242,9 @@ class HrPayslipRun(models.Model):
             and not (l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in (l.name or ""))
             and not (l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in (l.name or "") and "موظف" in (l.name or "")))
             and not (l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in (l.name or "") and "شركة" in (l.name or "")))
+            and not any(x in (l.name or "").lower() for x in ("salary advance 2", "salary advances 2", "salary advance two", "salary advances two"))
+            and not ((l.code or "").lower() in ("sala2",))
+            and not (l.salary_rule_id and any(x in (l.salary_rule_id.name or "").lower() for x in ("salary advance 2", "salary advances 2", "salary advance two", "salary advances two")))
         )
 
         ded_map = {}
@@ -264,12 +267,15 @@ class HrPayslipRun(models.Model):
                 t_norm = t_name.lower().strip()
                 t_code = (getattr(itype, "code", "") or "").lower()
 
+                # Completely ignore 'Salary Advance 2' / 'Salary Advances Two' inputs
+                if any(x in t_norm for x in ("salary advance 2", "salary advances 2", "salary advance two", "salary advances two")) or t_code == "sala2":
+                    continue
+
                 is_deduction_input = (
                     "deduction" in t_norm
                     or "ded" in t_code
                     or "adv" in t_code
                     or "saladv" in t_code
-                    or "sala2" in t_code
                     or any(
                         t_norm == d_name
                         or d_name == t_norm
@@ -340,6 +346,8 @@ class HrPayslipRun(models.Model):
 
         dynamic_ded_cols = []
         for norm_k in sorted(ded_map.keys(), key=lambda k: ded_map[k]["name"]):
+            if any(x in norm_k for x in ("salary advance 2", "salary advances 2", "salary advance two", "salary advances two")):
+                continue
             col_info = ded_map[norm_k]
             c_name = col_info["name"]
             rule_keys = col_info["rule_keys"]
