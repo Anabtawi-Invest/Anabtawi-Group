@@ -506,14 +506,17 @@ class HrPayslipRun(models.Model):
 
                 # Attendance metrics (Total calculated paid days = Attendance + Public Holidays + Paid Leaves)
                 worked_days = payslip.worked_days_line_ids
-                absence_codes = ['ABS', 'ABSENT', 'LEAVEUNPAID', 'un_paid', 'SICKLEAVE0', 'LAT']
+                absence_codes = ['ABS', 'ABSENT', 'LEAVEUNPAID', 'UN_PAID', 'un_paid', 'SICKLEAVE0', 'LAT', 'OUT', 'UNP', 'OUTCON', 'OUT_OF_CONTRACT']
                 extra_hours_codes = ['EXTRA', 'EXTRA_HOURS', 'OVERTIME', 'OVER_TIME', 'EXTRA100']
 
                 paid_lines = worked_days.filtered(lambda wd: (
                     (wd.code or '').strip() not in absence_codes and
                     (wd.code or '').strip() not in extra_hours_codes and
                     'extra' not in (wd.name or '').lower() and
-                    'overtime' not in (wd.name or '').lower()
+                    'overtime' not in (wd.name or '').lower() and
+                    'out of contract' not in (wd.name or '').lower() and
+                    'outcon' not in (wd.name or '').lower() and
+                    'خارج العقد' not in (wd.name or '').lower()
                 ))
                 att_days = sum(paid_lines.mapped("number_of_days"))
                 if payslip.date_from and payslip.date_to:
