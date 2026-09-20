@@ -1132,42 +1132,52 @@ class HrPayslip(models.Model):
         _logger.info("[FAP-RECON] _sync_reconciliation_settlements END slips=%s", self.ids)
 
     def _fap_get_extra_hours_balance_hours(self, extra_type, exclude_alloc_names=None):
-        """Return Extra Hours available in hours (allocations − validated leaves)."""
+        """Return Extra Hours available in hours using the same remaining as Time Off dashboard."""
         self.ensure_one()
         exclude_alloc_names = set(exclude_alloc_names or [])
         Allocation = self.env['hr.leave.allocation'].sudo()
-        Leave = self.env['hr.leave'].sudo() if 'hr.leave' in self.env else None
         emp = self.employee_id
         if not emp or not extra_type:
             return 0.0
 
-        hours = 0.0
         allocations = Allocation.search([
             ('employee_id', '=', emp.id),
             ('holiday_status_id', '=', extra_type.id),
             ('state', '=', 'validate'),
         ])
-        for alloc in allocations:
-            if (alloc.name or '') in exclude_alloc_names:
-                continue
-            if alloc.number_of_days:
-                hours += alloc.number_of_days * 8.0
-            elif getattr(alloc, 'number_of_hours_display', None):
-                hours += alloc.number_of_hours_display
+        if exclude_alloc_names:
+            allocations = allocations.filtered(lambda a: (a.name or '') not in exclude_alloc_names)
 
-        if Leave:
-            leaves = Leave.search([
-                ('employee_id', '=', emp.id),
-                ('holiday_status_id', '=', extra_type.id),
-                ('state', '=', 'validate'),
-            ])
-            for lve in leaves:
-                if lve.number_of_days:
-                    hours -= lve.number_of_days * 8.0
-                elif getattr(lve, 'number_of_hours', None):
-                    hours -= lve.number_of_hours
-                elif getattr(lve, 'number_of_hours_display', None):
-                    hours -= lve.number_of_hours_display
+        # Ensure computed remaining matches what Time Off dashboard shows
+        allocations.invalidate_recordset([
+            'virtual_remaining_leaves', 'leaves_taken', 'max_leaves',
+            'number_of_days', 'number_of_hours_display',
+        ])
+
+        hours_per_day = 8.0
+        try:
+            if hasattr(emp, '_get_hours_per_day'):
+                hours_per_day = emp._get_hours_per_day(self.date_to or fields.Date.context_today(self)) or 8.0
+        except Exception:
+            hours_per_day = 8.0
+
+        hours = 0.0
+        for alloc in allocations:
+            # Prefer dashboard remaining (days). Fall back to allocated − taken.
+            rem_days = getattr(alloc, 'virtual_remaining_leaves', None)
+            if rem_days is None:
+                max_leaves = getattr(alloc, 'max_leaves', None)
+                taken = getattr(alloc, 'leaves_taken', 0.0) or 0.0
+                if max_leaves is not None:
+                    rem_days = max_leaves - taken
+                else:
+                    rem_days = (alloc.number_of_days or 0.0) - taken
+            unit = getattr(alloc, 'type_request_unit', None) or getattr(extra_type, 'request_unit', None) or 'day'
+            if unit == 'hour':
+                # Some DBs store remaining already in hours for hour-based types
+                hours += float(rem_days or 0.0)
+            else:
+                hours += float(rem_days or 0.0) * hours_per_day
 
         return round(hours, 2)
 
@@ -1209,18 +1219,23 @@ class HrPayslip(models.Model):
                 sync_leaves.write({'state': 'draft'})
                 sync_leaves.unlink()
 
+        # Flush settlement leaves so virtual_remaining sees them
+        self.env.flush_all()
         current_hours = self._fap_get_extra_hours_balance_hours(extra_type)
         gap_hours = round(target_hours - current_hours, 2)
         _logger.info(
-            "[FAP-RECON] slip=%s FORCE Extra Hours current=%s target_remaining=%s gap=%s",
+            "[FAP-RECON] slip=%s FORCE Extra Hours current=%s target_remaining=%s gap=%s "
+            "(current_days=%s target_days=%s)",
             self.id,
             current_hours,
             target_hours,
             gap_hours,
+            round(current_hours / 8.0, 4),
+            round(target_hours / 8.0, 4),
         )
 
         if gap_hours > 0.01:
-            # Need more Extra Hours → create/update monthly reconciliation allocation
+            # Need more Extra Hours → create monthly reconciliation allocation
             ot_days = round(gap_hours / 8.0, 4)
             alloc_vals = {
                 'name': alloc_name,
@@ -1270,6 +1285,7 @@ class HrPayslip(models.Model):
             })
             _logger.info("[FAP-RECON] slip=%s FORCE already matched (gap≈0)", self.id)
 
+        self.env.flush_all()
         final_hours = self._fap_get_extra_hours_balance_hours(extra_type)
         _logger.info(
             "[FAP-RECON] slip=%s FORCE result Extra Hours hours=%s days=%s (target=%s)",
