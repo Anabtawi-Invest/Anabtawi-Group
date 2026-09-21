@@ -285,9 +285,26 @@ class HrEmployee(models.Model):
                     candidate_unpunched_days.append((current, expected_hours))
                     current += timedelta(days=1)
 
-                # 4-Day Monthly Grace Threshold Rule:
-                # First 4 unpunched days in month forgiven; 5th+ day receives ABSENT entry
-                allowed_grace_days = 4
+                # Monthly Grace Threshold Rule:
+                # For employees with Out of Contract days (start date after m_from), grace/rest days equal the count of Mondays on/after start date.
+                emp_contracts = cached_contracts.get(employee.id, [])
+                first_contract = emp_contracts[0] if emp_contracts else False
+                c_start = first_contract.date_start if (first_contract and first_contract.date_start) else m_from
+
+                if c_start > m_from:
+                    active_start = max(m_from, c_start)
+                    num_mondays_active = sum(
+                        1 for d_idx in range((m_to - active_start).days + 1)
+                        if (active_start + timedelta(days=d_idx)).weekday() == 0
+                    )
+                    allowed_grace_days = num_mondays_active
+                else:
+                    emp_checked_in_count = sum(1 for (e_id, d) in checked_in_keys if e_id == employee.id and m_from <= d <= eval_to)
+                    num_mondays_in_month = sum(
+                        1 for d_idx in range((m_to - m_from).days + 1)
+                        if (m_from + timedelta(days=d_idx)).weekday() == 0
+                    )
+                    allowed_grace_days = max(num_mondays_in_month, emp_checked_in_count // 6)
                 forgiven_days = [d[0] for d in candidate_unpunched_days[:allowed_grace_days]]
                 if forgiven_days:
                     WEModel = self.env["hr.work.entry"]
@@ -435,9 +452,12 @@ class HrEmployee(models.Model):
         return (getattr(version, 'work_entry_source', False) or "attendance").strip()
 
     def _get_expected_hours_on_day(self, target_date):
-        """Return expected net work hours based on contract work entry source (planning vs calendar vs attendance)."""
+        """Return expected net work hours based on contract work entry source (planning vs calendar vs attendance). Returns 0.0 if out of contract."""
         self.ensure_one()
-        source = self._get_work_entry_source_on_day(target_date)
+        version = self._get_versions_with_contract_overlap_with_period(target_date, target_date)[:1]
+        if not version:
+            return 0.0
+        source = (getattr(version, 'work_entry_source', False) or "attendance").strip()
         if source == "planning":
             return self._get_planning_hours_on_day(target_date)
         elif source == "calendar" and self.resource_calendar_id:

@@ -129,7 +129,7 @@ class HrAttendance(models.Model):
             old_atts.daily_variance_hours = 0.0
             old_atts.is_public_holiday = False
             for attendance in old_atts:
-                raw_hrs = attendance.worked_hours or 0.0
+                raw_hrs = (attendance.check_out - attendance.check_in).total_seconds() / 3600.0 if (attendance.check_in and attendance.check_out) else (attendance.worked_hours or 0.0)
                 b_hrs = 1.0 if raw_hrs >= 6.0 else 0.0
                 attendance.attendance_break_hours = b_hrs
                 attendance.net_worked_hours = max(0.0, raw_hrs - b_hrs)
@@ -162,7 +162,7 @@ class HrAttendance(models.Model):
                 }
             emp_info = emp_cache[emp_id]
 
-            raw_hrs = attendance.worked_hours or 0.0
+            raw_hrs = (attendance.check_out - attendance.check_in).total_seconds() / 3600.0 if (attendance.check_in and attendance.check_out) else (attendance.worked_hours or 0.0)
             break_hrs = emp_info['break_hrs']
 
             if raw_hrs >= 6.0:
@@ -275,9 +275,11 @@ class HrAttendance(models.Model):
                         sched_start = 8.0
                         sched_end = 16.5
 
-                # Lateness (Check-In delay vs Scheduled Start)
+                # Lateness (Check-In delay vs Scheduled Start + Early Departure vs Scheduled End)
                 late_delay = max(0.0, actual_in_hour - sched_start)
-                undertime = round(late_delay, 2) if late_delay >= min_lateness_threshold else 0.0
+                early_leave = max(0.0, sched_end - actual_out_hour) if attendance.check_out else 0.0
+                total_fixed_undertime = late_delay + early_leave
+                undertime = round(total_fixed_undertime, 2) if total_fixed_undertime >= min_lateness_threshold else 0.0
 
                 # Overtime (Check-Out delay vs Scheduled End)
                 if attendance.check_out:
@@ -468,7 +470,7 @@ class HrAttendance(models.Model):
 
         for att in valid_atts:
             try:
-                raw_hrs = att.worked_hours
+                raw_hrs = (att.check_out - att.check_in).total_seconds() / 3600.0 if (att.check_in and att.check_out) else (att.worked_hours or 0.0)
                 break_hrs = att.employee_id._get_lunch_break_duration()
 
                 if raw_hrs >= 6.0:
