@@ -409,6 +409,20 @@
         }
     }
 
+    /* High-contrast dropdowns & inputs */
+    .filter_select, .filter_input {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+        font-weight: 600 !important;
+
+        option {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            font-weight: 500 !important;
+        }
+    }
+
     .o_highlights_grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -416,10 +430,11 @@
         margin-bottom: 24px;
 
         .highlight_card {
-            background: #ffffff;
+            background: #ffffff !important;
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+            border: 1px solid #e2e8f0 !important;
 
             .card_header {
                 display: flex;
@@ -428,29 +443,44 @@
                 margin-bottom: 16px;
                 h5 {
                     font-size: 1.05rem;
-                    font-weight: 700;
+                    font-weight: 800 !important;
                     margin: 0;
-                    color: #0f172a;
+                    color: #0f172a !important;
                 }
             }
 
             .highlight_stat_box {
-                background: #0f172a;
-                color: #ffffff;
+                background: #f8fafc !important;
+                border: 1px solid #e2e8f0 !important;
+                color: #0f172a !important;
                 border-radius: 8px;
                 padding: 14px 16px;
                 margin-bottom: 10px;
 
                 .stat_label {
                     font-size: 0.8rem;
-                    color: #cbd5e1;
+                    color: #475569 !important;
                     display: block;
-                    font-weight: 600;
+                    font-weight: 700 !important;
                 }
                 .stat_value {
                     font-size: 1.25rem;
                     font-weight: 800;
-                    color: #38bdf8;
+
+                    &.text-primary { color: #2563eb !important; }
+                    &.text-success { color: #16a34a !important; }
+                    &.text-danger { color: #dc2626 !important; }
+                    &.text-warning { color: #d97706 !important; }
+                }
+            }
+
+            .list-group-item {
+                background-color: #ffffff !important;
+                color: #0f172a !important;
+                border-color: #f1f5f9 !important;
+
+                span, div {
+                    color: #0f172a !important;
                 }
             }
         }
