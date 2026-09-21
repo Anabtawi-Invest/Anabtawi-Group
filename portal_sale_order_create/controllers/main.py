@@ -115,6 +115,8 @@ class PortalSaleOrderCreate(http.Controller):
                     "name": p.display_name or p.name,
                     "phone": p.phone or "",
                     "email": p.email or "",
+                    "portal_allow_payment_term": bool(p.portal_allow_payment_term),
+                    "default_payment_term_id": p.property_payment_term_id.id or False,
                 }
                 for p in partners
             ]
@@ -169,8 +171,41 @@ class PortalSaleOrderCreate(http.Controller):
             "has_more": offset + len(result) < total,
         }
 
+    @http.route("/my/sales/api/payment_terms", type="jsonrpc", auth="user", website=True)
+    def api_payment_terms(self, **kwargs):
+        self._ensure_sales_portal()
+        return self._get_payment_terms()
+
+    @http.route(
+        "/my/sales/api/payment_terms/http",
+        type="http",
+        auth="user",
+        website=True,
+        methods=["GET"],
+        csrf=False,
+    )
+    def api_payment_terms_http(self, **kwargs):
+        self._ensure_sales_portal()
+        return request.make_json_response(self._get_payment_terms())
+
+    def _get_payment_terms(self):
+        company = request.env.company
+        terms = (
+            request.env["account.payment.term"]
+            .sudo()
+            .search(
+                [
+                    "|",
+                    ("company_id", "=", False),
+                    ("company_id", "=", company.id),
+                ],
+                order="name, id",
+            )
+        )
+        return [{"id": term.id, "name": term.display_name or term.name} for term in terms]
+
     @http.route("/my/sales/api/confirm", type="jsonrpc", auth="user", website=True)
-    def api_confirm(self, partner_id=None, lines=None, **kwargs):
+    def api_confirm(self, partner_id=None, lines=None, payment_term_id=None, **kwargs):
         self._ensure_sales_portal()
         if not partner_id:
             raise ValidationError(_("Please select a customer."))
@@ -181,6 +216,21 @@ class PortalSaleOrderCreate(http.Controller):
         partner = request.env["res.partner"].sudo().browse(int(partner_id)).exists()
         if not partner:
             raise ValidationError(_("Customer not found."))
+
+        payment_term = False
+        if partner.portal_allow_payment_term:
+            if not payment_term_id:
+                raise ValidationError(_("Please select payment terms."))
+            payment_term = (
+                request.env["account.payment.term"]
+                .sudo()
+                .browse(int(payment_term_id))
+                .exists()
+            )
+            if not payment_term:
+                raise ValidationError(_("Invalid payment terms selected."))
+            if payment_term.company_id and payment_term.company_id != request.env.company:
+                raise ValidationError(_("Invalid payment terms selected."))
 
         order_lines = []
         for line in lines:
@@ -215,6 +265,8 @@ class PortalSaleOrderCreate(http.Controller):
                 }
             )
         )
+        if payment_term:
+            order.payment_term_id = payment_term.id
         order.action_confirm()
         invoices = order._create_invoices()
         invoices.action_post()

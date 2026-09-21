@@ -46,9 +46,25 @@ async function fetchPartners(term) {
     }
 }
 
+async function fetchPaymentTerms() {
+    try {
+        return await rpc("/my/sales/api/payment_terms", {});
+    } catch (e1) {
+        const response = await fetch("/my/sales/api/payment_terms/http", {
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            throw e1;
+        }
+        return await response.json();
+    }
+}
+
 function initCreatePage(root) {
     const state = {
         partner: null,
+        paymentTermId: null,
+        paymentTermsLoaded: false,
         cart: {},
         productOffset: 0,
         productTerm: "",
@@ -59,6 +75,8 @@ function initCreatePage(root) {
     const partnerResults = qs("#partner_results", root);
     const selectedBox = qs("#selected_partner", root);
     const selectedLabel = qs("#selected_partner_label", root);
+    const paymentTermWrap = qs("#payment_term_wrap", root);
+    const paymentTermSelect = qs("#payment_term_id", root);
     const cartBody = qs("#cart_body", root);
     const cartEmpty = qs("#cart_empty", root);
     const cartWrap = qs("#cart_table_wrap", root);
@@ -106,12 +124,63 @@ function initCreatePage(root) {
         partnerResults.innerHTML = "";
     }
 
+    function hidePaymentTerms() {
+        state.paymentTermId = null;
+        if (paymentTermWrap) {
+            paymentTermWrap.classList.add("d-none");
+        }
+        if (paymentTermSelect) {
+            paymentTermSelect.value = "";
+        }
+    }
+
+    async function ensurePaymentTermsOptions() {
+        if (!paymentTermSelect || state.paymentTermsLoaded) {
+            return;
+        }
+        const terms = await fetchPaymentTerms();
+        const options = ['<option value="">Select payment terms...</option>'].concat(
+            (terms || []).map(
+                (term) =>
+                    `<option value="${term.id}">${escapeHtml(term.name)}</option>`
+            )
+        );
+        paymentTermSelect.innerHTML = options.join("");
+        state.paymentTermsLoaded = true;
+    }
+
+    async function showPaymentTerms(partner) {
+        if (!paymentTermWrap || !paymentTermSelect) {
+            return;
+        }
+        await ensurePaymentTermsOptions();
+        paymentTermWrap.classList.remove("d-none");
+        const defaultId = partner.default_payment_term_id
+            ? String(partner.default_payment_term_id)
+            : "";
+        if (defaultId && paymentTermSelect.querySelector(`option[value="${defaultId}"]`)) {
+            paymentTermSelect.value = defaultId;
+            state.paymentTermId = partner.default_payment_term_id;
+        } else {
+            paymentTermSelect.value = "";
+            state.paymentTermId = null;
+        }
+    }
+
     function selectPartner(partner) {
         state.partner = partner;
         selectedLabel.textContent = `${partner.name}${partner.phone ? " — " + partner.phone : ""}${partner.email ? " — " + partner.email : ""}`;
         selectedBox.classList.remove("d-none");
         partnerSearch.value = "";
         hidePartnerResults();
+        if (partner.portal_allow_payment_term) {
+            showPaymentTerms(partner).catch((err) => {
+                console.error("portal_sale_order_create: failed to load payment terms", err);
+                hidePaymentTerms();
+            });
+        } else {
+            hidePaymentTerms();
+        }
     }
 
     function renderCart() {
@@ -342,7 +411,15 @@ function initCreatePage(root) {
     qs("#btn_clear_partner", root).addEventListener("click", () => {
         state.partner = null;
         selectedBox.classList.add("d-none");
+        hidePaymentTerms();
     });
+
+    if (paymentTermSelect) {
+        paymentTermSelect.addEventListener("change", () => {
+            const value = paymentTermSelect.value;
+            state.paymentTermId = value ? parseInt(value, 10) : null;
+        });
+    }
 
     qs("#btn_open_products", root).addEventListener("click", async () => {
         openModal();
@@ -393,6 +470,10 @@ function initCreatePage(root) {
             showError(confirmError, "Please select a customer.");
             return;
         }
+        if (state.partner.portal_allow_payment_term && !state.paymentTermId) {
+            showError(confirmError, "Please select payment terms.");
+            return;
+        }
         const lines = Object.values(state.cart).map((i) => ({ product_id: i.id, qty: i.qty }));
         if (!lines.length) {
             showError(confirmError, "Please add at least one product.");
@@ -401,10 +482,14 @@ function initCreatePage(root) {
         const btn = qs("#btn_confirm_order", root);
         btn.disabled = true;
         try {
-            const result = await rpc("/my/sales/api/confirm", {
+            const payload = {
                 partner_id: state.partner.id,
                 lines,
-            });
+            };
+            if (state.partner.portal_allow_payment_term) {
+                payload.payment_term_id = state.paymentTermId;
+            }
+            const result = await rpc("/my/sales/api/confirm", payload);
             window.location.href = result.redirect_url;
         } catch (e) {
             showError(confirmError, e);

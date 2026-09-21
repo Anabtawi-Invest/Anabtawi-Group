@@ -92,6 +92,38 @@ msgid "Change"
 msgstr "تغيير"
 
 #. module: portal_sale_order_create
+#: model:ir.model.fields,field_description:portal_sale_order_create.field_res_partner__portal_allow_payment_term
+msgid "Allow Portal Payment Terms"
+msgstr "السماح بشروط الدفع من البوابة"
+
+#. module: portal_sale_order_create
+#: model:ir.model.fields,help:portal_sale_order_create.field_res_partner__portal_allow_payment_term
+msgid "If enabled, Sales Portal users can choose payment terms when creating a sale order for this customer."
+msgstr "عند التفعيل، يمكن لمستخدمي بوابة المبيعات اختيار شروط الدفع عند إنشاء أمر بيع لهذا العميل."
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "Payment Terms"
+msgstr "شروط الدفع"
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "Select payment terms..."
+msgstr "اختر شروط الدفع..."
+
+#. module: portal_sale_order_create
+#. odoo-python
+#: code:addons/portal_sale_order_create/controllers/main.py:0
+msgid "Please select payment terms."
+msgstr "يرجى اختيار شروط الدفع."
+
+#. module: portal_sale_order_create
+#. odoo-python
+#: code:addons/portal_sale_order_create/controllers/main.py:0
+msgid "Invalid payment terms selected."
+msgstr "شروط الدفع المحددة غير صالحة."
+
+#. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
 msgid "Name *"
 msgstr "الاسم *"
