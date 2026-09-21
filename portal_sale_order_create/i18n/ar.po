@@ -28,6 +28,26 @@ msgid "Sales Portal User"
 msgstr "مستخدم بوابة المبيعات"
 
 #. module: portal_sale_order_create
+#: model:res.groups,name:portal_sale_order_create.group_sales_portal_draft
+msgid "Sales Portal Draft Quotation"
+msgstr "مسودة عرض سعر لبوابة المبيعات"
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "Submitting will create a draft quotation only. Backend staff will confirm and invoice it."
+msgstr "الإرسال سينشئ مسودة عرض سعر فقط. سيقوم موظفو النظام بالتأكيد وإصدار الفاتورة."
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
+msgid "Submit Draft Quotation"
+msgstr "إرسال مسودة عرض السعر"
+
+#. module: portal_sale_order_create
+#: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_order_detail
+msgid "This is a draft quotation. Backend staff will confirm and continue the sales cycle."
+msgstr "هذه مسودة عرض سعر. سيقوم موظفو النظام بالتأكيد ومتابعة دورة المبيعات."
+
+#. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_breadcrumbs_sale
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_my_home_sale_cards

@@ -523,7 +523,11 @@ function initDetailPage() {
 
     if (cancelBtn) {
         cancelBtn.addEventListener("click", async () => {
-            if (!window.confirm("Cancel this order and reverse its invoice?")) {
+            const isDraft = cancelBtn.dataset.isDraft === "1";
+            const confirmMsg = isDraft
+                ? "Cancel this draft quotation?"
+                : "Cancel this order and reverse its invoice?";
+            if (!window.confirm(confirmMsg)) {
                 return;
             }
             try {

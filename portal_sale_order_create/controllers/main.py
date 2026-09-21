@@ -12,6 +12,7 @@ from odoo.addons.portal.controllers.portal import pager as portal_pager
 _logger = logging.getLogger(__name__)
 
 GROUP_XMLID = "portal_sale_order_create.group_sales_portal"
+GROUP_DRAFT_XMLID = "portal_sale_order_create.group_sales_portal_draft"
 
 
 class PortalSaleOrderCreate(http.Controller):
@@ -20,6 +21,8 @@ class PortalSaleOrderCreate(http.Controller):
         if request.env.user._is_public() or not request.env.user.has_group(GROUP_XMLID):
             raise AccessError(_("You do not have access to Sales Portal."))
 
+    def _is_draft_portal_user(self):
+        return request.env.user.has_group(GROUP_DRAFT_XMLID)
     def _get_my_order(self, order_id):
         order = request.env["sale.order"].sudo().browse(order_id).exists()
         if not order or order.create_uid.id != request.env.user.id:
@@ -34,6 +37,7 @@ class PortalSaleOrderCreate(http.Controller):
             {
                 "page_name": "portal_sale_create",
                 "currency": request.env.company.currency_id,
+                "draft_mode": self._is_draft_portal_user(),
             },
         )
 
@@ -267,6 +271,17 @@ class PortalSaleOrderCreate(http.Controller):
         )
         if payment_term:
             order.payment_term_id = payment_term.id
+
+        if self._is_draft_portal_user():
+            return {
+                "order_id": order.id,
+                "order_name": order.name,
+                "invoice_id": False,
+                "invoice_name": False,
+                "draft": True,
+                "redirect_url": f"/my/sales/orders/{order.id}",
+            }
+
         order.action_confirm()
         invoices = order._create_invoices()
         invoices.action_post()
@@ -276,6 +291,7 @@ class PortalSaleOrderCreate(http.Controller):
             "order_name": order.name,
             "invoice_id": invoice.id if invoice else False,
             "invoice_name": invoice.name if invoice else False,
+            "draft": False,
             "redirect_url": f"/my/sales/orders/{order.id}",
         }
 

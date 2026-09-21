@@ -118,12 +118,22 @@
                 <div class="card mb-3 o_portal_sale_section">
                     <div class="card-header fw-bold">3. Confirm</div>
                     <div class="card-body">
-                        <p class="text-muted mb-3">
-                            Confirming will create the sale order, confirm it, and post the invoice automatically.
-                        </p>
-                        <button type="button" class="btn btn-success btn-lg" id="btn_confirm_order">
-                            Confirm &amp; Invoice
-                        </button>
+                        <t t-if="draft_mode">
+                            <p class="text-muted mb-3">
+                                Submitting will create a draft quotation only. Backend staff will confirm and invoice it.
+                            </p>
+                            <button type="button" class="btn btn-success btn-lg" id="btn_confirm_order">
+                                Submit Draft Quotation
+                            </button>
+                        </t>
+                        <t t-else="">
+                            <p class="text-muted mb-3">
+                                Confirming will create the sale order, confirm it, and post the invoice automatically.
+                            </p>
+                            <button type="button" class="btn btn-success btn-lg" id="btn_confirm_order">
+                                Confirm &amp; Invoice
+                            </button>
+                        </t>
                         <div id="confirm_error" class="alert alert-danger mt-3 d-none mb-0"/>
                     </div>
                 </div>
@@ -221,6 +231,9 @@
                 </div>
 
                 <div t-if="order.state == 'cancel'" class="alert alert-warning">This order is cancelled.</div>
+                <div t-elif="order.state in ('draft', 'sent')" class="alert alert-info">
+                    This is a draft quotation. Backend staff will confirm and continue the sales cycle.
+                </div>
                 <div t-elif="invoice" class="alert alert-success">
                     Invoice <strong t-esc="invoice.name"/> created and posted.
                 </div>
@@ -291,7 +304,8 @@
 
                 <div class="mt-3" t-if="order.state != 'cancel'">
                     <button type="button" class="btn btn-outline-danger" id="btn_cancel_order"
-                            t-att-data-order-id="order.id">
+                            t-att-data-order-id="order.id"
+                            t-att-data-is-draft="'1' if order.state in ('draft', 'sent') else '0'">
                         Cancel Order
                     </button>
                 </div>
