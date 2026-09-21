@@ -119,6 +119,7 @@
                 <t t-set="net" t-value="lines.filtered(lambda l: l.salary_rule_id.code in ('NET', 'NET_SALARY') or l.salary_rule_id.id in rule_ids['net'])[:1]"/>
                 <t t-set="basic_amount" t-value="o.employee_id.wage if 'wage' in o.employee_id._fields else 0.0"/>
                 <t t-set="actual_amount" t-value="actual.total if actual else 0.0"/>
+                <t t-set="unpaid_amount" t-value="max(0.0, (basic_amount or 0.0) - (actual_amount or 0.0))"/>
                 <t t-set="information" t-value="visible_lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['information'])"/>
                 <t t-set="reserved" t-value="basic | actual | gross | net | information"/>
                 <!-- child_of includes any depth of category descendants. -->
@@ -316,7 +317,7 @@
                                     <tr>
                                         <td>Unpaid Time<br/><span class="ar">أيام الخصم</span></td>
                                         <td class="num"><span t-out="unpaid_days_count" t-options="{'widget': 'float', 'precision': 2}"/></td>
-                                        <td class="num"><span t-out="cfg['deduction_sign'] * sum(time_deductions.mapped('total'))" t-options="{'widget': 'float', 'precision': precision}"/></td>
+                                        <td class="num"><span t-out="unpaid_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                     <tr>
                                         <td>Actual Salary<br/><span class="ar">الراتب الفعلي</span></td>
