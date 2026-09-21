@@ -815,7 +815,19 @@ class HrPayslip(models.Model):
                         else:
                             earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
 
-                        line['number_of_days'] = float(regular_physical_days + earned_rest_days)
+                        active_period_days = max(0, (c_end - c_start).days + 1)
+                        max_standard_days = max(0, active_period_days - len(holiday_dates))
+
+                        total_standard_days = regular_physical_days + earned_rest_days
+                        if max_standard_days > 0 and total_standard_days > max_standard_days:
+                            excess_days = total_standard_days - max_standard_days
+                            final_attendance_days = max_standard_days
+                            extra_day_off_hrs = round(excess_days * 8.0, 2)
+                        else:
+                            final_attendance_days = total_standard_days
+                            extra_day_off_hrs = 0.0
+
+                        line['number_of_days'] = float(final_attendance_days)
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
@@ -833,11 +845,12 @@ class HrPayslip(models.Model):
                         line['amount'] = 0.0
                     filtered_lines.append(line)
 
-                elif code in ['OVERTIME', 'EXTRA', 'OUT'] or 'overtime' in we_name or 'extra' in we_name:
-                    if net_extra_hrs > 0.01:
-                        line['number_of_hours'] = net_extra_hrs
-                        line['number_of_days'] = round(net_extra_hrs / 8.0, 2)
-                        line['amount'] = round(net_extra_hrs * hourly_rate, 3)
+                elif code in ['OVERTIME', 'EXTRA'] or 'overtime' in we_name or 'extra' in we_name:
+                    total_net_extra_hrs = round(net_extra_hrs + (extra_day_off_hrs if 'extra_day_off_hrs' in locals() else 0.0), 2)
+                    if total_net_extra_hrs > 0.01:
+                        line['number_of_hours'] = total_net_extra_hrs
+                        line['number_of_days'] = round(total_net_extra_hrs / 8.0, 2)
+                        line['amount'] = round(total_net_extra_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
                 elif code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in we_name:
