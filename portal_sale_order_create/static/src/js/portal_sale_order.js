@@ -266,7 +266,9 @@ function initCreatePage(root) {
                 .map(
                     (p) => `<button type="button" class="list-group-item list-group-item-action text-start"
                         data-id="${p.id}" data-name="${escapeAttr(p.name)}"
-                        data-phone="${escapeAttr(p.phone)}" data-email="${escapeAttr(p.email)}">
+                        data-phone="${escapeAttr(p.phone)}" data-email="${escapeAttr(p.email)}"
+                        data-allow-payment-term="${p.portal_allow_payment_term ? "1" : "0"}"
+                        data-default-payment-term-id="${p.default_payment_term_id || ""}">
                         <strong>${highlight(p.name)}</strong>
                         <div class="small text-muted">
                             ${p.phone ? highlight(p.phone) : ""}
@@ -278,11 +280,14 @@ function initCreatePage(root) {
             qsa("button", partnerResults).forEach((btn) => {
                 btn.addEventListener("mousedown", (ev) => {
                     ev.preventDefault();
+                    const defaultTerm = parseInt(btn.dataset.defaultPaymentTermId || "", 10);
                     selectPartner({
                         id: parseInt(btn.dataset.id, 10),
                         name: btn.dataset.name,
                         phone: btn.dataset.phone,
                         email: btn.dataset.email,
+                        portal_allow_payment_term: btn.dataset.allowPaymentTerm === "1",
+                        default_payment_term_id: defaultTerm || false,
                     });
                 });
             });
