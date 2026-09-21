@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import base64
 import logging
 import re
 
@@ -39,9 +38,9 @@ class PortalCustomerRequest(http.Controller):
             raise UserError(
                 _("Create Customer approval category is not configured. Please contact an administrator.")
             )
-        # Keep aligned with approval_contact required fields / partner creation
-        if "x_create_contact_on_approve" in category._fields and not category.x_create_contact_on_approve:
-            category.x_create_contact_on_approve = True
+        # Portal create-customer must NOT use approval_contact mandatory VAT/attachment rules
+        if "x_create_contact_on_approve" in category._fields and category.x_create_contact_on_approve:
+            category.x_create_contact_on_approve = False
         return category
 
     def _get_my_request(self, request_id):
@@ -62,16 +61,6 @@ class PortalCustomerRequest(http.Controller):
             "refused": _("Refused"),
             "cancel": _("Canceled"),
         }.get(status, status or "")
-
-    def _display_name(self, approval):
-        return approval.x_contact_name or approval.customer_name or "-"
-
-    def _display_phone(self, approval):
-        return approval.x_contact_phone or approval.customer_phone or "-"
-
-    # ------------------------------------------------------------------
-    # Pages
-    # ------------------------------------------------------------------
 
     @http.route("/my/customer-requests/create", type="http", auth="user", website=True)
     def portal_customer_request_create(self, **kwargs):
@@ -115,8 +104,6 @@ class PortalCustomerRequest(http.Controller):
                 "approvals": approvals,
                 "pager": pager,
                 "status_label": self._status_label,
-                "display_name": self._display_name,
-                "display_phone": self._display_phone,
             },
         )
 
@@ -124,34 +111,19 @@ class PortalCustomerRequest(http.Controller):
     def portal_customer_request_detail(self, request_id, **kwargs):
         self._ensure_access()
         approval = self._get_my_request(request_id)
-        partner = approval.created_partner_id or approval.x_created_partner_id
         return request.render(
             "approvals_create_customer.portal_customer_request_detail",
             {
                 "page_name": "portal_customer_request_detail",
                 "approval": approval,
                 "status_label": self._status_label(approval.request_status),
-                "created_partner": partner,
             },
         )
 
-    # ------------------------------------------------------------------
-    # API
-    # ------------------------------------------------------------------
-
     @http.route("/my/customer-requests/api/submit", type="jsonrpc", auth="user", website=True)
-    def api_submit(
-        self,
-        name="",
-        phone="",
-        email="",
-        vat="",
-        contact_type="person",
-        attachment=None,
-        **kwargs,
-    ):
+    def api_submit(self, name="", phone="", email="", **kwargs):
         self._ensure_access()
-        return self._submit_request(name, phone, email, vat, contact_type, attachment)
+        return self._submit_request(name, phone, email)
 
     @http.route(
         "/my/customer-requests/api/submit/http",
@@ -168,46 +140,17 @@ class PortalCustomerRequest(http.Controller):
             payload.get("name", ""),
             payload.get("phone", ""),
             payload.get("email", ""),
-            payload.get("vat", ""),
-            payload.get("contact_type", "person"),
-            payload.get("attachment"),
         )
         return request.make_json_response(result)
 
-    def _normalize_attachment_datas(self, datas):
-        datas = (datas or "").strip()
-        if not datas:
-            return False
-        if "," in datas and datas.lower().startswith("data:"):
-            datas = datas.split(",", 1)[1]
-        try:
-            base64.b64decode(datas, validate=True)
-        except Exception as err:
-            raise UserError(_("Invalid attachment file.")) from err
-        return datas
-
-    def _submit_request(self, name, phone, email, vat="", contact_type="person", attachment=None):
+    def _submit_request(self, name, phone, email):
         name = (name or "").strip()
         phone = (phone or "").strip()
         email = (email or "").strip()
-        vat = (vat or "").strip()
-        contact_type = contact_type if contact_type in ("person", "company") else "person"
-
         if not name:
             raise UserError(_("Customer name is required."))
-        if not phone:
-            raise UserError(_("Phone is required."))
-        if not vat:
-            raise UserError(_("Tax ID (VAT) is required."))
         if email and not EMAIL_RE.match(email):
             raise UserError(_("Please enter a valid email address."))
-        if not attachment or not attachment.get("datas"):
-            raise UserError(_("At least one document attachment is required."))
-
-        filename = (attachment.get("name") or "document").strip() or "document"
-        datas = self._normalize_attachment_datas(attachment.get("datas"))
-        if not datas:
-            raise UserError(_("At least one document attachment is required."))
 
         category = self._get_category()
         Approval = request.env["approval.request"].sudo()
@@ -215,13 +158,8 @@ class PortalCustomerRequest(http.Controller):
             "category_id": category.id,
             "request_owner_id": request.env.user.id,
             "customer_name": name,
-            "customer_phone": phone,
+            "customer_phone": phone or False,
             "customer_email": email or False,
-            "x_contact_type": contact_type,
-            "x_contact_name": name,
-            "x_contact_phone": phone,
-            "x_contact_email": email or False,
-            "x_contact_vat": vat,
             "reason": _("Portal customer request: %(name)s", name=name),
         }
         if not category.automated_sequence:
@@ -230,15 +168,6 @@ class PortalCustomerRequest(http.Controller):
         approval = False
         try:
             approval = Approval.create(vals)
-            request.env["ir.attachment"].sudo().create(
-                {
-                    "name": filename,
-                    "datas": datas,
-                    "res_model": "approval.request",
-                    "res_id": approval.id,
-                    "type": "binary",
-                }
-            )
             approval.action_confirm()
         except (UserError, ValidationError):
             if approval:
@@ -285,7 +214,7 @@ class PortalCustomerRequest(http.Controller):
         approval = self._get_my_request(request_id)
         if approval.request_status in ("approved", "cancel"):
             raise UserError(_("This request can no longer be canceled."))
-        if approval.created_partner_id or approval.x_created_partner_id:
+        if approval.created_partner_id:
             raise UserError(_("This request already created a customer and cannot be canceled."))
         try:
             if approval.request_status == "new":

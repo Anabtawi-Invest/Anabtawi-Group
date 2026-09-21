@@ -64,31 +64,14 @@
                                        placeholder="Customer name" autocomplete="name" required="required"/>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="customer_phone">Phone <span class="text-danger">*</span></label>
+                                <label class="form-label" for="customer_phone">Phone</label>
                                 <input type="tel" class="form-control" id="customer_phone"
-                                       placeholder="Phone number" autocomplete="tel" required="required"/>
+                                       placeholder="Phone number" autocomplete="tel"/>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="customer_email">Email</label>
                                 <input type="email" class="form-control" id="customer_email"
                                        placeholder="Email address" autocomplete="email"/>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label" for="customer_vat">Tax ID (VAT) <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="customer_vat"
-                                       placeholder="Tax ID / VAT" required="required"/>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label" for="customer_type">Contact Type <span class="text-danger">*</span></label>
-                                <select class="form-select" id="customer_type" required="required">
-                                    <option value="person" selected="selected">Individual</option>
-                                    <option value="company">Company</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label" for="customer_attachment">Document <span class="text-danger">*</span></label>
-                                <input type="file" class="form-control" id="customer_attachment" required="required"/>
-                                <div class="form-text">At least one attachment is required for approval.</div>
                             </div>
                         </div>
                         <div class="mt-4">
@@ -133,8 +116,8 @@
                                             <t t-esc="approval.name"/>
                                         </a>
                                     </td>
-                                    <td><t t-esc="display_name(approval)"/></td>
-                                    <td><t t-esc="display_phone(approval)"/></td>
+                                    <td><t t-esc="approval.customer_name or '-'"/></td>
+                                    <td><t t-esc="approval.customer_phone or '-'"/></td>
                                     <td>
                                         <span t-attf-class="badge text-bg-#{
                                             'secondary' if approval.request_status == 'new' else
@@ -176,24 +159,20 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="text-muted">Customer Name</div>
-                                <div class="fw-bold"><t t-esc="approval.x_contact_name or approval.customer_name or '-'"/></div>
+                                <div class="fw-bold"><t t-esc="approval.customer_name or '-'"/></div>
                             </div>
                             <div class="col-md-6">
                                 <div class="text-muted">Phone</div>
-                                <div><t t-esc="approval.x_contact_phone or approval.customer_phone or '-'"/></div>
+                                <div><t t-esc="approval.customer_phone or '-'"/></div>
                             </div>
                             <div class="col-md-6">
                                 <div class="text-muted">Email</div>
-                                <div><t t-esc="approval.x_contact_email or approval.customer_email or '-'"/></div>
+                                <div><t t-esc="approval.customer_email or '-'"/></div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="text-muted">Tax ID (VAT)</div>
-                                <div><t t-esc="approval.x_contact_vat or '-'"/></div>
-                            </div>
-                            <div class="col-md-6" t-if="created_partner">
+                            <div class="col-md-6" t-if="approval.created_partner_id">
                                 <div class="text-muted">Created Customer</div>
                                 <div class="fw-bold text-success">
-                                    <t t-esc="created_partner.display_name"/>
+                                    <t t-esc="approval.created_partner_id.display_name"/>
                                 </div>
                             </div>
                         </div>
