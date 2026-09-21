@@ -19,6 +19,7 @@
             <field name="approval_minimum">1</field>
             <field name="automated_sequence" eval="True"/>
             <field name="sequence_code">APCUST</field>
+            <field name="x_create_contact_on_approve" eval="True"/>
             <field name="approver_ids" eval="[(0, 0, {'user_id': ref('base.user_admin'), 'required': True})]"/>
         </record>
     </data>

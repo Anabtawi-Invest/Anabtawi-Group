@@ -37,6 +37,15 @@ function errorMessage(err) {
     );
 }
 
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error("Could not read file"));
+        reader.readAsDataURL(file);
+    });
+}
+
 async function submitRequest(payload) {
     try {
         return await rpc("/my/customer-requests/api/submit", payload);
@@ -71,10 +80,21 @@ async function cancelRequest(requestId) {
     }
 }
 
+function showError(errorEl, message) {
+    if (!errorEl) {
+        return;
+    }
+    errorEl.textContent = message;
+    errorEl.classList.remove("d-none");
+}
+
 function initCreatePage(root) {
     const nameInput = qs("#customer_name", root);
     const phoneInput = qs("#customer_phone", root);
     const emailInput = qs("#customer_email", root);
+    const vatInput = qs("#customer_vat", root);
+    const typeInput = qs("#customer_type", root);
+    const fileInput = qs("#customer_attachment", root);
     const submitBtn = qs("#btn_submit_customer_request", root);
     const errorEl = qs("#submit_error", root);
 
@@ -90,22 +110,44 @@ function initCreatePage(root) {
         const name = (nameInput && nameInput.value) || "";
         const phone = (phoneInput && phoneInput.value) || "";
         const email = (emailInput && emailInput.value) || "";
+        const vat = (vatInput && vatInput.value) || "";
+        const contactType = (typeInput && typeInput.value) || "person";
+        const file = fileInput && fileInput.files && fileInput.files[0];
+
         if (!name.trim()) {
-            if (errorEl) {
-                errorEl.textContent = "Customer name is required.";
-                errorEl.classList.remove("d-none");
-            }
+            showError(errorEl, "Customer name is required.");
             return;
         }
+        if (!phone.trim()) {
+            showError(errorEl, "Phone is required.");
+            return;
+        }
+        if (!vat.trim()) {
+            showError(errorEl, "Tax ID (VAT) is required.");
+            return;
+        }
+        if (!file) {
+            showError(errorEl, "At least one document attachment is required.");
+            return;
+        }
+
         submitBtn.disabled = true;
         try {
-            const result = await submitRequest({ name, phone, email });
+            const datas = await readFileAsBase64(file);
+            const result = await submitRequest({
+                name,
+                phone,
+                email,
+                vat,
+                contact_type: contactType,
+                attachment: {
+                    name: file.name,
+                    datas,
+                },
+            });
             window.location.href = result.redirect_url || "/my/customer-requests";
         } catch (err) {
-            if (errorEl) {
-                errorEl.textContent = errorMessage(err);
-                errorEl.classList.remove("d-none");
-            }
+            showError(errorEl, errorMessage(err));
             submitBtn.disabled = false;
         }
     });
@@ -131,10 +173,7 @@ function initDetailPage(root) {
             await cancelRequest(requestId);
             window.location.reload();
         } catch (err) {
-            if (errorEl) {
-                errorEl.textContent = errorMessage(err);
-                errorEl.classList.remove("d-none");
-            }
+            showError(errorEl, errorMessage(err));
             cancelBtn.disabled = false;
         }
     });

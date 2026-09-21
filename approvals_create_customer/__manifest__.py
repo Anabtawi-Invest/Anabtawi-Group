@@ -2,15 +2,17 @@
 {
     "name": "Approvals - Create Customer",
     "summary": "Approval type to request new customers from portal; create res.partner on approve",
-    "version": "19.0.1.0.0",
+    "version": "19.0.1.0.1",
     "category": "Human Resources/Approvals",
     "author": "Anabtawi",
     "license": "LGPL-3",
     "depends": [
         "approvals",
+        "approval_contact",
         "portal",
         "contacts",
     ],
+    "post_init_hook": "post_init_hook",
     "data": [
         "security/security.xml",
         "data/approval_category_data.xml",

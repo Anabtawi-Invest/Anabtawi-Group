@@ -107,6 +107,61 @@ msgstr "الهاتف"
 
 #. module: approvals_create_customer
 #: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_detail
+msgid "Tax ID (VAT)"
+msgstr "الرقم الضريبي"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Contact Type"
+msgstr "نوع جهة الاتصال"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Individual"
+msgstr "فرد"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Company"
+msgstr "شركة"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Document"
+msgstr "مستند"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "At least one attachment is required for approval."
+msgstr "يلزم إرفاق مستند واحد على الأقل للموافقة."
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Tax ID / VAT"
+msgstr "الرقم الضريبي"
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "Phone is required."
+msgstr "الهاتف مطلوب."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "Tax ID (VAT) is required."
+msgstr "الرقم الضريبي مطلوب."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "At least one document attachment is required."
+msgstr "يلزم إرفاق مستند واحد على الأقل."
+
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
 msgid "Email"
 msgstr "الإيميل"
 
