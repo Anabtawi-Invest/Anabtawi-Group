@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="portal_my_home_customer_request_cards" inherit_id="portal.portal_my_home" priority="52">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <div t-if="request.env.user.has_group('approvals_create_customer.group_portal_customer_request')"
+                 class="o_portal_category row g-2 mt-3" id="portal_customer_request_category">
+                <div class="col-12 col-md-6">
+                    <a href="/my/customer-requests/create"
+                       class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none border bg-white">
+                        <div>
+                            <h5 class="mb-0">Request New Customer</h5>
+                            <p class="mt-1 mb-0 opacity-75">Submit a customer for approval</p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-12 col-md-6">
+                    <a href="/my/customer-requests"
+                       class="d-flex gap-2 gap-md-3 py-3 pe-2 px-md-3 h-100 rounded text-decoration-none border bg-white">
+                        <div>
+                            <h5 class="mb-0">My Customer Requests</h5>
+                            <p class="mt-1 mb-0 opacity-75">Track and cancel your requests</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </xpath>
+    </template>
+
+    <template id="portal_breadcrumbs_customer_request" inherit_id="portal.portal_breadcrumbs">
+        <xpath expr="//ol" position="inside">
+            <li t-if="page_name == 'portal_customer_request_create'" class="breadcrumb-item">
+                <a href="/my/customer-requests/create">Request New Customer</a>
+            </li>
+            <li t-if="page_name == 'portal_customer_request_list'" class="breadcrumb-item">
+                <a href="/my/customer-requests">My Customer Requests</a>
+            </li>
+            <li t-if="page_name == 'portal_customer_request_detail'" class="breadcrumb-item">
+                <a href="/my/customer-requests">My Customer Requests</a>
+            </li>
+            <li t-if="page_name == 'portal_customer_request_detail' and approval" class="breadcrumb-item active">
+                <t t-esc="approval.name"/>
+            </li>
+        </xpath>
+    </template>
+
+    <template id="portal_customer_request_create" name="Request New Customer">
+        <t t-call="portal.portal_layout">
+            <div class="container o_portal_customer_request_create py-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h3 class="mb-0">Request New Customer</h3>
+                    <a href="/my/customer-requests" class="btn btn-secondary">My Customer Requests</a>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header fw-bold">Customer details</div>
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Your request will be sent for approval. The customer is created only after approval.
+                        </p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="customer_name">Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="customer_name"
+                                       placeholder="Customer name" autocomplete="name" required="required"/>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="customer_phone">Phone</label>
+                                <input type="tel" class="form-control" id="customer_phone"
+                                       placeholder="Phone number" autocomplete="tel"/>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="customer_email">Email</label>
+                                <input type="email" class="form-control" id="customer_email"
+                                       placeholder="Email address" autocomplete="email"/>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <button type="button" class="btn btn-success btn-lg" id="btn_submit_customer_request">
+                                Submit Request
+                            </button>
+                        </div>
+                        <div id="submit_error" class="alert alert-danger mt-3 d-none mb-0"/>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_customer_request_list" name="My Customer Requests">
+        <t t-call="portal.portal_layout">
+            <div class="container o_portal_customer_request_list py-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h3 class="mb-0">My Customer Requests</h3>
+                    <a href="/my/customer-requests/create" class="btn btn-primary">Request New Customer</a>
+                </div>
+
+                <t t-if="not approvals">
+                    <div class="alert alert-info mb-0">You have no customer requests yet.</div>
+                </t>
+                <t t-else="">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th>Customer Name</th>
+                                    <th>Phone</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="approvals" t-as="approval">
+                                    <td>
+                                        <a t-att-href="'/my/customer-requests/%s' % approval.id">
+                                            <t t-esc="approval.name"/>
+                                        </a>
+                                    </td>
+                                    <td><t t-esc="approval.customer_name or '-'"/></td>
+                                    <td><t t-esc="approval.customer_phone or '-'"/></td>
+                                    <td>
+                                        <span t-attf-class="badge text-bg-#{
+                                            'secondary' if approval.request_status == 'new' else
+                                            'warning' if approval.request_status == 'pending' else
+                                            'success' if approval.request_status == 'approved' else
+                                            'danger' if approval.request_status == 'refused' else
+                                            'dark'}">
+                                            <t t-esc="status_label(approval.request_status)"/>
+                                        </span>
+                                    </td>
+                                    <td><span t-field="approval.create_date" t-options='{"widget": "datetime"}'/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div t-if="pager" class="o_portal_pager d-flex justify-content-center my-3">
+                        <t t-call="portal.pager"/>
+                    </div>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_customer_request_detail" name="Customer Request Detail">
+        <t t-call="portal.portal_layout">
+            <div class="container o_portal_customer_request_detail py-4"
+                 t-att-data-request-id="approval.id">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h3 class="mb-0"><t t-esc="approval.name"/></h3>
+                    <a href="/my/customer-requests" class="btn btn-secondary">Back to list</a>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="text-muted">Status</div>
+                                <div class="fw-bold"><t t-esc="status_label"/></div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-muted">Customer Name</div>
+                                <div class="fw-bold"><t t-esc="approval.customer_name or '-'"/></div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-muted">Phone</div>
+                                <div><t t-esc="approval.customer_phone or '-'"/></div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-muted">Email</div>
+                                <div><t t-esc="approval.customer_email or '-'"/></div>
+                            </div>
+                            <div class="col-md-6" t-if="approval.created_partner_id">
+                                <div class="text-muted">Created Customer</div>
+                                <div class="fw-bold text-success">
+                                    <t t-esc="approval.created_partner_id.display_name"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4" t-if="approval.request_status in ('new', 'pending')">
+                            <button type="button" class="btn btn-outline-danger" id="btn_cancel_customer_request">
+                                Cancel Request
+                            </button>
+                            <div id="cancel_error" class="alert alert-danger mt-3 d-none mb-0"/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+</odoo>

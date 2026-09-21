@@ -1,0 +1,8 @@
+.o_portal_customer_request_create .card-header,
+.o_portal_customer_request_detail .card-header {
+    background: #f8f9fa;
+}
+
+.o_portal_customer_request_list .badge {
+    font-weight: 500;
+}

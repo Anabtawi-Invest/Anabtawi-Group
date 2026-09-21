@@ -122,27 +122,6 @@ class PortalSaleOrderCreate(http.Controller):
             _logger.exception("portal_sale_order_create: partner search failed for term=%r", term)
             return []
 
-    @http.route("/my/sales/api/partner/create", type="jsonrpc", auth="user", website=True)
-    def api_partner_create(self, name="", phone="", email="", **kwargs):
-        self._ensure_sales_portal()
-        name = (name or "").strip()
-        if not name:
-            raise ValidationError(_("Customer name is required."))
-        partner = request.env["res.partner"].sudo().create(
-            {
-                "name": name,
-                "phone": (phone or "").strip() or False,
-                "email": (email or "").strip() or False,
-                "customer_rank": 1,
-            }
-        )
-        return {
-            "id": partner.id,
-            "name": partner.name,
-            "phone": partner.phone or "",
-            "email": partner.email or "",
-        }
-
     @http.route("/my/sales/api/products", type="jsonrpc", auth="user", website=True)
     def api_products(self, term="", offset=0, limit=60, **kwargs):
         self._ensure_sales_portal()

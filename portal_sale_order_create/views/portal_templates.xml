@@ -55,7 +55,7 @@
                     <div class="card-header fw-bold">1. Customer</div>
                     <div class="card-body">
                         <div class="row g-2 align-items-end">
-                            <div class="col-md-6">
+                            <div class="col-md-8">
                                 <label class="form-label">Search customer</label>
                                 <div class="o_portal_partner_autocomplete">
                                     <input type="text" class="form-control" id="partner_search"
@@ -63,34 +63,15 @@
                                            autocomplete="off"/>
                                     <div id="partner_results" class="o_portal_partner_results list-group mt-2"></div>
                                 </div>
-                            </div>
-                            <div class="col-md-6">
-                                <button type="button" class="btn btn-outline-primary" id="btn_new_partner">
-                                    Create new customer
-                                </button>
+                                <div class="form-text">
+                                    New customers must be requested from the Customer Request portal card.
+                                </div>
                             </div>
                         </div>
                         <div id="selected_partner" class="alert alert-success mt-3 d-none mb-0">
                             <strong>Selected:</strong>
                             <span id="selected_partner_label"/>
                             <button type="button" class="btn btn-sm btn-link" id="btn_clear_partner">Change</button>
-                        </div>
-                        <div id="new_partner_form" class="border rounded p-3 mt-3 d-none">
-                            <div class="row g-2">
-                                <div class="col-md-4">
-                                    <label class="form-label">Name *</label>
-                                    <input type="text" class="form-control" id="new_partner_name"/>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Phone</label>
-                                    <input type="text" class="form-control" id="new_partner_phone"/>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label">Email</label>
-                                    <input type="email" class="form-control" id="new_partner_email"/>
-                                </div>
-                            </div>
-                            <button type="button" class="btn btn-primary mt-2" id="btn_save_partner">Save customer</button>
                         </div>
                     </div>
                 </div>

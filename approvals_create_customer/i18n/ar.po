@@ -1,0 +1,220 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* approvals_create_customer
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-03-26 00:00:00\n"
+"PO-Revision-Date: 2026-03-26 00:00:00\n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 "
+"&& n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+
+#. module: approvals_create_customer
+#: model:ir.module.category,name:approvals_create_customer.module_category_portal_customer_request
+#: model:res.groups.privilege,name:approvals_create_customer.privilege_portal_customer_request
+msgid "Portal Customer Request"
+msgstr "طلب عميل من البوابة"
+
+#. module: approvals_create_customer
+#: model:res.groups,name:approvals_create_customer.group_portal_customer_request
+msgid "Customer Request Portal User"
+msgstr "مستخدم بوابة طلب العميل"
+
+#. module: approvals_create_customer
+#: model:approval.category,name:approvals_create_customer.approval_category_data_create_customer
+#: model:ir.model.fields.selection,name:approvals_create_customer.selection__approval_category__approval_type__create_customer
+msgid "Create Customer"
+msgstr "إنشاء عميل"
+
+#. module: approvals_create_customer
+#: model:approval.category,description:approvals_create_customer.approval_category_data_create_customer
+msgid "Request creation of a new customer contact"
+msgstr "طلب إنشاء جهة اتصال عميل جديدة"
+
+#. module: approvals_create_customer
+#: model:ir.model.fields,field_description:approvals_create_customer.field_approval_request__customer_name
+msgid "Customer Name"
+msgstr "اسم العميل"
+
+#. module: approvals_create_customer
+#: model:ir.model.fields,field_description:approvals_create_customer.field_approval_request__customer_phone
+msgid "Customer Phone"
+msgstr "هاتف العميل"
+
+#. module: approvals_create_customer
+#: model:ir.model.fields,field_description:approvals_create_customer.field_approval_request__customer_email
+msgid "Customer Email"
+msgstr "إيميل العميل"
+
+#. module: approvals_create_customer
+#: model:ir.model.fields,field_description:approvals_create_customer.field_approval_request__created_partner_id
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.approval_request_view_form_create_customer
+msgid "Customer"
+msgstr "العميل"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_my_home_customer_request_cards
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_breadcrumbs_customer_request
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_list
+msgid "Request New Customer"
+msgstr "طلب عميل جديد"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_my_home_customer_request_cards
+msgid "Submit a customer for approval"
+msgstr "إرسال عميل للموافقة"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_my_home_customer_request_cards
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_list
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_breadcrumbs_customer_request
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "My Customer Requests"
+msgstr "طلبات العملاء الخاصة بي"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_my_home_customer_request_cards
+msgid "Track and cancel your requests"
+msgstr "تتبع طلباتك وإلغاؤها"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Customer details"
+msgstr "تفاصيل العميل"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Your request will be sent for approval. The customer is created only after approval."
+msgstr "سيتم إرسال طلبك للموافقة. يتم إنشاء العميل فقط بعد الموافقة."
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Name"
+msgstr "الاسم"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Phone"
+msgstr "الهاتف"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Email"
+msgstr "الإيميل"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Customer name"
+msgstr "اسم العميل"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Phone number"
+msgstr "رقم الهاتف"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Email address"
+msgstr "عنوان الإيميل"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_create
+msgid "Submit Request"
+msgstr "إرسال الطلب"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_list
+msgid "You have no customer requests yet."
+msgstr "لا توجد لديك طلبات عملاء بعد."
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_list
+msgid "Reference"
+msgstr "المرجع"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_list
+msgid "Status"
+msgstr "الحالة"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_list
+msgid "Date"
+msgstr "التاريخ"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_detail
+msgid "Back to list"
+msgstr "العودة للقائمة"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_detail
+msgid "Created Customer"
+msgstr "العميل المنشأ"
+
+#. module: approvals_create_customer
+#: model_terms:ir.ui.view,arch_db:approvals_create_customer.portal_customer_request_detail
+msgid "Cancel Request"
+msgstr "إلغاء الطلب"
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "You do not have access to Customer Request Portal."
+msgstr "ليس لديك صلاحية للوصول إلى بوابة طلب العميل."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "Customer name is required."
+msgstr "اسم العميل مطلوب."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "Please enter a valid email address."
+msgstr "يرجى إدخال عنوان إيميل صالح."
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "To Submit"
+msgstr "للإرسال"
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "Submitted"
+msgstr "تم الإرسال"
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "Approved"
+msgstr "موافق عليه"
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "Refused"
+msgstr "مرفوض"
+
+#. module: approvals_create_customer
+#. odoo-python
+#: code:addons/approvals_create_customer/controllers/main.py:0
+msgid "Canceled"
+msgstr "ملغى"
+
+#. module: approvals_create_customer
+#. odoo-javascript
+#: code:addons/approvals_create_customer/static/src/js/portal_customer_request.js:0
+msgid "Cancel this customer request?"
+msgstr "إلغاء طلب العميل هذا؟"

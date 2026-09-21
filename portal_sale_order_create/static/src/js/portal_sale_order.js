@@ -59,7 +59,6 @@ function initCreatePage(root) {
     const partnerResults = qs("#partner_results", root);
     const selectedBox = qs("#selected_partner", root);
     const selectedLabel = qs("#selected_partner_label", root);
-    const newForm = qs("#new_partner_form", root);
     const cartBody = qs("#cart_body", root);
     const cartEmpty = qs("#cart_empty", root);
     const cartWrap = qs("#cart_table_wrap", root);
@@ -112,7 +111,6 @@ function initCreatePage(root) {
         selectedLabel.textContent = `${partner.name}${partner.phone ? " — " + partner.phone : ""}${partner.email ? " — " + partner.email : ""}`;
         selectedBox.classList.remove("d-none");
         partnerSearch.value = "";
-        newForm.classList.add("d-none");
         hidePartnerResults();
     }
 
@@ -341,30 +339,9 @@ function initCreatePage(root) {
     partnerSearch.addEventListener("compositionend", schedulePartnerSearch);
     partnerSearch.addEventListener("focus", schedulePartnerSearch);
 
-    qs("#btn_new_partner", root).addEventListener("click", () => {
-        newForm.classList.toggle("d-none");
-    });
-
     qs("#btn_clear_partner", root).addEventListener("click", () => {
         state.partner = null;
         selectedBox.classList.add("d-none");
-    });
-
-    qs("#btn_save_partner", root).addEventListener("click", async () => {
-        confirmError.classList.add("d-none");
-        try {
-            const partner = await rpc("/my/sales/api/partner/create", {
-                name: qs("#new_partner_name", root).value,
-                phone: qs("#new_partner_phone", root).value,
-                email: qs("#new_partner_email", root).value,
-            });
-            selectPartner(partner);
-            qs("#new_partner_name", root).value = "";
-            qs("#new_partner_phone", root).value = "";
-            qs("#new_partner_email", root).value = "";
-        } catch (e) {
-            showError(confirmError, e);
-        }
     });
 
     qs("#btn_open_products", root).addEventListener("click", async () => {

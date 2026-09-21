@@ -78,8 +78,8 @@ msgstr "اكتب الاسم أو الهاتف أو الإيميل..."
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
-msgid "Create new customer"
-msgstr "إنشاء عميل جديد"
+msgid "New customers must be requested from the Customer Request portal card."
+msgstr "يجب طلب العملاء الجدد من بطاقة طلب العميل في البوابة."
 
 #. module: portal_sale_order_create
 #: model_terms:ir.ui.view,arch_db:portal_sale_order_create.portal_sale_create
