@@ -43,7 +43,15 @@ export class HrPayrollDashboard extends Component {
             kpis: {},
             departments: [],
             channels: [],
-            operational_highlights: {},
+            operational_highlights: {
+                scheduled_hours: 0,
+                approved_hours: 0,
+                extra_ot_hours: 0,
+                subtracted_late_hours: 0,
+                top_ot_departments: [],
+                top_late_departments: [],
+                top_headcount_departments: [],
+            },
         });
 
         onWillStart(async () => {
@@ -75,18 +83,27 @@ export class HrPayrollDashboard extends Component {
                 }
             );
 
-            this.data.date_from = res.date_from || this.state.date_from;
-            this.data.date_to = res.date_to || this.state.date_to;
-            this.data.selected_company_id = res.selected_company_id;
-            this.data.selected_payrun_id = res.selected_payrun_id;
-            this.data.payrun_batches = res.payrun_batches || [];
-            this.data.all_departments = res.all_departments || [];
-            this.data.parent_departments = res.parent_departments || [];
-            this.data.all_companies = res.all_companies || [];
-            this.data.kpis = res.kpis || {};
-            this.data.departments = res.departments || [];
-            this.data.channels = res.channels || [];
-            this.data.operational_highlights = res.operational_highlights || {};
+            const op = res?.operational_highlights || {};
+            this.data.date_from = res?.date_from || this.state.date_from;
+            this.data.date_to = res?.date_to || this.state.date_to;
+            this.data.selected_company_id = res?.selected_company_id || 0;
+            this.data.selected_payrun_id = res?.selected_payrun_id || 0;
+            this.data.payrun_batches = res?.payrun_batches || [];
+            this.data.all_departments = res?.all_departments || [];
+            this.data.parent_departments = res?.parent_departments || [];
+            this.data.all_companies = res?.all_companies || [];
+            this.data.kpis = res?.kpis || {};
+            this.data.departments = res?.departments || [];
+            this.data.channels = res?.channels || [];
+            this.data.operational_highlights = {
+                scheduled_hours: op.scheduled_hours || 0,
+                approved_hours: op.approved_hours || 0,
+                extra_ot_hours: op.extra_ot_hours || 0,
+                subtracted_late_hours: op.subtracted_late_hours || 0,
+                top_ot_departments: op.top_ot_departments || [],
+                top_late_departments: op.top_late_departments || [],
+                top_headcount_departments: op.top_headcount_departments || [],
+            };
         } catch (error) {
             console.error("Failed to load HR & Payroll dashboard data", error);
             if (this.notification) {

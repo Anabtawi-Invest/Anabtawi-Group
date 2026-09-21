@@ -25,7 +25,7 @@
                     <!-- Payrun Batch Selector Dropdown -->
                     <select class="form-select form-select-sm filter_select" t-on-change="onPayrunChange">
                         <option value="0">-- All / Custom Range --</option>
-                        <t t-foreach="data.payrun_batches" t-as="batch" t-key="batch.id">
+                        <t t-foreach="data.payrun_batches || []" t-as="batch" t-key="batch.id">
                             <option t-att-value="batch.id" t-att-selected="state.payrun_id === batch.id">
                                 <t t-esc="batch.name"/> (<t t-esc="batch.date_start"/>)
                             </option>
@@ -53,7 +53,7 @@
                         <i class="fa fa-sitemap text-primary me-1"/> Companies (الشركات):
                     </span>
                     <div class="filter_pills_container">
-                        <t t-foreach="data.all_companies" t-as="comp" t-key="comp.id">
+                        <t t-foreach="data.all_companies || []" t-as="comp" t-key="comp.id">
                             <button type="button" 
                                     class="btn btn-sm btn-company-pill"
                                     t-att-class="{'active': isCompanySelected(comp.id)}"
@@ -83,11 +83,11 @@
                                 class="btn btn-sm btn-dept-pill btn-dept-all"
                                 t-att-class="{'active': isDeptSelected('all')}"
                                 t-on-click="() => this.selectAllDepartments()">
-                            <i class="fa fa-th-large me-1"/> All Departments (<t t-esc="data.all_departments.length"/>)
+                            <i class="fa fa-th-large me-1"/> All Departments (<t t-esc="(data.all_departments || []).length"/>)
                         </button>
 
                         <!-- Parent Departments List -->
-                        <t t-foreach="data.parent_departments" t-as="parent" t-key="parent.id">
+                        <t t-foreach="data.parent_departments || []" t-as="parent" t-key="parent.id">
                             <div class="btn-group btn-parent-group me-2 mb-2" role="group">
                                 <!-- Main Parent Selection Button -->
                                 <button type="button"
@@ -129,7 +129,7 @@
                     </div>
 
                     <!-- Collapsible Sub-Department Trays (Branches) -->
-                    <t t-foreach="data.parent_departments" t-as="parent" t-key="'tray_' + parent.id">
+                    <t t-foreach="data.parent_departments || []" t-as="parent" t-key="'tray_' + parent.id">
                         <t t-if="parent.child_count > 0 and isParentExpanded(parent.id)">
                             <div class="o_subdept_tray p-3 mb-3 animate__animated animate__fadeIn">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -154,7 +154,7 @@
                                 </div>
 
                                 <div class="filter_pills_container child_pills">
-                                    <t t-foreach="parent.children" t-as="child" t-key="child.id">
+                                    <t t-foreach="parent.children || []" t-as="child" t-key="child.id">
                                         <button type="button"
                                                 class="btn btn-sm btn-child-pill"
                                                 t-att-class="{'active': isDeptSelected(child.id)}"
@@ -382,7 +382,7 @@
                             <i class="fa fa-university text-success fs-4"/>
                             <h5>Bank &amp; Payment Methods (قنوات الدفع والبنوك)</h5>
                         </div>
-                        <t t-foreach="data.channels" t-as="ch" t-key="ch.name">
+                        <t t-foreach="data.channels || []" t-as="ch" t-key="ch.name">
                             <div class="p-3 mb-2 rounded bg-light border">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <span class="fw-bold"><t t-esc="ch.name"/></span>
@@ -403,7 +403,7 @@
                             <h5>Top Overtime Departments (أعلى الأقسام عملاً إضافياً)</h5>
                         </div>
                         <ul class="list-group list-group-flush">
-                            <t t-foreach="data.operational_highlights.top_ot_departments" t-as="ot_dept" t-key="ot_dept.department_id">
+                            <t t-foreach="(data.operational_highlights &amp;&amp; data.operational_highlights.top_ot_departments) || []" t-as="ot_dept" t-key="ot_dept.department_id">
                                 <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
                                     <span class="fw-bold text-dark"><t t-esc="ot_dept.department_name"/></span>
                                     <div class="text-end">
