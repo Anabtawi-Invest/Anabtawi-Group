@@ -119,6 +119,7 @@
                 <t t-set="net" t-value="lines.filtered(lambda l: l.salary_rule_id.code in ('NET', 'NET_SALARY') or l.salary_rule_id.id in rule_ids['net'])[:1]"/>
                 <t t-set="basic_amount" t-value="o.employee_id.wage if 'wage' in o.employee_id._fields else 0.0"/>
                 <t t-set="actual_amount" t-value="actual.total if actual else 0.0"/>
+                <t t-set="unpaid_amount" t-value="max(0.0, (basic_amount or 0.0) - (actual_amount or 0.0))"/>
                 <t t-set="information" t-value="visible_lines.filtered(lambda l: l.salary_rule_id.id in rule_ids['information'])"/>
                 <t t-set="reserved" t-value="basic | actual | gross | net | information"/>
                 <!-- child_of includes any depth of category descendants. -->
@@ -156,6 +157,10 @@
                 <t t-set="worked" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['worked_codes'])"/>
                 <t t-set="unpaid" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['unpaid_codes'])"/>
                 <t t-set="rows" t-value="max(cfg['minimum_rows'], len(allowances), len(deductions))"/>
+                <t t-set="ref_date" t-value="o.date_to or o.date_from"/>
+                <t t-set="month_total_days" t-value="((29 if (ref_date.year % 4 == 0 and (ref_date.year % 100 != 0 or ref_date.year % 400 == 0)) else 28) if ref_date.month == 2 else (30 if ref_date.month in (4, 6, 9, 11) else 31)) if ref_date else 30.0"/>
+                <t t-set="worked_days_count" t-value="sum(worked.mapped('number_of_days')) if cfg['worked_codes'] else (sum(o.worked_days_line_ids.mapped('number_of_days')) or 0.0)"/>
+                <t t-set="unpaid_days_count" t-value="max(0.0, month_total_days - worked_days_count)"/>
                 <style>
                     .cpr { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 10px; color: #151515; }
                     .cpr table { width: 100%; border-collapse: collapse; table-layout: fixed; direction: ltr; }
@@ -170,6 +175,8 @@
                     .cpr .license { text-align: right; font-size: 10px; }
                     .cpr .meta { margin: 14px 0 12px; }
                     .cpr .meta .label { font-weight: bold; width: 20%; }
+                    .cpr .meta > tbody > tr > td.v-sep { border-right: 1px solid #333 !important; padding-right: 8px; }
+                    .cpr .meta > tbody > tr > td.right-col { padding-left: 10px !important; }
                     .cpr .balance { border-top: 1px solid #555; border-bottom: 1px solid #555; padding: 8px 4px; margin: 10px 0 14px; }
                     .cpr .split > tbody > tr > td { width: 33.333%; padding: 0 5px; }
                     .cpr .split > tbody > tr > td:first-child { padding-left: 0; }
@@ -217,60 +224,82 @@
                 <table class="plain meta">
                     <tr>
                         <td class="label">Employee / الموظف</td>
-                        <td style="width:30%">
+                        <td class="v-sep" style="width:30%">
                             <div t-if="emp_name_en" dir="ltr" style="font-weight: bold;"><t t-out="emp_name_en"/></div>
                             <div t-if="emp_name_ar" dir="rtl" class="ar" style="font-weight: bold;"><t t-out="emp_name_ar"/></div>
                             <div t-if="not emp_name_en and not emp_name_ar" dir="auto" t-field="employee.name"/>
                         </td>
-                        <td class="label">Department / الدائرة</td>
+                        <td class="label right-col">Department / الدائرة</td>
                         <td style="width:30%" dir="auto"><span t-out="dept_display"/></td>
                     </tr>
                     <tr>
                         <td class="label">Employee Number / الرقم الوظيفي</td>
-                        <td dir="ltr"><span t-if="'employee_number' in employee._fields" t-out="employee.employee_number or '—'"/><span t-else="">—</span></td>
-                        <td class="label">Section / القسم</td>
+                        <td class="v-sep" dir="ltr"><span t-if="'employee_number' in employee._fields" t-out="employee.employee_number or '—'"/><span t-else="">—</span></td>
+                        <td class="label right-col">Section / القسم</td>
                         <td dir="auto"><span t-out="section_display"/></td>
                     </tr>
                     <tr>
                         <td class="label">Employee Type / نوع الموظف</td>
-                        <td><span t-field="employee.employee_type"/></td>
-                        <td class="label">Branch / الفرع</td>
+                        <td class="v-sep"><span t-field="employee.employee_type"/></td>
+                        <td class="label right-col">Branch / الفرع</td>
                         <td dir="auto"><span t-out="branch_display"/></td>
                     </tr>
                     <tr>
                         <td class="label">Contract Type / نوع العقد</td>
-                        <td><span t-if="version" t-field="version.contract_type_id"/><span t-else="">—</span></td>
-                        <td class="label">Start Date / بداية العقد</td>
+                        <td class="v-sep"><span t-if="version" t-field="version.contract_type_id"/><span t-else="">—</span></td>
+                        <td class="label right-col">Start Date / بداية العقد</td>
                         <td><span t-if="version" t-field="version.contract_date_start" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/><span t-else="">—</span></td>
                     </tr>
                     <tr>
                         <td class="label">Bank / البنك</td>
-                        <td dir="auto"><span t-if="bank" t-field="bank.bank_id"/><span t-else="">—</span></td>
-                        <td class="label">Primary Account / الحساب الرئيسي</td>
+                        <td class="v-sep" dir="auto"><span t-if="bank" t-field="bank.bank_id"/><span t-else="">—</span></td>
+                        <td class="label right-col">Primary Account / الحساب الرئيسي</td>
                         <td style="word-break:break-all" dir="ltr"><span t-if="bank" t-field="bank.acc_number"/><span t-else="">—</span></td>
                     </tr>
                     <tr>
-                        <td class="label">Currency / العملة</td><td><span t-field="currency.name"/></td>
-                        <td class="label">Termination Date / تاريخ انتهاء الخدمة</td>
+                        <td class="label">Currency / العملة</td><td class="v-sep"><span t-field="currency.name"/></td>
+                        <td class="label right-col">Termination Date / تاريخ انتهاء الخدمة</td>
                         <td><span t-field="o.date_to" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/></td>
                     </tr>
                 </table>
-                <div class="balance">
-                    <strong>Vacation &amp; Leave Balances / أرصدة الإجازات والمستحقات: </strong>
-                    <span style="margin-left: 10px; margin-right: 10px;">
-                        <strong>Annual Leave / سنوية: </strong>
-                        <span t-out="annual_days" t-options="{'widget': 'float', 'precision': 2}"/> يوم / Days
-                    </span>
-                    <span> | </span>
-                    <span style="margin-left: 10px; margin-right: 10px;">
-                        <strong>Paid Time Off / إجازة مدفوعة: </strong>
-                        <span t-out="pto_days" t-options="{'widget': 'float', 'precision': 2}"/> يوم / Days
-                    </span>
-                    <span> | </span>
-                    <span style="margin-left: 10px; margin-right: 10px;">
-                        <strong>Extra Hours / ساعات إضافية: </strong>
-                        <span t-out="extra_hrs" t-options="{'widget': 'float', 'precision': 2}"/> ساعة / Hours
-                    </span>
+                <div class="balance-boxes-container" style="margin: 10px 0 14px;">
+                    <div style="font-weight: bold; font-size: 10px; margin-bottom: 5px; color: #151515;">
+                        Vacation &amp; Leave Balances / أرصدة الإجازات والمستحقات:
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+                        <tr>
+                            <td style="width: 33.333%; padding: 0 4px 0 0; vertical-align: top;">
+                                <div style="border: 1px solid #333; background: #fafafa; border-radius: 4px; padding: 6px 4px; text-align: center;">
+                                    <div style="font-weight: bold; font-size: 10px; color: #222; margin-bottom: 4px;">
+                                        Annual Leave / سنوية
+                                    </div>
+                                    <div style="font-size: 11px; font-weight: bold; color: #000;">
+                                        <span t-out="annual_days" t-options="{'widget': 'float', 'precision': 2}"/> يوم / Days
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="width: 33.333%; padding: 0 4px; vertical-align: top;">
+                                <div style="border: 1px solid #333; background: #fafafa; border-radius: 4px; padding: 6px 4px; text-align: center;">
+                                    <div style="font-weight: bold; font-size: 10px; color: #222; margin-bottom: 4px;">
+                                        Paid Time Off / إجازة مدفوعة
+                                    </div>
+                                    <div style="font-size: 11px; font-weight: bold; color: #000;">
+                                        <span t-out="pto_days" t-options="{'widget': 'float', 'precision': 2}"/> يوم / Days
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="width: 33.333%; padding: 0 0 0 4px; vertical-align: top;">
+                                <div style="border: 1px solid #333; background: #fafafa; border-radius: 4px; padding: 6px 4px; text-align: center;">
+                                    <div style="font-weight: bold; font-size: 10px; color: #222; margin-bottom: 4px;">
+                                        Extra Hours / ساعات إضافية
+                                    </div>
+                                    <div style="font-size: 11px; font-weight: bold; color: #000;">
+                                        <span t-out="extra_hrs" t-options="{'widget': 'float', 'precision': 2}"/> ساعة / Hours
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
                 </div>
                 <table class="plain split">
                     <tr>
@@ -282,17 +311,17 @@
                                 <tbody>
                                     <tr>
                                         <td>Basic Salary<br/><span class="ar">الراتب الأساسي</span></td>
-                                        <td class="num"><span t-if="cfg['basis_days_field'] in o._fields and o[cfg['basis_days_field']]" t-out="o[cfg['basis_days_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="" t-out="(o.date_to - o.date_from).days + 1 if (o.date_from and o.date_to) else 30.0" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                        <td class="num"><span t-if="cfg['basis_days_field'] in o._fields and o[cfg['basis_days_field']]" t-out="o[cfg['basis_days_field']]" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="" t-out="month_total_days" t-options="{'widget': 'float', 'precision': 2}"/></td>
                                         <td class="num"><span t-out="basic_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                     <tr>
                                         <td>Unpaid Time<br/><span class="ar">أيام الخصم</span></td>
-                                        <td class="num"><span t-if="cfg['unpaid_codes']" t-out="sum(unpaid.mapped('number_of_days'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
-                                        <td class="num"><span t-out="cfg['deduction_sign'] * sum(time_deductions.mapped('total'))" t-options="{'widget': 'float', 'precision': precision}"/></td>
+                                        <td class="num"><span t-out="unpaid_days_count" t-options="{'widget': 'float', 'precision': 2}"/></td>
+                                        <td class="num"><span t-out="unpaid_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                     <tr>
                                         <td>Actual Salary<br/><span class="ar">الراتب الفعلي</span></td>
-                                        <td class="num"><span t-if="cfg['worked_codes']" t-out="sum(worked.mapped('number_of_days'))" t-options="{'widget': 'float', 'precision': 2}"/><span t-else="">—</span></td>
+                                        <td class="num"><span t-out="worked_days_count" t-options="{'widget': 'float', 'precision': 2}"/></td>
                                         <td class="num"><span t-out="actual_amount" t-options="{'widget': 'float', 'precision': precision}"/></td>
                                     </tr>
                                 </tbody>
@@ -340,7 +369,7 @@
                 <t t-set="print_datetime" t-value="context_timestamp(datetime.datetime.now()).strftime('%d/%m/%Y %H:%M:%S')"/>
 
                 <div class="clearance-footer">
-                    <table class="plain clearance-signatures">
+                    <table class="plain clearance-signatures" dir="rtl" style="width:100%; direction:rtl;">
                         <tr>
                             <td style="width:50%; text-align:right; direction:rtl;" class="ar">
                                 <span>توقيع الموارد البشرية:.............................</span>
