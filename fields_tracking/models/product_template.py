@@ -13,6 +13,7 @@ class ProductTemplate(models.Model):
     default_code = fields.Char(tracking=True)
     barcode = fields.Char(tracking=True)
     standard_price = fields.Float(tracking=True)
+    uom_id = fields.Many2one(tracking=True)
 
     @classmethod
     def _setup_complete(cls):
