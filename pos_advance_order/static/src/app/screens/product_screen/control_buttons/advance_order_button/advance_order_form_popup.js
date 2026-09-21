@@ -65,6 +65,8 @@ export class AdvanceOrderFormPopup extends Component {
             site_service_available: false,
             site_service_config: null,
             hideSiteServiceCheckbox: false,
+            onsite_service_type: "none",
+            onsite_service_unit_price: 0,
         });
 
         onMounted(async () => {
@@ -287,6 +289,8 @@ export class AdvanceOrderFormPopup extends Component {
             discount_id: this.state.discount_id || false,
             site_service: this.state.site_service,
             site_service_config: this.state.site_service_config,
+            onsite_service_type: this.state.onsite_service_type || "none",
+            onsite_service_unit_price: this.state.onsite_service_unit_price || 0,
         });
         this.props.close();
     }
