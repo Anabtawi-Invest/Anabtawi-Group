@@ -82,37 +82,32 @@ class HrPayrollDashboard(models.AbstractModel):
         dept_domain = [("company_id", "in", [False, target_company_id])] if target_company_id > 0 else [("company_id", "in", [False] + user_companies.ids)]
         raw_departments = self.env["hr.department"].search(dept_domain, order="name asc")
 
-        # Build department tree (parent departments and their children)
-        # Find all parent departments (no parent or parent not in current set)
-        dept_ids_set = set(raw_departments.ids)
+        # Build multi-level department tree (supports nested structures: Root -> Group -> Region -> Branch)
+        raw_dept_dict = {d.id: d for d in raw_departments}
+        root_departments = [d for d in raw_departments if not d.parent_id or d.parent_id.id not in raw_dept_dict]
+
         parent_departments = []
-        children_by_parent = {}
+        for root_dep in root_departments:
+            # Find all descendant branch departments under this root department
+            child_deps = self.env["hr.department"].sudo().search([
+                ("id", "child_of", root_dep.id),
+                ("id", "!=", root_dep.id)
+            ], order="name asc")
 
-        for dep in raw_departments:
-            p_id = dep.parent_id.id if dep.parent_id and dep.parent_id.id in dept_ids_set else 0
-            if p_id == 0:
-                parent_departments.append({
-                    "id": dep.id,
-                    "name": dep.name,
-                    "company_id": dep.company_id.id if dep.company_id else 0,
-                    "child_count": 0,
-                    "children": [],
-                })
-            else:
-                if p_id not in children_by_parent:
-                    children_by_parent[p_id] = []
-                children_by_parent[p_id].append({
-                    "id": dep.id,
-                    "name": dep.name,
-                    "parent_id": p_id,
-                    "company_id": dep.company_id.id if dep.company_id else 0,
-                })
+            children_list = [{
+                "id": c.id,
+                "name": c.name,
+                "parent_id": c.parent_id.id if c.parent_id else 0,
+                "company_id": c.company_id.id if c.company_id else 0,
+            } for c in child_deps]
 
-        # Attach children and counts to parents
-        for p in parent_departments:
-            c_list = children_by_parent.get(p["id"], [])
-            p["children"] = c_list
-            p["child_count"] = len(c_list)
+            parent_departments.append({
+                "id": root_dep.id,
+                "name": root_dep.name,
+                "company_id": root_dep.company_id.id if root_dep.company_id else 0,
+                "child_count": len(children_list),
+                "children": children_list,
+            })
 
         # Flat department list for quick reference
         all_departments_flat = [{
