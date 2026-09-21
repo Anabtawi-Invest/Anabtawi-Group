@@ -89,6 +89,29 @@ class HrPayslip(models.Model):
         copy=False,
         help="Tracks duration in days added directly to employee's Extra Hours allocation by this payslip."
     )
+    rest_days_taken = fields.Float(
+        string="Rest Days Taken",
+        compute="_compute_rest_days_taken",
+        store=True,
+        help="Total rest days taken or allocated during the payslip period."
+    )
+
+    @api.depends('employee_id', 'date_from', 'date_to')
+    def _compute_rest_days_taken(self):
+        for slip in self:
+            if not slip.employee_id or not slip.date_from or not slip.date_to:
+                slip.rest_days_taken = 0.0
+                continue
+            emp = slip.employee_id
+            c_start = slip.date_from
+            c_end = slip.date_to
+            contract_obj = getattr(slip, 'contract_id', None) or getattr(emp, 'contract_id', None)
+            if contract_obj and getattr(contract_obj, 'date_start', None) and contract_obj.date_start > slip.date_from:
+                c_start = contract_obj.date_start
+            if contract_obj and getattr(contract_obj, 'date_end', None) and contract_obj.date_end < slip.date_to:
+                c_end = contract_obj.date_end
+            rest_days = slip._get_fixed_schedule_rest_days(emp, c_start, c_end)
+            slip.rest_days_taken = float(rest_days)
 
     @api.depends('employee_id', 'date_from', 'date_to')
     def _compute_attendance_reconciliation_fields(self):
