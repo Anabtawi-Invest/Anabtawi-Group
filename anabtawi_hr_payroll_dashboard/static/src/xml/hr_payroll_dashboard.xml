@@ -22,16 +22,6 @@
                         <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'this_year'}" t-on-click="() => this.setPeriod('this_year')">This Year</button>
                     </div>
 
-                    <!-- Payrun Batch Selector Dropdown -->
-                    <select class="form-select form-select-sm filter_select" t-on-change="onPayrunChange">
-                        <option value="0">-- All / Custom Range --</option>
-                        <t t-foreach="data.payrun_batches || []" t-as="batch" t-key="batch.id">
-                            <option t-att-value="batch.id" t-att-selected="state.payrun_id === batch.id">
-                                <t t-esc="batch.name"/> (<t t-esc="batch.date_start"/>)
-                            </option>
-                        </t>
-                    </select>
-
                     <div class="d-flex align-items-center gap-2">
                         <input type="date" class="form-control form-control-sm filter_input" t-model="state.date_from"/>
                         <span class="text-muted small">to</span>

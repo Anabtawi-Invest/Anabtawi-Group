@@ -37,22 +37,16 @@ class HrPayrollDashboard(models.AbstractModel):
             else:
                 end_date = date_to
 
-        # Base Domain for Payslips
+        # Base Domain for Payslips (Includes ALL validated payslips: bulk & separate)
         slip_domain = [
             ("state", "not in", ["cancel"]),
+            ("date_from", "<=", end_date),
+            ("date_to", ">=", start_date),
         ]
         if target_company_id > 0:
             slip_domain.append(("company_id", "=", target_company_id))
         else:
             slip_domain.append(("company_id", "in", user_companies.ids))
-
-        if payrun_id and int(payrun_id) > 0:
-            slip_domain.append(("payslip_run_id", "=", int(payrun_id)))
-        else:
-            slip_domain.extend([
-                ("date_from", "<=", end_date),
-                ("date_to", ">=", start_date),
-            ])
 
         # Resolve selected departments and all their child departments (hierarchical)
         if department_ids:
@@ -158,6 +152,44 @@ class HrPayrollDashboard(models.AbstractModel):
         distinct_employee_ids = set()
         department_dict = {}
 
+        # Build POS Config -> HR Department lookup map (Direct link + Normalized Name & Branch Matching)
+        pos_config_dept_map = {}
+        if "pos.config" in self.env:
+            try:
+                all_depts = self.env["hr.department"].sudo().search([])
+                dept_by_name = {}
+                for d in all_depts:
+                    clean_name = (d.name or "").strip().lower()
+                    dept_by_name[clean_name] = d.id
+                    alt_name = clean_name.replace("فرع", "").replace("branch", "").strip()
+                    if alt_name and alt_name not in dept_by_name:
+                        dept_by_name[alt_name] = d.id
+
+                all_configs = self.env["pos.config"].sudo().search([])
+                for cfg in all_configs:
+                    d_obj = getattr(cfg, "department_id", False)
+                    if d_obj:
+                        pos_config_dept_map[cfg.id] = d_obj.id
+                    else:
+                        cfg_name = (cfg.name or "").strip().lower()
+                        if cfg_name in dept_by_name:
+                            pos_config_dept_map[cfg.id] = dept_by_name[cfg_name]
+                        else:
+                            alt_cfg_name = cfg_name.replace("فرع", "").replace("branch", "").strip()
+                            if alt_cfg_name in dept_by_name:
+                                pos_config_dept_map[cfg.id] = dept_by_name[alt_cfg_name]
+                            else:
+                                matched_id = 0
+                                for d in all_depts:
+                                    d_clean = (d.name or "").strip().lower()
+                                    if d_clean and (d_clean in cfg_name or cfg_name in d_clean):
+                                        matched_id = d.id
+                                        break
+                                if matched_id:
+                                    pos_config_dept_map[cfg.id] = matched_id
+            except Exception as e:
+                _logger.warning("Failed to build POS Config to Department map: %s", e)
+
         # Pre-fetch POS Sales data for retail branches if available
         pos_sales_by_dept = defaultdict(float)
         if "pos.order" in self.env:
@@ -169,13 +201,15 @@ class HrPayrollDashboard(models.AbstractModel):
                 ]
                 if target_company_id > 0:
                     pos_domain.append(("company_id", "=", target_company_id))
+
                 pos_orders = self.env["pos.order"].sudo().search(pos_domain)
                 for p_order in pos_orders:
-                    d_id = 0
-                    if p_order.config_id and hasattr(p_order.config_id, "department_id") and p_order.config_id.department_id:
-                        d_id = p_order.config_id.department_id.id
-                    elif p_order.session_id and hasattr(p_order.session_id.config_id, "department_id") and p_order.session_id.config_id.department_id:
-                        d_id = p_order.session_id.config_id.department_id.id
+                    cfg = p_order.config_id or (p_order.session_id.config_id if getattr(p_order, "session_id", False) else False)
+                    cfg_id = cfg.id if cfg else 0
+                    d_id = pos_config_dept_map.get(cfg_id, 0)
+                    if not d_id and cfg:
+                        d_id = getattr(cfg, "department_id", False)
+                        d_id = d_id.id if d_id else 0
                     if d_id:
                         pos_sales_by_dept[d_id] += p_order.amount_total
             except Exception as e:
@@ -416,6 +450,7 @@ class HrPayrollDashboard(models.AbstractModel):
 
         # Finalize department rows
         department_list = []
+        dept_children_map = {}
         for d_id, row in department_dict.items():
             row["headcount"] = len(row["employee_ids"])
             del row["employee_ids"]
@@ -423,15 +458,22 @@ class HrPayrollDashboard(models.AbstractModel):
             row["daily_cost"] = round(row["daily_cost"], 3)
             row["avg_daily_cost_per_emp"] = round(row["daily_cost"] / row["headcount"], 3) if row["headcount"] else 0.0
 
-            # POS Sales & Labor Cost % for Retail Branches
-            pos_sales = pos_sales_by_dept.get(d_id, 0.0)
+            if d_id > 0:
+                if d_id not in dept_children_map:
+                    dept_children_map[d_id] = set(self.env["hr.department"].sudo().search([("id", "child_of", d_id)]).ids)
+                relevant_dept_ids = dept_children_map[d_id]
+            else:
+                relevant_dept_ids = {0}
+
+            # POS Sales & Labor Cost % for Retail Branches (sums department and all child branches)
+            pos_sales = sum(pos_sales_by_dept.get(cid, 0.0) for cid in relevant_dept_ids)
             row["pos_sales"] = round(pos_sales, 3)
             monthly_dept_cost = row["daily_cost"] * float(calendar_days)
             row["pos_labor_cost_pct"] = round((monthly_dept_cost / pos_sales * 100.0), 1) if pos_sales else 0.0
             row["sales_per_jod_labor"] = round((pos_sales / monthly_dept_cost), 2) if monthly_dept_cost else 0.0
 
             # Factory Production Output Ratios
-            mrp_qty = mrp_qty_by_dept.get(d_id, 0.0)
+            mrp_qty = sum(mrp_qty_by_dept.get(cid, 0.0) for cid in relevant_dept_ids)
             row["mrp_qty"] = round(mrp_qty, 2)
             row["labor_cost_per_unit"] = round((monthly_dept_cost / mrp_qty), 3) if mrp_qty else 0.0
 
@@ -530,19 +572,13 @@ class HrPayrollDashboard(models.AbstractModel):
 
         slip_domain = [
             ("state", "not in", ["cancel"]),
+            ("date_from", "<=", end_date),
+            ("date_to", ">=", start_date),
         ]
         if target_company_id > 0:
             slip_domain.append(("company_id", "=", target_company_id))
         else:
             slip_domain.append(("company_id", "in", user_companies.ids))
-
-        if payrun_id and int(payrun_id) > 0:
-            slip_domain.append(("payslip_run_id", "=", int(payrun_id)))
-        else:
-            slip_domain.extend([
-                ("date_from", "<=", end_date),
-                ("date_to", ">=", start_date),
-            ])
 
         if department_ids:
             raw_dep_ids = [int(d) for d in department_ids if int(d) > 0]
@@ -682,3 +718,13 @@ class HrPayrollDashboard(models.AbstractModel):
             "context": {"create": False},
             "target": "current",
         }
+
+
+class PosConfigInheritDashboard(models.Model):
+    _inherit = "pos.config"
+
+    department_id = fields.Many2one(
+        "hr.department",
+        string="HR Department / Branch",
+        help="Link this Point of Sale shop/register to an HR Department for executive sales & labor cost reporting."
+    )

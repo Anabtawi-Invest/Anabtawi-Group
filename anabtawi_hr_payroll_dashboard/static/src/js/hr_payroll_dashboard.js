@@ -140,13 +140,6 @@ export class HrPayrollDashboard extends Component {
 
         this.state.date_from = this._formatLocalDate(fromDate);
         this.state.date_to = this._formatLocalDate(toDate);
-        this.state.payrun_id = 0;
-        this.fetchDashboardData();
-    }
-
-    onPayrunChange(ev) {
-        const val = parseInt(ev.target.value) || 0;
-        this.state.payrun_id = val;
         this.fetchDashboardData();
     }
 
