@@ -811,21 +811,24 @@ class HrPayslip(models.Model):
                                     if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == 0
                                 )
                             else:
-                                earned_rest_days = int(total_physical_days // 6)
+                                earned_rest_days = int(regular_physical_days // 6)
                         else:
                             earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
 
                         active_period_days = max(0, (c_end - c_start).days + 1)
-                        max_standard_days = max(0, active_period_days - len(holiday_dates))
 
-                        total_standard_days = regular_physical_days + earned_rest_days
-                        if max_standard_days > 0 and total_standard_days > max_standard_days:
-                            excess_days = total_standard_days - max_standard_days
-                            final_attendance_days = max_standard_days
-                            extra_day_off_hrs = round(excess_days * 8.0, 2)
+                        # Calculate worked rest days (physical punches on scheduled off days)
+                        if not is_flexible and emp.resource_calendar_id:
+                            cal = emp.resource_calendar_id
+                            working_weekdays = set(int(att.dayofweek) for att in cal.attendance_ids if att.dayofweek is not False and att.dayofweek is not None)
+                            worked_rest_days = sum(1 for att in regular_attendances if att.check_in and att.check_in.weekday() not in working_weekdays)
                         else:
-                            final_attendance_days = total_standard_days
-                            extra_day_off_hrs = 0.0
+                            worked_rest_days = max(0, regular_physical_days - max(0, active_period_days - earned_rest_days - len(holiday_dates)))
+
+                        unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
+                        final_attendance_days = total_physical_days + unpunched_rest_days
+                        if active_period_days > 0 and final_attendance_days > active_period_days:
+                            final_attendance_days = active_period_days
 
                         line['number_of_days'] = float(final_attendance_days)
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
@@ -837,13 +840,10 @@ class HrPayslip(models.Model):
                         line['number_of_hours'] = weighted_hol_hrs
                         line['number_of_days'] = float(len(set(att.check_in.date() for att in holiday_attendances))) if holiday_attendances else round(weighted_hol_hrs / 8.0, 2)
                         line['amount'] = round(weighted_hol_hrs * hourly_rate, 3)
+                        filtered_lines.append(line)
                     else:
-                        actual_hol_days = len(holiday_dates) if holiday_dates else 1.0
-                        base_hrs = round(actual_hol_days * 8.0, 2)
-                        line['number_of_hours'] = base_hrs
-                        line['number_of_days'] = round(actual_hol_days, 2)
-                        line['amount'] = 0.0
-                    filtered_lines.append(line)
+                        # Hide Public Holiday line if employee did not work on the holiday
+                        continue
 
                 elif code in ['OVERTIME', 'EXTRA'] or 'overtime' in we_name or 'extra' in we_name:
                     total_net_extra_hrs = round(net_extra_hrs + (extra_day_off_hrs if 'extra_day_off_hrs' in locals() else 0.0), 2)
