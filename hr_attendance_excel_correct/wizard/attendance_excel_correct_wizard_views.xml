@@ -8,9 +8,9 @@
                 <sheet>
                     <div class="alert alert-info" role="alert" invisible="state != 'upload'">
                         Upload the attendance Excel/CSV (UTC times).
-                        Matching uses <b>employee_number</b> (then national_id).
-                        Existing day records are updated; missing days are created.
-                        Multiple attendances on the same day are skipped with a note.
+                        Matching uses <b>employee_number</b> (then national_id), prefers active employees.
+                        Same-day multi sessions: match by Excel <b>attendance_id</b>, else closest check-in;
+                        extra Excel rows create an additional session.
                         Odoo stores UTC and shows times in the user's timezone on screen.
                     </div>
 

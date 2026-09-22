@@ -347,6 +347,61 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
             ("date", "=", day),
         ], order="check_in asc")
 
+    def _parse_excel_attendance_id(self, row):
+        raw = self._cell(row, "attendance_id", "source_attendance_id")
+        if raw in (None, ""):
+            return False
+        try:
+            text = str(raw).strip()
+            if text.endswith(".0"):
+                text = text[:-2]
+            return int(float(text))
+        except (TypeError, ValueError):
+            return False
+
+    def _match_attendance_session(self, employee, day, new_in, excel_att_id, claimed_ids):
+        """
+        Match one Excel row to an attendance session for multi check-in/out days.
+
+        Priority:
+        1) Excel attendance_id (if still exists for this employee and not claimed)
+        2) Closest check_in among unclaimed same-day sessions
+        3) Create a new session if none left
+        """
+        Attendance = self.env["hr.attendance"].sudo()
+
+        if excel_att_id:
+            att = Attendance.browse(excel_att_id).exists()
+            if att:
+                if att.employee_id.id != employee.id:
+                    # Wrong employee on that id — fall through to time match
+                    pass
+                elif att.id in claimed_ids:
+                    return (
+                        Attendance.browse(),
+                        ACTION_SKIP,
+                        _(
+                            "Excel attendance_id %s already matched by another Excel row. Skipped."
+                        ) % excel_att_id,
+                    )
+                else:
+                    return att, "by_id", ""
+
+        day_atts = self._find_attendances_for_day(employee, day)
+        available = day_atts.filtered(lambda a: a.id not in claimed_ids)
+        if not available:
+            return (
+                Attendance.browse(),
+                ACTION_CREATE,
+                _("No unmatched session left on this date — will create an additional record."),
+            )
+
+        best = min(
+            available,
+            key=lambda a: abs((fields.Datetime.to_datetime(a.check_in) - new_in).total_seconds()),
+        )
+        return best, "by_time", ""
+
     def _values_equal(self, left, right):
         if not left and not right:
             return True
@@ -371,6 +426,9 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
         Line = self.env["hr.attendance.excel.correct.line"]
         self.line_ids.unlink()
 
+        # attendance_id -> excel_row that claimed it (avoid two rows updating same session)
+        claimed_attendance_ids = {}
+
         vals_list = []
         for idx, row in enumerate(rows, start=2):
             note = ""
@@ -391,6 +449,7 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
                 )
                 new_in = self._parse_datetime_utc(self._cell(row, "check_in", "checkin"))
                 new_out = self._parse_datetime_utc(self._cell(row, "check_out", "checkout"))
+                excel_att_id = self._parse_excel_attendance_id(row)
 
                 if not day and new_in:
                     day = new_in.date()
@@ -404,32 +463,45 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
                     action = ACTION_SKIP
                     note = err
                 else:
-                    attendances = self._find_attendances_for_day(employee, day)
-                    if len(attendances) > 1:
+                    matched, match_kind, match_note = self._match_attendance_session(
+                        employee, day, new_in, excel_att_id, set(claimed_attendance_ids),
+                    )
+                    if match_kind == ACTION_SKIP:
                         action = ACTION_SKIP
-                        note = _(
-                            "Multiple attendance records on %s for %s (IDs: %s). Skipped — resolve manually."
-                        ) % (
-                            day,
-                            employee.name,
-                            ", ".join(str(a.id) for a in attendances),
-                        )
-                    elif len(attendances) == 1:
-                        attendance = attendances
-                        old_in = attendance.check_in
-                        old_out = attendance.check_out
-                        if self._values_equal(old_in, new_in) and self._values_equal(old_out, new_out):
-                            action = ACTION_NO_CHANGE
-                            note = _("Already matches Excel values.")
-                            apply = False
-                        else:
-                            action = ACTION_UPDATE
-                            note = _("Will update existing attendance.")
-                            apply = True
-                    else:
+                        note = match_note
+                    elif match_kind == ACTION_CREATE:
                         action = ACTION_CREATE
-                        note = _("No attendance on this date — will create a new record.")
+                        note = match_note
                         apply = True
+                    else:
+                        attendance = matched
+                        if attendance.id in claimed_attendance_ids:
+                            action = ACTION_SKIP
+                            note = _(
+                                "Session #%s already claimed by Excel row %s (multi-session collision). Skipped."
+                            ) % (attendance.id, claimed_attendance_ids[attendance.id])
+                        else:
+                            claimed_attendance_ids[attendance.id] = idx
+                            old_in = attendance.check_in
+                            old_out = attendance.check_out
+                            if self._values_equal(old_in, new_in) and self._values_equal(old_out, new_out):
+                                action = ACTION_NO_CHANGE
+                                note = _(
+                                    "Already matches Excel values (matched %s to session #%s)."
+                                ) % (
+                                    _("by attendance_id") if match_kind == "by_id" else _("by closest check-in"),
+                                    attendance.id,
+                                )
+                                apply = False
+                            else:
+                                action = ACTION_UPDATE
+                                note = _(
+                                    "Will update session #%s (matched %s)."
+                                ) % (
+                                    attendance.id,
+                                    _("by attendance_id") if match_kind == "by_id" else _("by closest check-in"),
+                                )
+                                apply = True
             except Exception as exc:
                 action = ACTION_ERROR
                 note = str(exc)
