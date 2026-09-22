@@ -285,12 +285,13 @@ class HrEmployee(models.Model):
                     candidate_unpunched_days.append((current, expected_hours))
                     current += timedelta(days=1)
 
-                # Monthly Grace Threshold Rule:
-                # For employees with Out of Contract days (start date after m_from), grace/rest days equal the count of Mondays on/after start date.
                 emp_contracts = cached_contracts.get(employee.id, [])
-                first_contract = emp_contracts[0] if emp_contracts else False
-                c_start = first_contract.date_start if (first_contract and getattr(first_contract, 'date_start', None)) else m_from
-                c_end = first_contract.date_end if (first_contract and getattr(first_contract, 'date_end', None)) else m_to
+                c_vers = employee._get_versions_with_contract_overlap_with_period(m_from, m_to) if hasattr(employee, '_get_versions_with_contract_overlap_with_period') else []
+                c_starts = [c.date_start for c in c_vers if getattr(c, 'date_start', None)] or [c.date_start for c in emp_contracts if getattr(c, 'date_start', None)]
+                c_ends = [c.date_end for c in c_vers if getattr(c, 'date_end', None)] or [c.date_end for c in emp_contracts if getattr(c, 'date_end', None)]
+
+                c_start = max(c_starts) if c_starts else m_from
+                c_end = min(c_ends) if c_ends else m_to
 
                 if (c_start and c_start > m_from) or (c_end and c_end < m_to):
                     active_start = max(m_from, c_start) if c_start else m_from

@@ -843,8 +843,12 @@ class HrPayslip(models.Model):
                         filtered_lines.append(line)
 
                 elif code in ['OUT', 'OUTCON', 'OUT_OF_CONTRACT'] or 'out of contract' in line_name or 'out of contract' in we_name:
-                    total_calendar_days = float((payslip.date_to - payslip.date_from).days + 1)
-                    out_of_contract_days = max(0.0, round(total_calendar_days - computed_attendance_days, 2))
+                    pre_out_days = (c_start - payslip.date_from).days if ('c_start' in locals() and c_start and c_start > payslip.date_from) else 0
+                    post_out_days = (payslip.date_to - c_end).days if ('c_end' in locals() and c_end and c_end < payslip.date_to) else 0
+                    out_of_contract_days = float(max(0, pre_out_days + post_out_days))
+                    if out_of_contract_days <= 0.0 and 'computed_attendance_days' in locals():
+                        total_calendar_days = float((payslip.date_to - payslip.date_from).days + 1)
+                        out_of_contract_days = max(0.0, round(total_calendar_days - computed_attendance_days, 2))
                     line['number_of_days'] = out_of_contract_days
                     line['number_of_hours'] = round(out_of_contract_days * 8.0, 2)
                     line['amount'] = 0.0
