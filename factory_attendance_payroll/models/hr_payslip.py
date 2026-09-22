@@ -815,8 +815,12 @@ class HrPayslip(models.Model):
                 else:
                     worked_rest_days = max(0, regular_physical_days - max(0, active_period_days - earned_rest_days - len(holiday_dates)))
 
+                active_holiday_dates = [d for d in holiday_dates if c_start <= d <= c_end]
+                unworked_holiday_dates = [d for d in active_holiday_dates if d not in set(att.check_in.date() for att in holiday_attendances if att.check_in)]
+                unworked_holiday_days = len(unworked_holiday_dates)
+
                 unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
-                final_attendance_days = total_physical_days + unpunched_rest_days
+                final_attendance_days = total_physical_days + unpunched_rest_days + unworked_holiday_days
                 if active_period_days > 0 and final_attendance_days > active_period_days:
                     final_attendance_days = active_period_days
 
