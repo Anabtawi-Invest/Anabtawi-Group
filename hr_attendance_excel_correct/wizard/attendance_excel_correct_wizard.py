@@ -509,37 +509,35 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
             raise UserError(_("Preview lines are not linked to tracking logs. Reload the preview."))
 
         selected_total = len(log_ids)
-        self.batch_id.action_queue_selected_logs(log_ids)
+        batch = self.batch_id
+        batch.action_queue_selected_logs(log_ids)
 
         result_message = _(
             "Background apply queued for %(count)s line(s).\n"
-            "You can close this wizard and follow progress in:\n"
-            "Attendances → Configuration → Excel Import Tracking.\n"
+            "Follow progress on this batch (Queued / Done / Failed).\n"
             "Batch: %(batch)s"
-        ) % {"count": selected_total, "batch": self.batch_id.name}
+        ) % {"count": selected_total, "batch": batch.name}
 
         self.write({
             "state": "done",
             "result_message": result_message,
         })
 
+        # Return a valid act_window (must include views) — nested notification.next
+        # without views crashes web._preprocessAction (.map on undefined).
         return {
-            "type": "ir.actions.client",
-            "tag": "display_notification",
-            "params": {
-                "title": _("Background apply started"),
-                "message": _(
-                    "%s line(s) queued. Open tracking to watch Done / Failed / Queued counts."
+            "type": "ir.actions.act_window",
+            "name": _("Excel Import Batch"),
+            "res_model": "hr.attendance.excel.correct.batch",
+            "res_id": batch.id,
+            "view_mode": "form",
+            "views": [(False, "form")],
+            "target": "current",
+            "context": {
+                "notification_title": _("Background apply started"),
+                "notification_message": _(
+                    "%s line(s) queued. Refresh this page to follow progress."
                 ) % selected_total,
-                "type": "success",
-                "sticky": True,
-                "next": {
-                    "type": "ir.actions.act_window",
-                    "res_model": "hr.attendance.excel.correct.batch",
-                    "res_id": self.batch_id.id,
-                    "view_mode": "form",
-                    "target": "current",
-                },
             },
         }
 
@@ -558,9 +556,11 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
             raise UserError(_("No tracking batch linked yet. Load the preview first."))
         return {
             "type": "ir.actions.act_window",
+            "name": _("Excel Import Batch"),
             "res_model": "hr.attendance.excel.correct.batch",
             "res_id": self.batch_id.id,
             "view_mode": "form",
+            "views": [(False, "form")],
             "target": "current",
         }
 

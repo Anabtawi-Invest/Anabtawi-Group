@@ -111,6 +111,7 @@ class HrAttendanceExcelCorrectBatch(models.Model):
             "name": _("Batch Lines — %s") % self.name,
             "res_model": "hr.attendance.excel.correct.log",
             "view_mode": "list,form",
+            "views": [(False, "list"), (False, "form")],
             "domain": [("batch_id", "=", self.id)],
             "context": {"default_batch_id": self.id, "search_default_group_state": 1},
         }
