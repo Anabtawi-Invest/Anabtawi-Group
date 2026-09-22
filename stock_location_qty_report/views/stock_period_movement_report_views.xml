@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_stock_period_movement_report_line_list" model="ir.ui.view">
+        <field name="name">stock.period.movement.report.line.list</field>
+        <field name="model">stock.period.movement.report.line</field>
+        <field name="arch" type="xml">
+            <list string="Stock Period Movement Report" create="false" edit="false" delete="false">
+                <field name="location_name"/>
+                <field name="location_id" column_invisible="True"/>
+                <field name="default_code" optional="show"/>
+                <field name="product_id"/>
+                <field name="uom_name"/>
+                <field name="uom_id" column_invisible="True"/>
+                <field name="qty_opening" sum="Total Opening"/>
+                <field name="qty_receipt" sum="Total Receipt"/>
+                <field name="qty_sale" sum="Total Sale"/>
+                <field name="qty_transfer_in" sum="Total Transfer In"/>
+                <field name="qty_transfer_out" sum="Total Transfer Out"/>
+                <field name="qty_other_in" sum="Total Other In" optional="show"/>
+                <field name="qty_other_out" sum="Total Other Out" optional="show"/>
+                <field name="qty_closing" sum="Total Closing"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_stock_period_movement_report_line_pivot" model="ir.ui.view">
+        <field name="name">stock.period.movement.report.line.pivot</field>
+        <field name="model">stock.period.movement.report.line</field>
+        <field name="arch" type="xml">
+            <pivot string="Stock Period Movement Report">
+                <field name="location_id" type="row"/>
+                <field name="product_id" type="row"/>
+                <field name="qty_opening" type="measure"/>
+                <field name="qty_receipt" type="measure"/>
+                <field name="qty_sale" type="measure"/>
+                <field name="qty_transfer_in" type="measure"/>
+                <field name="qty_transfer_out" type="measure"/>
+                <field name="qty_other_in" type="measure"/>
+                <field name="qty_other_out" type="measure"/>
+                <field name="qty_closing" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_stock_period_movement_report_line_search" model="ir.ui.view">
+        <field name="name">stock.period.movement.report.line.search</field>
+        <field name="model">stock.period.movement.report.line</field>
+        <field name="arch" type="xml">
+            <search string="Stock Period Movement Report">
+                <field name="product_id"
+                       string="Product"
+                       filter_domain="['|', '|',
+                           ('product_id.default_code', 'ilike', self),
+                           ('product_id.barcode', 'ilike', self),
+                           ('product_id.name', 'ilike', self)]"/>
+                <field name="location_id" string="Location"/>
+                <field name="location_name" string="Location Name"/>
+                <field name="default_code" string="Internal Reference"/>
+                <separator/>
+                <group>
+                    <filter string="Location" name="group_by_location" context="{'group_by': 'location_id'}"/>
+                    <filter string="Product" name="group_by_product" context="{'group_by': 'product_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+</odoo>

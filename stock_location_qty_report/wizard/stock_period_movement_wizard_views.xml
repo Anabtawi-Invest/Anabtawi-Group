@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_stock_period_movement_wizard_form" model="ir.ui.view">
+        <field name="name">stock.period.movement.wizard.form</field>
+        <field name="model">stock.period.movement.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Stock Period Movement Report">
+                <group>
+                    <group string="Period">
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                        <field name="include_child_locations"/>
+                        <field name="hide_zero_lines"/>
+                    </group>
+                    <group string="Filters">
+                        <field name="all_locations"/>
+                        <field name="location_ids"
+                               widget="many2many_tags"
+                               invisible="all_locations"
+                               required="not all_locations"
+                               options="{'no_create': True}"/>
+                        <field name="all_products"/>
+                        <field name="product_ids"
+                               widget="many2many_tags"
+                               invisible="all_products"
+                               required="not all_products"
+                               options="{'no_create': True}"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_generate_report"
+                            type="object"
+                            string="View Report"
+                            class="btn-primary"/>
+                    <button name="action_export_excel"
+                            type="object"
+                            string="Export Excel"
+                            class="btn-secondary"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_stock_period_movement_wizard" model="ir.actions.act_window">
+        <field name="name">Stock Period Movement Report</field>
+        <field name="res_model">stock.period.movement.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_stock_period_movement_report"
+              name="Stock Period Movement Report"
+              parent="stock.menu_warehouse_report"
+              action="action_stock_period_movement_wizard"
+              sequence="46"/>
+
+</odoo>
