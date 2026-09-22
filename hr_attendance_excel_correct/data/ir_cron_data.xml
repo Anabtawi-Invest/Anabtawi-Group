@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="ir_cron_attendance_excel_correct_apply" model="ir.cron">
+        <field name="name">Attendance Excel Correct: Background Apply</field>
+        <field name="model_id" ref="model_hr_attendance_excel_correct_batch"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_process_excel_correct_batches()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+        <field name="user_id" ref="base.user_root"/>
+    </record>
+</odoo>

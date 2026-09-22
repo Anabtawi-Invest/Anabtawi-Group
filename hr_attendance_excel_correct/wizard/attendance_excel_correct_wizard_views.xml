@@ -91,10 +91,10 @@
                             invisible="state != 'preview'"/>
                     <button name="action_apply"
                             type="object"
-                            string="Apply Selected"
+                            string="Apply in Background"
                             class="btn-primary"
                             invisible="state != 'preview'"
-                            confirm="Apply selected updates/creates? Worked hours and overtime will be recomputed by Odoo."/>
+                            confirm="Queue selected updates/creates for background processing? You can close this window and follow progress in Excel Import Tracking."/>
                     <button name="action_open_tracking_batch"
                             type="object"
                             string="Open Tracking"

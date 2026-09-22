@@ -488,7 +488,7 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
         return self._reopen()
 
     # ------------------------------------------------------------------
-    # Apply (batched)
+    # Apply (background via cron)
     # ------------------------------------------------------------------
 
     def action_apply(self):
@@ -504,148 +504,53 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
         if not lines:
             raise UserError(_("No selected rows to apply."))
 
-        # Mark unselected applyable rows as excluded in the tracking log
-        excluded = self.line_ids.filtered(
-            lambda l: (not l.apply) and l.action in APPLYABLE_ACTIONS and l.state == "pending" and l.log_id
-        )
-        if excluded:
-            excluded.mapped("log_id").write({
-                "state": "skipped",
-                "action": "excluded",
-                "note": _("Not selected for apply."),
-                "apply_requested": False,
-            })
+        log_ids = lines.mapped("log_id").ids
+        if not log_ids:
+            raise UserError(_("Preview lines are not linked to tracking logs. Reload the preview."))
 
-        wizard_id = self.id
-        batch_id = self.batch_id.id
-        line_ids = lines.ids
-        selected_total = len(line_ids)
-        batch_size = self.batch_size or 100
-        updated = created = failed = 0
-        Line = self.env["hr.attendance.excel.correct.line"]
-        now = fields.Datetime.now()
+        selected_total = len(log_ids)
+        self.batch_id.action_queue_selected_logs(log_ids)
 
-        # Mark selected logs as apply requested
-        lines.mapped("log_id").filtered(lambda l: l).write({"apply_requested": True})
-
-        # Process in batches; commit after each batch so progress is kept
-        for start in range(0, selected_total, batch_size):
-            wizard = self.env[self._name].browse(wizard_id)
-            batch_lines = Line.browse(line_ids[start:start + batch_size]).exists()
-            for line in batch_lines:
-                action_before = line.action
-                try:
-                    with self.env.cr.savepoint():
-                        attendance = wizard._apply_line(line)
-                    note = line.note or ""
-                    line.write({"state": "done", "note": note})
-                    if line.log_id:
-                        line.log_id.write({
-                            "state": "done",
-                            "action": action_before,
-                            "attendance_id": attendance.id if attendance else line.attendance_id.id,
-                            "note": note,
-                            "applied_date": now,
-                            "apply_requested": True,
-                        })
-                    if action_before == ACTION_UPDATE:
-                        updated += 1
-                    elif action_before == ACTION_CREATE:
-                        created += 1
-                except Exception as exc:
-                    failed += 1
-                    note = ((line.note or "") + (" | " if line.note else "")
-                            + _("Apply failed: %s") % exc)
-                    line.write({
-                        "state": "failed",
-                        "action": ACTION_ERROR,
-                        "note": note,
-                    })
-                    if line.log_id:
-                        line.log_id.write({
-                            "state": "failed",
-                            "action": ACTION_ERROR,
-                            "note": note,
-                            "apply_requested": True,
-                            "applied_date": now,
-                        })
-                    _logger.exception(
-                        "Attendance excel correct failed for row %s employee %s",
-                        line.excel_row,
-                        line.employee_id.id,
-                    )
-            self.env.cr.commit()
-            self.env.clear()
-
-        tracking = self.env["hr.attendance.excel.correct.batch"].browse(batch_id)
         result_message = _(
-            "Apply finished.\n"
-            "Updated: %(updated)s\n"
-            "Created: %(created)s\n"
-            "Failed: %(failed)s\n"
-            "Selected originally: %(selected)s"
-        ) % {
-            "updated": updated,
-            "created": created,
-            "failed": failed,
-            "selected": selected_total,
-        }
-        pending_left = tracking.line_ids.filtered(lambda l: l.state == "pending")
-        tracking.write({
-            "state": "partial" if pending_left else "done",
-            "date_end": fields.Datetime.now(),
-            "result_message": result_message,
-        })
+            "Background apply queued for %(count)s line(s).\n"
+            "You can close this wizard and follow progress in:\n"
+            "Attendances → Configuration → Excel Import Tracking.\n"
+            "Batch: %(batch)s"
+        ) % {"count": selected_total, "batch": self.batch_id.name}
 
-        wizard = self.env[self._name].browse(wizard_id)
-        wizard.write({
+        self.write({
             "state": "done",
             "result_message": result_message,
         })
-        return wizard._reopen()
 
-    def _apply_line(self, line):
-        """Write or create attendance; core write/create recomputes overtime & hours."""
-        if not line.employee_id:
-            raise UserError(_("Missing employee."))
-        if not line.new_check_in:
-            raise UserError(_("Missing check_in."))
-
-        Attendance = self.env["hr.attendance"].sudo()
-        vals = {
-            "check_in": line.new_check_in,
-            "check_out": line.new_check_out or False,
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Background apply started"),
+                "message": _(
+                    "%s line(s) queued. Open tracking to watch Done / Failed / Queued counts."
+                ) % selected_total,
+                "type": "success",
+                "sticky": True,
+                "next": {
+                    "type": "ir.actions.act_window",
+                    "res_model": "hr.attendance.excel.correct.batch",
+                    "res_id": self.batch_id.id,
+                    "view_mode": "form",
+                    "target": "current",
+                },
+            },
         }
 
-        if line.action == ACTION_UPDATE:
-            if not line.attendance_id:
-                raise UserError(_("Missing attendance to update."))
-            same_day = self._find_attendances_for_day(line.employee_id, line.date)
-            if len(same_day) > 1:
-                raise UserError(_(
-                    "Multiple attendances now exist on %s (IDs: %s)."
-                ) % (line.date, ", ".join(str(a.id) for a in same_day)))
-            line.attendance_id.write(vals)
-            line.note = _("Updated attendance #%s. Worked hours / overtime recomputed.") % line.attendance_id.id
-            return line.attendance_id
-
-        if line.action == ACTION_CREATE:
-            existing = self._find_attendances_for_day(line.employee_id, line.date)
-            if existing:
-                raise UserError(_(
-                    "Attendance appeared on %s before create (IDs: %s). Skipped create."
-                ) % (line.date, ", ".join(str(a.id) for a in existing)))
-            create_vals = {
-                "employee_id": line.employee_id.id,
-                "check_in": line.new_check_in,
-                "check_out": line.new_check_out or False,
-            }
-            attendance = Attendance.create(create_vals)
-            line.attendance_id = attendance.id
-            line.note = _("Created attendance #%s. Worked hours / overtime recomputed.") % attendance.id
-            return attendance
-
-        raise UserError(_("Unsupported action: %s") % line.action)
+    def _apply_line(self, line):
+        """Compatibility helper — real apply runs on tracking log via batch cron."""
+        if not line.log_id:
+            raise UserError(_("Missing tracking log."))
+        attendance, note = self.batch_id._apply_log_line(line.log_id)
+        line.attendance_id = attendance.id
+        line.note = note
+        return attendance
 
     def action_open_tracking_batch(self):
         self.ensure_one()

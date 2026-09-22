@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
+import logging
+
 from odoo import api, fields, models, _
+from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 ACTION_SELECTION = [
@@ -13,6 +18,7 @@ ACTION_SELECTION = [
 
 LINE_STATE_SELECTION = [
     ("pending", "Pending"),
+    ("queued", "Queued"),
     ("done", "Done"),
     ("failed", "Failed"),
     ("skipped", "Skipped"),
@@ -20,6 +26,7 @@ LINE_STATE_SELECTION = [
 
 BATCH_STATE_SELECTION = [
     ("preview", "Preview"),
+    ("running", "Running (Background)"),
     ("partial", "Partially Applied"),
     ("done", "Done"),
     ("cancelled", "Cancelled"),
@@ -41,7 +48,7 @@ class HrAttendanceExcelCorrectBatch(models.Model):
         readonly=True,
         required=True,
     )
-    batch_size = fields.Integer(readonly=True)
+    batch_size = fields.Integer(readonly=True, default=100)
     state = fields.Selection(
         BATCH_STATE_SELECTION,
         default="preview",
@@ -66,6 +73,7 @@ class HrAttendanceExcelCorrectBatch(models.Model):
     count_done = fields.Integer(compute="_compute_counts", store=True)
     count_failed = fields.Integer(compute="_compute_counts", store=True)
     count_pending = fields.Integer(compute="_compute_counts", store=True)
+    count_queued = fields.Integer(compute="_compute_counts", store=True)
 
     @api.depends(
         "line_ids",
@@ -84,6 +92,7 @@ class HrAttendanceExcelCorrectBatch(models.Model):
             batch.count_done = len(lines.filtered(lambda l: l.state == "done"))
             batch.count_failed = len(lines.filtered(lambda l: l.state == "failed"))
             batch.count_pending = len(lines.filtered(lambda l: l.state == "pending"))
+            batch.count_queued = len(lines.filtered(lambda l: l.state == "queued"))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -105,6 +114,225 @@ class HrAttendanceExcelCorrectBatch(models.Model):
             "domain": [("batch_id", "=", self.id)],
             "context": {"default_batch_id": self.id, "search_default_group_state": 1},
         }
+
+    def action_queue_selected_logs(self, log_ids):
+        """Queue specific log lines for background apply and trigger the cron."""
+        self.ensure_one()
+        logs = self.env["hr.attendance.excel.correct.log"].browse(log_ids).filtered(
+            lambda l: l.batch_id.id == self.id
+            and l.action in ("update", "create")
+            and l.state in ("pending", "queued", "failed")
+        )
+        if not logs:
+            raise UserError(_("No applyable lines to queue."))
+
+        # Exclude other pending applyable lines on this batch that were not selected
+        other = self.line_ids.filtered(
+            lambda l: l.id not in logs.ids
+            and l.action in ("update", "create")
+            and l.state == "pending"
+        )
+        if other:
+            other.write({
+                "state": "skipped",
+                "action": "excluded",
+                "note": _("Not selected for apply."),
+                "apply_requested": False,
+            })
+
+        logs.write({
+            "state": "queued",
+            "apply_requested": True,
+        })
+        self.write({
+            "state": "running",
+            "date_end": False,
+            "result_message": _(
+                "Background apply started for %s line(s). "
+                "Refresh this batch / Import Lines to follow progress."
+            ) % len(logs),
+        })
+        self._trigger_background_cron()
+        return True
+
+    def _trigger_background_cron(self):
+        cron = self.env.ref(
+            "hr_attendance_excel_correct.ir_cron_attendance_excel_correct_apply",
+            raise_if_not_found=False,
+        )
+        if cron:
+            try:
+                cron.sudo()._trigger()
+            except Exception:
+                _logger.exception("Failed to trigger attendance excel correct cron")
+
+    def _find_attendances_for_day(self, employee, day):
+        return self.env["hr.attendance"].sudo().search([
+            ("employee_id", "=", employee.id),
+            ("date", "=", day),
+        ], order="check_in asc")
+
+    def _apply_log_line(self, line):
+        """Create/update hr.attendance for one tracking log line."""
+        if not line.employee_id:
+            raise UserError(_("Missing employee."))
+        if not line.new_check_in:
+            raise UserError(_("Missing check_in."))
+
+        Attendance = self.env["hr.attendance"].sudo()
+        vals = {
+            "check_in": line.new_check_in,
+            "check_out": line.new_check_out or False,
+        }
+
+        if line.action == "update":
+            if not line.attendance_id:
+                raise UserError(_("Missing attendance to update."))
+            same_day = self._find_attendances_for_day(line.employee_id, line.date)
+            if len(same_day) > 1:
+                raise UserError(_(
+                    "Multiple attendances now exist on %s (IDs: %s)."
+                ) % (line.date, ", ".join(str(a.id) for a in same_day)))
+            line.attendance_id.write(vals)
+            note = _("Updated attendance #%s. Worked hours / overtime recomputed.") % line.attendance_id.id
+            return line.attendance_id, note
+
+        if line.action == "create":
+            existing = self._find_attendances_for_day(line.employee_id, line.date)
+            if existing:
+                raise UserError(_(
+                    "Attendance already exists on %s (IDs: %s)."
+                ) % (line.date, ", ".join(str(a.id) for a in existing)))
+            attendance = Attendance.create({
+                "employee_id": line.employee_id.id,
+                "check_in": line.new_check_in,
+                "check_out": line.new_check_out or False,
+            })
+            note = _("Created attendance #%s. Worked hours / overtime recomputed.") % attendance.id
+            return attendance, note
+
+        raise UserError(_("Unsupported action: %s") % line.action)
+
+    def _process_queued_chunk(self):
+        """Process up to batch_size queued lines. Returns True if more remain."""
+        self.ensure_one()
+        limit = self.batch_size or 100
+        lines = self.line_ids.search([
+            ("batch_id", "=", self.id),
+            ("state", "=", "queued"),
+            ("apply_requested", "=", True),
+            ("action", "in", ("update", "create")),
+        ], order="excel_row", limit=limit)
+
+        if not lines:
+            self._finalize_if_idle()
+            return False
+
+        now = fields.Datetime.now()
+        for line in lines:
+            action_before = line.action
+            try:
+                with self.env.cr.savepoint():
+                    attendance, note = self._apply_log_line(line)
+                line.write({
+                    "state": "done",
+                    "action": action_before,
+                    "attendance_id": attendance.id,
+                    "note": note,
+                    "applied_date": now,
+                })
+            except Exception as exc:
+                note = ((line.note or "") + (" | " if line.note else "")
+                        + _("Apply failed: %s") % exc)
+                line.write({
+                    "state": "failed",
+                    "action": "error",
+                    "note": note,
+                    "applied_date": now,
+                })
+                _logger.exception(
+                    "Background attendance excel correct failed batch=%s row=%s emp=%s",
+                    self.id,
+                    line.excel_row,
+                    line.employee_id.id,
+                )
+
+        remaining = self.line_ids.search_count([
+            ("batch_id", "=", self.id),
+            ("state", "=", "queued"),
+            ("apply_requested", "=", True),
+        ])
+        done = self.line_ids.search_count([("batch_id", "=", self.id), ("state", "=", "done")])
+        failed = self.line_ids.search_count([("batch_id", "=", self.id), ("state", "=", "failed")])
+        self.write({
+            "result_message": _(
+                "Background apply in progress…\n"
+                "Done: %(done)s\n"
+                "Failed: %(failed)s\n"
+                "Queued left: %(queued)s"
+            ) % {"done": done, "failed": failed, "queued": remaining},
+        })
+        if remaining:
+            return True
+        self._finalize_if_idle()
+        return False
+
+    def _finalize_if_idle(self):
+        self.ensure_one()
+        queued = self.line_ids.search_count([
+            ("batch_id", "=", self.id),
+            ("state", "=", "queued"),
+        ])
+        if queued:
+            return
+        pending = self.line_ids.search_count([
+            ("batch_id", "=", self.id),
+            ("state", "=", "pending"),
+        ])
+        done = self.line_ids.search_count([("batch_id", "=", self.id), ("state", "=", "done")])
+        failed = self.line_ids.search_count([("batch_id", "=", self.id), ("state", "=", "failed")])
+        self.write({
+            "state": "partial" if pending else "done",
+            "date_end": fields.Datetime.now(),
+            "result_message": _(
+                "Background apply finished.\n"
+                "Done: %(done)s\n"
+                "Failed: %(failed)s\n"
+                "Pending left: %(pending)s"
+            ) % {"done": done, "failed": failed, "pending": pending},
+        })
+
+    @api.model
+    def _cron_process_excel_correct_batches(self):
+        """Cron: process every running batch one chunk; re-trigger if work remains."""
+        batches = self.search([("state", "=", "running")], order="id")
+        more_work = False
+        for batch in batches:
+            try:
+                if batch._process_queued_chunk():
+                    more_work = True
+            except Exception:
+                _logger.exception("Cron failed on attendance excel batch %s", batch.id)
+                batch.write({
+                    "result_message": _(
+                        "Background job error — check server logs. Batch stays Running; cron will retry."
+                    ),
+                })
+                more_work = True
+        if more_work:
+            self._trigger_background_cron_static()
+
+    @api.model
+    def _trigger_background_cron_static(self):
+        cron = self.env.ref(
+            "hr_attendance_excel_correct.ir_cron_attendance_excel_correct_apply",
+            raise_if_not_found=False,
+        )
+        if cron:
+            try:
+                cron.sudo()._trigger()
+            except Exception:
+                _logger.exception("Failed to re-trigger attendance excel correct cron")
 
 
 class HrAttendanceExcelCorrectLog(models.Model):
