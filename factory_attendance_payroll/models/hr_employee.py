@@ -289,12 +289,14 @@ class HrEmployee(models.Model):
                 # For employees with Out of Contract days (start date after m_from), grace/rest days equal the count of Mondays on/after start date.
                 emp_contracts = cached_contracts.get(employee.id, [])
                 first_contract = emp_contracts[0] if emp_contracts else False
-                c_start = first_contract.date_start if (first_contract and first_contract.date_start) else m_from
+                c_start = first_contract.date_start if (first_contract and getattr(first_contract, 'date_start', None)) else m_from
+                c_end = first_contract.date_end if (first_contract and getattr(first_contract, 'date_end', None)) else m_to
 
-                if c_start > m_from:
-                    active_start = max(m_from, c_start)
+                if (c_start and c_start > m_from) or (c_end and c_end < m_to):
+                    active_start = max(m_from, c_start) if c_start else m_from
+                    active_end = min(m_to, c_end) if c_end else m_to
                     num_mondays_active = sum(
-                        1 for d_idx in range((m_to - active_start).days + 1)
+                        1 for d_idx in range(max(0, (active_end - active_start).days + 1))
                         if (active_start + timedelta(days=d_idx)).weekday() == 0
                     )
                     allowed_grace_days = num_mondays_active
