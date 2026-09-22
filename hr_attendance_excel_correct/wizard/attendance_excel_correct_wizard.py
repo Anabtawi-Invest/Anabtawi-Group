@@ -289,6 +289,13 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
             return soft
         return candidates
 
+    def _prefer_active_employees(self, candidates):
+        """If both active and archived match, keep only active ones."""
+        if len(candidates) <= 1:
+            return candidates
+        active = candidates.filtered(lambda e: e.active)
+        return active if active else candidates
+
     def _match_employee(self, row, by_number, by_national):
         number = self._normalize_code(self._cell(row, "employee_number", "employee_code", "emp_code"))
         national = self._normalize_code(self._cell(row, "national_id", "identification_id", "id_number"))
@@ -312,20 +319,24 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
                 "Employee not found (number=%s, national_id=%s, name=%s)."
             ) % (number or "-", national or "-", name or "-")
 
+        # Prefer active over archived duplicates (same number/name)
+        candidates = self._prefer_active_employees(candidates)
+
         if len(candidates) > 1:
             narrowed = self._filter_candidates_by_name(candidates, name)
+            narrowed = self._prefer_active_employees(narrowed)
             if len(narrowed) == 1:
                 return narrowed, ""
             if not name:
                 return self.env["hr.employee"], _(
                     "Multiple employees matched via %s: %s. Excel has no name to disambiguate. Skipped."
-                ) % (match_via, ", ".join("%s [#%s]" % (e.name, e.id) for e in candidates))
+                ) % (match_via, ", ".join("%s [#%s%s]" % (e.name, e.id, "" if e.active else " archived") for e in candidates))
             return self.env["hr.employee"], _(
                 "Multiple employees matched via %s even after name '%s': %s. Skipped."
             ) % (
                 match_via,
                 name,
-                ", ".join("%s [#%s]" % (e.name, e.id) for e in narrowed),
+                ", ".join("%s [#%s%s]" % (e.name, e.id, "" if e.active else " archived") for e in narrowed),
             )
 
         return candidates, ""
