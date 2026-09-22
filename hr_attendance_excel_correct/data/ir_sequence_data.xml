@@ -7,4 +7,12 @@
         <field name="padding">4</field>
         <field name="company_id" eval="False"/>
     </record>
+
+    <record id="seq_hr_attendance_excel_delete_job" model="ir.sequence">
+        <field name="name">Attendance Bulk Delete Job</field>
+        <field name="code">hr.attendance.excel.delete.job</field>
+        <field name="prefix">DEL-ATT/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
 </odoo>

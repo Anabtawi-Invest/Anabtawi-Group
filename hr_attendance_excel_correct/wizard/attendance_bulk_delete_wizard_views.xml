@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_attendance_excel_bulk_delete_wizard_form" model="ir.ui.view">
+        <field name="name">hr.attendance.excel.bulk.delete.wizard.form</field>
+        <field name="model">hr.attendance.excel.bulk.delete.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Bulk Delete Attendances">
+                <div class="alert alert-warning" role="alert">
+                    This deletes attendance (and related overtime lines) for the selected period,
+                    then you can recreate them with <b>Correct Attendance from Excel</b>.
+                    Prefer a company filter when possible. Run on staging first if unsure.
+                </div>
+                <group>
+                    <group>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                        <field name="company_id" options="{'no_create': True}"/>
+                        <field name="batch_size"/>
+                    </group>
+                    <group>
+                        <field name="matched_count"/>
+                        <field name="overtime_count"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_start_delete"
+                            type="object"
+                            string="Delete in Background"
+                            class="btn-primary"
+                            confirm="Delete all matching attendances for this period? This cannot be undone (except by re-importing Excel)."/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hr_attendance_excel_delete_job_form" model="ir.ui.view">
+        <field name="name">hr.attendance.excel.delete.job.form</field>
+        <field name="model">hr.attendance.excel.delete.job</field>
+        <field name="arch" type="xml">
+            <form string="Bulk Delete Job" create="0">
+                <header>
+                    <button name="action_refresh"
+                            type="object"
+                            string="Refresh"
+                            class="btn-primary"
+                            invisible="state not in ('running', 'done', 'cancelled')"/>
+                    <button name="action_cancel"
+                            type="object"
+                            string="Cancel Remaining"
+                            class="btn-secondary"
+                            invisible="state != 'running'"
+                            confirm="Stop deleting remaining attendances?"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,running,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-info" role="alert" invisible="state != 'running'">
+                        Delete is running in the background. Click <b>Refresh</b> to process the next chunk and update counts.
+                    </div>
+                    <div class="alert alert-success" role="alert" invisible="state != 'done'">
+                        Delete finished. Next: open <b>Correct Attendance from Excel</b> and Apply to recreate.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="date_from" readonly="1"/>
+                            <field name="date_to" readonly="1"/>
+                            <field name="company_id" readonly="1"/>
+                            <field name="batch_size" readonly="1"/>
+                            <field name="user_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="date_start" readonly="1"/>
+                            <field name="date_end" readonly="1"/>
+                            <field name="count_total"/>
+                            <field name="count_deleted"/>
+                            <field name="count_remaining"/>
+                            <field name="count_ot_deleted"/>
+                        </group>
+                    </group>
+                    <group string="Result" invisible="not result_message">
+                        <field name="result_message" nolabel="1" colspan="2" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hr_attendance_excel_delete_job_list" model="ir.ui.view">
+        <field name="name">hr.attendance.excel.delete.job.list</field>
+        <field name="model">hr.attendance.excel.delete.job</field>
+        <field name="arch" type="xml">
+            <list create="0"
+                  decoration-info="state == 'running'"
+                  decoration-success="state == 'done'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="company_id"/>
+                <field name="count_total"/>
+                <field name="count_deleted"/>
+                <field name="count_remaining"/>
+                <field name="state"/>
+                <field name="user_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_hr_attendance_excel_bulk_delete_wizard" model="ir.actions.act_window">
+        <field name="name">Bulk Delete Attendances</field>
+        <field name="res_model">hr.attendance.excel.bulk.delete.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_hr_attendance_excel_delete_job" model="ir.actions.act_window">
+        <field name="name">Bulk Delete Jobs</field>
+        <field name="res_model">hr.attendance.excel.delete.job</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_hr_attendance_excel_bulk_delete"
+              name="Bulk Delete Attendances"
+              parent="hr_attendance.menu_hr_attendance_configuration"
+              action="action_hr_attendance_excel_bulk_delete_wizard"
+              groups="hr_attendance.group_hr_attendance_manager"
+              sequence="92"/>
+
+    <menuitem id="menu_hr_attendance_excel_delete_jobs"
+              name="Bulk Delete Jobs"
+              parent="menu_hr_attendance_excel_correct_tracking"
+              action="action_hr_attendance_excel_delete_job"
+              groups="hr_attendance.group_hr_attendance_manager"
+              sequence="30"/>
+</odoo>
