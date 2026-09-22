@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_attendance_excel_correct_wizard_form" model="ir.ui.view">
+        <field name="name">hr.attendance.excel.correct.wizard.form</field>
+        <field name="model">hr.attendance.excel.correct.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Correct Attendance from Excel">
+                <sheet>
+                    <div class="alert alert-info" role="alert" invisible="state != 'upload'">
+                        Upload the attendance Excel/CSV (UTC times).
+                        Matching uses <b>employee_number</b> (then national_id).
+                        Existing day records are updated; missing days are created.
+                        Multiple attendances on the same day are skipped with a note.
+                        Odoo stores UTC and shows times in the user's timezone on screen.
+                    </div>
+
+                    <group invisible="state != 'upload'">
+                        <group string="File">
+                            <field name="excel_file" filename="file_name"/>
+                            <field name="file_name" invisible="1"/>
+                        </group>
+                        <group string="Options">
+                            <field name="company_id" options="{'no_create': True}"/>
+                            <field name="batch_size"/>
+                        </group>
+                    </group>
+
+                    <group invisible="state == 'upload'">
+                        <group string="Summary">
+                            <field name="batch_id" readonly="1"/>
+                            <field name="count_update"/>
+                            <field name="count_create"/>
+                            <field name="count_skip"/>
+                            <field name="count_no_change"/>
+                            <field name="count_error"/>
+                            <field name="count_selected"/>
+                            <field name="count_done"/>
+                            <field name="batch_size" readonly="1"/>
+                            <field name="company_id" readonly="1"/>
+                        </group>
+                        <group string="Result" invisible="state != 'done'">
+                            <field name="result_message" nolabel="1" colspan="2"/>
+                        </group>
+                    </group>
+
+                    <notebook invisible="state == 'upload'">
+                        <page string="Preview" name="preview">
+                            <field name="line_ids" nolabel="1">
+                                <list editable="bottom" create="0" delete="0"
+                                      decoration-success="action == 'update'"
+                                      decoration-info="action == 'create'"
+                                      decoration-warning="action == 'skip'"
+                                      decoration-muted="action == 'no_change'"
+                                      decoration-danger="action == 'error'">
+                                    <field name="apply" readonly="state != 'pending' or action not in ('update', 'create')"/>
+                                    <field name="excel_row" optional="hide"/>
+                                    <field name="action"/>
+                                    <field name="state" optional="show"/>
+                                    <field name="employee_number"/>
+                                    <field name="employee_id"/>
+                                    <field name="company_id" optional="hide"/>
+                                    <field name="date"/>
+                                    <field name="old_check_in"/>
+                                    <field name="old_check_out"/>
+                                    <field name="new_check_in"/>
+                                    <field name="new_check_out"/>
+                                    <field name="attendance_id" optional="hide"/>
+                                    <field name="employee_name_excel" optional="hide"/>
+                                    <field name="note"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                    <field name="state" invisible="1"/>
+                </sheet>
+                <footer>
+                    <button name="action_load_preview"
+                            type="object"
+                            string="Load Preview"
+                            class="btn-primary"
+                            invisible="state != 'upload'"/>
+                    <button name="action_select_applyable"
+                            type="object"
+                            string="Select All Applyable"
+                            class="btn-secondary"
+                            invisible="state != 'preview'"/>
+                    <button name="action_unselect_all"
+                            type="object"
+                            string="Unselect All"
+                            class="btn-secondary"
+                            invisible="state != 'preview'"/>
+                    <button name="action_apply"
+                            type="object"
+                            string="Apply in Background"
+                            class="btn-primary"
+                            invisible="state != 'preview'"
+                            confirm="Queue selected updates/creates for background processing? You can close this window and follow progress in Excel Import Tracking."/>
+                    <button name="action_open_tracking_batch"
+                            type="object"
+                            string="Open Tracking"
+                            class="btn-secondary"
+                            invisible="not batch_id"/>
+                    <button name="action_back_to_upload"
+                            type="object"
+                            string="Back"
+                            class="btn-secondary"
+                            invisible="state == 'upload'"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_attendance_excel_correct_wizard" model="ir.actions.act_window">
+        <field name="name">Correct Attendance from Excel</field>
+        <field name="res_model">hr.attendance.excel.correct.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_hr_attendance_excel_correct"
+              name="Correct Attendance from Excel"
+              parent="hr_attendance.menu_hr_attendance_configuration"
+              action="action_hr_attendance_excel_correct_wizard"
+              groups="hr_attendance.group_hr_attendance_manager"
+              sequence="90"/>
+</odoo>
