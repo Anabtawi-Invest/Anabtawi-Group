@@ -8,7 +8,8 @@
                 <div class="alert alert-warning" role="alert">
                     This deletes attendance (and related overtime lines) for the selected period,
                     then you can recreate them with <b>Correct Attendance from Excel</b>.
-                    Prefer a company filter when possible. Run on staging first if unsure.
+                    If attendances are linked to <b>validated work entries</b>, enable reset-to-draft below.
+                    Work entries already used on a <b>payslip</b> stay locked and those attendances are skipped.
                 </div>
                 <group>
                     <group>
@@ -16,10 +17,12 @@
                         <field name="date_to"/>
                         <field name="company_id" options="{'no_create': True}"/>
                         <field name="batch_size"/>
+                        <field name="reset_work_entries"/>
                     </group>
                     <group>
                         <field name="matched_count"/>
                         <field name="overtime_count"/>
+                        <field name="validated_we_count"/>
                     </group>
                 </group>
                 <footer>
@@ -69,6 +72,7 @@
                             <field name="date_to" readonly="1"/>
                             <field name="company_id" readonly="1"/>
                             <field name="batch_size" readonly="1"/>
+                            <field name="reset_work_entries" readonly="1"/>
                             <field name="user_id" readonly="1"/>
                         </group>
                         <group>
@@ -78,6 +82,8 @@
                             <field name="count_deleted"/>
                             <field name="count_remaining"/>
                             <field name="count_ot_deleted"/>
+                            <field name="count_we_reset"/>
+                            <field name="count_locked"/>
                         </group>
                     </group>
                     <group string="Result" invisible="not result_message">
