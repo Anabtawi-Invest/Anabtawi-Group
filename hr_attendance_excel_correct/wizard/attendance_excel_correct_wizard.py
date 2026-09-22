@@ -64,6 +64,12 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
     count_selected = fields.Integer(compute="_compute_counts")
     count_done = fields.Integer(compute="_compute_counts")
     result_message = fields.Text(readonly=True)
+    batch_id = fields.Many2one(
+        "hr.attendance.excel.correct.batch",
+        string="Tracking Batch",
+        readonly=True,
+        ondelete="set null",
+    )
 
     @api.depends(
         "line_ids.action",
@@ -390,10 +396,47 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
                 "state": "pending",
             })
 
+        # Persistent tracking batch (survives wizard close)
+        batch = self.env["hr.attendance.excel.correct.batch"].create({
+            "file_name": self.file_name or "",
+            "company_id": self.company_id.id if self.company_id else False,
+            "batch_size": self.batch_size,
+            "state": "preview",
+            "user_id": self.env.user.id,
+        })
+        log_vals = []
+        for vals in vals_list:
+            log_vals.append({
+                "batch_id": batch.id,
+                "excel_row": vals["excel_row"],
+                "employee_id": vals.get("employee_id") or False,
+                "employee_number": vals.get("employee_number") or "",
+                "employee_name_excel": vals.get("employee_name_excel") or "",
+                "attendance_id": vals.get("attendance_id") or False,
+                "date": vals.get("date") or False,
+                "old_check_in": vals.get("old_check_in") or False,
+                "old_check_out": vals.get("old_check_out") or False,
+                "new_check_in": vals.get("new_check_in") or False,
+                "new_check_out": vals.get("new_check_out") or False,
+                "action": vals["action"],
+                "state": "skipped" if vals["action"] in ("skip", "no_change", "error") else "pending",
+                "note": vals.get("note") or "",
+                "apply_requested": False,
+            })
+        logs = self.env["hr.attendance.excel.correct.log"]
+        if log_vals:
+            logs = logs.create(log_vals)
+        log_by_row = {log.excel_row: log for log in logs}
+
+        for vals in vals_list:
+            vals["log_id"] = log_by_row[vals["excel_row"]].id if vals["excel_row"] in log_by_row else False
         if vals_list:
             Line.create(vals_list)
 
-        self.state = "preview"
+        self.write({
+            "batch_id": batch.id,
+            "state": "preview",
+        })
         return self._reopen()
 
     # ------------------------------------------------------------------
@@ -404,6 +447,8 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
         self.ensure_one()
         if self.state != "preview":
             raise UserError(_("Load the preview before applying."))
+        if not self.batch_id:
+            raise UserError(_("Missing tracking batch. Reload the preview."))
 
         lines = self.line_ids.filtered(
             lambda l: l.apply and l.action in APPLYABLE_ACTIONS and l.state == "pending"
@@ -411,35 +456,71 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
         if not lines:
             raise UserError(_("No selected rows to apply."))
 
+        # Mark unselected applyable rows as excluded in the tracking log
+        excluded = self.line_ids.filtered(
+            lambda l: (not l.apply) and l.action in APPLYABLE_ACTIONS and l.state == "pending" and l.log_id
+        )
+        if excluded:
+            excluded.mapped("log_id").write({
+                "state": "skipped",
+                "action": "excluded",
+                "note": _("Not selected for apply."),
+                "apply_requested": False,
+            })
+
         wizard_id = self.id
+        batch_id = self.batch_id.id
         line_ids = lines.ids
         selected_total = len(line_ids)
         batch_size = self.batch_size or 100
         updated = created = failed = 0
         Line = self.env["hr.attendance.excel.correct.line"]
+        now = fields.Datetime.now()
+
+        # Mark selected logs as apply requested
+        lines.mapped("log_id").filtered(lambda l: l).write({"apply_requested": True})
 
         # Process in batches; commit after each batch so progress is kept
         for start in range(0, selected_total, batch_size):
             wizard = self.env[self._name].browse(wizard_id)
-            batch = Line.browse(line_ids[start:start + batch_size]).exists()
-            for line in batch:
+            batch_lines = Line.browse(line_ids[start:start + batch_size]).exists()
+            for line in batch_lines:
                 action_before = line.action
                 try:
                     with self.env.cr.savepoint():
-                        wizard._apply_line(line)
-                    line.write({"state": "done"})
+                        attendance = wizard._apply_line(line)
+                    note = line.note or ""
+                    line.write({"state": "done", "note": note})
+                    if line.log_id:
+                        line.log_id.write({
+                            "state": "done",
+                            "action": action_before,
+                            "attendance_id": attendance.id if attendance else line.attendance_id.id,
+                            "note": note,
+                            "applied_date": now,
+                            "apply_requested": True,
+                        })
                     if action_before == ACTION_UPDATE:
                         updated += 1
                     elif action_before == ACTION_CREATE:
                         created += 1
                 except Exception as exc:
                     failed += 1
+                    note = ((line.note or "") + (" | " if line.note else "")
+                            + _("Apply failed: %s") % exc)
                     line.write({
                         "state": "failed",
                         "action": ACTION_ERROR,
-                        "note": ((line.note or "") + (" | " if line.note else "")
-                                 + _("Apply failed: %s") % exc),
+                        "note": note,
                     })
+                    if line.log_id:
+                        line.log_id.write({
+                            "state": "failed",
+                            "action": ACTION_ERROR,
+                            "note": note,
+                            "apply_requested": True,
+                            "applied_date": now,
+                        })
                     _logger.exception(
                         "Attendance excel correct failed for row %s employee %s",
                         line.excel_row,
@@ -448,21 +529,30 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
             self.env.cr.commit()
             self.env.clear()
 
+        tracking = self.env["hr.attendance.excel.correct.batch"].browse(batch_id)
+        result_message = _(
+            "Apply finished.\n"
+            "Updated: %(updated)s\n"
+            "Created: %(created)s\n"
+            "Failed: %(failed)s\n"
+            "Selected originally: %(selected)s"
+        ) % {
+            "updated": updated,
+            "created": created,
+            "failed": failed,
+            "selected": selected_total,
+        }
+        pending_left = tracking.line_ids.filtered(lambda l: l.state == "pending")
+        tracking.write({
+            "state": "partial" if pending_left else "done",
+            "date_end": fields.Datetime.now(),
+            "result_message": result_message,
+        })
+
         wizard = self.env[self._name].browse(wizard_id)
         wizard.write({
             "state": "done",
-            "result_message": _(
-                "Apply finished.\n"
-                "Updated: %(updated)s\n"
-                "Created: %(created)s\n"
-                "Failed: %(failed)s\n"
-                "Selected originally: %(selected)s"
-            ) % {
-                "updated": updated,
-                "created": created,
-                "failed": failed,
-                "selected": selected_total,
-            },
+            "result_message": result_message,
         })
         return wizard._reopen()
 
@@ -482,14 +572,12 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
         if line.action == ACTION_UPDATE:
             if not line.attendance_id:
                 raise UserError(_("Missing attendance to update."))
-            # Re-check ambiguity just before write
             same_day = self._find_attendances_for_day(line.employee_id, line.date)
             if len(same_day) > 1:
                 raise UserError(_(
                     "Multiple attendances now exist on %s (IDs: %s)."
                 ) % (line.date, ", ".join(str(a.id) for a in same_day)))
             line.attendance_id.write(vals)
-            # Neighbor overtime already handled inside hr.attendance.write via _update_overtime
             line.note = _("Updated attendance #%s. Worked hours / overtime recomputed.") % line.attendance_id.id
             return line.attendance_id
 
@@ -511,6 +599,18 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
 
         raise UserError(_("Unsupported action: %s") % line.action)
 
+    def action_open_tracking_batch(self):
+        self.ensure_one()
+        if not self.batch_id:
+            raise UserError(_("No tracking batch linked yet. Load the preview first."))
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "hr.attendance.excel.correct.batch",
+            "res_id": self.batch_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
     def action_select_applyable(self):
         self.ensure_one()
         self.line_ids.filtered(lambda l: l.action in APPLYABLE_ACTIONS).write({"apply": True})
@@ -523,9 +623,15 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
 
     def action_back_to_upload(self):
         self.ensure_one()
+        # Keep historical batch; only clear wizard preview lines
+        if self.batch_id and self.batch_id.state == "preview":
+            self.batch_id.write({"state": "cancelled", "date_end": fields.Datetime.now()})
         self.line_ids.unlink()
-        self.state = "upload"
-        self.result_message = False
+        self.write({
+            "state": "upload",
+            "result_message": False,
+            "batch_id": False,
+        })
         return self._reopen()
 
     def _reopen(self):
@@ -548,6 +654,12 @@ class HrAttendanceExcelCorrectLine(models.TransientModel):
         "hr.attendance.excel.correct.wizard",
         required=True,
         ondelete="cascade",
+    )
+    log_id = fields.Many2one(
+        "hr.attendance.excel.correct.log",
+        string="Tracking Log",
+        ondelete="set null",
+        readonly=True,
     )
     excel_row = fields.Integer(string="Excel Row", readonly=True)
     employee_id = fields.Many2one("hr.employee", string="Employee", readonly=True)

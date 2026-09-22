@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_hr_attendance_excel_correct_wizard,hr.attendance.excel.correct.wizard,model_hr_attendance_excel_correct_wizard,hr_attendance.group_hr_attendance_manager,1,1,1,1
 access_hr_attendance_excel_correct_line,hr.attendance.excel.correct.line,model_hr_attendance_excel_correct_line,hr_attendance.group_hr_attendance_manager,1,1,1,1
+access_hr_attendance_excel_correct_batch,hr.attendance.excel.correct.batch,model_hr_attendance_excel_correct_batch,hr_attendance.group_hr_attendance_manager,1,1,1,1
+access_hr_attendance_excel_correct_log,hr.attendance.excel.correct.log,model_hr_attendance_excel_correct_log,hr_attendance.group_hr_attendance_manager,1,1,1,1

@@ -27,6 +27,7 @@
 
                     <group invisible="state == 'upload'">
                         <group string="Summary">
+                            <field name="batch_id" readonly="1"/>
                             <field name="count_update"/>
                             <field name="count_create"/>
                             <field name="count_skip"/>
@@ -94,6 +95,11 @@
                             class="btn-primary"
                             invisible="state != 'preview'"
                             confirm="Apply selected updates/creates? Worked hours and overtime will be recomputed by Odoo."/>
+                    <button name="action_open_tracking_batch"
+                            type="object"
+                            string="Open Tracking"
+                            class="btn-secondary"
+                            invisible="not batch_id"/>
                     <button name="action_back_to_upload"
                             type="object"
                             string="Back"

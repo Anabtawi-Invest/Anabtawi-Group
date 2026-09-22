@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Batch list -->
+    <record id="view_hr_attendance_excel_correct_batch_list" model="ir.ui.view">
+        <field name="name">hr.attendance.excel.correct.batch.list</field>
+        <field name="model">hr.attendance.excel.correct.batch</field>
+        <field name="arch" type="xml">
+            <list string="Attendance Excel Imports"
+                  decoration-info="state == 'preview'"
+                  decoration-warning="state == 'partial'"
+                  decoration-success="state == 'done'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="file_name"/>
+                <field name="user_id"/>
+                <field name="company_id" optional="show"/>
+                <field name="date_start"/>
+                <field name="date_end" optional="show"/>
+                <field name="count_total"/>
+                <field name="count_done"/>
+                <field name="count_failed"/>
+                <field name="count_pending"/>
+                <field name="count_skip" optional="hide"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Batch form -->
+    <record id="view_hr_attendance_excel_correct_batch_form" model="ir.ui.view">
+        <field name="name">hr.attendance.excel.correct.batch.form</field>
+        <field name="model">hr.attendance.excel.correct.batch</field>
+        <field name="arch" type="xml">
+            <form string="Attendance Excel Import" create="0">
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="preview,partial,done"/>
+                    <button name="action_open_lines"
+                            type="object"
+                            string="Open All Lines"
+                            class="btn-primary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="file_name" readonly="1"/>
+                            <field name="user_id" readonly="1"/>
+                            <field name="company_id" readonly="1"/>
+                            <field name="batch_size" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="date_start" readonly="1"/>
+                            <field name="date_end" readonly="1"/>
+                            <field name="count_total"/>
+                            <field name="count_done"/>
+                            <field name="count_failed"/>
+                            <field name="count_pending"/>
+                        </group>
+                    </group>
+                    <group string="Action breakdown">
+                        <group>
+                            <field name="count_update"/>
+                            <field name="count_create"/>
+                        </group>
+                        <group>
+                            <field name="count_skip"/>
+                            <field name="count_no_change"/>
+                            <field name="count_error"/>
+                        </group>
+                    </group>
+                    <group string="Result" invisible="not result_message">
+                        <field name="result_message" nolabel="1" colspan="2" readonly="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Lines" name="lines">
+                            <field name="line_ids" readonly="1">
+                                <list decoration-success="state == 'done'"
+                                      decoration-danger="state == 'failed' or action == 'error'"
+                                      decoration-warning="action == 'skip' or state == 'skipped'"
+                                      decoration-info="action == 'create' and state == 'pending'"
+                                      decoration-muted="action == 'no_change' or action == 'excluded'">
+                                    <field name="excel_row" optional="hide"/>
+                                    <field name="state"/>
+                                    <field name="action"/>
+                                    <field name="employee_number"/>
+                                    <field name="employee_id"/>
+                                    <field name="company_id" optional="hide"/>
+                                    <field name="date"/>
+                                    <field name="old_check_in" optional="show"/>
+                                    <field name="old_check_out" optional="show"/>
+                                    <field name="new_check_in"/>
+                                    <field name="new_check_out"/>
+                                    <field name="attendance_id" optional="show"/>
+                                    <field name="apply_requested" optional="hide"/>
+                                    <field name="applied_date" optional="show"/>
+                                    <field name="note"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hr_attendance_excel_correct_batch_search" model="ir.ui.view">
+        <field name="name">hr.attendance.excel.correct.batch.search</field>
+        <field name="model">hr.attendance.excel.correct.batch</field>
+        <field name="arch" type="xml">
+            <search string="Search Imports">
+                <field name="name"/>
+                <field name="file_name"/>
+                <field name="user_id"/>
+                <filter name="filter_preview" string="Preview" domain="[('state', '=', 'preview')]"/>
+                <filter name="filter_partial" string="Partial" domain="[('state', '=', 'partial')]"/>
+                <filter name="filter_done" string="Done" domain="[('state', '=', 'done')]"/>
+                <filter name="filter_my" string="My Imports" domain="[('user_id', '=', uid)]"/>
+                <group>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_user" string="User" context="{'group_by': 'user_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Log line list (standalone tracking) -->
+    <record id="view_hr_attendance_excel_correct_log_list" model="ir.ui.view">
+        <field name="name">hr.attendance.excel.correct.log.list</field>
+        <field name="model">hr.attendance.excel.correct.log</field>
+        <field name="arch" type="xml">
+            <list string="Attendance Excel Import Lines" create="0"
+                  decoration-success="state == 'done'"
+                  decoration-danger="state == 'failed' or action == 'error'"
+                  decoration-warning="action == 'skip' or state == 'skipped'"
+                  decoration-info="action == 'create' and state == 'pending'"
+                  decoration-muted="action == 'no_change' or action == 'excluded'">
+                <field name="batch_id"/>
+                <field name="excel_row" optional="hide"/>
+                <field name="state"/>
+                <field name="action"/>
+                <field name="employee_number"/>
+                <field name="employee_id"/>
+                <field name="company_id" optional="show"/>
+                <field name="date"/>
+                <field name="old_check_in" optional="hide"/>
+                <field name="old_check_out" optional="hide"/>
+                <field name="new_check_in"/>
+                <field name="new_check_out"/>
+                <field name="attendance_id" optional="show"/>
+                <field name="apply_requested" optional="hide"/>
+                <field name="applied_date" optional="show"/>
+                <field name="user_id" optional="hide"/>
+                <field name="note"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hr_attendance_excel_correct_log_form" model="ir.ui.view">
+        <field name="name">hr.attendance.excel.correct.log.form</field>
+        <field name="model">hr.attendance.excel.correct.log</field>
+        <field name="arch" type="xml">
+            <form string="Import Line" create="0" edit="0">
+                <header>
+                    <button name="action_open_attendance"
+                            type="object"
+                            string="Open Attendance"
+                            class="btn-primary"
+                            invisible="not attendance_id"/>
+                    <button name="action_open_employee"
+                            type="object"
+                            string="Open Employee"
+                            invisible="not employee_id"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="batch_id"/>
+                            <field name="excel_row"/>
+                            <field name="action"/>
+                            <field name="apply_requested"/>
+                            <field name="applied_date"/>
+                        </group>
+                        <group>
+                            <field name="employee_number"/>
+                            <field name="employee_id"/>
+                            <field name="employee_name_excel"/>
+                            <field name="company_id"/>
+                            <field name="attendance_id"/>
+                            <field name="user_id"/>
+                        </group>
+                    </group>
+                    <group string="Times">
+                        <group string="Current / Old">
+                            <field name="date"/>
+                            <field name="old_check_in"/>
+                            <field name="old_check_out"/>
+                        </group>
+                        <group string="New (UTC from Excel)">
+                            <field name="new_check_in"/>
+                            <field name="new_check_out"/>
+                        </group>
+                    </group>
+                    <group string="Note">
+                        <field name="note" nolabel="1" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_hr_attendance_excel_correct_log_search" model="ir.ui.view">
+        <field name="name">hr.attendance.excel.correct.log.search</field>
+        <field name="model">hr.attendance.excel.correct.log</field>
+        <field name="arch" type="xml">
+            <search string="Search Import Lines">
+                <field name="batch_id"/>
+                <field name="employee_id"/>
+                <field name="employee_number"/>
+                <field name="attendance_id"/>
+                <field name="note"/>
+                <separator/>
+                <filter name="filter_pending" string="Pending" domain="[('state', '=', 'pending')]"/>
+                <filter name="filter_done" string="Done" domain="[('state', '=', 'done')]"/>
+                <filter name="filter_failed" string="Failed" domain="[('state', '=', 'failed')]"/>
+                <filter name="filter_skipped" string="Skipped" domain="[('state', 'in', ['skipped'])]"/>
+                <separator/>
+                <filter name="filter_update" string="Update" domain="[('action', '=', 'update')]"/>
+                <filter name="filter_create" string="Create" domain="[('action', '=', 'create')]"/>
+                <filter name="filter_skip" string="Skip (ambiguous/missing)" domain="[('action', '=', 'skip')]"/>
+                <filter name="filter_error" string="Error" domain="[('action', '=', 'error')]"/>
+                <group>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_action" string="Action" context="{'group_by': 'action'}"/>
+                    <filter name="group_batch" string="Batch" context="{'group_by': 'batch_id'}"/>
+                    <filter name="group_employee" string="Employee" context="{'group_by': 'employee_id'}"/>
+                    <filter name="group_date" string="Date" context="{'group_by': 'date'}"/>
+                    <filter name="group_company" string="Company" context="{'group_by': 'company_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Actions -->
+    <record id="action_hr_attendance_excel_correct_batch" model="ir.actions.act_window">
+        <field name="name">Excel Import Batches</field>
+        <field name="res_model">hr.attendance.excel.correct.batch</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No import batches yet.
+            </p>
+            <p>
+                Use <b>Correct Attendance from Excel</b> to upload a file.
+                Every preview/apply run is tracked here with per-line status.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_hr_attendance_excel_correct_log" model="ir.actions.act_window">
+        <field name="name">Excel Import Lines</field>
+        <field name="res_model">hr.attendance.excel.correct.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_group_state': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No import lines yet.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu under Attendances > Configuration -->
+    <menuitem id="menu_hr_attendance_excel_correct_tracking"
+              name="Excel Import Tracking"
+              parent="hr_attendance.menu_hr_attendance_configuration"
+              groups="hr_attendance.group_hr_attendance_manager"
+              sequence="91"/>
+
+    <menuitem id="menu_hr_attendance_excel_correct_batch"
+              name="Import Batches"
+              parent="menu_hr_attendance_excel_correct_tracking"
+              action="action_hr_attendance_excel_correct_batch"
+              groups="hr_attendance.group_hr_attendance_manager"
+              sequence="10"/>
+
+    <menuitem id="menu_hr_attendance_excel_correct_log"
+              name="Import Lines"
+              parent="menu_hr_attendance_excel_correct_tracking"
+              action="action_hr_attendance_excel_correct_log"
+              groups="hr_attendance.group_hr_attendance_manager"
+              sequence="20"/>
+</odoo>
