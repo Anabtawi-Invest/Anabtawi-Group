@@ -252,6 +252,43 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
 
         return employees, by_number, by_national
 
+    def _normalize_name(self, value):
+        """Lowercase, collapse spaces, strip for name comparison."""
+        if not value:
+            return ""
+        text = str(value).strip().lower()
+        return " ".join(text.split())
+
+    def _filter_candidates_by_name(self, candidates, excel_name):
+        """Narrow duplicate employee_number matches using Excel name."""
+        needle = self._normalize_name(excel_name)
+        if not needle or len(candidates) <= 1:
+            return candidates
+
+        exact = self.env["hr.employee"]
+        soft = self.env["hr.employee"]
+        for emp in candidates:
+            names = [self._normalize_name(emp.name)]
+            if "name_arabic" in emp._fields and emp.name_arabic:
+                names.append(self._normalize_name(emp.name_arabic))
+            if "legal_name" in emp._fields and emp.legal_name:
+                names.append(self._normalize_name(emp.legal_name))
+
+            if needle in names:
+                exact |= emp
+            elif any(needle in n or n in needle for n in names if n):
+                soft |= emp
+
+        if len(exact) == 1:
+            return exact
+        if len(exact) > 1:
+            return exact
+        if len(soft) == 1:
+            return soft
+        if soft:
+            return soft
+        return candidates
+
     def _match_employee(self, row, by_number, by_national):
         number = self._normalize_code(self._cell(row, "employee_number", "employee_code", "emp_code"))
         national = self._normalize_code(self._cell(row, "national_id", "identification_id", "id_number"))
@@ -276,9 +313,20 @@ class HrAttendanceExcelCorrectWizard(models.TransientModel):
             ) % (number or "-", national or "-", name or "-")
 
         if len(candidates) > 1:
+            narrowed = self._filter_candidates_by_name(candidates, name)
+            if len(narrowed) == 1:
+                return narrowed, ""
+            if not name:
+                return self.env["hr.employee"], _(
+                    "Multiple employees matched via %s: %s. Excel has no name to disambiguate. Skipped."
+                ) % (match_via, ", ".join("%s [#%s]" % (e.name, e.id) for e in candidates))
             return self.env["hr.employee"], _(
-                "Multiple employees matched via %s: %s. Skipped."
-            ) % (match_via, ", ".join("%s [#%s]" % (e.name, e.id) for e in candidates))
+                "Multiple employees matched via %s even after name '%s': %s. Skipped."
+            ) % (
+                match_via,
+                name,
+                ", ".join("%s [#%s]" % (e.name, e.id) for e in narrowed),
+            )
 
         return candidates, ""
 
