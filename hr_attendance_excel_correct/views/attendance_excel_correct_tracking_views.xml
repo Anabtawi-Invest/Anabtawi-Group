@@ -18,6 +18,8 @@
                 <field name="date_end" optional="show"/>
                 <field name="count_total"/>
                 <field name="count_queued"/>
+                <field name="count_created"/>
+                <field name="count_corrected"/>
                 <field name="count_done"/>
                 <field name="count_failed"/>
                 <field name="count_pending"/>
@@ -34,18 +36,30 @@
         <field name="arch" type="xml">
             <form string="Attendance Excel Import" create="0">
                 <header>
-                    <field name="state" widget="statusbar" statusbar_visible="preview,running,done"/>
+                    <button name="action_refresh"
+                            type="object"
+                            string="Refresh"
+                            class="btn-primary"
+                            invisible="state not in ('running', 'partial', 'done', 'cancelled')"/>
+                    <button name="action_skip_process"
+                            type="object"
+                            string="Skip Process"
+                            class="btn-secondary"
+                            invisible="state not in ('running', 'preview')"
+                            confirm="Skip/cancel all remaining queued lines? Already created/corrected rows will be kept."/>
                     <button name="action_open_lines"
                             type="object"
                             string="Open All Lines"
-                            class="btn-primary"/>
+                            class="btn-secondary"/>
+                    <field name="state" widget="statusbar" statusbar_visible="preview,running,done"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
                     <div class="alert alert-info" role="alert" invisible="state != 'running'">
-                        Background apply is running. Refresh this page to see Done / Failed / Queued counts update.
+                        Background apply is running. Click <b>Refresh</b> to process the next chunk and update counts.
+                        Use <b>Skip Process</b> to cancel remaining queued lines.
                     </div>
                     <group>
                         <group>
@@ -59,12 +73,14 @@
                             <field name="date_end" readonly="1"/>
                             <field name="count_total"/>
                             <field name="count_queued"/>
+                            <field name="count_created"/>
+                            <field name="count_corrected"/>
                             <field name="count_done"/>
                             <field name="count_failed"/>
                             <field name="count_pending"/>
                         </group>
                     </group>
-                    <group string="Action breakdown">
+                    <group string="Action breakdown (planned)">
                         <group>
                             <field name="count_update"/>
                             <field name="count_create"/>
@@ -81,14 +97,15 @@
                     <notebook>
                         <page string="Lines" name="lines">
                             <field name="line_ids" readonly="1">
-                                <list decoration-success="state == 'done'"
-                                      decoration-danger="state == 'failed' or action == 'error'"
-                                      decoration-warning="action == 'skip' or state == 'skipped'"
-                                      decoration-info="action == 'create' and state == 'pending'"
-                                      decoration-muted="action == 'no_change' or action == 'excluded'">
+                                <list decoration-success="progress_status in ('created', 'corrected')"
+                                      decoration-danger="progress_status == 'failed'"
+                                      decoration-warning="progress_status == 'skipped'"
+                                      decoration-info="progress_status == 'not_yet'"
+                                      decoration-muted="progress_status == 'no_change'">
                                     <field name="excel_row" optional="hide"/>
-                                    <field name="state"/>
-                                    <field name="action"/>
+                                    <field name="progress_status"/>
+                                    <field name="state" optional="hide"/>
+                                    <field name="action" optional="show"/>
                                     <field name="employee_number"/>
                                     <field name="employee_id"/>
                                     <field name="company_id" optional="hide"/>
@@ -137,15 +154,16 @@
         <field name="model">hr.attendance.excel.correct.log</field>
         <field name="arch" type="xml">
             <list string="Attendance Excel Import Lines" create="0"
-                  decoration-success="state == 'done'"
-                  decoration-danger="state == 'failed' or action == 'error'"
-                  decoration-warning="action == 'skip' or state == 'skipped'"
-                  decoration-info="action == 'create' and state == 'pending'"
-                  decoration-muted="action == 'no_change' or action == 'excluded'">
+                  decoration-success="progress_status in ('created', 'corrected')"
+                  decoration-danger="progress_status == 'failed'"
+                  decoration-warning="progress_status == 'skipped'"
+                  decoration-info="progress_status == 'not_yet'"
+                  decoration-muted="progress_status == 'no_change'">
                 <field name="batch_id"/>
                 <field name="excel_row" optional="hide"/>
-                <field name="state"/>
-                <field name="action"/>
+                <field name="progress_status"/>
+                <field name="state" optional="hide"/>
+                <field name="action" optional="show"/>
                 <field name="employee_number"/>
                 <field name="employee_id"/>
                 <field name="company_id" optional="show"/>
@@ -185,7 +203,9 @@
                         <group>
                             <field name="batch_id"/>
                             <field name="excel_row"/>
+                            <field name="progress_status"/>
                             <field name="action"/>
+                            <field name="state"/>
                             <field name="apply_requested"/>
                             <field name="applied_date"/>
                         </group>
@@ -228,18 +248,22 @@
                 <field name="attendance_id"/>
                 <field name="note"/>
                 <separator/>
-                <filter name="filter_pending" string="Pending" domain="[('state', '=', 'pending')]"/>
-                <filter name="filter_queued" string="Queued" domain="[('state', '=', 'queued')]"/>
-                <filter name="filter_done" string="Done" domain="[('state', '=', 'done')]"/>
-                <filter name="filter_failed" string="Failed" domain="[('state', '=', 'failed')]"/>
-                <filter name="filter_skipped" string="Skipped" domain="[('state', 'in', ['skipped'])]"/>
+                <filter name="filter_not_yet" string="Not yet" domain="[('progress_status', '=', 'not_yet')]"/>
+                <filter name="filter_created" string="Created" domain="[('progress_status', '=', 'created')]"/>
+                <filter name="filter_corrected" string="Corrected" domain="[('progress_status', '=', 'corrected')]"/>
+                <filter name="filter_pending" string="Pending (tech)" domain="[('state', '=', 'pending')]"/>
+                <filter name="filter_queued" string="Queued (tech)" domain="[('state', '=', 'queued')]"/>
+                <filter name="filter_done" string="Done (tech)" domain="[('state', '=', 'done')]"/>
+                <filter name="filter_failed" string="Failed" domain="[('progress_status', '=', 'failed')]"/>
+                <filter name="filter_skipped" string="Skipped" domain="[('progress_status', '=', 'skipped')]"/>
                 <separator/>
-                <filter name="filter_update" string="Update" domain="[('action', '=', 'update')]"/>
-                <filter name="filter_create" string="Create" domain="[('action', '=', 'create')]"/>
-                <filter name="filter_skip" string="Skip (ambiguous/missing)" domain="[('action', '=', 'skip')]"/>
-                <filter name="filter_error" string="Error" domain="[('action', '=', 'error')]"/>
+                <filter name="filter_update" string="Plan: Update" domain="[('action', '=', 'update')]"/>
+                <filter name="filter_create" string="Plan: Create" domain="[('action', '=', 'create')]"/>
+                <filter name="filter_skip" string="Plan: Skip" domain="[('action', '=', 'skip')]"/>
+                <filter name="filter_error" string="Plan: Error" domain="[('action', '=', 'error')]"/>
                 <group>
-                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_progress" string="Status" context="{'group_by': 'progress_status'}"/>
+                    <filter name="group_state" string="Technical Status" context="{'group_by': 'state'}"/>
                     <filter name="group_action" string="Action" context="{'group_by': 'action'}"/>
                     <filter name="group_batch" string="Batch" context="{'group_by': 'batch_id'}"/>
                     <filter name="group_employee" string="Employee" context="{'group_by': 'employee_id'}"/>

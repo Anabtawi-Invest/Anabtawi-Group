@@ -24,6 +24,15 @@ LINE_STATE_SELECTION = [
     ("skipped", "Skipped"),
 ]
 
+PROGRESS_STATUS_SELECTION = [
+    ("not_yet", "Not yet"),
+    ("created", "Created"),
+    ("corrected", "Corrected"),
+    ("failed", "Failed"),
+    ("skipped", "Skipped"),
+    ("no_change", "No change"),
+]
+
 BATCH_STATE_SELECTION = [
     ("preview", "Preview"),
     ("running", "Running (Background)"),
@@ -74,11 +83,24 @@ class HrAttendanceExcelCorrectBatch(models.Model):
     count_failed = fields.Integer(compute="_compute_counts", store=True)
     count_pending = fields.Integer(compute="_compute_counts", store=True)
     count_queued = fields.Integer(compute="_compute_counts", store=True)
+    count_created = fields.Integer(
+        string="Created (done)",
+        compute="_compute_counts",
+        store=True,
+        help="Lines successfully created.",
+    )
+    count_corrected = fields.Integer(
+        string="Corrected (done)",
+        compute="_compute_counts",
+        store=True,
+        help="Lines successfully updated/corrected.",
+    )
 
     @api.depends(
         "line_ids",
         "line_ids.action",
         "line_ids.state",
+        "line_ids.progress_status",
     )
     def _compute_counts(self):
         for batch in self:
@@ -93,6 +115,8 @@ class HrAttendanceExcelCorrectBatch(models.Model):
             batch.count_failed = len(lines.filtered(lambda l: l.state == "failed"))
             batch.count_pending = len(lines.filtered(lambda l: l.state == "pending"))
             batch.count_queued = len(lines.filtered(lambda l: l.state == "queued"))
+            batch.count_created = len(lines.filtered(lambda l: l.progress_status == "created"))
+            batch.count_corrected = len(lines.filtered(lambda l: l.progress_status == "corrected"))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -113,8 +137,64 @@ class HrAttendanceExcelCorrectBatch(models.Model):
             "view_mode": "list,form",
             "views": [(False, "list"), (False, "form")],
             "domain": [("batch_id", "=", self.id)],
-            "context": {"default_batch_id": self.id, "search_default_group_state": 1},
+            "context": {
+                "default_batch_id": self.id,
+                "search_default_group_progress": 1,
+            },
         }
+
+    def action_refresh(self):
+        """Refresh counts; if still running, process one chunk now so progress moves."""
+        self.ensure_one()
+        if self.state == "running":
+            self._process_queued_chunk()
+            if self.state == "running":
+                self._trigger_background_cron()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Excel Import Batch"),
+            "res_model": self._name,
+            "res_id": self.id,
+            "view_mode": "form",
+            "views": [(False, "form")],
+            "target": "current",
+        }
+
+    def action_skip_process(self):
+        """Stop background apply: skip all remaining queued lines."""
+        self.ensure_one()
+        if self.state not in ("running", "preview", "partial"):
+            raise UserError(_("Nothing to skip for this batch (state: %s).") % self.state)
+
+        queued = self.line_ids.filtered(lambda l: l.state == "queued")
+        pending_applyable = self.line_ids.filtered(
+            lambda l: l.state == "pending" and l.action in ("update", "create")
+        )
+        to_skip = queued | pending_applyable
+        if to_skip:
+            to_skip.write({
+                "state": "skipped",
+                "apply_requested": False,
+                "note": _("Skipped by user — process cancelled."),
+            })
+
+        done = self.line_ids.search_count([("batch_id", "=", self.id), ("state", "=", "done")])
+        failed = self.line_ids.search_count([("batch_id", "=", self.id), ("state", "=", "failed")])
+        self.write({
+            "state": "cancelled",
+            "date_end": fields.Datetime.now(),
+            "result_message": _(
+                "Process skipped/cancelled by user.\n"
+                "Corrected/Created before cancel: %(done)s\n"
+                "Failed: %(failed)s\n"
+                "Skipped remaining: %(skipped)s"
+            ) % {
+                "done": done,
+                "failed": failed,
+                "skipped": len(to_skip),
+            },
+        })
+        return self.action_refresh()
 
     def action_queue_selected_logs(self, log_ids):
         """Queue specific log lines for background apply and trigger the cron."""
@@ -368,10 +448,18 @@ class HrAttendanceExcelCorrectLog(models.Model):
     action = fields.Selection(ACTION_SELECTION, string="Planned Action", required=True, index=True)
     state = fields.Selection(
         LINE_STATE_SELECTION,
-        string="Status",
+        string="Technical Status",
         default="pending",
         required=True,
         index=True,
+    )
+    progress_status = fields.Selection(
+        PROGRESS_STATUS_SELECTION,
+        string="Status",
+        compute="_compute_progress_status",
+        store=True,
+        index=True,
+        help="Created / Corrected / Not yet / Failed / Skipped",
     )
     note = fields.Text(string="Note")
     apply_requested = fields.Boolean(
@@ -390,6 +478,26 @@ class HrAttendanceExcelCorrectLog(models.Model):
         string="Batch Status",
         store=True,
     )
+
+    @api.depends("state", "action")
+    def _compute_progress_status(self):
+        for line in self:
+            if line.state == "done":
+                if line.action == "create":
+                    line.progress_status = "created"
+                elif line.action == "update":
+                    line.progress_status = "corrected"
+                else:
+                    line.progress_status = "corrected"
+            elif line.state == "failed" or line.action == "error":
+                line.progress_status = "failed"
+            elif line.action == "no_change":
+                line.progress_status = "no_change"
+            elif line.state == "skipped" or line.action in ("skip", "excluded"):
+                line.progress_status = "skipped"
+            else:
+                # pending / queued applyable rows
+                line.progress_status = "not_yet"
 
     def action_open_attendance(self):
         self.ensure_one()
