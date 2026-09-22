@@ -1,12 +1,13 @@
 {
     "name": "HR Attendance Excel Correct",
     "summary": "Upload Excel to preview and batch-correct employee check-in / check-out times",
-    "version": "19.0.1.4.1",
+    "version": "19.0.1.4.3",
     "category": "Human Resources/Attendances",
     "author": "Anabtawi Group",
     "license": "LGPL-3",
     "depends": [
         "hr_attendance",
+        "hr_work_entry_attendance",
     ],
     "external_dependencies": {
         "python": ["openpyxl"],

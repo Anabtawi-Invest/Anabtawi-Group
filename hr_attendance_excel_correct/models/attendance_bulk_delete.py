@@ -20,9 +20,9 @@ class HrAttendanceExcelDeleteJob(models.Model):
     batch_size = fields.Integer(default=500, required=True)
     reset_work_entries = fields.Boolean(
         string="Reset Validated Work Entries",
-        default=True,
-        help="Set linked validated work entries back to draft so attendances can be deleted. "
-             "Entries already used on a payslip stay locked and those attendances are skipped.",
+        default=False,
+        help="Deprecated: validated work entries are always skipped. "
+             "Attendances linked to validated work entries are not deleted.",
     )
     user_id = fields.Many2one(
         "res.users",
@@ -46,9 +46,9 @@ class HrAttendanceExcelDeleteJob(models.Model):
     count_ot_deleted = fields.Integer(string="Overtime Lines Deleted", readonly=True)
     count_we_reset = fields.Integer(string="Work Entries Reset to Draft", readonly=True)
     count_locked = fields.Integer(
-        string="Locked (Payslip)",
+        string="Skipped (Validated Work Entry)",
         readonly=True,
-        help="Attendances that could not be deleted because work entries are on a payslip.",
+        help="Attendances not deleted because they are linked to a validated work entry.",
     )
     count_remaining = fields.Integer(readonly=True)
     locked_attendance_ids_json = fields.Text(default="[]", readonly=True)
@@ -127,8 +127,8 @@ class HrAttendanceExcelDeleteJob(models.Model):
 
     def _prepare_attendances_for_delete(self, attendances):
         """
-        Reset validated work entries to draft when possible.
-        Return (deletable_attendances, locked_attendances, we_reset_count).
+        Skip any attendance linked to a validated work entry.
+        Return (deletable_attendances, skipped_attendances, we_reset_count=0).
         """
         self.ensure_one()
         if not attendances or "hr.work.entry" not in self.env:
@@ -142,33 +142,9 @@ class HrAttendanceExcelDeleteJob(models.Model):
         if not validated:
             return attendances, attendances.browse(), 0
 
-        if not self.reset_work_entries:
-            locked = attendances.filtered(
-                lambda a: a.id in validated.mapped("attendance_id").ids
-            )
-            return attendances - locked, locked, 0
-
-        locked_att_ids = set()
-        to_draft = WE.browse()
-        for we in validated:
-            # Payslip-linked validated entries cannot be moved to draft
-            if "has_payslip" in we._fields and we.has_payslip:
-                if we.attendance_id:
-                    locked_att_ids.add(we.attendance_id.id)
-                continue
-            to_draft |= we
-
-        we_reset = 0
-        if to_draft:
-            # Prefer official method when available
-            if hasattr(to_draft, "action_set_to_draft"):
-                to_draft.action_set_to_draft()
-            else:
-                to_draft.write({"state": "draft"})
-            we_reset = len(to_draft)
-
+        locked_att_ids = set(validated.mapped("attendance_id").ids)
         locked = attendances.filtered(lambda a: a.id in locked_att_ids)
-        return attendances - locked, locked, we_reset
+        return attendances - locked, locked, 0
 
     def action_start(self):
         self.ensure_one()
@@ -206,7 +182,7 @@ class HrAttendanceExcelDeleteJob(models.Model):
             "date_end": False,
             "result_message": _(
                 "Bulk delete started. Overtime lines removed: %s. "
-                "Validated work entries will be reset to draft when possible…"
+                "Attendances with validated work entries will be skipped…"
             ) % ot_deleted,
         })
         self._trigger_cron()
@@ -246,20 +222,18 @@ class HrAttendanceExcelDeleteJob(models.Model):
                     "Bulk delete finished.\n"
                     "Attendances deleted: %(deleted)s / %(total)s\n"
                     "Overtime lines deleted: %(ot)s\n"
-                    "Work entries reset to draft: %(we)s\n"
-                    "Locked by payslip (skipped): %(locked)s\n"
+                    "Skipped (validated work entry): %(locked)s\n"
                     "You can now run Correct Attendance from Excel to recreate."
                 ) % {
                     "deleted": self.count_deleted,
                     "total": self.count_total,
                     "ot": self.count_ot_deleted,
-                    "we": self.count_we_reset,
                     "locked": self.count_locked,
                 },
             })
             return False
 
-        deletable, locked, we_reset = self._prepare_attendances_for_delete(chunk)
+        deletable, locked, _we_reset = self._prepare_attendances_for_delete(chunk)
         locked_ids = self._locked_ids()
         if locked:
             locked_ids |= set(locked.ids)
@@ -269,32 +243,25 @@ class HrAttendanceExcelDeleteJob(models.Model):
             deleted_now = len(deletable)
             deletable.unlink()
 
-        # Persist locked ids so next search skips them (avoid infinite loop)
-        remaining = Attendance.search_count(self._attendance_domain())
-        # After updating locked json, recompute remaining excluding new locked
         new_locked_json = json.dumps(sorted(locked_ids))
         self.write({"locked_attendance_ids_json": new_locked_json})
         remaining = Attendance.search_count(self._attendance_domain())
 
         new_deleted = self.count_deleted + deleted_now
         new_locked = len(locked_ids)
-        new_we = self.count_we_reset + we_reset
         vals = {
             "count_deleted": new_deleted,
             "count_locked": new_locked,
-            "count_we_reset": new_we,
             "count_remaining": remaining,
             "result_message": _(
                 "Bulk delete in progress…\n"
                 "Deleted: %(deleted)s / %(total)s\n"
                 "Remaining: %(remaining)s\n"
-                "Work entries reset: %(we)s\n"
-                "Locked by payslip: %(locked)s"
+                "Skipped (validated work entry): %(locked)s"
             ) % {
                 "deleted": new_deleted,
                 "total": self.count_total,
                 "remaining": remaining,
-                "we": new_we,
                 "locked": new_locked,
             },
         }
@@ -310,13 +277,11 @@ class HrAttendanceExcelDeleteJob(models.Model):
                 "Bulk delete finished.\n"
                 "Attendances deleted: %(deleted)s\n"
                 "Overtime lines deleted: %(ot)s\n"
-                "Work entries reset to draft: %(we)s\n"
-                "Locked by payslip (skipped): %(locked)s\n"
+                "Skipped (validated work entry): %(locked)s\n"
                 "You can now run Correct Attendance from Excel to recreate."
             ) % {
                 "deleted": new_deleted,
                 "ot": self.count_ot_deleted,
-                "we": new_we,
                 "locked": new_locked,
             },
         })
@@ -360,15 +325,13 @@ class HrAttendanceExcelBulkDeleteWizard(models.TransientModel):
     date_to = fields.Date(required=True, default=lambda self: fields.Date.to_date("2026-09-21"))
     company_id = fields.Many2one("res.company", string="Limit to Company")
     batch_size = fields.Integer(default=500, required=True)
-    reset_work_entries = fields.Boolean(
-        string="Reset Validated Work Entries to Draft",
-        default=True,
-        help="Required when attendances are linked to validated work entries. "
-             "Entries already on a payslip cannot be reset and those attendances are skipped.",
-    )
     matched_count = fields.Integer(string="Attendances to Delete", readonly=True)
     overtime_count = fields.Integer(string="Overtime Lines to Delete", readonly=True)
-    validated_we_count = fields.Integer(string="Validated Work Entries Linked", readonly=True)
+    validated_we_count = fields.Integer(
+        string="Will Be Skipped (Validated WE)",
+        readonly=True,
+        help="Attendances linked to validated work entries — these will not be deleted.",
+    )
 
     @api.onchange("date_from", "date_to", "company_id")
     def _onchange_count(self):
@@ -389,10 +352,11 @@ class HrAttendanceExcelBulkDeleteWizard(models.TransientModel):
             if "hr.attendance.overtime.line" in self.env:
                 wiz.overtime_count = self.env["hr.attendance.overtime.line"].sudo().search_count(domain)
             if atts and "hr.work.entry" in self.env:
-                wiz.validated_we_count = self.env["hr.work.entry"].sudo().search_count([
+                linked_att_ids = self.env["hr.work.entry"].sudo().search([
                     ("attendance_id", "in", atts.ids),
                     ("state", "=", "validated"),
-                ])
+                ]).mapped("attendance_id").ids
+                wiz.validated_we_count = len(set(linked_att_ids))
 
     def action_start_delete(self):
         self.ensure_one()
@@ -400,17 +364,12 @@ class HrAttendanceExcelBulkDeleteWizard(models.TransientModel):
             self._onchange_count()
         if not self.matched_count:
             raise UserError(_("No attendance records found for this period."))
-        if self.validated_we_count and not self.reset_work_entries:
-            raise UserError(_(
-                "There are %s validated work entries linked to these attendances. "
-                "Enable 'Reset Validated Work Entries to Draft' (or reset them manually in Payroll)."
-            ) % self.validated_we_count)
 
         job = self.env["hr.attendance.excel.delete.job"].create({
             "date_from": self.date_from,
             "date_to": self.date_to,
             "company_id": self.company_id.id if self.company_id else False,
             "batch_size": self.batch_size or 500,
-            "reset_work_entries": self.reset_work_entries,
+            "reset_work_entries": False,
         })
         return job.action_start()
