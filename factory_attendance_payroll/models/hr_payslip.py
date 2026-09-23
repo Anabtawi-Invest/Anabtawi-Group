@@ -842,8 +842,8 @@ class HrPayslip(models.Model):
                 we_trv = self.env['hr.work.entry'].sudo().search([
                     ('employee_id', '=', emp.id),
                     ('state', '!=', 'cancelled'),
-                    '|', '|', ('work_entry_type_id.code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE']),
-                    ('work_entry_type_id.display_code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE']),
+                    '|', '|', ('work_entry_type_id.code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110']),
+                    ('work_entry_type_id.display_code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110']),
                     ('work_entry_type_id.name', 'ilike', 'Travel'),
                 ])
                 trv_starts = [we.date_start.date() for we in we_trv if getattr(we, 'date_start', None)]
@@ -867,7 +867,7 @@ class HrPayslip(models.Model):
                 if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
                     continue
 
-                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE'] or 'travel' in we_name or 'travel' in line_name:
+                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'] or 'travel' in we_name or 'travel' in line_name:
                     trv_days = travel_days_count if travel_days_count > 0.0 else line.get('number_of_days', 0.0)
                     line['number_of_days'] = trv_days
                     line['number_of_hours'] = round(trv_days * 9.0, 2)
