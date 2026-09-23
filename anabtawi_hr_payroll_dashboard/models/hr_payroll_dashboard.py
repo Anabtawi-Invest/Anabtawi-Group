@@ -723,7 +723,7 @@ class HrPayrollDashboard(models.AbstractModel):
             "time_from": time_from or "",
             "time_to": time_to or "",
             "active_persona_tab": persona_tab or "all",
-            "calendar_days": calendar_days,
+            "calendar_days": selected_days,
             "selected_company_id": target_company_id,
             "selected_payrun_id": int(payrun_id) if payrun_id else 0,
             "payrun_batches": payrun_batches,
