@@ -838,21 +838,46 @@ class HrPayslip(models.Model):
                 computed_attendance_days = float(final_attendance_days)
 
             travel_days_count = 0.0
+            trv_dates = []
+            if 'hr.leave' in self.env:
+                leaves_trv = self.env['hr.leave'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('state', 'in', ['validate', 'validate1']),
+                    ('date_from', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                    ('date_to', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                    '|', '|', '|',
+                    ('holiday_status_id.code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110']),
+                    ('holiday_status_id.name', 'ilike', 'Travel'),
+                    ('holiday_status_id.name', 'ilike', 'سفر'),
+                    ('holiday_status_id.name', 'ilike', 'مهمة'),
+                ])
+                for lve in leaves_trv:
+                    if getattr(lve, 'date_from', None):
+                        trv_dates.append(lve.date_from.date())
+                    if getattr(lve, 'date_to', None):
+                        trv_dates.append(lve.date_to.date())
+
             if 'hr.work.entry' in self.env:
                 we_trv = self.env['hr.work.entry'].sudo().search([
                     ('employee_id', '=', emp.id),
                     ('state', '!=', 'cancelled'),
-                    '|', '|', ('work_entry_type_id.code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110']),
+                    '|', '|', '|',
+                    ('work_entry_type_id.code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110']),
                     ('work_entry_type_id.display_code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110']),
                     ('work_entry_type_id.name', 'ilike', 'Travel'),
+                    ('work_entry_type_id.name', 'ilike', 'سفر'),
                 ])
-                trv_starts = [we.date_start.date() for we in we_trv if getattr(we, 'date_start', None)]
-                trv_stops = [we.date_stop.date() for we in we_trv if getattr(we, 'date_stop', None)] or trv_starts
-                if trv_starts and trv_stops:
-                    min_trv = max(payslip.date_from, min(trv_starts))
-                    max_trv = min(payslip.date_to, max(trv_stops))
-                    if min_trv <= max_trv:
-                        travel_days_count = float((max_trv - min_trv).days + 1)
+                for we in we_trv:
+                    if getattr(we, 'date_start', None):
+                        trv_dates.append(we.date_start.date())
+                    if getattr(we, 'date_stop', None):
+                        trv_dates.append(we.date_stop.date())
+
+            if trv_dates:
+                min_trv = max(payslip.date_from, min(trv_dates))
+                max_trv = min(payslip.date_to, max(trv_dates))
+                if min_trv <= max_trv:
+                    travel_days_count = float((max_trv - min_trv).days + 1)
 
             filtered_lines = []
             for line in res:
@@ -867,7 +892,7 @@ class HrPayslip(models.Model):
                 if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
                     continue
 
-                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'] or 'travel' in we_name or 'travel' in line_name:
+                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'] or 'travel' in we_name or 'travel' in line_name or 'سفر' in we_name or 'سفر' in line_name or 'مهمة' in we_name or 'مهمة' in line_name:
                     trv_days = travel_days_count if travel_days_count > 0.0 else line.get('number_of_days', 0.0)
                     line['number_of_days'] = trv_days
                     line['number_of_hours'] = round(trv_days * 9.0, 2)
