@@ -22,6 +22,8 @@ export class HrPayrollDashboard extends Component {
             date_to: this._formatLocalDate(lastDayThisMonth),
             payrun_id: 0,
             company_id: 0,
+            selectedRootId: null,
+            selectedAreaId: null,
             department_ids: [],
             expandedParents: [],
             searchQuery: "",
@@ -38,6 +40,7 @@ export class HrPayrollDashboard extends Component {
             selected_payrun_id: 0,
             payrun_batches: [],
             all_departments: [],
+            structured_departments: [],
             parent_departments: [],
             all_companies: [],
             kpis: {},
@@ -90,6 +93,7 @@ export class HrPayrollDashboard extends Component {
             this.data.selected_payrun_id = res?.selected_payrun_id || 0;
             this.data.payrun_batches = res?.payrun_batches || [];
             this.data.all_departments = res?.all_departments || [];
+            this.data.structured_departments = res?.structured_departments || res?.parent_departments || [];
             this.data.parent_departments = res?.parent_departments || [];
             this.data.all_companies = res?.all_companies || [];
             this.data.kpis = res?.kpis || {};
@@ -123,7 +127,10 @@ export class HrPayrollDashboard extends Component {
         let fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
         let toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-        if (period === "this_month") {
+        if (period === "today") {
+            fromDate = new Date();
+            toDate = new Date();
+        } else if (period === "this_month") {
             fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
             toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         } else if (period === "prev_month") {
@@ -145,6 +152,8 @@ export class HrPayrollDashboard extends Component {
 
     selectCompany(compId) {
         this.state.company_id = parseInt(compId) || 0;
+        this.state.selectedRootId = null;
+        this.state.selectedAreaId = null;
         this.state.department_ids = [];
         this.state.expandedParents = [];
         this.fetchDashboardData();
@@ -152,6 +161,81 @@ export class HrPayrollDashboard extends Component {
 
     isCompanySelected(compId) {
         return (this.state.company_id || 0) === (parseInt(compId) || 0);
+    }
+
+    // -------------------------------------------------------------
+    // 3-TIER DEPARTMENT FILTER NAVIGATION (Root -> Area -> Branch)
+    // -------------------------------------------------------------
+    selectRootDepartment(rootId) {
+        if (rootId === "all") {
+            this.state.selectedRootId = null;
+            this.state.selectedAreaId = null;
+            this.state.department_ids = [];
+        } else {
+            const rId = parseInt(rootId);
+            this.state.selectedRootId = rId;
+            this.state.selectedAreaId = null;
+            this.state.department_ids = [rId];
+        }
+        this.fetchDashboardData();
+    }
+
+    selectAreaDepartment(area) {
+        const areaId = parseInt(area.id);
+        const branchIds = (area.branches || []).map(b => parseInt(b.id));
+        this.state.selectedAreaId = areaId;
+        this.state.department_ids = [areaId, ...branchIds];
+        this.fetchDashboardData();
+    }
+
+    toggleBranchDepartment(branchId, ev) {
+        if (ev) {
+            ev.stopPropagation();
+        }
+        const bId = parseInt(branchId);
+        const current = [...this.state.department_ids];
+        const idx = current.indexOf(bId);
+
+        if (idx > -1) {
+            current.splice(idx, 1);
+        } else {
+            current.push(bId);
+        }
+        this.state.department_ids = current;
+        this.fetchDashboardData();
+    }
+
+    selectAllDepartments() {
+        this.state.selectedRootId = null;
+        this.state.selectedAreaId = null;
+        this.state.department_ids = [];
+        this.fetchDashboardData();
+    }
+
+    isRootSelected(rootId) {
+        if (rootId === "all") {
+            return !this.state.selectedRootId && (!this.state.department_ids || this.state.department_ids.length === 0);
+        }
+        return this.state.selectedRootId === parseInt(rootId);
+    }
+
+    isAreaSelected(areaId) {
+        return this.state.selectedAreaId === parseInt(areaId);
+    }
+
+    isBranchSelected(branchId) {
+        return this.state.department_ids && this.state.department_ids.includes(parseInt(branchId));
+    }
+
+    get activeRootData() {
+        if (!this.state.selectedRootId || !this.data.structured_departments) return null;
+        return this.data.structured_departments.find(r => r.id === this.state.selectedRootId) || null;
+    }
+
+    get activeAreaData() {
+        const root = this.activeRootData;
+        if (!root || !this.state.selectedAreaId || !root.areas) return null;
+        return root.areas.find(a => a.id === this.state.selectedAreaId) || null;
     }
 
     // Toggle expand/fold of a parent department's child branches

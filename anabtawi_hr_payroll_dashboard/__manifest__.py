@@ -16,6 +16,7 @@
         "security/ir.model.access.csv",
         "wizard/hr_payroll_report_wizard_views.xml",
         "views/hr_payroll_dashboard_views.xml",
+        "views/pos_config_views.xml",
     ],
     "assets": {
         "web.assets_backend": [

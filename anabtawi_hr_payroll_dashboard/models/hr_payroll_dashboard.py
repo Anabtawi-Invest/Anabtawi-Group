@@ -43,6 +43,10 @@ class HrPayrollDashboard(models.AbstractModel):
             ("date_from", "<=", end_date),
             ("date_to", ">=", start_date),
         ]
+        target_payrun_id = int(payrun_id) if payrun_id and int(payrun_id) > 0 else 0
+        if target_payrun_id > 0:
+            slip_domain.append(("payslip_run_id", "=", target_payrun_id))
+
         if target_company_id > 0:
             slip_domain.append(("company_id", "=", target_company_id))
         else:
@@ -82,31 +86,94 @@ class HrPayrollDashboard(models.AbstractModel):
         dept_domain = [("company_id", "in", [False, target_company_id])] if target_company_id > 0 else [("company_id", "in", [False] + user_companies.ids)]
         raw_departments = self.env["hr.department"].search(dept_domain, order="name asc")
 
-        # Build multi-level department tree (supports nested structures: Root -> Group -> Region -> Branch)
+        # Build 3-Tier Department Tree Structure: Root -> Areas/Subgroups -> Branches
         raw_dept_dict = {d.id: d for d in raw_departments}
-        root_departments = [d for d in raw_departments if not d.parent_id or d.parent_id.id not in raw_dept_dict]
+        root_deps = [d for d in raw_departments if not d.parent_id or d.parent_id.id not in raw_dept_dict]
 
-        parent_departments = []
-        for root_dep in root_departments:
-            # Find all descendant branch departments under this root department
-            child_deps = self.env["hr.department"].sudo().search([
-                ("id", "child_of", root_dep.id),
-                ("id", "!=", root_dep.id)
-            ], order="name asc")
+        structured_departments = []
+        for root in root_deps:
+            sub_deps = [d for d in raw_departments if d.parent_id and d.parent_id.id == root.id]
 
-            children_list = [{
-                "id": c.id,
-                "name": c.name,
-                "parent_id": c.parent_id.id if c.parent_id else 0,
-                "company_id": c.company_id.id if c.company_id else 0,
-            } for c in child_deps]
+            areas_list = []
+            if sub_deps:
+                for sub in sub_deps:
+                    sub_children = [d for d in raw_departments if d.parent_id and d.parent_id.id == sub.id]
 
-            parent_departments.append({
-                "id": root_dep.id,
-                "name": root_dep.name,
-                "company_id": root_dep.company_id.id if root_dep.company_id else 0,
-                "child_count": len(children_list),
-                "children": children_list,
+                    if sub_children:
+                        for s_child in sub_children:
+                            branches = self.env["hr.department"].sudo().search([
+                                ("id", "child_of", s_child.id),
+                                ("id", "!=", s_child.id)
+                            ], order="name asc")
+
+                            b_list = [{
+                                "id": b.id,
+                                "name": b.name,
+                                "parent_id": b.parent_id.id if b.parent_id else s_child.id,
+                                "company_id": b.company_id.id if b.company_id else 0,
+                            } for b in branches]
+
+                            areas_list.append({
+                                "id": s_child.id,
+                                "name": s_child.name,
+                                "parent_id": sub.id,
+                                "company_id": s_child.company_id.id if s_child.company_id else 0,
+                                "branch_count": len(b_list),
+                                "branches": b_list,
+                            })
+                    else:
+                        branches = self.env["hr.department"].sudo().search([
+                            ("id", "child_of", sub.id),
+                            ("id", "!=", sub.id)
+                        ], order="name asc")
+
+                        b_list = [{
+                            "id": b.id,
+                            "name": b.name,
+                            "parent_id": b.parent_id.id if b.parent_id else sub.id,
+                            "company_id": b.company_id.id if b.company_id else 0,
+                        } for b in branches]
+
+                        areas_list.append({
+                            "id": sub.id,
+                            "name": sub.name,
+                            "parent_id": root.id,
+                            "company_id": sub.company_id.id if sub.company_id else 0,
+                            "branch_count": len(b_list),
+                            "branches": b_list,
+                        })
+            else:
+                branches = self.env["hr.department"].sudo().search([
+                    ("id", "child_of", root.id),
+                    ("id", "!=", root.id)
+                ], order="name asc")
+
+                if branches:
+                    b_list = [{
+                        "id": b.id,
+                        "name": b.name,
+                        "parent_id": b.parent_id.id if b.parent_id else root.id,
+                        "company_id": b.company_id.id if b.company_id else 0,
+                    } for b in branches]
+
+                    areas_list.append({
+                        "id": root.id,
+                        "name": _("Direct Branches / Units"),
+                        "parent_id": root.id,
+                        "company_id": root.company_id.id if root.company_id else 0,
+                        "branch_count": len(b_list),
+                        "branches": b_list,
+                    })
+
+            total_branch_count = sum(a["branch_count"] for a in areas_list)
+
+            structured_departments.append({
+                "id": root.id,
+                "name": root.name,
+                "company_id": root.company_id.id if root.company_id else 0,
+                "area_count": len(areas_list),
+                "total_branch_count": total_branch_count,
+                "areas": areas_list,
             })
 
         # Flat department list for quick reference
@@ -460,15 +527,27 @@ class HrPayrollDashboard(models.AbstractModel):
             else:
                 relevant_dept_ids = {0}
 
-            # POS Sales & Labor Cost % for Retail Branches (sums department and all child branches)
-            pos_sales = sum(pos_sales_by_dept.get(cid, 0.0) for cid in relevant_dept_ids)
+            # POS Sales & Labor Cost % for Retail Branches (Direct branch matching + non-duplicated aggregation)
+            pos_sales = pos_sales_by_dept.get(d_id, 0.0)
+            if not pos_sales and d_id > 0:
+                child_ids = dept_children_map.get(d_id, set()) - {d_id}
+                unrepresented_children = [cid for cid in child_ids if cid not in department_dict]
+                if unrepresented_children:
+                    pos_sales = sum(pos_sales_by_dept.get(cid, 0.0) for cid in unrepresented_children)
+
             row["pos_sales"] = round(pos_sales, 3)
             monthly_dept_cost = row["daily_cost"] * float(calendar_days)
             row["pos_labor_cost_pct"] = round((monthly_dept_cost / pos_sales * 100.0), 1) if pos_sales else 0.0
             row["sales_per_jod_labor"] = round((pos_sales / monthly_dept_cost), 2) if monthly_dept_cost else 0.0
 
             # Factory Production Output Ratios
-            mrp_qty = sum(mrp_qty_by_dept.get(cid, 0.0) for cid in relevant_dept_ids)
+            mrp_qty = mrp_qty_by_dept.get(d_id, 0.0)
+            if not mrp_qty and d_id > 0:
+                child_ids = dept_children_map.get(d_id, set()) - {d_id}
+                unrepresented_children = [cid for cid in child_ids if cid not in department_dict]
+                if unrepresented_children:
+                    mrp_qty = sum(mrp_qty_by_dept.get(cid, 0.0) for cid in unrepresented_children)
+
             row["mrp_qty"] = round(mrp_qty, 2)
             row["labor_cost_per_unit"] = round((monthly_dept_cost / mrp_qty), 3) if mrp_qty else 0.0
 
@@ -492,7 +571,8 @@ class HrPayrollDashboard(models.AbstractModel):
             "selected_payrun_id": int(payrun_id) if payrun_id else 0,
             "payrun_batches": payrun_batches,
             "all_departments": all_departments_flat,
-            "parent_departments": parent_departments,
+            "structured_departments": structured_departments,
+            "parent_departments": structured_departments,
             "all_companies": allowed_companies,
             "kpis": {
                 "total_net_salary": round(total_net_salary, 3),
@@ -570,6 +650,10 @@ class HrPayrollDashboard(models.AbstractModel):
             ("date_from", "<=", end_date),
             ("date_to", ">=", start_date),
         ]
+        target_payrun_id = int(payrun_id) if payrun_id and int(payrun_id) > 0 else 0
+        if target_payrun_id > 0:
+            slip_domain.append(("payslip_run_id", "=", target_payrun_id))
+
         if target_company_id > 0:
             slip_domain.append(("company_id", "=", target_company_id))
         else:

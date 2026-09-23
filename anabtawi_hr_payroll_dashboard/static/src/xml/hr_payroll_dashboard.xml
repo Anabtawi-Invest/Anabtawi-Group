@@ -16,6 +16,7 @@
                 <div class="o_dashboard_filters">
                     <!-- Quick Date Range Buttons -->
                     <div class="btn-group btn-group-period" role="group">
+                        <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'today'}" t-on-click="() => this.setPeriod('today')">Today (اليوم)</button>
                         <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'this_month'}" t-on-click="() => this.setPeriod('this_month')">This Month</button>
                         <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'prev_month'}" t-on-click="() => this.setPeriod('prev_month')">Prev Month</button>
                         <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'this_quarter'}" t-on-click="() => this.setPeriod('this_quarter')">Quarter</button>
@@ -23,6 +24,18 @@
                     </div>
 
                     <div class="d-flex align-items-center gap-2">
+                        <!-- Payrun Batch Select Dropdown -->
+                        <t t-if="data.payrun_batches &amp;&amp; data.payrun_batches.length > 0">
+                            <select class="form-select form-select-sm filter_input" t-model="state.payrun_id" t-on-change="fetchDashboardData" style="max-width: 180px;">
+                                <option value="0">All Batches (كل الدفعات)</option>
+                                <t t-foreach="data.payrun_batches" t-as="pbatch" t-key="pbatch.id">
+                                    <option t-att-value="pbatch.id" t-att-selected="state.payrun_id === pbatch.id">
+                                        <t t-esc="pbatch.name"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </t>
+
                         <input type="date" class="form-control form-control-sm filter_input" t-model="state.date_from"/>
                         <span class="text-muted small">to</span>
                         <input type="date" class="form-control form-control-sm filter_input" t-model="state.date_to"/>
@@ -54,11 +67,12 @@
                     </div>
                 </div>
 
-                <!-- Organization Controls: 2) Hierarchical Departments Bar -->
+                <!-- 3-Tier Cascading Department Filter Navigation -->
                 <div class="o_filter_row department_row mt-2">
+                    <!-- Tier 1: Root Departments -->
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="filter_row_label">
-                            <i class="fa fa-cubes text-purple me-1"/> Departments (الأقسام والهيكلية):
+                            <i class="fa fa-cubes text-purple me-1"/> Main Departments (الأقسام الرئيسة):
                         </span>
                         <t t-if="state.department_ids and state.department_ids.length > 0">
                             <button type="button" class="btn btn-xs btn-outline-danger btn-clear-filter" t-on-click="() => this.selectAllDepartments()">
@@ -67,96 +81,82 @@
                         </t>
                     </div>
 
-                    <div class="filter_pills_container parent_pills">
+                    <div class="filter_pills_container tier1_pills mb-2">
                         <!-- All Departments Pill -->
                         <button type="button" 
                                 class="btn btn-sm btn-dept-pill btn-dept-all"
-                                t-att-class="{'active': isDeptSelected('all')}"
-                                t-on-click="() => this.selectAllDepartments()">
+                                t-att-class="{'active': isRootSelected('all')}"
+                                t-on-click="() => this.selectRootDepartment('all')">
                             <i class="fa fa-th-large me-1"/> All Departments (<t t-esc="(data.all_departments || []).length"/>)
                         </button>
 
-                        <!-- Parent Departments List -->
-                        <t t-foreach="data.parent_departments || []" t-as="parent" t-key="parent.id">
-                            <div class="btn-group btn-parent-group me-2 mb-2" role="group">
-                                <!-- Main Parent Selection Button -->
-                                <button type="button"
-                                        class="btn btn-sm btn-dept-pill btn-parent-main"
-                                        t-att-class="{
-                                            'active': isParentFullySelected(parent) or isDeptSelected(parent.id),
-                                            'partially-active': isParentPartiallySelected(parent)
-                                        }"
-                                        t-on-click="(ev) => this.toggleParentWithChildren(parent, ev)"
-                                        t-att-title="parent.child_count > 0 ? 'Click to select ' + parent.name + ' and all ' + parent.child_count + ' branches' : 'Click to select ' + parent.name">
-                                    <i class="fa fa-folder text-warning me-1" t-if="parent.child_count > 0"/>
-                                    <i class="fa fa-briefcase me-1" t-else=""/>
-                                    <span class="parent_title"><t t-esc="parent.name"/></span>
-                                    <t t-if="parent.child_count > 0">
-                                        <span class="badge bg-light text-dark border ms-1 branch_counter" title="Child branches">
-                                            <t t-esc="parent.child_count"/>
-                                        </span>
-                                    </t>
-                                    <t t-if="getSelectedCountForParent(parent) > 0">
-                                        <span class="badge bg-primary text-white ms-1" title="Selected from this group">
-                                            <i class="fa fa-check"/> <t t-esc="getSelectedCountForParent(parent)"/>
-                                        </span>
-                                    </t>
-                                </button>
-
-                                <!-- Fold/Unfold Toggle Chevron (if parent has child departments) -->
-                                <t t-if="parent.child_count > 0">
-                                    <button type="button"
-                                            class="btn btn-sm btn-dept-pill btn-parent-toggle"
-                                            t-att-class="{'active-toggle': isParentExpanded(parent.id)}"
-                                            t-on-click="(ev) => this.toggleParentExpand(parent.id, ev)"
-                                            t-att-title="isParentExpanded(parent.id) ? 'Fold (طي الفروع)' : 'Unfold / Expand ' + parent.child_count + ' branches (فتح الفروع)'">
-                                        <i class="fa fa-chevron-up" t-if="isParentExpanded(parent.id)"/>
-                                        <i class="fa fa-chevron-down" t-else=""/>
-                                    </button>
+                        <!-- Root Departments List -->
+                        <t t-foreach="data.structured_departments || []" t-as="root" t-key="root.id">
+                            <button type="button" 
+                                    class="btn btn-sm btn-root-pill"
+                                    t-att-class="{'active': isRootSelected(root.id)}"
+                                    t-on-click="() => this.selectRootDepartment(root.id)">
+                                <i class="fa fa-folder text-warning me-1"/>
+                                <span class="root_title"><t t-esc="root.name"/></span>
+                                <t t-if="root.total_branch_count > 0">
+                                    <span class="badge bg-light text-dark border ms-1" title="Branches count">
+                                        <t t-esc="root.total_branch_count"/>
+                                    </span>
                                 </t>
-                            </div>
+                            </button>
                         </t>
                     </div>
 
-                    <!-- Collapsible Sub-Department Trays (Branches) -->
-                    <t t-foreach="data.parent_departments || []" t-as="parent" t-key="'tray_' + parent.id">
-                        <t t-if="parent.child_count > 0 and isParentExpanded(parent.id)">
-                            <div class="o_subdept_tray p-3 mb-3 animate__animated animate__fadeIn">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div class="subdept_tray_title">
-                                        <i class="fa fa-level-down text-primary me-2"/>
-                                        <strong><t t-esc="parent.name"/> Branches &amp; Units (<t t-esc="parent.child_count"/> فرع وقسم تابع):</strong>
-                                        <span class="text-muted small ms-2">Click any branch to toggle multi-selection</span>
-                                    </div>
-                                    <div class="d-flex gap-2">
-                                        <button type="button" class="btn btn-xs btn-outline-primary" t-on-click="(ev) => this.toggleParentWithChildren(parent, ev)">
-                                            <t t-if="isParentFullySelected(parent)">
-                                                <i class="fa fa-square-o me-1"/> Deselect All Branches
-                                            </t>
-                                            <t t-else="">
-                                                <i class="fa fa-check-square-o me-1"/> Select All Branches
-                                            </t>
-                                        </button>
-                                        <button type="button" class="btn btn-xs btn-outline-secondary" t-on-click="(ev) => this.toggleParentExpand(parent.id, ev)">
-                                            <i class="fa fa-minus me-1"/> Fold (طي)
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="filter_pills_container child_pills">
-                                    <t t-foreach="parent.children || []" t-as="child" t-key="child.id">
-                                        <button type="button"
-                                                class="btn btn-sm btn-child-pill"
-                                                t-att-class="{'active': isDeptSelected(child.id)}"
-                                                t-on-click="(ev) => this.toggleDepartment(child.id, ev)">
-                                            <i class="fa fa-check-circle text-primary me-1" t-if="isDeptSelected(child.id)"/>
-                                            <i class="fa fa-circle-o text-muted me-1" t-else=""/>
-                                            <t t-esc="child.name"/>
-                                        </button>
-                                    </t>
+                    <!-- Tier 2: Regions / Areas (Appears when a Root Department like Retail is selected) -->
+                    <t t-if="activeRootData and activeRootData.areas &amp;&amp; activeRootData.areas.length > 0">
+                        <div class="o_subdept_tray p-3 mb-2 animate__animated animate__fadeIn border-primary">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="subdept_tray_title">
+                                    <i class="fa fa-map-marker text-primary me-2"/>
+                                    <strong><t t-esc="activeRootData.name"/> Regions &amp; Sub-Groups (المناطق والأقسام الفرعية):</strong>
+                                    <span class="text-muted small ms-2">Select an Area/Region to view its individual branches</span>
                                 </div>
                             </div>
-                        </t>
+                            <div class="filter_pills_container area_pills">
+                                <t t-foreach="activeRootData.areas" t-as="area" t-key="area.id">
+                                    <button type="button"
+                                            class="btn btn-sm btn-area-pill"
+                                            t-att-class="{'active': isAreaSelected(area.id)}"
+                                            t-on-click="() => this.selectAreaDepartment(area)">
+                                        <i class="fa fa-th-list me-1"/>
+                                        <t t-esc="area.name"/>
+                                        <t t-if="area.branch_count > 0">
+                                            <span class="badge bg-primary text-white ms-1"><t t-esc="area.branch_count"/></span>
+                                        </t>
+                                    </button>
+                                </t>
+                            </div>
+                        </div>
+                    </t>
+
+                    <!-- Tier 3: Individual Branches (Appears when an Area/Region like Area 1 is selected) -->
+                    <t t-if="activeAreaData and activeAreaData.branches &amp;&amp; activeAreaData.branches.length > 0">
+                        <div class="o_subdept_tray p-3 mb-2 animate__animated animate__fadeIn border-success" style="background-color: #f0fdf4;">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="subdept_tray_title">
+                                    <i class="fa fa-building text-success me-2"/>
+                                    <strong><t t-esc="activeAreaData.name"/> Branches &amp; Units (الفروع التابعة للمنطقة):</strong>
+                                    <span class="text-muted small ms-2">Click any branch to toggle filter</span>
+                                </div>
+                            </div>
+                            <div class="filter_pills_container child_pills">
+                                <t t-foreach="activeAreaData.branches" t-as="branch" t-key="branch.id">
+                                    <button type="button"
+                                            class="btn btn-sm btn-child-pill"
+                                            t-att-class="{'active': isBranchSelected(branch.id)}"
+                                            t-on-click="(ev) => this.toggleBranchDepartment(branch.id, ev)">
+                                        <i class="fa fa-check-circle text-success me-1" t-if="isBranchSelected(branch.id)"/>
+                                        <i class="fa fa-circle-o text-muted me-1" t-else=""/>
+                                        <t t-esc="branch.name"/>
+                                    </button>
+                                </t>
+                            </div>
+                        </div>
                     </t>
                 </div>
             </div>
