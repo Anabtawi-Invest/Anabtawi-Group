@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- QWeb PDF Report Action for C-Level Executive Briefing -->
+    <record id="action_report_executive_payroll_pdf" model="ir.actions.report">
+        <field name="name">C-Level Executive Briefing Report (PDF)</field>
+        <field name="model">hr.payroll.dashboard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">anabtawi_hr_payroll_dashboard.report_executive_payroll_pdf_document</field>
+        <field name="report_file">Executive_Payroll_Briefing</field>
+        <field name="binding_model_id" ref="hr_payroll.model_hr_payslip"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- QWeb Document Template -->
+    <template id="report_executive_payroll_pdf_document">
+        <t t-call="web.external_layout">
+            <t t-set="doc" t-value="docs and docs[0] or False"/>
+            <div class="page" style="font-family: Arial, sans-serif; color: #1e293b; font-size: 11pt;">
+                <!-- Header Title Banner -->
+                <div style="background-color: #1e3a8a; color: #ffffff; padding: 15px 20px; border-radius: 6px; margin-bottom: 20px;">
+                    <table style="width: 100%; border: none;">
+                        <tr>
+                            <td style="vertical-align: middle;">
+                                <h2 style="margin: 0; color: #ffffff; font-size: 18pt; font-weight: bold;">
+                                    Executive HR &amp; Payroll Briefing
+                                </h2>
+                                <p style="margin: 5px 0 0 0; font-size: 10pt; opacity: 0.9;">
+                                    Corporate Performance, Payroll Liabilities, Sales ROI &amp; Workforce Utilization
+                                </p>
+                            </td>
+                            <td style="text-align: right; vertical-align: middle; font-size: 9pt;">
+                                <strong>Generated Date:</strong> <t t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/><br/>
+                                <strong>Period:</strong> <t t-esc="data.get('date_from', '')"/> to <t t-esc="data.get('date_to', '')"/>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Executive Summary Cards -->
+                <table style="width: 100%; margin-bottom: 20px; border-collapse: separate; border-spacing: 10px;">
+                    <tr>
+                        <td style="width: 25%; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; text-align: center;">
+                            <span style="font-size: 9pt; color: #64748b; font-weight: bold; text-transform: uppercase;">Total Net Salaries</span>
+                            <h3 style="margin: 5px 0 0 0; color: #1e40af; font-size: 15pt;"><t t-esc="'{:,.3f}'.format(data.get('kpis', {}).get('total_net_salary', 0.0))"/> JOD</h3>
+                            <small style="color: #64748b;"><t t-esc="data.get('kpis', {}).get('payslip_count', 0)"/> Payslips</small>
+                        </td>
+                        <td style="width: 25%; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; text-align: center;">
+                            <span style="font-size: 9pt; color: #64748b; font-weight: bold; text-transform: uppercase;">Employer Expense (TCE)</span>
+                            <h3 style="margin: 5px 0 0 0; color: #4338ca; font-size: 15pt;"><t t-esc="'{:,.3f}'.format(data.get('kpis', {}).get('total_employer_expense', 0.0))"/> JOD</h3>
+                            <small style="color: #64748b;">Gross + Employer SS</small>
+                        </td>
+                        <td style="width: 25%; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; text-align: center;">
+                            <span style="font-size: 9pt; color: #64748b; font-weight: bold; text-transform: uppercase;">Daily Payroll Cost</span>
+                            <h3 style="margin: 5px 0 0 0; color: #0284c7; font-size: 15pt;"><t t-esc="'{:,.3f}'.format(data.get('kpis', {}).get('total_daily_cost', 0.0))"/> JOD</h3>
+                            <small style="color: #64748b;">Calendar Daily Rate</small>
+                        </td>
+                        <td style="width: 25%; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; text-align: center;">
+                            <span style="font-size: 9pt; color: #64748b; font-weight: bold; text-transform: uppercase;">Active Headcount</span>
+                            <h3 style="margin: 5px 0 0 0; color: #059669; font-size: 15pt;"><t t-esc="data.get('kpis', {}).get('headcount', 0)"/> Staff</h3>
+                            <small style="color: #64748b;">Avg Salary: <t t-esc="'{:,.3f}'.format(data.get('kpis', {}).get('avg_salary_per_emp', 0.0))"/> JOD</small>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Financial Liabilities & Overtime Audit Section -->
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 5px; margin-bottom: 10px;">
+                        1. Financial Liabilities &amp; Overtime Leakage Summary
+                    </h4>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                        <thead>
+                            <tr style="background-color: #f1f5f9; color: #334155; font-size: 9pt; text-transform: uppercase;">
+                                <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: left;">Category</th>
+                                <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: right;">Amount (JOD)</th>
+                                <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">% of Gross</th>
+                                <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: left;">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 9.5pt;">
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold;">Basic Salaries (الرواتب الأساسية)</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: right;"><t t-esc="'{:,.3f}'.format(data.get('kpis', {}).get('total_basic_salary', 0.0))"/></td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">-</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1;">Base contractual wage</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold; color: #059669;">Total Allowances &amp; Bonuses</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: right; color: #059669;"><t t-esc="'{:,.3f}'.format(data.get('kpis', {}).get('total_allowances', 0.0))"/></td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">-</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1;">Takleef, Bonuses, Allowances</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold; color: #dc2626;">Overtime Amount (العمل الإضافي)</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: right; color: #dc2626;"><t t-esc="'{:,.3f}'.format(data.get('kpis', {}).get('total_overtime_amount', 0.0))"/></td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;"><t t-esc="data.get('kpis', {}).get('overtime_cost_ratio', 0.0)"/>%</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1;"><t t-esc="data.get('kpis', {}).get('total_overtime_hours', 0.0)"/> Total OT Hours</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold; color: #d97706;">Social Security (Company Share)</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: right; color: #d97706;"><t t-esc="'{:,.3f}'.format(data.get('kpis', {}).get('total_social_security_company', 0.0))"/></td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">14.25%</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1;">Employer statutory liability</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold; color: #2563eb;">Income Tax Withheld</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: right; color: #2563eb;"><t t-esc="'{:,.3f}'.format(data.get('kpis', {}).get('total_income_tax', 0.0))"/></td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">-</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1;">Tax authority remittance</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Top Departmental Operations Breakdown -->
+                <div>
+                    <h4 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 5px; margin-bottom: 10px;">
+                        2. Top Departmental Performance &amp; Retail ROI Breakdown
+                    </h4>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 9pt;">
+                        <thead>
+                            <tr style="background-color: #1e40af; color: #ffffff;">
+                                <th style="padding: 6px 8px; text-align: left;">Department / Branch</th>
+                                <th style="padding: 6px 8px; text-align: center;">Staff</th>
+                                <th style="padding: 6px 8px; text-align: right;">Daily Cost (JOD)</th>
+                                <th style="padding: 6px 8px; text-align: right;">Net Salary (JOD)</th>
+                                <th style="padding: 6px 8px; text-align: right;">POS Sales / Output</th>
+                                <th style="padding: 6px 8px; text-align: right;">Labor Ratio / Unit Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="(data.get('departments', []) or [])[:15]" t-as="d">
+                                <tr style="border-bottom: 1px solid #e2e8f0;">
+                                    <td style="padding: 6px 8px; font-weight: bold;"><t t-esc="d.get('department_name', '')"/></td>
+                                    <td style="padding: 6px 8px; text-align: center;"><t t-esc="d.get('headcount', 0)"/></td>
+                                    <td style="padding: 6px 8px; text-align: right;"><t t-esc="'{:,.3f}'.format(d.get('daily_cost', 0.0))"/></td>
+                                    <td style="padding: 6px 8px; text-align: right; font-weight: bold; color: #1e40af;"><t t-esc="'{:,.3f}'.format(d.get('net_salary', 0.0))"/></td>
+                                    <td style="padding: 6px 8px; text-align: right;">
+                                        <t t-if="d.get('pos_sales', 0) > 0">
+                                            <span style="color: #059669; font-weight: bold;"><t t-esc="'{:,.3f}'.format(d.get('pos_sales', 0.0))"/> JOD</span>
+                                        </t>
+                                        <t t-elif="d.get('mrp_qty', 0) > 0">
+                                            <span style="color: #2563eb; font-weight: bold;"><t t-esc="'{:,.1f}'.format(d.get('mrp_qty', 0.0))"/> Units</span>
+                                        </t>
+                                        <t t-else="">-</t>
+                                    </td>
+                                    <td style="padding: 6px 8px; text-align: right;">
+                                        <t t-if="d.get('pos_sales', 0) > 0">
+                                            <span><t t-esc="d.get('pos_labor_cost_pct', 0.0)"/>% Labor</span>
+                                        </t>
+                                        <t t-elif="d.get('mrp_qty', 0) > 0">
+                                            <span><t t-esc="'{:,.3f}'.format(d.get('labor_cost_per_unit', 0.0))"/> JOD/Unit</span>
+                                        </t>
+                                        <t t-else="">-</t>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Signoff Footer -->
+                <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #cbd5e1; font-size: 8.5pt; color: #64748b;">
+                    <table style="width: 100%;">
+                        <tr>
+                            <td style="width: 33%; text-align: center;">
+                                _______________________<br/>
+                                <strong>Prepared by HR Director</strong>
+                            </td>
+                            <td style="width: 33%; text-align: center;">
+                                _______________________<br/>
+                                <strong>Reviewed by CFO</strong>
+                            </td>
+                            <td style="width: 33%; text-align: center;">
+                                _______________________<br/>
+                                <strong>Approved by CEO</strong>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </t>
+    </template>
+</odoo>

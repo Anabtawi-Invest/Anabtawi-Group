@@ -15,8 +15,8 @@ class HrPayrollDashboard(models.AbstractModel):
     _description = "HR & Payroll Executive Dashboard Backend Service"
 
     @api.model
-    def get_dashboard_data(self, date_from=None, date_to=None, payrun_id=None, company_id=None, department_ids=None):
-        """Calculates and aggregates comprehensive HR, Payroll, Overtime, and Attendance metrics."""
+    def get_dashboard_data(self, date_from=None, date_to=None, payrun_id=None, company_id=None, department_ids=None, time_from=None, time_to=None, persona_tab="all"):
+        """Calculates and aggregates comprehensive HR, Payroll, Overtime, and Attendance metrics for C-Level executives."""
         self = self.sudo()
         user_companies = self.env.user.company_ids
         target_company_id = int(company_id) if company_id and int(company_id) > 0 else 0
@@ -36,6 +36,18 @@ class HrPayrollDashboard(models.AbstractModel):
                 end_date = fields.Date.from_string(date_to[:10])
             else:
                 end_date = date_to
+
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_dt = datetime.combine(end_date, datetime.max.time())
+
+        if time_from and time_to:
+            try:
+                h1, m1 = map(int, str(time_from).strip().split(":")[:2])
+                h2, m2 = map(int, str(time_to).strip().split(":")[:2])
+                start_dt = datetime.combine(start_date, datetime.min.time()).replace(hour=h1, minute=m1)
+                end_dt = datetime.combine(end_date, datetime.min.time()).replace(hour=h2, minute=m2)
+            except Exception as e:
+                _logger.warning("Time range parsing fallback: %s", e)
 
         # Base Domain for Payslips (Includes ALL validated payslips: bulk & separate)
         slip_domain = [
@@ -252,49 +264,64 @@ class HrPayrollDashboard(models.AbstractModel):
             except Exception as e:
                 _logger.warning("Failed to build POS Config to Department map: %s", e)
 
-        # Pre-fetch POS Sales data for retail branches if available
+        # Pre-fetch POS Sales data for retail branches using SQL aggregation (Zero CPU/RAM overhead)
         pos_sales_by_dept = defaultdict(float)
         if "pos.order" in self.env:
             try:
                 pos_domain = [
                     ("state", "in", ["paid", "done", "invoiced"]),
-                    ("date_order", ">=", datetime.combine(start_date, datetime.min.time())),
-                    ("date_order", "<=", datetime.combine(end_date, datetime.max.time())),
+                    ("date_order", ">=", start_dt),
+                    ("date_order", "<=", end_dt),
                 ]
                 if target_company_id > 0:
                     pos_domain.append(("company_id", "=", target_company_id))
 
-                pos_orders = self.env["pos.order"].sudo().search(pos_domain)
-                for p_order in pos_orders:
-                    cfg = p_order.config_id or (p_order.session_id.config_id if getattr(p_order, "session_id", False) else False)
-                    cfg_id = cfg.id if cfg else 0
+                pos_grouped = self.env["pos.order"].sudo()._read_group(
+                    pos_domain,
+                    ["config_id"],
+                    ["amount_total:sum"]
+                )
+                for config_obj, total_amt in pos_grouped:
+                    cfg_id = config_obj.id if config_obj else 0
                     d_id = pos_config_dept_map.get(cfg_id, 0)
-                    if not d_id and cfg:
-                        d_id = getattr(cfg, "department_id", False)
+                    if not d_id and config_obj:
+                        d_id = getattr(config_obj, "department_id", False)
                         d_id = d_id.id if d_id else 0
                     if d_id:
-                        pos_sales_by_dept[d_id] += p_order.amount_total
+                        pos_sales_by_dept[d_id] += (total_amt or 0.0)
             except Exception as e:
-                _logger.warning("POS Order search skipped in payroll dashboard: %s", e)
+                _logger.warning("POS Order SQL aggregation fallback: %s", e)
 
-        # Pre-fetch Manufacturing Output data for factory lines if available
+        # Pre-fetch Manufacturing Output data for factory lines using SQL aggregation (Zero CPU/RAM overhead)
         mrp_qty_by_dept = defaultdict(float)
         if "mrp.production" in self.env:
             try:
                 mrp_domain = [
                     ("state", "=", "done"),
-                    ("date_finished", ">=", datetime.combine(start_date, datetime.min.time())),
-                    ("date_finished", "<=", datetime.combine(end_date, datetime.max.time())),
+                    ("date_finished", ">=", start_dt),
+                    ("date_finished", "<=", end_dt),
                 ]
                 if target_company_id > 0:
                     mrp_domain.append(("company_id", "=", target_company_id))
-                mrp_orders = self.env["mrp.production"].sudo().search(mrp_domain)
-                for m_order in mrp_orders:
-                    m_dept = getattr(m_order, "department_id", False)
-                    if m_dept:
-                        mrp_qty_by_dept[m_dept.id] += getattr(m_order, "qty_produced", 0.0) or 0.0
+
+                mrp_grouped = self.env["mrp.production"].sudo()._read_group(
+                    mrp_domain,
+                    ["department_id"],
+                    ["qty_produced:sum"]
+                )
+                for dept_obj, total_qty in mrp_grouped:
+                    if dept_obj:
+                        mrp_qty_by_dept[dept_obj.id] += (total_qty or 0.0)
             except Exception as e:
-                _logger.warning("MRP Production search skipped in payroll dashboard: %s", e)
+                _logger.warning("MRP Production SQL aggregation fallback: %s", e)
+
+        # Pre-fetch payslip lines and worked days in batch (Prevents N+1 database queries)
+        if payslips:
+            try:
+                payslips.mapped("line_ids")
+                payslips.mapped("worked_days_line_ids")
+            except Exception as e:
+                _logger.warning("Payslip batch pre-fetch fallback: %s", e)
 
         for slip in payslips:
             emp = slip.employee_id
@@ -510,22 +537,24 @@ class HrPayrollDashboard(models.AbstractModel):
             dep_row["working_days"] += slip_days
             dep_row["daily_cost"] += slip_daily_cost
 
-        # Finalize department rows
+        # Finalize department rows with zero-latency in-memory hierarchy lookup
+        dept_children_map = defaultdict(set)
+        dept_parent_map = {d.id: d.parent_id.id for d in raw_departments if d.parent_id}
+        for d in raw_departments:
+            dept_children_map[d.id].add(d.id)
+            curr = d.id
+            while curr in dept_parent_map:
+                p_id = dept_parent_map[curr]
+                dept_children_map[p_id].add(d.id)
+                curr = p_id
+
         department_list = []
-        dept_children_map = {}
         for d_id, row in department_dict.items():
             row["headcount"] = len(row["employee_ids"])
             del row["employee_ids"]
             row["calendar_days"] = calendar_days
             row["daily_cost"] = round(row["daily_cost"], 3)
             row["avg_daily_cost_per_emp"] = round(row["daily_cost"] / row["headcount"], 3) if row["headcount"] else 0.0
-
-            if d_id > 0:
-                if d_id not in dept_children_map:
-                    dept_children_map[d_id] = set(self.env["hr.department"].sudo().search([("id", "child_of", d_id)]).ids)
-                relevant_dept_ids = dept_children_map[d_id]
-            else:
-                relevant_dept_ids = {0}
 
             # POS Sales & Labor Cost % for Retail Branches (Direct branch matching + non-duplicated aggregation)
             pos_sales = pos_sales_by_dept.get(d_id, 0.0)
@@ -555,17 +584,78 @@ class HrPayrollDashboard(models.AbstractModel):
 
         department_list.sort(key=lambda x: x["net_salary"], reverse=True)
 
-        top_ot_departments = sorted(department_list, key=lambda x: x["overtime_hours"], reverse=True)[:5]
-        top_late_departments = sorted(department_list, key=lambda x: x["lateness_hours"], reverse=True)[:5]
-        top_headcount_departments = sorted(department_list, key=lambda x: x["headcount"], reverse=True)[:5]
+        # Live Attendance calculation for "Today"
+        today_present_count = 0
+        today_absent_count = 0
+        is_today = (start_date == end_date == today)
+        if is_today and "hr.attendance" in self.env:
+            try:
+                att_domain = [
+                    ("check_in", "<=", end_dt),
+                    "|",
+                    ("check_out", "=", False),
+                    ("check_out", ">=", start_dt),
+                ]
+                if target_company_id > 0:
+                    att_domain.append(("employee_id.company_id", "=", target_company_id))
+                if department_ids:
+                    raw_dep_ids = [int(d) for d in department_ids if int(d) > 0]
+                    if raw_dep_ids:
+                        all_target_dep_ids = self.env["hr.department"].search([("id", "child_of", raw_dep_ids)]).ids
+                        att_domain.append(("employee_id.department_id", "in", all_target_dep_ids))
 
-        approved_hours = max(total_scheduled_hours + total_overtime_hours - total_lateness_hours, 0.0)
-        total_employer_payroll_expense = round(total_gross_salary + total_social_security_comp, 3)
-        overtime_cost_ratio = round((total_overtime_amount / total_gross_salary * 100.0), 1) if total_gross_salary else 0.0
+                att_grouped = self.env["hr.attendance"].sudo()._read_group(att_domain, ["employee_id"], [])
+                today_present_count = len(att_grouped)
+
+                emp_domain = [("active", "=", True)]
+                if target_company_id > 0:
+                    emp_domain.append(("company_id", "=", target_company_id))
+                if department_ids:
+                    raw_dep_ids = [int(d) for d in department_ids if int(d) > 0]
+                    if raw_dep_ids:
+                        all_target_dep_ids = self.env["hr.department"].search([("id", "child_of", raw_dep_ids)]).ids
+                        emp_domain.append(("department_id", "in", all_target_dep_ids))
+
+                total_assigned = self.env["hr.employee"].sudo().search_count(emp_domain)
+                today_absent_count = max(total_assigned - today_present_count, 0)
+            except Exception as e:
+                _logger.warning("Live attendance calculation skipped: %s", e)
+
+        # C-Level Persona Analytics
+        total_pos_sales = sum(d["pos_sales"] for d in department_list)
+        ceo_sales_labor_roi = round((total_pos_sales / total_employer_payroll_expense), 2) if total_employer_payroll_expense else 0.0
+
+        retail_depts = [d for d in department_list if d["pos_sales"] > 0]
+        top_profitable_branches = sorted(retail_depts, key=lambda x: x["sales_per_jod_labor"], reverse=True)[:3]
+        bottom_profitable_branches = sorted(retail_depts, key=lambda x: x["pos_labor_cost_pct"], reverse=True)[:3]
+
+        factory_depts = [d for d in department_list if d["mrp_qty"] > 0]
+        factory_unit_cost_avg = round(sum(d["labor_cost_per_unit"] for d in factory_depts) / len(factory_depts), 3) if factory_depts else 0.0
+
+        cfo_metrics = {
+            "total_employer_expense": total_employer_payroll_expense,
+            "total_net_cash_outflow": round(total_net_salary, 3),
+            "social_security_total_liability": round(total_social_security_emp + total_social_security_comp, 3),
+            "tax_liability": round(total_income_tax, 3),
+            "bank_disbursement_pct": round((bank_amount / total_net_salary * 100), 1) if total_net_salary else 0.0,
+            "cash_disbursement_pct": round((cash_amount / total_net_salary * 100), 1) if total_net_salary else 0.0,
+        }
+
+        hr_metrics = {
+            "is_today": is_today,
+            "today_present_count": today_present_count,
+            "today_absent_count": today_absent_count,
+            "overtime_cost_ratio": overtime_cost_ratio,
+            "lateness_hours_total": round(total_lateness_hours, 1),
+            "avg_salary_per_emp": round(total_net_salary / len(distinct_employee_ids), 3) if distinct_employee_ids else 0.0,
+        }
 
         data = {
             "date_from": str(start_date),
             "date_to": str(end_date),
+            "time_from": time_from or "",
+            "time_to": time_to or "",
+            "active_persona_tab": persona_tab or "all",
             "calendar_days": calendar_days,
             "selected_company_id": target_company_id,
             "selected_payrun_id": int(payrun_id) if payrun_id else 0,
@@ -574,6 +664,15 @@ class HrPayrollDashboard(models.AbstractModel):
             "structured_departments": structured_departments,
             "parent_departments": structured_departments,
             "all_companies": allowed_companies,
+            "ceo_analytics": {
+                "sales_labor_roi": ceo_sales_labor_roi,
+                "total_pos_sales": round(total_pos_sales, 3),
+                "top_profitable_branches": top_profitable_branches,
+                "bottom_profitable_branches": bottom_profitable_branches,
+                "factory_unit_cost_avg": factory_unit_cost_avg,
+            },
+            "cfo_analytics": cfo_metrics,
+            "hr_analytics": hr_metrics,
             "kpis": {
                 "total_net_salary": round(total_net_salary, 3),
                 "total_gross_salary": round(total_gross_salary, 3),
@@ -797,6 +896,20 @@ class HrPayrollDashboard(models.AbstractModel):
             "context": {"create": False},
             "target": "current",
         }
+
+    @api.model
+    def action_print_executive_pdf(self, date_from=None, date_to=None, payrun_id=None, company_id=None, department_ids=None):
+        """Generates C-level Executive Briefing PDF Action."""
+        dashboard_data = self.get_dashboard_data(
+            date_from=date_from,
+            date_to=date_to,
+            payrun_id=payrun_id,
+            company_id=company_id,
+            department_ids=department_ids,
+        )
+        return self.env.ref("anabtawi_hr_payroll_dashboard.action_report_executive_payroll_pdf").report_action(
+            [], data={"data": dashboard_data}
+        )
 
 
 class PosConfigInheritDashboard(models.Model):

@@ -19,6 +19,22 @@
     background-color: #9333ea !important;
 }
 
+.text-indigo {
+    color: #6366f1 !important;
+}
+
+.bg-indigo {
+    background-color: #4338ca !important;
+}
+
+.role_tab_group {
+    button {
+        font-size: 0.84rem;
+        padding: 6px 12px;
+        transition: all 0.2s ease;
+    }
+}
+
 .o_hr_payroll_dashboard_wrapper {
     background-color: #f8fafc;
     min-height: 100%;

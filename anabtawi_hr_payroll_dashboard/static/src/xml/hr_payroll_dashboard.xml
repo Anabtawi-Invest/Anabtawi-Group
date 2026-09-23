@@ -43,9 +43,41 @@
                             <i class="fa fa-refresh me-1"/> Apply
                         </button>
                         <button class="btn btn-success btn-sm text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="exportExcel">
-                            <i class="fa fa-file-excel-o me-1"/> Export Full Excel Package
+                            <i class="fa fa-file-excel-o me-1"/> Excel Package
+                        </button>
+                        <button class="btn btn-danger btn-sm text-nowrap" t-att-disabled="state.printingPdf" t-on-click="printExecutivePdf">
+                            <i class="fa fa-file-pdf-o me-1"/> Board PDF Briefing
                         </button>
                     </div>
+                </div>
+            </div>
+
+            <!-- C-Level Executive Persona Navigation Bar -->
+            <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-white rounded shadow-sm border">
+                <div class="btn-group role_tab_group" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" t-att-class="{'active btn-primary text-white': state.personaTab === 'all'}" t-on-click="() => this.setPersonaTab('all')">
+                        <i class="fa fa-globe me-1"/> Executive Summary (الشامل)
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" t-att-class="{'active btn-primary text-white': state.personaTab === 'ceo'}" t-on-click="() => this.setPersonaTab('ceo')">
+                        <i class="fa fa-user-secret me-1"/> CEO View (الرئيس التنفيذي)
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" t-att-class="{'active btn-primary text-white': state.personaTab === 'cfo'}" t-on-click="() => this.setPersonaTab('cfo')">
+                        <i class="fa fa-line-chart me-1"/> CFO View (المدير المالي)
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" t-att-class="{'active btn-primary text-white': state.personaTab === 'hr'}" t-on-click="() => this.setPersonaTab('hr')">
+                        <i class="fa fa-address-book me-1"/> HR Director View (مدير الموارد)
+                    </button>
+                </div>
+
+                <!-- Today Shift & Hours Toolbar -->
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-muted small fw-bold"><i class="fa fa-clock-o text-warning me-1"/> Shift / Hours:</span>
+                    <button type="button" class="btn btn-xs btn-outline-secondary" t-on-click="() => this.setShift('morning')">Morning (08-16)</button>
+                    <button type="button" class="btn btn-xs btn-outline-secondary" t-on-click="() => this.setShift('evening')">Evening (16-00)</button>
+                    <button type="button" class="btn btn-xs btn-outline-secondary" t-on-click="() => this.setShift('fullday')">Full Day</button>
+                    <input type="time" class="form-control form-control-sm" t-model="state.time_from" t-on-change="fetchDashboardData" style="width: 100px;"/>
+                    <span class="text-muted small">to</span>
+                    <input type="time" class="form-control form-control-sm" t-model="state.time_to" t-on-change="fetchDashboardData" style="width: 100px;"/>
                 </div>
             </div>
 
@@ -173,6 +205,130 @@
 
             <!-- Main Dashboard Body -->
             <t t-else="">
+                <!-- CEO Persona Strategic View Banner -->
+                <t t-if="state.personaTab === 'ceo'">
+                    <div class="alert alert-primary p-3 mb-3 border-primary shadow-sm rounded">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="m-0 text-primary fw-bold"><i class="fa fa-user-secret me-2"/> CEO Strategic Summary &amp; ROI Analytics</h5>
+                            <span class="badge bg-primary fs-6">Sales vs Labor ROI: <t t-esc="data.ceo_analytics.sales_labor_roi"/> JOD Revenue / JOD Labor</span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Total Retail Sales</span>
+                                    <strong class="text-success fs-5"><t t-esc="formatCurrency(data.ceo_analytics.total_pos_sales)"/> JOD</strong>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Top Profitable Branch</span>
+                                    <t t-if="data.ceo_analytics.top_profitable_branches &amp;&amp; data.ceo_analytics.top_profitable_branches.length > 0">
+                                        <strong class="text-primary"><t t-esc="data.ceo_analytics.top_profitable_branches[0].department_name"/></strong>
+                                        <div class="small text-muted"><t t-esc="data.ceo_analytics.top_profitable_branches[0].sales_per_jod_labor"/> JOD Sales/Labor</div>
+                                    </t>
+                                    <t t-else=""><span class="text-muted">N/A</span></t>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Highest Labor Cost % Branch</span>
+                                    <t t-if="data.ceo_analytics.bottom_profitable_branches &amp;&amp; data.ceo_analytics.bottom_profitable_branches.length > 0">
+                                        <strong class="text-danger"><t t-esc="data.ceo_analytics.bottom_profitable_branches[0].department_name"/></strong>
+                                        <div class="small text-muted"><t t-esc="data.ceo_analytics.bottom_profitable_branches[0].pos_labor_cost_pct"/>% Labor Ratio</div>
+                                    </t>
+                                    <t t-else=""><span class="text-muted">N/A</span></t>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Factory Avg Unit Cost</span>
+                                    <strong class="text-info fs-5"><t t-esc="formatCurrency(data.ceo_analytics.factory_unit_cost_avg)"/> JOD/Unit</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- CFO Persona Financial View Banner -->
+                <t t-if="state.personaTab === 'cfo'">
+                    <div class="alert alert-indigo p-3 mb-3 border-indigo shadow-sm rounded" style="background-color: #eef2ff; border-color: #6366f1;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="m-0 text-indigo fw-bold" style="color: #4338ca;"><i class="fa fa-line-chart me-2"/> CFO Financial Liabilities &amp; Cash Outflow</h5>
+                            <span class="badge bg-indigo fs-6" style="background-color: #4338ca;">Total Employer Burden: <t t-esc="formatCurrency(data.cfo_analytics.total_employer_expense)"/> JOD</span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Net Cash Outflow</span>
+                                    <strong class="text-indigo fs-5" style="color: #4338ca;"><t t-esc="formatCurrency(data.cfo_analytics.total_net_cash_outflow)"/> JOD</strong>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Social Security Liability</span>
+                                    <strong class="text-warning fs-5"><t t-esc="formatCurrency(data.cfo_analytics.social_security_total_liability)"/> JOD</strong>
+                                    <div class="small text-muted">Emp + Company Share</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Income Tax Liability</span>
+                                    <strong class="text-primary fs-5"><t t-esc="formatCurrency(data.cfo_analytics.tax_liability)"/> JOD</strong>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Bank vs Cash Payout Split</span>
+                                    <strong class="text-dark"><t t-esc="data.cfo_analytics.bank_disbursement_pct"/>% Bank / <t t-esc="data.cfo_analytics.cash_disbursement_pct"/>% Cash</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- HR Director Persona Operational Banner -->
+                <t t-if="state.personaTab === 'hr'">
+                    <div class="alert alert-success p-3 mb-3 border-success shadow-sm rounded" style="background-color: #f0fdf4; border-color: #10b981;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="m-0 text-success fw-bold"><i class="fa fa-address-book me-2"/> HR Director Workforce Utilization &amp; Attendance</h5>
+                            <span class="badge bg-success fs-6">Avg Salary: <t t-esc="formatCurrency(data.hr_analytics.avg_salary_per_emp)"/> JOD</span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Today's Live Attendance</span>
+                                    <t t-if="data.hr_analytics.is_today">
+                                        <strong class="text-success fs-5"><t t-esc="data.hr_analytics.today_present_count"/> Present</strong>
+                                        <span class="text-danger small ms-2">(<t t-esc="data.hr_analytics.today_absent_count"/> Absent)</span>
+                                    </t>
+                                    <t t-else="">
+                                        <strong class="text-dark fs-5"><t t-esc="data.kpis.headcount"/> Active Staff</strong>
+                                    </t>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Overtime Cost Ratio</span>
+                                    <strong class="text-danger fs-5"><t t-esc="data.hr_analytics.overtime_cost_ratio"/>%</strong>
+                                    <div class="small text-muted">of Gross Payroll</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Subtracted Lateness Hours</span>
+                                    <strong class="text-warning fs-5"><t t-esc="data.hr_analytics.lateness_hours_total"/> Hours</strong>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Total Working Days</span>
+                                    <strong class="text-primary fs-5"><t t-esc="data.kpis.total_working_days"/> Days</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
                 <!-- KPI Summary Grid -->
                 <div class="o_kpi_grid">
                     <!-- Total Net Salaries -->

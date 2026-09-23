@@ -20,6 +20,9 @@ export class HrPayrollDashboard extends Component {
             period: "this_month",
             date_from: this._formatLocalDate(firstDayThisMonth),
             date_to: this._formatLocalDate(lastDayThisMonth),
+            time_from: "",
+            time_to: "",
+            personaTab: "all",
             payrun_id: 0,
             company_id: 0,
             selectedRootId: null,
@@ -31,11 +34,15 @@ export class HrPayrollDashboard extends Component {
             sortOrder: "desc",
             loading: true,
             exportingExcel: false,
+            printingPdf: false,
         });
 
         this.data = useState({
             date_from: "",
             date_to: "",
+            time_from: "",
+            time_to: "",
+            active_persona_tab: "all",
             selected_company_id: 0,
             selected_payrun_id: 0,
             payrun_batches: [],
@@ -43,6 +50,9 @@ export class HrPayrollDashboard extends Component {
             structured_departments: [],
             parent_departments: [],
             all_companies: [],
+            ceo_analytics: {},
+            cfo_analytics: {},
+            hr_analytics: {},
             kpis: {},
             departments: [],
             channels: [],
@@ -80,6 +90,9 @@ export class HrPayrollDashboard extends Component {
                 {
                     date_from: this.state.date_from,
                     date_to: this.state.date_to,
+                    time_from: this.state.time_from,
+                    time_to: this.state.time_to,
+                    persona_tab: this.state.personaTab,
                     payrun_id: this.state.payrun_id,
                     company_id: this.state.company_id,
                     department_ids: this.state.department_ids,
@@ -89,6 +102,9 @@ export class HrPayrollDashboard extends Component {
             const op = res?.operational_highlights || {};
             this.data.date_from = res?.date_from || this.state.date_from;
             this.data.date_to = res?.date_to || this.state.date_to;
+            this.data.time_from = res?.time_from || this.state.time_from;
+            this.data.time_to = res?.time_to || this.state.time_to;
+            this.data.active_persona_tab = res?.active_persona_tab || this.state.personaTab;
             this.data.selected_company_id = res?.selected_company_id || 0;
             this.data.selected_payrun_id = res?.selected_payrun_id || 0;
             this.data.payrun_batches = res?.payrun_batches || [];
@@ -96,6 +112,9 @@ export class HrPayrollDashboard extends Component {
             this.data.structured_departments = res?.structured_departments || res?.parent_departments || [];
             this.data.parent_departments = res?.parent_departments || [];
             this.data.all_companies = res?.all_companies || [];
+            this.data.ceo_analytics = res?.ceo_analytics || {};
+            this.data.cfo_analytics = res?.cfo_analytics || {};
+            this.data.hr_analytics = res?.hr_analytics || {};
             this.data.kpis = res?.kpis || {};
             this.data.departments = res?.departments || [];
             this.data.channels = res?.channels || [];
@@ -118,6 +137,66 @@ export class HrPayrollDashboard extends Component {
             }
         } finally {
             this.state.loading = false;
+        }
+    }
+
+    setPersonaTab(tab) {
+        this.state.personaTab = tab;
+        this.fetchDashboardData();
+    }
+
+    setShift(preset) {
+        if (preset === "morning") {
+            this.state.time_from = "08:00";
+            this.state.time_to = "16:00";
+        } else if (preset === "evening") {
+            this.state.time_from = "16:00";
+            this.state.time_to = "00:00";
+        } else if (preset === "fullday") {
+            this.state.time_from = "00:00";
+            this.state.time_to = "23:59";
+        }
+        this.fetchDashboardData();
+    }
+
+    async printExecutivePdf() {
+        if (this.state.printingPdf) return;
+        this.state.printingPdf = true;
+
+        if (this.notification) {
+            this.notification.add(
+                "Generating C-Level Executive PDF Briefing Report...",
+                { type: "info" }
+            );
+        }
+
+        try {
+            const action = await this.orm.call(
+                "hr.payroll.dashboard",
+                "action_print_executive_pdf",
+                [],
+                {
+                    date_from: this.state.date_from,
+                    date_to: this.state.date_to,
+                    payrun_id: this.state.payrun_id,
+                    company_id: this.state.company_id,
+                    department_ids: this.state.department_ids,
+                }
+            );
+
+            if (action) {
+                await this.actionService.doAction(action);
+            }
+        } catch (error) {
+            console.error("Failed to print executive PDF report", error);
+            if (this.notification) {
+                this.notification.add(
+                    "PDF generation failed: " + (error.data?.message || error.message || error),
+                    { type: "danger" }
+                );
+            }
+        } finally {
+            this.state.printingPdf = false;
         }
     }
 
