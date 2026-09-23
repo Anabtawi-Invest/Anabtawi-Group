@@ -211,7 +211,7 @@
                             <div class="license">Licensed To: <span t-field="company.name"/></div>
                             <div class="title ar" lang="ar">
                                 <span>مخالصة / TERMINATION</span>
-                                <span dir="ltr" style="margin-right: 8px; margin-left: 8px;"><t t-out="term_date.strftime('%d/%m/%Y') if (term_date and hasattr(term_date, 'strftime')) else (str(term_date) if term_date else '')"/></span>
+                                <span dir="ltr" style="margin-right: 8px; margin-left: 8px;"><t t-out="term_date.strftime('%d/%m/%Y') if term_date else ''"/></span>
                             </div>
                         </td>
                     </tr>
