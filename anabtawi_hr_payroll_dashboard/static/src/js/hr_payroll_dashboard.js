@@ -182,9 +182,8 @@ export class HrPayrollDashboard extends Component {
 
     selectAreaDepartment(area) {
         const areaId = parseInt(area.id);
-        const branchIds = (area.branches || []).map(b => parseInt(b.id));
         this.state.selectedAreaId = areaId;
-        this.state.department_ids = [areaId, ...branchIds];
+        this.state.department_ids = [areaId];
         this.fetchDashboardData();
     }
 
@@ -193,14 +192,32 @@ export class HrPayrollDashboard extends Component {
             ev.stopPropagation();
         }
         const bId = parseInt(branchId);
-        const current = [...this.state.department_ids];
-        const idx = current.indexOf(bId);
+        const areaId = this.state.selectedAreaId;
+        const rootId = this.state.selectedRootId;
+        let current = [...(this.state.department_ids || [])];
 
-        if (idx > -1) {
-            current.splice(idx, 1);
+        const hasParentArea = areaId && current.includes(areaId);
+        const hasParentRoot = rootId && current.includes(rootId);
+
+        if (hasParentArea || hasParentRoot) {
+            current = [bId];
         } else {
-            current.push(bId);
+            const idx = current.indexOf(bId);
+            if (idx > -1) {
+                current.splice(idx, 1);
+            } else {
+                current.push(bId);
+            }
         }
+
+        if (current.length === 0) {
+            if (areaId) {
+                current = [areaId];
+            } else if (rootId) {
+                current = [rootId];
+            }
+        }
+
         this.state.department_ids = current;
         this.fetchDashboardData();
     }
@@ -224,7 +241,13 @@ export class HrPayrollDashboard extends Component {
     }
 
     isBranchSelected(branchId) {
-        return this.state.department_ids && this.state.department_ids.includes(parseInt(branchId));
+        const bId = parseInt(branchId);
+        if (!this.state.department_ids || this.state.department_ids.length === 0) return true;
+        const areaId = this.state.selectedAreaId;
+        if (areaId && this.state.department_ids.includes(areaId)) {
+            return true;
+        }
+        return this.state.department_ids.includes(bId);
     }
 
     get activeRootData() {
