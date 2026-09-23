@@ -840,17 +840,17 @@ class HrPayslip(models.Model):
             travel_days_count = 0.0
             trv_dates = []
             if 'hr.leave' in self.env:
-                leaves_trv = self.env['hr.leave'].sudo().search([
+                leaves_all = self.env['hr.leave'].sudo().search([
                     ('employee_id', '=', emp.id),
                     ('state', 'in', ['validate', 'validate1']),
                     ('date_from', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
                     ('date_to', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
-                    '|', '|', '|',
-                    ('holiday_status_id.code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110']),
-                    ('holiday_status_id.name', 'ilike', 'Travel'),
-                    ('holiday_status_id.name', 'ilike', 'سفر'),
-                    ('holiday_status_id.name', 'ilike', 'مهمة'),
                 ])
+                leaves_trv = leaves_all.filtered(lambda l: l.holiday_status_id and (
+                    any(term in (l.holiday_status_id.name or '').lower() for term in ['travel', 'سفر', 'مهمة']) or
+                    (hasattr(l.holiday_status_id, 'work_entry_type_id') and l.holiday_status_id.work_entry_type_id and l.holiday_status_id.work_entry_type_id.code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110']) or
+                    (hasattr(l.holiday_status_id, 'code') and l.holiday_status_id.code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'])
+                ))
                 for lve in leaves_trv:
                     if getattr(lve, 'date_from', None):
                         trv_dates.append(lve.date_from.date())
