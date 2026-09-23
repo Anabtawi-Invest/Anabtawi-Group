@@ -17,6 +17,8 @@ export class HrPayrollDashboard extends Component {
         const lastDayThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
         this.state = useState({
+            activeDashboardTab: "overview",
+            dashboardMode: "live",
             period: "this_month",
             date_from: this._formatLocalDate(firstDayThisMonth),
             date_to: this._formatLocalDate(lastDayThisMonth),
@@ -35,6 +37,8 @@ export class HrPayrollDashboard extends Component {
             loading: true,
             exportingExcel: false,
             printingPdf: false,
+            isBenchmarkMode: false,
+            benchmarkBranches: [],
         });
 
         this.data = useState({
@@ -126,6 +130,8 @@ export class HrPayrollDashboard extends Component {
                 top_ot_departments: op.top_ot_departments || [],
                 top_late_departments: op.top_late_departments || [],
                 top_headcount_departments: op.top_headcount_departments || [],
+                top_sales_present_emp_branches: op.top_sales_present_emp_branches || [],
+                top_overtime_cost_branches: op.top_overtime_cost_branches || [],
             };
         } catch (error) {
             console.error("Failed to load HR & Payroll dashboard data", error);
@@ -137,6 +143,26 @@ export class HrPayrollDashboard extends Component {
             }
         } finally {
             this.state.loading = false;
+        }
+    }
+
+    setDashboardTab(tab) {
+        this.state.activeDashboardTab = tab;
+    }
+
+    setDashboardMode(mode) {
+        this.state.dashboardMode = mode;
+    }
+
+    toggleBenchmarkBranch(bId) {
+        const id = parseInt(bId);
+        const idx = this.state.benchmarkBranches.indexOf(id);
+        if (idx > -1) {
+            this.state.benchmarkBranches.splice(idx, 1);
+        } else {
+            if (this.state.benchmarkBranches.length < 5) {
+                this.state.benchmarkBranches.push(id);
+            }
         }
     }
 
