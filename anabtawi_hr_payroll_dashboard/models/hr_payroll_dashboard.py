@@ -584,6 +584,14 @@ class HrPayrollDashboard(models.AbstractModel):
 
         department_list.sort(key=lambda x: x["net_salary"], reverse=True)
 
+        top_ot_departments = sorted(department_list, key=lambda x: x["overtime_hours"], reverse=True)[:5]
+        top_late_departments = sorted(department_list, key=lambda x: x["lateness_hours"], reverse=True)[:5]
+        top_headcount_departments = sorted(department_list, key=lambda x: x["headcount"], reverse=True)[:5]
+
+        approved_hours = max(total_scheduled_hours + total_overtime_hours - total_lateness_hours, 0.0)
+        total_employer_payroll_expense = round(total_gross_salary + total_social_security_comp, 3)
+        overtime_cost_ratio = round((total_overtime_amount / total_gross_salary * 100.0), 1) if total_gross_salary else 0.0
+
         # Live Attendance calculation for "Today"
         today_present_count = 0
         today_absent_count = 0
