@@ -195,10 +195,18 @@ class HrPayrollDashboard(models.AbstractModel):
             "parent_id": d.parent_id.id if d.parent_id else 0,
         } for d in raw_departments]
 
-        # Calendar days in selected month period
-        calendar_days = (end_date - start_date).days + 1
-        if calendar_days <= 0:
-            calendar_days = 30
+        # Determine calendar days in target month vs selected date range
+        month_start = start_date.replace(day=1)
+        next_month_start = (month_start + timedelta(days=32)).replace(day=1)
+        month_total_days = (next_month_start - month_start).days
+        if month_total_days <= 0:
+            month_total_days = 30
+
+        selected_days = (end_date - start_date).days + 1
+        if selected_days <= 0:
+            selected_days = 1
+
+        proration_ratio = float(selected_days) / float(month_total_days)
 
         # Aggregate KPI totals
         total_basic_salary = 0.0
@@ -486,24 +494,40 @@ class HrPayrollDashboard(models.AbstractModel):
                 total_all_deductions = slip_deductions + slip_ssc_emp + slip_tax + slip_late_amount
                 slip_net = getattr(slip, "net_wage", 0.0) or max(slip_gross - total_all_deductions, 0.0)
 
-            # Calendar-Exact Employee Daily Cost
-            slip_daily_cost = (slip_gross + slip_ssc_comp) / float(calendar_days)
+            # Calendar-Exact Employee Daily Cost (using actual target month days)
+            slip_daily_cost = (slip_gross + slip_ssc_comp) / float(month_total_days)
+
+            # Apply proration ratio to scale monthly payslip figures for the selected date range
+            p_basic = slip_basic * proration_ratio
+            p_gross = slip_gross * proration_ratio
+            p_net = slip_net * proration_ratio
+            p_allowances = slip_allowances * proration_ratio
+            p_deductions = (slip_deductions + slip_late_amount) * proration_ratio
+            p_ssc_emp = slip_ssc_emp * proration_ratio
+            p_ssc_comp = slip_ssc_comp * proration_ratio
+            p_tax = slip_tax * proration_ratio
+            p_ot_amount = slip_ot_amount * proration_ratio
+            p_ot_hours = slip_ot_hours * proration_ratio
+            p_late_hours = slip_late_hours * proration_ratio
+            p_late_amount = slip_late_amount * proration_ratio
+            p_sched_hours = slip_sched_hours * proration_ratio
+            p_working_days = slip_days * proration_ratio
 
             # Accumulate global totals
-            total_basic_salary += slip_basic
-            total_gross_salary += slip_gross
-            total_net_salary += slip_net
-            total_allowances += slip_allowances
-            total_deductions += (slip_deductions + slip_late_amount)
-            total_social_security_emp += slip_ssc_emp
-            total_social_security_comp += slip_ssc_comp
-            total_income_tax += slip_tax
-            total_overtime_amount += slip_ot_amount
-            total_overtime_hours += slip_ot_hours
-            total_lateness_hours += slip_late_hours
-            total_lateness_amount += slip_late_amount
-            total_scheduled_hours += slip_sched_hours
-            total_working_days += slip_days
+            total_basic_salary += p_basic
+            total_gross_salary += p_gross
+            total_net_salary += p_net
+            total_allowances += p_allowances
+            total_deductions += p_deductions
+            total_social_security_emp += p_ssc_emp
+            total_social_security_comp += p_ssc_comp
+            total_income_tax += p_tax
+            total_overtime_amount += p_ot_amount
+            total_overtime_hours += p_ot_hours
+            total_lateness_hours += p_late_hours
+            total_lateness_amount += p_late_amount
+            total_scheduled_hours += p_sched_hours
+            total_working_days += p_working_days
             total_daily_cost += slip_daily_cost
 
             # Bank vs Cash Payment analysis
@@ -515,26 +539,26 @@ class HrPayrollDashboard(models.AbstractModel):
 
             if has_bank:
                 bank_count += 1
-                bank_amount += slip_net
+                bank_amount += p_net
             else:
                 cash_count += 1
-                cash_amount += slip_net
+                cash_amount += p_net
 
             # Department breakdown accumulation
             dep_row = department_dict[dep_id]
-            dep_row["basic_salary"] += slip_basic
-            dep_row["gross_salary"] += slip_gross
-            dep_row["net_salary"] += slip_net
-            dep_row["allowances"] += slip_allowances
-            dep_row["deductions"] += (slip_deductions + slip_late_amount)
-            dep_row["social_security"] += slip_ssc_emp
-            dep_row["social_security_comp"] += slip_ssc_comp
-            dep_row["income_tax"] += slip_tax
-            dep_row["overtime_amount"] += slip_ot_amount
-            dep_row["overtime_hours"] += slip_ot_hours
-            dep_row["lateness_hours"] += slip_late_hours
-            dep_row["lateness_amount"] += slip_late_amount
-            dep_row["working_days"] += slip_days
+            dep_row["basic_salary"] += p_basic
+            dep_row["gross_salary"] += p_gross
+            dep_row["net_salary"] += p_net
+            dep_row["allowances"] += p_allowances
+            dep_row["deductions"] += p_deductions
+            dep_row["social_security"] += p_ssc_emp
+            dep_row["social_security_comp"] += p_ssc_comp
+            dep_row["income_tax"] += p_tax
+            dep_row["overtime_amount"] += p_ot_amount
+            dep_row["overtime_hours"] += p_ot_hours
+            dep_row["lateness_hours"] += p_late_hours
+            dep_row["lateness_amount"] += p_late_amount
+            dep_row["working_days"] += p_working_days
             dep_row["daily_cost"] += slip_daily_cost
 
         # Finalize department rows with zero-latency in-memory hierarchy lookup
@@ -552,7 +576,7 @@ class HrPayrollDashboard(models.AbstractModel):
         for d_id, row in department_dict.items():
             row["headcount"] = len(row["employee_ids"])
             del row["employee_ids"]
-            row["calendar_days"] = calendar_days
+            row["calendar_days"] = selected_days
             row["daily_cost"] = round(row["daily_cost"], 3)
             row["avg_daily_cost_per_emp"] = round(row["daily_cost"] / row["headcount"], 3) if row["headcount"] else 0.0
 
@@ -565,9 +589,9 @@ class HrPayrollDashboard(models.AbstractModel):
                     pos_sales = sum(pos_sales_by_dept.get(cid, 0.0) for cid in unrepresented_children)
 
             row["pos_sales"] = round(pos_sales, 3)
-            monthly_dept_cost = row["daily_cost"] * float(calendar_days)
-            row["pos_labor_cost_pct"] = round((monthly_dept_cost / pos_sales * 100.0), 1) if pos_sales else 0.0
-            row["sales_per_jod_labor"] = round((pos_sales / monthly_dept_cost), 2) if monthly_dept_cost else 0.0
+            period_dept_labor_cost = row["daily_cost"] * float(selected_days)
+            row["pos_labor_cost_pct"] = round((period_dept_labor_cost / pos_sales * 100.0), 1) if pos_sales else 0.0
+            row["sales_per_jod_labor"] = round((pos_sales / period_dept_labor_cost), 2) if period_dept_labor_cost else 0.0
 
             # Factory Production Output Ratios
             mrp_qty = mrp_qty_by_dept.get(d_id, 0.0)
@@ -578,7 +602,7 @@ class HrPayrollDashboard(models.AbstractModel):
                     mrp_qty = sum(mrp_qty_by_dept.get(cid, 0.0) for cid in unrepresented_children)
 
             row["mrp_qty"] = round(mrp_qty, 2)
-            row["labor_cost_per_unit"] = round((monthly_dept_cost / mrp_qty), 3) if mrp_qty else 0.0
+            row["labor_cost_per_unit"] = round((period_dept_labor_cost / mrp_qty), 3) if mrp_qty else 0.0
 
             department_list.append(row)
 
@@ -592,11 +616,16 @@ class HrPayrollDashboard(models.AbstractModel):
         total_employer_payroll_expense = round(total_gross_salary + total_social_security_comp, 3)
         overtime_cost_ratio = round((total_overtime_amount / total_gross_salary * 100.0), 1) if total_gross_salary else 0.0
 
-        # Live Attendance calculation for "Today"
+        # Live Attendance & Attendance-Based Live Labor Cost calculation
         today_present_count = 0
         today_absent_count = 0
+        live_present_daily_cost = 0.0
+        absence_saved_cost = 0.0
+        live_attendance_labor_ratio = 0.0
+        sales_per_present_emp = 0.0
+
         is_today = (start_date == end_date == today)
-        if is_today and "hr.attendance" in self.env:
+        if "hr.attendance" in self.env:
             try:
                 att_domain = [
                     ("check_in", "<=", end_dt),
@@ -612,8 +641,9 @@ class HrPayrollDashboard(models.AbstractModel):
                         all_target_dep_ids = self.env["hr.department"].search([("id", "child_of", raw_dep_ids)]).ids
                         att_domain.append(("employee_id.department_id", "in", all_target_dep_ids))
 
-                att_grouped = self.env["hr.attendance"].sudo()._read_group(att_domain, ["employee_id"], [])
-                today_present_count = len(att_grouped)
+                attendances = self.env["hr.attendance"].sudo().search(att_domain)
+                present_employees = attendances.mapped("employee_id")
+                today_present_count = len(present_employees)
 
                 emp_domain = [("active", "=", True)]
                 if target_company_id > 0:
@@ -624,8 +654,33 @@ class HrPayrollDashboard(models.AbstractModel):
                         all_target_dep_ids = self.env["hr.department"].search([("id", "child_of", raw_dep_ids)]).ids
                         emp_domain.append(("department_id", "in", all_target_dep_ids))
 
-                total_assigned = self.env["hr.employee"].sudo().search_count(emp_domain)
-                today_absent_count = max(total_assigned - today_present_count, 0)
+                all_active_employees = self.env["hr.employee"].sudo().search(emp_domain)
+                today_absent_count = max(len(all_active_employees) - today_present_count, 0)
+
+                # Compute exact live daily cost of PRESENT employees vs ABSENT employees
+                avg_wage_fallback = (total_gross_salary / len(distinct_employee_ids)) if distinct_employee_ids else 500.0
+                for emp in all_active_employees:
+                    wage = getattr(emp, "wage", 0.0) or 0.0
+                    if not wage and hasattr(emp, "contract_id") and emp.contract_id:
+                        wage = getattr(emp.contract_id, "wage", 0.0) or 0.0
+                    if not wage:
+                        wage = avg_wage_fallback
+
+                    emp_daily_cost = (wage * 1.1425) / float(month_total_days)
+
+                    if emp.id in present_employees.ids:
+                        live_present_daily_cost += emp_daily_cost
+                    else:
+                        absence_saved_cost += emp_daily_cost
+
+                live_present_daily_cost = round(live_present_daily_cost, 3)
+                absence_saved_cost = round(absence_saved_cost, 3)
+
+                if total_pos_sales > 0:
+                    live_attendance_labor_ratio = round((live_present_daily_cost / total_pos_sales * 100.0), 1)
+                if today_present_count > 0:
+                    sales_per_present_emp = round(total_pos_sales / today_present_count, 2)
+
             except Exception as e:
                 _logger.warning("Live attendance calculation skipped: %s", e)
 
@@ -653,6 +708,10 @@ class HrPayrollDashboard(models.AbstractModel):
             "is_today": is_today,
             "today_present_count": today_present_count,
             "today_absent_count": today_absent_count,
+            "live_present_daily_cost": live_present_daily_cost,
+            "absence_saved_cost": absence_saved_cost,
+            "live_attendance_labor_ratio": live_attendance_labor_ratio,
+            "sales_per_present_emp": sales_per_present_emp,
             "overtime_cost_ratio": overtime_cost_ratio,
             "lateness_hours_total": round(total_lateness_hours, 1),
             "avg_salary_per_emp": round(total_net_salary / len(distinct_employee_ids), 3) if distinct_employee_ids else 0.0,
@@ -706,6 +765,10 @@ class HrPayrollDashboard(models.AbstractModel):
                 "avg_daily_cost_per_emp": round(total_daily_cost / len(distinct_employee_ids), 3) if distinct_employee_ids else 0.0,
                 "total_employer_expense": total_employer_payroll_expense,
                 "overtime_cost_ratio": overtime_cost_ratio,
+                "live_present_daily_cost": live_present_daily_cost,
+                "absence_saved_cost": absence_saved_cost,
+                "live_attendance_labor_ratio": live_attendance_labor_ratio,
+                "sales_per_present_emp": sales_per_present_emp,
             },
             "departments": department_list,
             "channels": [

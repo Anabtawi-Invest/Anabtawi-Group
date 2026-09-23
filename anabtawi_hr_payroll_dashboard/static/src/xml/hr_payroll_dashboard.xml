@@ -290,8 +290,8 @@
                 <t t-if="state.personaTab === 'hr'">
                     <div class="alert alert-success p-3 mb-3 border-success shadow-sm rounded" style="background-color: #f0fdf4; border-color: #10b981;">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h5 class="m-0 text-success fw-bold"><i class="fa fa-address-book me-2"/> HR Director Workforce Utilization &amp; Attendance</h5>
-                            <span class="badge bg-success fs-6">Avg Salary: <t t-esc="formatCurrency(data.hr_analytics.avg_salary_per_emp)"/> JOD</span>
+                            <h5 class="m-0 text-success fw-bold"><i class="fa fa-address-book me-2"/> HR Director Workforce Utilization &amp; Live Attendance Cost</h5>
+                            <span class="badge bg-success fs-6">Live Attendance Ratio: <t t-esc="data.hr_analytics.live_attendance_labor_ratio"/>% of Today Sales</span>
                         </div>
                         <div class="row g-3">
                             <div class="col-md-3">
@@ -308,21 +308,27 @@
                             </div>
                             <div class="col-md-3">
                                 <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Present Staff Live Daily Cost</span>
+                                    <strong class="text-success fs-5"><t t-esc="formatCurrency(data.hr_analytics.live_present_daily_cost)"/> JOD</strong>
+                                    <div class="small text-success fw-bold">
+                                        <i class="fa fa-user-check me-1"/>
+                                        <t t-esc="data.hr_analytics.today_present_count"/> Checked-In
+                                        <span class="text-muted fw-normal">/ <t t-esc="data.kpis.headcount"/> Total</span>
+                                    </div>
+                                    <div class="small text-muted">Saved: <t t-esc="formatCurrency(data.hr_analytics.absence_saved_cost)"/> JOD (<t t-esc="data.hr_analytics.today_absent_count"/> Absent)</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
+                                    <span class="text-muted small d-block">Sales / Present Headcount</span>
+                                    <strong class="text-primary fs-5"><t t-esc="formatCurrency(data.hr_analytics.sales_per_present_emp)"/> JOD/Head</strong>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="bg-white p-2 rounded border">
                                     <span class="text-muted small d-block">Overtime Cost Ratio</span>
                                     <strong class="text-danger fs-5"><t t-esc="data.hr_analytics.overtime_cost_ratio"/>%</strong>
                                     <div class="small text-muted">of Gross Payroll</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="bg-white p-2 rounded border">
-                                    <span class="text-muted small d-block">Subtracted Lateness Hours</span>
-                                    <strong class="text-warning fs-5"><t t-esc="data.hr_analytics.lateness_hours_total"/> Hours</strong>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="bg-white p-2 rounded border">
-                                    <span class="text-muted small d-block">Total Working Days</span>
-                                    <strong class="text-primary fs-5"><t t-esc="data.kpis.total_working_days"/> Days</strong>
                                 </div>
                             </div>
                         </div>
@@ -447,7 +453,12 @@
                         <div class="kpi_title">Daily Payroll Cost (التكلفة اليومية)</div>
                         <div class="kpi_value text-primary"><t t-esc="formatCurrency(data.kpis.total_daily_cost)"/> <span class="fs-6 fw-normal text-muted">JOD/Day</span></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <span class="badge bg-primary text-white badge_sub">Calendar: <t t-esc="data.calendar_days"/> Days</span>
+                            <t t-if="data.hr_analytics &amp;&amp; data.hr_analytics.is_today">
+                                <span class="badge bg-success text-white badge_sub"><i class="fa fa-user-check me-1"/><t t-esc="data.hr_analytics.today_present_count"/> Present</span>
+                            </t>
+                            <t t-else="">
+                                <span class="badge bg-primary text-white badge_sub">Calendar: <t t-esc="data.calendar_days"/> Days</span>
+                            </t>
                             <span class="fw-bold text-dark">Exact Rate</span>
                         </div>
                     </div>
@@ -624,7 +635,7 @@
                                             <t t-esc="d.department_name"/>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-light text-dark border px-2 py-1"><t t-esc="d.headcount"/></span>
+                                            <span class="badge badge-headcount px-2 py-1"><t t-esc="d.headcount"/></span>
                                         </td>
                                         <td class="text-end fw-bold text-info"><t t-esc="formatCurrency(d.daily_cost)"/></td>
                                         <td class="text-end text-teal fw-bold"><t t-esc="formatCurrency(d.avg_daily_cost_per_emp)"/></td>
@@ -656,7 +667,7 @@
                             <tfoot>
                                 <tr>
                                     <td>Grand Total</td>
-                                    <td class="text-center"><t t-esc="data.kpis.headcount"/></td>
+                                    <td class="text-center"><span class="badge badge-headcount px-2 py-1"><t t-esc="data.kpis.headcount"/></span></td>
                                     <td class="text-end text-info fw-bold"><t t-esc="formatCurrency(data.kpis.total_daily_cost)"/></td>
                                     <td class="text-end text-teal fw-bold"><t t-esc="formatCurrency(data.kpis.avg_daily_cost_per_emp)"/></td>
                                     <td class="text-end"><t t-esc="formatCurrency(data.kpis.total_basic_salary)"/></td>
