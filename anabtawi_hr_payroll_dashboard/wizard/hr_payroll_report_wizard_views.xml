@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_payroll_report_wizard_form" model="ir.ui.view">
+        <field name="name">hr.payroll.report.wizard.form</field>
+        <field name="model">hr.payroll.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Export HR &amp; Payroll Unified Excel Reports">
+                <sheet>
+                    <div class="oe_title mb-3">
+                        <h2><i class="fa fa-file-excel-o text-success me-2"/> Export Unified Payroll &amp; Operations Package</h2>
+                        <p class="text-muted">Generate professional multi-sheet Excel reports matching corporate banking, payroll, overtime, and attendance reconciliation standards.</p>
+                    </div>
+
+                    <group>
+                        <group string="Filter by Period / Batch">
+                            <field name="payrun_id" options="{'no_create': True}" placeholder="Select specific Payrun Batch (Optional)"/>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                        <group string="Organizational Scope">
+                            <field name="company_id" options="{'no_create': True}"/>
+                            <field name="department_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="All Departments"/>
+                            <field name="report_type"/>
+                            <field name="company_source_account" invisible="report_type not in ['all', 'bank']"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Included Sheets Overview">
+                            <div class="row mt-2">
+                                <div class="col-md-6 mb-2">
+                                    <div class="card p-3 border-start border-primary border-4 shadow-sm h-100">
+                                        <h6 class="text-primary fw-bold"><i class="fa fa-list-alt me-1"/> 1. Monthly Payroll List</h6>
+                                        <p class="small text-muted mb-0">Detailed breakdown of Basic, Actual, Due salary, Allowances (Takleef, Bonuses, OT), Deductions (Advances, Loans, Health Insurance, SSC, Income Tax), and Net Salaries per department.</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <div class="card p-3 border-start border-warning border-4 shadow-sm h-100">
+                                        <h6 class="text-warning fw-bold"><i class="fa fa-clock-o me-1"/> 2. Monthly Overtime Analysis</h6>
+                                        <p class="small text-muted mb-0">Full analysis of employee overtime hours, hourly pay rates, accrued vs paid hours, and monetary totals grouped by department.</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <div class="card p-3 border-start border-success border-4 shadow-sm h-100">
+                                        <h6 class="text-success fw-bold"><i class="fa fa-university me-1"/> 3. Bank Transfer File (BT/LBT)</h6>
+                                        <p class="small text-muted mb-0">Direct banking format compatible with Arab Bank and local RTGS/ACH networks with SWIFT codes, employee IBANs, and purpose codes.</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <div class="card p-3 border-start border-info border-4 shadow-sm h-100">
+                                        <h6 class="text-info fw-bold"><i class="fa fa-calendar-check-o me-1"/> 4. Attendance Reconciliation</h6>
+                                        <p class="small text-muted mb-0">Scheduled hours vs approved hours, extra hours, subtractive hours (lateness/shortages), and net reconciliation hours.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+                <footer>
+                    <button name="action_export_xlsx" string="Generate &amp; Download Excel (.xlsx)" type="object" class="btn-success" icon="fa-download"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_payroll_report_wizard" model="ir.actions.act_window">
+        <field name="name">Unified Payroll Excel Reports</field>
+        <field name="res_model">hr.payroll.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

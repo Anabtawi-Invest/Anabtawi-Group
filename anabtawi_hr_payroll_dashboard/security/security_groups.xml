@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="group_hr_payroll_dashboard_user" model="res.groups">
+        <field name="name">HR &amp; Payroll Dashboard User</field>
+        <field name="implied_ids" eval="[(4, ref('hr_payroll.group_hr_payroll_user'))]"/>
+        <field name="comment">Users with this permission can view the HR &amp; Payroll Executive Dashboard and export unified Excel reports.</field>
+    </record>
+
+    <record id="group_hr_payroll_dashboard_manager" model="res.groups">
+        <field name="name">HR &amp; Payroll Dashboard Manager</field>
+        <field name="implied_ids" eval="[(4, ref('anabtawi_hr_payroll_dashboard.group_hr_payroll_dashboard_user')), (4, ref('hr_payroll.group_hr_payroll_manager'))]"/>
+        <field name="comment">Full managerial access to HR &amp; Payroll Dashboard, advanced analytics, and configuration.</field>
+    </record>
+</odoo>
