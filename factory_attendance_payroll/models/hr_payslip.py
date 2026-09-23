@@ -837,6 +837,23 @@ class HrPayslip(models.Model):
 
                 computed_attendance_days = float(final_attendance_days)
 
+            travel_days_count = 0.0
+            if 'hr.work.entry' in self.env:
+                we_trv = self.env['hr.work.entry'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '!=', 'cancelled'),
+                    '|', '|', ('work_entry_type_id.code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE']),
+                    ('work_entry_type_id.display_code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE']),
+                    ('work_entry_type_id.name', 'ilike', 'Travel'),
+                ])
+                trv_starts = [we.date_start.date() for we in we_trv if getattr(we, 'date_start', None)]
+                trv_stops = [we.date_stop.date() for we in we_trv if getattr(we, 'date_stop', None)] or trv_starts
+                if trv_starts and trv_stops:
+                    min_trv = max(payslip.date_from, min(trv_starts))
+                    max_trv = min(payslip.date_to, max(trv_stops))
+                    if min_trv <= max_trv:
+                        travel_days_count = float((max_trv - min_trv).days + 1)
+
             filtered_lines = []
             for line in res:
                 code = (line.get('code') or '').strip()
@@ -850,7 +867,15 @@ class HrPayslip(models.Model):
                 if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
                     continue
 
-                if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
+                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE'] or 'travel' in we_name or 'travel' in line_name:
+                    trv_days = travel_days_count if travel_days_count > 0.0 else line.get('number_of_days', 0.0)
+                    line['number_of_days'] = trv_days
+                    line['number_of_hours'] = round(trv_days * 9.0, 2)
+                    daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
+                    line['amount'] = round(trv_days * daily_rate, 3)
+                    filtered_lines.append(line)
+
+                elif code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
                         line['number_of_days'] = computed_attendance_days
