@@ -109,6 +109,7 @@
                 <t t-set="precision" t-value="currency.decimal_places"/>
                 <t t-set="version" t-value="o.version_id if 'version_id' in o._fields else False"/>
                 <t t-set="employee" t-value="o.employee_id.with_context(version_id=version.id) if version else o.employee_id"/>
+                <t t-set="term_date" t-value="(version.contract_date_end if (version and 'contract_date_end' in version._fields and version.contract_date_end) else False) or (employee.contract_date_end if ('contract_date_end' in employee._fields and employee.contract_date_end) else False) or o.date_to"/>
                 <t t-set="bank" t-value="employee.primary_bank_account_id"/>
                 <t t-set="lines" t-value="o.line_ids.sorted('sequence')"/>
                 <t t-set="visible_lines" t-value="lines.filtered(lambda l: l.salary_rule_id.appears_on_payslip)"/>
@@ -210,14 +211,14 @@
                             <div class="license">Licensed To: <span t-field="company.name"/></div>
                             <div class="title ar" lang="ar">
                                 <span>مخالصة / TERMINATION</span>
-                                <span dir="ltr" style="margin-right: 8px; margin-left: 8px;"><t t-out="o.date_to.strftime('%d/%m/%Y') if o.date_to else ''"/></span>
+                                <span dir="ltr" style="margin-right: 8px; margin-left: 8px;"><t t-out="term_date.strftime('%d/%m/%Y') if term_date else ''"/></span>
                             </div>
                         </td>
                     </tr>
                 </table>
                 <div class="muted center">
                     Termination Date / تاريخ انتهاء الخدمة:
-                    <span t-field="o.date_to" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/>
+                    <span t-if="term_date" t-out="term_date" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/><span t-else="">—</span>
                     <span> | </span><span t-field="o.name"/>
                 </div>
 
@@ -259,7 +260,7 @@
                     <tr>
                         <td class="label">Currency / العملة</td><td class="v-sep"><span t-field="currency.name"/></td>
                         <td class="label right-col">Termination Date / تاريخ انتهاء الخدمة</td>
-                        <td><span t-field="o.date_to" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/></td>
+                        <td><span t-if="term_date" t-out="term_date" t-options="{'widget': 'date', 'format': 'dd/MM/yyyy'}"/><span t-else="">—</span></td>
                     </tr>
                 </table>
                 <div class="balance-boxes-container" style="margin: 10px 0 14px;">
