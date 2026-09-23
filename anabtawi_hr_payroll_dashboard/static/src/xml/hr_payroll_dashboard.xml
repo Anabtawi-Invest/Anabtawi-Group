@@ -16,11 +16,11 @@
                 <div class="o_dashboard_filters">
                     <!-- Quick Date Range Buttons -->
                     <div class="btn-group btn-group-period" role="group">
-                        <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'today'}" t-on-click="() => this.setPeriod('today')">Today (اليوم)</button>
-                        <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'this_month'}" t-on-click="() => this.setPeriod('this_month')">This Month</button>
-                        <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'prev_month'}" t-on-click="() => this.setPeriod('prev_month')">Prev Month</button>
-                        <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'this_quarter'}" t-on-click="() => this.setPeriod('this_quarter')">Quarter</button>
-                        <button type="button" class="btn btn-outline-primary btn-sm" t-att-class="{'active': state.period === 'this_year'}" t-on-click="() => this.setPeriod('this_year')">This Year</button>
+                        <button type="button" class="btn btn-period-quick" t-att-class="{'active': state.period === 'today'}" t-on-click="() => this.setPeriod('today')">Today (اليوم)</button>
+                        <button type="button" class="btn btn-period-quick" t-att-class="{'active': state.period === 'this_month'}" t-on-click="() => this.setPeriod('this_month')">This Month</button>
+                        <button type="button" class="btn btn-period-quick" t-att-class="{'active': state.period === 'prev_month'}" t-on-click="() => this.setPeriod('prev_month')">Prev Month</button>
+                        <button type="button" class="btn btn-period-quick" t-att-class="{'active': state.period === 'this_quarter'}" t-on-click="() => this.setPeriod('this_quarter')">Quarter</button>
+                        <button type="button" class="btn btn-period-quick" t-att-class="{'active': state.period === 'this_year'}" t-on-click="() => this.setPeriod('this_year')">This Year</button>
                     </div>
 
                     <div class="d-flex align-items-center gap-2">
@@ -37,15 +37,15 @@
                         </t>
 
                         <input type="date" class="form-control form-control-sm filter_input" t-model="state.date_from"/>
-                        <span class="text-muted small">to</span>
+                        <span class="text-muted small font-weight-bold">to</span>
                         <input type="date" class="form-control form-control-sm filter_input" t-model="state.date_to"/>
-                        <button class="btn btn-primary btn-sm text-nowrap" t-on-click="fetchDashboardData">
+                        <button class="btn btn-apply-action text-nowrap" t-on-click="fetchDashboardData">
                             <i class="fa fa-refresh me-1"/> Apply
                         </button>
-                        <button class="btn btn-success btn-sm text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="exportExcel">
+                        <button class="btn btn-excel-action text-nowrap" t-att-disabled="state.exportingExcel" t-on-click="exportExcel">
                             <i class="fa fa-file-excel-o me-1"/> Excel Package
                         </button>
-                        <button class="btn btn-danger btn-sm text-nowrap" t-att-disabled="state.printingPdf" t-on-click="printExecutivePdf">
+                        <button class="btn btn-pdf-action text-nowrap" t-att-disabled="state.printingPdf" t-on-click="printExecutivePdf">
                             <i class="fa fa-file-pdf-o me-1"/> Board PDF Briefing
                         </button>
                     </div>
@@ -53,52 +53,52 @@
             </div>
 
             <!-- Suite 5-Dashboard Main Navigation Bar -->
-            <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-dark rounded shadow-sm border border-secondary">
-                <div class="btn-group suite_tab_group" role="group">
-                    <button type="button" class="btn btn-sm btn-outline-light fw-bold" t-att-class="{'active btn-primary text-white': state.activeDashboardTab === 'overview'}" t-on-click="() => this.setDashboardTab('overview')">
+            <div class="suite_tab_container">
+                <div class="suite_tab_group" role="group">
+                    <button type="button" class="btn suite_tab_btn" t-att-class="{'active': state.activeDashboardTab === 'overview'}" t-on-click="() => this.setDashboardTab('overview')">
                         <i class="fa fa-tachometer me-1"/> 1. Executive Overview (نظرة شاملة)
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-light fw-bold" t-att-class="{'active btn-primary text-white': state.activeDashboardTab === 'payroll'}" t-on-click="() => this.setDashboardTab('payroll')">
+                    <button type="button" class="btn suite_tab_btn" t-att-class="{'active': state.activeDashboardTab === 'payroll'}" t-on-click="() => this.setDashboardTab('payroll')">
                         <i class="fa fa-money me-1"/> 2. Payroll &amp; Accruals (الرواتب والاستحقاق)
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-light fw-bold" t-att-class="{'active btn-primary text-white': state.activeDashboardTab === 'workforce'}" t-on-click="() => this.setDashboardTab('workforce')">
+                    <button type="button" class="btn suite_tab_btn" t-att-class="{'active': state.activeDashboardTab === 'workforce'}" t-on-click="() => this.setDashboardTab('workforce')">
                         <i class="fa fa-users me-1"/> 3. Workforce Intelligence (ذكاء الكادر)
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-light fw-bold" t-att-class="{'active btn-primary text-white': state.activeDashboardTab === 'operations'}" t-on-click="() => this.setDashboardTab('operations')">
+                    <button type="button" class="btn suite_tab_btn" t-att-class="{'active': state.activeDashboardTab === 'operations'}" t-on-click="() => this.setDashboardTab('operations')">
                         <i class="fa fa-cogs me-1"/> 4. Operations &amp; 23 Branches (المصنع والفروع)
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-light fw-bold" t-att-class="{'active btn-primary text-white': state.activeDashboardTab === 'sales'}" t-on-click="() => this.setDashboardTab('sales')">
+                    <button type="button" class="btn suite_tab_btn" t-att-class="{'active': state.activeDashboardTab === 'sales'}" t-on-click="() => this.setDashboardTab('sales')">
                         <i class="fa fa-line-chart me-1"/> 5. Sales &amp; Commission HR (المبيعات والعمولات)
                     </button>
                 </div>
             </div>
 
             <!-- C-Level Executive Persona Navigation Bar -->
-            <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-white rounded shadow-sm border">
-                <div class="btn-group role_tab_group" role="group">
-                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" t-att-class="{'active btn-primary text-white': state.personaTab === 'all'}" t-on-click="() => this.setPersonaTab('all')">
+            <div class="persona_bar_container">
+                <div class="role_tab_group" role="group">
+                    <button type="button" class="btn role_tab_btn" t-att-class="{'active': state.personaTab === 'all'}" t-on-click="() => this.setPersonaTab('all')">
                         <i class="fa fa-globe me-1"/> Executive Summary (الشامل)
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" t-att-class="{'active btn-primary text-white': state.personaTab === 'ceo'}" t-on-click="() => this.setPersonaTab('ceo')">
+                    <button type="button" class="btn role_tab_btn" t-att-class="{'active': state.personaTab === 'ceo'}" t-on-click="() => this.setPersonaTab('ceo')">
                         <i class="fa fa-user-secret me-1"/> CEO View (الرئيس التنفيذي)
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" t-att-class="{'active btn-primary text-white': state.personaTab === 'cfo'}" t-on-click="() => this.setPersonaTab('cfo')">
+                    <button type="button" class="btn role_tab_btn" t-att-class="{'active': state.personaTab === 'cfo'}" t-on-click="() => this.setPersonaTab('cfo')">
                         <i class="fa fa-line-chart me-1"/> CFO View (المدير المالي)
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold" t-att-class="{'active btn-primary text-white': state.personaTab === 'hr'}" t-on-click="() => this.setPersonaTab('hr')">
+                    <button type="button" class="btn role_tab_btn" t-att-class="{'active': state.personaTab === 'hr'}" t-on-click="() => this.setPersonaTab('hr')">
                         <i class="fa fa-address-book me-1"/> HR Director View (مدير الموارد)
                     </button>
                 </div>
 
                 <!-- Today Shift & Hours Toolbar -->
                 <div class="d-flex align-items-center gap-2">
-                    <span class="text-muted small fw-bold"><i class="fa fa-clock-o text-warning me-1"/> Shift / Hours:</span>
-                    <button type="button" class="btn btn-xs btn-outline-secondary" t-on-click="() => this.setShift('morning')">Morning (08-16)</button>
-                    <button type="button" class="btn btn-xs btn-outline-secondary" t-on-click="() => this.setShift('evening')">Evening (16-00)</button>
-                    <button type="button" class="btn btn-xs btn-outline-secondary" t-on-click="() => this.setShift('fullday')">Full Day</button>
-                    <input type="time" class="form-control form-control-sm" t-model="state.time_from" t-on-change="fetchDashboardData" style="width: 100px;"/>
-                    <span class="text-muted small">to</span>
-                    <input type="time" class="form-control form-control-sm" t-model="state.time_to" t-on-change="fetchDashboardData" style="width: 100px;"/>
+                    <span class="text-dark small fw-bold me-1"><i class="fa fa-clock-o text-warning me-1"/> Shift / Hours:</span>
+                    <button type="button" class="btn shift_btn" t-on-click="() => this.setShift('morning')">Morning (08-16)</button>
+                    <button type="button" class="btn shift_btn" t-on-click="() => this.setShift('evening')">Evening (16-00)</button>
+                    <button type="button" class="btn shift_btn" t-on-click="() => this.setShift('fullday')">Full Day</button>
+                    <input type="time" class="form-control form-control-sm filter_input" t-model="state.time_from" t-on-change="fetchDashboardData" style="width: 100px;"/>
+                    <span class="text-dark small font-weight-bold">to</span>
+                    <input type="time" class="form-control form-control-sm filter_input" t-model="state.time_to" t-on-change="fetchDashboardData" style="width: 100px;"/>
                 </div>
             </div>
 
@@ -593,16 +593,16 @@
 
                 <!-- TAB 2: PAYROLL & ACCRUAL ENGINE -->
                 <t t-if="state.activeDashboardTab === 'payroll'">
-                    <div class="p-3 mb-3 bg-dark text-white rounded border border-secondary d-flex justify-content-between align-items-center">
+                    <div class="tab_header_banner d-flex justify-content-between align-items-center">
                         <div>
                             <h4 class="m-0 fw-bold"><i class="fa fa-money text-success me-2"/> Payroll &amp; Accrual Engine</h4>
-                            <span class="small text-muted">Live daily accruals vs post-payroll approved summary</span>
+                            <span class="small subtitle">Live daily accruals vs post-payroll approved summary</span>
                         </div>
                         <div class="btn-group" role="group">
-                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold" t-att-class="{'active btn-danger text-white': state.dashboardMode === 'live'}" t-on-click="() => this.setDashboardMode('live')">
+                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold" t-att-class="{'active': state.dashboardMode === 'live'}" t-on-click="() => this.setDashboardMode('live')">
                                 🔴 LIVE ACCRUAL MODE
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" t-att-class="{'active btn-success text-white': state.dashboardMode === 'post_payroll'}" t-on-click="() => this.setDashboardMode('post_payroll')">
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" t-att-class="{'active': state.dashboardMode === 'post_payroll'}" t-on-click="() => this.setDashboardMode('post_payroll')">
                                 ✅ POST-PAYROLL MODE
                             </button>
                         </div>
@@ -610,14 +610,14 @@
 
                     <t t-if="state.dashboardMode === 'live'">
                         <div class="alert alert-info p-3 mb-3">
-                            <strong className="d-block"><i class="fa fa-clock-o me-1"/> Pre-Payroll Live Accrual Tracking</strong>
-                            <span>Real-time payroll cost burn calculated dynamically from attendance logs and active contracts.</span>
+                            <strong class="d-block text-dark"><i class="fa fa-clock-o me-1"/> Pre-Payroll Live Accrual Tracking</strong>
+                            <span class="text-dark">Real-time payroll cost burn calculated dynamically from attendance logs and active contracts.</span>
                         </div>
                     </t>
                     <t t-else="">
                         <div class="alert alert-success p-3 mb-3">
-                            <strong className="d-block"><i class="fa fa-check-circle me-1"/> Final Approved Payroll Ledger</strong>
-                            <span>Posted and approved payroll slips summary for the active period.</span>
+                            <strong class="d-block text-dark"><i class="fa fa-check-circle me-1"/> Final Approved Payroll Ledger</strong>
+                            <span class="text-dark">Posted and approved payroll slips summary for the active period.</span>
                         </div>
                     </t>
 
@@ -656,9 +656,11 @@
 
                 <!-- TAB 3: WORKFORCE INTELLIGENCE -->
                 <t t-if="state.activeDashboardTab === 'workforce'">
-                    <div class="p-3 mb-3 bg-dark text-white rounded border border-secondary">
-                        <h4 class="m-0 fw-bold"><i class="fa fa-users text-info me-2"/> Workforce Intelligence &amp; Attendance Heatmap</h4>
-                        <span class="small text-muted">Demographics, 30-Day Attendance Heatmap Calendar &amp; OT Risk Flags</span>
+                    <div class="tab_header_banner">
+                        <div>
+                            <h4 class="m-0 fw-bold"><i class="fa fa-users text-info me-2"/> Workforce Intelligence &amp; Attendance Heatmap</h4>
+                            <span class="small subtitle">Demographics, 30-Day Attendance Heatmap Calendar &amp; OT Risk Flags</span>
+                        </div>
                     </div>
 
                     <div class="row g-3 mb-3">
@@ -672,7 +674,7 @@
                                     <span class="badge bg-success me-2 px-2 py-1">🟢 &gt;95% Attendance</span>
                                     <span class="badge bg-warning text-dark me-2 px-2 py-1">🟡 85-95% Attendance</span>
                                     <span class="badge bg-danger me-2 px-2 py-1">🔴 &lt;85% Attendance</span>
-                                    <p class="mt-3 text-muted small">Corporate Average Attendance: <strong class="text-success fs-6">94.2%</strong></p>
+                                    <p class="mt-3 text-dark small font-weight-bold">Corporate Average Attendance: <strong class="text-success fs-6">94.2%</strong></p>
                                 </div>
                             </div>
                         </div>
@@ -684,15 +686,15 @@
                                 </div>
                                 <div class="space-y-2">
                                     <div class="p-2 bg-light rounded border d-flex justify-content-between align-items-center mb-2">
-                                        <span>Employees with &gt;15 Unused Leave Days:</span>
+                                        <span class="text-dark font-weight-bold">Employees with &gt;15 Unused Leave Days:</span>
                                         <span class="badge bg-warning text-dark fs-6">28 Staff</span>
                                     </div>
                                     <div class="p-2 bg-light rounded border d-flex justify-content-between align-items-center mb-2">
-                                        <span>OT High Consumers (&gt;20% Basic Salary):</span>
+                                        <span class="text-dark font-weight-bold">OT High Consumers (&gt;20% Basic Salary):</span>
                                         <span class="badge bg-danger fs-6">12 Staff</span>
                                     </div>
                                     <div class="p-2 bg-light rounded border d-flex justify-content-between align-items-center">
-                                        <span>1-Year New Hire Retention Rate:</span>
+                                        <span class="text-dark font-weight-bold">1-Year New Hire Retention Rate:</span>
                                         <span class="badge bg-success fs-6">88.5%</span>
                                     </div>
                                 </div>
@@ -703,10 +705,10 @@
 
                 <!-- TAB 4: OPERATIONS & 23 RETAIL BRANCHES -->
                 <t t-if="state.activeDashboardTab === 'operations'">
-                    <div class="p-3 mb-3 bg-dark text-white rounded border border-secondary d-flex justify-content-between align-items-center">
+                    <div class="tab_header_banner d-flex justify-content-between align-items-center">
                         <div>
                             <h4 class="m-0 fw-bold"><i class="fa fa-cogs text-warning me-2"/> Operations HR — Main Factory &amp; 23 Retail Branches</h4>
-                            <span class="small text-muted">Factory line labor splitting &amp; master branch comparison table</span>
+                            <span class="small subtitle">Factory line labor splitting &amp; master branch comparison table</span>
                         </div>
                         <button type="button" class="btn btn-sm btn-outline-warning" t-on-click="() => this.state.isBenchmarkMode = !this.state.isBenchmarkMode">
                             <i class="fa fa-columns me-1"/> Branch Benchmarking Mode
@@ -751,33 +753,35 @@
 
                 <!-- TAB 5: SALES & COMMISSION HR -->
                 <t t-if="state.activeDashboardTab === 'sales'">
-                    <div class="p-3 mb-3 bg-dark text-white rounded border border-secondary">
-                        <h4 class="m-0 fw-bold"><i class="fa fa-line-chart text-cyan me-2"/> Sales Team HR &amp; Commission Analytics (Export + Local)</h4>
-                        <span class="small text-muted">Daily commission accrual tracker, variable pay exposure &amp; earners leaderboard</span>
+                    <div class="tab_header_banner">
+                        <div>
+                            <h4 class="m-0 fw-bold"><i class="fa fa-line-chart text-info me-2"/> Sales Team HR &amp; Commission Analytics (Export + Local)</h4>
+                            <span class="small subtitle">Daily commission accrual tracker, variable pay exposure &amp; earners leaderboard</span>
+                        </div>
                     </div>
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-3">
                             <div class="bg-white p-3 rounded border shadow-sm">
-                                <span class="text-muted small d-block">Export Commission MTD</span>
+                                <span class="text-dark fw-bold small d-block mb-1">Export Commission MTD</span>
                                 <strong class="text-primary fs-4">14,250 JOD</strong>
                             </div>
                         </div>
                         <div class="col-md-3">
                             <div class="bg-white p-3 rounded border shadow-sm">
-                                <span class="text-muted small d-block">Local Sales Commission MTD</span>
+                                <span class="text-dark fw-bold small d-block mb-1">Local Sales Commission MTD</span>
                                 <strong class="text-success fs-4">18,900 JOD</strong>
                             </div>
                         </div>
                         <div class="col-md-3">
                             <div class="bg-white p-3 rounded border shadow-sm">
-                                <span class="text-muted small d-block">Max Variable Pay Exposure</span>
+                                <span class="text-dark fw-bold small d-block mb-1">Max Variable Pay Exposure</span>
                                 <strong class="text-warning fs-4">48,500 JOD</strong>
                             </div>
                         </div>
                         <div class="col-md-3">
                             <div class="bg-white p-3 rounded border shadow-sm">
-                                <span class="text-muted small d-block">Payroll % of Revenue</span>
+                                <span class="text-dark fw-bold small d-block mb-1">Payroll % of Revenue</span>
                                 <strong class="text-info fs-4">11.4%</strong>
                             </div>
                         </div>
