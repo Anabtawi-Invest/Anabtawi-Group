@@ -228,7 +228,11 @@ class HrPayslipRun(models.Model):
             rule = line.salary_rule_id
             rule_key = rule.id if rule else line.code
             rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Allowance"))).strip()
+            if "copy" in rule_name.lower() or "copy" in (line.code or "").lower():
+                continue
             norm_key = (rule.name.lower().strip() if rule and rule.name else (line.code or rule_name).lower().strip())
+            if "copy" in norm_key:
+                continue
             if norm_key not in alw_map:
                 alw_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
             alw_map[norm_key]["rule_keys"].add(rule_key)
@@ -261,8 +265,12 @@ class HrPayslipRun(models.Model):
             rule = line.salary_rule_id
             rule_key = rule.id if rule else line.code
             raw_rule_name = (rule.name if rule and rule.name else (line.name or line.code or _("Deduction"))).strip()
+            if "copy" in raw_rule_name.lower() or "copy" in (line.code or "").lower():
+                continue
             rule_name = raw_rule_name.replace("Advances Two", "Advances 2").replace("Advance Two", "Advance 2")
             norm_key = _normalize_key(rule.name if rule and rule.name else (line.code or rule_name))
+            if "copy" in norm_key:
+                continue
             if norm_key not in ded_map:
                 ded_map[norm_key] = {"name": rule_name, "rule_keys": set(), "input_type_ids": set()}
             ded_map[norm_key]["rule_keys"].add(rule_key)
@@ -274,6 +282,8 @@ class HrPayslipRun(models.Model):
         if input_types:
             for itype in input_types:
                 raw_t_name = (itype.name or _("Salary Input")).strip()
+                if "copy" in raw_t_name.lower() or "copy" in (getattr(itype, "code", "") or "").lower():
+                    continue
                 t_name = raw_t_name.replace("Advances Two", "Advances 2").replace("Advance Two", "Advance 2")
                 t_norm = _normalize_key(t_name)
                 t_code = (getattr(itype, "code", "") or "").lower()
@@ -343,6 +353,8 @@ class HrPayslipRun(models.Model):
         for norm_k in sorted(alw_map.keys(), key=lambda k: alw_map[k]["name"]):
             col_info = alw_map[norm_k]
             c_name = col_info["name"]
+            if "copy" in c_name.lower():
+                continue
             rule_keys = col_info["rule_keys"]
             input_type_ids = col_info["input_type_ids"]
 
@@ -370,6 +382,8 @@ class HrPayslipRun(models.Model):
         for norm_k in sorted(ded_map.keys(), key=lambda k: ded_map[k]["name"]):
             col_info = ded_map[norm_k]
             c_name = col_info["name"]
+            if "copy" in c_name.lower():
+                continue
             rule_keys = col_info["rule_keys"]
             input_type_ids = col_info["input_type_ids"]
 
@@ -557,21 +571,18 @@ class HrPayslipRun(models.Model):
                 if net_sal < 0:
                     issues.append(_("Negative Net Salary (%.2f JOD)") % net_sal)
 
-                # Attendance metrics (Total calculated paid days = Attendance + Public Holidays + Paid Leaves)
+                # Attendance metrics (Take ONLY Attendance days, excluding Public Holidays, Leaves, and Absence)
                 worked_days = payslip.worked_days_line_ids
-                absence_codes = ['ABS', 'ABSENT', 'LEAVEUNPAID', 'UN_PAID', 'un_paid', 'SICKLEAVE0', 'LAT', 'OUT', 'UNP', 'OUTCON', 'OUT_OF_CONTRACT']
-                extra_hours_codes = ['EXTRA', 'EXTRA_HOURS', 'OVERTIME', 'OVER_TIME', 'EXTRA100']
-
-                paid_lines = worked_days.filtered(lambda wd: (
-                    (wd.code or '').strip() not in absence_codes and
-                    (wd.code or '').strip() not in extra_hours_codes and
-                    'extra' not in (wd.name or '').lower() and
-                    'overtime' not in (wd.name or '').lower() and
-                    'out of contract' not in (wd.name or '').lower() and
-                    'outcon' not in (wd.name or '').lower() and
-                    'خارج العقد' not in (wd.name or '').lower()
+                att_lines = worked_days.filtered(lambda wd: (
+                    (
+                        (wd.code or '').strip().upper() in ('WORK100', 'ATTENDANCE', 'WORK') or
+                        'attendance' in (wd.name or '').lower() or
+                        'حضور' in (wd.name or '')
+                    ) and
+                    not any(h in (wd.name or '').lower() for h in ['public holiday', 'holiday', 'عطلة', 'leave', 'إجازة']) and
+                    not any(h in (wd.code or '').lower() for h in ['holiday', 'leave', 'public'])
                 ))
-                att_days = sum(paid_lines.mapped("number_of_days"))
+                att_days = sum(att_lines.mapped("number_of_days"))
                 if payslip.date_from and payslip.date_to:
                     days_in_period = (payslip.date_to - payslip.date_from).days + 1
                     if att_days > days_in_period:
