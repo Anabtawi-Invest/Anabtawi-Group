@@ -831,7 +831,9 @@ class HrPayslip(models.Model):
                 unworked_holiday_days = len(unworked_holiday_dates)
 
                 unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
-                final_attendance_days = total_physical_days + unpunched_rest_days + unworked_holiday_days
+                covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
+                covered_lateness_days = covered_lateness_hours / 8.0
+                final_attendance_days = total_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
                 if active_period_days > 0 and final_attendance_days > active_period_days:
                     final_attendance_days = active_period_days
 
