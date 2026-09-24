@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_employee_cost_center_wizard" model="ir.ui.view">
+        <field name="name">employee.cost.center.wizard.form</field>
+        <field name="model">employee.cost.center.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Employees Cost Center">
+                <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+                    <div>
+                        <strong>Employees Cost Center Report | تقرير مركز تكلفة الموظفين</strong><br/>
+                        يحسب التكلفة الشهرية للموظف بناءً على:
+                        <strong>أيام الدوام الفعلية (Attendance Days) × معدل اليومية (أجر الساعة hourly_wage × ساعات العمل اليومية)</strong>.
+                    </div>
+                </div>
+
+                <!-- KPI Totals Cards Banner -->
+                <div class="row g-2 mb-3 text-center">
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded bg-light">
+                            <div class="text-muted small">الموظفين المشمولين</div>
+                            <div class="fs-5 fw-bold text-dark"><field name="total_employees" readonly="1"/></div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded bg-light">
+                            <div class="text-muted small">إجمالي أيام الدوام</div>
+                            <div class="fs-5 fw-bold text-primary"><field name="total_attendance_days" readonly="1"/></div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded bg-light">
+                            <div class="text-muted small">إجمالي ساعات الدوام</div>
+                            <div class="fs-5 fw-bold text-info"><field name="total_attendance_hours" readonly="1"/></div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-2 border rounded" style="background-color: #ECFDF5;">
+                            <div class="text-muted small">إجمالي تكلفة الشركة</div>
+                            <div class="fs-5 fw-bold" style="color: #065F46;">
+                                <field name="total_cost" widget="monetary" options="{'currency_field': 'currency_id'}" readonly="1"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <group>
+                    <group string="Period &amp; Company / الشركة والفترة">
+                        <field name="company_id" options="{'no_create': True}"/>
+                        <field name="payrun_id" options="{'no_create': True}" placeholder="Select Pay Run..."/>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                    <group string="Scope &amp; Filters / الفلاتر">
+                        <field name="department_ids" widget="many2many_tags" domain="[('company_id', '=', company_id)]" options="{'no_create': True}" placeholder="All Departments..."/>
+                        <field name="employee_ids" widget="many2many_tags" domain="[('company_id', '=', company_id)]" options="{'no_create': True}" placeholder="All Employees..."/>
+                        <div colspan="2" class="mt-2">
+                            <button name="action_calculate_preview" type="object" string="🔄 Refresh Preview / تحديث الحسابات" class="btn btn-outline-primary btn-sm"/>
+                        </div>
+                    </group>
+                </group>
+
+                <!-- Live In-Wizard Preview Table -->
+                <notebook>
+                    <page string="Cost Center Breakdown / تفاصيل التكلفة" name="cost_preview">
+                        <field name="line_ids" readonly="1">
+                            <list decoration-warning="not hourly_wage" decoration-muted="attendance_days == 0">
+                                <field name="employee_code"/>
+                                <field name="employee_id"/>
+                                <field name="department_id"/>
+                                <field name="job_id"/>
+                                <field name="hourly_wage" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                                <field name="daily_rate" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                                <field name="attendance_days"/>
+                                <field name="attendance_hours"/>
+                                <field name="monthly_cost" widget="monetary" options="{'currency_field': 'currency_id'}" class="fw-bold"/>
+                                <field name="line_amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                                <field name="payslip_state"/>
+                                <field name="currency_id" column_invisible="1"/>
+                                <field name="notes"/>
+                            </list>
+                        </field>
+                    </page>
+                </notebook>
+
+                <group invisible="not file_data" class="mt-2">
+                    <field name="filename" invisible="1"/>
+                    <field name="file_data" filename="filename" string="Download Excel File"/>
+                </group>
+
+                <footer>
+                    <button name="action_export_xlsx" type="object" string="Export to Excel / تصدير التقرير" class="btn-primary"/>
+                    <button string="Close / إغلاق" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action Window -->
+    <record id="action_employee_cost_center_wizard" model="ir.actions.act_window">
+        <field name="name">Employees Cost Center</field>
+        <field name="res_model">employee.cost.center.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Menu Item under Payroll -> Reporting -->
+    <menuitem id="menu_employee_cost_center"
+              name="Employees Cost Center"
+              action="action_employee_cost_center_wizard"
+              sequence="70"
+              groups="hr_payroll.group_hr_payroll_user"/>
+
+    <!-- Dynamic Menu Parent Resolver -->
+    <function model="employee.cost.center.wizard" name="_attach_reporting_menu"/>
+</odoo>
