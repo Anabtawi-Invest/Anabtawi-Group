@@ -32,7 +32,7 @@ class ConstructionBudgetPo(models.Model):
         required=True,
         tracking=True,
         domain="[('is_construction_vendor', '=', True)]",
-        context="{'default_is_construction_vendor': True, 'default_supplier_rank': 1}",
+        context={'default_is_construction_vendor': True, 'default_supplier_rank': 1},
     )
     po_number = fields.Char(string="PO Reference No.", help="Reference number printed on the uploaded PO document")
     po_date = fields.Date(string="PO Date", default=fields.Date.context_today)
