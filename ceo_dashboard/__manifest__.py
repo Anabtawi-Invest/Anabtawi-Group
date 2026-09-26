@@ -6,7 +6,7 @@
     'summary': 'One-screen executive dashboard: Revenue, Profit, Cash, AR/AP, Sales & CRM Pipeline, '
                'Inventory, HR and Project KPIs with daily/weekly/monthly/yearly & custom date filters.',
     'description': "",
-    'author': 'MOHAMMAD NABIL',
+    'author': 'ANABTAWI',
     'website': '',
     'license': 'LGPL-3',
     'depends': [
