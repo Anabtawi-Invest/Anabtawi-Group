@@ -16,14 +16,13 @@ class RetailLaborCostWizardLine(models.TransientModel):
 
     wizard_id = fields.Many2one('retail.labor.cost.wizard', string='Wizard', ondelete='cascade', required=True)
     department_id = fields.Many2one('hr.department', string='Branch Department', required=True)
-    branch_code = fields.Char(string='Branch Code')
-    branch_name = fields.Char(string='Branch Name')
+    branch_name = fields.Char(string='Branch Name / اسم الفرع')
     company_id = fields.Many2one('res.company', string='Company')
     
-    # 1. Sales & Profits from POS (Store Shift Window from Dashboard)
+    # 1. Sales & Profits from POS (Standard Calendar Period Orders)
     sales_profit = fields.Monetary(string='Sales Profit / Revenue', currency_field='currency_id')
     
-    # 2. Labor Cost (Payslip Attendance Days)
+    # 2. Labor Cost (Actual Attendance Days)
     employee_count = fields.Integer(string='Employees Count')
     attendance_days = fields.Float(string='Total Attendance Days', digits=(16, 2))
     labor_cost = fields.Monetary(string='Total Labor Cost', currency_field='currency_id')
@@ -36,7 +35,6 @@ class RetailLaborCostWizardLine(models.TransientModel):
     # Metrics
     net_margin = fields.Monetary(string='Net Contribution Margin', currency_field='currency_id')
     labor_pct = fields.Float(string='Labor Cost %', digits=(16, 2))
-    pos_config_names = fields.Char(string='Linked POS Configurations')
     currency_id = fields.Many2one('res.currency', string='Currency')
     notes = fields.Char(string='Notes')
 
@@ -80,7 +78,6 @@ class RetailLaborCostWizard(models.TransientModel):
         string='Period To', required=True,
         default=lambda self: fields.Date.end_of(fields.Date.context_today(self), 'month')
     )
-    payrun_id = fields.Many2one('hr.payslip.run', string='Pay Run')
 
     retail_department_id = fields.Many2one(
         'hr.department', string='Retail Main Department',
@@ -123,15 +120,7 @@ class RetailLaborCostWizard(models.TransientModel):
         else:
             self.branch_department_ids = False
 
-    @api.onchange('payrun_id')
-    def _onchange_payrun(self):
-        if self.payrun_id:
-            if self.payrun_id.date_start:
-                self.date_from = self.payrun_id.date_start
-            if self.payrun_id.date_end:
-                self.date_to = self.payrun_id.date_end
-
-    @api.onchange('company_id', 'date_from', 'date_to', 'payrun_id', 'retail_department_id', 'branch_department_ids')
+    @api.onchange('company_id', 'date_from', 'date_to', 'retail_department_id', 'branch_department_ids')
     def _onchange_filters(self):
         self._populate_preview_lines()
 
@@ -160,14 +149,12 @@ class RetailLaborCostWizard(models.TransientModel):
         dept_name = (department.name or '').strip().lower()
         dept_code = (getattr(department, 'code', False) or '').strip().lower()
 
-        # Clean noise words
         clean_dept = dept_name.replace('فرع', '').replace('branch', '').replace('retail', '').replace('ريتيل', '').replace('-', '').strip()
 
         for cfg in all_configs:
             cfg_name = (cfg.name or '').strip().lower()
             clean_cfg = cfg_name.replace('فرع', '').replace('branch', '').replace('retail', '').replace('ريتيل', '').replace('-', '').strip()
 
-            # Exact or clean substring match
             if cfg_name == dept_name or (clean_dept and clean_dept == clean_cfg):
                 matched_configs |= cfg
             elif clean_dept and (clean_dept in clean_cfg or clean_cfg in clean_dept):
@@ -179,115 +166,82 @@ class RetailLaborCostWizard(models.TransientModel):
 
     def _get_branch_sales_profit(self, configs, str_start, str_end):
         """
-        Calculate total branch sales revenue matching the Dashboard Shift Window logic
-        (06:00 AM on start date to 05:00 AM on following day of end date).
-        Uses reconciled pos.payment and pos.order as per anabtawi_pos_reporting_dashboard.
+        Calculate total branch sales revenue reading directly from Point of Sale Orders (pos.order)
+        based on the exact calendar date range (date_from 00:00:00 to date_to 23:59:59).
+        Matches Point of Sale -> Orders screen totals.
         """
         if not configs:
             return 0.0
 
-        # Method A: via pos.payment
-        payments = self.env['pos.payment'].sudo().search([
-            ('pos_order_id.state', 'in', ('paid', 'done', 'invoiced')),
-            ('session_id.config_id', 'in', configs.ids),
-            '|',
-            '&', ('payment_date', '>=', str_start), ('payment_date', '<=', str_end),
-            '&', ('payment_date', '=', False),
-                 '&', ('pos_order_id.date_order', '>=', str_start), ('pos_order_id.date_order', '<=', str_end),
-        ])
-        total_payment_sales = sum(payments.mapped('amount'))
-
-        # Method B: via pos.order direct check
         orders = self.env['pos.order'].sudo().search([
             ('config_id', 'in', configs.ids),
             ('state', 'in', ('paid', 'done', 'invoiced', 'posted')),
             ('date_order', '>=', str_start),
             ('date_order', '<=', str_end),
         ])
-        total_order_sales = sum(orders.mapped('amount_total'))
+        order_sales = sum(orders.mapped('amount_total'))
+        if order_sales:
+            return round(order_sales, 3)
 
-        return max(total_payment_sales, total_order_sales)
+        # Fallback to pos.payment if needed
+        payments = self.env['pos.payment'].sudo().search([
+            ('session_id.config_id', 'in', configs.ids),
+            ('pos_order_id.state', 'in', ('paid', 'done', 'invoiced')),
+            ('payment_date', '>=', str_start),
+            ('payment_date', '<=', str_end),
+        ])
+        return round(sum(payments.mapped('amount')), 3)
 
-    def _get_employee_hourly_wage(self, emp, slip=None):
-        """Technical field hourly_wage from hr.employee with robust fallbacks."""
+    def _get_employee_hourly_wage(self, emp):
+        """Technical field hourly_wage from hr.employee with contract/wage fallbacks."""
         wage = getattr(emp, 'hourly_wage', 0.0)
         if wage:
             return float(wage)
-        if slip and hasattr(slip, 'version_id') and slip.version_id:
-            v_wage = getattr(slip.version_id, 'hourly_wage', 0.0)
-            if v_wage:
-                return float(v_wage)
-        if slip and slip.contract_id:
-            c_wage = getattr(slip.contract_id, 'hourly_wage', 0.0)
-            if c_wage:
-                return float(c_wage)
         if getattr(emp, 'contract_id', False):
             c_wage = getattr(emp.contract_id, 'hourly_wage', 0.0)
             if c_wage:
                 return float(c_wage)
-        monthly_wage = (
-            getattr(slip, 'wage', 0.0) if slip else 0.0
-        ) or getattr(emp, 'wage', 0.0) or (
-            getattr(slip.contract_id, 'wage', 0.0) if (slip and slip.contract_id) else 0.0
+        monthly_wage = getattr(emp, 'wage', 0.0) or (
+            getattr(emp.contract_id, 'wage', 0.0) if getattr(emp, 'contract_id', False) else 0.0
         )
         if monthly_wage:
             return round(float(monthly_wage) / 240.0, 3)
         return 0.0
 
-    def _get_branch_labor_cost(self, employees, date_from, date_to, payrun_id=None):
+    def _get_branch_labor_cost(self, employees, date_from, date_to):
         """
-        Calculate total labor cost for all employees in a branch:
-        Cost = Attendance Days on Payslip * (hourly_wage * 8.0 hrs/day).
+        Calculate total Attendance Days and Labor Cost for all employees in a branch:
+        Reads directly from hr.attendance actual physical check-ins during the period.
+        - Attendance Days = count of distinct days each employee actually attended work.
+        - Daily Rate = hourly_wage * 8.0 hrs/day (or resource calendar hours).
+        - Labor Cost = sum of (emp_att_days * daily_rate) for each employee.
         """
         if not employees:
             return 0.0, 0.0
 
-        payslip_domain = [
-            ('employee_id', 'in', employees.ids),
-            ('company_id', '=', self.company_id.id),
-            ('state', '!=', 'cancel'),
-        ]
-        if payrun_id:
-            payslip_domain.append(('payslip_run_id', '=', payrun_id.id))
-        else:
-            payslip_domain.extend([('date_from', '>=', date_from), ('date_to', '<=', date_to)])
-
-        slips = self.env['hr.payslip'].search(payslip_domain)
-        slips_by_emp = {slip.employee_id.id: slip for slip in slips}
+        dt_start = datetime.combine(date_from, time.min)
+        dt_end = datetime.combine(date_to, time.max)
 
         total_cost = 0.0
         total_att_days = 0.0
 
-        absence_codes = {'ABS', 'ABSENT', 'LEAVEUNPAID', 'UN_PAID', 'un_paid', 'SICKLEAVE0', 'LAT', 'OUT', 'UNP', 'OUTCON', 'OUT_OF_CONTRACT'}
-        extra_codes = {'EXTRA', 'EXTRA_HOURS', 'OVERTIME', 'OVER_TIME', 'EXTRA100'}
-
         for emp in employees:
-            slip = slips_by_emp.get(emp.id)
-            hourly_wage = self._get_employee_hourly_wage(emp, slip)
+            emp_atts = self.env['hr.attendance'].sudo().search([
+                ('employee_id', '=', emp.id),
+                ('check_in', '>=', dt_start),
+                ('check_in', '<=', dt_end),
+            ])
+            if emp_atts:
+                # Count distinct check-in dates
+                att_days = float(len(set(att.check_in.date() for att in emp_atts if att.check_in)))
+            else:
+                att_days = 0.0
+
+            hourly_wage = self._get_employee_hourly_wage(emp)
             hours_per_day = 8.0
             if emp.resource_calendar_id and emp.resource_calendar_id.hours_per_day:
                 hours_per_day = emp.resource_calendar_id.hours_per_day
             daily_rate = round(hourly_wage * hours_per_day, 3)
-
-            att_days = 0.0
-            if slip and slip.worked_days_line_ids:
-                att_lines = slip.worked_days_line_ids.filtered(lambda wd: (
-                    (wd.code and wd.code.strip().upper() in ('WORK100', 'ATTENDANCE', 'ATT', 'WORK'))
-                    or (wd.work_entry_type_id and 'attendance' in (wd.work_entry_type_id.name or '').lower())
-                    or ('attendance' in (wd.name or '').lower())
-                    or ('حضور' in (wd.name or '').lower())
-                ))
-                if not att_lines:
-                    att_lines = slip.worked_days_line_ids.filtered(lambda wd: (
-                        (wd.code or '').strip().upper() not in absence_codes and
-                        (wd.code or '').strip().upper() not in extra_codes and
-                        'extra' not in (wd.name or '').lower() and
-                        'overtime' not in (wd.name or '').lower() and
-                        'out of contract' not in (wd.name or '').lower() and
-                        'خارج العقد' not in (wd.name or '').lower() and
-                        wd.number_of_days > 0
-                    ))
-                att_days = sum(att_lines.mapped('number_of_days'))
 
             emp_cost = round(att_days * daily_rate, 3)
             total_cost += emp_cost
@@ -316,23 +270,28 @@ class RetailLaborCostWizard(models.TransientModel):
         ])
 
         if attendances:
-            # 1. Total Daily Extra Hours worked (matching column "Daily Extra Hours")
-            daily_extra = sum(getattr(att, 'daily_overtime_hours', 0.0) or 0.0 for att in attendances)
-            
-            # 2. Approved / Qualified Extra Hours (matching column "Extra Hours")
-            approved_ot = sum(getattr(att, 'overtime_hours', 0.0) or getattr(att, 'validated_overtime_hours', 0.0) or 0.0 for att in attendances)
-            
-            # If daily_overtime_hours exists, unapproved is difference
-            if daily_extra >= approved_ot and daily_extra > 0:
-                unapproved_ot = daily_extra - approved_ot
-            else:
-                unapproved_ot = sum(
-                    att.overtime_hours for att in attendances if getattr(att, 'overtime_status', '') != 'approved'
-                )
-                if daily_extra == 0:
-                    daily_extra = approved_ot + unapproved_ot
+            has_daily = hasattr(attendances[0], 'daily_overtime_hours')
+            has_ot = hasattr(attendances[0], 'overtime_hours')
 
-            return round(approved_ot, 2), round(unapproved_ot, 2)
+            daily_extra = sum((getattr(att, 'daily_overtime_hours', 0.0) or 0.0) for att in attendances) if has_daily else 0.0
+            ot_hours = sum((getattr(att, 'overtime_hours', 0.0) or 0.0) for att in attendances) if has_ot else 0.0
+
+            if daily_extra > 0 and ot_hours > 0:
+                if daily_extra >= ot_hours:
+                    approved_ot = ot_hours
+                    unapproved_ot = daily_extra - ot_hours
+                else:
+                    approved_ot = daily_extra
+                    unapproved_ot = ot_hours - daily_extra
+                return round(approved_ot, 2), round(unapproved_ot, 2)
+            elif daily_extra > 0:
+                return round(daily_extra, 2), 0.0
+            elif ot_hours > 0:
+                approved = sum(att.overtime_hours for att in attendances if getattr(att, 'overtime_status', '') == 'approved')
+                unapproved = sum(att.overtime_hours for att in attendances if getattr(att, 'overtime_status', '') != 'approved')
+                if approved == 0 and unapproved == 0:
+                    approved = ot_hours
+                return round(approved, 2), round(unapproved, 2)
 
         # Fallback to hr.attendance.overtime.line
         if 'hr.attendance.overtime.line' in self.env:
@@ -371,20 +330,18 @@ class RetailLaborCostWizard(models.TransientModel):
                 '|', ('name', 'ilike', 'retail'), ('name', 'ilike', 'فرع')
             ])
 
-        # Store shift window 06:00 AM on start date to 05:00 AM on following day (Dashboard standard)
-        dt_start = datetime.combine(self.date_from, time(6, 0, 0))
-        dt_end = datetime.combine(self.date_to + timedelta(days=1), time(5, 0, 0))
+        # Standard Calendar Month/Period: 00:00:00 on date_from to 23:59:59 on date_to
+        dt_start = datetime.combine(self.date_from, time.min)
+        dt_end = datetime.combine(self.date_to, time.max)
         str_start = fields.Datetime.to_string(dt_start)
         str_end = fields.Datetime.to_string(dt_end)
 
         rows = []
         for branch in branches:
-            branch_code = getattr(branch, 'code', False) or getattr(branch, 'complete_name', False) or str(branch.id)
             branch_name = branch.name or ''
 
-            # 1. Matching POS Configs & Sales Profit (Dashboard Shift Window)
+            # 1. Matching POS Configs & Sales Profit (Direct Calendar Orders)
             configs = self._get_branch_pos_configs(branch)
-            cfg_names = ', '.join(configs.mapped('name')) if configs else _('Auto/Direct match')
             sales_profit = self._get_branch_sales_profit(configs, str_start, str_end)
 
             # 2. Employees of this branch
@@ -394,9 +351,9 @@ class RetailLaborCostWizard(models.TransientModel):
             ])
             emp_count = len(branch_employees)
 
-            # 3. Labor Cost (Payslip Attendance Days)
+            # 3. Labor Cost & Attendance Days (Actual Attendance Screen Check-ins)
             labor_cost, att_days = self._get_branch_labor_cost(
-                branch_employees, self.date_from, self.date_to, self.payrun_id
+                branch_employees, self.date_from, self.date_to
             )
 
             # 4. Overtime Hours (Approved vs Unapproved)
@@ -419,9 +376,7 @@ class RetailLaborCostWizard(models.TransientModel):
 
             rows.append({
                 'department_id': branch.id,
-                'branch_code': branch_code,
                 'branch_name': branch_name,
-                'company_id': self.company_id.id,
                 'sales_profit': sales_profit,
                 'employee_count': emp_count,
                 'attendance_days': att_days,
@@ -431,22 +386,21 @@ class RetailLaborCostWizard(models.TransientModel):
                 'total_ot_hours': total_ot,
                 'net_margin': net_margin,
                 'labor_pct': labor_pct,
-                'pos_config_names': cfg_names,
-                'notes': ' '.join(notes),
+                'currency_id': self.company_id.currency_id.id,
+                'notes': ' | '.join(notes) if notes else '',
             })
 
         return rows
 
     def _populate_preview_lines(self):
-        """Populate line_ids for immediate interactive preview in wizard form."""
-        lines_data = []
+        """Populate the in-wizard preview table without saving permanently."""
+        self.line_ids.unlink()
         rows = self._prepare_data_rows()
+        line_vals = []
         for r in rows:
-            lines_data.append((0, 0, {
+            line_vals.append((0, 0, {
                 'department_id': r['department_id'],
-                'branch_code': r['branch_code'],
                 'branch_name': r['branch_name'],
-                'company_id': r['company_id'],
                 'sales_profit': r['sales_profit'],
                 'employee_count': r['employee_count'],
                 'attendance_days': r['attendance_days'],
@@ -456,14 +410,13 @@ class RetailLaborCostWizard(models.TransientModel):
                 'total_ot_hours': r['total_ot_hours'],
                 'net_margin': r['net_margin'],
                 'labor_pct': r['labor_pct'],
-                'pos_config_names': r['pos_config_names'],
-                'currency_id': self.company_id.currency_id.id,
+                'currency_id': r['currency_id'],
                 'notes': r['notes'],
             }))
-        self.line_ids = [(5, 0, 0)] + lines_data
+        self.line_ids = line_vals
 
     def action_calculate_preview(self):
-        """Explicit action to calculate/refresh the preview inside the wizard pop-up."""
+        """Action button to refresh live calculations inside the wizard."""
         self.ensure_one()
         self._populate_preview_lines()
         return {
@@ -475,48 +428,54 @@ class RetailLaborCostWizard(models.TransientModel):
         }
 
     def action_export_xlsx(self):
-        """Generate formatted Excel report and trigger download."""
+        """Generate and download the production Excel report."""
         self.ensure_one()
         rows = self._prepare_data_rows()
         if not rows:
-            raise UserError(_('No retail branches found matching the selected criteria.'))
+            raise UserError(_('No retail branches or data found for the selected filters.'))
 
         metadata = {
             'company': self.company_id.name or '',
             'period': f'{self.date_from} — {self.date_to}',
-            'payrun': self.payrun_id.name if self.payrun_id else _('All Pay Runs'),
             'user': self.env.user.name or '',
+            'generated': fields.Datetime.now().strftime('%Y-%m-%d %H:%M'),
             'currency': self.company_id.currency_id.name or 'JOD',
-            'generated': fields.Datetime.context_timestamp(self, fields.Datetime.now()).strftime('%Y-%m-%d %H:%M'),
         }
 
-        content = build_retail_labor_cost_xlsx(rows, metadata)
+        xlsx_bytes = build_retail_labor_cost_xlsx(rows, metadata)
         fname = f"Retail_Labor_Cost_Report_{self.date_from}_{self.date_to}.xlsx"
+
         self.write({
-            'file_data': base64.b64encode(content),
+            'file_data': base64.b64encode(xlsx_bytes),
             'filename': fname,
         })
 
         return {
             'type': 'ir.actions.act_url',
-            'target': 'download',
-            'url': f'/web/content?model={self._name}&id={self.id}&field=file_data&filename_field=filename&download=true'
+            'url': f'/web/content/?model=retail.labor.cost.wizard&id={self.id}&field=file_data&filename={fname}&download=true',
+            'target': 'self',
         }
 
     @api.model
     def _attach_reporting_menu(self):
-        """Resolve standard Payroll Reporting menu across Odoo distributions."""
-        parent = self.env.ref('hr_payroll.menu_hr_payroll_report', raise_if_not_found=False)
-        if not parent:
-            data = self.env['ir.model.data'].search([
-                ('module', '=', 'hr_payroll'),
-                ('model', '=', 'ir.ui.menu'),
-                ('name', 'ilike', 'report')
-            ])
-            candidates = self.env['ir.ui.menu'].browse(data.mapped('res_id')).exists().filtered(lambda menu: not menu.action)
-            if len(candidates) == 1:
-                parent = candidates
-        if parent:
-            menu = self.env.ref('retail_lapor_cost_report.menu_retail_labor_cost_report', raise_if_not_found=False)
-            if menu:
-                menu.write({'parent_id': parent.id})
+        """Ensure menu item attaches under Payroll -> Reporting if available."""
+        try:
+            candidates = [
+                'hr_payroll.menu_hr_payroll_report',
+                'hr_payroll_community.menu_hr_payroll_report',
+                'hr_payroll.payroll_report_menu',
+                'hr_payroll.menu_payroll_report',
+            ]
+            target_parent = None
+            for xml_id in candidates:
+                menu = self.env.ref(xml_id, raise_if_not_found=False)
+                if menu:
+                    target_parent = menu
+                    break
+
+            if target_parent:
+                my_menu = self.env.ref('retail_lapor_cost_report.menu_retail_labor_cost_report', raise_if_not_found=False)
+                if my_menu and my_menu.parent_id != target_parent:
+                    my_menu.write({'parent_id': target_parent.id})
+        except Exception as e:
+            _logger.warning("Could not auto-attach retail labor cost report menu: %s", e)

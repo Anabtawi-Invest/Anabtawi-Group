@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_retail_labor_cost_wizard" model="ir.ui.view">
+    <!-- Form View for Pop-up Wizard -->
+    <record id="view_retail_labor_cost_wizard_form" model="ir.ui.view">
         <field name="name">retail.labor.cost.wizard.form</field>
         <field name="model">retail.labor.cost.wizard</field>
         <field name="arch" type="xml">
@@ -61,7 +62,6 @@
                 <group>
                     <group string="Period &amp; Company / الشركة والفترة">
                         <field name="company_id" options="{'no_create': True}"/>
-                        <field name="payrun_id" options="{'no_create': True}" placeholder="Select Pay Run (optional)..."/>
                         <field name="date_from"/>
                         <field name="date_to"/>
                         <field name="currency_id" invisible="1"/>
@@ -80,7 +80,6 @@
                     <page string="Branches Summary / ملخص الأفرع" name="branches_preview">
                         <field name="line_ids" readonly="1">
                             <list decoration-danger="labor_cost > sales_profit and sales_profit > 0" decoration-warning="sales_profit == 0">
-                                <field name="branch_code"/>
                                 <field name="branch_name" class="fw-bold"/>
                                 <field name="sales_profit" widget="monetary" options="{'currency_field': 'currency_id'}" class="text-primary fw-bold"/>
                                 <field name="employee_count"/>
@@ -91,7 +90,6 @@
                                 <field name="total_ot_hours" class="fw-bold"/>
                                 <field name="net_margin" widget="monetary" options="{'currency_field': 'currency_id'}"/>
                                 <field name="labor_pct" string="Labor %"/>
-                                <field name="pos_config_names" optional="hide"/>
                                 <field name="currency_id" column_invisible="1"/>
                                 <field name="notes" optional="show"/>
                             </list>
