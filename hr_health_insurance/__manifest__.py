@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Health Insurance',
-    'version': '1.4',
+    'version': '1.5',
     'category': 'Human Resources',
     'summary': 'Employee health insurance management.',
     'description': """
@@ -16,10 +16,19 @@
           _ Employee Contribution percentage (to deduct from policy amount on payroll)
           _ Manual Contribution ( to manage cases with manual fixed amounts that override the current contract amounts on the set insurance contract)
       * Payroll Integration –  A salary rule is added on salary structure creation to automatically deduct the applicable monthly amount when generating employee payslips.
+      * Employee Documents tab uploads are copied into the Documents app under the existing employee folder (documents_hr).
       """,
     'author': 'Smart Way Business Solutions',
     'website': 'https://www.smartway.co',
-    'depends': ['base', 'hr_payroll_account', 'hr', 'hr_holidays', 'mail', 'base_payroll_account'],
+    'depends': [
+        'base',
+        'hr_payroll_account',
+        'hr',
+        'hr_holidays',
+        'mail',
+        'base_payroll_account',
+        'documents_hr',
+    ],
     'license': "Other proprietary",
     'data': [
         "security/ir.model.access.csv",
