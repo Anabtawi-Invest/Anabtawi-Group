@@ -1,0 +1,1012 @@
+/* ==========================================================================
+   Executive CEO Dashboard - Premium Design System (apps.odoo.com Ready)
+   ========================================================================== */
+
+.cd_dashboard_container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 100%;
+    background-color: #f8fafc;
+    color: #1e293b;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+
+    * {
+        box-sizing: border-box;
+    }
+
+    /* -------------------------------------------------------------------------
+       1. Top Navbar
+       ------------------------------------------------------------------------- */
+    .cd_navbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #ffffff;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0 20px;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        flex-shrink: 0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+
+        .cd_nav_tabs {
+            display: flex;
+            align-items: center;
+            overflow-x: auto;
+            gap: 4px;
+
+            &::-webkit-scrollbar {
+                display: none;
+            }
+
+            .cd_tab_btn {
+                background: transparent;
+                border: none;
+                border-bottom: 3px solid transparent;
+                padding: 14px 16px;
+                font-size: 13.5px;
+                font-weight: 500;
+                color: #64748b;
+                cursor: pointer;
+                white-space: nowrap;
+                transition: all 0.15s ease;
+
+                &:hover {
+                    color: #0d9488;
+                }
+
+                &.cd_active {
+                    color: #0f766e;
+                    font-weight: 600;
+                    border-bottom-color: #0d9488;
+                }
+            }
+        }
+
+        .cd_nav_actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: 16px;
+
+            .cd_btn_sync {
+                display: inline-flex;
+                align-items: center;
+                background: #ffffff;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 12.5px;
+                font-weight: 500;
+                color: #475569;
+                cursor: pointer;
+                transition: all 0.15s ease;
+
+                &:hover {
+                    background: #f1f5f9;
+                    border-color: #94a3b8;
+                }
+            }
+
+            .cd_btn_export {
+                display: inline-flex;
+                align-items: center;
+                background: #0d9488;
+                border: 1px solid #0d9488;
+                border-radius: 6px;
+                padding: 6px 14px;
+                font-size: 12.5px;
+                font-weight: 600;
+                color: #ffffff;
+                cursor: pointer;
+                transition: all 0.15s ease;
+
+                &:hover {
+                    background: #0f766e;
+                    border-color: #0f766e;
+                }
+            }
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+       2. Filter Ribbon Bar
+       ------------------------------------------------------------------------- */
+    .cd_filter_bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        background: #ffffff;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 8px 20px;
+        gap: 12px;
+        font-size: 12.5px;
+
+        .cd_preset_pills {
+            display: flex;
+            align-items: center;
+            background: #f1f5f9;
+            padding: 3px;
+            border-radius: 7px;
+            gap: 2px;
+
+            .cd_pill {
+                background: transparent;
+                border: none;
+                padding: 5px 11px;
+                border-radius: 5px;
+                font-size: 12px;
+                font-weight: 500;
+                color: #475569;
+                cursor: pointer;
+                transition: all 0.15s ease;
+
+                &:hover {
+                    color: #0f172a;
+                }
+
+                &.cd_pill_active {
+                    background: #ffffff;
+                    color: #0f766e;
+                    font-weight: 600;
+                    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                }
+            }
+        }
+
+        .cd_range_picker {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+
+            .cd_range_label {
+                color: #64748b;
+                font-weight: 500;
+            }
+
+            .cd_date_input {
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 4px 8px;
+                font-size: 12px;
+                color: #1e293b;
+                background: #ffffff;
+
+                &:focus {
+                    outline: none;
+                    border-color: #0d9488;
+                }
+            }
+
+            .cd_range_to {
+                color: #94a3b8;
+                font-size: 11.5px;
+            }
+
+            .cd_btn_apply {
+                background: #f8fafc;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 4px 8px;
+                color: #475569;
+                cursor: pointer;
+
+                &:hover {
+                    background: #f1f5f9;
+                }
+            }
+        }
+
+        .cd_filter_extra {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+
+            .cd_checkbox_label {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 500;
+                color: #475569;
+
+                input[type="checkbox"] {
+                    accent-color: #0d9488;
+                    width: 14px;
+                    height: 14px;
+                }
+            }
+
+            .cd_currency_selector {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 12px;
+
+                .cd_curr_label {
+                    color: #64748b;
+                }
+
+                .cd_curr_val {
+                    font-weight: 600;
+                    color: #0f172a;
+                    background: #f1f5f9;
+                    padding: 3px 8px;
+                    border-radius: 4px;
+                }
+            }
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+       3. Main Content Body & Grid Systems
+       ------------------------------------------------------------------------- */
+    .cd_content_body {
+        padding: 20px;
+        flex: 1;
+
+        .cd_kpi_row {
+            display: grid;
+            gap: 16px;
+
+            &.cd_grid_5 {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+            &.cd_grid_4 {
+                grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            }
+            &.cd_grid_3 {
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            }
+            &.cd_grid_2 {
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            }
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+       4. Card & Panel Components
+       ------------------------------------------------------------------------- */
+    .cd_stat_card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 16px 18px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+        &:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
+
+        &.cd_card_danger_tint {
+            background: #fff8f8;
+            border-color: #fecdd3;
+        }
+
+        .cd_card_header_sub {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+        }
+
+        .cd_card_big_val {
+            font-size: 24px;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 6px 0;
+            line-height: 1.2;
+        }
+
+        .cd_card_sub_line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+    }
+
+    .cd_box_panel {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 18px 20px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+
+        .cd_panel_header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+
+            .cd_panel_title {
+                font-size: 14.5px;
+                font-weight: 700;
+                color: #0f172a;
+            }
+
+            .cd_panel_meta {
+                font-size: 12px;
+                color: #64748b;
+                font-weight: 500;
+            }
+        }
+
+        .cd_panel_footer_link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+       5. Badges & Micro-tags
+       ------------------------------------------------------------------------- */
+    .cd_badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 7px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+
+        &.cd_badge_success {
+            background: #ecfdf5;
+            color: #059669;
+        }
+
+        &.cd_badge_teal {
+            background: #f0fdfa;
+            color: #0f766e;
+        }
+
+        &.cd_badge_danger {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
+        &.cd_badge_warn {
+            background: #fffbeb;
+            color: #d97706;
+        }
+
+        &.cd_badge_info {
+            background: #eff6ff;
+            color: #2563eb;
+        }
+
+        &.cd_badge_grey {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        &.cd_badge_pill_outline {
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #334155;
+            border-radius: 12px;
+            padding: 2px 9px;
+            font-weight: 500;
+        }
+    }
+
+    .cd_counter_pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #ef4444;
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 10px;
+    }
+
+    .cd_delay_badge {
+        display: inline-flex;
+        align-items: center;
+        background: #fee2e2;
+        color: #b91c1c;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+
+    .cd_stock_badge {
+        display: inline-flex;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 11.5px;
+        font-weight: 600;
+
+        &.cd_badge_low {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+    }
+
+    .cd_action_link {
+        font-size: 12px;
+        font-weight: 600;
+        color: #0d9488;
+        text-decoration: none;
+
+        &:hover {
+            color: #0f766e;
+            text-decoration: underline;
+        }
+    }
+
+    .cd_code_link {
+        font-family: monospace;
+        font-weight: 600;
+        color: #2563eb;
+        text-decoration: none;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    .cd_sku_tag {
+        background: #f1f5f9;
+        color: #334155;
+        font-family: monospace;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 11.5px;
+    }
+
+    /* -------------------------------------------------------------------------
+       6. Gauge Component & Progress Bars
+       ------------------------------------------------------------------------- */
+    .cd_gauge_box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 0 0;
+
+        .cd_gauge_svg {
+            width: 100%;
+            max-width: 200px;
+            height: auto;
+
+            .cd_gauge_pct {
+                font-size: 23px;
+                font-weight: 800;
+                fill: #0f172a;
+            }
+
+            .cd_gauge_sub {
+                font-size: 8px;
+                font-weight: 700;
+                letter-spacing: 0.8px;
+                fill: #64748b;
+            }
+        }
+    }
+
+    .cd_target_stats {
+        display: flex;
+        justify-content: space-around;
+        text-align: center;
+        margin-top: 6px;
+        padding-top: 10px;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .cd_progress_track {
+        background: #e2e8f0;
+        height: 6px;
+        border-radius: 4px;
+        overflow: hidden;
+
+        .cd_progress_fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+
+            &.cd_fill_teal {
+                background: #0d9488;
+            }
+
+            &.cd_fill_purple {
+                background: #8b5cf6;
+            }
+
+            &.cd_fill_green {
+                background: #10b981;
+            }
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+       7. Split Stat Sub-boxes
+       ------------------------------------------------------------------------- */
+    .cd_split_boxes {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+
+        .cd_sub_stat_box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+    }
+
+    .cd_overdue_callout {
+        background: #fff8f8;
+        border: 1px solid #fecdd3;
+        border-radius: 8px;
+        padding: 12px 14px;
+    }
+
+    .cd_bank_list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        .cd_bank_item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: #f8fafc;
+            border-radius: 6px;
+            font-size: 13px;
+
+            .cd_bank_name {
+                font-weight: 500;
+                color: #334155;
+            }
+
+            .cd_bank_amt {
+                font-weight: 700;
+                color: #0f172a;
+            }
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+       8. Lists & Signoff Cards
+       ------------------------------------------------------------------------- */
+    .cd_debt_list,
+    .cd_signoff_list,
+    .cd_pulse_list,
+    .cd_opps_list,
+    .cd_late_list,
+    .cd_leave_list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .cd_debt_item,
+    .cd_pulse_item,
+    .cd_late_item,
+    .cd_project_item,
+    .cd_ticket_item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 0;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 13px;
+
+        &:last-child {
+            border-bottom: none;
+        }
+
+        &.cd_item_alert {
+            color: #dc2626;
+            font-weight: 600;
+        }
+    }
+
+    .cd_signoff_card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #ffffff;
+
+        &.cd_signoff_warn {
+            background: #fffdf5;
+            border-color: #fde68a;
+        }
+
+        .cd_signoff_title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+    }
+
+    .cd_leave_item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #ffffff;
+
+        .cd_avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #475569;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .cd_leave_btns {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+
+            .cd_btn_approve {
+                background: #10b981;
+                border: none;
+                color: #ffffff;
+                font-size: 11.5px;
+                font-weight: 600;
+                padding: 5px 11px;
+                border-radius: 5px;
+                cursor: pointer;
+
+                &:hover {
+                    background: #059669;
+                }
+            }
+
+            .cd_btn_refuse {
+                background: #ffffff;
+                border: 1px solid #fecdd3;
+                color: #ef4444;
+                font-size: 11.5px;
+                font-weight: 600;
+                padding: 5px 11px;
+                border-radius: 5px;
+                cursor: pointer;
+
+                &:hover {
+                    background: #fee2e2;
+                }
+            }
+        }
+    }
+
+    .cd_so_cards_row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+
+        .cd_so_mini_card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+
+            &.cd_so_card_active {
+                background: #f0fdfa;
+                border-color: #99f6e4;
+            }
+
+            .cd_so_val {
+                font-size: 24px;
+                font-weight: 700;
+                color: #0f172a;
+                margin: 4px 0;
+            }
+        }
+    }
+
+    .cd_pipeline_metrics_row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        text-align: left;
+    }
+
+    .cd_cust_rev_item {
+        padding: 9px 0;
+        border-bottom: 1px solid #f1f5f9;
+
+        &:last-child {
+            border-bottom: none;
+        }
+    }
+
+    .cd_opp_item {
+        padding: 11px 12px;
+        border: 1px solid #f1f5f9;
+        border-radius: 6px;
+        background: #f8fafc;
+
+        .cd_opp_title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .cd_opp_amt {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+    }
+
+    .cd_jobs_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 14px;
+
+        .cd_job_card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 14px 16px;
+
+            .cd_job_title {
+                font-size: 13px;
+                font-weight: 700;
+                color: #0f172a;
+            }
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+       9. Buttons & Action Trigger Controls
+       ------------------------------------------------------------------------- */
+    .cd_btn_remind_all {
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+
+        &:hover {
+            background: #fecdd3;
+        }
+    }
+
+    .cd_btn_dunning {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        color: #334155;
+        font-size: 11.5px;
+        font-weight: 500;
+        padding: 4px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+
+        &:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+    }
+
+    .cd_btn_rfq_all {
+        background: #0d9488;
+        border: none;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+
+        &:hover {
+            background: #0f766e;
+        }
+    }
+
+    .cd_btn_create_rfq {
+        background: #ffffff;
+        border: 1px solid #0d9488;
+        color: #0d9488;
+        font-size: 11.5px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+
+        &:hover {
+            background: #0d9488;
+            color: #ffffff;
+        }
+    }
+
+    .cd_btn_pill_outline,
+    .cd_btn_outline_amber,
+    .cd_btn_outline_grey,
+    .cd_btn_outline_purple {
+        background: #ffffff;
+        font-size: 11.5px;
+        font-weight: 600;
+        padding: 4px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .cd_btn_pill_outline {
+        border: 1px solid #cbd5e1;
+        color: #334155;
+        &:hover { background: #f1f5f9; }
+    }
+
+    .cd_btn_outline_amber {
+        border: 1px solid #fde68a;
+        color: #d97706;
+        &:hover { background: #fef3c7; }
+    }
+
+    .cd_btn_outline_grey {
+        border: 1px solid #cbd5e1;
+        color: #475569;
+        &:hover { background: #f1f5f9; }
+    }
+
+    .cd_btn_outline_purple {
+        border: 1px solid #ddd6fe;
+        color: #7c3aed;
+        &:hover { background: #ede9fe; }
+    }
+
+    /* -------------------------------------------------------------------------
+       10. Modern Data Tables
+       ------------------------------------------------------------------------- */
+    .cd_table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12.5px;
+
+        thead {
+            tr {
+                border-bottom: 2px solid #e2e8f0;
+                th {
+                    padding: 9px 12px;
+                    font-size: 11px;
+                    font-weight: 700;
+                    letter-spacing: 0.5px;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    text-align: left;
+                }
+            }
+        }
+
+        tbody {
+            tr {
+                border-bottom: 1px solid #f1f5f9;
+                transition: background 0.15s ease;
+
+                &:hover {
+                    background: #f8fafc;
+                }
+
+                td {
+                    padding: 11px 12px;
+                    vertical-align: middle;
+                }
+            }
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+       11. App Store Showcase Tab
+       ------------------------------------------------------------------------- */
+    .cd_appstore_info_grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+
+        .cd_info_box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+
+            .cd_info_icon {
+                font-size: 24px;
+                margin-bottom: 12px;
+            }
+
+            h5 {
+                font-size: 15px;
+                font-weight: 700;
+                margin-bottom: 8px;
+                color: #0f172a;
+            }
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+       12. Typography & Utility Helpers
+       ------------------------------------------------------------------------- */
+    .cd_tiny_lbl {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        color: #64748b;
+        text-transform: uppercase;
+        display: block;
+    }
+
+    .cd_tiny {
+        font-size: 11px;
+    }
+
+    .cd_small {
+        font-size: 12px;
+    }
+
+    .cd_fw_600 {
+        font-weight: 600;
+    }
+
+    .cd_bold_txt {
+        font-weight: 700;
+        font-size: 14px;
+        color: #0f172a;
+    }
+
+    .cd_med_val {
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+    .cd_big_val {
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .text-purple {
+        color: #8b5cf6 !important;
+    }
+
+    .text-teal {
+        color: #0d9488 !important;
+    }
+
+    .cd_loading_indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #0d9488;
+    }
+}

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.ceo.dashboard</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Executive Dashboard" string="Executive Dashboard" name="ceo_dashboard">
+                    <block title="Dashboard Targets &amp; Settings">
+                        <setting string="Monthly Revenue Target" help="Used for the Revenue vs Target gauge">
+                            <field name="ceo_dashboard_monthly_revenue_target"/>
+                        </setting>
+                        <setting string="Billable Hours Target" help="Monthly billable hours target">
+                            <field name="ceo_dashboard_billable_hours_target"/>
+                        </setting>
+                        <setting string="Expected Check-in Time" help="Clock-ins after this hour count as late (e.g. 9.5 = 9:30 AM)">
+                            <field name="ceo_dashboard_late_checkin_time"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

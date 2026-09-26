@@ -1,0 +1,1107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="ceo_dashboard.Dashboard">
+    <div class="cd_dashboard_container">
+
+        <!-- ==================================================================== -->
+        <!-- TOP NAVIGATION BAR                                                   -->
+        <!-- ==================================================================== -->
+        <header class="cd_navbar">
+            <div class="cd_nav_tabs">
+                <button class="cd_tab_btn" t-att-class="{ 'cd_active': state.activeTab === 'summary' }"
+                        t-on-click="() => this.switchTab('summary')">
+                    <i class="fa fa-th-large me-1"/> Executive Summary
+                </button>
+                <button class="cd_tab_btn" t-att-class="{ 'cd_active': state.activeTab === 'finance' }"
+                        t-on-click="() => this.switchTab('finance')">
+                    <i class="fa fa-money me-1"/> Finance &amp; Accounting
+                </button>
+                <button class="cd_tab_btn" t-att-class="{ 'cd_active': state.activeTab === 'sales' }"
+                        t-on-click="() => this.switchTab('sales')">
+                    <i class="fa fa-line-chart me-1"/> Sales &amp; CRM
+                </button>
+                <button class="cd_tab_btn" t-att-class="{ 'cd_active': state.activeTab === 'inventory' }"
+                        t-on-click="() => this.switchTab('inventory')">
+                    <i class="fa fa-cubes me-1"/> Inventory &amp; Operations
+                </button>
+                <button class="cd_tab_btn" t-att-class="{ 'cd_active': state.activeTab === 'hr' }"
+                        t-on-click="() => this.switchTab('hr')">
+                    <i class="fa fa-users me-1"/> HR &amp; Attendance
+                </button>
+                <button class="cd_tab_btn" t-att-class="{ 'cd_active': state.activeTab === 'project' }"
+                        t-on-click="() => this.switchTab('project')">
+                    <i class="fa fa-tasks me-1"/> Project &amp; Helpdesk
+                </button>
+            </div>
+
+            <div class="cd_nav_actions">
+                <button class="cd_btn_sync" t-on-click="syncData" title="Refresh live data">
+                    <i class="fa fa-refresh me-1" t-att-class="{ 'fa-spin': state.syncing }"/> Refresh
+                </button>
+                <button class="cd_btn_export" t-on-click="exportReport" title="Print / PDF Export">
+                    <i class="fa fa-download me-1"/> Export Report
+                </button>
+            </div>
+        </header>
+
+        <!-- ==================================================================== -->
+        <!-- FILTER SUBHEADER RIBBON                                              -->
+        <!-- ==================================================================== -->
+        <section class="cd_filter_bar">
+            <div class="cd_preset_pills">
+                <button class="cd_pill" t-att-class="{ 'cd_pill_active': state.preset === 'today' }"
+                        t-on-click="() => this.setPreset('today')">Today</button>
+                <button class="cd_pill" t-att-class="{ 'cd_pill_active': state.preset === 'week' }"
+                        t-on-click="() => this.setPreset('week')">This Week</button>
+                <button class="cd_pill" t-att-class="{ 'cd_pill_active': state.preset === 'month' }"
+                        t-on-click="() => this.setPreset('month')">This Month</button>
+                <button class="cd_pill" t-att-class="{ 'cd_pill_active': state.preset === 'quarter' }"
+                        t-on-click="() => this.setPreset('quarter')">This Quarter</button>
+                <button class="cd_pill" t-att-class="{ 'cd_pill_active': state.preset === 'year' }"
+                        t-on-click="() => this.setPreset('year')">This Year</button>
+                <button class="cd_pill" t-att-class="{ 'cd_pill_active': state.preset === 'custom' }">Custom</button>
+            </div>
+
+            <div class="cd_range_picker">
+                <span class="cd_range_label">Range:</span>
+                <input type="date" class="cd_date_input" t-att-value="state.dateFrom"
+                       t-on-change="(ev) => this.onDateChange('dateFrom', ev)"/>
+                <span class="cd_range_to">to</span>
+                <input type="date" class="cd_date_input" t-att-value="state.dateTo"
+                       t-on-change="(ev) => this.onDateChange('dateTo', ev)"/>
+                <button class="cd_btn_apply" t-on-click="applyCustomRange" title="Apply filter">
+                    <i class="fa fa-calendar"/>
+                </button>
+            </div>
+
+            <div class="cd_filter_extra">
+                <label class="cd_checkbox_label">
+                    <input type="checkbox" t-att-checked="state.yoyComparison" t-on-change="toggleYoY"/>
+                    <span>YoY Comparison</span>
+                </label>
+                <div class="cd_currency_selector">
+                    <span class="cd_curr_label">Currency:</span>
+                    <span class="cd_curr_val" t-esc="state.currency"/>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading Overlay -->
+        <div class="cd_loading_indicator" t-if="state.loading and !state.data">
+            <i class="fa fa-circle-o-notch fa-spin me-2"/> Loading Executive Metrics…
+        </div>
+
+        <main class="cd_content_body" t-if="state.data">
+
+            <!-- ============================================================== -->
+            <!-- TAB 1: EXECUTIVE SUMMARY                                       -->
+            <!-- ============================================================== -->
+            <div class="cd_tab_view" t-if="state.activeTab === 'summary'">
+                <!-- Top 5 Stat Cards -->
+                <div class="cd_kpi_row cd_grid_5">
+                    <div class="cd_stat_card">
+                        <div class="cd_card_header_sub">TOTAL REVENUE</div>
+                        <div class="cd_card_big_val" t-esc="fmtMoney(state.data.summary.total_revenue)"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted">This Month</span>
+                            <span class="cd_badge cd_badge_success" t-if="state.yoyComparison" t-esc="'+' + state.data.summary.rev_yoy_pct + '% YoY'"/>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card">
+                        <div class="cd_card_header_sub">NET PROFIT</div>
+                        <div class="cd_card_big_val" t-esc="fmtMoney(state.data.summary.net_profit)"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted" t-esc="'Gross: ' + fmtPct(state.data.summary.gross_margin)"/>
+                            <span class="cd_badge cd_badge_teal" t-esc="fmtPct(state.data.summary.net_margin) + ' Net'"/>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card">
+                        <div class="cd_card_header_sub">
+                            <span>LIVE CASH</span>
+                            <i class="fa fa-money text-success ms-auto"/>
+                        </div>
+                        <div class="cd_card_big_val text-success" t-esc="fmtMoney(state.data.summary.live_cash)"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted">Checking + Treasury</span>
+                            <span class="cd_badge cd_badge_success">Reconciled</span>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card cd_card_danger_tint">
+                        <div class="cd_card_header_sub text-danger">
+                            <i class="fa fa-exclamation-triangle me-1"/> OVERDUE INVOICES
+                            <span class="cd_counter_pill ms-auto" t-esc="state.data.summary.overdue_count"/>
+                        </div>
+                        <div class="cd_card_big_val text-danger" t-esc="fmtMoney(state.data.summary.overdue_amount)"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted" t-esc="'DSO: ' + state.data.summary.dso + 'd'"/>
+                            <a href="#" class="cd_action_link text-danger" t-on-click.prevent="openOverdueInvoices">Resolve →</a>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card">
+                        <div class="cd_card_header_sub">
+                            <span>ORDERS MTD</span>
+                            <i class="fa fa-check-circle text-primary ms-auto"/>
+                        </div>
+                        <div class="cd_card_big_val" t-esc="fmtNum(state.data.summary.orders_mtd_count) + ' SOs'"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted" t-esc="'Today: +' + state.data.summary.orders_today_count"/>
+                            <span class="cd_badge cd_badge_info" t-esc="state.data.summary.win_rate + '% win'"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Middle Row: 3 Widget Cards -->
+                <div class="cd_kpi_row cd_grid_3 mt-3">
+                    <!-- Gauge Widget -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <span class="cd_panel_title"><i class="fa fa-bullseye me-1 text-primary"/> Revenue vs Monthly Target</span>
+                            <span class="cd_panel_meta" t-esc="'Goal: ' + fmtMoney(state.data.summary.monthly_target)"/>
+                        </div>
+                        <div class="cd_gauge_box">
+                            <svg viewBox="0 0 200 115" class="cd_gauge_svg">
+                                <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e2e8f0" stroke-width="18" stroke-linecap="round"/>
+                                <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#cd_gauge_gradient)" stroke-width="18" stroke-linecap="round"
+                                      stroke-dasharray="251.2" t-att-stroke-dashoffset="251.2 * (1 - (state.data.summary.target_pct / 100))"/>
+                                <defs>
+                                    <linearGradient id="cd_gauge_gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stop-color="#ef4444"/>
+                                        <stop offset="60%" stop-color="#f59e0b"/>
+                                        <stop offset="100%" stop-color="#10b981"/>
+                                    </linearGradient>
+                                </defs>
+                                <text x="100" y="88" text-anchor="middle" class="cd_gauge_pct" t-esc="state.data.summary.target_pct + '%'"/>
+                                <text x="100" y="104" text-anchor="middle" class="cd_gauge_sub">OF TARGET ACHIEVED</text>
+                            </svg>
+                        </div>
+                        <div class="cd_target_stats">
+                            <div>
+                                <span class="cd_tiny_lbl">Actual MTD</span>
+                                <div class="cd_bold_txt" t-esc="fmtCompact(state.data.summary.total_revenue)"/>
+                            </div>
+                            <div>
+                                <span class="cd_tiny_lbl">Status</span>
+                                <div class="cd_badge cd_badge_success" t-esc="'On Target / ' + state.data.summary.target_pace"/>
+                            </div>
+                            <div>
+                                <span class="cd_tiny_lbl">Monthly Target</span>
+                                <div class="cd_bold_txt" t-esc="fmtCompact(state.data.summary.monthly_target)"/>
+                            </div>
+                        </div>
+                        <div class="cd_panel_footer_link">
+                            <span>Attainment pace: <strong class="text-success" t-esc="state.data.summary.target_pace"/></span>
+                            <a href="#" class="cd_action_link" t-on-click.prevent="openCRM">Sales CRM →</a>
+                        </div>
+                    </div>
+
+                    <!-- Working Capital Ledger -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <span class="cd_panel_title">Working Capital Ledger</span>
+                            <span class="cd_panel_meta">Aging &amp; Cash Gap</span>
+                        </div>
+                        <div class="cd_split_boxes mt-2">
+                            <div class="cd_sub_stat_box">
+                                <span class="cd_tiny_lbl text-primary">ACCOUNTS RECEIVABLE</span>
+                                <div class="cd_med_val text-primary" t-esc="fmtMoney(state.data.summary.ar_total)"/>
+                                <span class="text-muted cd_small">Owed by customers</span>
+                            </div>
+                            <div class="cd_sub_stat_box">
+                                <span class="cd_tiny_lbl text-warning">ACCOUNTS PAYABLE</span>
+                                <div class="cd_med_val text-warning" t-esc="fmtMoney(state.data.summary.ap_total)"/>
+                                <span class="text-muted cd_small">Owed to vendors</span>
+                            </div>
+                        </div>
+                        <div class="cd_dso_bar_section mt-3">
+                            <div class="d-flex justify-content-between cd_small">
+                                <span>Days Sales Outstanding (DSO):</span>
+                                <strong t-esc="state.data.summary.dso + ' days'"/>
+                            </div>
+                            <div class="cd_progress_track mt-1">
+                                <div class="cd_progress_fill cd_fill_teal" style="width: 42%;"/>
+                            </div>
+                            <div class="d-flex justify-content-between text-muted cd_tiny mt-1">
+                                <span>Fast collection (&lt;40d target)</span>
+                                <span>Avg: 45.2d</span>
+                            </div>
+                        </div>
+                        <div class="cd_panel_footer_link mt-3 pt-2 border-top">
+                            <span>Net AR/AP Surplus:</span>
+                            <strong class="text-success" t-esc="'+' + fmtMoney(state.data.summary.net_working_capital_surplus)"/>
+                        </div>
+                    </div>
+
+                    <!-- Inventory & Operations Pulse -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <span class="cd_panel_title"><i class="fa fa-cubes me-1 text-purple"/> Inventory &amp; Operations Pulse</span>
+                            <span class="cd_panel_meta" t-esc="fmtMoney(state.data.summary.inventory_value) + ' Value'"/>
+                        </div>
+                        <div class="cd_pulse_list mt-2">
+                            <div class="cd_pulse_item cd_item_alert">
+                                <span>Low Stock Alerts</span>
+                                <span class="cd_badge cd_badge_danger" t-esc="state.data.summary.low_stock_count + ' SKUs below reorder'"/>
+                            </div>
+                            <div class="cd_pulse_item">
+                                <span>Pending Deliveries Due Today</span>
+                                <span class="cd_bold_txt" t-esc="state.data.summary.pending_deliveries + ' orders'"/>
+                            </div>
+                            <div class="cd_pulse_item">
+                                <span>Pending Receipts (Incoming)</span>
+                                <span class="cd_bold_txt" t-esc="state.data.summary.pending_receipts + ' expected'"/>
+                            </div>
+                        </div>
+                        <div class="cd_panel_footer_link mt-3 pt-2 border-top">
+                            <span>Turnover Velocity:</span>
+                            <strong class="text-dark" t-esc="state.data.summary.turnover_rate + 'x / year'"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Row: 2 Split Columns -->
+                <div class="cd_kpi_row cd_grid_2 mt-3">
+                    <!-- Top Overdue Customer Debt -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <div>
+                                <span class="cd_panel_title">Top Overdue Customer Debt</span>
+                                <div class="cd_tiny text-muted" t-esc="'Totaling ' + fmtMoney(state.data.summary.overdue_amount)"/>
+                            </div>
+                            <a href="#" class="cd_action_link" t-on-click.prevent="openOverdueInvoices">All Invoices →</a>
+                        </div>
+                        <div class="cd_debt_list mt-2">
+                            <t t-if="!state.data.summary.top_overdue.length">
+                                <div class="text-muted text-center py-4">
+                                    <i class="fa fa-check-circle text-success me-1"/> No overdue customer debt! All accounts are current.
+                                </div>
+                            </t>
+                            <t t-foreach="state.data.summary.top_overdue" t-as="c" t-key="c.name">
+                                <div class="cd_debt_item">
+                                    <div class="cd_debt_info">
+                                        <div class="cd_debt_name" t-esc="c.name"/>
+                                        <div class="cd_debt_sub text-muted" t-esc="c.inv_ref + ' · ' + c.contact"/>
+                                    </div>
+                                    <div class="cd_debt_amt_box text-end">
+                                        <div class="cd_debt_val text-danger" t-esc="fmtMoney(c.amount)"/>
+                                        <span class="cd_debt_late" t-esc="c.days_late + ' days late'"/>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    <!-- HR, Attendance & Helpdesk Signoffs -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <div>
+                                <span class="cd_panel_title">HR, Attendance &amp; Helpdesk</span>
+                                <div class="cd_tiny text-muted">Internal operations and pending signoffs</div>
+                            </div>
+                            <a href="#" class="cd_action_link" t-on-click.prevent="openHRModule">HR Module →</a>
+                        </div>
+                        <div class="cd_signoff_list mt-2">
+                            <div class="cd_signoff_card cd_signoff_warn">
+                                <div>
+                                    <div class="cd_signoff_title" t-esc="state.data.summary.pending_leaves_count + ' Leave Requests Awaiting Approval'"/>
+                                    <div class="cd_signoff_sub text-muted">Sarah Connor, Alexandre Dumas, Elena Rostova</div>
+                                </div>
+                                <button class="cd_btn_outline_amber" t-on-click="openTimeOff">Review</button>
+                            </div>
+                            <div class="cd_signoff_card">
+                                <div>
+                                    <div class="cd_signoff_title" t-esc="state.data.summary.projects_over_budget_count + ' Projects Over Budget'"/>
+                                    <div class="cd_signoff_sub text-muted">7 overdue tasks requiring sprint realignment</div>
+                                </div>
+                                <button class="cd_btn_outline_grey" t-on-click="openProjects">View</button>
+                            </div>
+                            <div class="cd_signoff_card">
+                                <div>
+                                    <div class="cd_signoff_title" t-esc="state.data.summary.open_tickets_count + ' Customer Support Tickets'"/>
+                                    <div class="cd_signoff_sub text-muted">1 urgent SLA ticket in progress</div>
+                                </div>
+                                <button class="cd_btn_outline_purple" t-on-click="openTickets">Tickets</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================== -->
+            <!-- TAB 2: FINANCE & INVOICING                                     -->
+            <!-- ============================================================== -->
+            <div class="cd_tab_view" t-if="state.activeTab === 'finance'">
+                <!-- Top 4 Summary Cards -->
+                <div class="cd_kpi_row cd_grid_4">
+                    <div class="cd_stat_card">
+                        <div class="d-flex justify-content-between cd_card_header_sub">
+                            <span>TOTAL REVENUE</span>
+                            <span class="text-muted">This Month</span>
+                        </div>
+                        <div class="cd_card_big_val" t-esc="fmtMoney(state.data.finance.total_revenue)"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted" t-esc="'Same period LY: ' + fmtMoney(state.data.finance.revenue_ly)"/>
+                            <span class="cd_badge cd_badge_success" t-esc="'+' + state.data.finance.revenue_growth_pct + '%'"/>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card">
+                        <div class="d-flex justify-content-between cd_card_header_sub">
+                            <span>TOTAL EXPENSES</span>
+                            <span class="text-muted">This Month</span>
+                        </div>
+                        <div class="cd_card_big_val" t-esc="fmtMoney(state.data.finance.total_expenses)"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted" t-esc="'Same period LY: ' + fmtMoney(state.data.finance.expenses_ly)"/>
+                            <span class="cd_badge cd_badge_warn" t-esc="'+' + state.data.finance.expenses_growth_pct + '%'"/>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card">
+                        <div class="d-flex justify-content-between cd_card_header_sub">
+                            <span>GROSS PROFIT</span>
+                            <span class="cd_badge cd_badge_success" t-esc="fmtPct(state.data.finance.gross_margin) + ' Margin'"/>
+                        </div>
+                        <div class="cd_card_big_val text-success" t-esc="fmtMoney(state.data.finance.gross_profit)"/>
+                        <div class="cd_card_sub_line text-muted cd_tiny">
+                            Formula: Revenue – Cost of Sales
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card">
+                        <div class="d-flex justify-content-between cd_card_header_sub">
+                            <span>NET PROFIT</span>
+                            <span class="cd_badge cd_badge_teal" t-esc="fmtPct(state.data.finance.net_margin) + ' Net Margin'"/>
+                        </div>
+                        <div class="cd_card_big_val" t-esc="fmtMoney(state.data.finance.net_profit)"/>
+                        <div class="cd_card_sub_line text-muted cd_tiny">
+                            After Taxes &amp; Overhead: <strong t-esc="state.data.finance.retained_pct + '% retained'"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Middle 3 Cards -->
+                <div class="cd_kpi_row cd_grid_3 mt-3">
+                    <!-- Cash Position -->
+                    <div class="cd_box_panel">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="cd_panel_title"><i class="fa fa-university me-1 text-success"/> Cash Position</span>
+                                <div class="cd_tiny text-muted">Live consolidated bank balances</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="cd_med_val text-dark" t-esc="fmtMoney(state.data.finance.cash)"/>
+                                <span class="cd_badge cd_badge_success cd_tiny">Reconciled Today</span>
+                            </div>
+                        </div>
+                        <div class="cd_bank_list mt-3">
+                            <t t-if="!state.data.finance.bank_accounts.length">
+                                <div class="text-muted text-center py-3">
+                                    <i class="fa fa-info-circle me-1"/> No bank or cash journals found.
+                                </div>
+                            </t>
+                            <t t-foreach="state.data.finance.bank_accounts" t-as="b" t-key="b.name">
+                                <div class="cd_bank_item">
+                                    <div class="cd_bank_name"><i class="fa fa-credit-card text-muted me-2"/> <t t-esc="b.name"/></div>
+                                    <div class="cd_bank_amt" t-esc="fmtMoney(b.amount)"/>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    <!-- Working Capital Ledger -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <span class="cd_panel_title">Working Capital Ledger</span>
+                            <span class="cd_panel_meta">AR vs AP Ratio</span>
+                        </div>
+                        <div class="cd_split_boxes mt-3">
+                            <div class="cd_sub_stat_box">
+                                <span class="cd_tiny_lbl text-primary">ACCOUNTS RECEIVABLE (AR)</span>
+                                <div class="cd_med_val text-primary" t-esc="fmtMoney(state.data.finance.ar_total)"/>
+                                <span class="text-muted cd_tiny">What customers owe you</span>
+                            </div>
+                            <div class="cd_sub_stat_box">
+                                <span class="cd_tiny_lbl text-warning">ACCOUNTS PAYABLE (AP)</span>
+                                <div class="cd_med_val text-warning" t-esc="fmtMoney(state.data.finance.ap_total)"/>
+                                <span class="text-muted cd_tiny">What you owe vendors</span>
+                            </div>
+                        </div>
+                        <div class="cd_panel_footer_link mt-4 pt-2 border-top">
+                            <span>Net Receivable Surplus:</span>
+                            <strong t-att-class="state.data.finance.net_receivable_surplus &gt;= 0 ? 'text-success' : 'text-danger'"
+                                    t-esc="(state.data.finance.net_receivable_surplus &gt; 0 ? '+' : '') + fmtMoney(state.data.finance.net_receivable_surplus)"/>
+                        </div>
+                    </div>
+
+                    <!-- Overdue Invoices & DSO -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <span class="cd_panel_title">Overdue Invoices &amp; DSO</span>
+                            <span class="cd_panel_meta">Aging Metrics</span>
+                        </div>
+                        <div class="cd_overdue_callout mt-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="cd_tiny_lbl text-danger"><i class="fa fa-warning me-1"/> CRITICAL OVERDUE INVOICES</span>
+                                <span class="cd_counter_pill" t-esc="state.data.finance.overdue_count + ' Invoices'"/>
+                            </div>
+                            <div class="cd_big_val text-danger mt-1" t-esc="fmtMoney(state.data.finance.overdue_amount)"/>
+                            <div class="cd_tiny text-muted mt-1" t-esc="state.data.finance.overdue_ar_pct + '% of total AR is past agreed payment term'"/>
+                        </div>
+                        <div class="cd_dso_bar_section mt-3">
+                            <div class="d-flex justify-content-between cd_small">
+                                <span>DSO (Days Sales Outstanding):</span>
+                                <strong t-esc="state.data.finance.dso + ' days'"/>
+                            </div>
+                            <div class="cd_progress_track mt-1">
+                                <div class="cd_progress_fill cd_fill_teal" style="width: 42%;"/>
+                            </div>
+                            <div class="d-flex justify-content-between text-muted cd_tiny mt-1">
+                                <span>Target: &lt;40d</span>
+                                <span>Industry Avg: 45.2d</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Table: Top 5 Overdue Customers -->
+                <div class="cd_box_panel mt-3">
+                    <div class="cd_panel_header align-items-center">
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="cd_panel_title">Top 5 Overdue Customers</span>
+                                <span class="cd_badge cd_badge_danger">Action Required</span>
+                            </div>
+                            <div class="cd_tiny text-muted">Ranked by total overdue debt exposure and payment delay</div>
+                        </div>
+                        <button class="cd_btn_remind_all" t-on-click="remindAllOverdue">
+                            <i class="fa fa-bell me-1"/> Remind All 5
+                        </button>
+                    </div>
+                    <div class="table-responsive mt-3">
+                        <table class="cd_table">
+                            <thead>
+                                <tr>
+                                    <th>Customer Name</th>
+                                    <th>Latest Invoice</th>
+                                    <th>Contact</th>
+                                    <th>Delay</th>
+                                    <th>Overdue Balance</th>
+                                    <th class="text-end">Odoo Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="!state.data.finance.overdue_customers.length">
+                                    <tr>
+                                        <td colspan="6" class="text-muted text-center py-4">
+                                            <i class="fa fa-check-circle text-success me-1"/> All customer invoices are current or paid. No overdue balances!
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="state.data.finance.overdue_customers" t-as="cust" t-key="cust.id">
+                                    <tr>
+                                        <td>
+                                            <div class="cd_fw_600" t-esc="cust.name"/>
+                                            <div class="cd_tiny text-muted" t-esc="'Partner ID: ' + cust.code"/>
+                                        </td>
+                                        <td>
+                                            <a href="#" class="cd_code_link" t-on-click.prevent="openInvoices" t-esc="cust.latest_invoice"/>
+                                        </td>
+                                        <td>
+                                            <div t-esc="cust.contact"/>
+                                            <div class="cd_tiny text-muted" t-esc="cust.email"/>
+                                        </td>
+                                        <td>
+                                            <span class="cd_delay_badge" t-esc="cust.delay_days + ' days'"/>
+                                        </td>
+                                        <td>
+                                            <strong class="text-danger" t-esc="fmtMoney(cust.amount)"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <button class="cd_btn_dunning" t-on-click="() => this.sendDunning(cust)">
+                                                <i class="fa fa-paper-plane me-1"/> Send Dunning
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================== -->
+            <!-- TAB 3: SALES & CRM                                             -->
+            <!-- ============================================================== -->
+            <div class="cd_tab_view" t-if="state.activeTab === 'sales'">
+                <!-- Top Row: Gauge + Sales Orders Confirmed -->
+                <div class="cd_kpi_row cd_grid_2">
+                    <!-- Gauge Panel -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <div>
+                                <span class="cd_panel_title"><i class="fa fa-bullseye text-primary me-1"/> Revenue vs Target</span>
+                                <div class="cd_tiny text-muted">Monthly quota attainment gauge</div>
+                            </div>
+                            <span class="cd_panel_meta" t-esc="'Goal: ' + fmtMoney(state.data.sales.monthly_target)"/>
+                        </div>
+                        <div class="cd_gauge_box mt-2">
+                            <svg viewBox="0 0 200 115" class="cd_gauge_svg">
+                                <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#e2e8f0" stroke-width="18" stroke-linecap="round"/>
+                                <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#cd_sales_gauge_grad)" stroke-width="18" stroke-linecap="round"
+                                      stroke-dasharray="251.2" t-att-stroke-dashoffset="251.2 * (1 - (state.data.sales.target_pct / 100))"/>
+                                <defs>
+                                    <linearGradient id="cd_sales_gauge_grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stop-color="#ef4444"/>
+                                        <stop offset="60%" stop-color="#f59e0b"/>
+                                        <stop offset="100%" stop-color="#10b981"/>
+                                    </linearGradient>
+                                </defs>
+                                <text x="100" y="88" text-anchor="middle" class="cd_gauge_pct" t-esc="state.data.sales.target_pct + '%'"/>
+                                <text x="100" y="104" text-anchor="middle" class="cd_gauge_sub">OF TARGET ACHIEVED</text>
+                            </svg>
+                        </div>
+                        <div class="cd_target_stats mt-2">
+                            <div>
+                                <span class="cd_tiny_lbl">Actual MTD</span>
+                                <div class="cd_bold_txt" t-esc="fmtCompact(state.data.sales.month_actual)"/>
+                            </div>
+                            <div>
+                                <span class="cd_tiny_lbl">Status</span>
+                                <div class="cd_badge cd_badge_success">On Target / Excellent</div>
+                            </div>
+                            <div>
+                                <span class="cd_tiny_lbl">Monthly Target</span>
+                                <div class="cd_bold_txt" t-esc="fmtCompact(state.data.sales.monthly_target)"/>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between text-muted cd_tiny mt-3 pt-2 border-top">
+                            <span><i class="fa fa-circle text-success me-1"/> Target: &gt;85%</span>
+                            <span><i class="fa fa-circle text-warning me-1"/> Approaching: 60-85%</span>
+                            <span><i class="fa fa-circle text-danger me-1"/> Critical: &lt;60%</span>
+                        </div>
+                    </div>
+
+                    <!-- Sales Orders Confirmed Panel -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <div>
+                                <span class="cd_panel_title"><i class="fa fa-check-circle-o text-primary me-1"/> Sales Orders Confirmed</span>
+                                <div class="cd_tiny text-muted">Validated SOs from quotations</div>
+                            </div>
+                            <span class="cd_badge cd_badge_info" t-esc="state.data.sales.orders_ytd + ' Orders YTD'"/>
+                        </div>
+                        <div class="cd_so_cards_row mt-2">
+                            <div class="cd_so_mini_card">
+                                <span class="cd_tiny_lbl">TODAY</span>
+                                <div class="cd_so_val" t-esc="state.data.sales.orders_today"/>
+                                <span class="cd_tiny text-success">+3 since 12:00 PM</span>
+                            </div>
+                            <div class="cd_so_mini_card">
+                                <span class="cd_tiny_lbl">THIS WEEK</span>
+                                <div class="cd_so_val" t-esc="state.data.sales.orders_week"/>
+                                <span class="cd_tiny text-muted">Avg 18.8 orders/day</span>
+                            </div>
+                            <div class="cd_so_mini_card cd_so_card_active">
+                                <span class="cd_tiny_lbl">THIS MONTH</span>
+                                <div class="cd_so_val text-primary" t-esc="state.data.sales.orders_month"/>
+                                <span class="cd_tiny text-success">+12.4% vs last month</span>
+                            </div>
+                        </div>
+                        <div class="cd_pipeline_metrics_row mt-4 pt-3 border-top">
+                            <div>
+                                <span class="cd_tiny_lbl">Pipeline Value</span>
+                                <div class="cd_bold_txt" t-esc="fmtMoney(state.data.sales.pipeline_value)"/>
+                            </div>
+                            <div>
+                                <span class="cd_tiny_lbl">Pipeline Win Rate</span>
+                                <div class="cd_bold_txt text-success" t-esc="state.data.sales.win_rate + '%'"/>
+                            </div>
+                            <div>
+                                <span class="cd_tiny_lbl">Average Deal Size</span>
+                                <div class="cd_bold_txt" t-esc="fmtMoney(state.data.sales.avg_deal_size)"/>
+                            </div>
+                            <div>
+                                <span class="cd_tiny_lbl">New Leads This Week</span>
+                                <div class="cd_bold_txt text-primary" t-esc="'+' + state.data.sales.new_leads + ' leads'"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Row: Top 5 Customers by Revenue & Opportunities Closing -->
+                <div class="cd_kpi_row cd_grid_2 mt-3">
+                    <!-- Top 5 Customers by Revenue -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <div>
+                                <span class="cd_panel_title">Top 5 Customers by Revenue</span>
+                                <div class="cd_tiny text-muted">Total closed value contribution this month</div>
+                            </div>
+                            <span class="cd_badge cd_badge_grey">MTD Ranking</span>
+                        </div>
+                        <div class="cd_cust_rev_list mt-2">
+                            <t t-if="!state.data.sales.top_customers.length">
+                                <div class="text-muted text-center py-4">
+                                    No confirmed customer sales yet.
+                                </div>
+                            </t>
+                            <t t-foreach="state.data.sales.top_customers" t-as="tc" t-key="tc.name">
+                                <div class="cd_cust_rev_item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="cd_fw_600">
+                                            <span class="text-muted me-1" t-esc="'#' + (tc_index + 1)"/>
+                                            <span t-esc="tc.name"/>
+                                            <span class="cd_tiny text-muted ms-1" t-esc="'(' + tc.category + ')'"/>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="cd_tiny text-muted me-2" t-esc="tc.deals + ' deals'"/>
+                                            <strong t-esc="fmtMoney(tc.amount)"/>
+                                        </div>
+                                    </div>
+                                    <div class="cd_progress_track mt-1">
+                                        <div class="cd_progress_fill cd_fill_purple" t-attf-style="width: {{tc.pct}}%;"/>
+                                    </div>
+                                    <div class="text-end cd_tiny text-muted mt-1" t-esc="tc.pct + '% of total revenue'"/>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    <!-- Opportunities Closing This Month -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <div>
+                                <span class="cd_panel_title">Opportunities Closing This Month</span>
+                                <div class="cd_tiny text-muted">High-probability pipeline forecast</div>
+                            </div>
+                            <span class="cd_badge cd_badge_teal" t-esc="fmtMoney(state.data.sales.weighted_closing_sum) + ' Weighted'"/>
+                        </div>
+                        <div class="cd_opps_list mt-2">
+                            <t t-if="!state.data.sales.closing_opportunities.length">
+                                <div class="text-muted text-center py-4">
+                                    No open opportunities closing this period.
+                                </div>
+                            </t>
+                            <t t-foreach="state.data.sales.closing_opportunities" t-as="opp" t-key="opp.title">
+                                <div class="cd_opp_item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <div class="cd_opp_title" t-esc="opp.title"/>
+                                            <div class="cd_tiny text-muted" t-esc="opp.customer + ' · Rep: ' + opp.rep"/>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="cd_opp_amt" t-esc="fmtMoney(opp.amount)"/>
+                                            <span class="cd_tiny text-success" t-esc="opp.prob + '% win prob'"/>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mt-2">
+                                        <span class="cd_badge cd_badge_pill_outline" t-esc="opp.stage"/>
+                                        <span class="cd_tiny text-muted" t-esc="'Closing: ' + opp.closing_date"/>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================== -->
+            <!-- TAB 4: INVENTORY & OPERATIONS                                  -->
+            <!-- ============================================================== -->
+            <div class="cd_tab_view" t-if="state.activeTab === 'inventory'">
+                <!-- Top 4 Summary Cards -->
+                <div class="cd_kpi_row cd_grid_4">
+                    <div class="cd_stat_card">
+                        <div class="d-flex justify-content-between cd_card_header_sub">
+                            <span>TOTAL INVENTORY VALUE</span>
+                            <i class="fa fa-cubes text-purple"/>
+                        </div>
+                        <div class="cd_card_big_val" t-esc="fmtMoney(state.data.inventory.total_value)"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted">Valuation Method:</span>
+                            <span class="cd_badge cd_badge_grey" t-esc="state.data.inventory.valuation_method"/>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card cd_card_danger_tint">
+                        <div class="d-flex justify-content-between cd_card_header_sub text-danger">
+                            <span>LOW STOCK ALERTS</span>
+                            <i class="fa fa-info-circle"/>
+                        </div>
+                        <div class="cd_card_big_val text-danger" t-esc="state.data.inventory.low_stock_count + ' Products'"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted">Reorder Trigger:</span>
+                            <span class="text-danger cd_fw_600">Below Minimum Qty</span>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card">
+                        <div class="d-flex justify-content-between cd_card_header_sub">
+                            <span>OPERATIONS DUE TODAY</span>
+                            <i class="fa fa-truck text-primary"/>
+                        </div>
+                        <div class="d-flex align-items-baseline gap-3 mt-1">
+                            <div>
+                                <span class="cd_card_big_val" t-esc="state.data.inventory.pending_deliveries"/>
+                                <span class="cd_tiny text-muted d-block">Outgoing Deliveries</span>
+                            </div>
+                            <div class="border-start ps-3">
+                                <span class="cd_card_big_val" t-esc="state.data.inventory.pending_receipts"/>
+                                <span class="cd_tiny text-muted d-block">Incoming Receipts</span>
+                            </div>
+                        </div>
+                        <div class="cd_card_sub_line mt-2">
+                            <span class="text-muted">Logistics status: Normal dispatch</span>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card">
+                        <div class="d-flex justify-content-between cd_card_header_sub">
+                            <span>TURNOVER &amp; PURCHASE</span>
+                            <i class="fa fa-refresh text-success"/>
+                        </div>
+                        <div class="d-flex align-items-baseline gap-3 mt-1">
+                            <div>
+                                <span class="cd_card_big_val text-success" t-esc="state.data.inventory.turnover_rate + 'x'"/>
+                                <span class="cd_tiny text-muted d-block">Annual Turnover</span>
+                            </div>
+                            <div class="border-start ps-3">
+                                <span class="cd_card_big_val text-warning" t-esc="state.data.inventory.overdue_po"/>
+                                <span class="cd_tiny text-muted d-block">Overdue POs</span>
+                            </div>
+                        </div>
+                        <div class="cd_card_sub_line mt-2">
+                            <span class="text-muted">Target: &gt;4.0x turnover</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reorder Table -->
+                <div class="cd_box_panel mt-3">
+                    <div class="cd_panel_header align-items-center">
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="cd_panel_title">Products Below Reorder Point</span>
+                                <span class="cd_badge cd_badge_danger" t-if="state.data.inventory.reorder_products.length" t-esc="state.data.inventory.reorder_products.length + ' Critical Lines'"/>
+                                <span class="cd_badge cd_badge_success" t-if="!state.data.inventory.reorder_products.length">Stock Levels Optimal</span>
+                            </div>
+                            <div class="cd_tiny text-muted">Automated reorder rule triggers ready for immediate RFQ submission to vendors</div>
+                        </div>
+                        <button class="cd_btn_rfq_all" t-if="state.data.inventory.reorder_products.length" t-on-click="generateRFQForAll">
+                            <i class="fa fa-shopping-cart me-1"/> Generate RFQ for All
+                        </button>
+                    </div>
+                    <div class="table-responsive mt-3">
+                        <table class="cd_table">
+                            <thead>
+                                <tr>
+                                    <th>SKU / Code</th>
+                                    <th>Product Name</th>
+                                    <th>Vendor</th>
+                                    <th>On Hand</th>
+                                    <th>Min / Max Qty</th>
+                                    <th>Unit Cost</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="!state.data.inventory.reorder_products.length">
+                                    <tr>
+                                        <td colspan="7" class="text-muted text-center py-4">
+                                            <i class="fa fa-check-circle text-success me-1"/> All inventory levels are optimal. No products require reordering!
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="state.data.inventory.reorder_products" t-as="item" t-key="item.sku">
+                                    <tr>
+                                        <td><code class="cd_sku_tag" t-esc="item.sku"/></td>
+                                        <td class="cd_fw_600" t-esc="item.name"/>
+                                        <td class="text-muted" t-esc="item.vendor"/>
+                                        <td>
+                                            <span class="cd_stock_badge cd_badge_low" t-esc="item.on_hand + ' units'"/>
+                                        </td>
+                                        <td class="text-muted" t-esc="item.min_qty + ' / ' + item.max_qty"/>
+                                        <td t-esc="fmtMoney(item.cost)"/>
+                                        <td class="text-end">
+                                            <button class="cd_btn_create_rfq" t-on-click="() => this.createRFQ(item)">
+                                                <i class="fa fa-shopping-cart me-1"/> Create RFQ
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================== -->
+            <!-- TAB 5: HR & ATTENDANCE                                         -->
+            <!-- ============================================================== -->
+            <div class="cd_tab_view" t-if="state.activeTab === 'hr'">
+                <!-- Top 4 Cards -->
+                <div class="cd_kpi_row cd_grid_4">
+                    <div class="cd_stat_card">
+                        <div class="d-flex justify-content-between cd_card_header_sub">
+                            <span>ACTIVE EMPLOYEES</span>
+                            <i class="fa fa-users text-purple"/>
+                        </div>
+                        <div class="cd_card_big_val" t-esc="state.data.hr.active_employees"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted">Headcount Status:</span>
+                            <span class="cd_badge cd_badge_teal" t-esc="state.data.hr.headcount_status"/>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card">
+                        <div class="d-flex justify-content-between cd_card_header_sub">
+                            <span>LEAVE REQUESTS PENDING</span>
+                            <i class="fa fa-calendar-check-o text-warning"/>
+                        </div>
+                        <div class="cd_card_big_val text-warning" t-esc="state.data.hr.pending_leaves_count"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted">Requires Action:</span>
+                            <strong class="text-dark">Manager Signoff</strong>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card">
+                        <div class="d-flex justify-content-between cd_card_header_sub">
+                            <span>ON LEAVE TODAY</span>
+                            <i class="fa fa-clock-o text-info"/>
+                        </div>
+                        <div class="cd_card_big_val text-info" t-esc="state.data.hr.on_leave_today + ' Staff'"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted" t-esc="'Absence Rate: ' + state.data.hr.absence_rate + '%'"/>
+                        </div>
+                    </div>
+
+                    <div class="cd_stat_card">
+                        <div class="d-flex justify-content-between cd_card_header_sub">
+                            <span>OPEN POSITIONS</span>
+                            <i class="fa fa-briefcase text-teal"/>
+                        </div>
+                        <div class="cd_card_big_val text-teal" t-esc="state.data.hr.open_positions + ' Roles'"/>
+                        <div class="cd_card_sub_line">
+                            <span class="text-muted" t-esc="'Active Talent Pipeline: ' + state.data.hr.applicants_count + ' Applicants'"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Middle Row: Leave Requests + Late Clockins -->
+                <div class="cd_kpi_row cd_grid_2 mt-3">
+                    <!-- Leave Requests -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <div>
+                                <span class="cd_panel_title">Leave Requests Pending Approval</span>
+                                <div class="cd_tiny text-muted">Direct reports requesting time off</div>
+                            </div>
+                            <button class="cd_btn_pill_outline" t-on-click="openTimeOff">Odoo Time Off</button>
+                        </div>
+                        <div class="cd_leave_list mt-2">
+                            <t t-foreach="state.data.hr.pending_leaves" t-as="l" t-key="l.id">
+                                <div class="cd_leave_item">
+                                    <div class="cd_avatar" t-esc="l.initials"/>
+                                    <div class="cd_leave_desc">
+                                        <div class="cd_fw_600" t-esc="l.employee_name"/>
+                                        <div class="cd_tiny text-muted" t-esc="l.department + ' · ' + l.leave_type"/>
+                                        <div class="cd_tiny text-dark" t-esc="l.dates + ' (' + l.days + ' days)'"/>
+                                    </div>
+                                    <div class="cd_leave_btns ms-auto">
+                                        <button class="cd_btn_approve" t-on-click="() => this.approveLeave(l)">
+                                            <i class="fa fa-check me-1"/> Approve
+                                        </button>
+                                        <button class="cd_btn_refuse" t-on-click="() => this.refuseLeave(l)">
+                                            <i class="fa fa-times me-1"/> Refuse
+                                        </button>
+                                    </div>
+                                </div>
+                            </t>
+                            <div class="cd_empty_box text-center p-3 text-muted" t-if="!state.data.hr.pending_leaves.length">
+                                <i class="fa fa-check-circle text-success me-1"/> All leave requests reviewed!
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Late Clock-ins & Out of Office -->
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <div>
+                                <span class="cd_panel_title">Late Clock-Ins Today</span>
+                                <div class="cd_tiny text-muted">Attendance badge kiosk / RFID check-ins</div>
+                            </div>
+                            <span class="cd_counter_pill" t-esc="state.data.hr.late_clockins.length + ' Late'"/>
+                        </div>
+                        <div class="cd_late_list mt-2">
+                            <t t-if="!state.data.hr.late_clockins.length">
+                                <div class="text-muted text-center py-3">
+                                    <i class="fa fa-check-circle text-success me-1"/> No late clock-ins recorded today.
+                                </div>
+                            </t>
+                            <t t-foreach="state.data.hr.late_clockins" t-as="lc" t-key="lc.name">
+                                <div class="cd_late_item">
+                                    <div>
+                                        <div class="cd_fw_600" t-esc="lc.name"/>
+                                        <div class="cd_tiny text-muted" t-esc="lc.department"/>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="cd_tiny" t-esc="'Check-In: ' + lc.time"/>
+                                        <span class="cd_delay_badge" t-esc="lc.delay"/>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+
+                        <div class="cd_panel_header mt-4 pt-3 border-top">
+                            <div>
+                                <span class="cd_panel_title">Staff Out of Office Today</span>
+                                <div class="cd_tiny text-muted">Current calendar absences</div>
+                            </div>
+                            <span class="cd_badge cd_badge_grey" t-esc="state.data.hr.on_leave_today + ' Absent'"/>
+                        </div>
+                        <div class="cd_split_boxes mt-2">
+                            <t t-if="!state.data.hr.out_of_office.length">
+                                <div class="text-muted text-center py-3 w-100">
+                                    <i class="fa fa-check-circle text-success me-1"/> All team members are present.
+                                </div>
+                            </t>
+                            <t t-foreach="state.data.hr.out_of_office" t-as="oo" t-key="oo.name">
+                                <div class="cd_sub_stat_box">
+                                    <div class="cd_fw_600" t-esc="oo.name"/>
+                                    <div class="cd_tiny text-muted" t-esc="oo.department"/>
+                                    <div class="cd_tiny text-primary mt-1" t-esc="oo.returns"/>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Row: Open Job Positions -->
+                <div class="cd_box_panel mt-3">
+                    <div class="cd_panel_header">
+                        <div>
+                            <span class="cd_panel_title">Open Job Positions (Recruitment)</span>
+                            <div class="cd_tiny text-muted">Active hiring pipelines in Odoo HR</div>
+                        </div>
+                        <button class="cd_btn_pill_outline" t-on-click="openJobs">
+                            <i class="fa fa-briefcase me-1"/> Manage Jobs
+                        </button>
+                    </div>
+                    <div class="cd_jobs_grid mt-3">
+                        <t t-if="!state.data.hr.job_positions.length">
+                            <div class="text-muted text-center py-4 w-100">
+                                <i class="fa fa-info-circle me-1"/> No active job positions open for recruitment.
+                            </div>
+                        </t>
+                        <t t-foreach="state.data.hr.job_positions" t-as="job" t-key="job.title">
+                            <div class="cd_job_card">
+                                <div class="cd_job_title" t-esc="job.title"/>
+                                <div class="cd_tiny text-muted" t-esc="job.department"/>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                    <strong t-esc="job.applicants + ' Applicants'"/>
+                                    <span class="cd_badge cd_badge_pill_outline" t-esc="job.stage"/>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================== -->
+            <!-- TAB 6: PROJECT & HELPDESK                                      -->
+            <!-- ============================================================== -->
+            <div class="cd_tab_view" t-if="state.activeTab === 'project'">
+                <div class="cd_kpi_row cd_grid_5">
+                    <div class="cd_stat_card cd_card_danger_tint">
+                        <div class="cd_card_header_sub text-danger">OVERDUE TASKS</div>
+                        <div class="cd_card_big_val text-danger" t-esc="state.data.project.overdue_tasks"/>
+                        <div class="cd_card_sub_line text-muted cd_tiny">Requiring sprint attention</div>
+                    </div>
+                    <div class="cd_stat_card">
+                        <div class="cd_card_header_sub">TASKS DUE TODAY</div>
+                        <div class="cd_card_big_val text-primary" t-esc="state.data.project.tasks_due_today"/>
+                        <div class="cd_card_sub_line text-muted cd_tiny">Active deliverables</div>
+                    </div>
+                    <div class="cd_stat_card cd_card_danger_tint">
+                        <div class="cd_card_header_sub text-danger">PROJECTS OVER BUDGET</div>
+                        <div class="cd_card_big_val text-danger" t-esc="state.data.project.projects_over_budget"/>
+                        <div class="cd_card_sub_line text-muted cd_tiny">Hour allocation exceeded</div>
+                    </div>
+                    <div class="cd_stat_card">
+                        <div class="cd_card_header_sub">BILLABLE HOURS</div>
+                        <div class="cd_card_big_val text-success" t-esc="fmtNum(state.data.project.billable_hours) + ' h'"/>
+                        <div class="cd_card_sub_line text-muted cd_tiny" t-esc="'Target: ' + fmtNum(state.data.project.billable_target) + ' h'"/>
+                    </div>
+                    <div class="cd_stat_card">
+                        <div class="cd_card_header_sub">OPEN SUPPORT TICKETS</div>
+                        <div class="cd_card_big_val text-info" t-esc="state.data.project.open_tickets"/>
+                        <div class="cd_card_sub_line text-muted cd_tiny">Customer SLA monitored</div>
+                    </div>
+                </div>
+
+                <div class="cd_kpi_row cd_grid_2 mt-3">
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <span class="cd_panel_title">Project Budget Health</span>
+                            <button class="cd_btn_pill_outline" t-on-click="openProjects">Open Projects</button>
+                        </div>
+                        <div class="cd_project_list mt-2">
+                            <t t-if="!state.data.project.projects.length">
+                                <div class="text-muted text-center py-4">
+                                    <i class="fa fa-info-circle me-1"/> No active projects found.
+                                </div>
+                            </t>
+                            <t t-foreach="state.data.project.projects" t-as="p" t-key="p.name">
+                                <div class="cd_project_item">
+                                    <div>
+                                        <div class="cd_fw_600" t-esc="p.name"/>
+                                        <div class="cd_tiny text-muted" t-esc="'Project Lead: ' + p.lead"/>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="cd_badge" t-att-class="p.health === 'critical' ? 'cd_badge_danger' : p.health === 'warning' ? 'cd_badge_warn' : 'cd_badge_success'" t-esc="p.status"/>
+                                        <div class="cd_tiny text-muted mt-1" t-esc="p.spent_hours + 'h / ' + p.allocated_hours + 'h'"/>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    <div class="cd_box_panel">
+                        <div class="cd_panel_header">
+                            <span class="cd_panel_title">Priority Support Tickets</span>
+                            <button class="cd_btn_pill_outline" t-on-click="openTickets">Open Helpdesk</button>
+                        </div>
+                        <div class="cd_ticket_list mt-2">
+                            <t t-if="!state.data.project.tickets.length">
+                                <div class="text-muted text-center py-4">
+                                    <i class="fa fa-check-circle text-success me-1"/> No open support tickets.
+                                </div>
+                            </t>
+                            <t t-foreach="state.data.project.tickets" t-as="tk" t-key="tk.id">
+                                <div class="cd_ticket_item">
+                                    <div>
+                                        <div class="cd_fw_600"><span class="text-primary me-1" t-esc="tk.id"/> <t t-esc="tk.subject"/></div>
+                                        <div class="cd_tiny text-muted" t-esc="'Customer: ' + tk.partner"/>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="cd_badge" t-att-class="tk.priority === 'Urgent' ? 'cd_badge_danger' : tk.priority === 'High' ? 'cd_badge_warn' : 'cd_badge_grey'" t-esc="tk.priority"/>
+                                        <div class="cd_tiny text-muted mt-1" t-esc="tk.stage"/>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</t>
+
+</templates>
