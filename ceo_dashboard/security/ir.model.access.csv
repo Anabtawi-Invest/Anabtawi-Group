@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ceo_dashboard_user,ceo.dashboard.user,model_ceo_dashboard,ceo_dashboard.group_ceo_dashboard_user,1,0,0,0
+access_ceo_dashboard_internal,ceo.dashboard.internal,model_ceo_dashboard,base.group_user,1,0,0,0
