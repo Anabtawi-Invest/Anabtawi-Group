@@ -20,15 +20,15 @@ class RetailLaborCostWizardLine(models.TransientModel):
     branch_name = fields.Char(string='Branch Name')
     company_id = fields.Many2one('res.company', string='Company')
     
-    # 1. Sales & Profits from POS
+    # 1. Sales & Profits from POS (Store Shift Window from Dashboard)
     sales_profit = fields.Monetary(string='Sales Profit / Revenue', currency_field='currency_id')
     
-    # 2. Labor Cost
+    # 2. Labor Cost (Payslip Attendance Days)
     employee_count = fields.Integer(string='Employees Count')
     attendance_days = fields.Float(string='Total Attendance Days', digits=(16, 2))
     labor_cost = fields.Monetary(string='Total Labor Cost', currency_field='currency_id')
     
-    # 3. Overtime Hours
+    # 3. Overtime Hours (Attendance Screen: Daily Extra Hours vs Extra Hours)
     approved_ot_hours = fields.Float(string='Approved Overtime (hrs)', digits=(16, 2))
     unapproved_ot_hours = fields.Float(string='Unapproved Overtime (hrs)', digits=(16, 2))
     total_ot_hours = fields.Float(string='Total Overtime (hrs)', digits=(16, 2))
@@ -179,13 +179,14 @@ class RetailLaborCostWizard(models.TransientModel):
 
     def _get_branch_sales_profit(self, configs, str_start, str_end):
         """
-        Calculate total branch sales revenue / profits directly matching
-        the logic of anabtawi_pos_reporting_dashboard.
+        Calculate total branch sales revenue matching the Dashboard Shift Window logic
+        (06:00 AM on start date to 05:00 AM on following day of end date).
+        Uses reconciled pos.payment and pos.order as per anabtawi_pos_reporting_dashboard.
         """
         if not configs:
             return 0.0
 
-        # Method A: via pos.payment (preferred in pos_reporting_dashboard for reconciled payments)
+        # Method A: via pos.payment
         payments = self.env['pos.payment'].sudo().search([
             ('pos_order_id.state', 'in', ('paid', 'done', 'invoiced')),
             ('session_id.config_id', 'in', configs.ids),
@@ -199,7 +200,7 @@ class RetailLaborCostWizard(models.TransientModel):
         # Method B: via pos.order direct check
         orders = self.env['pos.order'].sudo().search([
             ('config_id', 'in', configs.ids),
-            ('state', 'in', ('paid', 'done', 'invoiced')),
+            ('state', 'in', ('paid', 'done', 'invoiced', 'posted')),
             ('date_order', '>=', str_start),
             ('date_order', '<=', str_end),
         ])
@@ -236,7 +237,7 @@ class RetailLaborCostWizard(models.TransientModel):
     def _get_branch_labor_cost(self, employees, date_from, date_to, payrun_id=None):
         """
         Calculate total labor cost for all employees in a branch:
-        Cost = Attendance Days * (hourly_wage * 8.0 hrs/day).
+        Cost = Attendance Days on Payslip * (hourly_wage * 8.0 hrs/day).
         """
         if not employees:
             return 0.0, 0.0
@@ -297,45 +298,58 @@ class RetailLaborCostWizard(models.TransientModel):
     def _get_branch_overtime_hours(self, employees, date_from, date_to):
         """
         Calculate total Overtime Hours for all employees in a branch:
-        - Approved Overtime Hours
-        - Unapproved Overtime Hours
+        Reads directly from hr.attendance matching the Attendance screen columns:
+        - Daily Extra Hours (daily_overtime_hours): Total Extra Hours worked.
+        - Extra Hours (overtime_hours): Approved Extra Hours.
+        - Unapproved Extra Hours = Daily Extra Hours - Extra Hours.
         """
         if not employees:
             return 0.0, 0.0
 
-        approved_hrs = 0.0
-        unapproved_hrs = 0.0
+        dt_start = datetime.combine(date_from, time.min)
+        dt_end = datetime.combine(date_to, time.max)
 
-        # Source 1: hr.attendance.overtime.line
+        attendances = self.env['hr.attendance'].sudo().search([
+            ('employee_id', 'in', employees.ids),
+            ('check_in', '>=', dt_start),
+            ('check_in', '<=', dt_end),
+        ])
+
+        if attendances:
+            # 1. Total Daily Extra Hours worked (matching column "Daily Extra Hours")
+            daily_extra = sum(getattr(att, 'daily_overtime_hours', 0.0) or 0.0 for att in attendances)
+            
+            # 2. Approved / Qualified Extra Hours (matching column "Extra Hours")
+            approved_ot = sum(getattr(att, 'overtime_hours', 0.0) or getattr(att, 'validated_overtime_hours', 0.0) or 0.0 for att in attendances)
+            
+            # If daily_overtime_hours exists, unapproved is difference
+            if daily_extra >= approved_ot and daily_extra > 0:
+                unapproved_ot = daily_extra - approved_ot
+            else:
+                unapproved_ot = sum(
+                    att.overtime_hours for att in attendances if getattr(att, 'overtime_status', '') != 'approved'
+                )
+                if daily_extra == 0:
+                    daily_extra = approved_ot + unapproved_ot
+
+            return round(approved_ot, 2), round(unapproved_ot, 2)
+
+        # Fallback to hr.attendance.overtime.line
         if 'hr.attendance.overtime.line' in self.env:
             ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
                 ('employee_id', 'in', employees.ids),
                 ('date', '>=', date_from),
                 ('date', '<=', date_to),
             ])
-            for line in ot_lines:
-                dur = line.manual_duration if hasattr(line, 'manual_duration') and line.manual_duration else (line.duration or 0.0)
-                if line.status == 'approved':
-                    approved_hrs += dur
-                else:
-                    unapproved_hrs += dur
+            approved_hrs = sum(
+                (l.manual_duration or l.duration or 0.0) for l in ot_lines if l.status == 'approved'
+            )
+            unapproved_hrs = sum(
+                (l.manual_duration or l.duration or 0.0) for l in ot_lines if l.status != 'approved'
+            )
+            return round(approved_hrs, 2), round(unapproved_hrs, 2)
 
-        # Source 2: hr.attendance fallback
-        elif 'hr.attendance' in self.env:
-            dt_start = datetime.combine(date_from, time.min)
-            dt_end = datetime.combine(date_to, time.max)
-            attendances = self.env['hr.attendance'].sudo().search([
-                ('employee_id', 'in', employees.ids),
-                ('check_in', '>=', dt_start),
-                ('check_in', '<=', dt_end),
-            ])
-            for att in attendances:
-                val_ot = getattr(att, 'validated_overtime_hours', 0.0) or 0.0
-                tot_ot = getattr(att, 'overtime_hours', 0.0) or 0.0
-                approved_hrs += val_ot
-                unapproved_hrs += max(0.0, tot_ot - val_ot)
-
-        return round(approved_hrs, 2), round(unapproved_hrs, 2)
+        return 0.0, 0.0
 
     def _prepare_data_rows(self):
         self.ensure_one()
@@ -357,7 +371,7 @@ class RetailLaborCostWizard(models.TransientModel):
                 '|', ('name', 'ilike', 'retail'), ('name', 'ilike', 'فرع')
             ])
 
-        # Store shift window 06:00 to 05:00 next day
+        # Store shift window 06:00 AM on start date to 05:00 AM on following day (Dashboard standard)
         dt_start = datetime.combine(self.date_from, time(6, 0, 0))
         dt_end = datetime.combine(self.date_to + timedelta(days=1), time(5, 0, 0))
         str_start = fields.Datetime.to_string(dt_start)
@@ -368,7 +382,7 @@ class RetailLaborCostWizard(models.TransientModel):
             branch_code = getattr(branch, 'code', False) or getattr(branch, 'complete_name', False) or str(branch.id)
             branch_name = branch.name or ''
 
-            # 1. Matching POS Configs & Sales Profit
+            # 1. Matching POS Configs & Sales Profit (Dashboard Shift Window)
             configs = self._get_branch_pos_configs(branch)
             cfg_names = ', '.join(configs.mapped('name')) if configs else _('Auto/Direct match')
             sales_profit = self._get_branch_sales_profit(configs, str_start, str_end)
@@ -380,7 +394,7 @@ class RetailLaborCostWizard(models.TransientModel):
             ])
             emp_count = len(branch_employees)
 
-            # 3. Labor Cost
+            # 3. Labor Cost (Payslip Attendance Days)
             labor_cost, att_days = self._get_branch_labor_cost(
                 branch_employees, self.date_from, self.date_to, self.payrun_id
             )

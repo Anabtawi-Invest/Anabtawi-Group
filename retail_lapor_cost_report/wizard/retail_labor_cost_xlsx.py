@@ -187,7 +187,6 @@ def build_retail_labor_cost_xlsx(rows, metadata):
             else:
                 sheet.write_number(totals_row, c_idx, 0.0, total_fmt)
         elif kind == 'percent':
-            # Overall Labor % = Total Labor Cost / Total Sales
             sales_col = xlsxwriter.utility.xl_col_to_name(2)
             cost_col = xlsxwriter.utility.xl_col_to_name(5)
             formula = f'=IF({sales_col}{totals_row+1}>0,{cost_col}{totals_row+1}/{sales_col}{totals_row+1},0)'
