@@ -13,6 +13,12 @@
                             <field name="probation_start_date" optional="show"/>
                             <field name="document_file" filename="document_filename"/>
                             <field name="document_filename" column_invisible="1"/>
+                            <button name="action_preview_document_file"
+                                    type="object"
+                                    icon="fa-eye"
+                                    title="Preview"
+                                    aria-label="Preview"
+                                    invisible="not document_file"/>
                             <field name="expiry_date"/>
                         </list>
                     </field>

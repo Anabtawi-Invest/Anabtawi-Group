@@ -5,7 +5,10 @@ from datetime import date, datetime
 
 from dateutil.relativedelta import relativedelta
 
+from werkzeug.urls import url_encode
+
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -40,6 +43,29 @@ class HrHealthEmployeeDocument(models.Model):
             'This document type is already attached to the employee.',
         ),
     ]
+
+    def action_preview_document_file(self):
+        """Open the uploaded file in a new tab without forcing a download."""
+        self.ensure_one()
+        if not self.document_file or not isinstance(self.id, int):
+            raise UserError(_("Save the line and upload a file before previewing it."))
+        filename = (
+            self.document_filename
+            or (self.document_type_id.name if self.document_type_id else False)
+            or 'document'
+        )
+        query = url_encode({
+            'model': self._name,
+            'id': self.id,
+            'field': 'document_file',
+            'filename': filename,
+            'filename_field': 'document_filename',
+        })
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f'/web/content?{query}',
+            'target': 'new',
+        }
 
     @api.onchange('document_type_id', 'probation_start_date')
     def _onchange_probation_dates(self):
