@@ -32,6 +32,30 @@ class PortalInternalTransfer(http.Controller):
         """Odoo 19 renamed stock.move.product_uom to uom_id; staging may still have product_uom."""
         return "uom_id" if "uom_id" in request.env["stock.move"]._fields else "product_uom"
 
+    def _get_mapped_source_location(self, raise_if_missing=True):
+        mapping = (
+            request.env["portal.transfer.location.map"]
+            .sudo()
+            .search(
+                [
+                    ("user_id", "=", request.env.user.id),
+                    ("active", "=", True),
+                ],
+                limit=1,
+            )
+        )
+        location = mapping.location_id
+        if location and (location.usage != "internal" or not location.active):
+            location = request.env["stock.location"]
+        if raise_if_missing and not location:
+            raise UserError(
+                _(
+                    "No source location is mapped for your user. "
+                    "Please contact an administrator."
+                )
+            )
+        return location
+
     def _get_internal_picking_type(self):
         PickingType = request.env["stock.picking.type"].sudo()
         company = request.env.company
@@ -54,9 +78,13 @@ class PortalInternalTransfer(http.Controller):
     @http.route("/my/transfers/create", type="http", auth="user", website=True)
     def portal_transfer_create(self, **kwargs):
         self._ensure_access()
+        source_location = self._get_mapped_source_location(raise_if_missing=False)
         return request.render(
             "portal_internal_transfer.portal_transfer_create",
-            {"page_name": "portal_transfer_create"},
+            {
+                "page_name": "portal_transfer_create",
+                "source_location": source_location,
+            },
         )
 
     @http.route(
@@ -195,16 +223,14 @@ class PortalInternalTransfer(http.Controller):
     @http.route("/my/transfers/api/confirm", type="jsonrpc", auth="user", website=True)
     def api_confirm(self, location_id=None, location_dest_id=None, lines=None, **kwargs):
         self._ensure_access()
-        if not location_id or not location_dest_id:
-            raise ValidationError(_("Please select source and destination locations."))
-        if int(location_id) == int(location_dest_id):
+        source = self._get_mapped_source_location(raise_if_missing=True)
+        if not location_dest_id:
+            raise ValidationError(_("Please select a destination location."))
+        if source.id == int(location_dest_id):
             raise ValidationError(_("Source and destination must be different."))
 
         Location = request.env["stock.location"].sudo()
-        source = Location.browse(int(location_id)).exists()
         dest = Location.browse(int(location_dest_id)).exists()
-        if not source or source.usage != "internal" or not source.active:
-            raise ValidationError(_("Invalid source location."))
         if not dest or dest.usage != "internal" or not dest.active:
             raise ValidationError(_("Invalid destination location."))
 

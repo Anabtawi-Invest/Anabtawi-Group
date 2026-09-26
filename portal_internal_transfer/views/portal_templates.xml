@@ -45,10 +45,16 @@
 
     <template id="portal_transfer_create" name="Create Internal Transfer">
         <t t-call="portal.portal_layout">
-            <div class="container o_portal_transfer_create py-4">
+            <div class="container o_portal_transfer_create py-4"
+                 t-att-data-source-id="source_location.id if source_location else ''"
+                 t-att-data-source-name="source_location.complete_name if source_location else ''">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                     <h3 class="mb-0">Create Internal Transfer</h3>
                     <a href="/my/transfers" class="btn btn-secondary">My Internal Transfers</a>
+                </div>
+
+                <div t-if="not source_location" class="alert alert-warning">
+                    No source location is mapped for your user. Please contact an administrator.
                 </div>
 
                 <div class="card mb-3 o_portal_transfer_section">
@@ -57,21 +63,21 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Source location</label>
-                                <div class="o_portal_loc_autocomplete">
-                                    <input type="text" class="form-control" id="location_src_search"
-                                           placeholder="Type location name..." autocomplete="off"/>
-                                    <div id="location_src_results" class="o_portal_loc_results list-group mt-2"></div>
+                                <div t-if="source_location" class="alert alert-success mb-0">
+                                    <strong>From:</strong>
+                                    <span id="selected_location_src_label"
+                                          t-esc="source_location.complete_name or source_location.name"/>
                                 </div>
-                                <div id="selected_location_src" class="alert alert-success mt-2 d-none mb-0">
-                                    <strong>From:</strong> <span id="selected_location_src_label"/>
-                                    <button type="button" class="btn btn-sm btn-link" id="btn_clear_location_src">Change</button>
+                                <div t-else="" class="text-muted">
+                                    Not configured
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Destination location</label>
                                 <div class="o_portal_loc_autocomplete">
                                     <input type="text" class="form-control" id="location_dest_search"
-                                           placeholder="Type location name..." autocomplete="off"/>
+                                           placeholder="Type location name..." autocomplete="off"
+                                           t-att-disabled="not source_location"/>
                                     <div id="location_dest_results" class="o_portal_loc_results list-group mt-2"></div>
                                 </div>
                                 <div id="selected_location_dest" class="alert alert-success mt-2 d-none mb-0">
@@ -86,7 +92,8 @@
                 <div class="card mb-3 o_portal_transfer_section">
                     <div class="card-header fw-bold d-flex justify-content-between align-items-center">
                         <span>2. Products</span>
-                        <button type="button" class="btn btn-primary btn-sm" id="btn_open_products">
+                        <button type="button" class="btn btn-primary btn-sm" id="btn_open_products"
+                                t-att-disabled="not source_location">
                             Choose products
                         </button>
                     </div>
@@ -112,8 +119,10 @@
                     <div class="card-body">
                         <p class="text-muted mb-3">
                             Confirming will create the internal transfer and confirm it.
+                            Source location is fixed from your portal mapping.
                         </p>
-                        <button type="button" class="btn btn-success btn-lg" id="btn_confirm_transfer">
+                        <button type="button" class="btn btn-success btn-lg" id="btn_confirm_transfer"
+                                t-att-disabled="not source_location">
                             Confirm Transfer
                         </button>
                         <div id="confirm_error" class="alert alert-danger mt-3 d-none mb-0"/>

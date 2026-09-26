@@ -28,6 +28,49 @@ msgid "Internal Transfer Portal User"
 msgstr "مستخدم بوابة التحويل الداخلي"
 
 #. module: portal_internal_transfer
+#: model:ir.actions.act_window,name:portal_internal_transfer.action_portal_transfer_location_map
+#: model:ir.ui.menu,name:portal_internal_transfer.menu_portal_transfer_location_map
+msgid "Portal Source Locations"
+msgstr "مواقع المصدر للبوابة"
+
+#. module: portal_internal_transfer
+#: model:ir.model.fields,field_description:portal_internal_transfer.field_portal_transfer_location_map__user_id
+msgid "Portal User"
+msgstr "مستخدم البوابة"
+
+#. module: portal_internal_transfer
+#: model:ir.model.fields,field_description:portal_internal_transfer.field_portal_transfer_location_map__location_id
+msgid "Source Location"
+msgstr "موقع المصدر"
+
+#. module: portal_internal_transfer
+#: model_terms:ir.ui.view,arch_db:portal_internal_transfer.portal_transfer_create
+msgid "No source location is mapped for your user. Please contact an administrator."
+msgstr "لا يوجد موقع مصدر مرتبط بمستخدمك. يرجى التواصل مع المسؤول."
+
+#. module: portal_internal_transfer
+#: model_terms:ir.ui.view,arch_db:portal_internal_transfer.portal_transfer_create
+msgid "Not configured"
+msgstr "غير مُعد"
+
+#. module: portal_internal_transfer
+#: model_terms:ir.ui.view,arch_db:portal_internal_transfer.portal_transfer_create
+msgid "Source location is fixed from your portal mapping."
+msgstr "موقع المصدر ثابت من إعداد الربط في البوابة."
+
+#. module: portal_internal_transfer
+#. odoo-python
+#: code:addons/portal_internal_transfer/controllers/main.py:0
+msgid "No source location is mapped for your user. Please contact an administrator."
+msgstr "لا يوجد موقع مصدر مرتبط بمستخدمك. يرجى التواصل مع المسؤول."
+
+#. module: portal_internal_transfer
+#. odoo-python
+#: code:addons/portal_internal_transfer/controllers/main.py:0
+msgid "Please select a destination location."
+msgstr "يرجى اختيار موقع الوجهة."
+
+#. module: portal_internal_transfer
 #: model_terms:ir.ui.view,arch_db:portal_internal_transfer.portal_my_home_transfer_cards
 #: model_terms:ir.ui.view,arch_db:portal_internal_transfer.portal_transfer_create
 #: model_terms:ir.ui.view,arch_db:portal_internal_transfer.portal_breadcrumbs_transfer

@@ -43,8 +43,12 @@ async function fetchLocations(term) {
 }
 
 function initCreatePage(root) {
+    const sourceId = parseInt(root.dataset.sourceId || "", 10);
+    const sourceName = root.dataset.sourceName || "";
     const state = {
-        locationSrc: null,
+        locationSrc: sourceId
+            ? {id: sourceId, name: sourceName}
+            : null,
         locationDest: null,
         cart: {},
         productOffset: 0,
@@ -91,13 +95,15 @@ function initCreatePage(root) {
             labelId,
             clearId,
             stateKey,
-            prefix,
         } = opts;
         const input = qs(inputId, root);
         const results = qs(resultsId, root);
         const selectedBox = qs(selectedId, root);
         const selectedLabel = qs(labelId, root);
         const clearBtn = qs(clearId, root);
+        if (!input || !results || !selectedBox || !selectedLabel || !clearBtn) {
+            return;
+        }
         let timer = null;
         let seq = 0;
 
@@ -180,16 +186,7 @@ function initCreatePage(root) {
         });
     }
 
-    setupLocationSearch({
-        inputId: "#location_src_search",
-        resultsId: "#location_src_results",
-        selectedId: "#selected_location_src",
-        labelId: "#selected_location_src_label",
-        clearId: "#btn_clear_location_src",
-        stateKey: "locationSrc",
-        prefix: "From",
-    });
-
+    // Source comes from backend mapping; destination remains selectable.
     setupLocationSearch({
         inputId: "#location_dest_search",
         resultsId: "#location_dest_results",
@@ -197,9 +194,7 @@ function initCreatePage(root) {
         labelId: "#selected_location_dest_label",
         clearId: "#btn_clear_location_dest",
         stateKey: "locationDest",
-        prefix: "To",
     });
-
     function renderCart() {
         const items = Object.values(state.cart);
         if (!items.length) {
@@ -367,8 +362,15 @@ function initCreatePage(root) {
 
     qs("#btn_confirm_transfer", root).addEventListener("click", async () => {
         confirmError.classList.add("d-none");
-        if (!state.locationSrc || !state.locationDest) {
-            showError(confirmError, "Please select source and destination locations.");
+        if (!state.locationSrc) {
+            showError(
+                confirmError,
+                "No source location is mapped for your user. Please contact an administrator."
+            );
+            return;
+        }
+        if (!state.locationDest) {
+            showError(confirmError, "Please select a destination location.");
             return;
         }
         if (state.locationSrc.id === state.locationDest.id) {
@@ -384,7 +386,6 @@ function initCreatePage(root) {
         btn.disabled = true;
         try {
             const result = await rpc("/my/transfers/api/confirm", {
-                location_id: state.locationSrc.id,
                 location_dest_id: state.locationDest.id,
                 lines,
             });
