@@ -90,17 +90,14 @@
                                     <field name="chairman_user_id" readonly="1"/>
                                     <field name="chairman_date" readonly="1"/>
                                 </group>
+                                <group string="Rejection Info" invisible="state != 'rejected'">
+                                    <field name="rejected_by" readonly="1"/>
+                                    <field name="rejected_stage" readonly="1"/>
+                                </group>
                             </group>
-                        </page>
-                        <page string="Rejection" invisible="state != 'rejected'">
-                            <group>
-                                <field name="rejected_by" readonly="1"/>
-                                <field name="rejected_stage" readonly="1"/>
-                            </group>
-                            <field name="reject_reason"/>
                         </page>
                     </notebook>
-                    <field name="reject_reason" invisible="state not in ('accounting_review', 'gm_review', 'chairman_review')" placeholder="Fill in before rejecting..."/>
+                    <field name="reject_reason" invisible="state not in ('accounting_review', 'gm_review', 'chairman_review') and state != 'rejected'" readonly="state == 'rejected'" placeholder="Fill in before rejecting..."/>
                 </sheet>
                 <chatter/>
             </form>

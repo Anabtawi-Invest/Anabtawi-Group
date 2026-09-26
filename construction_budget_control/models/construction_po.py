@@ -27,7 +27,12 @@ class ConstructionBudgetPo(models.Model):
     company_id = fields.Many2one(related="project_id.company_id", store=True, readonly=True)
     currency_id = fields.Many2one(related="project_id.currency_id", store=True, readonly=True)
     vendor_id = fields.Many2one(
-        "res.partner", string="Vendor / Subcontractor", required=True, tracking=True
+        "res.partner",
+        string="Vendor / Subcontractor",
+        required=True,
+        tracking=True,
+        domain="[('is_construction_vendor', '=', True)]",
+        context="{'default_is_construction_vendor': True, 'default_supplier_rank': 1}",
     )
     po_number = fields.Char(string="PO Reference No.", help="Reference number printed on the uploaded PO document")
     po_date = fields.Date(string="PO Date", default=fields.Date.context_today)
@@ -114,8 +119,8 @@ class ConstructionBudgetPo(models.Model):
         manager_group = self.env.ref(
             "construction_budget_control.group_construction_manager", raise_if_not_found=False
         )
-        allowed = (group and self.env.user in group.users) or (
-            manager_group and self.env.user in manager_group.users
+        allowed = (group and self.env.user in group.user_ids) or (
+            manager_group and self.env.user in manager_group.user_ids
         )
         if not allowed:
             raise AccessError(_("You are not authorized to perform this approval step."))
@@ -124,7 +129,7 @@ class ConstructionBudgetPo(models.Model):
         group = self.env.ref("construction_budget_control.%s" % group_xmlid, raise_if_not_found=False)
         if not group:
             return
-        for user in group.users:
+        for user in group.user_ids:
             self.activity_schedule(
                 "mail.mail_activity_data_todo",
                 summary=_("PO approval required: %s", self.name),

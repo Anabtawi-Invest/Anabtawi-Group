@@ -1,6 +1,6 @@
 {
     "name": "Construction Budget & PO Approval Control",
-    "version": "19.0.1.0.1",
+    "version": "19.0.1.0.0",
     "category": "Construction",
     "summary": "Budget control and multi-level Purchase Order approval workflow for construction projects",
     "description": """
@@ -31,12 +31,13 @@ Features
 """,
     "author": "Custom Development",
     "license": "LGPL-3",
-    "depends": ["mail", "base", "base_setup"],
+    "depends": ["mail", "base"],
     "external_dependencies": {"python": ["xlsxwriter"]},
     "data": [
         "security/construction_security.xml",
         "security/ir.model.access.csv",
         "data/ir_sequence_data.xml",
+        "views/res_partner_views.xml",
         "views/construction_project_views.xml",
         "views/construction_po_views.xml",
         "views/res_config_settings_views.xml",
