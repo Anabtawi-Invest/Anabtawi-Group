@@ -6,4 +6,21 @@
         <field name="padding">4</field>
         <field name="company_id" eval="False"/>
     </record>
+
+    <record id="seq_construction_budget_receipt" model="ir.sequence">
+        <field name="name">Construction Item Receipt Reference</field>
+        <field name="code">construction.budget.receipt</field>
+        <field name="prefix">REC/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_construction_budget_invoice" model="ir.sequence">
+        <field name="name">Construction Vendor Bill Reference</field>
+        <field name="code">construction.budget.invoice</field>
+        <field name="prefix">INV/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
 </odoo>
+

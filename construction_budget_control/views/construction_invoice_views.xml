@@ -1,0 +1,71 @@
+<odoo>
+    <record id="view_construction_invoice_list" model="ir.ui.view">
+        <field name="name">construction.budget.invoice.list</field>
+        <field name="model">construction.budget.invoice</field>
+        <field name="arch" type="xml">
+            <list string="Vendor Bills" decoration-success="state == 'paid'" decoration-info="state == 'posted'" decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="vendor_bill_ref"/>
+                <field name="po_id"/>
+                <field name="project_id"/>
+                <field name="vendor_id"/>
+                <field name="date"/>
+                <field name="due_date"/>
+                <field name="amount" sum="Total Amount"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_construction_invoice_form" model="ir.ui.view">
+        <field name="name">construction.budget.invoice.form</field>
+        <field name="model">construction.budget.invoice</field>
+        <field name="arch" type="xml">
+            <form string="Vendor Bill / Invoice">
+                <header>
+                    <button name="action_post" type="object" string="Post Bill" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_register_payment" type="object" string="Register Payment" class="btn-success" invisible="state != 'posted'"/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state == 'paid'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,posted,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="po_id" readonly="state != 'draft'"/>
+                            <field name="project_id"/>
+                            <field name="vendor_id"/>
+                            <field name="payment_schedule_id" readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="vendor_bill_ref" placeholder="Vendor invoice reference #"/>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="due_date" readonly="state != 'draft'"/>
+                            <field name="amount" readonly="state != 'draft'"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="company_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Notes / Terms">
+                            <field name="notes" placeholder="Additional billing notes or payment instructions..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_construction_invoice" model="ir.actions.act_window">
+        <field name="name">Vendor Bills</field>
+        <field name="res_model">construction.budget.invoice</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Record vendor bills for Purchase Orders</p>
+            <p>Track vendor invoices and payments per PO.</p>
+        </field>
+    </record>
+</odoo>

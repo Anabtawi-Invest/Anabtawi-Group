@@ -84,6 +84,140 @@ class ConstructionBudgetPo(models.Model):
         related="project_id.remaining_budget", string="Project Remaining Budget", readonly=True
     )
 
+    payment_schedule_ids = fields.One2many("construction.budget.po.payment.schedule", "po_id", string="Payment Schedule")
+    receipt_ids = fields.One2many("construction.budget.receipt", "po_id", string="Item Receipts")
+    receipt_count = fields.Integer(compute="_compute_receipt_count")
+
+    invoice_ids = fields.One2many("construction.budget.invoice", "po_id", string="Vendor Invoices")
+    invoice_count = fields.Integer(compute="_compute_invoice_count")
+
+    delivery_status = fields.Selection(
+        [("nothing", "Not Received"), ("partial", "Partially Received"), ("full", "Fully Received")],
+        string="Delivery Status",
+        compute="_compute_delivery_status",
+        store=True,
+        default="nothing",
+    )
+    invoice_status = fields.Selection(
+        [("no", "Nothing to Bill"), ("to_invoice", "To Invoice"), ("invoiced", "Fully Invoiced")],
+        string="Invoicing Status",
+        compute="_compute_invoice_status",
+        store=True,
+        default="no",
+    )
+
+    invoiced_amount = fields.Monetary(string="Invoiced Amount", compute="_compute_invoice_totals", store=True)
+    paid_amount = fields.Monetary(string="Paid Amount", compute="_compute_invoice_totals", store=True)
+
+    @api.depends("receipt_ids")
+    def _compute_receipt_count(self):
+        for rec in self:
+            rec.receipt_count = len(rec.receipt_ids)
+
+    @api.depends("invoice_ids")
+    def _compute_invoice_count(self):
+        for rec in self:
+            rec.invoice_count = len(rec.invoice_ids)
+
+    @api.depends("line_ids.quantity", "line_ids.qty_received", "state")
+    def _compute_delivery_status(self):
+        for rec in self:
+            if rec.state != "approved" or not rec.line_ids:
+                rec.delivery_status = "nothing"
+                continue
+            tot_qty = sum(rec.line_ids.mapped("quantity"))
+            tot_received = sum(rec.line_ids.mapped("qty_received"))
+            if tot_received <= 0:
+                rec.delivery_status = "nothing"
+            elif tot_received >= tot_qty:
+                rec.delivery_status = "full"
+            else:
+                rec.delivery_status = "partial"
+
+    @api.depends("invoice_ids.state", "invoice_ids.amount", "amount", "state")
+    def _compute_invoice_status(self):
+        for rec in self:
+            valid_invoices = rec.invoice_ids.filtered(lambda i: i.state in ("posted", "paid"))
+            total_invoiced = sum(valid_invoices.mapped("amount"))
+            if rec.state != "approved":
+                rec.invoice_status = "no"
+            elif total_invoiced >= rec.amount and rec.amount > 0:
+                rec.invoice_status = "invoiced"
+            elif total_invoiced > 0:
+                rec.invoice_status = "to_invoice"
+            else:
+                rec.invoice_status = "to_invoice"
+
+    @api.depends("invoice_ids.state", "invoice_ids.amount")
+    def _compute_invoice_totals(self):
+        for rec in self:
+            posted = rec.invoice_ids.filtered(lambda i: i.state in ("posted", "paid"))
+            paid = rec.invoice_ids.filtered(lambda i: i.state == "paid")
+            rec.invoiced_amount = sum(posted.mapped("amount"))
+            rec.paid_amount = sum(paid.mapped("amount"))
+
+    def action_create_receipt(self):
+        self.ensure_one()
+        if self.state != "approved":
+            raise UserError(_("Receipts can only be created for approved Purchase Orders."))
+        lines = []
+        for line in self.line_ids:
+            rem = max(0.0, line.quantity - line.qty_received)
+            lines.append((0, 0, {
+                "po_line_id": line.id,
+                "quantity_received": rem,
+            }))
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Receive Items"),
+            "res_model": "construction.budget.receipt",
+            "view_mode": "form",
+            "target": "current",
+            "context": {
+                "default_po_id": self.id,
+                "default_line_ids": lines,
+            },
+        }
+
+    def action_view_receipts(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Item Receipts"),
+            "res_model": "construction.budget.receipt",
+            "view_mode": "list,form",
+            "domain": [("po_id", "=", self.id)],
+            "context": {"default_po_id": self.id},
+        }
+
+    def action_create_invoice(self):
+        self.ensure_one()
+        if self.state != "approved":
+            raise UserError(_("Vendor bills can only be created for approved Purchase Orders."))
+        rem_amount = max(0.0, self.amount - self.invoiced_amount)
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Create Vendor Bill"),
+            "res_model": "construction.budget.invoice",
+            "view_mode": "form",
+            "target": "current",
+            "context": {
+                "default_po_id": self.id,
+                "default_amount": rem_amount,
+            },
+        }
+
+    def action_view_invoices(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Vendor Bills"),
+            "res_model": "construction.budget.invoice",
+            "view_mode": "list,form",
+            "domain": [("po_id", "=", self.id)],
+            "context": {"default_po_id": self.id},
+        }
+
     @api.depends("line_ids.subtotal", "amount")
     def _compute_lines_total(self):
         for rec in self:

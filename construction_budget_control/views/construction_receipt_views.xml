@@ -1,0 +1,75 @@
+<odoo>
+    <record id="view_construction_receipt_list" model="ir.ui.view">
+        <field name="name">construction.budget.receipt.list</field>
+        <field name="model">construction.budget.receipt</field>
+        <field name="arch" type="xml">
+            <list string="Item Receipts" decoration-success="state == 'done'" decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="po_id"/>
+                <field name="project_id"/>
+                <field name="vendor_id"/>
+                <field name="date"/>
+                <field name="reference"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_construction_receipt_form" model="ir.ui.view">
+        <field name="name">construction.budget.receipt.form</field>
+        <field name="model">construction.budget.receipt</field>
+        <field name="arch" type="xml">
+            <form string="Item Receipt / Delivery Note">
+                <header>
+                    <button name="action_validate" type="object" string="Validate Receipt" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state == 'done'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="po_id" readonly="state != 'draft'"/>
+                            <field name="project_id"/>
+                            <field name="vendor_id"/>
+                        </group>
+                        <group>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="reference" placeholder="e.g. Waybill / Delivery Note #"/>
+                            <field name="company_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Received Items">
+                            <field name="line_ids" readonly="state != 'draft'">
+                                <list editable="bottom">
+                                    <field name="po_line_id" domain="[('po_id', '=', parent.po_id)]"/>
+                                    <field name="description"/>
+                                    <field name="uom"/>
+                                    <field name="quantity_ordered"/>
+                                    <field name="quantity_received"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes">
+                            <field name="notes" placeholder="Inspection comments or delivery notes..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_construction_receipt" model="ir.actions.act_window">
+        <field name="name">Item Receipts</field>
+        <field name="res_model">construction.budget.receipt</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Record item receipts for Purchase Orders</p>
+            <p>Log goods and materials delivered to site against approved POs.</p>
+        </field>
+    </record>
+</odoo>

@@ -39,6 +39,8 @@ Features
         "data/ir_sequence_data.xml",
         "views/res_partner_views.xml",
         "views/construction_project_views.xml",
+        "views/construction_receipt_views.xml",
+        "views/construction_invoice_views.xml",
         "views/construction_po_views.xml",
         "views/res_config_settings_views.xml",
         "views/construction_menus.xml",

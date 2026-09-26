@@ -26,12 +26,22 @@
                     <button name="action_accounting_approve" type="object" string="Approve (Accounting)" class="btn-primary" invisible="state != 'accounting_review'" groups="construction_budget_control.group_construction_accounting_approver"/>
                     <button name="action_gm_approve" type="object" string="Approve (General Manager)" class="btn-primary" invisible="state != 'gm_review'" groups="construction_budget_control.group_construction_gm_approver"/>
                     <button name="action_chairman_approve" type="object" string="Approve (Chairman)" class="btn-primary" invisible="state != 'chairman_review'" groups="construction_budget_control.group_construction_chairman_approver"/>
+                    <button name="action_create_receipt" type="object" string="Receive Items" class="btn-primary" invisible="state != 'approved'"/>
+                    <button name="action_create_invoice" type="object" string="Create Vendor Bill" class="btn-primary" invisible="state != 'approved'"/>
                     <button name="action_reject" type="object" string="Reject" class="btn-danger" invisible="state not in ('accounting_review', 'gm_review', 'chairman_review')"/>
                     <button name="action_reset_to_draft" type="object" string="Reset to Draft" invisible="state != 'rejected'"/>
                     <button name="action_cancel" type="object" string="Cancel" invisible="state != 'draft'"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,accounting_review,gm_review,chairman_review,approved"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_receipts" type="object" class="oe_stat_button" icon="fa-truck" invisible="state != 'approved'">
+                            <field name="receipt_count" widget="statinfo" string="Receipts"/>
+                        </button>
+                        <button name="action_view_invoices" type="object" class="oe_stat_button" icon="fa-pencil-square-o" invisible="state != 'approved'">
+                            <field name="invoice_count" widget="statinfo" string="Vendor Bills"/>
+                        </button>
+                    </div>
                     <widget name="web_ribbon" title="Rejected" bg_color="text-bg-danger" invisible="state != 'rejected'"/>
                     <widget name="web_ribbon" title="Approved" bg_color="text-bg-success" invisible="state != 'approved'"/>
                     <div class="oe_title">
@@ -53,6 +63,8 @@
                             <field name="lines_total"/>
                             <field name="project_remaining_budget"/>
                             <field name="requested_by"/>
+                            <field name="delivery_status" widget="badge" invisible="state != 'approved'"/>
+                            <field name="invoice_status" widget="badge" invisible="state != 'approved'"/>
                         </group>
                     </group>
                     <field name="description" placeholder="Scope of work / description..."/>
@@ -64,11 +76,42 @@
                                     <field name="description"/>
                                     <field name="uom"/>
                                     <field name="quantity"/>
+                                    <field name="qty_received" readonly="1" string="Received Qty"/>
                                     <field name="unit_price"/>
                                     <field name="subtotal" sum="Total"/>
                                 </list>
                             </field>
                             <button name="action_export_bom_excel" type="object" string="Export BOM to Excel" class="btn-secondary mt-2" icon="fa-file-excel-o"/>
+                        </page>
+                        <page string="Payment Schedule">
+                            <field name="payment_schedule_ids">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="due_date"/>
+                                    <field name="amount_type"/>
+                                    <field name="percentage"/>
+                                    <field name="amount" sum="Total Schedule Amount"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Invoices &amp; Payments" invisible="state != 'approved'">
+                            <group>
+                                <group string="Billing Summary">
+                                    <field name="invoiced_amount" readonly="1"/>
+                                    <field name="paid_amount" readonly="1"/>
+                                </group>
+                            </group>
+                            <field name="invoice_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="vendor_bill_ref"/>
+                                    <field name="date"/>
+                                    <field name="due_date"/>
+                                    <field name="amount" sum="Total"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
                         </page>
                         <page string="Document">
                             <field name="po_document" filename="po_document_filename"/>
