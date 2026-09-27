@@ -87,6 +87,7 @@ class PosReportingDashboard(models.TransientModel):
                 "discount_amount": 0.0,
                 "cash": 0.0,
                 "visa": 0.0,
+                "online_sales": 0.0,
                 "employee_debt": 0.0,
                 "hospitality": 0.0,
                 "talabat": 0.0,
@@ -109,48 +110,76 @@ class PosReportingDashboard(models.TransientModel):
                 "delivery_amount": 0.0,
                 "order_count": 0,
                 "orders_per_min": 0.0,
+                "attendant_employee_count": 0,
+                "total_labor_cost": 0.0,
             }
 
         branch_data = defaultdict(_empty_branch_dict)
 
+        # Helper for classification
+        def _classify_pm(pm):
+            daily_type = getattr(pm, "daily_ops_report_type", "") or ""
+            pm_type = getattr(pm, "type", "") or ""
+            pm_name = (pm.name or "").lower()
+
+            is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
+            is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
+            
+            online_kw = ("talabat", "careem", "mythings", "kabseh", "طلبات", "كريم", "أشياتي", "توصيل", "delivery", "online")
+            is_online = any(k in pm_name for k in online_kw) or daily_type in ("talabat", "careem", "mythings", "kabseh", "online")
+
+            is_cash = not (is_emp or is_hosp or is_online) and (
+                daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name or "صندوق" in pm_name
+            )
+
+            is_visa = not (is_emp or is_hosp or is_online or is_cash) and (
+                daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
+            )
+
+            return is_emp, is_hosp, is_online, is_cash, is_visa, pm_name
+
         # --- A. Collect POS Payments & Channel Breakdown ---
         payments = self.env["pos.payment"].sudo().search([
+            ("pos_order_id.state", "in", ("paid", "done", "invoiced")),
             "|",
             "&", ("payment_date", ">=", str_start), ("payment_date", "<=", str_end),
             "&", ("payment_date", "=", False),
                  "&", ("pos_order_id.date_order", ">=", str_start), ("pos_order_id.date_order", "<=", str_end),
         ])
 
+        # Group payments by POS Order to rebalance non-cash change adjustments
+        order_payments = defaultdict(list)
+        session_only_payments = []
+
         for pay in payments:
-            cfg = pay.session_id.config_id if pay.session_id else (pay.pos_order_id.config_id if pay.pos_order_id else False)
+            if pay.pos_order_id:
+                order_payments[pay.pos_order_id].append(pay)
+            else:
+                session_only_payments.append(pay)
+
+        # Process session-only payments
+        for pay in session_only_payments:
+            cfg = pay.session_id.config_id if pay.session_id else False
             if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                 continue
-
             cfg_id = cfg.id
             amt = pay.amount or 0.0
             branch_data[cfg_id]["sales"] += amt
+            is_emp, is_hosp, is_online, is_cash, is_visa, pm_name = _classify_pm(pay.payment_method_id)
 
-            pm = pay.payment_method_id
-            daily_type = getattr(pm, "daily_ops_report_type", "")
-            pm_type = getattr(pm, "type", "")
-            pm_name = (pm.name or "").lower()
-
-            is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
-            is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
-
-            # Payment Classification
             if is_emp:
                 branch_data[cfg_id]["employee_debt"] += amt
             elif is_hosp:
                 branch_data[cfg_id]["hospitality"] += amt
-            elif daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name:
+            elif is_online:
+                branch_data[cfg_id]["online_sales"] += amt
+            elif is_cash:
                 branch_data[cfg_id]["cash"] += amt
-            elif daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name:
+            elif is_visa:
                 branch_data[cfg_id]["visa"] += amt
             else:
                 branch_data[cfg_id]["other_sales"] += amt
 
-            # Delivery Partner Channels
             if "talabat" in pm_name:
                 branch_data[cfg_id]["talabat"] += amt
             elif "careem" in pm_name:
@@ -159,6 +188,69 @@ class PosReportingDashboard(models.TransientModel):
                 branch_data[cfg_id]["mythings"] += amt
             elif "kabseh" in pm_name:
                 branch_data[cfg_id]["kabseh"] += amt
+
+        # Process order payments with cross-method change rebalancing
+        for order, pay_list in order_payments.items():
+            cfg = order.config_id
+            if not cfg or (active_config_ids and cfg.id not in active_config_ids):
+                continue
+            cfg_id = cfg.id
+
+            cat_amounts = defaultdict(float)
+            pm_names = {}
+
+            for pay in pay_list:
+                amt = pay.amount or 0.0
+                pm = pay.payment_method_id
+                is_emp, is_hosp, is_online, is_cash, is_visa, pm_name = _classify_pm(pm)
+                pm_names[pay.id] = pm_name
+
+                if is_emp:
+                    cat_amounts["employee_debt"] += amt
+                elif is_hosp:
+                    cat_amounts["hospitality"] += amt
+                elif is_online:
+                    cat_amounts["online_sales"] += amt
+                elif is_cash:
+                    cat_amounts["cash"] += amt
+                elif is_visa:
+                    cat_amounts["visa"] += amt
+                else:
+                    cat_amounts["other_sales"] += amt
+
+                if "talabat" in pm_name:
+                    branch_data[cfg_id]["talabat"] += amt
+                elif "careem" in pm_name:
+                    branch_data[cfg_id]["careem"] += amt
+                elif "mythings" in pm_name:
+                    branch_data[cfg_id]["mythings"] += amt
+                elif "kabseh" in pm_name:
+                    branch_data[cfg_id]["kabseh"] += amt
+
+            # If cash is negative (change given) but non-cash methods cover the order total
+            non_cash_sum = cat_amounts["visa"] + cat_amounts["online_sales"] + cat_amounts["employee_debt"] + cat_amounts["hospitality"] + cat_amounts["other_sales"]
+            if cat_amounts["cash"] < 0 and non_cash_sum > 0:
+                ord_tot = order.amount_total or 0.0
+                if ord_tot >= 0:
+                    excess = max(0.0, non_cash_sum - ord_tot)
+                    if excess > 0:
+                        # Rebalance: cap non-cash to actual order total and remove negative cash drag
+                        scale = ord_tot / non_cash_sum if non_cash_sum > 0 else 1.0
+                        cat_amounts["visa"] *= scale
+                        cat_amounts["online_sales"] *= scale
+                        cat_amounts["employee_debt"] *= scale
+                        cat_amounts["hospitality"] *= scale
+                        cat_amounts["other_sales"] *= scale
+                        cat_amounts["cash"] = max(0.0, cat_amounts["cash"] + excess)
+
+            order_sales = sum(cat_amounts.values())
+            branch_data[cfg_id]["sales"] += order_sales
+            branch_data[cfg_id]["cash"] += cat_amounts["cash"]
+            branch_data[cfg_id]["visa"] += cat_amounts["visa"]
+            branch_data[cfg_id]["online_sales"] += cat_amounts["online_sales"]
+            branch_data[cfg_id]["employee_debt"] += cat_amounts["employee_debt"]
+            branch_data[cfg_id]["hospitality"] += cat_amounts["hospitality"]
+            branch_data[cfg_id]["other_sales"] += cat_amounts["other_sales"]
 
         # --- B. Collect POS Orders ---
         pos_orders = self.env["pos.order"].sudo().search([
@@ -307,7 +399,58 @@ class PosReportingDashboard(models.TransientModel):
                         if adv.state in ("confirmed", "advance_paid"):
                             branch_data[pick_cfg_id]["advance_pending_count"] += 1
 
-        # --- F. Build Rows & Global Totals ---
+        # Helper to map employee to POS config / branch
+        def _get_employee_pos_config(emp):
+            if hasattr(emp, "pos_config_id") and emp.pos_config_id:
+                return emp.pos_config_id
+            if hasattr(emp, "pos_config_ids") and emp.pos_config_ids:
+                return emp.pos_config_ids[0]
+            dept_name = (emp.department_id.name or "").strip().lower() if emp.department_id else ""
+            loc_name = (emp.work_location_id.name or "").strip().lower() if hasattr(emp, "work_location_id") and emp.work_location_id else ""
+            for cfg in configs:
+                cfg_name = (cfg.name or "").strip().lower()
+                if (dept_name and (dept_name in cfg_name or cfg_name in dept_name)) or (loc_name and (loc_name in cfg_name or cfg_name in loc_name)):
+                    return cfg
+            company_cfgs = [c for c in configs if c.company_id.id == emp.company_id.id]
+            if len(company_cfgs) == 1:
+                return company_cfgs[0]
+            return False
+
+        # --- F. Collect Attendance & Calculate Daily Employee Labor Cost ---
+        if "hr.attendance" in self.env:
+            import calendar
+            attendances = self.env["hr.attendance"].sudo().search([
+                ("check_in", ">=", str_start),
+                ("check_in", "<=", str_end),
+            ])
+            branch_daily_attendants = defaultdict(lambda: defaultdict(set))
+            for att in attendances:
+                emp = att.employee_id
+                if not emp:
+                    continue
+                cfg = _get_employee_pos_config(emp)
+                if not cfg or (active_config_ids and cfg.id not in active_config_ids):
+                    continue
+                att_date = att.check_in.date()
+                branch_daily_attendants[cfg.id][att_date].add(emp)
+
+            for cfg_id, daily_map in branch_daily_attendants.items():
+                all_attending_emp_ids = set()
+                total_cost = 0.0
+                for att_date, emp_set in daily_map.items():
+                    all_attending_emp_ids.update(e.id for e in emp_set)
+                    num_days = calendar.monthrange(att_date.year, att_date.month)[1]
+                    for emp in emp_set:
+                        wage = getattr(emp, "wage", 0.0) or (
+                            emp.contract_id.wage if (hasattr(emp, "contract_id") and emp.contract_id and emp.contract_id.wage) else 0.0
+                        ) or 0.0
+                        daily_cost = wage / float(num_days) if num_days > 0 else 0.0
+                        total_cost += daily_cost
+
+                branch_data[cfg_id]["attendant_employee_count"] = len(all_attending_emp_ids)
+                branch_data[cfg_id]["total_labor_cost"] = round(total_cost, 3)
+
+        # --- G. Build Rows & Global Totals ---
         branch_rows = []
         global_totals = _empty_branch_dict()
 
@@ -325,6 +468,7 @@ class PosReportingDashboard(models.TransientModel):
         channels = [
             {"name": _("Cash Sales"), "value": global_totals["cash"], "color": "#28a745"},
             {"name": _("Visa / Card"), "value": global_totals["visa"], "color": "#007bff"},
+            {"name": _("Online & Delivery"), "value": global_totals["online_sales"], "color": "#fd7e14"},
             {"name": _("Debt Sales (مبيعات الذمم)"), "value": global_totals["employee_debt"], "color": "#6f42c1"},
             {"name": _("Hospitality"), "value": global_totals["hospitality"], "color": "#ffc107"},
             {"name": _("Talabat"), "value": global_totals["talabat"], "color": "#fd7e14"},
@@ -359,12 +503,8 @@ class PosReportingDashboard(models.TransientModel):
                 amt = p.amount or 0.0
                 day_total += amt
 
-                pm = p.payment_method_id
-                daily_type = getattr(pm, "daily_ops_report_type", "")
-                pm_type = getattr(pm, "type", "")
-                pm_name = (pm.name or "").lower()
-
-                if daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name:
+                is_emp, is_hosp, is_online, is_cash, is_visa, pm_name = _classify_pm(p.payment_method_id)
+                if is_cash:
                     day_cash += amt
 
             day_visa = day_total - day_cash
@@ -396,6 +536,7 @@ class PosReportingDashboard(models.TransientModel):
                 "discount_amount": global_totals["discount_amount"],
                 "cash_sales": global_totals["cash"],
                 "visa_sales": global_totals["visa"],
+                "online_sales": global_totals["online_sales"],
                 "employee_debt": global_totals["employee_debt"],
                 "hospitality_sales": global_totals["hospitality"],
                 "cash_in": global_totals["cash_in"],
@@ -413,6 +554,8 @@ class PosReportingDashboard(models.TransientModel):
                 "delivery_amount": global_totals["delivery_amount"],
                 "order_count": global_totals["order_count"],
                 "orders_per_min": global_totals["orders_per_min"],
+                "attendant_employee_count": global_totals["attendant_employee_count"],
+                "total_labor_cost": global_totals["total_labor_cost"],
             },
             "branches": branch_rows,
             "global_totals": global_totals,
@@ -440,42 +583,82 @@ class PosReportingDashboard(models.TransientModel):
         configs = self.env["pos.config"].sudo().search(config_domain)
         active_config_ids = set(configs.ids)
 
+        def _get_employee_pos_config(emp):
+            if hasattr(emp, "pos_config_id") and emp.pos_config_id:
+                return emp.pos_config_id
+            if hasattr(emp, "pos_config_ids") and emp.pos_config_ids:
+                return emp.pos_config_ids[0]
+            dept_name = (emp.department_id.name or "").strip().lower() if emp.department_id else ""
+            loc_name = (emp.work_location_id.name or "").strip().lower() if hasattr(emp, "work_location_id") and emp.work_location_id else ""
+            for cfg in configs:
+                cfg_name = (cfg.name or "").strip().lower()
+                if (dept_name and (dept_name in cfg_name or cfg_name in dept_name)) or (loc_name and (loc_name in cfg_name or cfg_name in loc_name)):
+                    return cfg
+            company_cfgs = [c for c in configs if c.company_id.id == emp.company_id.id]
+            if len(company_cfgs) == 1:
+                return company_cfgs[0]
+            return False
+
         # Clear previous transient drill-down records for current user
         self.env["pos.unified.report"].sudo().search([("create_uid", "=", self.env.user.id)]).unlink()
 
         vals_list = []
 
-        if metric_type in ("sales", "cash_sales", "visa_sales", "employee_debt"):
+        # Classification helper
+        def _classify_pm(pm):
+            daily_type = getattr(pm, "daily_ops_report_type", "") or ""
+            pm_type = getattr(pm, "type", "") or ""
+            pm_name = (pm.name or "").lower()
+
+            is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
+            is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
+
+            online_kw = ("talabat", "careem", "mythings", "kabseh", "طلبات", "كريم", "أشياتي", "توصيل", "delivery", "online")
+            is_online = any(k in pm_name for k in online_kw) or daily_type in ("talabat", "careem", "mythings", "kabseh", "online")
+
+            is_cash = not (is_emp or is_hosp or is_online) and (
+                daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name or "صندوق" in pm_name
+            )
+
+            is_visa = not (is_emp or is_hosp or is_online or is_cash) and (
+                daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
+            )
+
+            return is_emp, is_hosp, is_online, is_cash, is_visa
+
+        if metric_type in ("sales", "cash_sales", "visa_sales", "employee_debt", "online_sales"):
             payments = self.env["pos.payment"].sudo().search([
+                ("pos_order_id.state", "in", ("paid", "done", "invoiced")),
                 "|",
                 "&", ("payment_date", ">=", str_start), ("payment_date", "<=", str_end),
                 "&", ("payment_date", "=", False),
                      "&", ("pos_order_id.date_order", ">=", str_start), ("pos_order_id.date_order", "<=", str_end),
             ])
+
+            order_payments = defaultdict(list)
+            session_only_payments = []
+
             for pay in payments:
-                cfg = pay.session_id.config_id if pay.session_id else (pay.pos_order_id.config_id if pay.pos_order_id else False)
+                if pay.pos_order_id:
+                    order_payments[pay.pos_order_id].append(pay)
+                else:
+                    session_only_payments.append(pay)
+
+            # Process session-only payments
+            for pay in session_only_payments:
+                cfg = pay.session_id.config_id if pay.session_id else False
                 if not cfg or cfg.id not in active_config_ids:
                     continue
-
+                amt = pay.amount or 0.0
                 pm = pay.payment_method_id
-                daily_type = getattr(pm, "daily_ops_report_type", "")
-                pm_type = getattr(pm, "type", "")
-                pm_name = (pm.name or "").lower()
-
-                is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
-                is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
-
-                if is_emp or is_hosp:
-                    is_cash = False
-                    is_visa = False
-                else:
-                    is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
-                    is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
+                is_emp, is_hosp, is_online, is_cash, is_visa = _classify_pm(pm)
 
                 include = False
                 if metric_type == "sales":
                     include = True
                 elif metric_type == "employee_debt" and is_emp:
+                    include = True
+                elif metric_type == "online_sales" and is_online:
                     include = True
                 elif metric_type == "cash_sales" and is_cash:
                     include = True
@@ -483,36 +666,120 @@ class PosReportingDashboard(models.TransientModel):
                     include = True
 
                 if include:
-                    amt = pay.amount or 0.0
-                    po = pay.pos_order_id
-                    tax_amt = getattr(po, "amount_tax", 0.0) or 0.0 if po else 0.0
-                    tot_amt = getattr(po, "amount_total", 0.0) or 0.0 if po else amt
-                    untaxed_amt = getattr(po, "amount_untaxed", None) if po else None
-                    if untaxed_amt is None:
-                        untaxed_amt = tot_amt - tax_amt
-                    order_disc = sum(
-                        (l.price_unit or 0.0) * (l.qty or 0.0) * (l.discount / 100.0)
-                        for l in po.lines if l.discount
-                    ) if po else 0.0
-
                     vals_list.append({
-                        "name": po.name if po else (pay.name or _("POS Payment")),
-                        "date": pay.payment_date or (po.date_order if po else dt_start),
+                        "name": pay.name or _("POS Payment"),
+                        "date": pay.payment_date or dt_start,
                         "config_id": cfg.id,
                         "session_id": pay.session_id.id if pay.session_id else False,
                         "payment_method_id": pm.id,
-                        "pos_order_id": po.id if po else False,
-                        "report_type": "pos_sales",
+                        "report_type": "online_sales" if is_online else "pos_sales",
                         "amount": amt,
-                        "untaxed_amount": untaxed_amt,
-                        "tax_amount": tax_amt,
-                        "discount_amount": order_disc,
+                        "untaxed_amount": amt,
+                        "tax_amount": 0.0,
+                        "discount_amount": 0.0,
                         "employee_debt_amount": amt if is_emp else 0.0,
                         "cash_amount": amt if is_cash else 0.0,
                         "visa_amount": amt if is_visa else 0.0,
-                        "partner_id": po.partner_id.id if po else False,
+                        "online_amount": amt if is_online else 0.0,
                         "company_id": cfg.company_id.id,
                     })
+
+            # Process order payments with cross-method change rebalancing (matching get_dashboard_data)
+            for po, pay_list in order_payments.items():
+                cfg = po.config_id
+                if not cfg or cfg.id not in active_config_ids:
+                    continue
+
+                cat_amounts = defaultdict(float)
+                for pay in pay_list:
+                    amt = pay.amount or 0.0
+                    pm = pay.payment_method_id
+                    is_emp, is_hosp, is_online, is_cash, is_visa = _classify_pm(pm)
+
+                    if is_emp:
+                        cat_amounts["employee_debt"] += amt
+                    elif is_hosp:
+                        cat_amounts["hospitality"] += amt
+                    elif is_online:
+                        cat_amounts["online_sales"] += amt
+                    elif is_cash:
+                        cat_amounts["cash"] += amt
+                    elif is_visa:
+                        cat_amounts["visa"] += amt
+                    else:
+                        cat_amounts["other_sales"] += amt
+
+                non_cash_sum = cat_amounts["visa"] + cat_amounts["online_sales"] + cat_amounts["employee_debt"] + cat_amounts["hospitality"] + cat_amounts["other_sales"]
+                scale = 1.0
+                cash_rebalanced_total = cat_amounts["cash"]
+                if cat_amounts["cash"] < 0 and non_cash_sum > 0:
+                    ord_tot = po.amount_total or 0.0
+                    if ord_tot >= 0:
+                        excess = max(0.0, non_cash_sum - ord_tot)
+                        if excess > 0:
+                            scale = ord_tot / non_cash_sum if non_cash_sum > 0 else 1.0
+                            cash_rebalanced_total = max(0.0, cat_amounts["cash"] + excess)
+
+                tax_amt_full = getattr(po, "amount_tax", 0.0) or 0.0
+                tot_amt_full = getattr(po, "amount_total", 0.0) or 0.0
+                untaxed_amt_full = getattr(po, "amount_untaxed", None)
+                if untaxed_amt_full is None:
+                    untaxed_amt_full = tot_amt_full - tax_amt_full
+                order_disc_full = sum(
+                    (l.price_unit or 0.0) * (l.qty or 0.0) * (l.discount / 100.0)
+                    for l in po.lines if l.discount
+                )
+
+                for pay in pay_list:
+                    amt = pay.amount or 0.0
+                    pm = pay.payment_method_id
+                    is_emp, is_hosp, is_online, is_cash, is_visa = _classify_pm(pm)
+
+                    if is_cash:
+                        if cat_amounts["cash"] < 0 and cash_rebalanced_total >= 0:
+                            effective_amt = max(0.0, amt * (cash_rebalanced_total / cat_amounts["cash"])) if cat_amounts["cash"] != 0 else 0.0
+                        else:
+                            effective_amt = amt
+                    else:
+                        effective_amt = amt * scale
+
+                    include = False
+                    if metric_type == "sales":
+                        include = True
+                    elif metric_type == "employee_debt" and is_emp:
+                        include = True
+                    elif metric_type == "online_sales" and is_online:
+                        include = True
+                    elif metric_type == "cash_sales" and is_cash:
+                        include = True
+                    elif metric_type == "visa_sales" and is_visa:
+                        include = True
+
+                    if include:
+                        ratio = (effective_amt / tot_amt_full) if (tot_amt_full and tot_amt_full != 0.0) else 1.0
+                        untaxed_amt = untaxed_amt_full * ratio
+                        tax_amt = tax_amt_full * ratio
+                        order_disc = order_disc_full * ratio
+
+                        vals_list.append({
+                            "name": po.name or pay.name or _("POS Payment"),
+                            "date": pay.payment_date or po.date_order or dt_start,
+                            "config_id": cfg.id,
+                            "session_id": pay.session_id.id if pay.session_id else False,
+                            "payment_method_id": pm.id,
+                            "pos_order_id": po.id,
+                            "report_type": "online_sales" if is_online else "pos_sales",
+                            "amount": effective_amt,
+                            "untaxed_amount": untaxed_amt,
+                            "tax_amount": tax_amt,
+                            "discount_amount": order_disc,
+                            "employee_debt_amount": effective_amt if is_emp else 0.0,
+                            "cash_amount": effective_amt if is_cash else 0.0,
+                            "visa_amount": effective_amt if is_visa else 0.0,
+                            "online_amount": effective_amt if is_online else 0.0,
+                            "partner_id": po.partner_id.id if po.partner_id else False,
+                            "company_id": cfg.company_id.id,
+                        })
 
         elif metric_type in ("untaxed_sales", "tax_amount", "discount_amount"):
             pos_orders = self.env["pos.order"].sudo().search([
@@ -659,6 +926,39 @@ class PosReportingDashboard(models.TransientModel):
                             "company_id": cfg.company_id.id,
                         })
 
+        elif metric_type in ("attendant_employees", "labor_cost"):
+            if "hr.attendance" in self.env:
+                import calendar
+                attendances = self.env["hr.attendance"].sudo().search([
+                    ("check_in", ">=", str_start),
+                    ("check_in", "<=", str_end),
+                ])
+                for att in attendances:
+                    emp = att.employee_id
+                    if not emp:
+                        continue
+                    cfg = _get_employee_pos_config(emp)
+                    if not cfg or cfg.id not in active_config_ids:
+                        continue
+                    att_date = att.check_in.date()
+                    num_days = calendar.monthrange(att_date.year, att_date.month)[1]
+                    wage = getattr(emp, "wage", 0.0) or (
+                        emp.contract_id.wage if (hasattr(emp, "contract_id") and emp.contract_id and emp.contract_id.wage) else 0.0
+                    ) or 0.0
+                    daily_cost = wage / float(num_days) if num_days > 0 else 0.0
+
+                    vals_list.append({
+                        "name": _("%s - Daily Wage (%s JOD)") % (emp.name, f"{daily_cost:.3f}"),
+                        "date": att.check_in,
+                        "config_id": cfg.id,
+                        "report_type": "labor_cost" if metric_type == "labor_cost" else "attendant_employees",
+                        "amount": daily_cost,
+                        "labor_cost_amount": daily_cost,
+                        "attendant_employee_count": 1,
+                        "employee_id": emp.id,
+                        "company_id": cfg.company_id.id,
+                    })
+
         if vals_list:
             self.env["pos.unified.report"].sudo().create(vals_list)
 
@@ -674,10 +974,13 @@ class PosReportingDashboard(models.TransientModel):
             "discount_amount": _("Order Discount Transactions"),
             "cash_sales": _("Cash Sales Transactions"),
             "visa_sales": _("Visa & Card Sales Transactions"),
+            "online_sales": _("Online & Delivery Sales Transactions"),
             "employee_debt": _("Debt Sales (مبيعات الذمم) Transactions"),
             "net_cash_moves": _("Cash Moves (In / Out) Transactions"),
             "net_pledges": _("Pledges (Rahen In / Out) Transactions"),
             "advance_deposits": _("Advance Order Deposit Transactions"),
+            "attendant_employees": _("Attendant Employees Breakdown"),
+            "labor_cost": _("Daily Employee Labor Cost Breakdown"),
         }
         title = metric_titles.get(metric_type, _("Metric Drill-Down Transactions"))
 

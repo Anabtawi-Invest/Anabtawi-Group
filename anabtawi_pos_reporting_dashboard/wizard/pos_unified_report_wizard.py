@@ -67,166 +67,20 @@ class PosUnifiedReportWizard(models.TransientModel):
 
     def action_open_pivot(self):
         self.ensure_one()
-        dt_start = self._to_datetime(self.date_from) or datetime.combine(fields.Date.context_today(self), time.min)
-        dt_end = self._to_datetime(self.date_to) or datetime.combine(fields.Date.context_today(self), time.max)
-        str_start = fields.Datetime.to_string(dt_start)
-        str_end = fields.Datetime.to_string(dt_end)
-
-        # Clear previous transient report records for current user
-        self.env["pos.unified.report"].sudo().search([("create_uid", "=", self.env.user.id)]).unlink()
-
-        config_domain = [("active", "=", True)]
-        if self.config_ids:
-            config_domain.append(("id", "in", self.config_ids.ids))
-        configs = self.env["pos.config"].sudo().search(config_domain)
-        active_config_ids = set(configs.ids)
-
-        vals_list = []
-
-        # POS Payments
-        payments = self.env["pos.payment"].sudo().search([
-            ("session_id.config_id", "in", list(active_config_ids)),
-            ("payment_date", ">=", str_start),
-            ("payment_date", "<=", str_end),
-        ])
-        for pay in payments:
-            amt = pay.amount or 0.0
-            pm = pay.payment_method_id
-            daily_type = getattr(pm, "daily_ops_report_type", "")
-            pm_type = getattr(pm, "type", "")
-            pm_name = (pm.name or "").lower()
-
-            is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
-            is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
-
-            if is_emp:
-                is_cash = False
-                is_visa = False
-            elif is_hosp:
-                is_cash = False
-                is_visa = False
-            else:
-                is_cash = daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name
-                is_visa = daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
-
-            vals_list.append({
-                "name": pay.pos_order_id.name or pay.name or _("POS Payment"),
-                "date": pay.payment_date or self.date_from,
-                "config_id": pay.session_id.config_id.id,
-                "session_id": pay.session_id.id,
-                "payment_method_id": pm.id,
-                "report_type": "pos_sales",
-                "amount": amt,
-                "cash_amount": amt if is_cash else 0.0,
-                "visa_amount": amt if is_visa else 0.0,
-                "employee_debt_amount": amt if is_emp else 0.0,
-                "partner_id": pay.pos_order_id.partner_id.id if pay.pos_order_id else False,
-            })
-
-        # Statement Lines (Cash In / Out)
-        st_lines = self.env["account.bank.statement.line"].sudo().search([
-            ("pos_session_id.config_id", "in", list(active_config_ids)),
-            ("date", ">=", dt_start.date()),
-            ("date", "<=", dt_end.date()),
-        ])
-        for st in st_lines:
-            amt = st.amount or 0.0
-            is_in = amt > 0
-            st_dt = st.create_date or (datetime.combine(st.date, time.min) if st.date else self.date_from)
-            vals_list.append({
-                "name": st.payment_ref or st.ref or _("Cash Move"),
-                "date": st_dt,
-                "config_id": st.pos_session_id.config_id.id,
-                "session_id": st.pos_session_id.id,
-                "report_type": "cash_in" if is_in else "cash_out",
-                "amount": abs(amt),
-                "cash_in_amount": amt if is_in else 0.0,
-                "cash_out_amount": abs(amt) if not is_in else 0.0,
-                "partner_id": st.partner_id.id,
-            })
-
-        # Pledges (Rahen In / Out)
-        if "pos.advance.order.pledge" in self.env:
-            pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([
-                "|",
-                "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
-                "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
-            ])
-            for pledge in pledge_recs:
-                cfg_id = False
-                if pledge.pos_order_id:
-                    cfg_id = pledge.pos_order_id.config_id.id
-                elif pledge.order_id and hasattr(pledge.order_id, "pos_config_id"):
-                    cfg_id = pledge.order_id.pos_config_id.id
-                elif pledge.order_id and hasattr(pledge.order_id, "from_pos_config_id"):
-                    cfg_id = pledge.order_id.from_pos_config_id.id
-
-                if not cfg_id or cfg_id not in active_config_ids:
-                    continue
-
-                amt = pledge.pledge_subtotal or (getattr(pledge, "pledge_qty", 1.0) * getattr(pledge, "pledge_amount_unit", 0.0)) or getattr(pledge, "pledge_amount", 0.0) or 0.0
-
-                rec_dt = self._to_datetime(pledge.receive_date) or self._to_datetime(pledge.create_date)
-                ret_dt = self._to_datetime(pledge.return_date) or (self._to_datetime(pledge.write_date) if pledge.state == "returned" else None)
-
-                if rec_dt and dt_start <= rec_dt <= dt_end:
-                    vals_list.append({
-                        "name": pledge.display_name or _("Pledge Record"),
-                        "date": rec_dt,
-                        "config_id": cfg_id,
-                        "report_type": "rahen_in",
-                        "amount": amt,
-                        "rahen_in_amount": amt,
-                        "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
-                    })
-
-                if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
-                    vals_list.append({
-                        "name": pledge.display_name or _("Pledge Return Record"),
-                        "date": ret_dt,
-                        "config_id": cfg_id,
-                        "report_type": "rahen_out",
-                        "amount": amt,
-                        "rahen_out_amount": amt,
-                        "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
-                    })
-
-        # Advance Orders
-        if "pos.advance.order" in self.env:
-            adv_orders = self.env["pos.advance.order"].sudo().search([
-                ("state", "not in", ("draft", "cancel")),
-                "|",
-                "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
-                "&", ("picking_date", ">=", str_start), ("picking_date", "<=", str_end),
-            ])
-            for adv in adv_orders:
-                cfg_id = adv.from_pos_config_id.id if adv.from_pos_config_id else (adv.pos_config_id.id if adv.pos_config_id else False)
-                if not cfg_id or cfg_id not in active_config_ids:
-                    continue
-
-                c_dt = self._to_datetime(adv.create_date)
-                if c_dt and dt_start <= c_dt <= dt_end:
-                    amt = adv.advance_amount or 0.0
-                    vals_list.append({
-                        "name": adv.name or _("Advance Order"),
-                        "date": c_dt,
-                        "config_id": cfg_id,
-                        "report_type": "advance_deposit",
-                        "amount": amt,
-                        "advance_amount": amt,
-                        "partner_id": adv.partner_id.id if hasattr(adv, "partner_id") else False,
-                    })
-
-        if vals_list:
-            self.env["pos.unified.report"].sudo().create(vals_list)
-
-        return {
-            "name": _("Unified POS Operations Analysis"),
-            "type": "ir.actions.act_window",
-            "res_model": "pos.unified.report",
-            "view_mode": "pivot,graph,list",
-            "target": "current",
-        }
+        c_ids = self.config_ids.ids if self.config_ids else None
+        res = self.env["pos.reporting.dashboard"].open_kpi_drilldown(
+            metric_type="sales",
+            date_from=fields.Datetime.to_string(self.date_from),
+            date_to=fields.Datetime.to_string(self.date_to),
+            config_ids=c_ids,
+        )
+        res["view_mode"] = "pivot,graph,list"
+        res["views"] = [
+            (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_pivot").id, "pivot"),
+            (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_graph").id, "graph"),
+            (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_tree").id, "list"),
+        ]
+        return res
 
     def action_export_xlsx(self):
         self.ensure_one()
@@ -289,6 +143,7 @@ class PosUnifiedReportWizard(models.TransientModel):
             _("Total Discounts"),
             _("Cash Sales"),
             _("Visa Sales"),
+            _("Online & Delivery Sales"),
             _("Debt Sales (مبيعات الذمم)"),
             _("Hospitality"),
             _("Talabat"),
@@ -305,6 +160,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             _("Scheduled Pickup Value"),
             _("Pending Pickups"),
             _("Delivery Fees"),
+            _("Attendant Staff"),
+            _("Daily Labor Cost"),
         ]
 
         sheet1.set_column(0, 0, 28)
@@ -325,22 +182,25 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet1.write_number(curr_row, 5, b.get("discount_amount", 0.0), num_fmt)
             sheet1.write_number(curr_row, 6, b["cash"], num_fmt)
             sheet1.write_number(curr_row, 7, b["visa"], num_fmt)
-            sheet1.write_number(curr_row, 8, b.get("employee_debt", 0.0), num_fmt)
-            sheet1.write_number(curr_row, 9, b["hospitality"], num_fmt)
-            sheet1.write_number(curr_row, 10, b["talabat"], num_fmt)
-            sheet1.write_number(curr_row, 11, b["careem"], num_fmt)
-            sheet1.write_number(curr_row, 12, b["mythings"], num_fmt)
-            sheet1.write_number(curr_row, 13, b["kabseh"], num_fmt)
-            sheet1.write_number(curr_row, 14, b["cash_in"], num_fmt)
-            sheet1.write_number(curr_row, 15, b["cash_out"], num_fmt)
-            sheet1.write_number(curr_row, 16, b["net_cash_moves"], num_fmt)
-            sheet1.write_number(curr_row, 17, b["rahen_in"], num_fmt)
-            sheet1.write_number(curr_row, 18, b["rahen_out"], num_fmt)
-            sheet1.write_number(curr_row, 19, b["net_pledges"], num_fmt)
-            sheet1.write_number(curr_row, 20, b["advance_deposits"], num_fmt)
-            sheet1.write_number(curr_row, 21, b.get("advance_pickup_value", 0.0), num_fmt)
-            sheet1.write_number(curr_row, 22, b.get("advance_pending_count", 0), int_fmt)
-            sheet1.write_number(curr_row, 23, b["delivery_amount"], num_fmt)
+            sheet1.write_number(curr_row, 8, b.get("online_sales", 0.0), num_fmt)
+            sheet1.write_number(curr_row, 9, b.get("employee_debt", 0.0), num_fmt)
+            sheet1.write_number(curr_row, 10, b["hospitality"], num_fmt)
+            sheet1.write_number(curr_row, 11, b["talabat"], num_fmt)
+            sheet1.write_number(curr_row, 12, b["careem"], num_fmt)
+            sheet1.write_number(curr_row, 13, b["mythings"], num_fmt)
+            sheet1.write_number(curr_row, 14, b["kabseh"], num_fmt)
+            sheet1.write_number(curr_row, 15, b["cash_in"], num_fmt)
+            sheet1.write_number(curr_row, 16, b["cash_out"], num_fmt)
+            sheet1.write_number(curr_row, 17, b["net_cash_moves"], num_fmt)
+            sheet1.write_number(curr_row, 18, b["rahen_in"], num_fmt)
+            sheet1.write_number(curr_row, 19, b["rahen_out"], num_fmt)
+            sheet1.write_number(curr_row, 20, b["net_pledges"], num_fmt)
+            sheet1.write_number(curr_row, 21, b["advance_deposits"], num_fmt)
+            sheet1.write_number(curr_row, 22, b.get("advance_pickup_value", 0.0), num_fmt)
+            sheet1.write_number(curr_row, 23, b.get("advance_pending_count", 0), int_fmt)
+            sheet1.write_number(curr_row, 24, b["delivery_amount"], num_fmt)
+            sheet1.write_number(curr_row, 25, b.get("attendant_employee_count", 0), int_fmt)
+            sheet1.write_number(curr_row, 26, b.get("total_labor_cost", 0.0), num_fmt)
             curr_row += 1
 
         # Global Total Row Sheet 1
@@ -353,22 +213,25 @@ class PosUnifiedReportWizard(models.TransientModel):
         sheet1.write_number(curr_row, 5, gt.get("discount_amount", 0.0), total_num_fmt)
         sheet1.write_number(curr_row, 6, gt["cash"], total_num_fmt)
         sheet1.write_number(curr_row, 7, gt["visa"], total_num_fmt)
-        sheet1.write_number(curr_row, 8, gt.get("employee_debt", 0.0), total_num_fmt)
-        sheet1.write_number(curr_row, 9, gt["hospitality"], total_num_fmt)
-        sheet1.write_number(curr_row, 10, gt["talabat"], total_num_fmt)
-        sheet1.write_number(curr_row, 11, gt["careem"], total_num_fmt)
-        sheet1.write_number(curr_row, 12, gt["mythings"], total_num_fmt)
-        sheet1.write_number(curr_row, 13, gt["kabseh"], total_num_fmt)
-        sheet1.write_number(curr_row, 14, gt["cash_in"], total_num_fmt)
-        sheet1.write_number(curr_row, 15, gt["cash_out"], total_num_fmt)
-        sheet1.write_number(curr_row, 16, gt["net_cash_moves"], total_num_fmt)
-        sheet1.write_number(curr_row, 17, gt["rahen_in"], total_num_fmt)
-        sheet1.write_number(curr_row, 18, gt["rahen_out"], total_num_fmt)
-        sheet1.write_number(curr_row, 19, gt["net_pledges"], total_num_fmt)
-        sheet1.write_number(curr_row, 20, gt["advance_deposits"], total_num_fmt)
-        sheet1.write_number(curr_row, 21, gt.get("advance_pickup_value", 0.0), total_num_fmt)
-        sheet1.write_number(curr_row, 22, gt.get("advance_pending_count", 0), total_int_fmt)
-        sheet1.write_number(curr_row, 23, gt["delivery_amount"], total_num_fmt)
+        sheet1.write_number(curr_row, 8, gt.get("online_sales", 0.0), total_num_fmt)
+        sheet1.write_number(curr_row, 9, gt.get("employee_debt", 0.0), total_num_fmt)
+        sheet1.write_number(curr_row, 10, gt["hospitality"], total_num_fmt)
+        sheet1.write_number(curr_row, 11, gt["talabat"], total_num_fmt)
+        sheet1.write_number(curr_row, 12, gt["careem"], total_num_fmt)
+        sheet1.write_number(curr_row, 13, gt["mythings"], total_num_fmt)
+        sheet1.write_number(curr_row, 14, gt["kabseh"], total_num_fmt)
+        sheet1.write_number(curr_row, 15, gt["cash_in"], total_num_fmt)
+        sheet1.write_number(curr_row, 16, gt["cash_out"], total_num_fmt)
+        sheet1.write_number(curr_row, 17, gt["net_cash_moves"], total_num_fmt)
+        sheet1.write_number(curr_row, 18, gt["rahen_in"], total_num_fmt)
+        sheet1.write_number(curr_row, 19, gt["rahen_out"], total_num_fmt)
+        sheet1.write_number(curr_row, 20, gt["net_pledges"], total_num_fmt)
+        sheet1.write_number(curr_row, 21, gt["advance_deposits"], total_num_fmt)
+        sheet1.write_number(curr_row, 22, gt.get("advance_pickup_value", 0.0), total_num_fmt)
+        sheet1.write_number(curr_row, 23, gt.get("advance_pending_count", 0), total_int_fmt)
+        sheet1.write_number(curr_row, 24, gt["delivery_amount"], total_num_fmt)
+        sheet1.write_number(curr_row, 25, gt.get("attendant_employee_count", 0), total_int_fmt)
+        sheet1.write_number(curr_row, 26, gt.get("total_labor_cost", 0.0), total_num_fmt)
 
         # Target branch config IDs set
         target_config_ids = set(self.config_ids.ids) if self.config_ids else None
