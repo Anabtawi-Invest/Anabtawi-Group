@@ -399,6 +399,38 @@ class PosReportingDashboard(models.TransientModel):
                         if adv.state in ("confirmed", "advance_paid"):
                             branch_data[pick_cfg_id]["advance_pending_count"] += 1
 
+        EXPLICIT_DEPT_TO_POS_MAP = {
+            "شفا بدران": "فرع شفا بدران",
+            "فرع ابونصير": "فرع ابونصير",
+            "فرع اربد": "فرع اربد",
+            "فرع السلط 1": "فرع السلط 1",
+            "فرع السلط 2": "فرع السلط 2",
+            "فرع الشويخ مول": "شويخ مول",
+            "شويخ مول": "شويخ مول",
+            "فرع الفحيص": "فرع الفحيص",
+            "فرع القويسمة": "فرع القويسمة",
+            "فرع الكرك": "فرع الكرك",
+            "فرع المدينة المنورة": "فرع المدينة",
+            "فرع المدينة": "فرع المدينة",
+            "المدينة المنورة": "فرع المدينة",
+            "فرع المقابلين": "المقابلين",
+            "المقابلين": "المقابلين",
+            "فرع الهاشمي": "فرع الهاشمي",
+            "فرع ايلا": "ايلا",
+            "ايلا": "ايلا",
+            "فرع شارع البيتزا": "فرع البتزا",
+            "شارع البيتزا": "فرع البتزا",
+            "فرع البتزا": "فرع البتزا",
+            "فرع صويلح": "فرع صويلح",
+            "فرع عريفة مول": "فرع عريفة مول",
+            "فرع عين الباشا": "فرع عين الباشا",
+            "فرع مادبا": "فرع مادبا",
+            "فرع ماركا": "فرع ماركا",
+            "فرع مرج الحمام": "فرع مرج الحمام",
+            "فرع الإذاعة": "فرع الإذاعة",
+            "الإذاعة": "فرع الإذاعة",
+        }
+
         # Helper to map employee to POS config / branch via hierarchical department path & branch name
         def _get_employee_pos_config(emp):
             if hasattr(emp, "pos_config_id") and emp.pos_config_id:
@@ -415,9 +447,26 @@ class PosReportingDashboard(models.TransientModel):
 
             loc_name = (emp.work_location_id.name or "").strip() if hasattr(emp, "work_location_id") and emp.work_location_id else ""
 
+            # Check explicit mapping dictionary first
+            mapped_target = EXPLICIT_DEPT_TO_POS_MAP.get(leaf_dept_name) or EXPLICIT_DEPT_TO_POS_MAP.get(dept_full_path)
+            if mapped_target:
+                target_clean = mapped_target.strip().lower()
+                for cfg in configs:
+                    cfg_name = (cfg.name or "").strip().lower()
+                    if cfg_name == target_clean or target_clean in cfg_name or cfg_name in target_clean:
+                        return cfg
+
             clean_leaf = leaf_dept_name.lower()
             clean_full = dept_full_path.lower()
             clean_loc = loc_name.lower()
+
+            # Normalized keyword matching (stripping common prefixes like "فرع", "شارع")
+            def _normalize(s):
+                for noise in ("فرع", "شارع", "منطقة", "فرع "):
+                    s = s.replace(noise, "")
+                return s.strip().lower()
+
+            norm_leaf = _normalize(leaf_dept_name)
 
             # Tier 1: Exact match on leaf department name or work location
             if clean_leaf or clean_loc:
@@ -426,7 +475,14 @@ class PosReportingDashboard(models.TransientModel):
                     if (clean_leaf and cfg_name == clean_leaf) or (clean_loc and cfg_name == clean_loc):
                         return cfg
 
-            # Tier 2: Leaf department name or work location is contained in POS config name (or vice versa)
+            # Tier 2: Normalized keyword matching
+            if norm_leaf:
+                for cfg in configs:
+                    norm_cfg = _normalize(cfg.name or "")
+                    if norm_leaf and norm_cfg and (norm_leaf in norm_cfg or norm_cfg in norm_leaf):
+                        return cfg
+
+            # Tier 3: Leaf department name or work location is contained in POS config name (or vice versa)
             if clean_leaf or clean_loc:
                 for cfg in configs:
                     cfg_name = (cfg.name or "").strip().lower()
@@ -435,14 +491,14 @@ class PosReportingDashboard(models.TransientModel):
                     if clean_loc and (clean_loc in cfg_name or cfg_name in clean_loc):
                         return cfg
 
-            # Tier 3: POS config name is contained anywhere within the full department path
+            # Tier 4: POS config name is contained anywhere within the full department path
             if clean_full:
                 for cfg in configs:
                     cfg_name = (cfg.name or "").strip().lower()
                     if cfg_name and cfg_name in clean_full:
                         return cfg
 
-            # Tier 4: Single company POS config fallback
+            # Tier 5: Single company POS config fallback
             company_cfgs = [c for c in configs if c.company_id.id == emp.company_id.id]
             if len(company_cfgs) == 1:
                 return company_cfgs[0]
@@ -630,9 +686,26 @@ class PosReportingDashboard(models.TransientModel):
 
             loc_name = (emp.work_location_id.name or "").strip() if hasattr(emp, "work_location_id") and emp.work_location_id else ""
 
+            # Check explicit mapping dictionary first
+            mapped_target = EXPLICIT_DEPT_TO_POS_MAP.get(leaf_dept_name) or EXPLICIT_DEPT_TO_POS_MAP.get(dept_full_path)
+            if mapped_target:
+                target_clean = mapped_target.strip().lower()
+                for cfg in configs:
+                    cfg_name = (cfg.name or "").strip().lower()
+                    if cfg_name == target_clean or target_clean in cfg_name or cfg_name in target_clean:
+                        return cfg
+
             clean_leaf = leaf_dept_name.lower()
             clean_full = dept_full_path.lower()
             clean_loc = loc_name.lower()
+
+            # Normalized keyword matching (stripping common prefixes like "فرع", "شارع")
+            def _normalize(s):
+                for noise in ("فرع", "شارع", "منطقة", "فرع "):
+                    s = s.replace(noise, "")
+                return s.strip().lower()
+
+            norm_leaf = _normalize(leaf_dept_name)
 
             # Tier 1: Exact match on leaf department name or work location
             if clean_leaf or clean_loc:
@@ -641,7 +714,14 @@ class PosReportingDashboard(models.TransientModel):
                     if (clean_leaf and cfg_name == clean_leaf) or (clean_loc and cfg_name == clean_loc):
                         return cfg
 
-            # Tier 2: Leaf department name or work location is contained in POS config name (or vice versa)
+            # Tier 2: Normalized keyword matching
+            if norm_leaf:
+                for cfg in configs:
+                    norm_cfg = _normalize(cfg.name or "")
+                    if norm_leaf and norm_cfg and (norm_leaf in norm_cfg or norm_cfg in norm_leaf):
+                        return cfg
+
+            # Tier 3: Leaf department name or work location is contained in POS config name (or vice versa)
             if clean_leaf or clean_loc:
                 for cfg in configs:
                     cfg_name = (cfg.name or "").strip().lower()
@@ -650,14 +730,14 @@ class PosReportingDashboard(models.TransientModel):
                     if clean_loc and (clean_loc in cfg_name or cfg_name in clean_loc):
                         return cfg
 
-            # Tier 3: POS config name is contained anywhere within the full department path
+            # Tier 4: POS config name is contained anywhere within the full department path
             if clean_full:
                 for cfg in configs:
                     cfg_name = (cfg.name or "").strip().lower()
                     if cfg_name and cfg_name in clean_full:
                         return cfg
 
-            # Tier 4: Single company POS config fallback
+            # Tier 5: Single company POS config fallback
             company_cfgs = [c for c in configs if c.company_id.id == emp.company_id.id]
             if len(company_cfgs) == 1:
                 return company_cfgs[0]
