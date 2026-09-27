@@ -7,6 +7,38 @@ from odoo import _, api, fields, models
 
 _logger = logging.getLogger(__name__)
 
+EXPLICIT_DEPT_TO_POS_MAP = {
+    "شفا بدران": "فرع شفا بدران",
+    "فرع ابونصير": "فرع ابونصير",
+    "فرع اربد": "فرع اربد",
+    "فرع السلط 1": "فرع السلط 1",
+    "فرع السلط 2": "فرع السلط 2",
+    "فرع الشويخ مول": "شويخ مول",
+    "شويخ مول": "شويخ مول",
+    "فرع الفحيص": "فرع الفحيص",
+    "فرع القويسمة": "فرع القويسمة",
+    "فرع الكرك": "فرع الكرك",
+    "فرع المدينة المنورة": "فرع المدينة",
+    "فرع المدينة": "فرع المدينة",
+    "المدينة المنورة": "فرع المدينة",
+    "فرع المقابلين": "المقابلين",
+    "المقابلين": "المقابلين",
+    "فرع الهاشمي": "فرع الهاشمي",
+    "فرع ايلا": "ايلا",
+    "ايلا": "ايلا",
+    "فرع شارع البيتزا": "فرع البتزا",
+    "شارع البيتزا": "فرع البتزا",
+    "فرع البتزا": "فرع البتزا",
+    "فرع صويلح": "فرع صويلح",
+    "فرع عريفة مول": "فرع عريفة مول",
+    "فرع عين الباشا": "فرع عين الباشا",
+    "فرع مادبا": "فرع مادبا",
+    "فرع ماركا": "فرع ماركا",
+    "فرع مرج الحمام": "فرع مرج الحمام",
+    "فرع الإذاعة": "فرع الإذاعة",
+    "الإذاعة": "فرع الإذاعة",
+}
+
 
 class PosReportingDashboard(models.TransientModel):
     _name = "pos.reporting.dashboard"
@@ -404,37 +436,7 @@ class PosReportingDashboard(models.TransientModel):
                         if adv.state in ("confirmed", "advance_paid"):
                             branch_data[pick_cfg_id]["advance_pending_count"] += 1
 
-        EXPLICIT_DEPT_TO_POS_MAP = {
-            "شفا بدران": "فرع شفا بدران",
-            "فرع ابونصير": "فرع ابونصير",
-            "فرع اربد": "فرع اربد",
-            "فرع السلط 1": "فرع السلط 1",
-            "فرع السلط 2": "فرع السلط 2",
-            "فرع الشويخ مول": "شويخ مول",
-            "شويخ مول": "شويخ مول",
-            "فرع الفحيص": "فرع الفحيص",
-            "فرع القويسمة": "فرع القويسمة",
-            "فرع الكرك": "فرع الكرك",
-            "فرع المدينة المنورة": "فرع المدينة",
-            "فرع المدينة": "فرع المدينة",
-            "المدينة المنورة": "فرع المدينة",
-            "فرع المقابلين": "المقابلين",
-            "المقابلين": "المقابلين",
-            "فرع الهاشمي": "فرع الهاشمي",
-            "فرع ايلا": "ايلا",
-            "ايلا": "ايلا",
-            "فرع شارع البيتزا": "فرع البتزا",
-            "شارع البيتزا": "فرع البتزا",
-            "فرع البتزا": "فرع البتزا",
-            "فرع صويلح": "فرع صويلح",
-            "فرع عريفة مول": "فرع عريفة مول",
-            "فرع عين الباشا": "فرع عين الباشا",
-            "فرع مادبا": "فرع مادبا",
-            "فرع ماركا": "فرع ماركا",
-            "فرع مرج الحمام": "فرع مرج الحمام",
-            "فرع الإذاعة": "فرع الإذاعة",
-            "الإذاعة": "فرع الإذاعة",
-        }
+
 
         # Helper to map employee to POS config / branch via hierarchical department path & branch name
         def _get_employee_pos_config(emp):
@@ -1234,6 +1236,8 @@ class PosReportingDashboard(models.TransientModel):
             target_tree_xml_id = "anabtawi_pos_reporting_dashboard.view_pos_unified_report_extra_hours_tree"
 
         tree_view = self.env.ref(target_tree_xml_id, raise_if_not_found=False)
+        if not tree_view:
+            tree_view = self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_tree", raise_if_not_found=False)
         pivot_view = self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_pivot", raise_if_not_found=False)
         views = []
         if tree_view:
