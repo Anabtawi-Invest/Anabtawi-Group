@@ -528,14 +528,21 @@ class PosReportingDashboard(models.TransientModel):
                     continue
                 c_dt = att.check_in
                 att_date = c_dt.date()
-                if not (dt_start.date() <= att_date <= dt_end.date()):
+                if not (dt_start <= c_dt <= dt_end or dt_start.date() <= att_date <= dt_end.date()):
                     continue
                 cfg = _get_employee_pos_config(emp)
+                if not cfg:
+                    cfg = configs[0] if configs else (all_configs[0] if all_configs else False)
                 if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                     continue
                 branch_daily_attendants[cfg.id][att_date].add(emp)
 
-                ot_val = getattr(att, "overtime_hours", 0.0) or getattr(att, "extra_hours", 0.0) or 0.0
+                ot_val = (
+                    getattr(att, "overtime_hours", 0.0)
+                    or getattr(att, "extra_hours", 0.0)
+                    or getattr(att, "validated_overtime_hours", 0.0)
+                    or 0.0
+                )
                 branch_extra_hours[cfg.id] += ot_val
 
             for cfg_id, daily_map in branch_daily_attendants.items():
@@ -1131,13 +1138,20 @@ class PosReportingDashboard(models.TransientModel):
                         continue
                     c_dt = att.check_in
                     att_date = c_dt.date()
-                    if not (dt_start.date() <= att_date <= dt_end.date()):
+                    if not (dt_start <= c_dt <= dt_end or dt_start.date() <= att_date <= dt_end.date()):
                         continue
                     cfg = _get_employee_pos_config(emp)
-                    if not cfg or cfg.id not in active_config_ids:
+                    if not cfg:
+                        cfg = configs[0] if configs else (all_configs[0] if all_configs else False)
+                    if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                         continue
 
-                    ot_val = getattr(att, "overtime_hours", 0.0) or getattr(att, "extra_hours", 0.0) or 0.0
+                    ot_val = (
+                        getattr(att, "overtime_hours", 0.0)
+                        or getattr(att, "extra_hours", 0.0)
+                        or getattr(att, "validated_overtime_hours", 0.0)
+                        or 0.0
+                    )
                     if metric_type == "extra_hours" and ot_val <= 0:
                         continue
 
@@ -1212,6 +1226,26 @@ class PosReportingDashboard(models.TransientModel):
         if pivot_view:
             views.append((pivot_view.id, "pivot"))
 
+        filter_ctx = {
+            "attendant_employees": "search_default_filter_attendants",
+            "labor_cost": "search_default_filter_labor_cost",
+            "extra_hours": "search_default_filter_extra_hours",
+            "pos_sales": "search_default_filter_sales",
+            "sales": "search_default_filter_sales",
+            "cash_in": "search_default_filter_cash_in",
+            "cash_out": "search_default_filter_cash_out",
+            "rahen_in": "search_default_filter_rahen_in",
+            "rahen_out": "search_default_filter_rahen_out",
+            "advance_deposits": "search_default_filter_advance",
+        }
+
+        context = {
+            "active_wizard_id": wiz.id,
+            "metric_type": metric_type,
+        }
+        if metric_type in filter_ctx:
+            context[filter_ctx[metric_type]] = 1
+
         return {
             "name": title,
             "type": "ir.actions.act_window",
@@ -1220,9 +1254,6 @@ class PosReportingDashboard(models.TransientModel):
             "domain": domain,
             "views": views if views else [(False, "list"), (False, "pivot")],
             "target": "current",
-            "context": {
-                "active_wizard_id": wiz.id,
-                "metric_type": metric_type,
-            },
+            "context": context,
         }
 
