@@ -68,11 +68,15 @@ class PosReportingDashboard(models.TransientModel):
         total_seconds = max((dt_end - dt_start).total_seconds(), 60.0)
         total_minutes = max(total_seconds / 60.0, 1.0)
 
-        # Identify target POS configurations filtered by active companies
+        # Identify target POS configurations filtered by active companies (excluding non-retail/cafe/corporate configs)
+        EXCLUDED_CONFIG_KEYWORDS = ["كافيه", "نجيب", "ذوابي"]
         config_domain = [
             ("active", "=", True),
             ("company_id", "in", self.env.companies.ids),
         ]
+        for kw in EXCLUDED_CONFIG_KEYWORDS:
+            config_domain.append(("name", "not ilike", kw))
+
         if config_ids and isinstance(config_ids, (list, tuple)) and len(config_ids) > 0:
             config_domain.append(("id", "in", config_ids))
 
@@ -619,10 +623,14 @@ class PosReportingDashboard(models.TransientModel):
             })
             curr_date += timedelta(days=1)
 
-        all_configs = self.env["pos.config"].sudo().search([
+        all_config_domain = [
             ("active", "=", True),
             ("company_id", "in", self.env.companies.ids),
-        ], order="name")
+        ]
+        for kw in EXCLUDED_CONFIG_KEYWORDS:
+            all_config_domain.append(("name", "not ilike", kw))
+
+        all_configs = self.env["pos.config"].sudo().search(all_config_domain, order="name")
         all_branches_list = [{"id": cfg.id, "name": cfg.name} for cfg in all_configs]
 
         return {
@@ -675,19 +683,28 @@ class PosReportingDashboard(models.TransientModel):
         str_start = fields.Datetime.to_string(dt_start)
         str_end = fields.Datetime.to_string(dt_end)
 
+        EXCLUDED_CONFIG_KEYWORDS = ["كافيه", "نجيب", "ذوابي"]
         config_domain = [
             ("active", "=", True),
             ("company_id", "in", self.env.companies.ids),
         ]
+        for kw in EXCLUDED_CONFIG_KEYWORDS:
+            config_domain.append(("name", "not ilike", kw))
+
         if config_ids and isinstance(config_ids, (list, tuple)) and len(config_ids) > 0:
             config_domain.append(("id", "in", config_ids))
 
         configs = self.env["pos.config"].sudo().search(config_domain)
         active_config_ids = set(configs.ids)
-        all_configs = self.env["pos.config"].sudo().search([
+
+        all_config_domain = [
             ("active", "=", True),
             ("company_id", "in", self.env.companies.ids),
-        ])
+        ]
+        for kw in EXCLUDED_CONFIG_KEYWORDS:
+            all_config_domain.append(("name", "not ilike", kw))
+
+        all_configs = self.env["pos.config"].sudo().search(all_config_domain)
 
         def _get_employee_pos_config(emp):
             if hasattr(emp, "pos_config_id") and emp.pos_config_id:

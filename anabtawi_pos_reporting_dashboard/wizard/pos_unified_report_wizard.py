@@ -33,6 +33,12 @@ class PosUnifiedReportWizard(models.TransientModel):
     )
     config_ids = fields.Many2many(
         "pos.config",
+        domain=[
+            ("active", "=", True),
+            ("name", "not ilike", "كافيه"),
+            ("name", "not ilike", "نجيب"),
+            ("name", "not ilike", "ذوابي"),
+        ],
         string="POS Branches",
         help="Leave empty to include all active branches.",
     )
