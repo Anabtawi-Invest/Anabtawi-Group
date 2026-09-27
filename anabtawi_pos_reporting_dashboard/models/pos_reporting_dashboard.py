@@ -453,20 +453,22 @@ class PosReportingDashboard(models.TransientModel):
                 target_clean = mapped_target.strip().lower()
                 for cfg in configs:
                     cfg_name = (cfg.name or "").strip().lower()
-                    if cfg_name == target_clean or target_clean in cfg_name or cfg_name in target_clean:
+                    if cfg_name == target_clean or (len(target_clean) >= 3 and target_clean in cfg_name) or (len(cfg_name) >= 3 and cfg_name in target_clean):
                         return cfg
 
-            clean_leaf = leaf_dept_name.lower()
-            clean_full = dept_full_path.lower()
-            clean_loc = loc_name.lower()
+            clean_leaf = leaf_dept_name.lower().strip()
+            clean_full = dept_full_path.lower().strip()
+            clean_loc = loc_name.lower().strip()
 
-            # Normalized keyword matching (stripping common prefixes like "فرع", "شارع")
             def _normalize(s):
-                for noise in ("فرع", "شارع", "منطقة", "فرع "):
+                if not s:
+                    return ""
+                for noise in ("فرع ", "فرع", "شارع ", "شارع", "منطقة ", "منطقة", "مول"):
                     s = s.replace(noise, "")
                 return s.strip().lower()
 
             norm_leaf = _normalize(leaf_dept_name)
+            norm_loc = _normalize(loc_name)
 
             # Tier 1: Exact match on leaf department name or work location
             if clean_leaf or clean_loc:
@@ -475,33 +477,32 @@ class PosReportingDashboard(models.TransientModel):
                     if (clean_leaf and cfg_name == clean_leaf) or (clean_loc and cfg_name == clean_loc):
                         return cfg
 
-            # Tier 2: Normalized keyword matching
-            if norm_leaf:
+            # Tier 2: Normalized keyword matching (minimum 3 characters to prevent empty string matching)
+            if (norm_leaf and len(norm_leaf) >= 3) or (norm_loc and len(norm_loc) >= 3):
                 for cfg in configs:
                     norm_cfg = _normalize(cfg.name or "")
-                    if norm_leaf and norm_cfg and (norm_leaf in norm_cfg or norm_cfg in norm_leaf):
-                        return cfg
+                    if norm_cfg and len(norm_cfg) >= 3:
+                        if (norm_leaf and len(norm_leaf) >= 3 and (norm_leaf in norm_cfg or norm_cfg in norm_leaf)) or \
+                           (norm_loc and len(norm_loc) >= 3 and (norm_loc in norm_cfg or norm_cfg in norm_loc)):
+                            return cfg
 
-            # Tier 3: Leaf department name or work location is contained in POS config name (or vice versa)
-            if clean_leaf or clean_loc:
+            # Tier 3: Leaf department name or work location contained in POS config name (minimum 3 chars)
+            if (clean_leaf and len(clean_leaf) >= 3) or (clean_loc and len(clean_loc) >= 3):
                 for cfg in configs:
                     cfg_name = (cfg.name or "").strip().lower()
-                    if clean_leaf and (clean_leaf in cfg_name or cfg_name in clean_leaf):
-                        return cfg
-                    if clean_loc and (clean_loc in cfg_name or cfg_name in clean_loc):
-                        return cfg
+                    if len(cfg_name) >= 3:
+                        if clean_leaf and (clean_leaf in cfg_name or cfg_name in clean_leaf):
+                            return cfg
+                        if clean_loc and (clean_loc in cfg_name or cfg_name in clean_loc):
+                            return cfg
 
-            # Tier 4: POS config name is contained anywhere within the full department path
-            if clean_full:
+            # Tier 4: POS config name contained within full department path (minimum 3 chars)
+            if clean_full and len(clean_full) >= 3:
                 for cfg in configs:
                     cfg_name = (cfg.name or "").strip().lower()
-                    if cfg_name and cfg_name in clean_full:
+                    if cfg_name and len(cfg_name) >= 3 and cfg_name in clean_full:
                         return cfg
 
-            # Tier 5: Single company POS config fallback
-            company_cfgs = [c for c in configs if c.company_id.id == emp.company_id.id]
-            if len(company_cfgs) == 1:
-                return company_cfgs[0]
             return False
 
         # --- F. Collect Attendance & Calculate Daily Employee Labor Cost ---
@@ -692,20 +693,22 @@ class PosReportingDashboard(models.TransientModel):
                 target_clean = mapped_target.strip().lower()
                 for cfg in configs:
                     cfg_name = (cfg.name or "").strip().lower()
-                    if cfg_name == target_clean or target_clean in cfg_name or cfg_name in target_clean:
+                    if cfg_name == target_clean or (len(target_clean) >= 3 and target_clean in cfg_name) or (len(cfg_name) >= 3 and cfg_name in target_clean):
                         return cfg
 
-            clean_leaf = leaf_dept_name.lower()
-            clean_full = dept_full_path.lower()
-            clean_loc = loc_name.lower()
+            clean_leaf = leaf_dept_name.lower().strip()
+            clean_full = dept_full_path.lower().strip()
+            clean_loc = loc_name.lower().strip()
 
-            # Normalized keyword matching (stripping common prefixes like "فرع", "شارع")
             def _normalize(s):
-                for noise in ("فرع", "شارع", "منطقة", "فرع "):
+                if not s:
+                    return ""
+                for noise in ("فرع ", "فرع", "شارع ", "شارع", "منطقة ", "منطقة", "مول"):
                     s = s.replace(noise, "")
                 return s.strip().lower()
 
             norm_leaf = _normalize(leaf_dept_name)
+            norm_loc = _normalize(loc_name)
 
             # Tier 1: Exact match on leaf department name or work location
             if clean_leaf or clean_loc:
@@ -714,33 +717,32 @@ class PosReportingDashboard(models.TransientModel):
                     if (clean_leaf and cfg_name == clean_leaf) or (clean_loc and cfg_name == clean_loc):
                         return cfg
 
-            # Tier 2: Normalized keyword matching
-            if norm_leaf:
+            # Tier 2: Normalized keyword matching (minimum 3 characters to prevent empty string matching)
+            if (norm_leaf and len(norm_leaf) >= 3) or (norm_loc and len(norm_loc) >= 3):
                 for cfg in configs:
                     norm_cfg = _normalize(cfg.name or "")
-                    if norm_leaf and norm_cfg and (norm_leaf in norm_cfg or norm_cfg in norm_leaf):
-                        return cfg
+                    if norm_cfg and len(norm_cfg) >= 3:
+                        if (norm_leaf and len(norm_leaf) >= 3 and (norm_leaf in norm_cfg or norm_cfg in norm_leaf)) or \
+                           (norm_loc and len(norm_loc) >= 3 and (norm_loc in norm_cfg or norm_cfg in norm_loc)):
+                            return cfg
 
-            # Tier 3: Leaf department name or work location is contained in POS config name (or vice versa)
-            if clean_leaf or clean_loc:
+            # Tier 3: Leaf department name or work location contained in POS config name (minimum 3 chars)
+            if (clean_leaf and len(clean_leaf) >= 3) or (clean_loc and len(clean_loc) >= 3):
                 for cfg in configs:
                     cfg_name = (cfg.name or "").strip().lower()
-                    if clean_leaf and (clean_leaf in cfg_name or cfg_name in clean_leaf):
-                        return cfg
-                    if clean_loc and (clean_loc in cfg_name or cfg_name in clean_loc):
-                        return cfg
+                    if len(cfg_name) >= 3:
+                        if clean_leaf and (clean_leaf in cfg_name or cfg_name in clean_leaf):
+                            return cfg
+                        if clean_loc and (clean_loc in cfg_name or cfg_name in clean_loc):
+                            return cfg
 
-            # Tier 4: POS config name is contained anywhere within the full department path
-            if clean_full:
+            # Tier 4: POS config name contained within full department path (minimum 3 chars)
+            if clean_full and len(clean_full) >= 3:
                 for cfg in configs:
                     cfg_name = (cfg.name or "").strip().lower()
-                    if cfg_name and cfg_name in clean_full:
+                    if cfg_name and len(cfg_name) >= 3 and cfg_name in clean_full:
                         return cfg
 
-            # Tier 5: Single company POS config fallback
-            company_cfgs = [c for c in configs if c.company_id.id == emp.company_id.id]
-            if len(company_cfgs) == 1:
-                return company_cfgs[0]
             return False
 
         # Clear previous transient drill-down records for current user
@@ -1103,8 +1105,9 @@ class PosReportingDashboard(models.TransientModel):
                         "company_id": cfg.company_id.id,
                     })
 
+        created_recs = False
         if vals_list:
-            self.env["pos.unified.report"].sudo().create(vals_list)
+            created_recs = self.env["pos.unified.report"].sudo().create(vals_list)
 
         wizard_vals = {"date_from": dt_start, "date_to": dt_end}
         if config_ids:
@@ -1128,11 +1131,14 @@ class PosReportingDashboard(models.TransientModel):
         }
         title = metric_titles.get(metric_type, _("Metric Drill-Down Transactions"))
 
+        domain = [("id", "in", created_recs.ids)] if created_recs else [("id", "=", 0)]
+
         return {
             "name": title,
             "type": "ir.actions.act_window",
             "res_model": "pos.unified.report",
             "view_mode": "list,pivot,graph",
+            "domain": domain,
             "views": [
                 (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_tree").id, "list"),
                 (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_pivot").id, "pivot"),
