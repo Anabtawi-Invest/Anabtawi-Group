@@ -354,7 +354,7 @@ class HrPayslip(models.Model):
                     dur = getattr(we, 'duration', 8.0) or 8.0
                     total_undertime += dur
 
-            # Weekly rest/off days: monthly allowance 4; unused × 8 × 1.5 → Monthly OT
+            # Weekly rest/off days: monthly allowance 4; unused × 8 × 1.5 → Monthly OT (only if employee physically worked)
             worked_days_count = len(daily_hours)
             emp_leave_dates = leave_dates_by_emp.get(emp_id, set())
             approved_leave_days_count = sum(
@@ -363,9 +363,14 @@ class HrPayslip(models.Model):
                 and ((payslip.date_from + datetime.timedelta(days=d)) in emp_leave_dates or
                      (payslip.date_from + datetime.timedelta(days=d)) in public_holiday_dates)
             )
-            rest_days_taken = max(0, total_days_in_month - worked_days_count - approved_leave_days_count)
-            unused_rest_days = max(0, monthly_rest_allowance - rest_days_taken)
-            if allow_ot and unused_rest_days > 0:
+            if worked_days_count > 0:
+                rest_days_taken = max(0, total_days_in_month - worked_days_count - approved_leave_days_count)
+                unused_rest_days = max(0, monthly_rest_allowance - rest_days_taken)
+            else:
+                rest_days_taken = 0
+                unused_rest_days = 0
+
+            if allow_ot and unused_rest_days > 0 and worked_days_count > 0:
                 total_ot += (unused_rest_days * 8.0 * 1.5)
 
             gross_ot = round(total_ot, 2)
