@@ -836,13 +836,9 @@ class HrPayslip(models.Model):
                 unworked_holiday_days = len(unworked_holiday_dates)
 
                 unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
-                rem_cash_deduction_days = (payslip.undertime_cash_deduction_hours or 0.0) / 8.0
-                if active_period_days > 0:
-                    final_attendance_days = max(0.0, active_period_days - rem_cash_deduction_days)
-                else:
-                    covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
-                    covered_lateness_days = covered_lateness_hours / 8.0
-                    final_attendance_days = total_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
+                covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
+                covered_lateness_days = covered_lateness_hours / 8.0
+                final_attendance_days = total_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
 
                 computed_attendance_days = float(final_attendance_days)
 
@@ -888,29 +884,6 @@ class HrPayslip(models.Model):
                 if min_trv <= max_trv:
                     travel_days_count = float((max_trv - min_trv).days + 1)
 
-            # Calculate deductions from Attendance line:
-            # 1. Worked Public Holiday (deduct ONLY if employee physically worked on the holiday)
-            worked_holiday_days_to_deduct = 0.0
-            if total_holiday_worked_hrs > 0.01:
-                worked_holiday_days_to_deduct = float(len(set(att.check_in.date() for att in holiday_attendances))) if holiday_attendances else round(total_holiday_worked_hrs / 8.0, 2)
-
-            # 2. Used Paid Time Off Leaves (deduct ONLY if employee used paid time off / leaves)
-            paid_time_off_days_to_deduct = 0.0
-            for line in res:
-                code = (line.get('code') or '').strip()
-                work_entry_type = self.env['hr.work.entry.type'].browse(line.get('work_entry_type_id')) if line.get('work_entry_type_id') else None
-                we_name = (work_entry_type.name or '').lower() if work_entry_type else ''
-                line_name = (line.get('name') or '').lower()
-
-                if code in ['WORK100', 'A', 'ATTENDANCE', 'OUT', 'OUTCON', 'OUT_OF_CONTRACT', 'ARS', 'REST', 'RESTDAY', 'OVERTIME', 'EXTRA', 'LEAVE500', 'UNPAID', 'ABSENT', 'ABS', 'TRV', 'TRAVEL', 'TRAVEL_LEAVE'] or 'attendance' in we_name or 'out of contract' in line_name or 'rest' in we_name or 'overtime' in we_name or 'absent' in we_name or 'travel' in we_name:
-                    continue
-
-                if code in ['GTO', 'PHD', 'HOLIDAY', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name or 'public holiday' in line_name or 'holiday' in line_name:
-                    continue
-
-                # Add used paid time off days
-                paid_time_off_days_to_deduct += line.get('number_of_days', 0.0)
-
             filtered_lines = []
             for line in res:
                 code = (line.get('code') or '').strip()
@@ -924,7 +897,7 @@ class HrPayslip(models.Model):
                 if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
                     continue
 
-                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'] and ('travel' in we_name or 'travel' in line_name or 'سفر' in we_name or 'سفر' in line_name or 'مهمة' in we_name or 'مهمة' in line_name):
+                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'] or 'travel' in we_name or 'travel' in line_name or 'سفر' in we_name or 'سفر' in line_name or 'مهمة' in we_name or 'مهمة' in line_name:
                     trv_days = travel_days_count if travel_days_count > 0.0 else line.get('number_of_days', 0.0)
                     line['number_of_days'] = trv_days
                     line['number_of_hours'] = round(trv_days * 9.0, 2)
@@ -935,8 +908,7 @@ class HrPayslip(models.Model):
                 elif code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
                     if total_regular_attendance_hrs > 0.01 or computed_attendance_days > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
-                        eff_att_days = max(0.0, round(computed_attendance_days - worked_holiday_days_to_deduct - paid_time_off_days_to_deduct, 2))
-                        line['number_of_days'] = eff_att_days
+                        line['number_of_days'] = computed_attendance_days
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
@@ -952,10 +924,9 @@ class HrPayslip(models.Model):
                     line['amount'] = 0.0
                     filtered_lines.append(line)
 
-                elif code in ['GTO', 'PHD', 'HOLIDAY', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name or 'public holiday' in line_name or 'holiday' in line_name:
+                elif code in ['GTO', 'PHD', 'HOLIDAY', 'LEAVE110', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name:
                     if total_holiday_worked_hrs > 0.01:
                         weighted_hol_hrs = round(total_holiday_worked_hrs * 1.5, 2)
-                        line['name'] = 'Public Holiday'
                         line['number_of_hours'] = weighted_hol_hrs
                         line['number_of_days'] = float(len(set(att.check_in.date() for att in holiday_attendances))) if holiday_attendances else round(weighted_hol_hrs / 8.0, 2)
                         line['amount'] = round(weighted_hol_hrs * hourly_rate, 3)
@@ -980,33 +951,6 @@ class HrPayslip(models.Model):
                         filtered_lines.append(line)
                 else:
                     filtered_lines.append(line)
-
-            # Ensure Public Holiday line is present if employee physically worked on public holiday (especially for flexible schedules)
-            if total_holiday_worked_hrs > 0.01:
-                has_ph_line = any(
-                    (line.get('code') in ['GTO', 'PHD', 'HOLIDAY', 'PHW', 'HOLIDAY_WORKED']) or
-                    ('public holiday' in (line.get('name') or '').lower()) or
-                    ('holiday' in (line.get('name') or '').lower())
-                    for line in filtered_lines
-                )
-                if not has_ph_line:
-                    weighted_hol_hrs = round(total_holiday_worked_hrs * 1.5, 2)
-                    ph_work_entry_type = self.env['hr.work.entry.type'].sudo().search([
-                        '|', '|', ('code', 'in', ['PHD', 'GTO', 'HOLIDAY', 'PHW']),
-                        ('display_code', 'in', ['PHD', 'GTO', 'HOLIDAY', 'PHW']),
-                        ('name', 'ilike', 'Public Holiday')
-                    ], limit=1)
-                    hol_days = float(len(set(att.check_in.date() for att in holiday_attendances))) if holiday_attendances else round(weighted_hol_hrs / 8.0, 2)
-                    ph_line = {
-                        'name': 'Public Holiday',
-                        'sequence': 15,
-                        'code': ph_work_entry_type.code if ph_work_entry_type else 'PHD',
-                        'work_entry_type_id': ph_work_entry_type.id if ph_work_entry_type else False,
-                        'number_of_days': hol_days,
-                        'number_of_hours': weighted_hol_hrs,
-                        'amount': round(weighted_hol_hrs * hourly_rate, 3),
-                    }
-                    filtered_lines.append(ph_line)
 
             res = filtered_lines
         return res
