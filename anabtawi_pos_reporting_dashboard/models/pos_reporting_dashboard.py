@@ -399,18 +399,50 @@ class PosReportingDashboard(models.TransientModel):
                         if adv.state in ("confirmed", "advance_paid"):
                             branch_data[pick_cfg_id]["advance_pending_count"] += 1
 
-        # Helper to map employee to POS config / branch
+        # Helper to map employee to POS config / branch via hierarchical department path & branch name
         def _get_employee_pos_config(emp):
             if hasattr(emp, "pos_config_id") and emp.pos_config_id:
                 return emp.pos_config_id
             if hasattr(emp, "pos_config_ids") and emp.pos_config_ids:
                 return emp.pos_config_ids[0]
-            dept_name = (emp.department_id.name or "").strip().lower() if emp.department_id else ""
-            loc_name = (emp.work_location_id.name or "").strip().lower() if hasattr(emp, "work_location_id") and emp.work_location_id else ""
-            for cfg in configs:
-                cfg_name = (cfg.name or "").strip().lower()
-                if (dept_name and (dept_name in cfg_name or cfg_name in dept_name)) or (loc_name and (loc_name in cfg_name or cfg_name in loc_name)):
-                    return cfg
+
+            dept_full_path = ""
+            leaf_dept_name = ""
+            if emp.department_id:
+                dept_full_path = (getattr(emp.department_id, "complete_name", None) or emp.department_id.name or "").strip()
+                path_parts = [p.strip() for p in dept_full_path.split("/") if p.strip()]
+                leaf_dept_name = path_parts[-1] if path_parts else ""
+
+            loc_name = (emp.work_location_id.name or "").strip() if hasattr(emp, "work_location_id") and emp.work_location_id else ""
+
+            clean_leaf = leaf_dept_name.lower()
+            clean_full = dept_full_path.lower()
+            clean_loc = loc_name.lower()
+
+            # Tier 1: Exact match on leaf department name or work location
+            if clean_leaf or clean_loc:
+                for cfg in configs:
+                    cfg_name = (cfg.name or "").strip().lower()
+                    if (clean_leaf and cfg_name == clean_leaf) or (clean_loc and cfg_name == clean_loc):
+                        return cfg
+
+            # Tier 2: Leaf department name or work location is contained in POS config name (or vice versa)
+            if clean_leaf or clean_loc:
+                for cfg in configs:
+                    cfg_name = (cfg.name or "").strip().lower()
+                    if clean_leaf and (clean_leaf in cfg_name or cfg_name in clean_leaf):
+                        return cfg
+                    if clean_loc and (clean_loc in cfg_name or cfg_name in clean_loc):
+                        return cfg
+
+            # Tier 3: POS config name is contained anywhere within the full department path
+            if clean_full:
+                for cfg in configs:
+                    cfg_name = (cfg.name or "").strip().lower()
+                    if cfg_name and cfg_name in clean_full:
+                        return cfg
+
+            # Tier 4: Single company POS config fallback
             company_cfgs = [c for c in configs if c.company_id.id == emp.company_id.id]
             if len(company_cfgs) == 1:
                 return company_cfgs[0]
@@ -588,12 +620,44 @@ class PosReportingDashboard(models.TransientModel):
                 return emp.pos_config_id
             if hasattr(emp, "pos_config_ids") and emp.pos_config_ids:
                 return emp.pos_config_ids[0]
-            dept_name = (emp.department_id.name or "").strip().lower() if emp.department_id else ""
-            loc_name = (emp.work_location_id.name or "").strip().lower() if hasattr(emp, "work_location_id") and emp.work_location_id else ""
-            for cfg in configs:
-                cfg_name = (cfg.name or "").strip().lower()
-                if (dept_name and (dept_name in cfg_name or cfg_name in dept_name)) or (loc_name and (loc_name in cfg_name or cfg_name in loc_name)):
-                    return cfg
+
+            dept_full_path = ""
+            leaf_dept_name = ""
+            if emp.department_id:
+                dept_full_path = (getattr(emp.department_id, "complete_name", None) or emp.department_id.name or "").strip()
+                path_parts = [p.strip() for p in dept_full_path.split("/") if p.strip()]
+                leaf_dept_name = path_parts[-1] if path_parts else ""
+
+            loc_name = (emp.work_location_id.name or "").strip() if hasattr(emp, "work_location_id") and emp.work_location_id else ""
+
+            clean_leaf = leaf_dept_name.lower()
+            clean_full = dept_full_path.lower()
+            clean_loc = loc_name.lower()
+
+            # Tier 1: Exact match on leaf department name or work location
+            if clean_leaf or clean_loc:
+                for cfg in configs:
+                    cfg_name = (cfg.name or "").strip().lower()
+                    if (clean_leaf and cfg_name == clean_leaf) or (clean_loc and cfg_name == clean_loc):
+                        return cfg
+
+            # Tier 2: Leaf department name or work location is contained in POS config name (or vice versa)
+            if clean_leaf or clean_loc:
+                for cfg in configs:
+                    cfg_name = (cfg.name or "").strip().lower()
+                    if clean_leaf and (clean_leaf in cfg_name or cfg_name in clean_leaf):
+                        return cfg
+                    if clean_loc and (clean_loc in cfg_name or cfg_name in clean_loc):
+                        return cfg
+
+            # Tier 3: POS config name is contained anywhere within the full department path
+            if clean_full:
+                for cfg in configs:
+                    cfg_name = (cfg.name or "").strip().lower()
+                    if cfg_name and cfg_name in clean_full:
+                        return cfg
+
+            # Tier 4: Single company POS config fallback
             company_cfgs = [c for c in configs if c.company_id.id == emp.company_id.id]
             if len(company_cfgs) == 1:
                 return company_cfgs[0]
