@@ -842,7 +842,7 @@ class HrPayslip(models.Model):
                 if active_period_days > 0 and final_attendance_days > active_period_days:
                     final_attendance_days = active_period_days
 
-                computed_attendance_days = float(final_attendance_days)
+                computed_attendance_days = float(round(final_attendance_days))
 
             travel_days_count = 0.0
             trv_dates = []
