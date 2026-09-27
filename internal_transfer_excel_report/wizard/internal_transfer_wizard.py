@@ -36,6 +36,15 @@ class InternalTransferReportWizard(models.TransientModel):
         required=True,
         domain="[('code', '=', 'internal')]",
     )
+    include_purchase_receipts = fields.Boolean(string='Include Purchase Receipts')
+    receipt_location_id = fields.Many2one(
+        'stock.location',
+        string='From Location',
+    )
+    receipt_location_dest_id = fields.Many2one(
+        'stock.location',
+        string='To Location',
+    )
 
     @api.model
     def default_get(self, fields_list):
@@ -48,6 +57,10 @@ class InternalTransferReportWizard(models.TransientModel):
             ], limit=1)
             if picking_type:
                 res['picking_type_id'] = picking_type.id
+        if 'receipt_location_id' in fields_list and not res.get('receipt_location_id'):
+            supplier_location = self.env.ref('stock.stock_location_suppliers', raise_if_not_found=False)
+            if supplier_location:
+                res['receipt_location_id'] = supplier_location.id
         return res
 
     @api.onchange('all_factory_plan_categories')
@@ -159,14 +172,14 @@ class InternalTransferReportWizard(models.TransientModel):
             ('create_date', '<=', date_to_dt),
         ]
 
-    def _get_sheet1_data(self):
+    def _get_internal_transfer_moves(self):
         self.ensure_one()
 
         picking_domain = self._get_base_picking_domain()
         picking_domain.append(('state', 'not in', ('done', 'cancel')))
         picking_ids = self.env['stock.picking'].search(picking_domain).ids
         if not picking_ids:
-            return []
+            return self.env['stock.move']
 
         move_domain = [
             ('picking_id.picking_type_id', '=', self.picking_type_id.id),
@@ -176,16 +189,52 @@ class InternalTransferReportWizard(models.TransientModel):
             ('move_dest_ids', '=', False),
         ]
         move_domain = self._append_factory_plan_category_domain(move_domain)
+        return self.env['stock.move'].search(move_domain, order='picking_id, product_id')
 
-        moves = self.env['stock.move'].search(
-            move_domain,
-            order='picking_id, product_id',
-        )
+    def _get_purchase_receipt_moves(self):
+        self.ensure_one()
+        if not self.include_purchase_receipts:
+            return self.env['stock.move']
+        if not self.receipt_location_id or not self.receipt_location_dest_id:
+            raise UserError(_("Please set both From Location and To Location for purchase receipts."))
+
+        date_from_dt, date_to_dt = self._compute_dates()
+        move_domain = [
+            ('picking_id.picking_type_id.code', '=', 'incoming'),
+            ('purchase_line_id', '!=', False),
+            ('picking_id.create_date', '>=', date_from_dt),
+            ('picking_id.create_date', '<=', date_to_dt),
+            ('picking_id.state', 'not in', ('done', 'cancel')),
+            ('state', 'not in', ('done', 'cancel')),
+            ('location_id', 'child_of', self.receipt_location_id.id),
+            ('location_dest_id', 'child_of', self.receipt_location_dest_id.id),
+        ]
+        move_domain = self._append_factory_plan_category_domain(move_domain)
+        return self.env['stock.move'].search(move_domain, order='picking_id, product_id')
+
+    def _get_report_moves(self):
+        """Return (moves, receipt_moves): all report moves and the purchase receipt subset."""
+        self.ensure_one()
+        receipt_moves = self._get_purchase_receipt_moves()
+        return self._get_internal_transfer_moves() | receipt_moves, receipt_moves
+
+    def _get_sheet1_data(self):
+        self.ensure_one()
+        moves, receipt_moves = self._get_report_moves()
         rows = []
         for move in moves:
             picking = move.picking_id
+            is_receipt = move in receipt_moves
+            if is_receipt:
+                transfer_type = self.env._('Purchase Receipt')
+                source_document = move.purchase_line_id.order_id.name or picking.origin or ''
+            else:
+                transfer_type = self.env._('Internal Transfer')
+                source_document = picking.origin or ''
             rows.append({
                 'transfer_reference': picking.name or '',
+                'transfer_type': transfer_type,
+                'source_document': source_document,
                 'product_name': move.product_id.display_name,
                 'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
                 'created_by': self._get_picking_created_by_display(picking),
@@ -197,28 +246,13 @@ class InternalTransferReportWizard(models.TransientModel):
 
     def _get_sheet2_data(self):
         self.ensure_one()
-
-        picking_domain = self._get_base_picking_domain()
-        picking_domain.append(('state', 'not in', ('done', 'cancel')))
-        picking_ids = self.env['stock.picking'].search(picking_domain).ids
-        if not picking_ids:
-            return []
-
-        move_domain = [
-            ('picking_id.picking_type_id', '=', self.picking_type_id.id),
-            ('picking_id', 'in', picking_ids),
-            ('picking_id.state', 'not in', ('done', 'cancel')),
-            ('state', 'not in', ('done', 'cancel')),
-            ('move_dest_ids', '=', False),
-        ]
-        move_domain = self._append_factory_plan_category_domain(move_domain)
-        moves = self.env['stock.move'].search(move_domain)
+        moves, _receipt_moves = self._get_report_moves()
         if not moves:
             return []
 
         aggregated = {}
         for move in moves:
-            key = move.product_id.id
+            key = (move.product_id.id, move.product_uom.id)
             row = aggregated.setdefault(key, {
                 'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
                 'product_name': move.product_id.display_name,
@@ -259,6 +293,8 @@ class InternalTransferReportWizard(models.TransientModel):
 
         sheet1_headers = [
             self.env._('Reference'),
+            self.env._('Type'),
+            self.env._('Source Document'),
             self.env._('Product'),
             self.env._('Factory Plan Category'),
             self.env._('Created By'),
@@ -270,12 +306,14 @@ class InternalTransferReportWizard(models.TransientModel):
             sheet1.write(0, col, header, header_style)
 
         sheet1.set_column(0, 0, 22)
-        sheet1.set_column(1, 1, 45)
-        sheet1.set_column(2, 2, 25)
-        sheet1.set_column(3, 3, 30)
-        sheet1.set_column(4, 4, 22)
-        sheet1.set_column(5, 5, 18)
-        sheet1.set_column(6, 6, 16)
+        sheet1.set_column(1, 1, 18)
+        sheet1.set_column(2, 2, 20)
+        sheet1.set_column(3, 3, 45)
+        sheet1.set_column(4, 4, 25)
+        sheet1.set_column(5, 5, 30)
+        sheet1.set_column(6, 6, 22)
+        sheet1.set_column(7, 7, 18)
+        sheet1.set_column(8, 8, 16)
 
         row = 1
         sheet1_rows = self._get_sheet1_data()
@@ -284,15 +322,17 @@ class InternalTransferReportWizard(models.TransientModel):
         else:
             for data in sheet1_rows:
                 sheet1.write(row, 0, data['transfer_reference'], text_style)
-                sheet1.write(row, 1, data['product_name'], text_style)
-                sheet1.write(row, 2, data['factory_plan_category'], text_style)
-                sheet1.write(row, 3, data['created_by'], text_style)
+                sheet1.write(row, 1, data['transfer_type'], text_style)
+                sheet1.write(row, 2, data['source_document'], text_style)
+                sheet1.write(row, 3, data['product_name'], text_style)
+                sheet1.write(row, 4, data['factory_plan_category'], text_style)
+                sheet1.write(row, 5, data['created_by'], text_style)
                 if data['creating_date']:
-                    sheet1.write_datetime(row, 4, data['creating_date'], datetime_style)
+                    sheet1.write_datetime(row, 6, data['creating_date'], datetime_style)
                 else:
-                    sheet1.write(row, 4, '', text_style)
-                sheet1.write_number(row, 5, data['demand'], number_style)
-                sheet1.write(row, 6, data['product_uom'], text_style)
+                    sheet1.write(row, 6, '', text_style)
+                sheet1.write_number(row, 7, data['demand'], number_style)
+                sheet1.write(row, 8, data['product_uom'], text_style)
                 row += 1
 
         sheet2 = workbook.add_worksheet(self.env._('Summary'))

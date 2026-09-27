@@ -19,6 +19,16 @@
                            widget="many2many_tags"
                            invisible="all_factory_plan_categories"
                            options="{'no_create': True, 'no_create_edit': True}"/>
+
+                    <field name="include_purchase_receipts"/>
+                    <field name="receipt_location_id"
+                           invisible="not include_purchase_receipts"
+                           required="include_purchase_receipts"
+                           options="{'no_create': True, 'no_create_edit': True}"/>
+                    <field name="receipt_location_dest_id"
+                           invisible="not include_purchase_receipts"
+                           required="include_purchase_receipts"
+                           options="{'no_create': True, 'no_create_edit': True}"/>
                 </group>
 
                 <footer>

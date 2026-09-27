@@ -184,3 +184,43 @@ msgstr "الحالة"
 #: code:addons/internal_transfer_excel_report/controllers/main.py:0
 msgid "Internal Transfer Report"
 msgstr "تقرير التحويل الداخلي"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__include_purchase_receipts
+msgid "Include Purchase Receipts"
+msgstr "تضمين استلامات المشتريات"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__receipt_location_id
+msgid "From Location"
+msgstr "من الموقع"
+
+#. module: internal_transfer_excel_report
+#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__receipt_location_dest_id
+msgid "To Location"
+msgstr "إلى الموقع"
+
+#. module: internal_transfer_excel_report
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Please set both From Location and To Location for purchase receipts."
+msgstr "يرجى تحديد الموقع المصدر والموقع الوجهة لاستلامات المشتريات."
+
+#. module: internal_transfer_excel_report
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Purchase Receipt"
+msgstr "استلام مشتريات"
+
+#. module: internal_transfer_excel_report
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Internal Transfer"
+msgstr "تحويل داخلي"
+
+#. module: internal_transfer_excel_report
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Type"
+msgstr "النوع"
+
+#. module: internal_transfer_excel_report
+#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
+msgid "Source Document"
+msgstr "المستند المصدر"
