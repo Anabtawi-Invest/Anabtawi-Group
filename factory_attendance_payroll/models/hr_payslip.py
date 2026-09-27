@@ -884,6 +884,29 @@ class HrPayslip(models.Model):
                 if min_trv <= max_trv:
                     travel_days_count = float((max_trv - min_trv).days + 1)
 
+            # Calculate deductions from Attendance line:
+            # 1. Worked Public Holiday (deduct ONLY if employee physically worked on the holiday)
+            worked_holiday_days_to_deduct = 0.0
+            if total_holiday_worked_hrs > 0.01:
+                worked_holiday_days_to_deduct = float(len(set(att.check_in.date() for att in holiday_attendances))) if holiday_attendances else round(total_holiday_worked_hrs / 8.0, 2)
+
+            # 2. Used Paid Time Off Leaves (deduct ONLY if employee used paid time off / leaves)
+            paid_time_off_days_to_deduct = 0.0
+            for line in res:
+                code = (line.get('code') or '').strip()
+                work_entry_type = self.env['hr.work.entry.type'].browse(line.get('work_entry_type_id')) if line.get('work_entry_type_id') else None
+                we_name = (work_entry_type.name or '').lower() if work_entry_type else ''
+                line_name = (line.get('name') or '').lower()
+
+                if code in ['WORK100', 'A', 'ATTENDANCE', 'OUT', 'OUTCON', 'OUT_OF_CONTRACT', 'ARS', 'REST', 'RESTDAY', 'OVERTIME', 'EXTRA', 'LEAVE500', 'UNPAID', 'ABSENT', 'ABS', 'TRV', 'TRAVEL', 'TRAVEL_LEAVE'] or 'attendance' in we_name or 'out of contract' in line_name or 'rest' in we_name or 'overtime' in we_name or 'absent' in we_name or 'travel' in we_name:
+                    continue
+
+                if code in ['GTO', 'PHD', 'HOLIDAY', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name:
+                    continue
+
+                # Add used paid time off days
+                paid_time_off_days_to_deduct += line.get('number_of_days', 0.0)
+
             filtered_lines = []
             for line in res:
                 code = (line.get('code') or '').strip()
@@ -908,7 +931,8 @@ class HrPayslip(models.Model):
                 elif code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
                     if total_regular_attendance_hrs > 0.01 or computed_attendance_days > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
-                        line['number_of_days'] = computed_attendance_days
+                        eff_att_days = max(0.0, round(computed_attendance_days - worked_holiday_days_to_deduct - paid_time_off_days_to_deduct, 2))
+                        line['number_of_days'] = eff_att_days
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
