@@ -531,8 +531,6 @@ class PosReportingDashboard(models.TransientModel):
                 if not (dt_start <= c_dt <= dt_end or dt_start.date() <= att_date <= dt_end.date()):
                     continue
                 cfg = _get_employee_pos_config(emp)
-                if not cfg:
-                    cfg = configs[0] if configs else (all_configs[0] if all_configs else False)
                 if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                     continue
                 branch_daily_attendants[cfg.id][att_date].add(emp)
@@ -1141,8 +1139,6 @@ class PosReportingDashboard(models.TransientModel):
                     if not (dt_start <= c_dt <= dt_end or dt_start.date() <= att_date <= dt_end.date()):
                         continue
                     cfg = _get_employee_pos_config(emp)
-                    if not cfg:
-                        cfg = configs[0] if configs else (all_configs[0] if all_configs else False)
                     if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                         continue
 
