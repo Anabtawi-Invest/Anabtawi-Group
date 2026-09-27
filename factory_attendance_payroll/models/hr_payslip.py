@@ -839,6 +839,8 @@ class HrPayslip(models.Model):
                 covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
                 covered_lateness_days = covered_lateness_hours / 8.0
                 final_attendance_days = total_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
+                if active_period_days > 0 and final_attendance_days > active_period_days:
+                    final_attendance_days = active_period_days
 
                 computed_attendance_days = float(final_attendance_days)
 
@@ -906,7 +908,7 @@ class HrPayslip(models.Model):
                     filtered_lines.append(line)
 
                 elif code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
-                    if total_regular_attendance_hrs > 0.01 or computed_attendance_days > 0.01:
+                    if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
                         line['number_of_days'] = computed_attendance_days
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
