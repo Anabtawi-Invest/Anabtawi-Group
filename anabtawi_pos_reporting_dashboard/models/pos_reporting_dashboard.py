@@ -1191,7 +1191,7 @@ class PosReportingDashboard(models.TransientModel):
         pivot_view = self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_pivot", raise_if_not_found=False)
         views = []
         if tree_view:
-            views.append((tree_view.id, "tree"))
+            views.append((tree_view.id, "list"))
         if pivot_view:
             views.append((pivot_view.id, "pivot"))
 
@@ -1199,9 +1199,9 @@ class PosReportingDashboard(models.TransientModel):
             "name": title,
             "type": "ir.actions.act_window",
             "res_model": "pos.unified.report",
-            "view_mode": "tree,pivot,graph",
+            "view_mode": "list,pivot,graph",
             "domain": domain,
-            "views": views if views else [(False, "tree"), (False, "pivot")],
+            "views": views if views else [(False, "list"), (False, "pivot")],
             "target": "current",
             "context": {
                 "active_wizard_id": wiz.id,

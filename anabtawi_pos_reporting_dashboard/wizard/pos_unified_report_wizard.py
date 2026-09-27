@@ -74,11 +74,11 @@ class PosUnifiedReportWizard(models.TransientModel):
             date_to=fields.Datetime.to_string(self.date_to),
             config_ids=c_ids,
         )
-        res["view_mode"] = "pivot,graph,tree"
+        res["view_mode"] = "pivot,graph,list"
         res["views"] = [
             (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_pivot").id, "pivot"),
             (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_graph").id, "graph"),
-            (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_tree").id, "tree"),
+            (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_tree").id, "list"),
         ]
         return res
 

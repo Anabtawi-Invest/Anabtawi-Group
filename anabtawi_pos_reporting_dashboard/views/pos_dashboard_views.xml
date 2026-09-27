@@ -42,10 +42,10 @@
     </record>
 
     <record id="view_pos_unified_report_tree" model="ir.ui.view">
-        <field name="name">pos.unified.report.tree</field>
+        <field name="name">pos.unified.report.list</field>
         <field name="model">pos.unified.report</field>
         <field name="arch" type="xml">
-            <tree string="POS Unified Operations">
+            <list string="POS Unified Operations">
                 <header>
                     <button name="action_export_excel" string="Export Excel Report (.xlsx)" type="object" class="btn-success" icon="fa-file-excel-o"/>
                 </header>
@@ -74,7 +74,7 @@
                 <field name="labor_cost_amount" sum="Total Labor Cost" optional="show"/>
                 <field name="extra_hours" string="Extra Hours (hrs)" sum="Total Extra Hours" optional="show"/>
                 <field name="amount" string="Full Amount" sum="Total Amount"/>
-            </tree>
+            </list>
         </field>
     </record>
 
