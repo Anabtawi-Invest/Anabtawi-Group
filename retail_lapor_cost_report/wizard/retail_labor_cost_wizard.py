@@ -184,7 +184,9 @@ class RetailLaborCostWizard(models.TransientModel):
 
     @api.onchange('date_from', 'date_to', 'branch_department_ids')
     def _onchange_filters(self):
-        self._populate_preview_lines()
+        """Safely refresh preview lines when dates or branches change without crashing on incomplete dates."""
+        if self.date_from and self.date_to and self.date_from <= self.date_to:
+            self._populate_preview_lines()
 
     @api.depends('line_ids', 'line_ids.sales_profit', 'line_ids.labor_cost', 'line_ids.approved_ot_hours', 'line_ids.unapproved_ot_hours')
     def _compute_totals(self):
@@ -374,7 +376,7 @@ class RetailLaborCostWizard(models.TransientModel):
 
         # Strictly respect the user's selected branches; do NOT re-add if user removed them!
         branches = self.branch_department_ids
-        if not branches:
+        if not branches or not self.date_from or not self.date_to or self.date_from > self.date_to:
             return []
 
         # Exact calendar month period: 00:00:00 on date_from to 23:59:59 on date_to (no next day shift)
@@ -444,8 +446,7 @@ class RetailLaborCostWizard(models.TransientModel):
         return rows
 
     def _populate_preview_lines(self):
-        """Populate the in-wizard preview table without resetting user's branch selection."""
-        self.line_ids.unlink()
+        """Populate the in-wizard preview table safely using (5, 0, 0) without unlinking in-memory virtual records."""
         rows = self._prepare_data_rows()
         line_vals = []
         for r in rows:
@@ -467,10 +468,10 @@ class RetailLaborCostWizard(models.TransientModel):
                 'currency_id': r['company_id'],
                 'notes': r['notes'],
             }))
-        self.line_ids = line_vals
+        self.line_ids = [(5, 0, 0)] + line_vals
 
     def action_calculate_preview(self):
-        """Action button to refresh live calculations inside the wizard."""
+        """Action button to refresh live calculations inside the wizard preserving user dates and branches."""
         self.ensure_one()
         self._populate_preview_lines()
         return {
@@ -479,7 +480,14 @@ class RetailLaborCostWizard(models.TransientModel):
             'res_id': self.id,
             'view_mode': 'form',
             'target': 'new',
-            'context': dict(self.env.context, default_branch_department_ids=[(6, 0, self.branch_department_ids.ids)]),
+            'context': dict(
+                self.env.context,
+                default_company_id=self.company_id.id,
+                default_date_from=self.date_from,
+                default_date_to=self.date_to,
+                default_retail_department_id=self.retail_department_id.id,
+                default_branch_department_ids=[(6, 0, self.branch_department_ids.ids)],
+            ),
         }
 
     def action_export_xlsx(self):
@@ -491,7 +499,7 @@ class RetailLaborCostWizard(models.TransientModel):
 
         metadata = {
             'company': self.company_id.name or '',
-            'period': f'{self.date_from} — {self.date_to}',
+            'period': f'{self.date_from} to {self.date_to}',
             'user': self.env.user.name or '',
             'generated': fields.Datetime.now().strftime('%Y-%m-%d %H:%M'),
             'currency': self.company_id.currency_id.name or 'JOD',
