@@ -21,6 +21,8 @@ class PosUnifiedReport(models.TransientModel):
         ("cash_out", "Cash Out"),
         ("rahen_in", "Pledge Received (Rahen In)"),
         ("rahen_out", "Pledge Returned (Rahen Out)"),
+        ("attendant_employees", "Attendant Employees"),
+        ("labor_cost", "Daily Employee Labor Cost"),
     ], string="Report Type", required=True, index=True)
 
     pos_order_id = fields.Many2one("pos.order", string="POS Order", index=True)
@@ -39,6 +41,9 @@ class PosUnifiedReport(models.TransientModel):
     rahen_out_amount = fields.Float(string="Rahen Out Amount", digits=(16, 3))
     advance_amount = fields.Float(string="Advance Deposit Amount", digits=(16, 3))
     delivery_amount = fields.Float(string="Delivery Amount", digits=(16, 3))
+    attendant_employee_count = fields.Integer(string="Attendant Employee Count")
+    labor_cost_amount = fields.Float(string="Labor Cost Amount", digits=(16, 3))
+    employee_id = fields.Many2one("hr.employee", string="Employee")
     partner_id = fields.Many2one("res.partner", string="Customer")
     company_id = fields.Many2one("res.company", string="Company", default=lambda self: self.env.company)
 

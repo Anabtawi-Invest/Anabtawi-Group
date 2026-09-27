@@ -44,7 +44,7 @@
                             <i class="fa fa-cubes me-1"/> All Branches
                         </button>
                     </li>
-                    <t t-foreach="data.all_branches" t-as="branch_item" t-key="branch_item.id">
+                    <t t-foreach="data.all_branches || []" t-as="branch_item" t-key="branch_item.id">
                         <li class="nav-item">
                             <button type="button" class="nav-link" t-att-class="{'active': isBranchSelected(branch_item.id)}" t-on-click="() => this.selectBranch(branch_item.id)">
                                 <i class="fa fa-building-o me-1"/> <t t-esc="branch_item.name"/>
@@ -205,6 +205,28 @@
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
+
+                    <!-- Attendant Employees -->
+                    <div class="o_kpi_card card-attendant clickable_kpi" t-on-click="() => this.onKpiClick('attendant_employees')" title="Click to view attendant employees breakdown">
+                        <div class="kpi_icon"><i class="fa fa-users text-primary"/></div>
+                        <div class="kpi_title">Attendant Employees</div>
+                        <div class="kpi_value"><t t-esc="data.kpis.attendant_employee_count || 0"/> <span class="fs-6 fw-normal text-muted">Staff</span></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-primary badge_sub">Active Attendance</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
+
+                    <!-- Daily Employee Labor Cost -->
+                    <div class="o_kpi_card card-labor clickable_kpi" t-on-click="() => this.onKpiClick('labor_cost')" title="Click to view daily employee labor cost breakdown">
+                        <div class="kpi_icon"><i class="fa fa-calculator text-danger"/></div>
+                        <div class="kpi_title">Daily Employee Cost</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_labor_cost)"/></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-danger badge_sub">Wage Cost / Day</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Channels & Daily Trend Summary -->
@@ -216,7 +238,7 @@
                                 <h4><i class="fa fa-pie-chart text-primary"/> Sales Payment Channels</h4>
                             </div>
                             <div class="channel_list mt-3">
-                                <t t-foreach="data.channels" t-as="channel" t-key="channel.name">
+                                <t t-foreach="data.channels || []" t-as="channel" t-key="channel.name">
                                     <div class="channel_progress_item">
                                         <div class="channel_info">
                                             <span><t t-esc="channel.name"/></span>
@@ -273,7 +295,7 @@
                 <!-- Per-Branch Detailed Comparison Grid -->
                 <div class="o_dashboard_section">
                     <div class="section_header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <h4><i class="fa fa-building text-info"/> Branch Performance Matrix (<t t-esc="data.branches.length"/> Active Branches)</h4>
+                        <h4><i class="fa fa-building text-info"/> Branch Performance Matrix (<t t-esc="(data.branches || []).length"/> Active Branches)</h4>
                         <span class="text-muted small"><i class="fa fa-info-circle me-1"/>Click any column header to sort high-to-low or low-to-high</span>
                     </div>
 
@@ -416,7 +438,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <t t-foreach="sortedBranches" t-as="branch" t-key="branch.config_id">
+                                <t t-foreach="sortedBranches || []" t-as="branch" t-key="branch.config_id">
                                     <tr>
                                         <td class="branch_title"><t t-esc="branch.branch_name"/></td>
                                         <td class="val_num fw-bold text-primary"><t t-esc="formatCurrency(branch.sales)"/></td>
