@@ -905,7 +905,7 @@ class HrPayslip(models.Model):
                 if code in ['WORK100', 'A', 'ATTENDANCE', 'OUT', 'OUTCON', 'OUT_OF_CONTRACT', 'ARS', 'REST', 'RESTDAY', 'OVERTIME', 'EXTRA', 'LEAVE500', 'UNPAID', 'ABSENT', 'ABS', 'TRV', 'TRAVEL', 'TRAVEL_LEAVE'] or 'attendance' in we_name or 'out of contract' in line_name or 'rest' in we_name or 'overtime' in we_name or 'absent' in we_name or 'travel' in we_name:
                     continue
 
-                if code in ['GTO', 'PHD', 'HOLIDAY', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name:
+                if code in ['GTO', 'PHD', 'HOLIDAY', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name or 'public holiday' in line_name or 'holiday' in line_name:
                     continue
 
                 # Add used paid time off days
@@ -924,7 +924,7 @@ class HrPayslip(models.Model):
                 if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
                     continue
 
-                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'] or 'travel' in we_name or 'travel' in line_name or 'سفر' in we_name or 'سفر' in line_name or 'مهمة' in we_name or 'مهمة' in line_name:
+                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'] and ('travel' in we_name or 'travel' in line_name or 'سفر' in we_name or 'سفر' in line_name or 'مهمة' in we_name or 'مهمة' in line_name):
                     trv_days = travel_days_count if travel_days_count > 0.0 else line.get('number_of_days', 0.0)
                     line['number_of_days'] = trv_days
                     line['number_of_hours'] = round(trv_days * 9.0, 2)
@@ -952,9 +952,10 @@ class HrPayslip(models.Model):
                     line['amount'] = 0.0
                     filtered_lines.append(line)
 
-                elif code in ['GTO', 'PHD', 'HOLIDAY', 'LEAVE110', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name:
+                elif code in ['GTO', 'PHD', 'HOLIDAY', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name or 'public holiday' in line_name or 'holiday' in line_name:
                     if total_holiday_worked_hrs > 0.01:
                         weighted_hol_hrs = round(total_holiday_worked_hrs * 1.5, 2)
+                        line['name'] = 'Public Holiday'
                         line['number_of_hours'] = weighted_hol_hrs
                         line['number_of_days'] = float(len(set(att.check_in.date() for att in holiday_attendances))) if holiday_attendances else round(weighted_hol_hrs / 8.0, 2)
                         line['amount'] = round(weighted_hol_hrs * hourly_rate, 3)
