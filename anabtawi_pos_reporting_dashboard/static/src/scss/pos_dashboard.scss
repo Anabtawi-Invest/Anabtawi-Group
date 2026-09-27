@@ -76,6 +76,16 @@
         }
     }
 
+    .clickable_cell {
+        cursor: pointer !important;
+        transition: background-color 0.15s ease-in-out !important;
+
+        &:hover {
+            background-color: rgba(59, 130, 246, 0.12) !important;
+            text-decoration: underline;
+        }
+    }
+
     /* Top Toolbar & Header */
     .o_pos_dashboard_header {
         display: flex;
