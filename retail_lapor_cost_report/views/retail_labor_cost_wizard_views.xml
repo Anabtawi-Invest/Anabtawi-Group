@@ -80,6 +80,7 @@
                     <page string="Branches Summary / ملخص الأفرع" name="branches_preview">
                         <field name="line_ids" readonly="1">
                             <list decoration-danger="labor_cost > sales_profit and sales_profit > 0" decoration-warning="sales_profit == 0">
+                                <field name="branch_code"/>
                                 <field name="branch_name" class="fw-bold"/>
                                 <field name="sales_profit" widget="monetary" options="{'currency_field': 'currency_id'}" class="text-primary fw-bold"/>
                                 <field name="employee_count"/>
@@ -90,6 +91,7 @@
                                 <field name="total_ot_hours" class="fw-bold"/>
                                 <field name="net_margin" widget="monetary" options="{'currency_field': 'currency_id'}"/>
                                 <field name="labor_pct" string="Labor %"/>
+                                <field name="pos_config_names" optional="hide"/>
                                 <field name="currency_id" column_invisible="1"/>
                                 <field name="notes" optional="show"/>
                             </list>

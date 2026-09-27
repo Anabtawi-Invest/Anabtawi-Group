@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import base64
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 import logging
 
 from odoo import api, fields, models, _
@@ -16,13 +16,14 @@ class RetailLaborCostWizardLine(models.TransientModel):
 
     wizard_id = fields.Many2one('retail.labor.cost.wizard', string='Wizard', ondelete='cascade', required=True)
     department_id = fields.Many2one('hr.department', string='Branch Department', required=True)
-    branch_name = fields.Char(string='Branch Name / اسم الفرع')
+    branch_code = fields.Char(string='Branch Code')
+    branch_name = fields.Char(string='Branch Name')
     company_id = fields.Many2one('res.company', string='Company')
     
-    # 1. Sales & Profits from POS (Standard Calendar Period Orders)
+    # 1. Sales & Profits from POS (Direct Calendar Period Orders: 00:00:00 to 23:59:59)
     sales_profit = fields.Monetary(string='Sales Profit / Revenue', currency_field='currency_id')
     
-    # 2. Labor Cost (Actual Attendance Days)
+    # 2. Labor Cost (Actual hr.attendance Presence Days)
     employee_count = fields.Integer(string='Employees Count')
     attendance_days = fields.Float(string='Total Attendance Days', digits=(16, 2))
     labor_cost = fields.Monetary(string='Total Labor Cost', currency_field='currency_id')
@@ -35,6 +36,7 @@ class RetailLaborCostWizardLine(models.TransientModel):
     # Metrics
     net_margin = fields.Monetary(string='Net Contribution Margin', currency_field='currency_id')
     labor_pct = fields.Float(string='Labor Cost %', digits=(16, 2))
+    pos_config_names = fields.Char(string='Linked POS Configurations')
     currency_id = fields.Many2one('res.currency', string='Currency')
     notes = fields.Char(string='Notes')
 
@@ -42,6 +44,20 @@ class RetailLaborCostWizardLine(models.TransientModel):
 class RetailLaborCostWizard(models.TransientModel):
     _name = 'retail.labor.cost.wizard'
     _description = 'Retail Labor Cost & Sales Profit Report Wizard'
+
+    def _default_company(self):
+        """Default to the company owning the Retail department if available."""
+        dept = self.env['hr.department'].search([
+            ('company_id', 'in', self.env.companies.ids),
+            '|', '|', '|',
+            ('name', '=ilike', 'retail'),
+            ('name', '=ilike', 'retail%'),
+            ('name', '=ilike', '%retail%'),
+            ('name', '=ilike', '%ريتيل%')
+        ], limit=1)
+        if dept and dept.company_id:
+            return dept.company_id
+        return self.env.company
 
     def _default_retail_department(self):
         """Find the main Retail department."""
@@ -55,20 +71,50 @@ class RetailLaborCostWizard(models.TransientModel):
         ], limit=1)
         return dept.id if dept else False
 
+    @api.model
+    def _get_leaf_retail_branches(self, dept_id=None, company_id=None):
+        """
+        Find only the actual retail branch stores.
+        Excludes administration, management, HR, Finance, and grouping region folders.
+        """
+        dept_id = dept_id or self._default_retail_department()
+        if not dept_id:
+            return self.env['hr.department']
+
+        dept = self.env['hr.department'].browse(dept_id)
+        cid = company_id or (dept.company_id.id if dept else False) or self.env.company.id
+
+        # Look for sub-department 'الفروع' under Retail
+        branches_parent = self.env['hr.department'].search([
+            ('company_id', '=', cid),
+            ('id', 'child_of', dept_id),
+            ('name', '=ilike', 'الفروع')
+        ], limit=1)
+        search_parent = branches_parent.id if branches_parent else dept_id
+
+        all_depts = self.env['hr.department'].search([
+            ('company_id', '=', cid),
+            ('id', 'child_of', search_parent),
+            ('id', '!=', search_parent),
+            ('id', '!=', dept_id)
+        ])
+
+        # Exclude administrative / non-branch departments and group folders
+        ignored_words = ['ادارة', 'إدارة', 'مالية', 'محاسبة', 'موارد بشرية', 'admin', 'hr', 'finance']
+        leaf_branches = all_depts.filtered(lambda d:
+            not d.child_ids and
+            not any(w in (d.name or '').lower() for w in ignored_words)
+        )
+        return leaf_branches or all_depts
+
     def _default_branches(self):
-        """Pre-select all child branch departments under Retail."""
-        dept_id = self._default_retail_department()
-        if dept_id:
-            children = self.env['hr.department'].search([
-                ('id', 'child_of', dept_id),
-                ('id', '!=', dept_id)
-            ])
-            return children.ids if children else [dept_id]
-        return []
+        """Pre-select only the actual retail branch departments."""
+        branches = self._get_leaf_retail_branches()
+        return branches.ids
 
     company_id = fields.Many2one(
         'res.company', string='Company', required=True,
-        default=lambda self: self.env.company
+        default=_default_company
     )
     date_from = fields.Date(
         string='Period From', required=True,
@@ -109,18 +155,34 @@ class RetailLaborCostWizard(models.TransientModel):
     file_data = fields.Binary(readonly=True, attachment=False)
     filename = fields.Char(readonly=True)
 
+    @api.onchange('company_id')
+    def _onchange_company(self):
+        if self.company_id:
+            dept = self.env['hr.department'].search([
+                ('company_id', '=', self.company_id.id),
+                '|', '|', '|',
+                ('name', '=ilike', 'retail'),
+                ('name', '=ilike', 'retail%'),
+                ('name', '=ilike', '%retail%'),
+                ('name', '=ilike', '%ريتيل%')
+            ], limit=1)
+            self.retail_department_id = dept.id if dept else False
+            if dept:
+                self.branch_department_ids = self._get_leaf_retail_branches(dept.id, self.company_id.id)
+            else:
+                self.branch_department_ids = False
+
     @api.onchange('retail_department_id')
     def _onchange_retail_department(self):
         if self.retail_department_id:
-            children = self.env['hr.department'].search([
-                ('id', 'child_of', self.retail_department_id.id),
-                ('id', '!=', self.retail_department_id.id)
-            ])
-            self.branch_department_ids = children if children else self.retail_department_id
+            self.branch_department_ids = self._get_leaf_retail_branches(
+                self.retail_department_id.id,
+                self.company_id.id if self.company_id else False
+            )
         else:
             self.branch_department_ids = False
 
-    @api.onchange('company_id', 'date_from', 'date_to', 'retail_department_id', 'branch_department_ids')
+    @api.onchange('date_from', 'date_to', 'branch_department_ids')
     def _onchange_filters(self):
         self._populate_preview_lines()
 
@@ -149,12 +211,14 @@ class RetailLaborCostWizard(models.TransientModel):
         dept_name = (department.name or '').strip().lower()
         dept_code = (getattr(department, 'code', False) or '').strip().lower()
 
+        # Clean noise words
         clean_dept = dept_name.replace('فرع', '').replace('branch', '').replace('retail', '').replace('ريتيل', '').replace('-', '').strip()
 
         for cfg in all_configs:
             cfg_name = (cfg.name or '').strip().lower()
             clean_cfg = cfg_name.replace('فرع', '').replace('branch', '').replace('retail', '').replace('ريتيل', '').replace('-', '').strip()
 
+            # Exact or clean substring match
             if cfg_name == dept_name or (clean_dept and clean_dept == clean_cfg):
                 matched_configs |= cfg
             elif clean_dept and (clean_dept in clean_cfg or clean_cfg in clean_dept):
@@ -166,13 +230,14 @@ class RetailLaborCostWizard(models.TransientModel):
 
     def _get_branch_sales_profit(self, configs, str_start, str_end):
         """
-        Calculate total branch sales revenue reading directly from Point of Sale Orders (pos.order)
-        based on the exact calendar date range (date_from 00:00:00 to date_to 23:59:59).
-        Matches Point of Sale -> Orders screen totals.
+        Calculate total branch sales profit reading directly from Point of Sale Orders (pos.order)
+        based on the exact calendar date range (date_from 00:00:00 to date_to 23:59:59)
+        without shifting into the next day. Matches Point of Sale -> Orders screen totals.
         """
         if not configs:
             return 0.0
 
+        # Method 1: Direct pos.order sales matching POS Orders screen
         orders = self.env['pos.order'].sudo().search([
             ('config_id', 'in', configs.ids),
             ('state', 'in', ('paid', 'done', 'invoiced', 'posted')),
@@ -183,7 +248,7 @@ class RetailLaborCostWizard(models.TransientModel):
         if order_sales:
             return round(order_sales, 3)
 
-        # Fallback to pos.payment if needed
+        # Method 2: Fallback to pos.payment within exact calendar period
         payments = self.env['pos.payment'].sudo().search([
             ('session_id.config_id', 'in', configs.ids),
             ('pos_order_id.state', 'in', ('paid', 'done', 'invoiced')),
@@ -210,11 +275,11 @@ class RetailLaborCostWizard(models.TransientModel):
 
     def _get_branch_labor_cost(self, employees, date_from, date_to):
         """
-        Calculate total Attendance Days and Labor Cost for all employees in a branch:
-        Reads directly from hr.attendance actual physical check-ins during the period.
-        - Attendance Days = count of distinct days each employee actually attended work.
-        - Daily Rate = hourly_wage * 8.0 hrs/day (or resource calendar hours).
-        - Labor Cost = sum of (emp_att_days * daily_rate) for each employee.
+        Calculate total Attendance Days and Labor Cost for branch employees:
+        Reads directly from physical hr.attendance check-ins during the exact calendar period.
+        - Total Attendance Days = count of distinct days each employee actually attended.
+        - Daily Rate = hourly_wage * hours_per_day.
+        - Labor Cost = sum of (emp_att_days * daily_rate).
         """
         if not employees:
             return 0.0, 0.0
@@ -232,7 +297,6 @@ class RetailLaborCostWizard(models.TransientModel):
                 ('check_in', '<=', dt_end),
             ])
             if emp_atts:
-                # Count distinct check-in dates
                 att_days = float(len(set(att.check_in.date() for att in emp_atts if att.check_in)))
             else:
                 att_days = 0.0
@@ -252,10 +316,7 @@ class RetailLaborCostWizard(models.TransientModel):
     def _get_branch_overtime_hours(self, employees, date_from, date_to):
         """
         Calculate total Overtime Hours for all employees in a branch:
-        Reads directly from hr.attendance matching the Attendance screen columns:
-        - Daily Extra Hours (daily_overtime_hours): Total Extra Hours worked.
-        - Extra Hours (overtime_hours): Approved Extra Hours.
-        - Unapproved Extra Hours = Daily Extra Hours - Extra Hours.
+        Reads directly from hr.attendance extra hours (Daily Extra Hours vs Extra Hours).
         """
         if not employees:
             return 0.0, 0.0
@@ -287,11 +348,7 @@ class RetailLaborCostWizard(models.TransientModel):
             elif daily_extra > 0:
                 return round(daily_extra, 2), 0.0
             elif ot_hours > 0:
-                approved = sum(att.overtime_hours for att in attendances if getattr(att, 'overtime_status', '') == 'approved')
-                unapproved = sum(att.overtime_hours for att in attendances if getattr(att, 'overtime_status', '') != 'approved')
-                if approved == 0 and unapproved == 0:
-                    approved = ot_hours
-                return round(approved, 2), round(unapproved, 2)
+                return round(ot_hours, 2), 0.0
 
         # Fallback to hr.attendance.overtime.line
         if 'hr.attendance.overtime.line' in self.env:
@@ -315,22 +372,12 @@ class RetailLaborCostWizard(models.TransientModel):
         if not self.env.user.has_group('hr_payroll.group_hr_payroll_user'):
             raise AccessError(_('Only Payroll users may export this report.'))
 
+        # Strictly respect the user's selected branches; do NOT re-add if user removed them!
         branches = self.branch_department_ids
-        if not branches and self.retail_department_id:
-            branches = self.env['hr.department'].search([
-                ('id', 'child_of', self.retail_department_id.id),
-                ('id', '!=', self.retail_department_id.id)
-            ])
-            if not branches:
-                branches = self.retail_department_id
-
         if not branches:
-            branches = self.env['hr.department'].search([
-                ('company_id', '=', self.company_id.id),
-                '|', ('name', 'ilike', 'retail'), ('name', 'ilike', 'فرع')
-            ])
+            return []
 
-        # Standard Calendar Month/Period: 00:00:00 on date_from to 23:59:59 on date_to
+        # Exact calendar month period: 00:00:00 on date_from to 23:59:59 on date_to (no next day shift)
         dt_start = datetime.combine(self.date_from, time.min)
         dt_end = datetime.combine(self.date_to, time.max)
         str_start = fields.Datetime.to_string(dt_start)
@@ -338,10 +385,12 @@ class RetailLaborCostWizard(models.TransientModel):
 
         rows = []
         for branch in branches:
+            branch_code = getattr(branch, 'code', False) or getattr(branch, 'complete_name', False) or str(branch.id)
             branch_name = branch.name or ''
 
             # 1. Matching POS Configs & Sales Profit (Direct Calendar Orders)
             configs = self._get_branch_pos_configs(branch)
+            cfg_names = ', '.join(configs.mapped('name')) if configs else _('Auto/Direct match')
             sales_profit = self._get_branch_sales_profit(configs, str_start, str_end)
 
             # 2. Employees of this branch
@@ -351,7 +400,7 @@ class RetailLaborCostWizard(models.TransientModel):
             ])
             emp_count = len(branch_employees)
 
-            # 3. Labor Cost & Attendance Days (Actual Attendance Screen Check-ins)
+            # 3. Labor Cost & Attendance Days (Actual physical hr.attendance check-ins)
             labor_cost, att_days = self._get_branch_labor_cost(
                 branch_employees, self.date_from, self.date_to
             )
@@ -376,7 +425,9 @@ class RetailLaborCostWizard(models.TransientModel):
 
             rows.append({
                 'department_id': branch.id,
+                'branch_code': branch_code,
                 'branch_name': branch_name,
+                'company_id': self.company_id.id,
                 'sales_profit': sales_profit,
                 'employee_count': emp_count,
                 'attendance_days': att_days,
@@ -386,21 +437,23 @@ class RetailLaborCostWizard(models.TransientModel):
                 'total_ot_hours': total_ot,
                 'net_margin': net_margin,
                 'labor_pct': labor_pct,
-                'currency_id': self.company_id.currency_id.id,
-                'notes': ' | '.join(notes) if notes else '',
+                'pos_config_names': cfg_names,
+                'notes': ' '.join(notes),
             })
 
         return rows
 
     def _populate_preview_lines(self):
-        """Populate the in-wizard preview table without saving permanently."""
+        """Populate the in-wizard preview table without resetting user's branch selection."""
         self.line_ids.unlink()
         rows = self._prepare_data_rows()
         line_vals = []
         for r in rows:
             line_vals.append((0, 0, {
                 'department_id': r['department_id'],
+                'branch_code': r['branch_code'],
                 'branch_name': r['branch_name'],
+                'company_id': r['company_id'],
                 'sales_profit': r['sales_profit'],
                 'employee_count': r['employee_count'],
                 'attendance_days': r['attendance_days'],
@@ -410,7 +463,8 @@ class RetailLaborCostWizard(models.TransientModel):
                 'total_ot_hours': r['total_ot_hours'],
                 'net_margin': r['net_margin'],
                 'labor_pct': r['labor_pct'],
-                'currency_id': r['currency_id'],
+                'pos_config_names': r['pos_config_names'],
+                'currency_id': r['company_id'],
                 'notes': r['notes'],
             }))
         self.line_ids = line_vals
@@ -425,6 +479,7 @@ class RetailLaborCostWizard(models.TransientModel):
             'res_id': self.id,
             'view_mode': 'form',
             'target': 'new',
+            'context': dict(self.env.context, default_branch_department_ids=[(6, 0, self.branch_department_ids.ids)]),
         }
 
     def action_export_xlsx(self):
