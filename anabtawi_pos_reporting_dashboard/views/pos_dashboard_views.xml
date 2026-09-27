@@ -42,10 +42,10 @@
     </record>
 
     <record id="view_pos_unified_report_tree" model="ir.ui.view">
-        <field name="name">pos.unified.report.list</field>
+        <field name="name">pos.unified.report.tree</field>
         <field name="model">pos.unified.report</field>
         <field name="arch" type="xml">
-            <list string="POS Unified Operations">
+            <tree string="POS Unified Operations">
                 <header>
                     <button name="action_export_excel" string="Export Excel Report (.xlsx)" type="object" class="btn-success" icon="fa-file-excel-o"/>
                 </header>
@@ -72,8 +72,9 @@
                 <field name="advance_amount" sum="Total Advance" optional="hide"/>
                 <field name="attendant_employee_count" sum="Total Attending Staff" optional="show"/>
                 <field name="labor_cost_amount" sum="Total Labor Cost" optional="show"/>
+                <field name="extra_hours" string="Extra Hours (hrs)" sum="Total Extra Hours" optional="show"/>
                 <field name="amount" string="Full Amount" sum="Total Amount"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -96,6 +97,7 @@
                 <filter string="Advance Deposits" name="filter_advance" domain="[('report_type', '=', 'advance_deposit')]"/>
                 <filter string="Attendant Employees" name="filter_attendants" domain="[('report_type', '=', 'attendant_employees')]"/>
                 <filter string="Daily Labor Cost" name="filter_labor_cost" domain="[('report_type', '=', 'labor_cost')]"/>
+                <filter string="Extra Hours" name="filter_extra_hours" domain="[('report_type', '=', 'extra_hours')]"/>
                 <separator/>
                 <filter string="POS Branch" name="group_config" context="{'group_by': 'config_id'}"/>
                 <filter string="Report Type" name="group_type" context="{'group_by': 'report_type'}"/>

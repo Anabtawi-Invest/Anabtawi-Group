@@ -74,11 +74,11 @@ class PosUnifiedReportWizard(models.TransientModel):
             date_to=fields.Datetime.to_string(self.date_to),
             config_ids=c_ids,
         )
-        res["view_mode"] = "pivot,graph,list"
+        res["view_mode"] = "pivot,graph,tree"
         res["views"] = [
             (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_pivot").id, "pivot"),
             (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_graph").id, "graph"),
-            (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_tree").id, "list"),
+            (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_tree").id, "tree"),
         ]
         return res
 
@@ -162,6 +162,7 @@ class PosUnifiedReportWizard(models.TransientModel):
             _("Delivery Fees"),
             _("Attendant Staff"),
             _("Daily Labor Cost"),
+            _("Extra Hours (hrs)"),
         ]
 
         sheet1.set_column(0, 0, 28)
@@ -201,6 +202,7 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet1.write_number(curr_row, 24, b["delivery_amount"], num_fmt)
             sheet1.write_number(curr_row, 25, b.get("attendant_employee_count", 0), int_fmt)
             sheet1.write_number(curr_row, 26, b.get("total_labor_cost", 0.0), num_fmt)
+            sheet1.write_number(curr_row, 27, b.get("extra_hours", 0.0), num_fmt)
             curr_row += 1
 
         # Global Total Row Sheet 1
@@ -232,6 +234,7 @@ class PosUnifiedReportWizard(models.TransientModel):
         sheet1.write_number(curr_row, 24, gt["delivery_amount"], total_num_fmt)
         sheet1.write_number(curr_row, 25, gt.get("attendant_employee_count", 0), total_int_fmt)
         sheet1.write_number(curr_row, 26, gt.get("total_labor_cost", 0.0), total_num_fmt)
+        sheet1.write_number(curr_row, 27, gt.get("extra_hours", 0.0), total_num_fmt)
 
         # Target branch config IDs set
         target_config_ids = set(self.config_ids.ids) if self.config_ids else None

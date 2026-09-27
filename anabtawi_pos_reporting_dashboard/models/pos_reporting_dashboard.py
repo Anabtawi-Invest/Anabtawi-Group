@@ -112,6 +112,7 @@ class PosReportingDashboard(models.TransientModel):
                 "orders_per_min": 0.0,
                 "attendant_employee_count": 0,
                 "total_labor_cost": 0.0,
+                "extra_hours": 0.0,
             }
 
         branch_data = defaultdict(_empty_branch_dict)
@@ -508,20 +509,30 @@ class PosReportingDashboard(models.TransientModel):
         # --- F. Collect Attendance & Calculate Daily Employee Labor Cost ---
         if "hr.attendance" in self.env:
             import calendar
+            search_start = datetime.combine(dt_start.date() - timedelta(days=1), time.min)
+            search_end = datetime.combine(dt_end.date() + timedelta(days=1), time.max)
             attendances = self.env["hr.attendance"].sudo().search([
-                ("check_in", ">=", str_start),
-                ("check_in", "<=", str_end),
+                ("check_in", ">=", search_start),
+                ("check_in", "<=", search_end),
             ])
             branch_daily_attendants = defaultdict(lambda: defaultdict(set))
+            branch_extra_hours = defaultdict(float)
+
             for att in attendances:
                 emp = att.employee_id
-                if not emp:
+                if not emp or not att.check_in:
+                    continue
+                c_dt = att.check_in
+                att_date = c_dt.date()
+                if not (dt_start.date() <= att_date <= dt_end.date()):
                     continue
                 cfg = _get_employee_pos_config(emp)
                 if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                     continue
-                att_date = att.check_in.date()
                 branch_daily_attendants[cfg.id][att_date].add(emp)
+
+                ot_val = getattr(att, "overtime_hours", 0.0) or getattr(att, "extra_hours", 0.0) or 0.0
+                branch_extra_hours[cfg.id] += ot_val
 
             for cfg_id, daily_map in branch_daily_attendants.items():
                 all_attending_emp_ids = set()
@@ -538,6 +549,7 @@ class PosReportingDashboard(models.TransientModel):
 
                 branch_data[cfg_id]["attendant_employee_count"] = len(all_attending_emp_ids)
                 branch_data[cfg_id]["total_labor_cost"] = round(total_cost, 3)
+                branch_data[cfg_id]["extra_hours"] = round(branch_extra_hours[cfg_id], 2)
 
         # --- G. Build Rows & Global Totals ---
         branch_rows = []
@@ -645,6 +657,7 @@ class PosReportingDashboard(models.TransientModel):
                 "orders_per_min": global_totals["orders_per_min"],
                 "attendant_employee_count": global_totals["attendant_employee_count"],
                 "total_labor_cost": global_totals["total_labor_cost"],
+                "total_extra_hours": global_totals["extra_hours"],
             },
             "branches": branch_rows,
             "global_totals": global_totals,
@@ -671,6 +684,10 @@ class PosReportingDashboard(models.TransientModel):
 
         configs = self.env["pos.config"].sudo().search(config_domain)
         active_config_ids = set(configs.ids)
+        all_configs = self.env["pos.config"].sudo().search([
+            ("active", "=", True),
+            ("company_id", "in", self.env.companies.ids),
+        ])
 
         def _get_employee_pos_config(emp):
             if hasattr(emp, "pos_config_id") and emp.pos_config_id:
@@ -691,7 +708,7 @@ class PosReportingDashboard(models.TransientModel):
             mapped_target = EXPLICIT_DEPT_TO_POS_MAP.get(leaf_dept_name) or EXPLICIT_DEPT_TO_POS_MAP.get(dept_full_path)
             if mapped_target:
                 target_clean = mapped_target.strip().lower()
-                for cfg in configs:
+                for cfg in all_configs:
                     cfg_name = (cfg.name or "").strip().lower()
                     if cfg_name == target_clean or (len(target_clean) >= 3 and target_clean in cfg_name) or (len(cfg_name) >= 3 and cfg_name in target_clean):
                         return cfg
@@ -712,14 +729,14 @@ class PosReportingDashboard(models.TransientModel):
 
             # Tier 1: Exact match on leaf department name or work location
             if clean_leaf or clean_loc:
-                for cfg in configs:
+                for cfg in all_configs:
                     cfg_name = (cfg.name or "").strip().lower()
                     if (clean_leaf and cfg_name == clean_leaf) or (clean_loc and cfg_name == clean_loc):
                         return cfg
 
             # Tier 2: Normalized keyword matching (minimum 3 characters to prevent empty string matching)
             if (norm_leaf and len(norm_leaf) >= 3) or (norm_loc and len(norm_loc) >= 3):
-                for cfg in configs:
+                for cfg in all_configs:
                     norm_cfg = _normalize(cfg.name or "")
                     if norm_cfg and len(norm_cfg) >= 3:
                         if (norm_leaf and len(norm_leaf) >= 3 and (norm_leaf in norm_cfg or norm_cfg in norm_leaf)) or \
@@ -728,7 +745,7 @@ class PosReportingDashboard(models.TransientModel):
 
             # Tier 3: Leaf department name or work location contained in POS config name (minimum 3 chars)
             if (clean_leaf and len(clean_leaf) >= 3) or (clean_loc and len(clean_loc) >= 3):
-                for cfg in configs:
+                for cfg in all_configs:
                     cfg_name = (cfg.name or "").strip().lower()
                     if len(cfg_name) >= 3:
                         if clean_leaf and (clean_leaf in cfg_name or cfg_name in clean_leaf):
@@ -738,7 +755,7 @@ class PosReportingDashboard(models.TransientModel):
 
             # Tier 4: POS config name contained within full department path (minimum 3 chars)
             if clean_full and len(clean_full) >= 3:
-                for cfg in configs:
+                for cfg in all_configs:
                     cfg_name = (cfg.name or "").strip().lower()
                     if cfg_name and len(cfg_name) >= 3 and cfg_name in clean_full:
                         return cfg
@@ -772,7 +789,7 @@ class PosReportingDashboard(models.TransientModel):
 
             return is_emp, is_hosp, is_online, is_cash, is_visa
 
-        if metric_type in ("sales", "cash_sales", "visa_sales", "employee_debt", "online_sales"):
+        if metric_type in ("sales", "cash_sales", "visa_sales", "employee_debt", "online_sales", "hospitality"):
             payments = self.env["pos.payment"].sudo().search([
                 ("pos_order_id.state", "in", ("paid", "done", "invoiced")),
                 "|",
@@ -809,6 +826,8 @@ class PosReportingDashboard(models.TransientModel):
                 elif metric_type == "cash_sales" and is_cash:
                     include = True
                 elif metric_type == "visa_sales" and is_visa:
+                    include = True
+                elif metric_type == "hospitality" and is_hosp:
                     include = True
 
                 if include:
@@ -900,6 +919,8 @@ class PosReportingDashboard(models.TransientModel):
                         include = True
                     elif metric_type == "visa_sales" and is_visa:
                         include = True
+                    elif metric_type == "hospitality" and is_hosp:
+                        include = True
 
                     if include:
                         ratio = (effective_amt / tot_amt_full) if (tot_amt_full and tot_amt_full != 0.0) else 1.0
@@ -973,7 +994,7 @@ class PosReportingDashboard(models.TransientModel):
                         "company_id": cfg.company_id.id,
                     })
 
-        elif metric_type == "net_cash_moves":
+        elif metric_type in ("net_cash_moves", "cash_in", "cash_out"):
             st_lines = self.env["account.bank.statement.line"].sudo().search([
                 ("date", ">=", dt_start.date()),
                 ("date", "<=", dt_end.date() + timedelta(days=1)),
@@ -989,6 +1010,12 @@ class PosReportingDashboard(models.TransientModel):
 
                 amt = st.amount or 0.0
                 is_in = amt > 0
+
+                if metric_type == "cash_in" and not is_in:
+                    continue
+                if metric_type == "cash_out" and is_in:
+                    continue
+
                 vals_list.append({
                     "name": st.payment_ref or st.ref or st.name or _("Cash Move"),
                     "date": st_dt or str_start,
@@ -1002,7 +1029,7 @@ class PosReportingDashboard(models.TransientModel):
                     "company_id": cfg.company_id.id,
                 })
 
-        elif metric_type == "net_pledges":
+        elif metric_type in ("net_pledges", "rahen_in", "rahen_out"):
             if "pos.advance.order.pledge" in self.env:
                 pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([
                     "|",
@@ -1022,7 +1049,7 @@ class PosReportingDashboard(models.TransientModel):
                     rec_dt = pledge.receive_date or pledge.create_date
                     ret_dt = pledge.return_date or (pledge.write_date if pledge.state == "returned" else None)
 
-                    if rec_dt and dt_start <= rec_dt <= dt_end:
+                    if metric_type in ("net_pledges", "rahen_in") and rec_dt and dt_start <= rec_dt <= dt_end:
                         vals_list.append({
                             "name": _("Pledge Received: %s") % (pledge.display_name or pledge.product_id.name),
                             "date": rec_dt,
@@ -1034,7 +1061,7 @@ class PosReportingDashboard(models.TransientModel):
                             "company_id": cfg.company_id.id,
                         })
 
-                    if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
+                    if metric_type in ("net_pledges", "rahen_out") and pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
                         vals_list.append({
                             "name": _("Pledge Returned: %s") % (pledge.display_name or pledge.product_id.name),
                             "date": ret_dt,
@@ -1072,34 +1099,55 @@ class PosReportingDashboard(models.TransientModel):
                             "company_id": cfg.company_id.id,
                         })
 
-        elif metric_type in ("attendant_employees", "labor_cost"):
+        elif metric_type in ("attendant_employees", "labor_cost", "extra_hours"):
             if "hr.attendance" in self.env:
                 import calendar
+                search_start = datetime.combine(dt_start.date() - timedelta(days=1), time.min)
+                search_end = datetime.combine(dt_end.date() + timedelta(days=1), time.max)
                 attendances = self.env["hr.attendance"].sudo().search([
-                    ("check_in", ">=", str_start),
-                    ("check_in", "<=", str_end),
+                    ("check_in", ">=", search_start),
+                    ("check_in", "<=", search_end),
                 ])
                 for att in attendances:
                     emp = att.employee_id
-                    if not emp:
+                    if not emp or not att.check_in:
+                        continue
+                    c_dt = att.check_in
+                    att_date = c_dt.date()
+                    if not (dt_start.date() <= att_date <= dt_end.date()):
                         continue
                     cfg = _get_employee_pos_config(emp)
                     if not cfg or cfg.id not in active_config_ids:
                         continue
-                    att_date = att.check_in.date()
+
+                    ot_val = getattr(att, "overtime_hours", 0.0) or getattr(att, "extra_hours", 0.0) or 0.0
+                    if metric_type == "extra_hours" and ot_val <= 0:
+                        continue
+
                     num_days = calendar.monthrange(att_date.year, att_date.month)[1]
                     wage = getattr(emp, "wage", 0.0) or (
                         emp.contract_id.wage if (hasattr(emp, "contract_id") and emp.contract_id and emp.contract_id.wage) else 0.0
                     ) or 0.0
                     daily_cost = wage / float(num_days) if num_days > 0 else 0.0
 
+                    if metric_type == "extra_hours":
+                        rec_name = _("%s - Extra Hours (%s hrs)") % (emp.name, f"{ot_val:.2f}")
+                        rec_amt = ot_val
+                    elif metric_type == "labor_cost":
+                        rec_name = _("%s - Daily Wage (%s JOD)") % (emp.name, f"{daily_cost:.3f}")
+                        rec_amt = daily_cost
+                    else:
+                        rec_name = _("%s - Attendant Staff") % (emp.name,)
+                        rec_amt = 1.0
+
                     vals_list.append({
-                        "name": _("%s - Daily Wage (%s JOD)") % (emp.name, f"{daily_cost:.3f}"),
+                        "name": rec_name,
                         "date": att.check_in,
                         "config_id": cfg.id,
-                        "report_type": "labor_cost" if metric_type == "labor_cost" else "attendant_employees",
-                        "amount": daily_cost,
+                        "report_type": metric_type,
+                        "amount": rec_amt,
                         "labor_cost_amount": daily_cost,
+                        "extra_hours": ot_val,
                         "attendant_employee_count": 1,
                         "employee_id": emp.id,
                         "company_id": cfg.company_id.id,
@@ -1122,27 +1170,38 @@ class PosReportingDashboard(models.TransientModel):
             "cash_sales": _("Cash Sales Transactions"),
             "visa_sales": _("Visa & Card Sales Transactions"),
             "online_sales": _("Online & Delivery Sales Transactions"),
+            "hospitality": _("Hospitality Transactions"),
             "employee_debt": _("Debt Sales (مبيعات الذمم) Transactions"),
             "net_cash_moves": _("Cash Moves (In / Out) Transactions"),
+            "cash_in": _("Cash In Transactions"),
+            "cash_out": _("Cash Out Transactions"),
             "net_pledges": _("Pledges (Rahen In / Out) Transactions"),
+            "rahen_in": _("Pledges Received (Rahen In) Transactions"),
+            "rahen_out": _("Pledges Returned (Rahen Out) Transactions"),
             "advance_deposits": _("Advance Order Deposit Transactions"),
             "attendant_employees": _("Attendant Employees Breakdown"),
             "labor_cost": _("Daily Employee Labor Cost Breakdown"),
+            "extra_hours": _("Extra Hours (Overtime) Breakdown"),
         }
         title = metric_titles.get(metric_type, _("Metric Drill-Down Transactions"))
 
         domain = [("id", "in", created_recs.ids)] if created_recs else [("id", "=", 0)]
 
+        tree_view = self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_tree", raise_if_not_found=False)
+        pivot_view = self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_pivot", raise_if_not_found=False)
+        views = []
+        if tree_view:
+            views.append((tree_view.id, "tree"))
+        if pivot_view:
+            views.append((pivot_view.id, "pivot"))
+
         return {
             "name": title,
             "type": "ir.actions.act_window",
             "res_model": "pos.unified.report",
-            "view_mode": "list,pivot,graph",
+            "view_mode": "tree,pivot,graph",
             "domain": domain,
-            "views": [
-                (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_tree").id, "list"),
-                (self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_pivot").id, "pivot"),
-            ],
+            "views": views if views else [(False, "tree"), (False, "pivot")],
             "target": "current",
             "context": {
                 "active_wizard_id": wiz.id,

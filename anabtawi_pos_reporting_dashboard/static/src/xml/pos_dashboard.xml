@@ -227,6 +227,17 @@
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>
+
+                    <!-- Extra Hours (Overtime) -->
+                    <div class="o_kpi_card card-extra-hours clickable_kpi" t-on-click="() => this.onKpiClick('extra_hours')" title="Click to view employee extra hours breakdown">
+                        <div class="kpi_icon"><i class="fa fa-clock-o text-success"/></div>
+                        <div class="kpi_title">Extra Hours (Overtime)</div>
+                        <div class="kpi_value"><t t-esc="formatDecimal(data.kpis.total_extra_hours, 2)"/> <span class="fs-6 fw-normal text-muted">hrs</span></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-success badge_sub">Approved Overtime</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Channels & Daily Trend Summary -->
@@ -435,6 +446,12 @@
                                         <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'delivery_amount' &amp;&amp; state.sortOrder === 'asc'"/>
                                         <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'delivery_amount'"/>
                                     </th>
+                                    <th class="text-end sortable_th" t-on-click="() => this.sortBy('extra_hours')">
+                                        Extra Hours
+                                        <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'extra_hours' &amp;&amp; state.sortOrder === 'desc'"/>
+                                        <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'extra_hours' &amp;&amp; state.sortOrder === 'asc'"/>
+                                        <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'extra_hours'"/>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -462,6 +479,7 @@
                                         <td class="val_num text-info"><t t-esc="formatCurrency(branch.advance_pickup_value)"/></td>
                                         <td class="val_num fw-bold"><t t-esc="branch.advance_pending_count"/></td>
                                         <td class="val_num"><t t-esc="formatCurrency(branch.delivery_amount)"/></td>
+                                        <td class="val_num text-success clickable_cell" t-on-click="() => this.onKpiClick('extra_hours', branch.config_id)" title="Click to view branch extra hours"><t t-esc="formatDecimal(branch.extra_hours, 2)"/></td>
                                     </tr>
                                 </t>
                                 <!-- Total Row -->
@@ -488,6 +506,7 @@
                                     <td class="val_num text-info"><t t-esc="formatCurrency(data.global_totals.advance_pickup_value)"/></td>
                                     <td class="val_num fw-bold"><t t-esc="data.global_totals.advance_pending_count"/></td>
                                     <td class="val_num"><t t-esc="formatCurrency(data.global_totals.delivery_amount)"/></td>
+                                    <td class="val_num text-success clickable_cell" t-on-click="() => this.onKpiClick('extra_hours')" title="Click to view total extra hours"><t t-esc="formatDecimal(data.global_totals.extra_hours, 2)"/></td>
                                 </tr>
                             </tbody>
                         </table>
