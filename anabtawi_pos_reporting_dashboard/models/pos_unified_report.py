@@ -46,6 +46,10 @@ class PosUnifiedReport(models.TransientModel):
     labor_cost_amount = fields.Float(string="Labor Cost Amount", digits=(16, 3))
     extra_hours = fields.Float(string="Extra Hours (hrs)", digits=(16, 2))
     employee_id = fields.Many2one("hr.employee", string="Employee")
+    employee_code = fields.Char(string="Employee ID / Code")
+    check_in = fields.Datetime(string="Check In")
+    check_out = fields.Datetime(string="Check Out")
+    monthly_wage = fields.Float(string="Monthly Wage", digits=(16, 3))
     partner_id = fields.Many2one("res.partner", string="Customer")
     company_id = fields.Many2one("res.company", string="Company", default=lambda self: self.env.company)
 

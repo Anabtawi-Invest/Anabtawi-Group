@@ -1151,6 +1151,12 @@ class PosReportingDashboard(models.TransientModel):
                     if metric_type == "extra_hours" and ot_val <= 0:
                         continue
 
+                    emp_code = (
+                        getattr(emp, "employee_number", None)
+                        or getattr(emp, "barcode", None)
+                        or getattr(emp, "registration_number", None)
+                        or (str(emp.id) if emp.id else "")
+                    )
                     num_days = calendar.monthrange(att_date.year, att_date.month)[1]
                     wage = getattr(emp, "wage", 0.0) or (
                         emp.contract_id.wage if (hasattr(emp, "contract_id") and emp.contract_id and emp.contract_id.wage) else 0.0
@@ -1158,13 +1164,13 @@ class PosReportingDashboard(models.TransientModel):
                     daily_cost = wage / float(num_days) if num_days > 0 else 0.0
 
                     if metric_type == "extra_hours":
-                        rec_name = _("%s - Extra Hours (%s hrs)") % (emp.name, f"{ot_val:.2f}")
+                        rec_name = _("[%s] %s - Extra Hours (%s hrs)") % (emp_code, emp.name, f"{ot_val:.2f}")
                         rec_amt = ot_val
                     elif metric_type == "labor_cost":
-                        rec_name = _("%s - Daily Wage (%s JOD)") % (emp.name, f"{daily_cost:.3f}")
+                        rec_name = _("[%s] %s - Daily Wage (%s JOD)") % (emp_code, emp.name, f"{daily_cost:.3f}")
                         rec_amt = daily_cost
                     else:
-                        rec_name = _("%s - Attendant Staff") % (emp.name,)
+                        rec_name = _("[%s] %s - Attendant Staff") % (emp_code, emp.name)
                         rec_amt = 1.0
 
                     vals_list.append({
@@ -1173,6 +1179,10 @@ class PosReportingDashboard(models.TransientModel):
                         "config_id": cfg.id,
                         "report_type": metric_type,
                         "amount": rec_amt,
+                        "employee_code": emp_code,
+                        "check_in": att.check_in,
+                        "check_out": att.check_out,
+                        "monthly_wage": wage,
                         "labor_cost_amount": daily_cost,
                         "extra_hours": ot_val,
                         "attendant_employee_count": 1,
@@ -1214,7 +1224,16 @@ class PosReportingDashboard(models.TransientModel):
 
         domain = [("id", "in", created_recs.ids)] if created_recs else [("id", "=", 0)]
 
-        tree_view = self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_tree", raise_if_not_found=False)
+        # Select targeted tree view based on metric_type
+        target_tree_xml_id = "anabtawi_pos_reporting_dashboard.view_pos_unified_report_tree"
+        if metric_type == "attendant_employees":
+            target_tree_xml_id = "anabtawi_pos_reporting_dashboard.view_pos_unified_report_attendance_tree"
+        elif metric_type == "labor_cost":
+            target_tree_xml_id = "anabtawi_pos_reporting_dashboard.view_pos_unified_report_labor_cost_tree"
+        elif metric_type == "extra_hours":
+            target_tree_xml_id = "anabtawi_pos_reporting_dashboard.view_pos_unified_report_extra_hours_tree"
+
+        tree_view = self.env.ref(target_tree_xml_id, raise_if_not_found=False)
         pivot_view = self.env.ref("anabtawi_pos_reporting_dashboard.view_pos_unified_report_pivot", raise_if_not_found=False)
         views = []
         if tree_view:
