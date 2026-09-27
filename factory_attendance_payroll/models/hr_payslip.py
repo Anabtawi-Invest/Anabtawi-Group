@@ -980,6 +980,33 @@ class HrPayslip(models.Model):
                 else:
                     filtered_lines.append(line)
 
+            # Ensure Public Holiday line is present if employee physically worked on public holiday (especially for flexible schedules)
+            if total_holiday_worked_hrs > 0.01:
+                has_ph_line = any(
+                    (line.get('code') in ['GTO', 'PHD', 'HOLIDAY', 'PHW', 'HOLIDAY_WORKED']) or
+                    ('public holiday' in (line.get('name') or '').lower()) or
+                    ('holiday' in (line.get('name') or '').lower())
+                    for line in filtered_lines
+                )
+                if not has_ph_line:
+                    weighted_hol_hrs = round(total_holiday_worked_hrs * 1.5, 2)
+                    ph_work_entry_type = self.env['hr.work.entry.type'].sudo().search([
+                        '|', '|', ('code', 'in', ['PHD', 'GTO', 'HOLIDAY', 'PHW']),
+                        ('display_code', 'in', ['PHD', 'GTO', 'HOLIDAY', 'PHW']),
+                        ('name', 'ilike', 'Public Holiday')
+                    ], limit=1)
+                    hol_days = float(len(set(att.check_in.date() for att in holiday_attendances))) if holiday_attendances else round(weighted_hol_hrs / 8.0, 2)
+                    ph_line = {
+                        'name': 'Public Holiday',
+                        'sequence': 15,
+                        'code': ph_work_entry_type.code if ph_work_entry_type else 'PHD',
+                        'work_entry_type_id': ph_work_entry_type.id if ph_work_entry_type else False,
+                        'number_of_days': hol_days,
+                        'number_of_hours': weighted_hol_hrs,
+                        'amount': round(weighted_hol_hrs * hourly_rate, 3),
+                    }
+                    filtered_lines.append(ph_line)
+
             res = filtered_lines
         return res
 
