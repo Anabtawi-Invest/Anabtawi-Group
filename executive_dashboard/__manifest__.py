@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'CEO Main Dashboard',
+    'name': 'Executive Dashboard',
     'version': '19.0.1.0.0',
     'category': 'Productivity/Dashboards',
     'summary': 'Executive dashboard: daily purchases and purchase price increase / decrease tracking.',
