@@ -15,6 +15,7 @@ class ConstructionBudgetPoLine(models.Model):
     quantity = fields.Float(string="Quantity", default=1.0, required=True)
     unit_price = fields.Monetary(string="Unit Price", required=True)
     currency_id = fields.Many2one(related="po_id.currency_id", store=True, readonly=True)
+    subtotal = fields.Monetary(string="Subtotal", compute="_compute_subtotal", store=True)
     receipt_line_ids = fields.One2many("construction.budget.receipt.line", "po_line_id", string="Receipt Lines")
     qty_received = fields.Float(string="Received Qty", compute="_compute_received_qty", store=True)
     qty_to_receive = fields.Float(string="Remaining Qty", compute="_compute_received_qty", store=True)
