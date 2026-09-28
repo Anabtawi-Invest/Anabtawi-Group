@@ -8,9 +8,10 @@
                 <field name="code"/>
                 <field name="project_manager_id"/>
                 <field name="total_budget" sum="Total Budget"/>
-                <field name="approved_amount" sum="Approved"/>
-                <field name="pending_amount" sum="Pending"/>
-                <field name="remaining_budget" sum="Remaining"/>
+                <field name="materials_total_cost" sum="Approved Materials Cost"/>
+                <field name="approved_amount" sum="Approved POs"/>
+                <field name="pending_amount" sum="Pending POs"/>
+                <field name="remaining_budget" sum="Remaining Budget"/>
                 <field name="state" widget="badge" decoration-success="state == 'active'" decoration-muted="state == 'closed'"/>
             </list>
         </field>
@@ -22,6 +23,10 @@
         <field name="arch" type="xml">
             <form string="Construction Project">
                 <header>
+                    <button name="action_submit_draft_materials" type="object" string="Submit Draft Materials" class="btn-secondary"/>
+                    <button name="action_accounting_approve_materials" type="object" string="Approve Materials (Accounting)" class="btn-primary" groups="construction_budget_control.group_construction_accounting_approver"/>
+                    <button name="action_ceo_approve_materials" type="object" string="Approve Materials (CEO)" class="btn-primary" groups="construction_budget_control.group_construction_gm_approver"/>
+                    <button name="action_chairman_approve_materials" type="object" string="Approve Materials (Chairman)" class="btn-primary" groups="construction_budget_control.group_construction_chairman_approver"/>
                     <field name="state" widget="statusbar" statusbar_visible="planning,active,closed"/>
                 </header>
                 <sheet>
@@ -33,7 +38,7 @@
                             <field name="receipt_count" widget="statinfo" string="Receipts"/>
                         </button>
                         <button name="action_view_invoices" type="object" class="oe_stat_button" icon="fa-pencil-square-o">
-                            <field name="invoice_count" widget="statinfo" string="Vendor Bills"/>
+                            <field name="construction_invoice_count" widget="statinfo" string="Vendor Bills"/>
                         </button>
                     </div>
                     <widget name="web_ribbon" title="On Hold" bg_color="text-bg-warning" invisible="state != 'on_hold'"/>
@@ -55,9 +60,10 @@
                             <field name="site_address"/>
                         </group>
                     </group>
-                    <group string="Budget">
+                    <group string="Budget Summary">
                         <group>
                             <field name="total_budget"/>
+                            <field name="materials_total_cost"/>
                             <field name="approved_amount"/>
                         </group>
                         <group>
@@ -66,6 +72,33 @@
                         </group>
                     </group>
                     <notebook>
+                        <page string="Project Budget Materials">
+                            <div class="mb-2">
+                                <span class="text-muted">
+                                    Project Handlers can add material items. Approvals are required from <strong>Accounting Manager</strong>, <strong>CEO</strong>, and <strong>Chairman</strong> before items can be purchased in POs.
+                                </span>
+                            </div>
+                            <field name="material_ids">
+                                <list editable="bottom" decoration-success="state == 'approved'" decoration-danger="state == 'rejected'" decoration-warning="state in ('accounting_review', 'ceo_review', 'chairman_review')">
+                                    <field name="name"/>
+                                    <field name="uom"/>
+                                    <field name="quantity" sum="Total Qty"/>
+                                    <field name="unit_cost"/>
+                                    <field name="total_cost" sum="Total Budgeted Cost"/>
+                                    <field name="qty_purchased" readonly="1" string="Purchased Qty"/>
+                                    <field name="qty_remaining" readonly="1" string="Remaining Qty"/>
+                                    <field name="qty_received" readonly="1" string="Received Qty"/>
+                                    <field name="qty_invoiced" readonly="1" string="Invoiced Qty"/>
+                                    <field name="state" widget="badge"/>
+                                    <button name="action_submit" type="object" string="Submit" icon="fa-paper-plane" invisible="state != 'draft'"/>
+                                    <button name="action_accounting_approve" type="object" string="Approve (Acct)" icon="fa-check-circle" invisible="state != 'accounting_review'" groups="construction_budget_control.group_construction_accounting_approver"/>
+                                    <button name="action_ceo_approve" type="object" string="Approve (CEO)" icon="fa-check-circle" invisible="state != 'ceo_review'" groups="construction_budget_control.group_construction_gm_approver"/>
+                                    <button name="action_chairman_approve" type="object" string="Approve (Chairman)" icon="fa-check-circle" invisible="state != 'chairman_review'" groups="construction_budget_control.group_construction_chairman_approver"/>
+                                    <button name="action_reject" type="object" string="Reject" icon="fa-times-circle" invisible="state not in ('accounting_review', 'ceo_review', 'chairman_review')"/>
+                                    <button name="action_reset_to_draft" type="object" string="Reset" icon="fa-undo" invisible="state != 'rejected'"/>
+                                </list>
+                            </field>
+                        </page>
                         <page string="Purchase Orders">
                             <button name="action_export_all_bom_excel" type="object" string="Export All BOM to Excel" class="btn-secondary mb-2" icon="fa-file-excel-o"/>
                             <field name="po_ids">
@@ -93,7 +126,7 @@
                             </field>
                         </page>
                         <page string="Vendor Bills (Invoices)">
-                            <field name="invoice_ids" readonly="1">
+                            <field name="construction_invoice_ids" readonly="1">
                                 <list>
                                     <field name="name"/>
                                     <field name="vendor_bill_ref"/>
@@ -138,7 +171,7 @@
         <field name="search_view_id" ref="view_construction_project_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">Create your first construction project</p>
-            <p>Set a total budget for the project, then track Purchase Orders against it.</p>
+            <p>Set a total budget for the project, define project budget materials, then track Purchase Orders against them.</p>
         </field>
     </record>
 </odoo>

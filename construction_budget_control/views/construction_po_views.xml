@@ -75,6 +75,7 @@
                             <field name="line_ids">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
+                                    <field name="budget_material_id" string="Project Budget Material" required="1" options="{'no_create': True}"/>
                                     <field name="description"/>
                                     <field name="uom"/>
                                     <field name="quantity" sum="Total Ordered"/>
@@ -118,8 +119,10 @@
                         </page>
                         <page string="Invoices &amp; Payments" invisible="state != 'approved'">
                             <group>
-                                <group string="Billing Summary">
+                                <group string="Billing &amp; Inventory Received Limits">
+                                    <field name="total_received_value" readonly="1"/>
                                     <field name="invoiced_amount" readonly="1"/>
+                                    <field name="max_billable_amount" readonly="1"/>
                                     <field name="paid_amount" readonly="1"/>
                                 </group>
                             </group>

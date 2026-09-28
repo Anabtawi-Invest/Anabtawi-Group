@@ -119,6 +119,14 @@ class ConstructionBudgetPo(models.Model):
 
     invoiced_amount = fields.Monetary(string="Invoiced Amount", compute="_compute_invoice_totals", store=True)
     paid_amount = fields.Monetary(string="Paid Amount", compute="_compute_invoice_totals", store=True)
+    total_received_value = fields.Monetary(string="Total Received Value", compute="_compute_received_totals", store=True)
+    max_billable_amount = fields.Monetary(string="Max Billable Amount", compute="_compute_received_totals", store=True)
+
+    @api.depends("line_ids.qty_received", "line_ids.unit_price", "invoiced_amount")
+    def _compute_received_totals(self):
+        for rec in self:
+            rec.total_received_value = sum(line.qty_received * line.unit_price for line in rec.line_ids)
+            rec.max_billable_amount = max(0.0, rec.total_received_value - rec.invoiced_amount)
 
     @api.depends("receipt_ids")
     def _compute_receipt_count(self):
@@ -145,7 +153,7 @@ class ConstructionBudgetPo(models.Model):
             else:
                 rec.delivery_status = "partial"
 
-    @api.depends("invoice_ids.state", "invoice_ids.amount", "amount", "state")
+    @api.depends("invoice_ids.state", "invoice_ids.amount", "amount", "state", "total_received_value")
     def _compute_invoice_status(self):
         for rec in self:
             valid_invoices = rec.invoice_ids.filtered(lambda i: i.state in ("posted", "paid"))
@@ -205,7 +213,22 @@ class ConstructionBudgetPo(models.Model):
         self.ensure_one()
         if self.state != "approved":
             raise UserError(_("Vendor bills can only be created for approved Purchase Orders."))
-        rem_amount = max(0.0, self.amount - self.invoiced_amount)
+        if self.total_received_value <= 0 or self.max_billable_amount <= 0:
+            raise UserError(_(
+                "Cannot create a Vendor Bill: No unbilled received inventory is available for this PO. "
+                "You must receive inventory before creating a Vendor Bill."
+            ))
+        
+        inv_lines = []
+        for line in self.line_ids:
+            unbilled_qty = max(0.0, line.qty_received - line.qty_invoiced)
+            if unbilled_qty > 0:
+                inv_lines.append((0, 0, {
+                    "po_line_id": line.id,
+                    "quantity": unbilled_qty,
+                    "unit_price": line.unit_price,
+                }))
+
         return {
             "type": "ir.actions.act_window",
             "name": _("Create Vendor Bill"),
@@ -214,7 +237,8 @@ class ConstructionBudgetPo(models.Model):
             "target": "current",
             "context": {
                 "default_po_id": self.id,
-                "default_amount": rem_amount,
+                "default_amount": self.max_billable_amount,
+                "default_line_ids": inv_lines,
             },
         }
 
@@ -228,6 +252,7 @@ class ConstructionBudgetPo(models.Model):
             "domain": [("po_id", "=", self.id)],
             "context": {"default_po_id": self.id},
         }
+
 
     @api.depends("line_ids.subtotal", "amount")
     def _compute_lines_total(self):
@@ -292,6 +317,39 @@ class ConstructionBudgetPo(models.Model):
                 raise UserError(_("The PO amount must be greater than zero."))
             if not rec.line_ids:
                 raise UserError(_("Please add at least one Bill of Materials line before submitting."))
+
+            # Validate that all PO lines have a budget material from the project and it's approved
+            for line in rec.line_ids:
+                if not line.budget_material_id:
+                    raise UserError(_(
+                        "Line '%s' must be linked to an approved Project Budget Material item."
+                    ) % (line.description or _("Unnamed")))
+                if line.budget_material_id.project_id != rec.project_id:
+                    raise UserError(_(
+                        "Line '%s' references budget material '%s' which does not belong to project '%s'."
+                    ) % (line.description, line.budget_material_id.name, rec.project_id.name))
+                if line.budget_material_id.state != "approved":
+                    raise UserError(_(
+                        "Material '%s' is not fully approved yet (current status: %s). Only approved project budget materials can be purchased."
+                    ) % (line.budget_material_id.name, line.budget_material_id.state))
+
+                # Validate quantity doesn't exceed budget material remaining quantity
+                # We check already purchased qty excluding current PO line if any
+                other_po_lines = line.budget_material_id.po_line_ids.filtered(
+                    lambda l: l.id != line.id and l.po_id.state in ("approved", "accounting_review", "gm_review", "chairman_review")
+                )
+                already_ordered = sum(other_po_lines.mapped("quantity"))
+                available_qty = max(0.0, line.budget_material_id.quantity - already_ordered)
+                if line.quantity > available_qty + 1e-4:
+                    raise UserError(_(
+                        "Quantity %(requested)s for material '%(mat)s' exceeds remaining budgeted quantity (%(available)s available out of %(total)s budgeted)."
+                    ) % {
+                        "requested": line.quantity,
+                        "mat": line.budget_material_id.name,
+                        "available": available_qty,
+                        "total": line.budget_material_id.quantity,
+                    })
+
             project = rec.project_id
             remaining = project.total_budget - project.approved_amount - project.pending_amount
             if rec.amount > remaining:
@@ -305,6 +363,7 @@ class ConstructionBudgetPo(models.Model):
             rec.state = "accounting_review"
             rec.message_post(body=_("Submitted for approval by %s.", rec.env.user.name))
             rec._notify_approvers("group_construction_accounting_approver")
+
 
     def action_accounting_approve(self):
         for rec in self:

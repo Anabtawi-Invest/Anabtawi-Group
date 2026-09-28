@@ -1,6 +1,8 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_construction_project_user,construction.project.user,model_construction_project,group_construction_user,1,1,1,0
 access_construction_project_manager,construction.project.manager,model_construction_project,group_construction_manager,1,1,1,1
+access_construction_project_budget_material_user,construction.project.budget.material.user,model_construction_project_budget_material,group_construction_user,1,1,1,0
+access_construction_project_budget_material_manager,construction.project.budget.material.manager,model_construction_project_budget_material,group_construction_manager,1,1,1,1
 access_construction_po_user,construction.budget.po.user,model_construction_budget_po,group_construction_user,1,1,1,0
 access_construction_po_manager,construction.budget.po.manager,model_construction_budget_po,group_construction_manager,1,1,1,1
 access_construction_po_line_user,construction.budget.po.line.user,model_construction_budget_po_line,group_construction_user,1,1,1,1
@@ -13,4 +15,5 @@ access_construction_receipt_line_user,construction.budget.receipt.line.user,mode
 access_construction_receipt_line_manager,construction.budget.receipt.line.manager,model_construction_budget_receipt_line,group_construction_manager,1,1,1,1
 access_construction_invoice_user,construction.budget.invoice.user,model_construction_budget_invoice,group_construction_user,1,1,1,0
 access_construction_invoice_manager,construction.budget.invoice.manager,model_construction_budget_invoice,group_construction_manager,1,1,1,1
-
+access_construction_invoice_line_user,construction.budget.invoice.line.user,model_construction_budget_invoice_line,group_construction_user,1,1,1,1
+access_construction_invoice_line_manager,construction.budget.invoice.line.manager,model_construction_budget_invoice_line,group_construction_manager,1,1,1,1

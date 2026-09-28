@@ -33,6 +33,14 @@ class ConstructionProject(models.Model):
     )
     total_budget = fields.Monetary(string="Total Approved Budget", required=True, tracking=True)
 
+    material_ids = fields.One2many(
+        "construction.project.budget.material", "project_id", string="Project Budget Materials"
+    )
+    material_count = fields.Integer(compute="_compute_material_stats", string="Material Count")
+    materials_total_cost = fields.Monetary(
+        compute="_compute_material_stats", string="Approved Materials Total Cost", store=True
+    )
+
     po_ids = fields.One2many("construction.budget.po", "project_id", string="Purchase Orders")
     po_count = fields.Integer(compute="_compute_po_stats")
     approved_amount = fields.Monetary(compute="_compute_po_stats", store=True)
@@ -40,17 +48,58 @@ class ConstructionProject(models.Model):
     remaining_budget = fields.Monetary(compute="_compute_po_stats", store=True)
     budget_used_pct = fields.Float(compute="_compute_po_stats", string="% Committed")
 
-    invoice_ids = fields.One2many("construction.budget.invoice", "project_id", string="Vendor Invoices")
-    invoice_count = fields.Integer(compute="_compute_project_counts", string="Invoice Count")
+    construction_invoice_ids = fields.One2many("construction.budget.invoice", "project_id", string="Vendor Invoices")
+    construction_invoice_count = fields.Integer(compute="_compute_project_counts", string="Invoice Count")
 
     receipt_ids = fields.One2many("construction.budget.receipt", "project_id", string="Item Receipts")
     receipt_count = fields.Integer(compute="_compute_project_counts", string="Receipt Count")
 
-    @api.depends("po_ids", "invoice_ids", "receipt_ids")
+    @api.depends("material_ids", "material_ids.state", "material_ids.total_cost")
+    def _compute_material_stats(self):
+        for project in self:
+            project.material_count = len(project.material_ids)
+            project.materials_total_cost = sum(
+                project.material_ids.filtered(lambda m: m.state == "approved").mapped("total_cost")
+            )
+
+    @api.depends("po_ids", "construction_invoice_ids", "receipt_ids")
     def _compute_project_counts(self):
         for project in self:
-            project.invoice_count = len(project.invoice_ids)
+            project.construction_invoice_count = len(project.construction_invoice_ids)
             project.receipt_count = len(project.receipt_ids)
+
+    def action_submit_draft_materials(self):
+        self.ensure_one()
+        draft_materials = self.material_ids.filtered(lambda m: m.state == "draft")
+        if not draft_materials:
+            raise UserError(_("There are no draft budget materials to submit."))
+        draft_materials.action_submit()
+        return True
+
+    def action_accounting_approve_materials(self):
+        self.ensure_one()
+        materials = self.material_ids.filtered(lambda m: m.state == "accounting_review")
+        if not materials:
+            raise UserError(_("There are no materials waiting for Accounting approval."))
+        materials.action_accounting_approve()
+        return True
+
+    def action_ceo_approve_materials(self):
+        self.ensure_one()
+        materials = self.material_ids.filtered(lambda m: m.state == "ceo_review")
+        if not materials:
+            raise UserError(_("There are no materials waiting for CEO approval."))
+        materials.action_ceo_approve()
+        return True
+
+    def action_chairman_approve_materials(self):
+        self.ensure_one()
+        materials = self.material_ids.filtered(lambda m: m.state == "chairman_review")
+        if not materials:
+            raise UserError(_("There are no materials waiting for Chairman approval."))
+        materials.action_chairman_approve()
+        return True
+
 
     @api.depends("total_budget", "po_ids.amount", "po_ids.state")
     def _compute_po_stats(self):

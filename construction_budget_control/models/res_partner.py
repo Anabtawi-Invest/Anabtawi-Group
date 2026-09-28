@@ -12,17 +12,17 @@ class ResPartner(models.Model):
     po_ids = fields.One2many("construction.budget.po", "vendor_id", string="Construction POs")
     po_count = fields.Integer(compute="_compute_construction_counts", string="PO Count")
 
-    invoice_ids = fields.One2many("construction.budget.invoice", "vendor_id", string="Construction Invoices")
-    invoice_count = fields.Integer(compute="_compute_construction_counts", string="Invoice Count")
+    construction_invoice_ids = fields.One2many("construction.budget.invoice", "vendor_id", string="Construction Invoices")
+    construction_invoice_count = fields.Integer(compute="_compute_construction_counts", string="Invoice Count")
 
     receipt_ids = fields.One2many("construction.budget.receipt", "vendor_id", string="Construction Receipts")
     receipt_count = fields.Integer(compute="_compute_construction_counts", string="Receipt Count")
 
-    @api.depends("po_ids", "invoice_ids", "receipt_ids")
+    @api.depends("po_ids", "construction_invoice_ids", "receipt_ids")
     def _compute_construction_counts(self):
         for partner in self:
             partner.po_count = len(partner.po_ids)
-            partner.invoice_count = len(partner.invoice_ids)
+            partner.construction_invoice_count = len(partner.construction_invoice_ids)
             partner.receipt_count = len(partner.receipt_ids)
 
     def action_view_construction_pos(self):
