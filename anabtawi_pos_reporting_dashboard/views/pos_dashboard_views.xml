@@ -136,7 +136,8 @@
                 <field name="date" string="Shift Date"/>
                 <field name="check_in" string="Check In"/>
                 <field name="check_out" string="Check Out"/>
-                <field name="extra_hours" string="Approved Overtime Hours (hrs)" sum="Total Approved OT Hours"/>
+                <field name="extra_hours" string="Extra Hours (hrs)" sum="Total Extra Hours"/>
+                <field name="amount" string="Extra Hours Amount (JOD)" sum="Total Extra Hours Amount"/>
                 <field name="name" string="Details"/>
             </list>
         </field>

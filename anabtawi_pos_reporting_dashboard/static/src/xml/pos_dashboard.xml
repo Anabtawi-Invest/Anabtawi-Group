@@ -235,13 +235,24 @@
                         </div>
                     </div>
 
-                    <!-- Extra Hours (Overtime) -->
-                    <div class="o_kpi_card card-extra-hours clickable_kpi" t-on-click="() => this.onKpiClick('extra_hours')" title="Click to view employee extra hours breakdown">
+                    <!-- Approved Extra Hours (Overtime) -->
+                    <div class="o_kpi_card card-extra-hours clickable_kpi" t-on-click="() => this.onKpiClick('extra_hours')" title="Click to view approved employee extra hours breakdown">
                         <div class="kpi_icon"><i class="fa fa-clock-o text-success"/></div>
-                        <div class="kpi_title">Extra Hours (Overtime)</div>
-                        <div class="kpi_value"><t t-esc="formatDecimal(data.kpis.total_extra_hours, 2)"/> <span class="fs-6 fw-normal text-muted">hrs</span></div>
+                        <div class="kpi_title">Approved Extra Hours</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_extra_hours_amount || 0)"/></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
-                            <span class="badge bg-success badge_sub">Approved Overtime</span>
+                            <span class="badge bg-success badge_sub"><t t-esc="formatDecimal(data.kpis.total_extra_hours || 0, 2)"/> hrs</span>
+                            <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
+                        </div>
+                    </div>
+
+                    <!-- Not Approved Extra Hours (Overtime) -->
+                    <div class="o_kpi_card card-extra-hours-pending clickable_kpi" t-on-click="() => this.onKpiClick('unapproved_extra_hours')" title="Click to view not approved employee extra hours breakdown">
+                        <div class="kpi_icon"><i class="fa fa-hourglass-half text-warning"/></div>
+                        <div class="kpi_title">Not Approved Extra Hours</div>
+                        <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.unapproved_extra_hours_amount || 0)"/></div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                            <span class="badge bg-warning text-dark badge_sub"><t t-esc="formatDecimal(data.kpis.unapproved_extra_hours || 0, 2)"/> hrs</span>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
                     </div>

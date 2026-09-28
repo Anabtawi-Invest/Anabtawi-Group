@@ -149,6 +149,9 @@ class PosReportingDashboard(models.TransientModel):
                 "attendant_employee_count": 0,
                 "total_labor_cost": 0.0,
                 "extra_hours": 0.0,
+                "extra_hours_amount": 0.0,
+                "unapproved_extra_hours": 0.0,
+                "unapproved_extra_hours_amount": 0.0,
             }
 
         branch_data = defaultdict(_empty_branch_dict)
@@ -523,6 +526,9 @@ class PosReportingDashboard(models.TransientModel):
             ])
             branch_daily_attendants = defaultdict(lambda: defaultdict(set))
             branch_extra_hours = defaultdict(float)
+            branch_extra_hours_amount = defaultdict(float)
+            branch_unapproved_extra_hours = defaultdict(float)
+            branch_unapproved_extra_hours_amount = defaultdict(float)
 
             for att in attendances:
                 emp = att.employee_id
@@ -530,20 +536,44 @@ class PosReportingDashboard(models.TransientModel):
                     continue
                 c_dt = att.check_in
                 att_date = c_dt.date()
-                if not (dt_start <= c_dt <= dt_end or dt_start.date() <= att_date <= dt_end.date()):
+                if not (dt_start <= c_dt <= dt_end):
                     continue
                 cfg = _get_employee_pos_config(emp)
                 if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                     continue
                 branch_daily_attendants[cfg.id][att_date].add(emp)
 
-                ot_val = (
-                    getattr(att, "overtime_hours", 0.0)
-                    or getattr(att, "extra_hours", 0.0)
-                    or getattr(att, "validated_overtime_hours", 0.0)
-                    or 0.0
-                )
-                branch_extra_hours[cfg.id] += ot_val
+                # Overtime Breakdown: Approved vs Not Approved
+                approved_ot = 0.0
+                unapproved_ot = 0.0
+                if hasattr(att, "linked_overtime_ids") and att.linked_overtime_ids:
+                    for line in att.linked_overtime_ids:
+                        dur = line.manual_duration or line.duration or 0.0
+                        if line.status == "approved":
+                            approved_ot += dur
+                        else:
+                            unapproved_ot += dur
+                if approved_ot == 0.0 and hasattr(att, "validated_overtime_hours"):
+                    approved_ot = getattr(att, "validated_overtime_hours", 0.0) or 0.0
+                total_ot = getattr(att, "overtime_hours", 0.0) or getattr(att, "extra_hours", 0.0) or 0.0
+                if unapproved_ot == 0.0 and total_ot > approved_ot:
+                    unapproved_ot = total_ot - approved_ot
+
+                # Calculate Hourly Rate from monthly wage & standard 8-hour workday
+                wage = getattr(emp, "wage", 0.0) or (
+                    emp.contract_id.wage if (hasattr(emp, "contract_id") and emp.contract_id and emp.contract_id.wage) else 0.0
+                ) or 0.0
+                num_days = calendar.monthrange(att_date.year, att_date.month)[1] if att_date else 30
+                daily_cost = wage / float(num_days) if num_days > 0 else 0.0
+                hourly_rate = daily_cost / 8.0 if daily_cost > 0 else 0.0
+
+                approved_amt = approved_ot * hourly_rate
+                unapproved_amt = unapproved_ot * hourly_rate
+
+                branch_extra_hours[cfg.id] += approved_ot
+                branch_extra_hours_amount[cfg.id] += approved_amt
+                branch_unapproved_extra_hours[cfg.id] += unapproved_ot
+                branch_unapproved_extra_hours_amount[cfg.id] += unapproved_amt
 
             for cfg_id, daily_map in branch_daily_attendants.items():
                 all_attending_emp_ids = set()
@@ -561,6 +591,9 @@ class PosReportingDashboard(models.TransientModel):
                 branch_data[cfg_id]["attendant_employee_count"] = len(all_attending_emp_ids)
                 branch_data[cfg_id]["total_labor_cost"] = round(total_cost, 3)
                 branch_data[cfg_id]["extra_hours"] = round(branch_extra_hours[cfg_id], 2)
+                branch_data[cfg_id]["extra_hours_amount"] = round(branch_extra_hours_amount[cfg_id], 3)
+                branch_data[cfg_id]["unapproved_extra_hours"] = round(branch_unapproved_extra_hours[cfg_id], 2)
+                branch_data[cfg_id]["unapproved_extra_hours_amount"] = round(branch_unapproved_extra_hours_amount[cfg_id], 3)
 
         # --- G. Build Rows & Global Totals ---
         branch_rows = []
@@ -673,6 +706,9 @@ class PosReportingDashboard(models.TransientModel):
                 "attendant_employee_count": global_totals["attendant_employee_count"],
                 "total_labor_cost": global_totals["total_labor_cost"],
                 "total_extra_hours": global_totals["extra_hours"],
+                "total_extra_hours_amount": global_totals["extra_hours_amount"],
+                "unapproved_extra_hours": global_totals["unapproved_extra_hours"],
+                "unapproved_extra_hours_amount": global_totals["unapproved_extra_hours_amount"],
             },
             "branches": branch_rows,
             "global_totals": global_totals,
@@ -1123,7 +1159,7 @@ class PosReportingDashboard(models.TransientModel):
                             "company_id": cfg.company_id.id,
                         })
 
-        elif metric_type in ("attendant_employees", "labor_cost", "extra_hours"):
+        elif metric_type in ("attendant_employees", "labor_cost", "extra_hours", "unapproved_extra_hours"):
             if "hr.attendance" in self.env:
                 import calendar
                 search_start = datetime.combine(dt_start.date() - timedelta(days=1), time.min)
@@ -1138,20 +1174,27 @@ class PosReportingDashboard(models.TransientModel):
                         continue
                     c_dt = att.check_in
                     att_date = c_dt.date()
-                    if not (dt_start <= c_dt <= dt_end or dt_start.date() <= att_date <= dt_end.date()):
+                    if not (dt_start <= c_dt <= dt_end):
                         continue
                     cfg = _get_employee_pos_config(emp)
                     if not cfg or (active_config_ids and cfg.id not in active_config_ids):
                         continue
 
-                    ot_val = (
-                        getattr(att, "overtime_hours", 0.0)
-                        or getattr(att, "extra_hours", 0.0)
-                        or getattr(att, "validated_overtime_hours", 0.0)
-                        or 0.0
-                    )
-                    if metric_type == "extra_hours" and ot_val <= 0:
-                        continue
+                    # Overtime Breakdown: Approved vs Not Approved
+                    approved_ot = 0.0
+                    unapproved_ot = 0.0
+                    if hasattr(att, "linked_overtime_ids") and att.linked_overtime_ids:
+                        for line in att.linked_overtime_ids:
+                            dur = line.manual_duration or line.duration or 0.0
+                            if line.status == "approved":
+                                approved_ot += dur
+                            else:
+                                unapproved_ot += dur
+                    if approved_ot == 0.0 and hasattr(att, "validated_overtime_hours"):
+                        approved_ot = getattr(att, "validated_overtime_hours", 0.0) or 0.0
+                    total_ot = getattr(att, "overtime_hours", 0.0) or getattr(att, "extra_hours", 0.0) or 0.0
+                    if unapproved_ot == 0.0 and total_ot > approved_ot:
+                        unapproved_ot = total_ot - approved_ot
 
                     emp_code = (
                         getattr(emp, "employee_number", None)
@@ -1159,34 +1202,46 @@ class PosReportingDashboard(models.TransientModel):
                         or getattr(emp, "registration_number", None)
                         or (str(emp.id) if emp.id else "")
                     )
-                    num_days = calendar.monthrange(att_date.year, att_date.month)[1]
+                    num_days = calendar.monthrange(att_date.year, att_date.month)[1] if att_date else 30
                     wage = getattr(emp, "wage", 0.0) or (
                         emp.contract_id.wage if (hasattr(emp, "contract_id") and emp.contract_id and emp.contract_id.wage) else 0.0
                     ) or 0.0
                     daily_cost = wage / float(num_days) if num_days > 0 else 0.0
+                    hourly_rate = daily_cost / 8.0 if daily_cost > 0 else 0.0
 
                     if metric_type == "extra_hours":
-                        rec_name = _("[%s] %s - Extra Hours (%s hrs)") % (emp_code, emp.name, f"{ot_val:.2f}")
-                        rec_amt = ot_val
+                        if approved_ot <= 0:
+                            continue
+                        rec_amt = round(approved_ot * hourly_rate, 3)
+                        rec_name = _("[%s] %s - Approved Extra Hours (%s hrs)") % (emp_code, emp.name, f"{approved_ot:.2f}")
+                        ot_hrs = approved_ot
+                    elif metric_type == "unapproved_extra_hours":
+                        if unapproved_ot <= 0:
+                            continue
+                        rec_amt = round(unapproved_ot * hourly_rate, 3)
+                        rec_name = _("[%s] %s - Not Approved Extra Hours (%s hrs)") % (emp_code, emp.name, f"{unapproved_ot:.2f}")
+                        ot_hrs = unapproved_ot
                     elif metric_type == "labor_cost":
                         rec_name = _("[%s] %s - Daily Wage (%s JOD)") % (emp_code, emp.name, f"{daily_cost:.3f}")
                         rec_amt = daily_cost
+                        ot_hrs = approved_ot
                     else:
                         rec_name = _("[%s] %s - Attendant Staff") % (emp_code, emp.name)
                         rec_amt = 1.0
+                        ot_hrs = approved_ot
 
                     vals_list.append({
                         "name": rec_name,
                         "date": att.check_in,
                         "config_id": cfg.id,
-                        "report_type": metric_type,
+                        "report_type": "extra_hours" if metric_type in ("extra_hours", "unapproved_extra_hours") else metric_type,
                         "amount": rec_amt,
                         "employee_code": emp_code,
                         "check_in": att.check_in,
                         "check_out": att.check_out,
                         "monthly_wage": wage,
                         "labor_cost_amount": daily_cost,
-                        "extra_hours": ot_val,
+                        "extra_hours": ot_hrs,
                         "attendant_employee_count": 1,
                         "employee_id": emp.id,
                         "company_id": cfg.company_id.id,
@@ -1220,7 +1275,8 @@ class PosReportingDashboard(models.TransientModel):
             "advance_deposits": _("Advance Order Deposit Transactions"),
             "attendant_employees": _("Attendant Employees Breakdown"),
             "labor_cost": _("Daily Employee Labor Cost Breakdown"),
-            "extra_hours": _("Extra Hours (Overtime) Breakdown"),
+            "extra_hours": _("Approved Extra Hours (Overtime) Breakdown"),
+            "unapproved_extra_hours": _("Not Approved Extra Hours (Overtime) Breakdown"),
         }
         title = metric_titles.get(metric_type, _("Metric Drill-Down Transactions"))
 
@@ -1232,7 +1288,7 @@ class PosReportingDashboard(models.TransientModel):
             target_tree_xml_id = "anabtawi_pos_reporting_dashboard.view_pos_unified_report_attendance_tree"
         elif metric_type == "labor_cost":
             target_tree_xml_id = "anabtawi_pos_reporting_dashboard.view_pos_unified_report_labor_cost_tree"
-        elif metric_type == "extra_hours":
+        elif metric_type in ("extra_hours", "unapproved_extra_hours"):
             target_tree_xml_id = "anabtawi_pos_reporting_dashboard.view_pos_unified_report_extra_hours_tree"
 
         tree_view = self.env.ref(target_tree_xml_id, raise_if_not_found=False)
@@ -1249,6 +1305,7 @@ class PosReportingDashboard(models.TransientModel):
             "attendant_employees": "search_default_filter_attendants",
             "labor_cost": "search_default_filter_labor_cost",
             "extra_hours": "search_default_filter_extra_hours",
+            "unapproved_extra_hours": "search_default_filter_extra_hours",
             "pos_sales": "search_default_filter_sales",
             "sales": "search_default_filter_sales",
             "cash_in": "search_default_filter_cash_in",
