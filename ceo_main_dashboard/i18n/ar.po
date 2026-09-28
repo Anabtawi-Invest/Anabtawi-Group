@@ -1,0 +1,525 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* ceo_main_dashboard
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-28 00:00+0000\n"
+"PO-Revision-Date: 2026-09-28 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+
+#. module: ceo_main_dashboard
+#: model:ir.actions.client,name:ceo_main_dashboard.action_ceo_main_dashboard
+#: model:ir.ui.menu,name:ceo_main_dashboard.menu_ceo_main_dashboard_root
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "CEO Main Dashboard"
+msgstr "لوحة المدير التنفيذي الرئيسية"
+
+#. module: ceo_main_dashboard
+#: model:ir.ui.menu,name:ceo_main_dashboard.menu_ceo_main_dashboard_main
+msgid "Dashboard"
+msgstr "لوحة المعلومات"
+
+#. module: ceo_main_dashboard
+#: model:res.groups,name:ceo_main_dashboard.group_ceo_main_dashboard_user
+msgid "CEO Main Dashboard / Viewer"
+msgstr "لوحة المدير التنفيذي الرئيسية / مشاهد"
+
+#. module: ceo_main_dashboard
+#. odoo-python
+#: code:addons/ceo_main_dashboard/models/ceo_main_dashboard.py:0
+msgid "You are not allowed to access the CEO Main Dashboard."
+msgstr "غير مسموح لك بالوصول إلى لوحة المدير التنفيذي الرئيسية."
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/js/dashboard.js:0
+msgid "Dashboard refreshed"
+msgstr "تم تحديث لوحة المعلومات"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/js/dashboard.js:0
+msgid "Confirmed Purchase Orders"
+msgstr "أوامر الشراء المؤكدة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/js/dashboard.js:0
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Increased"
+msgstr "ارتفع"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/js/dashboard.js:0
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Decreased"
+msgstr "انخفض"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/js/dashboard.js:0
+msgid "No change"
+msgstr "بدون تغيير"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/js/dashboard.js:0
+msgid "First purchase"
+msgstr "أول شراء"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Purchase"
+msgstr "المشتريات"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Refresh"
+msgstr "تحديث"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Refresh live data"
+msgstr "تحديث البيانات المباشرة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Today"
+msgstr "اليوم"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Yesterday"
+msgstr "أمس"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "This Week"
+msgstr "هذا الأسبوع"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "This Month"
+msgstr "هذا الشهر"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "This Quarter"
+msgstr "هذا الربع"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "This Year"
+msgstr "هذه السنة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Custom"
+msgstr "مخصص"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "From"
+msgstr "من"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "To"
+msgstr "إلى"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Apply"
+msgstr "تطبيق"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Currency"
+msgstr "العملة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Loading purchase data…"
+msgstr "جاري تحميل بيانات المشتريات…"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Purchases in period"
+msgstr "المشتريات خلال الفترة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "confirmed orders"
+msgstr "أوامر مؤكدة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "vs previous period"
+msgstr "مقارنة بالفترة السابقة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Today's purchases"
+msgstr "مشتريات اليوم"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "orders"
+msgstr "أوامر"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "vs yesterday"
+msgstr "مقارنة بالأمس"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Vendors"
+msgstr "الموردون"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Average order"
+msgstr "متوسط الأمر"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Price increased"
+msgstr "ارتفع السعر"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Price decreased"
+msgstr "انخفض السعر"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "of"
+msgstr "من"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "products bought"
+msgstr "منتجات تم شراؤها"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Money impact of price changes"
+msgstr "الأثر المالي لتغير الأسعار"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid ""
+"Every purchase in the period compared with the previous purchase price of "
+"the same product × quantity bought"
+msgstr "كل عملية شراء في الفترة مقارنة بسعر الشراء السابق لنفس المنتج × الكمية المشتراة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Extra paid (price increases)"
+msgstr "مبالغ إضافية مدفوعة (ارتفاع الأسعار)"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Saved (price decreases)"
+msgstr "مبالغ موفرة (انخفاض الأسعار)"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Net impact"
+msgstr "صافي الأثر"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "You paid more than before"
+msgstr "دفعت أكثر من السابق"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "You paid less than before"
+msgstr "دفعت أقل من السابق"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "No price effect"
+msgstr "لا يوجد أثر للأسعار"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Purchase price comparison"
+msgstr "مقارنة أسعار الشراء"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Latest purchase price vs previous purchase price (any vendor)"
+msgstr "آخر سعر شراء مقارنة بسعر الشراء السابق (من أي مورد)"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Search any product, reference or barcode…"
+msgstr "ابحث عن أي منتج أو مرجع أو باركود…"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Clear"
+msgstr "مسح"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "All"
+msgstr "الكل"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Show"
+msgstr "عرض"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Search results use the full purchase history up to"
+msgstr "نتائج البحث تعتمد على كامل سجل المشتريات حتى"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Back to period view"
+msgstr "العودة إلى عرض الفترة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Product"
+msgstr "المنتج"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Previous price"
+msgstr "السعر السابق"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Last price"
+msgstr "آخر سعر"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Change"
+msgstr "التغير"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Change %"
+msgstr "نسبة التغير %"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Status"
+msgstr "الحالة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Last qty"
+msgstr "آخر كمية"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Last vendor"
+msgstr "آخر مورد"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Last purchase"
+msgstr "آخر شراء"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Period impact"
+msgstr "أثر الفترة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Click to see price history"
+msgstr "اضغط لعرض سجل الأسعار"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "per"
+msgstr "لكل"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Before:"
+msgstr "سابقاً:"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Loading price history…"
+msgstr "جاري تحميل سجل الأسعار…"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Price trend (last purchases)"
+msgstr "اتجاه السعر (آخر المشتريات)"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Date"
+msgstr "التاريخ"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Order"
+msgstr "الأمر"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Vendor"
+msgstr "المورد"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Qty"
+msgstr "الكمية"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Unit price"
+msgstr "سعر الوحدة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "No purchases found for this product."
+msgstr "لا توجد مشتريات لهذا المنتج."
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "No confirmed purchases for the selected period."
+msgstr "لا توجد مشتريات مؤكدة في الفترة المحددة."
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Showing"
+msgstr "عرض"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "products — sorted by biggest price change."
+msgstr "منتجات — مرتبة حسب أكبر تغير في السعر."
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Monthly purchases"
+msgstr "المشتريات الشهرية"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Daily purchases"
+msgstr "المشتريات اليومية"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Latest confirmed purchase orders"
+msgstr "أحدث أوامر الشراء المؤكدة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "View all →"
+msgstr "عرض الكل ←"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Confirmed"
+msgstr "تاريخ التأكيد"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Lines"
+msgstr "البنود"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Total"
+msgstr "الإجمالي"

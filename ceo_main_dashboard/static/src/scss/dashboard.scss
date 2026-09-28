@@ -1,0 +1,693 @@
+/* ==========================================================================
+   CEO Main Dashboard
+   ========================================================================== */
+
+$cmd-primary: #0d9488;
+$cmd-primary-dark: #0f766e;
+$cmd-up: #dc2626;
+$cmd-up-bg: #fef2f2;
+$cmd-up-border: #fecaca;
+$cmd-down: #16a34a;
+$cmd-down-bg: #f0fdf4;
+$cmd-down-border: #bbf7d0;
+$cmd-border: #e2e8f0;
+$cmd-muted: #64748b;
+$cmd-text: #1e293b;
+
+.cmd_container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #f8fafc;
+    color: $cmd-text;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-size: 13px;
+
+    * {
+        box-sizing: border-box;
+    }
+
+    a {
+        color: $cmd-primary-dark;
+        text-decoration: none;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    .cmd_muted {
+        color: $cmd-muted;
+    }
+
+    .cmd_small {
+        font-size: 11.5px;
+    }
+
+    .cmd_strong {
+        font-weight: 600;
+    }
+
+    .cmd_text_up {
+        color: $cmd-up !important;
+    }
+
+    .cmd_text_down {
+        color: $cmd-down !important;
+    }
+
+    /* ---------------------------------------------------------------- Navbar */
+    .cmd_navbar {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        background: #fff;
+        border-bottom: 1px solid $cmd-border;
+        padding: 0 20px;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        flex-shrink: 0;
+    }
+
+    .cmd_brand {
+        display: flex;
+        align-items: center;
+        font-size: 15px;
+        font-weight: 700;
+        color: $cmd-primary-dark;
+        white-space: nowrap;
+
+        .cmd_company {
+            margin-inline-start: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            color: $cmd-muted;
+            background: #f1f5f9;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+    }
+
+    .cmd_tabs {
+        display: flex;
+        flex: 1;
+        gap: 4px;
+        overflow-x: auto;
+    }
+
+    .cmd_tab {
+        background: transparent;
+        border: none;
+        border-bottom: 3px solid transparent;
+        padding: 14px 16px;
+        font-weight: 500;
+        color: $cmd-muted;
+        white-space: nowrap;
+
+        &:hover {
+            color: $cmd-primary;
+        }
+
+        &.cmd_tab_active {
+            color: $cmd-primary-dark;
+            font-weight: 600;
+            border-bottom-color: $cmd-primary;
+        }
+    }
+
+    .cmd_btn {
+        display: inline-flex;
+        align-items: center;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 12.5px;
+        font-weight: 500;
+        color: #475569;
+
+        &:hover {
+            background: #f1f5f9;
+        }
+
+        &.cmd_btn_icon {
+            padding: 5px 9px;
+        }
+    }
+
+    /* ---------------------------------------------------------- Filter bar */
+    .cmd_filter_bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: #fff;
+        border-bottom: 1px solid $cmd-border;
+        padding: 8px 20px;
+    }
+
+    .cmd_pills {
+        display: flex;
+        flex-wrap: wrap;
+        background: #f1f5f9;
+        padding: 3px;
+        border-radius: 7px;
+        gap: 2px;
+
+        .cmd_pill {
+            background: transparent;
+            border: none;
+            padding: 5px 11px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #475569;
+            white-space: nowrap;
+
+            &:hover {
+                color: #0f172a;
+            }
+
+            &.cmd_pill_active {
+                background: #fff;
+                color: $cmd-primary-dark;
+                font-weight: 600;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+            }
+
+            &.cmd_pill_up.cmd_pill_active {
+                color: $cmd-up;
+            }
+
+            &.cmd_pill_down.cmd_pill_active {
+                color: $cmd-down;
+            }
+        }
+    }
+
+    .cmd_range {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+
+        .cmd_date {
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 12px;
+
+            &:focus {
+                outline: none;
+                border-color: $cmd-primary;
+            }
+        }
+    }
+
+    .cmd_currency {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+
+        .cmd_currency_val {
+            font-weight: 600;
+            background: #f1f5f9;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+    }
+
+    .cmd_loading {
+        padding: 60px;
+        text-align: center;
+        color: $cmd-muted;
+        font-size: 14px;
+    }
+
+    .cmd_loading_sm {
+        padding: 16px;
+        color: $cmd-muted;
+    }
+
+    /* ---------------------------------------------------------------- Body */
+    .cmd_body {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 20px;
+        transition: opacity 0.15s ease;
+
+        &.cmd_body_busy {
+            opacity: 0.55;
+            pointer-events: none;
+        }
+    }
+
+    .cmd_grid {
+        display: grid;
+        gap: 16px;
+
+        &.cmd_grid_5 {
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        &.cmd_grid_3 {
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+
+        &.cmd_grid_2 {
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+        }
+    }
+
+    /* --------------------------------------------------------------- Cards */
+    .cmd_card {
+        background: #fff;
+        border: 1px solid $cmd-border;
+        border-radius: 10px;
+        padding: 14px 16px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+
+        &.cmd_card_click {
+            cursor: pointer;
+            transition: box-shadow 0.15s ease, transform 0.15s ease;
+
+            &:hover {
+                box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+                transform: translateY(-1px);
+            }
+        }
+
+        .cmd_card_label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: $cmd-muted;
+        }
+
+        .cmd_card_value {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 6px 0 4px;
+        }
+
+        .cmd_card_sub {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            font-size: 12px;
+            color: $cmd-muted;
+        }
+
+        &.cmd_card_up {
+            background: $cmd-up-bg;
+            border-color: $cmd-up-border;
+
+            .cmd_card_label,
+            .cmd_card_value {
+                color: $cmd-up;
+            }
+        }
+
+        &.cmd_card_down {
+            background: $cmd-down-bg;
+            border-color: $cmd-down-border;
+
+            .cmd_card_label,
+            .cmd_card_value {
+                color: $cmd-down;
+            }
+        }
+    }
+
+    .cmd_badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 10px;
+
+        &.cmd_badge_neutral {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+    }
+
+    /* -------------------------------------------------------------- Panels */
+    .cmd_panel {
+        background: #fff;
+        border: 1px solid $cmd-border;
+        border-radius: 10px;
+        padding: 14px 16px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        min-width: 0;
+    }
+
+    .cmd_panel_head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+
+        &.cmd_panel_head_wrap {
+            flex-wrap: wrap;
+        }
+
+        .cmd_panel_title {
+            font-size: 14px;
+            font-weight: 700;
+        }
+    }
+
+    .cmd_link {
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    /* -------------------------------------------------------------- Impact */
+    .cmd_impact_box {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        border: 1px solid $cmd-border;
+        border-radius: 8px;
+        padding: 12px 14px;
+        background: #f8fafc;
+
+        .cmd_impact_label {
+            font-size: 12px;
+            font-weight: 600;
+            color: $cmd-muted;
+        }
+
+        .cmd_impact_value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .cmd_impact_hint {
+            font-size: 11.5px;
+            color: $cmd-muted;
+        }
+
+        &.cmd_impact_up {
+            background: $cmd-up-bg;
+            border-color: $cmd-up-border;
+
+            .cmd_impact_value {
+                color: $cmd-up;
+            }
+        }
+
+        &.cmd_impact_down {
+            background: $cmd-down-bg;
+            border-color: $cmd-down-border;
+
+            .cmd_impact_value {
+                color: $cmd-down;
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------- Toolbar */
+    .cmd_toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .cmd_search {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 4px 8px;
+        min-width: 280px;
+        background: #fff;
+        color: $cmd-muted;
+
+        &:focus-within {
+            border-color: $cmd-primary;
+        }
+
+        input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 12.5px;
+            background: transparent;
+            color: $cmd-text;
+        }
+
+        .cmd_search_clear {
+            border: none;
+            background: transparent;
+            color: $cmd-muted;
+            padding: 0 2px;
+        }
+    }
+
+    .cmd_limit {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+
+        select {
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 3px 6px;
+            font-size: 12px;
+        }
+    }
+
+    .cmd_search_notice {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1e40af;
+        border-radius: 6px;
+        padding: 7px 10px;
+        margin-bottom: 10px;
+        font-size: 12px;
+    }
+
+    /* -------------------------------------------------------------- Tables */
+    .cmd_table_wrap {
+        overflow-x: auto;
+    }
+
+    .cmd_table {
+        width: 100%;
+        border-collapse: collapse;
+
+        th {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: $cmd-muted;
+            background: #f8fafc;
+            border-bottom: 1px solid $cmd-border;
+            padding: 8px 10px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+        }
+
+        &.cmd_table_sm {
+            th,
+            td {
+                padding: 6px 8px;
+                font-size: 12px;
+            }
+        }
+
+        .cmd_row {
+            cursor: pointer;
+
+            &:hover {
+                background: #f8fafc;
+            }
+
+            &.cmd_row_up {
+                box-shadow: inset 3px 0 0 $cmd-up;
+            }
+
+            &.cmd_row_down {
+                box-shadow: inset 3px 0 0 $cmd-down;
+            }
+
+            &.cmd_row_open {
+                background: #f1f5f9;
+            }
+        }
+
+        .cmd_product {
+            display: flex;
+            align-items: center;
+
+            .cmd_product_name {
+                font-weight: 600;
+                color: $cmd-text;
+            }
+        }
+
+        .cmd_empty {
+            text-align: center;
+            color: $cmd-muted;
+            padding: 30px 10px;
+        }
+    }
+
+    .cmd_table_foot {
+        margin-top: 8px;
+        font-size: 12px;
+        color: $cmd-muted;
+    }
+
+    .cmd_trend {
+        display: inline-flex;
+        align-items: center;
+        font-size: 11.5px;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 10px;
+        white-space: nowrap;
+
+        &.cmd_trend_up {
+            background: $cmd-up-bg;
+            color: $cmd-up;
+            border: 1px solid $cmd-up-border;
+        }
+
+        &.cmd_trend_down {
+            background: $cmd-down-bg;
+            color: $cmd-down;
+            border: 1px solid $cmd-down-border;
+        }
+
+        &.cmd_trend_same {
+            background: #f1f5f9;
+            color: $cmd-muted;
+            border: 1px solid $cmd-border;
+        }
+
+        &.cmd_trend_new {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+        }
+    }
+
+    /* ------------------------------------------------------ Price history */
+    .cmd_history_row > td {
+        background: #f8fafc;
+        padding: 12px 16px 16px;
+    }
+
+    .cmd_history {
+        display: grid;
+        grid-template-columns: minmax(280px, 1fr) minmax(360px, 1.3fr);
+        gap: 16px;
+
+        @media (max-width: 900px) {
+            grid-template-columns: 1fr;
+        }
+
+        .cmd_table {
+            background: #fff;
+            border: 1px solid $cmd-border;
+            border-radius: 8px;
+        }
+    }
+
+    .cmd_history_chart {
+        background: #fff;
+        border: 1px solid $cmd-border;
+        border-radius: 8px;
+        padding: 10px 12px;
+
+        svg {
+            width: 100%;
+            height: 150px;
+            overflow: visible;
+        }
+
+        .cmd_chart_line {
+            fill: none;
+            stroke: $cmd-primary;
+            stroke-width: 2;
+            vector-effect: non-scaling-stroke;
+        }
+
+        .cmd_chart_dot {
+            fill: #fff;
+            stroke: $cmd-primary;
+            stroke-width: 2;
+            vector-effect: non-scaling-stroke;
+
+            &.cmd_chart_dot_up {
+                stroke: $cmd-up;
+                fill: $cmd-up;
+            }
+
+            &.cmd_chart_dot_down {
+                stroke: $cmd-down;
+                fill: $cmd-down;
+            }
+        }
+    }
+
+    /* --------------------------------------------------------- Daily bars */
+    .cmd_bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 4px;
+        height: 200px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+
+        .cmd_bar_col {
+            flex: 1 0 22px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100%;
+        }
+
+        .cmd_bar_track {
+            flex: 1;
+            width: 100%;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .cmd_bar {
+            width: 70%;
+            max-width: 36px;
+            background: linear-gradient(180deg, #14b8a6, $cmd-primary-dark);
+            border-radius: 4px 4px 0 0;
+            transition: height 0.3s ease;
+        }
+
+        .cmd_bar_label {
+            font-size: 10px;
+            color: $cmd-muted;
+            margin-top: 4px;
+            white-space: nowrap;
+        }
+    }
+}
