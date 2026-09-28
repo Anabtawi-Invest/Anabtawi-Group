@@ -106,6 +106,17 @@ class ConstructionBudgetPo(models.Model):
         default="no",
     )
 
+    total_qty_ordered = fields.Float(string="Total Ordered Qty", compute="_compute_qty_totals")
+    total_qty_received = fields.Float(string="Total Received Qty", compute="_compute_qty_totals")
+    total_qty_remaining = fields.Float(string="Total Remaining Qty", compute="_compute_qty_totals")
+
+    @api.depends("line_ids.quantity", "line_ids.qty_received", "line_ids.qty_to_receive")
+    def _compute_qty_totals(self):
+        for rec in self:
+            rec.total_qty_ordered = sum(rec.line_ids.mapped("quantity"))
+            rec.total_qty_received = sum(rec.line_ids.mapped("qty_received"))
+            rec.total_qty_remaining = sum(rec.line_ids.mapped("qty_to_receive"))
+
     invoiced_amount = fields.Monetary(string="Invoiced Amount", compute="_compute_invoice_totals", store=True)
     paid_amount = fields.Monetary(string="Paid Amount", compute="_compute_invoice_totals", store=True)
 

@@ -11,6 +11,8 @@
                 <field name="po_date"/>
                 <field name="amount" sum="Total"/>
                 <field name="requested_by"/>
+                <field name="delivery_status" widget="badge"/>
+                <field name="invoice_status" widget="badge"/>
                 <field name="state" widget="badge"/>
             </list>
         </field>
@@ -75,8 +77,9 @@
                                     <field name="sequence" widget="handle"/>
                                     <field name="description"/>
                                     <field name="uom"/>
-                                    <field name="quantity"/>
-                                    <field name="qty_received" readonly="1" string="Received Qty"/>
+                                    <field name="quantity" sum="Total Ordered"/>
+                                    <field name="qty_received" readonly="1" string="Received Qty" sum="Total Received"/>
+                                    <field name="qty_to_receive" readonly="1" string="Remaining Qty" sum="Total Remaining"/>
                                     <field name="unit_price"/>
                                     <field name="subtotal" sum="Total"/>
                                 </list>
@@ -96,6 +99,14 @@
                             </field>
                         </page>
                         <page string="Item Receipts (Inventory)" invisible="state != 'approved'">
+                            <group>
+                                <group string="Delivery Summary">
+                                    <field name="total_qty_ordered" readonly="1"/>
+                                    <field name="total_qty_received" readonly="1"/>
+                                    <field name="total_qty_remaining" readonly="1"/>
+                                    <field name="delivery_status" widget="badge" readonly="1"/>
+                                </group>
+                            </group>
                             <field name="receipt_ids" readonly="1">
                                 <list>
                                     <field name="name"/>
