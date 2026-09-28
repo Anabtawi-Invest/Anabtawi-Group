@@ -19,11 +19,7 @@
                 <field name="is_construction_vendor"/>
             </xpath>
 
-            <!-- Hide all standard notebook pages when is_construction_vendor is True -->
-            <xpath expr="//notebook/page[not(@name='construction_pos' or @name='construction_receipts' or @name='construction_invoices')]" position="attributes">
-                <attribute name="invisible">is_construction_vendor</attribute>
-            </xpath>
-
+            <!-- 1. Add Construction Notebook Pages first -->
             <xpath expr="//notebook" position="inside">
                 <page string="Construction POs" name="construction_pos" invisible="not is_construction_vendor">
                     <field name="po_ids" readonly="1">
@@ -65,6 +61,11 @@
                         </list>
                     </field>
                 </page>
+            </xpath>
+
+            <!-- 2. Hide all non-construction notebook pages when is_construction_vendor is True -->
+            <xpath expr="//notebook/page[@name!='construction_pos' and @name!='construction_receipts' and @name!='construction_invoices']" position="attributes">
+                <attribute name="invisible">is_construction_vendor</attribute>
             </xpath>
         </field>
     </record>
