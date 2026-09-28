@@ -224,8 +224,8 @@
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_labor_cost)"/></div>
                         <div class="kpi_ratio_line mt-1">
                             <t t-set="cost_ratio" t-value="data.kpis.total_sales ? ((data.kpis.total_labor_cost / data.kpis.total_sales) * 100) : 0"/>
-                            <span t-attf-class="badge {{cost_ratio &lt;= 10.0 ? 'bg-success' : 'bg-danger'}} text-white px-2 py-1 fs-7 fw-bold">
-                                <i t-attf-class="fa {{cost_ratio &lt;= 10.0 ? 'fa-check-circle' : 'fa-exclamation-triangle'}} me-1"/> 
+                            <span t-attf-class="badge {{cost_ratio &lt;= 10.0 ? 'bg-success' : 'bg-danger'}} px-2 py-1 fs-7 fw-bold" style="color: #ffffff !important;">
+                                <i t-attf-class="fa {{cost_ratio &lt;= 10.0 ? 'fa-check-circle' : 'fa-exclamation-triangle'}} me-1" style="color: #ffffff !important;"/> 
                                 <t t-esc="getPercent(data.kpis.total_labor_cost, data.kpis.total_sales)"/>% of Total Sales
                             </span>
                         </div>
