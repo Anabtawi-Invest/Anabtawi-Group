@@ -222,7 +222,11 @@
                         <div class="kpi_icon"><i class="fa fa-calculator text-danger"/></div>
                         <div class="kpi_title">Daily Employee Cost</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_labor_cost)"/></div>
-                        <div class="kpi_subtext d-flex justify-content-between align-items-center">
+                        <div class="kpi_ratio_line text-muted small mt-1 fs-7 fw-semibold">
+                            <i class="fa fa-percent text-danger me-1"/> 
+                            <t t-esc="getPercent(data.kpis.total_labor_cost, data.kpis.total_sales)"/>% of Total Sales
+                        </div>
+                        <div class="kpi_subtext d-flex justify-content-between align-items-center mt-2">
                             <span class="badge bg-danger badge_sub">Wage Cost / Day</span>
                             <span class="drill_badge"><i class="fa fa-search-plus me-1"/>Drill Down</span>
                         </div>
