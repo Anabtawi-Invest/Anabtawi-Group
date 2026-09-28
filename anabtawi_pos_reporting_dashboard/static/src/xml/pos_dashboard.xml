@@ -222,7 +222,7 @@
                         <div class="kpi_icon"><i class="fa fa-calculator text-danger"/></div>
                         <div class="kpi_title">Daily Employee Cost</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_labor_cost)"/></div>
-                        <div class="kpi_ratio_line text-muted small mt-1 fs-7 fw-semibold">
+                        <div class="kpi_ratio_line text-dark fw-bold mt-1" style="color: #1a252c; font-weight: 700; font-size: 0.85rem;">
                             <i class="fa fa-percent text-danger me-1"/> 
                             <t t-esc="getPercent(data.kpis.total_labor_cost, data.kpis.total_sales)"/>% of Total Sales
                         </div>
