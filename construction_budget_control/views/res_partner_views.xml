@@ -19,49 +19,45 @@
                 <field name="is_construction_vendor"/>
             </xpath>
             <xpath expr="//notebook" position="inside">
-                <page string="Construction Budget Control" name="construction_budget_tab" invisible="not is_construction_vendor and po_count == 0 and invoice_count == 0 and receipt_count == 0">
-                    <notebook>
-                        <page string="Purchase Orders" name="construction_pos">
-                            <field name="po_ids" readonly="1">
-                                <list>
-                                    <field name="name"/>
-                                    <field name="project_id"/>
-                                    <field name="po_number"/>
-                                    <field name="po_date"/>
-                                    <field name="amount" sum="Total"/>
-                                    <field name="delivery_status" widget="badge"/>
-                                    <field name="invoice_status" widget="badge"/>
-                                    <field name="state" widget="badge"/>
-                                </list>
-                            </field>
-                        </page>
-                        <page string="Item Receipts (Inventory)" name="construction_receipts">
-                            <field name="receipt_ids" readonly="1">
-                                <list>
-                                    <field name="name"/>
-                                    <field name="po_id"/>
-                                    <field name="project_id"/>
-                                    <field name="date"/>
-                                    <field name="reference"/>
-                                    <field name="state" widget="badge"/>
-                                </list>
-                            </field>
-                        </page>
-                        <page string="Vendor Bills (Invoices)" name="construction_invoices">
-                            <field name="invoice_ids" readonly="1">
-                                <list>
-                                    <field name="name"/>
-                                    <field name="vendor_bill_ref"/>
-                                    <field name="po_id"/>
-                                    <field name="project_id"/>
-                                    <field name="date"/>
-                                    <field name="due_date"/>
-                                    <field name="amount" sum="Total Amount"/>
-                                    <field name="state" widget="badge"/>
-                                </list>
-                            </field>
-                        </page>
-                    </notebook>
+                <page string="Construction POs" name="construction_pos" invisible="not is_construction_vendor and po_count == 0">
+                    <field name="po_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="project_id"/>
+                            <field name="po_number"/>
+                            <field name="po_date"/>
+                            <field name="amount" sum="Total"/>
+                            <field name="delivery_status" widget="badge"/>
+                            <field name="invoice_status" widget="badge"/>
+                            <field name="state" widget="badge"/>
+                        </list>
+                    </field>
+                </page>
+                <page string="Construction Receipts" name="construction_receipts" invisible="not is_construction_vendor and receipt_count == 0">
+                    <field name="receipt_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="po_id"/>
+                            <field name="project_id"/>
+                            <field name="date"/>
+                            <field name="reference"/>
+                            <field name="state" widget="badge"/>
+                        </list>
+                    </field>
+                </page>
+                <page string="Construction Vendor Bills" name="construction_invoices" invisible="not is_construction_vendor and invoice_count == 0">
+                    <field name="invoice_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="vendor_bill_ref"/>
+                            <field name="po_id"/>
+                            <field name="project_id"/>
+                            <field name="date"/>
+                            <field name="due_date"/>
+                            <field name="amount" sum="Total Amount"/>
+                            <field name="state" widget="badge"/>
+                        </list>
+                    </field>
                 </page>
             </xpath>
         </field>
