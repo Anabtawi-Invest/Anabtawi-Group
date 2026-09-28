@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_ceo_main_dashboard" model="ir.actions.client">
+        <field name="name">CEO Main Dashboard</field>
+        <field name="tag">ceo_main_dashboard.dashboard</field>
+    </record>
+
+    <menuitem id="menu_ceo_main_dashboard_root"
+              name="CEO Main Dashboard"
+              sequence="2"
+              web_icon="ceo_main_dashboard,static/description/icon.png"
+              groups="ceo_main_dashboard.group_ceo_main_dashboard_user"/>
+
+    <menuitem id="menu_ceo_main_dashboard_main"
+              name="Dashboard"
+              parent="menu_ceo_main_dashboard_root"
+              action="action_ceo_main_dashboard"
+              sequence="1"/>
+</odoo>

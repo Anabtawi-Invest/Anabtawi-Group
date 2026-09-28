@@ -1,0 +1,393 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="ceo_main_dashboard.Dashboard">
+    <div class="cmd_container">
+
+        <!-- Top navigation -->
+        <header class="cmd_navbar">
+            <div class="cmd_brand">
+                <i class="fa fa-tachometer me-2"/>
+                <span>CEO Main Dashboard</span>
+                <span class="cmd_company" t-if="state.data" t-esc="state.data.company_name"/>
+            </div>
+            <div class="cmd_tabs">
+                <button class="cmd_tab" t-att-class="{ 'cmd_tab_active': state.activeTab === 'purchase' }"
+                        t-on-click="() => this.switchTab('purchase')">
+                    <i class="fa fa-shopping-cart me-1"/> Purchase
+                </button>
+            </div>
+            <div class="cmd_nav_actions">
+                <button class="cmd_btn" t-on-click="refresh" title="Refresh live data">
+                    <i class="fa fa-refresh me-1" t-att-class="{ 'fa-spin': state.syncing }"/> Refresh
+                </button>
+            </div>
+        </header>
+
+        <!-- Date filter ribbon -->
+        <section class="cmd_filter_bar">
+            <div class="cmd_pills">
+                <button class="cmd_pill" t-att-class="{ 'cmd_pill_active': state.preset === 'today' }"
+                        t-on-click="() => this.setPreset('today')">Today</button>
+                <button class="cmd_pill" t-att-class="{ 'cmd_pill_active': state.preset === 'yesterday' }"
+                        t-on-click="() => this.setPreset('yesterday')">Yesterday</button>
+                <button class="cmd_pill" t-att-class="{ 'cmd_pill_active': state.preset === 'week' }"
+                        t-on-click="() => this.setPreset('week')">This Week</button>
+                <button class="cmd_pill" t-att-class="{ 'cmd_pill_active': state.preset === 'month' }"
+                        t-on-click="() => this.setPreset('month')">This Month</button>
+                <button class="cmd_pill" t-att-class="{ 'cmd_pill_active': state.preset === 'quarter' }"
+                        t-on-click="() => this.setPreset('quarter')">This Quarter</button>
+                <button class="cmd_pill" t-att-class="{ 'cmd_pill_active': state.preset === 'year' }"
+                        t-on-click="() => this.setPreset('year')">This Year</button>
+                <button class="cmd_pill" t-att-class="{ 'cmd_pill_active': state.preset === 'custom' }">Custom</button>
+            </div>
+            <div class="cmd_range">
+                <span class="cmd_muted">From</span>
+                <input type="date" class="cmd_date" t-att-value="state.dateFrom"
+                       t-on-change="(ev) => this.onDateChange('dateFrom', ev)"/>
+                <span class="cmd_muted">To</span>
+                <input type="date" class="cmd_date" t-att-value="state.dateTo"
+                       t-on-change="(ev) => this.onDateChange('dateTo', ev)"/>
+                <button class="cmd_btn cmd_btn_icon" t-on-click="applyCustomRange" title="Apply">
+                    <i class="fa fa-check"/>
+                </button>
+            </div>
+            <div class="cmd_currency" t-if="state.data">
+                <span class="cmd_muted">Currency</span>
+                <span class="cmd_currency_val" t-esc="state.data.currency.name"/>
+            </div>
+        </section>
+
+        <div class="cmd_loading" t-if="state.loading and !state.data">
+            <i class="fa fa-circle-o-notch fa-spin me-2"/> Loading purchase data…
+        </div>
+
+        <main class="cmd_body" t-if="state.data and state.activeTab === 'purchase'"
+              t-att-class="{ 'cmd_body_busy': state.loading }">
+            <t t-set="summary" t-value="state.data.summary"/>
+            <t t-set="impact" t-value="state.data.impact"/>
+
+            <!-- KPI cards -->
+            <div class="cmd_grid cmd_grid_5">
+                <div class="cmd_card cmd_card_click" t-on-click="openPeriodOrders">
+                    <div class="cmd_card_label"><i class="fa fa-shopping-bag me-1"/> Purchases in period</div>
+                    <div class="cmd_card_value" t-esc="fmtMoney(summary.period_total)"/>
+                    <div class="cmd_card_sub">
+                        <span><t t-esc="summary.period_count"/> <span>confirmed orders</span></span>
+                        <span class="cmd_badge cmd_badge_neutral" t-if="summary.period_change_pct !== null"
+                              t-att-title="fmtDate(summary.prev_period_from) + ' → ' + fmtDate(summary.prev_period_to) + ': ' + fmtMoney(summary.prev_period_total)">
+                            <t t-esc="fmtPct(summary.period_change_pct)"/> <span>vs previous period</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="cmd_card">
+                    <div class="cmd_card_label"><i class="fa fa-calendar-check-o me-1"/> Today's purchases</div>
+                    <div class="cmd_card_value" t-esc="fmtMoney(summary.today_total)"/>
+                    <div class="cmd_card_sub">
+                        <span><t t-esc="summary.today_count"/> <span>orders</span></span>
+                        <span class="cmd_badge cmd_badge_neutral" t-if="summary.today_change_pct !== null"
+                              t-att-title="fmtMoney(summary.yesterday_total)">
+                            <t t-esc="fmtPct(summary.today_change_pct)"/> <span>vs yesterday</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="cmd_card">
+                    <div class="cmd_card_label"><i class="fa fa-truck me-1"/> Vendors</div>
+                    <div class="cmd_card_value" t-esc="summary.vendor_count"/>
+                    <div class="cmd_card_sub">
+                        <span>Average order</span>
+                        <span class="cmd_strong" t-esc="fmtMoney(summary.avg_order)"/>
+                    </div>
+                </div>
+
+                <div class="cmd_card cmd_card_up cmd_card_click" t-on-click="() => this.setTrendFilter('up')">
+                    <div class="cmd_card_label"><i class="fa fa-arrow-up me-1"/> Price increased</div>
+                    <div class="cmd_card_value" t-esc="impact.up_count"/>
+                    <div class="cmd_card_sub">
+                        <span>of</span> <t t-esc="impact.product_count"/> <span>products bought</span>
+                    </div>
+                </div>
+
+                <div class="cmd_card cmd_card_down cmd_card_click" t-on-click="() => this.setTrendFilter('down')">
+                    <div class="cmd_card_label"><i class="fa fa-arrow-down me-1"/> Price decreased</div>
+                    <div class="cmd_card_value" t-esc="impact.down_count"/>
+                    <div class="cmd_card_sub">
+                        <span>of</span> <t t-esc="impact.product_count"/> <span>products bought</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Money impact of price changes -->
+            <div class="cmd_panel cmd_impact">
+                <div class="cmd_panel_head">
+                    <span class="cmd_panel_title"><i class="fa fa-balance-scale me-1"/> Money impact of price changes</span>
+                    <span class="cmd_muted">Every purchase in the period compared with the previous purchase price of the same product × quantity bought</span>
+                </div>
+                <div class="cmd_grid cmd_grid_3">
+                    <div class="cmd_impact_box cmd_impact_up">
+                        <span class="cmd_impact_label">Extra paid (price increases)</span>
+                        <span class="cmd_impact_value" t-esc="fmtMoney(impact.extra_paid)"/>
+                    </div>
+                    <div class="cmd_impact_box cmd_impact_down">
+                        <span class="cmd_impact_label">Saved (price decreases)</span>
+                        <span class="cmd_impact_value" t-esc="fmtMoney(impact.saved)"/>
+                    </div>
+                    <div class="cmd_impact_box"
+                         t-att-class="impact.net > 0 ? 'cmd_impact_up' : impact.net &lt; 0 ? 'cmd_impact_down' : ''">
+                        <span class="cmd_impact_label">Net impact</span>
+                        <span class="cmd_impact_value" t-esc="fmtSignedMoney(impact.net)"/>
+                        <span class="cmd_impact_hint" t-if="impact.net > 0">You paid more than before</span>
+                        <span class="cmd_impact_hint" t-elif="impact.net &lt; 0">You paid less than before</span>
+                        <span class="cmd_impact_hint" t-else="">No price effect</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Price comparison -->
+            <div class="cmd_panel">
+                <div class="cmd_panel_head cmd_panel_head_wrap">
+                    <span class="cmd_panel_title">
+                        <i class="fa fa-exchange me-1"/> Purchase price comparison
+                        <span class="cmd_muted cmd_small ms-2">Latest purchase price vs previous purchase price (any vendor)</span>
+                    </span>
+                    <div class="cmd_toolbar">
+                        <div class="cmd_search">
+                            <i class="fa fa-search"/>
+                            <input type="text" placeholder="Search any product, reference or barcode…"
+                                   t-att-value="state.searchTerm" t-on-input="onSearchInput"/>
+                            <i class="fa fa-circle-o-notch fa-spin" t-if="state.searching"/>
+                            <button class="cmd_search_clear" t-if="state.searchTerm" t-on-click="clearSearch" title="Clear">
+                                <i class="fa fa-times"/>
+                            </button>
+                        </div>
+                        <div class="cmd_pills cmd_pills_sm">
+                            <button class="cmd_pill" t-att-class="{ 'cmd_pill_active': state.trendFilter === 'all' }"
+                                    t-on-click="() => this.setTrendFilter('all')">All</button>
+                            <button class="cmd_pill cmd_pill_up" t-att-class="{ 'cmd_pill_active': state.trendFilter === 'up' }"
+                                    t-on-click="() => this.setTrendFilter('up')">
+                                <i class="fa fa-arrow-up"/> <span>Increased</span> (<t t-esc="countTrend('up')"/>)
+                            </button>
+                            <button class="cmd_pill cmd_pill_down" t-att-class="{ 'cmd_pill_active': state.trendFilter === 'down' }"
+                                    t-on-click="() => this.setTrendFilter('down')">
+                                <i class="fa fa-arrow-down"/> <span>Decreased</span> (<t t-esc="countTrend('down')"/>)
+                            </button>
+                        </div>
+                        <label class="cmd_limit" t-if="!isSearchMode">
+                            <span class="cmd_muted">Show</span>
+                            <select t-on-change="onLimitChange">
+                                <t t-foreach="limitOptions" t-as="opt" t-key="opt">
+                                    <option t-att-value="opt" t-att-selected="opt === state.limit" t-esc="opt"/>
+                                </t>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="cmd_search_notice" t-if="isSearchMode">
+                    <i class="fa fa-info-circle me-1"/>
+                    <span>Search results use the full purchase history up to</span> <strong t-esc="fmtDate(state.dateTo)"/>.
+                    <a href="#" t-on-click.prevent="clearSearch">Back to period view</a>
+                </div>
+
+                <div class="cmd_table_wrap">
+                    <table class="cmd_table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Product</th>
+                                <th class="text-end">Previous price</th>
+                                <th class="text-end">Last price</th>
+                                <th class="text-end">Change</th>
+                                <th class="text-end">Change %</th>
+                                <th>Status</th>
+                                <th class="text-end">Last qty</th>
+                                <th>Last vendor</th>
+                                <th>Last purchase</th>
+                                <th class="text-end" t-if="!isSearchMode">Period impact</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="visibleRows" t-as="row" t-key="row.product_id">
+                                <tr class="cmd_row" t-att-class="'cmd_row_' + row.trend + (state.expandedProductId === row.product_id ? ' cmd_row_open' : '')"
+                                    t-on-click="() => this.toggleHistory(row)" title="Click to see price history">
+                                    <td class="cmd_muted" t-esc="row_index + 1"/>
+                                    <td>
+                                        <div class="cmd_product">
+                                            <i class="fa me-1" t-att-class="state.expandedProductId === row.product_id ? 'fa-caret-down' : 'fa-caret-right'"/>
+                                            <a href="#" class="cmd_product_name" t-esc="row.product_name"
+                                               t-on-click.prevent.stop="() => this.openProduct(row.product_id)"/>
+                                        </div>
+                                        <div class="cmd_muted cmd_small">
+                                            <t t-if="row.default_code"><t t-esc="row.default_code"/> · </t>
+                                            <span>per</span> <t t-esc="row.uom"/>
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        <div t-esc="fmtPrice(row.prev_price)"/>
+                                        <div class="cmd_muted cmd_small" t-if="row.prev_date" t-esc="fmtDate(row.prev_date)"/>
+                                    </td>
+                                    <td class="text-end cmd_strong" t-esc="fmtPrice(row.last_price)"/>
+                                    <td class="text-end cmd_strong" t-att-class="changeClass(row.diff)">
+                                        <t t-if="row.trend !== 'new'" t-esc="fmtSignedPrice(row.diff)"/>
+                                        <t t-else="">—</t>
+                                    </td>
+                                    <td class="text-end cmd_strong" t-att-class="changeClass(row.pct)" t-esc="fmtPct(row.pct)"/>
+                                    <td>
+                                        <span class="cmd_trend" t-att-class="'cmd_trend_' + row.trend">
+                                            <i class="fa me-1" t-att-class="trendIcon(row.trend)"/>
+                                            <t t-esc="trendLabel(row.trend)"/>
+                                        </span>
+                                    </td>
+                                    <td class="text-end"><t t-esc="fmtQty(row.last_qty)"/> <span class="cmd_muted cmd_small" t-esc="row.uom"/></td>
+                                    <td>
+                                        <div t-esc="row.last_vendor"/>
+                                        <div class="cmd_muted cmd_small" t-if="row.prev_vendor and row.prev_vendor !== row.last_vendor">
+                                            <span>Before:</span> <t t-esc="row.prev_vendor"/>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <a href="#" t-esc="row.last_order_name"
+                                           t-on-click.prevent.stop="() => this.openOrder(row.last_order_id)"/>
+                                        <div class="cmd_muted cmd_small" t-esc="fmtDate(row.last_date)"/>
+                                    </td>
+                                    <td class="text-end cmd_strong" t-if="!isSearchMode" t-att-class="changeClass(row.impact)">
+                                        <t t-if="row.impact" t-esc="fmtSignedMoney(row.impact)"/>
+                                        <t t-else="">—</t>
+                                    </td>
+                                </tr>
+
+                                <!-- Expanded price history -->
+                                <tr class="cmd_history_row" t-if="state.expandedProductId === row.product_id">
+                                    <td t-att-colspan="isSearchMode ? 10 : 11">
+                                        <div class="cmd_loading_sm" t-if="state.historyLoading and !state.history[row.product_id]">
+                                            <i class="fa fa-circle-o-notch fa-spin me-2"/> Loading price history…
+                                        </div>
+                                        <div class="cmd_history" t-elif="state.history[row.product_id]">
+                                            <t t-set="chart" t-value="historyChart(row.product_id)"/>
+                                            <div class="cmd_history_chart">
+                                                <div class="cmd_small cmd_strong mb-1">Price trend (last purchases)</div>
+                                                <svg t-att-viewBox="'0 0 ' + chart.width + ' ' + chart.height" preserveAspectRatio="none">
+                                                    <polyline class="cmd_chart_line" t-att-points="chart.path"/>
+                                                    <t t-foreach="chart.dots" t-as="dot" t-key="dot.key">
+                                                        <circle t-att-cx="dot.x" t-att-cy="dot.y" r="5"
+                                                                t-att-class="'cmd_chart_dot cmd_chart_dot_' + dot.trend">
+                                                            <title t-esc="dot.title"/>
+                                                        </circle>
+                                                    </t>
+                                                </svg>
+                                            </div>
+                                            <table class="cmd_table cmd_table_sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Date</th>
+                                                        <th>Order</th>
+                                                        <th>Vendor</th>
+                                                        <th class="text-end">Qty</th>
+                                                        <th class="text-end">Unit price</th>
+                                                        <th class="text-end">Change</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <t t-foreach="state.history[row.product_id].slice().reverse()" t-as="h" t-key="h.line_id">
+                                                        <tr>
+                                                            <td t-esc="fmtDate(h.date)"/>
+                                                            <td>
+                                                                <a href="#" t-esc="h.order_name"
+                                                                   t-on-click.prevent.stop="() => this.openOrder(h.order_id)"/>
+                                                            </td>
+                                                            <td t-esc="h.vendor"/>
+                                                            <td class="text-end"><t t-esc="fmtQty(h.qty)"/> <span class="cmd_muted" t-esc="h.uom"/></td>
+                                                            <td class="text-end cmd_strong" t-esc="fmtPrice(h.price)"/>
+                                                            <td class="text-end" t-att-class="changeClass(h.diff)">
+                                                                <t t-if="h.trend === 'new'">—</t>
+                                                                <t t-else="">
+                                                                    <i class="fa me-1" t-att-class="trendIcon(h.trend)"/>
+                                                                    <t t-esc="fmtPct(h.pct)"/>
+                                                                </t>
+                                                            </td>
+                                                        </tr>
+                                                    </t>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </t>
+
+                            <tr t-if="!visibleRows.length">
+                                <td class="cmd_empty" t-att-colspan="isSearchMode ? 10 : 11">
+                                    <i class="fa fa-inbox fa-2x d-block mb-2"/>
+                                    <span t-if="isSearchMode">No purchases found for this product.</span>
+                                    <span t-else="">No confirmed purchases for the selected period.</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="cmd_table_foot" t-if="!isSearchMode and allRows.length > visibleRows.length and state.trendFilter === 'all'">
+                    <span>Showing</span> <t t-esc="visibleRows.length"/> <span>of</span> <t t-esc="allRows.length"/> <span>products — sorted by biggest price change.</span>
+                </div>
+            </div>
+
+            <!-- Daily totals + recent orders -->
+            <div class="cmd_grid cmd_grid_2">
+                <div class="cmd_panel">
+                    <div class="cmd_panel_head">
+                        <span class="cmd_panel_title">
+                            <i class="fa fa-bar-chart me-1"/>
+                            <t t-if="state.data.daily.granularity === 'month'">Monthly purchases</t>
+                            <t t-else="">Daily purchases</t>
+                        </span>
+                        <span class="cmd_muted" t-esc="fmtDate(state.data.date_from) + ' → ' + fmtDate(state.data.date_to)"/>
+                    </div>
+                    <div class="cmd_bars">
+                        <t t-foreach="state.data.daily.points" t-as="point" t-key="point.date">
+                            <div class="cmd_bar_col" t-att-title="fmtBarLabel(point.date) + ': ' + fmtMoney(point.amount) + ' (' + point.count + ')'">
+                                <div class="cmd_bar_track">
+                                    <div class="cmd_bar" t-att-style="'height:' + barHeight(point.amount) + '%'"/>
+                                </div>
+                                <div class="cmd_bar_label" t-esc="fmtBarLabel(point.date)"/>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+
+                <div class="cmd_panel">
+                    <div class="cmd_panel_head">
+                        <span class="cmd_panel_title"><i class="fa fa-list me-1"/> Latest confirmed purchase orders</span>
+                        <a href="#" class="cmd_link" t-on-click.prevent="openPeriodOrders">View all →</a>
+                    </div>
+                    <table class="cmd_table cmd_table_sm">
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>Vendor</th>
+                                <th>Confirmed</th>
+                                <th class="text-end">Lines</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="state.data.recent_orders" t-as="order" t-key="order.id">
+                                <tr class="cmd_row" t-on-click="() => this.openOrder(order.id)">
+                                    <td class="cmd_strong" t-esc="order.name"/>
+                                    <td t-esc="order.vendor"/>
+                                    <td class="cmd_muted" t-esc="fmtDateTime(order.date)"/>
+                                    <td class="text-end" t-esc="order.line_count"/>
+                                    <td class="text-end cmd_strong" t-esc="fmtMoney(order.amount)"/>
+                                </tr>
+                            </t>
+                            <tr t-if="!state.data.recent_orders.length">
+                                <td class="cmd_empty" colspan="5">No confirmed purchases for the selected period.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</t>
+
+</templates>
