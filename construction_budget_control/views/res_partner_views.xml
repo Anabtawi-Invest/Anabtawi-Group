@@ -18,8 +18,14 @@
             <xpath expr="//field[@name='category_id']" position="after">
                 <field name="is_construction_vendor"/>
             </xpath>
+
+            <!-- Hide all standard notebook pages when is_construction_vendor is True -->
+            <xpath expr="//notebook/page[not(@name='construction_pos' or @name='construction_receipts' or @name='construction_invoices')]" position="attributes">
+                <attribute name="invisible">is_construction_vendor</attribute>
+            </xpath>
+
             <xpath expr="//notebook" position="inside">
-                <page string="Construction POs" name="construction_pos" invisible="not is_construction_vendor and po_count == 0">
+                <page string="Construction POs" name="construction_pos" invisible="not is_construction_vendor">
                     <field name="po_ids" readonly="1">
                         <list>
                             <field name="name"/>
@@ -33,7 +39,7 @@
                         </list>
                     </field>
                 </page>
-                <page string="Construction Receipts" name="construction_receipts" invisible="not is_construction_vendor and receipt_count == 0">
+                <page string="Construction Receipts" name="construction_receipts" invisible="not is_construction_vendor">
                     <field name="receipt_ids" readonly="1">
                         <list>
                             <field name="name"/>
@@ -45,7 +51,7 @@
                         </list>
                     </field>
                 </page>
-                <page string="Construction Vendor Bills" name="construction_invoices" invisible="not is_construction_vendor and construction_invoice_count == 0">
+                <page string="Construction Vendor Bills" name="construction_invoices" invisible="not is_construction_vendor">
                     <field name="construction_invoice_ids" readonly="1">
                         <list>
                             <field name="name"/>

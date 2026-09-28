@@ -213,7 +213,34 @@ class ConstructionBudgetInvoice(models.Model):
             rec.message_post(body=_("Payment registered. Bill marked as Paid."))
             rec.po_id._compute_invoice_status()
 
+    def _check_three_approvers_deletion_auth(self):
+        user = self.env.user
+        if user.has_group("base.group_system"):
+            return
+        manager_group = self.env.ref("construction_budget_control.group_construction_manager", raise_if_not_found=False)
+        accounting_group = self.env.ref("construction_budget_control.group_construction_accounting_approver", raise_if_not_found=False)
+        gm_group = self.env.ref("construction_budget_control.group_construction_gm_approver", raise_if_not_found=False)
+        chairman_group = self.env.ref("construction_budget_control.group_construction_chairman_approver", raise_if_not_found=False)
+
+        is_manager = manager_group and user in manager_group.user_ids
+        has_all_three = (
+            accounting_group and user in accounting_group.user_ids and
+            gm_group and user in gm_group.user_ids and
+            chairman_group and user in chairman_group.user_ids
+        )
+
+        if not (is_manager or has_all_three):
+            raise AccessError(_(
+                "Deletion Restricted: You cannot delete records without the approval authorization of all three approver roles "
+                "(Accounting Manager, CEO, and Chairman)."
+            ))
+
+    def unlink(self):
+        self._check_three_approvers_deletion_auth()
+        return super().unlink()
+
     def action_cancel(self):
+
         for rec in self:
             if rec.state == "paid":
                 raise UserError(_("Cannot cancel a paid invoice."))

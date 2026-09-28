@@ -25,7 +25,7 @@ class ConstructionBudgetReceipt(models.Model):
     @api.depends("po_id.invoice_ids")
     def _compute_invoice_count(self):
         for rec in self:
-            rec.invoice_count = len(rec.invoice_ids)
+            rec.invoice_count = len(rec.po_id.invoice_ids) if rec.po_id else 0
 
     def action_view_po(self):
         self.ensure_one()
@@ -45,8 +45,8 @@ class ConstructionBudgetReceipt(models.Model):
             "name": _("Vendor Bills"),
             "res_model": "construction.budget.invoice",
             "view_mode": "list,form",
-            "domain": [("po_id", "=", self.po_id.id)],
-            "context": {"default_po_id": self.po_id.id},
+            "domain": [("po_id", "=", self.po_id.id)] if self.po_id else [],
+            "context": {"default_po_id": self.po_id.id} if self.po_id else {},
         }
 
     state = fields.Selection(
@@ -71,11 +71,43 @@ class ConstructionBudgetReceipt(models.Model):
                 continue
             if not rec.line_ids:
                 raise UserError(_("Cannot validate a receipt with no received item lines."))
+            
+            # Validate received quantity limits before validating receipt
+            for line in rec.line_ids:
+                line._check_received_qty_limit()
+
             rec.state = "done"
             rec.message_post(body=_("Receipt validated and items marked as received."))
             rec.po_id._compute_delivery_status()
 
+    def _check_three_approvers_deletion_auth(self):
+        user = self.env.user
+        if user.has_group("base.group_system"):
+            return
+        manager_group = self.env.ref("construction_budget_control.group_construction_manager", raise_if_not_found=False)
+        accounting_group = self.env.ref("construction_budget_control.group_construction_accounting_approver", raise_if_not_found=False)
+        gm_group = self.env.ref("construction_budget_control.group_construction_gm_approver", raise_if_not_found=False)
+        chairman_group = self.env.ref("construction_budget_control.group_construction_chairman_approver", raise_if_not_found=False)
+
+        is_manager = manager_group and user in manager_group.user_ids
+        has_all_three = (
+            accounting_group and user in accounting_group.user_ids and
+            gm_group and user in gm_group.user_ids and
+            chairman_group and user in chairman_group.user_ids
+        )
+
+        if not (is_manager or has_all_three):
+            raise AccessError(_(
+                "Deletion Restricted: You cannot delete records without the approval authorization of all three approver roles "
+                "(Accounting Manager, CEO, and Chairman)."
+            ))
+
+    def unlink(self):
+        self._check_three_approvers_deletion_auth()
+        return super().unlink()
+
     def action_cancel(self):
+
         for rec in self:
             if rec.state == "done":
                 raise UserError(_("Cannot cancel a validated receipt."))
@@ -92,3 +124,32 @@ class ConstructionBudgetReceiptLine(models.Model):
     uom = fields.Char(related="po_line_id.uom", readonly=True)
     quantity_ordered = fields.Float(related="po_line_id.quantity", string="Ordered Qty", readonly=True)
     quantity_received = fields.Float(string="Received Qty", required=True, default=0.0)
+
+    @api.constrains("quantity_received", "po_line_id")
+    def _check_received_qty_limit(self):
+        for line in self:
+            if line.quantity_received < 0:
+                raise ValidationError(_("Received quantity cannot be negative."))
+            if not line.po_line_id:
+                continue
+
+            # Calculate total received quantity from all other validated receipts
+            other_receipt_lines = line.po_line_id.receipt_line_ids.filtered(
+                lambda r: r.id != line.id and r.receipt_id.state == "done"
+            )
+            already_received = sum(other_receipt_lines.mapped("quantity_received"))
+            max_allowed = max(0.0, line.po_line_id.quantity - already_received)
+
+            if line.quantity_received > max_allowed + 1e-4:
+                raise ValidationError(_(
+                    "Cannot receive quantity %(received)s for item '%(item)s'!\n"
+                    "Ordered Quantity: %(ordered)s\n"
+                    "Previously Received: %(prev)s\n"
+                    "Maximum Allowed to Receive Now: %(max_allowed)s"
+                ) % {
+                    "received": line.quantity_received,
+                    "item": line.description or line.po_line_id.description,
+                    "ordered": line.po_line_id.quantity,
+                    "prev": already_received,
+                    "max_allowed": max_allowed,
+                })
