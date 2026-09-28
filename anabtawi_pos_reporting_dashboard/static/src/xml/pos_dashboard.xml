@@ -222,9 +222,12 @@
                         <div class="kpi_icon"><i class="fa fa-calculator text-danger"/></div>
                         <div class="kpi_title">Daily Employee Cost</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.total_labor_cost)"/></div>
-                        <div class="kpi_ratio_line text-dark fw-bold mt-1" style="color: #1a252c; font-weight: 700; font-size: 0.85rem;">
-                            <i class="fa fa-percent text-danger me-1"/> 
-                            <t t-esc="getPercent(data.kpis.total_labor_cost, data.kpis.total_sales)"/>% of Total Sales
+                        <div class="kpi_ratio_line mt-1">
+                            <t t-set="cost_ratio" t-value="data.kpis.total_sales ? ((data.kpis.total_labor_cost / data.kpis.total_sales) * 100) : 0"/>
+                            <span t-attf-class="badge {{cost_ratio &lt;= 10.0 ? 'bg-success' : 'bg-danger'}} text-white px-2 py-1 fs-7 fw-bold">
+                                <i t-attf-class="fa {{cost_ratio &lt;= 10.0 ? 'fa-check-circle' : 'fa-exclamation-triangle'}} me-1"/> 
+                                <t t-esc="getPercent(data.kpis.total_labor_cost, data.kpis.total_sales)"/>% of Total Sales
+                            </span>
                         </div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center mt-2">
                             <span class="badge bg-danger badge_sub">Wage Cost / Day</span>
