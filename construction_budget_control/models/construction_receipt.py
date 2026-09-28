@@ -19,6 +19,36 @@ class ConstructionBudgetReceipt(models.Model):
     reference = fields.Char(string="Delivery Note / Waybill Ref", help="Vendor delivery note or reference number")
     notes = fields.Text(string="Notes / Inspection Comments")
 
+    invoice_ids = fields.One2many(related="po_id.invoice_ids", string="Vendor Invoices")
+    invoice_count = fields.Integer(compute="_compute_invoice_count")
+
+    @api.depends("po_id.invoice_ids")
+    def _compute_invoice_count(self):
+        for rec in self:
+            rec.invoice_count = len(rec.invoice_ids)
+
+    def action_view_po(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Purchase Order"),
+            "res_model": "construction.budget.po",
+            "res_id": self.po_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def action_view_invoices(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Vendor Bills"),
+            "res_model": "construction.budget.invoice",
+            "view_mode": "list,form",
+            "domain": [("po_id", "=", self.po_id.id)],
+            "context": {"default_po_id": self.po_id.id},
+        }
+
     state = fields.Selection(
         [("draft", "Draft"), ("done", "Received"), ("cancelled", "Cancelled")],
         default="draft",

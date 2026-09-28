@@ -40,6 +40,18 @@ class ConstructionProject(models.Model):
     remaining_budget = fields.Monetary(compute="_compute_po_stats", store=True)
     budget_used_pct = fields.Float(compute="_compute_po_stats", string="% Committed")
 
+    invoice_ids = fields.One2many("construction.budget.invoice", "project_id", string="Vendor Invoices")
+    invoice_count = fields.Integer(compute="_compute_project_counts", string="Invoice Count")
+
+    receipt_ids = fields.One2many("construction.budget.receipt", "project_id", string="Item Receipts")
+    receipt_count = fields.Integer(compute="_compute_project_counts", string="Receipt Count")
+
+    @api.depends("po_ids", "invoice_ids", "receipt_ids")
+    def _compute_project_counts(self):
+        for project in self:
+            project.invoice_count = len(project.invoice_ids)
+            project.receipt_count = len(project.receipt_ids)
+
     @api.depends("total_budget", "po_ids.amount", "po_ids.state")
     def _compute_po_stats(self):
         pending_states = ("accounting_review", "gm_review", "chairman_review")
@@ -59,8 +71,30 @@ class ConstructionProject(models.Model):
         self.ensure_one()
         return {
             "type": "ir.actions.act_window",
-            "name": "Purchase Orders",
+            "name": _("Purchase Orders"),
             "res_model": "construction.budget.po",
+            "view_mode": "list,form",
+            "domain": [("project_id", "=", self.id)],
+            "context": {"default_project_id": self.id},
+        }
+
+    def action_view_invoices(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Vendor Bills"),
+            "res_model": "construction.budget.invoice",
+            "view_mode": "list,form",
+            "domain": [("project_id", "=", self.id)],
+            "context": {"default_project_id": self.id},
+        }
+
+    def action_view_receipts(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Item Receipts"),
+            "res_model": "construction.budget.receipt",
             "view_mode": "list,form",
             "domain": [("project_id", "=", self.id)],
             "context": {"default_project_id": self.id},

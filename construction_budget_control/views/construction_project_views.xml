@@ -29,6 +29,12 @@
                         <button name="action_view_pos" type="object" class="oe_stat_button" icon="fa-file-text-o">
                             <field name="po_count" widget="statinfo" string="Purchase Orders"/>
                         </button>
+                        <button name="action_view_receipts" type="object" class="oe_stat_button" icon="fa-truck">
+                            <field name="receipt_count" widget="statinfo" string="Receipts"/>
+                        </button>
+                        <button name="action_view_invoices" type="object" class="oe_stat_button" icon="fa-pencil-square-o">
+                            <field name="invoice_count" widget="statinfo" string="Vendor Bills"/>
+                        </button>
                     </div>
                     <widget name="web_ribbon" title="On Hold" bg_color="text-bg-warning" invisible="state != 'on_hold'"/>
                     <div class="oe_title">
@@ -68,6 +74,34 @@
                                     <field name="vendor_id"/>
                                     <field name="po_number"/>
                                     <field name="amount" sum="Total"/>
+                                    <field name="delivery_status" widget="badge"/>
+                                    <field name="invoice_status" widget="badge"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Item Receipts (Inventory)">
+                            <field name="receipt_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="po_id"/>
+                                    <field name="vendor_id"/>
+                                    <field name="date"/>
+                                    <field name="reference"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Vendor Bills (Invoices)">
+                            <field name="invoice_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="vendor_bill_ref"/>
+                                    <field name="po_id"/>
+                                    <field name="vendor_id"/>
+                                    <field name="date"/>
+                                    <field name="due_date"/>
+                                    <field name="amount" sum="Total Amount"/>
                                     <field name="state" widget="badge"/>
                                 </list>
                             </field>

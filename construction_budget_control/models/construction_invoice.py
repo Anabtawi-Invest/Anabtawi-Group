@@ -31,6 +31,36 @@ class ConstructionBudgetInvoice(models.Model):
         help="Optional: Link this bill to a specific payment milestone on the PO",
     )
 
+    receipt_ids = fields.One2many(related="po_id.receipt_ids", string="Item Receipts")
+    receipt_count = fields.Integer(compute="_compute_receipt_count")
+
+    @api.depends("po_id.receipt_ids")
+    def _compute_receipt_count(self):
+        for rec in self:
+            rec.receipt_count = len(rec.receipt_ids)
+
+    def action_view_po(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Purchase Order"),
+            "res_model": "construction.budget.po",
+            "res_id": self.po_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def action_view_receipts(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Item Receipts"),
+            "res_model": "construction.budget.receipt",
+            "view_mode": "list,form",
+            "domain": [("po_id", "=", self.po_id.id)],
+            "context": {"default_po_id": self.po_id.id},
+        }
+
     state = fields.Selection(
         [("draft", "Draft"), ("posted", "Posted"), ("paid", "Paid"), ("cancelled", "Cancelled")],
         default="draft",

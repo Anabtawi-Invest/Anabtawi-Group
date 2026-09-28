@@ -26,6 +26,14 @@
                     <field name="state" widget="statusbar" statusbar_visible="draft,done"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_po" type="object" class="oe_stat_button" icon="fa-file-text-o" invisible="not po_id">
+                            <span class="o_stat_text">Purchase Order</span>
+                        </button>
+                        <button name="action_view_invoices" type="object" class="oe_stat_button" icon="fa-pencil-square-o" invisible="not po_id">
+                            <field name="invoice_count" widget="statinfo" string="Vendor Bills"/>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
@@ -50,6 +58,18 @@
                                     <field name="uom"/>
                                     <field name="quantity_ordered"/>
                                     <field name="quantity_received"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Vendor Bills &amp; Invoices">
+                            <field name="invoice_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="vendor_bill_ref"/>
+                                    <field name="date"/>
+                                    <field name="due_date"/>
+                                    <field name="amount" sum="Total Amount"/>
+                                    <field name="state" widget="badge"/>
                                 </list>
                             </field>
                         </page>

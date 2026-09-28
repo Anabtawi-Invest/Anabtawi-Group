@@ -95,6 +95,16 @@
                                 </list>
                             </field>
                         </page>
+                        <page string="Item Receipts (Inventory)" invisible="state != 'approved'">
+                            <field name="receipt_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="date"/>
+                                    <field name="reference"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
                         <page string="Invoices &amp; Payments" invisible="state != 'approved'">
                             <group>
                                 <group string="Billing Summary">

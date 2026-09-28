@@ -29,6 +29,14 @@
                     <field name="state" widget="statusbar" statusbar_visible="draft,posted,paid"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_po" type="object" class="oe_stat_button" icon="fa-file-text-o" invisible="not po_id">
+                            <span class="o_stat_text">Purchase Order</span>
+                        </button>
+                        <button name="action_view_receipts" type="object" class="oe_stat_button" icon="fa-truck" invisible="not po_id">
+                            <field name="receipt_count" widget="statinfo" string="Receipts"/>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
@@ -49,6 +57,16 @@
                         </group>
                     </group>
                     <notebook>
+                        <page string="Received Items (Inventory)">
+                            <field name="receipt_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="date"/>
+                                    <field name="reference"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
                         <page string="Notes / Terms">
                             <field name="notes" placeholder="Additional billing notes or payment instructions..."/>
                         </page>
