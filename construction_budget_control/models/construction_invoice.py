@@ -64,6 +64,29 @@ class ConstructionBudgetInvoice(models.Model):
         for rec in self:
             rec.receipt_count = len(rec.po_id.receipt_ids) if rec.po_id else 0
 
+    def action_view_po(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Purchase Order"),
+            "res_model": "construction.budget.po",
+            "res_id": self.po_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def action_view_receipts(self):
+        self.ensure_one()
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Item Receipts"),
+            "res_model": "construction.budget.receipt",
+            "view_mode": "list,form",
+            "domain": [("po_id", "=", self.po_id.id)] if self.po_id else [],
+            "context": {"default_po_id": self.po_id.id} if self.po_id else {},
+        }
+
+
     @api.depends("line_ids.subtotal")
     def _compute_amount(self):
         for rec in self:
