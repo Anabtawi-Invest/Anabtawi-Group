@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Logistics Request List View (Odoo 19 uses <list>) -->
+    <!-- Logistics Request List View -->
     <record id="view_logistics_request_tree" model="ir.ui.view">
         <field name="name">logistics.request.list</field>
         <field name="model">logistics.request</field>
@@ -108,7 +108,6 @@
                 <field name="name"/>
                 <field name="sale_order_id"/>
                 <field name="purchase_order_id"/>
-                <field name="selected_line_id"/>
                 <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="RFQs Sent" name="rfq" domain="[('state', '=', 'rfq')]"/>
                 <filter string="Quotes Received" name="quoted" domain="[('state', '=', 'quoted')]"/>

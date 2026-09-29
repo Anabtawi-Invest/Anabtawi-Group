@@ -245,6 +245,7 @@ class LogisticsRequest(models.Model):
 class LogisticsRequestLine(models.Model):
     _name = 'logistics.request.line'
     _description = 'Forwarder Quotation Line'
+    _rec_name = 'partner_id'
     _order = 'price_total asc, id asc'
 
     request_id = fields.Many2one(
@@ -294,3 +295,10 @@ class LogisticsRequestLine(models.Model):
     def _compute_price_total(self):
         for line in self:
             line.price_total = (line.price_subtotal or 0.0) + (line.handling_fee or 0.0)
+
+    def name_get(self):
+        result = []
+        for line in self:
+            name = f"{line.partner_id.name or 'Forwarder'} - {line.price_total} {line.currency_id.symbol or ''}"
+            result.append((line.id, name))
+        return result
