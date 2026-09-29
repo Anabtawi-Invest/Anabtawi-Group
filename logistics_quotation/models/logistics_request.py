@@ -85,11 +85,27 @@ class LogisticsRequest(models.Model):
         tracking=True,
     )
     package_details = fields.Text(
-        string='Package & Weight Details',
-        help='Weight, dimensions, CBM volume, special handling requirements',
+        string='Package & Weight Summary',
+        help='Calculated weight, dimensions, CBM volume, special handling requirements',
     )
     destination_address = fields.Text(
         string='Destination / Shipping Address',
+    )
+    item_ids = fields.One2many(
+        'logistics.request.item',
+        'request_id',
+        string='Packaging / Cargo Breakdown',
+        copy=True,
+    )
+    total_weight = fields.Float(
+        string='Total Weight (kg)',
+        compute='_compute_totals',
+        store=True,
+    )
+    total_volume = fields.Float(
+        string='Total Volume (m³ / CBM)',
+        compute='_compute_totals',
+        store=True,
     )
     line_ids = fields.One2many(
         'logistics.request.line',
@@ -123,6 +139,12 @@ class LogisticsRequest(models.Model):
         tracking=True,
     )
     notes = fields.Text(string='Internal Notes')
+
+    @api.depends('item_ids.weight', 'item_ids.volume', 'item_ids.quantity')
+    def _compute_totals(self):
+        for rec in self:
+            rec.total_weight = sum(rec.item_ids.mapped('weight'))
+            rec.total_volume = sum(rec.item_ids.mapped('volume'))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -240,6 +262,43 @@ class LogisticsRequest(models.Model):
             'view_mode': 'form',
             'target': 'current',
         }
+
+
+class LogisticsRequestItem(models.Model):
+    _name = 'logistics.request.item'
+    _description = 'Logistics Request Packaging Item (Without Price)'
+
+    request_id = fields.Many2one(
+        'logistics.request',
+        string='Logistics Request',
+        required=True,
+        ondelete='cascade',
+    )
+    product_id = fields.Many2one(
+        'product.product',
+        string='Product',
+    )
+    name = fields.Char(
+        string='Description / Packaging Specification',
+        required=True,
+    )
+    quantity = fields.Float(
+        string='Quantity',
+        default=1.0,
+        required=True,
+    )
+    product_uom_id = fields.Many2one(
+        'uom.uom',
+        string='Unit of Measure',
+    )
+    weight = fields.Float(
+        string='Gross Weight (kg)',
+        help='Gross weight for this cargo item line',
+    )
+    volume = fields.Float(
+        string='Volume (m³ / CBM)',
+        help='Volume for this cargo item line',
+    )
 
 
 class LogisticsRequestLine(models.Model):

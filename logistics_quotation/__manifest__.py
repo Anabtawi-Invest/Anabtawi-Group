@@ -17,7 +17,8 @@ Features:
 * Forwarder RFQs & bid comparison: Log freight costs, handling fees, and transit times per carrier.
 * Inbound Import Logistics: Automatically generates Purchase Orders to winning freight forwarders and enables Landed Cost allocation on stock pickings.
 * Outbound Customer Logistics: Automatically injects Freight & Handling charges into originating Sales Orders.
-* Native Smart Buttons on Sales Orders and Purchase Orders.
+* Native Header Action Buttons on Sales Orders and Purchase Orders.
+* Price-confidential Freight RFQ PDF generation for forwarder emailing.
 """,
     'author': 'Anabtawi Group',
     'website': 'https://www.anabtawisweets.com',
@@ -35,6 +36,7 @@ Features:
         'security/ir.model.access.csv',
         'data/ir_sequence_data.xml',
         'data/product_data.xml',
+        'report/logistics_request_report.xml',
         'views/logistics_request_views.xml',
     ],
     'assets': {},

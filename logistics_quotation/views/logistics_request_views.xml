@@ -13,6 +13,8 @@
                 <field name="shipping_mode"/>
                 <field name="shipment_type"/>
                 <field name="container_size"/>
+                <field name="total_weight" string="Weight (kg)"/>
+                <field name="total_volume" string="Volume (m³)"/>
                 <field name="selected_line_id"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="state" widget="badge" decoration-info="state == 'rfq'" decoration-warning="state == 'quoted'" decoration-success="state == 'confirmed'" decoration-muted="state == 'cancelled'"/>
@@ -62,14 +64,30 @@
                         </group>
                     </group>
                     <group>
-                        <group string="Package &amp; Weight Details">
-                            <field name="package_details" placeholder="Dimensions, gross weight, volume (CBM), special handling notes..."/>
+                        <group string="Calculated Cargo Totals">
+                            <field name="total_weight"/>
+                            <field name="total_volume"/>
                         </group>
                         <group string="Destination / Delivery">
                             <field name="destination_address" placeholder="Destination port or warehouse address..."/>
                         </group>
                     </group>
+                    <group string="Special Package &amp; Handling Notes">
+                        <field name="package_details" nolabel="1" placeholder="Dimensions, gross weight, volume (CBM), special handling notes..."/>
+                    </group>
                     <notebook>
+                        <page string="Cargo &amp; Item Breakdown (Price Confidential)" name="cargo_items">
+                            <field name="item_ids">
+                                <list editable="bottom">
+                                    <field name="product_id"/>
+                                    <field name="name"/>
+                                    <field name="quantity"/>
+                                    <field name="product_uom_id"/>
+                                    <field name="weight"/>
+                                    <field name="volume"/>
+                                </list>
+                            </field>
+                        </page>
                         <page string="Forwarder Bids / Quotations" name="forwarder_bids">
                             <field name="line_ids">
                                 <list editable="bottom">
@@ -145,30 +163,26 @@
     <menuitem id="menu_logistics_root" name="Logistics" sequence="35" web_icon="logistics_quotation,static/description/icon.png"/>
     <menuitem id="menu_logistics_requests" name="Logistics Requests" parent="menu_logistics_root" action="action_logistics_request" sequence="10"/>
 
-    <!-- Inherit Sales Order Form to add Smart Button -->
+    <!-- Inherit Sales Order Form to add Header Action Button -->
     <record id="view_order_form_inherit_logistics" model="ir.ui.view">
         <field name="name">sale.order.form.inherit.logistics</field>
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//div[@name='button_box']" position="inside">
-                <button name="action_open_logistics_requests" type="object" class="oe_stat_button" icon="fa-truck">
-                    <field name="logistics_count" widget="statinfo" string="Logistics"/>
-                </button>
+            <xpath expr="//header" position="inside">
+                <button name="action_request_shipping_cost" string="Request Shipping Cost" type="object" class="btn-primary" invisible="state in ('done', 'cancel')"/>
             </xpath>
         </field>
     </record>
 
-    <!-- Inherit Purchase Order Form to add Smart Button -->
+    <!-- Inherit Purchase Order Form to add Header Action Button -->
     <record id="view_purchase_order_form_inherit_logistics" model="ir.ui.view">
         <field name="name">purchase.order.form.inherit.logistics</field>
         <field name="model">purchase.order</field>
         <field name="inherit_id" ref="purchase.purchase_order_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//div[@name='button_box']" position="inside">
-                <button name="action_open_logistics_requests" type="object" class="oe_stat_button" icon="fa-truck">
-                    <field name="logistics_count" widget="statinfo" string="Logistics"/>
-                </button>
+            <xpath expr="//header" position="inside">
+                <button name="action_request_shipping_cost" string="Request Shipping Cost" type="object" class="btn-primary" invisible="state in ('done', 'cancel')"/>
             </xpath>
         </field>
     </record>
