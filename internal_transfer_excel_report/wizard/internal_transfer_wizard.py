@@ -36,15 +36,6 @@ class InternalTransferReportWizard(models.TransientModel):
         required=True,
         domain="[('code', '=', 'internal')]",
     )
-    include_purchase_receipts = fields.Boolean(string='Include Purchase Receipts')
-    receipt_location_id = fields.Many2one(
-        'stock.location',
-        string='From Location',
-    )
-    receipt_location_dest_id = fields.Many2one(
-        'stock.location',
-        string='To Location',
-    )
 
     @api.model
     def default_get(self, fields_list):
@@ -57,10 +48,6 @@ class InternalTransferReportWizard(models.TransientModel):
             ], limit=1)
             if picking_type:
                 res['picking_type_id'] = picking_type.id
-        if 'receipt_location_id' in fields_list and not res.get('receipt_location_id'):
-            supplier_location = self.env.ref('stock.stock_location_suppliers', raise_if_not_found=False)
-            if supplier_location:
-                res['receipt_location_id'] = supplier_location.id
         return res
 
     @api.onchange('all_factory_plan_categories')
@@ -191,62 +178,69 @@ class InternalTransferReportWizard(models.TransientModel):
         move_domain = self._append_factory_plan_category_domain(move_domain)
         return self.env['stock.move'].search(move_domain, order='picking_id, product_id')
 
-    def _get_purchase_receipt_moves(self):
+    def _get_receipt_settings(self):
+        """Return (company, vendor, location) from settings, or None if any is missing."""
+        params = self.env['ir.config_parameter'].sudo()
+        company = self.env['res.company'].sudo().browse(
+            int(params.get_param('internal_transfer_excel_report.receipt_company_id') or 0)
+        ).exists()
+        vendor = self.env['res.partner'].sudo().browse(
+            int(params.get_param('internal_transfer_excel_report.receipt_vendor_id') or 0)
+        ).exists()
+        location = self.env['stock.location'].sudo().browse(
+            int(params.get_param('internal_transfer_excel_report.receipt_location_id') or 0)
+        ).exists()
+        if not (company and vendor and location):
+            return None
+        return company, vendor, location
+
+    def _get_receipt_moves(self):
         self.ensure_one()
-        if not self.include_purchase_receipts:
+        receipt_settings = self._get_receipt_settings()
+        if not receipt_settings:
             return self.env['stock.move']
-        if not self.receipt_location_id or not self.receipt_location_dest_id:
-            raise UserError(_("Please set both From Location and To Location for purchase receipts."))
+        company, vendor, location = receipt_settings
 
         date_from_dt, date_to_dt = self._compute_dates()
         move_domain = [
             ('picking_id.picking_type_id.code', '=', 'incoming'),
-            ('purchase_line_id', '!=', False),
+            ('picking_id.company_id', '=', company.id),
+            ('picking_id.partner_id', 'child_of', vendor.id),
             ('picking_id.create_date', '>=', date_from_dt),
             ('picking_id.create_date', '<=', date_to_dt),
             ('picking_id.state', 'not in', ('done', 'cancel')),
             ('state', 'not in', ('done', 'cancel')),
-            ('location_id', 'child_of', self.receipt_location_id.id),
-            ('location_dest_id', 'child_of', self.receipt_location_dest_id.id),
+            ('location_dest_id', 'child_of', location.id),
         ]
         move_domain = self._append_factory_plan_category_domain(move_domain)
-        return self.env['stock.move'].search(move_domain, order='picking_id, product_id')
-
-    def _get_report_moves(self):
-        """Return (moves, receipt_moves): all report moves and the purchase receipt subset."""
-        self.ensure_one()
-        receipt_moves = self._get_purchase_receipt_moves()
-        return self._get_internal_transfer_moves() | receipt_moves, receipt_moves
+        # The configured company may be outside the user's allowed companies.
+        return self.env['stock.move'].sudo().search(move_domain, order='picking_id, product_id')
 
     def _get_sheet1_data(self):
         self.ensure_one()
-        moves, receipt_moves = self._get_report_moves()
         rows = []
-        for move in moves:
-            picking = move.picking_id
-            is_receipt = move in receipt_moves
-            if is_receipt:
-                transfer_type = self.env._('Purchase Receipt')
-                source_document = move.purchase_line_id.order_id.name or picking.origin or ''
-            else:
-                transfer_type = self.env._('Internal Transfer')
-                source_document = picking.origin or ''
-            rows.append({
-                'transfer_reference': picking.name or '',
-                'transfer_type': transfer_type,
-                'source_document': source_document,
-                'product_name': move.product_id.display_name,
-                'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
-                'created_by': self._get_picking_created_by_display(picking),
-                'creating_date': picking.create_date,
-                'demand': move.product_uom_qty,
-                'product_uom': self._get_move_uom_name(move),
-            })
+        for moves, transfer_type in (
+            (self._get_internal_transfer_moves(), self.env._('Internal Transfer')),
+            (self._get_receipt_moves(), self.env._('Purchase Receipt')),
+        ):
+            for move in moves:
+                picking = move.picking_id
+                rows.append({
+                    'transfer_reference': picking.name or '',
+                    'transfer_type': transfer_type,
+                    'source_document': picking.origin or '',
+                    'product_name': move.product_id.display_name,
+                    'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
+                    'created_by': self._get_picking_created_by_display(picking),
+                    'creating_date': picking.create_date,
+                    'demand': move.product_uom_qty,
+                    'product_uom': self._get_move_uom_name(move),
+                })
         return rows
 
     def _get_sheet2_data(self):
         self.ensure_one()
-        moves, _receipt_moves = self._get_report_moves()
+        moves = list(self._get_internal_transfer_moves()) + list(self._get_receipt_moves())
         if not moves:
             return []
 

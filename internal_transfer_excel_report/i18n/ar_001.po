@@ -186,24 +186,34 @@ msgid "Internal Transfer Report"
 msgstr "تقرير التحويل الداخلي"
 
 #. module: internal_transfer_excel_report
-#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__include_purchase_receipts
-msgid "Include Purchase Receipts"
-msgstr "تضمين استلامات المشتريات"
+#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_res_config_settings__itr_receipt_company_id
+msgid "Source Company"
+msgstr "الشركة المصدر"
 
 #. module: internal_transfer_excel_report
-#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__receipt_location_id
-msgid "From Location"
-msgstr "من الموقع"
+#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_res_config_settings__itr_receipt_vendor_id
+msgid "Vendor Company"
+msgstr "شركة المورد"
 
 #. module: internal_transfer_excel_report
-#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_internal_transfer_report_wizard__receipt_location_dest_id
-msgid "To Location"
-msgstr "إلى الموقع"
+#: model:ir.model.fields,field_description:internal_transfer_excel_report.field_res_config_settings__itr_receipt_location_id
+msgid "Source Location"
+msgstr "الموقع المصدر"
 
 #. module: internal_transfer_excel_report
-#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
-msgid "Please set both From Location and To Location for purchase receipts."
-msgstr "يرجى تحديد الموقع المصدر والموقع الوجهة لاستلامات المشتريات."
+#: model_terms:ir.ui.view,arch_db:internal_transfer_excel_report.res_config_settings_view_form_internal_transfer_report
+msgid "Internal Transfer Report"
+msgstr "تقرير التحويل الداخلي"
+
+#. module: internal_transfer_excel_report
+#: model_terms:ir.ui.view,arch_db:internal_transfer_excel_report.res_config_settings_view_form_internal_transfer_report
+msgid "Purchase Receipts"
+msgstr "استلامات المشتريات"
+
+#. module: internal_transfer_excel_report
+#: model_terms:ir.ui.view,arch_db:internal_transfer_excel_report.res_config_settings_view_form_internal_transfer_report
+msgid "Include receipts matching these values in the Internal Transfer Report."
+msgstr "تضمين الاستلامات المطابقة لهذه القيم في تقرير التحويل الداخلي."
 
 #. module: internal_transfer_excel_report
 #: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
