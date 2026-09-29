@@ -95,9 +95,9 @@
                                 <field name="attendance_days"/>
                                 <field name="labor_cost" widget="monetary" options="{'currency_field': 'currency_id'}" class="text-danger fw-bold"/>
                                 <field name="approved_ot_hours" class="text-success"/>
-                                <field name="approved_ot_cost" widget="monetary" options="{'currency_field': 'currency_id'}" class="text-success fw-bold"/>
                                 <field name="unapproved_ot_hours" class="text-warning"/>
                                 <field name="total_ot_hours" class="fw-bold"/>
+                                <field name="approved_ot_cost" widget="monetary" options="{'currency_field': 'currency_id'}" class="text-success fw-bold"/>
                                 <field name="labor_pct" string="Labor %"/>
                                 <field name="pos_config_names" optional="hide"/>
                                 <field name="currency_id" column_invisible="1"/>

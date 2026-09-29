@@ -323,37 +323,66 @@ class RetailLaborCostWizard(models.TransientModel):
             emp_unapp_ot = 0.0
 
             if emp_atts:
-                has_daily = hasattr(emp_atts[0], 'daily_overtime_hours')
-                has_ot = hasattr(emp_atts[0], 'overtime_hours')
+                for att in emp_atts:
+                    att_app = 0.0
+                    att_unapp = 0.0
 
-                daily_extra = sum((getattr(att, 'daily_overtime_hours', 0.0) or 0.0) for att in emp_atts) if has_daily else 0.0
-                ot_hours = sum((getattr(att, 'overtime_hours', 0.0) or 0.0) for att in emp_atts) if has_ot else 0.0
+                    # 1. Linked overtime records (Odoo 19 / planning / custom)
+                    if hasattr(att, 'linked_overtime_ids') and att.linked_overtime_ids:
+                        for ot in att.linked_overtime_ids:
+                            dur = (ot.manual_duration if (hasattr(ot, 'manual_duration') and ot.manual_duration) else ot.duration) or 0.0
+                            if getattr(ot, 'status', False) == 'approved':
+                                att_app += dur
+                            else:
+                                att_unapp += dur
+                    # 2. Validated Overtime Hours & Overtime Status (Odoo 17/18/19 Enterprise hr_attendance)
+                    elif hasattr(att, 'validated_overtime_hours'):
+                        val_ot = getattr(att, 'validated_overtime_hours', 0.0) or 0.0
+                        raw_ot = getattr(att, 'overtime_hours', 0.0) or 0.0
+                        stat = getattr(att, 'overtime_status', False)
 
-                if daily_extra > 0 and ot_hours > 0:
-                    if daily_extra >= ot_hours:
-                        emp_app_ot = ot_hours
-                        emp_unapp_ot = daily_extra - ot_hours
+                        if stat == 'approved':
+                            att_app += (val_ot if val_ot > 0 else raw_ot)
+                        elif stat in ('to_approve', 'refused'):
+                            att_unapp += raw_ot
+                        else:
+                            if val_ot > 0:
+                                att_app += val_ot
+                                if raw_ot > val_ot:
+                                    att_unapp += (raw_ot - val_ot)
+                            else:
+                                att_unapp += raw_ot
+                    # 3. Overtime Status field alone
+                    elif hasattr(att, 'overtime_status'):
+                        raw_ot = getattr(att, 'overtime_hours', 0.0) or getattr(att, 'daily_overtime_hours', 0.0) or 0.0
+                        if att.overtime_status == 'approved':
+                            att_app += raw_ot
+                        else:
+                            att_unapp += raw_ot
+                    # 4. Fallback when no approval fields exist
                     else:
-                        emp_app_ot = daily_extra
-                        emp_unapp_ot = ot_hours - daily_extra
-                elif daily_extra > 0:
-                    emp_app_ot = daily_extra
-                    emp_unapp_ot = 0.0
-                elif ot_hours > 0:
-                    emp_app_ot = ot_hours
-                    emp_unapp_ot = 0.0
+                        daily_extra = getattr(att, 'daily_overtime_hours', 0.0) or 0.0
+                        raw_ot = getattr(att, 'overtime_hours', 0.0) or 0.0
+                        att_unapp += (daily_extra or raw_ot)
 
-            # Fallback to hr.attendance.overtime.line if needed
+                    emp_app_ot += att_app
+                    emp_unapp_ot += att_unapp
+
+            # Fallback to hr.attendance.overtime.line if attendance records had no overtime but overtime lines exist
             if emp_app_ot == 0.0 and emp_unapp_ot == 0.0 and 'hr.attendance.overtime.line' in self.env:
                 ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
                     ('employee_id', '=', emp.id),
                     ('date', '>=', date_from),
                     ('date', '<=', date_to),
                 ])
-                emp_app_ot = sum((l.manual_duration or l.duration or 0.0) for l in ot_lines if l.status == 'approved')
-                emp_unapp_ot = sum((l.manual_duration or l.duration or 0.0) for l in ot_lines if l.status != 'approved')
+                if ot_lines:
+                    app_lines = ot_lines.filtered(lambda l: l.status == 'approved')
+                    unapp_lines = ot_lines.filtered(lambda l: l.status != 'approved')
+                    emp_app_ot = sum((l.manual_duration or l.duration or 0.0) for l in app_lines)
+                    emp_unapp_ot = sum((l.manual_duration or l.duration or 0.0) for l in unapp_lines)
 
-            emp_ot_cost = round(emp_app_ot * hourly_wage, 3)
+            # Financial Cost for APPROVED overtime hours ONLY, multiplied by 1.25 (125% overtime multiplier)
+            emp_ot_cost = round(emp_app_ot * hourly_wage * 1.25, 3)
 
             total_app_ot_hours += emp_app_ot
             total_app_ot_cost += emp_ot_cost
