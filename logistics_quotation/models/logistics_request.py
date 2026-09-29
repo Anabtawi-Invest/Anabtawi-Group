@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import _, api, fields, models
+from odoo import _, api, fields, models, Command
 from odoo.exceptions import UserError, ValidationError
 
 
@@ -86,7 +86,7 @@ class LogisticsRequest(models.Model):
     )
     package_details = fields.Text(
         string='Package & Weight Details',
-        help='Weight, dimensions, special handling requirements',
+        help='Weight, dimensions, CBM volume, special handling requirements',
     )
     destination_address = fields.Text(
         string='Destination / Shipping Address',
@@ -154,7 +154,7 @@ class LogisticsRequest(models.Model):
             if not rec.selected_line_id:
                 raise UserError(_("Please select a winning forwarder quote before confirming."))
 
-            # 1. Fetch or create default freight service product
+            # Fetch or create default freight service product
             freight_product = self.env.ref(
                 'logistics_quotation.product_freight_service',
                 raise_if_not_found=False,
@@ -173,7 +173,7 @@ class LogisticsRequest(models.Model):
             forwarder_partner = selected_line.partner_id
             total_price = selected_line.price_total
 
-            # 2. Create Purchase Order to Freight Forwarder
+            # 1. Create Purchase Order to Freight Forwarder
             po_description = (
                 f"Freight Service ({rec.shipping_mode.upper()} - "
                 f"{rec.shipment_type.upper()}) - {rec.name}"
@@ -182,23 +182,19 @@ class LogisticsRequest(models.Model):
                 'partner_id': forwarder_partner.id,
                 'company_id': rec.company_id.id,
                 'order_line': [
-                    (
-                        0,
-                        0,
-                        {
-                            'name': po_description,
-                            'product_id': freight_product.id,
-                            'product_qty': 1.0,
-                            'price_unit': total_price,
-                            'date_planned': fields.Datetime.now(),
-                        },
-                    )
+                    Command.create({
+                        'name': po_description,
+                        'product_id': freight_product.id,
+                        'product_qty': 1.0,
+                        'price_unit': total_price,
+                        'date_planned': fields.Datetime.now(),
+                    })
                 ],
             }
             logistics_po = self.env['purchase.order'].create(po_vals)
             rec.generated_po_id = logistics_po.id
 
-            # 3. If source is Sales Order, inject freight line into Sales Order
+            # 2. If source is Sales Order, inject shipping line into Sales Order
             if rec.source_type == 'sale' and rec.sale_order_id:
                 so_description = (
                     f"Shipping & Handling ({rec.shipping_mode.upper()} - "
@@ -206,16 +202,12 @@ class LogisticsRequest(models.Model):
                 )
                 rec.sale_order_id.write({
                     'order_line': [
-                        (
-                            0,
-                            0,
-                            {
-                                'product_id': freight_product.id,
-                                'name': so_description,
-                                'product_uom_qty': 1.0,
-                                'price_unit': total_price,
-                            },
-                        )
+                        Command.create({
+                            'product_id': freight_product.id,
+                            'name': so_description,
+                            'product_uom_qty': 1.0,
+                            'price_unit': total_price,
+                        })
                     ]
                 })
 
