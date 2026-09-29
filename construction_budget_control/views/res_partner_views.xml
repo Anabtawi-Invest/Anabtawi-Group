@@ -1,4 +1,102 @@
 <odoo>
+    <!-- Standalone Dedicated Form View for Construction Vendors / Subcontractors -->
+    <record id="view_construction_partner_form" model="ir.ui.view">
+        <field name="name">res.partner.form.construction</field>
+        <field name="model">res.partner</field>
+        <field name="arch" type="xml">
+            <form string="Construction Vendor / Subcontractor">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_construction_pos" type="object" class="oe_stat_button" icon="fa-file-text-o">
+                            <field name="po_count" widget="statinfo" string="POs"/>
+                        </button>
+                        <button name="action_view_construction_receipts" type="object" class="oe_stat_button" icon="fa-truck">
+                            <field name="receipt_count" widget="statinfo" string="Receipts"/>
+                        </button>
+                        <button name="action_view_construction_invoices" type="object" class="oe_stat_button" icon="fa-pencil-square-o">
+                            <field name="construction_invoice_count" widget="statinfo" string="Bills"/>
+                        </button>
+                    </div>
+                    <field name="image_1920" widget="image" class="oe_avatar" options="{'preview_image': 'avatar_128'}"/>
+                    <div class="oe_title">
+                        <field name="is_company" invisible="1"/>
+                        <field name="is_construction_vendor" invisible="1"/>
+                        <label for="name"/>
+                        <h1>
+                            <field name="name" default_focus="1" placeholder="Vendor / Subcontractor Name" required="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <span class="o_form_label o_td_label" name="address_name">
+                                <b>Address</b>
+                            </span>
+                            <div class="o_address_format">
+                                <field name="street" placeholder="Street..." class="o_address_street"/>
+                                <field name="street2" placeholder="Street 2..." class="o_address_street"/>
+                                <field name="city" placeholder="City" class="o_address_city"/>
+                                <field name="state_id" class="o_address_state" placeholder="State" options="{'no_open': True, 'no_quick_create': True}"/>
+                                <field name="zip" placeholder="ZIP" class="o_address_zip"/>
+                                <field name="country_id" placeholder="Country" class="o_address_country" options="{'no_open': True, 'no_create': True}"/>
+                            </div>
+                        </group>
+                        <group>
+                            <field name="phone" widget="phone"/>
+                            <field name="mobile" widget="phone"/>
+                            <field name="email" widget="email"/>
+                            <field name="website" widget="url" placeholder="e.g. https://www.example.com"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Construction POs" name="construction_pos">
+                            <field name="po_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="project_id"/>
+                                    <field name="po_number"/>
+                                    <field name="po_date"/>
+                                    <field name="amount" sum="Total"/>
+                                    <field name="delivery_status" widget="badge"/>
+                                    <field name="invoice_status" widget="badge"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Construction Receipts" name="construction_receipts">
+                            <field name="receipt_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="po_id"/>
+                                    <field name="project_id"/>
+                                    <field name="date"/>
+                                    <field name="reference"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Construction Vendor Bills" name="construction_invoices">
+                            <field name="construction_invoice_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="vendor_bill_ref"/>
+                                    <field name="po_id"/>
+                                    <field name="project_id"/>
+                                    <field name="date"/>
+                                    <field name="due_date"/>
+                                    <field name="amount" sum="Total Amount"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Inherit Standard View as Backup for Global Search / Navigation -->
     <record id="view_partner_form_inherit_construction" model="ir.ui.view">
         <field name="name">res.partner.form.inherit.construction</field>
         <field name="model">res.partner</field>
@@ -16,7 +114,7 @@
                 </button>
             </xpath>
             <xpath expr="//field[@name='category_id']" position="after">
-                <field name="is_construction_vendor"/>
+                <field name="is_construction_vendor" invisible="1"/>
             </xpath>
 
             <!-- 1. Add Construction Notebook Pages first -->
@@ -70,12 +168,17 @@
         </field>
     </record>
 
+    <!-- Action Bound Exclusively to Dedicated Standalone View -->
     <record id="action_construction_vendor" model="ir.actions.act_window">
         <field name="name">Vendors / Subcontractors</field>
         <field name="res_model">res.partner</field>
         <field name="view_mode">kanban,list,form</field>
         <field name="domain">[('is_construction_vendor', '=', True)]</field>
         <field name="context">{'default_is_construction_vendor': True, 'default_supplier_rank': 1}</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('base.res_partner_kanban_view')}),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('base.view_partner_tree')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_construction_partner_form')})]"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">Create your first Construction Vendor</p>
             <p>Add vendors and subcontractors specifically for construction budget control.</p>
