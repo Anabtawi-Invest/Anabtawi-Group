@@ -210,7 +210,7 @@ class InternalTransferReportWizard(models.TransientModel):
             ('picking_id.create_date', '<=', date_to_dt),
             ('picking_id.state', 'not in', ('done', 'cancel')),
             ('state', 'not in', ('done', 'cancel')),
-            ('location_dest_id', 'child_of', location.id),
+            ('location_id', 'child_of', location.id),
         ]
         move_domain = self._append_factory_plan_category_domain(move_domain)
         # The configured company may be outside the user's allowed companies.
