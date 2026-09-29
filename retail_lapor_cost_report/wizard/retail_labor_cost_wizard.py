@@ -23,18 +23,18 @@ class RetailLaborCostWizardLine(models.TransientModel):
     # 1. Sales & Profits from POS (Direct Calendar Period Orders: 00:00:00 to 23:59:59)
     sales_profit = fields.Monetary(string='Sales Profit / Revenue', currency_field='currency_id')
     
-    # 2. Labor Cost (Actual hr.attendance Presence Days)
+    # 2. Labor Cost (Actual hr.attendance Presence Days + Approved Overtime Cost)
     employee_count = fields.Integer(string='Employees Count')
     attendance_days = fields.Float(string='Total Attendance Days', digits=(16, 2))
     labor_cost = fields.Monetary(string='Total Labor Cost', currency_field='currency_id')
     
-    # 3. Overtime Hours (Attendance Screen: Daily Extra Hours vs Extra Hours)
+    # 3. Overtime Hours & Financial Cost
     approved_ot_hours = fields.Float(string='Approved Overtime (hrs)', digits=(16, 2))
+    approved_ot_cost = fields.Monetary(string='Approved Overtime Cost', currency_field='currency_id')
     unapproved_ot_hours = fields.Float(string='Unapproved Overtime (hrs)', digits=(16, 2))
     total_ot_hours = fields.Float(string='Total Overtime (hrs)', digits=(16, 2))
     
     # Metrics
-    net_margin = fields.Monetary(string='Net Contribution Margin', currency_field='currency_id')
     labor_pct = fields.Float(string='Labor Cost %', digits=(16, 2))
     pos_config_names = fields.Char(string='Linked POS Configurations')
     currency_id = fields.Many2one('res.currency', string='Currency')
@@ -146,14 +146,21 @@ class RetailLaborCostWizard(models.TransientModel):
     total_sales = fields.Monetary(string='Total Sales Revenue', compute='_compute_totals', currency_field='currency_id')
     total_labor_cost = fields.Monetary(string='Total Labor Cost', compute='_compute_totals', currency_field='currency_id')
     total_approved_ot = fields.Float(string='Total Approved OT (hrs)', compute='_compute_totals', digits=(16, 2))
+    total_approved_ot_cost = fields.Monetary(string='Total Approved OT Cost', compute='_compute_totals', currency_field='currency_id')
     total_unapproved_ot = fields.Float(string='Total Unapproved OT (hrs)', compute='_compute_totals', digits=(16, 2))
     total_ot = fields.Float(string='Total OT (hrs)', compute='_compute_totals', digits=(16, 2))
-    overall_net_margin = fields.Monetary(string='Overall Net Margin', compute='_compute_totals', currency_field='currency_id')
     overall_labor_pct = fields.Float(string='Overall Labor %', compute='_compute_totals', digits=(16, 2))
     currency_id = fields.Many2one('res.currency', string='Currency', related='company_id.currency_id')
 
     file_data = fields.Binary(readonly=True, attachment=False)
     filename = fields.Char(readonly=True)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        for rec in records:
+            rec._populate_preview_lines()
+        return records
 
     @api.onchange('company_id')
     def _onchange_company(self):
@@ -182,22 +189,16 @@ class RetailLaborCostWizard(models.TransientModel):
         else:
             self.branch_department_ids = False
 
-    @api.onchange('date_from', 'date_to', 'branch_department_ids')
-    def _onchange_filters(self):
-        """Safely refresh preview lines when dates or branches change without crashing on incomplete dates."""
-        if self.date_from and self.date_to and self.date_from <= self.date_to:
-            self._populate_preview_lines()
-
-    @api.depends('line_ids', 'line_ids.sales_profit', 'line_ids.labor_cost', 'line_ids.approved_ot_hours', 'line_ids.unapproved_ot_hours')
+    @api.depends('line_ids', 'line_ids.sales_profit', 'line_ids.labor_cost', 'line_ids.approved_ot_hours', 'line_ids.approved_ot_cost', 'line_ids.unapproved_ot_hours')
     def _compute_totals(self):
         for wiz in self:
             wiz.total_branches = len(wiz.line_ids)
             wiz.total_sales = sum(wiz.line_ids.mapped('sales_profit'))
             wiz.total_labor_cost = sum(wiz.line_ids.mapped('labor_cost'))
             wiz.total_approved_ot = sum(wiz.line_ids.mapped('approved_ot_hours'))
+            wiz.total_approved_ot_cost = sum(wiz.line_ids.mapped('approved_ot_cost'))
             wiz.total_unapproved_ot = sum(wiz.line_ids.mapped('unapproved_ot_hours'))
             wiz.total_ot = wiz.total_approved_ot + wiz.total_unapproved_ot
-            wiz.overall_net_margin = wiz.total_sales - wiz.total_labor_cost
             wiz.overall_labor_pct = round((wiz.total_labor_cost / wiz.total_sales * 100.0), 2) if wiz.total_sales > 0 else 0.0
 
     # -------------------------------------------------------------------------
@@ -275,99 +276,96 @@ class RetailLaborCostWizard(models.TransientModel):
             return round(float(monthly_wage) / 240.0, 3)
         return 0.0
 
-    def _get_branch_labor_cost(self, employees, date_from, date_to):
+    def _get_branch_labor_and_overtime(self, employees, date_from, date_to):
         """
-        Calculate total Attendance Days and Labor Cost for branch employees:
-        Reads directly from physical hr.attendance check-ins during the exact calendar period.
-        - Total Attendance Days = count of distinct days each employee actually attended.
-        - Daily Rate = hourly_wage * hours_per_day.
-        - Labor Cost = sum of (emp_att_days * daily_rate).
+        Calculate Attendance Days, Base Labor Cost, Approved OT Hours, Approved OT Cost,
+        and Unapproved OT Hours for branch employees.
+        - Overtime cost per employee = employee's approved OT hours * employee's hourly wage.
+        - Total labor cost = base attendance cost + total approved OT cost.
         """
         if not employees:
-            return 0.0, 0.0
+            return 0.0, 0.0, 0.0, 0.0, 0.0
 
         dt_start = datetime.combine(date_from, time.min)
         dt_end = datetime.combine(date_to, time.max)
 
-        total_cost = 0.0
+        total_base_cost = 0.0
         total_att_days = 0.0
+        total_app_ot_hours = 0.0
+        total_app_ot_cost = 0.0
+        total_unapp_ot_hours = 0.0
 
         for emp in employees:
-            emp_atts = self.env['hr.attendance'].sudo().search([
-                ('employee_id', '=', emp.id),
-                ('check_in', '>=', dt_start),
-                ('check_in', '<=', dt_end),
-            ])
-            if emp_atts:
-                att_days = float(len(set(att.check_in.date() for att in emp_atts if att.check_in)))
-            else:
-                att_days = 0.0
-
             hourly_wage = self._get_employee_hourly_wage(emp)
             hours_per_day = 8.0
             if emp.resource_calendar_id and emp.resource_calendar_id.hours_per_day:
                 hours_per_day = emp.resource_calendar_id.hours_per_day
             daily_rate = round(hourly_wage * hours_per_day, 3)
 
+            emp_atts = self.env['hr.attendance'].sudo().search([
+                ('employee_id', '=', emp.id),
+                ('check_in', '>=', dt_start),
+                ('check_in', '<=', dt_end),
+            ])
+
+            # Attendance Days
+            if emp_atts:
+                att_days = float(len(set(att.check_in.date() for att in emp_atts if att.check_in)))
+            else:
+                att_days = 0.0
+
             emp_cost = round(att_days * daily_rate, 3)
-            total_cost += emp_cost
+            total_base_cost += emp_cost
             total_att_days += att_days
 
-        return round(total_cost, 3), round(total_att_days, 2)
+            # Overtime Hours per employee
+            emp_app_ot = 0.0
+            emp_unapp_ot = 0.0
 
-    def _get_branch_overtime_hours(self, employees, date_from, date_to):
-        """
-        Calculate total Overtime Hours for all employees in a branch:
-        Reads directly from hr.attendance extra hours (Daily Extra Hours vs Extra Hours).
-        """
-        if not employees:
-            return 0.0, 0.0
+            if emp_atts:
+                has_daily = hasattr(emp_atts[0], 'daily_overtime_hours')
+                has_ot = hasattr(emp_atts[0], 'overtime_hours')
 
-        dt_start = datetime.combine(date_from, time.min)
-        dt_end = datetime.combine(date_to, time.max)
+                daily_extra = sum((getattr(att, 'daily_overtime_hours', 0.0) or 0.0) for att in emp_atts) if has_daily else 0.0
+                ot_hours = sum((getattr(att, 'overtime_hours', 0.0) or 0.0) for att in emp_atts) if has_ot else 0.0
 
-        attendances = self.env['hr.attendance'].sudo().search([
-            ('employee_id', 'in', employees.ids),
-            ('check_in', '>=', dt_start),
-            ('check_in', '<=', dt_end),
-        ])
+                if daily_extra > 0 and ot_hours > 0:
+                    if daily_extra >= ot_hours:
+                        emp_app_ot = ot_hours
+                        emp_unapp_ot = daily_extra - ot_hours
+                    else:
+                        emp_app_ot = daily_extra
+                        emp_unapp_ot = ot_hours - daily_extra
+                elif daily_extra > 0:
+                    emp_app_ot = daily_extra
+                    emp_unapp_ot = 0.0
+                elif ot_hours > 0:
+                    emp_app_ot = ot_hours
+                    emp_unapp_ot = 0.0
 
-        if attendances:
-            has_daily = hasattr(attendances[0], 'daily_overtime_hours')
-            has_ot = hasattr(attendances[0], 'overtime_hours')
+            # Fallback to hr.attendance.overtime.line if needed
+            if emp_app_ot == 0.0 and emp_unapp_ot == 0.0 and 'hr.attendance.overtime.line' in self.env:
+                ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('date', '>=', date_from),
+                    ('date', '<=', date_to),
+                ])
+                emp_app_ot = sum((l.manual_duration or l.duration or 0.0) for l in ot_lines if l.status == 'approved')
+                emp_unapp_ot = sum((l.manual_duration or l.duration or 0.0) for l in ot_lines if l.status != 'approved')
 
-            daily_extra = sum((getattr(att, 'daily_overtime_hours', 0.0) or 0.0) for att in attendances) if has_daily else 0.0
-            ot_hours = sum((getattr(att, 'overtime_hours', 0.0) or 0.0) for att in attendances) if has_ot else 0.0
+            emp_ot_cost = round(emp_app_ot * hourly_wage, 3)
 
-            if daily_extra > 0 and ot_hours > 0:
-                if daily_extra >= ot_hours:
-                    approved_ot = ot_hours
-                    unapproved_ot = daily_extra - ot_hours
-                else:
-                    approved_ot = daily_extra
-                    unapproved_ot = ot_hours - daily_extra
-                return round(approved_ot, 2), round(unapproved_ot, 2)
-            elif daily_extra > 0:
-                return round(daily_extra, 2), 0.0
-            elif ot_hours > 0:
-                return round(ot_hours, 2), 0.0
+            total_app_ot_hours += emp_app_ot
+            total_app_ot_cost += emp_ot_cost
+            total_unapp_ot_hours += emp_unapp_ot
 
-        # Fallback to hr.attendance.overtime.line
-        if 'hr.attendance.overtime.line' in self.env:
-            ot_lines = self.env['hr.attendance.overtime.line'].sudo().search([
-                ('employee_id', 'in', employees.ids),
-                ('date', '>=', date_from),
-                ('date', '<=', date_to),
-            ])
-            approved_hrs = sum(
-                (l.manual_duration or l.duration or 0.0) for l in ot_lines if l.status == 'approved'
-            )
-            unapproved_hrs = sum(
-                (l.manual_duration or l.duration or 0.0) for l in ot_lines if l.status != 'approved'
-            )
-            return round(approved_hrs, 2), round(unapproved_hrs, 2)
-
-        return 0.0, 0.0
+        return (
+            round(total_base_cost, 3),
+            round(total_att_days, 2),
+            round(total_app_ot_hours, 2),
+            round(total_app_ot_cost, 3),
+            round(total_unapp_ot_hours, 2)
+        )
 
     def _prepare_data_rows(self):
         self.ensure_one()
@@ -395,27 +393,27 @@ class RetailLaborCostWizard(models.TransientModel):
             cfg_names = ', '.join(configs.mapped('name')) if configs else _('Auto/Direct match')
             sales_profit = self._get_branch_sales_profit(configs, str_start, str_end)
 
-            # 2. Employees of this branch
-            branch_employees = self.env['hr.employee'].search([
+            # 2. Employees of this branch (sudo search with fallback to children)
+            branch_employees = self.env['hr.employee'].sudo().search([
                 ('department_id', '=', branch.id),
                 ('company_id', '=', self.company_id.id)
             ])
+            if not branch_employees:
+                branch_employees = self.env['hr.employee'].sudo().search([
+                    ('department_id', 'child_of', branch.id),
+                    ('company_id', '=', self.company_id.id)
+                ])
             emp_count = len(branch_employees)
 
-            # 3. Labor Cost & Attendance Days (Actual physical hr.attendance check-ins)
-            labor_cost, att_days = self._get_branch_labor_cost(
+            # 3. Labor Cost & Overtime Hours (Calculated per employee from hr.attendance)
+            base_labor_cost, att_days, app_ot_hours, app_ot_cost, unapp_ot_hours = self._get_branch_labor_and_overtime(
                 branch_employees, self.date_from, self.date_to
             )
 
-            # 4. Overtime Hours (Approved vs Unapproved)
-            app_ot, unapp_ot = self._get_branch_overtime_hours(
-                branch_employees, self.date_from, self.date_to
-            )
-            total_ot = round(app_ot + unapp_ot, 2)
-
-            # 5. Margins
-            net_margin = round(sales_profit - labor_cost, 3)
-            labor_pct = round((labor_cost / sales_profit * 100.0), 2) if sales_profit > 0 else 0.0
+            # Total labor cost includes base attendance cost + approved overtime cost!
+            total_labor_cost = round(base_labor_cost + app_ot_cost, 3)
+            total_ot = round(app_ot_hours + unapp_ot_hours, 2)
+            labor_pct = round((total_labor_cost / sales_profit * 100.0), 2) if sales_profit > 0 else 0.0
 
             notes = []
             if not configs:
@@ -433,11 +431,11 @@ class RetailLaborCostWizard(models.TransientModel):
                 'sales_profit': sales_profit,
                 'employee_count': emp_count,
                 'attendance_days': att_days,
-                'labor_cost': labor_cost,
-                'approved_ot_hours': app_ot,
-                'unapproved_ot_hours': unapp_ot,
+                'labor_cost': total_labor_cost,
+                'approved_ot_hours': app_ot_hours,
+                'approved_ot_cost': app_ot_cost,
+                'unapproved_ot_hours': unapp_ot_hours,
                 'total_ot_hours': total_ot,
-                'net_margin': net_margin,
                 'labor_pct': labor_pct,
                 'pos_config_names': cfg_names,
                 'notes': ' '.join(notes),
@@ -446,29 +444,33 @@ class RetailLaborCostWizard(models.TransientModel):
         return rows
 
     def _populate_preview_lines(self):
-        """Populate the in-wizard preview table safely using (5, 0, 0) without unlinking in-memory virtual records."""
-        rows = self._prepare_data_rows()
-        line_vals = []
-        for r in rows:
-            line_vals.append((0, 0, {
-                'department_id': r['department_id'],
-                'branch_code': r['branch_code'],
-                'branch_name': r['branch_name'],
-                'company_id': r['company_id'],
-                'sales_profit': r['sales_profit'],
-                'employee_count': r['employee_count'],
-                'attendance_days': r['attendance_days'],
-                'labor_cost': r['labor_cost'],
-                'approved_ot_hours': r['approved_ot_hours'],
-                'unapproved_ot_hours': r['unapproved_ot_hours'],
-                'total_ot_hours': r['total_ot_hours'],
-                'net_margin': r['net_margin'],
-                'labor_pct': r['labor_pct'],
-                'pos_config_names': r['pos_config_names'],
-                'currency_id': r['company_id'],
-                'notes': r['notes'],
-            }))
-        self.line_ids = [(5, 0, 0)] + line_vals
+        """Populate the in-wizard preview table lines and save them in the database for instant display."""
+        for wiz in self:
+            rows = wiz._prepare_data_rows()
+            wiz.line_ids.unlink()
+            lines_vals = []
+            for r in rows:
+                lines_vals.append({
+                    'wizard_id': wiz.id,
+                    'department_id': r['department_id'],
+                    'branch_code': r['branch_code'],
+                    'branch_name': r['branch_name'],
+                    'company_id': r['company_id'],
+                    'sales_profit': r['sales_profit'],
+                    'employee_count': r['employee_count'],
+                    'attendance_days': r['attendance_days'],
+                    'labor_cost': r['labor_cost'],
+                    'approved_ot_hours': r['approved_ot_hours'],
+                    'approved_ot_cost': r['approved_ot_cost'],
+                    'unapproved_ot_hours': r['unapproved_ot_hours'],
+                    'total_ot_hours': r['total_ot_hours'],
+                    'labor_pct': r['labor_pct'],
+                    'pos_config_names': r['pos_config_names'],
+                    'currency_id': wiz.company_id.currency_id.id if wiz.company_id.currency_id else False,
+                    'notes': r['notes'],
+                })
+            if lines_vals:
+                wiz.env['retail.labor.cost.wizard.line'].create(lines_vals)
 
     def action_calculate_preview(self):
         """Action button to refresh live calculations inside the wizard preserving user dates and branches."""

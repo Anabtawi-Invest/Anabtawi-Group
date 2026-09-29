@@ -12,7 +12,7 @@
                         تقرير تحليلي لأفرع قسم الريتيل يجمع:
                         <strong>أرباح المبيعات (من نقاط البيع POS)</strong> +
                         <strong>تكلفة موظفي الفرع (بناءً على أيام دوامهم الفعلي وأجر الساعة)</strong> +
-                        <strong>ساعات الأوفر تايم (المعتمدة وغير المعتمدة)</strong>.
+                        <strong>ساعات وتكلفة الأوفر تايم المعتمد</strong>.
                     </div>
                 </div>
 
@@ -24,7 +24,7 @@
                             <div class="fs-5 fw-bold text-dark"><field name="total_branches" readonly="1"/></div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <div class="p-2 border rounded" style="background-color: #EFF6FF;">
                             <div class="text-muted small">إجمالي مبيعات الأفرع</div>
                             <div class="fs-5 fw-bold text-primary">
@@ -32,7 +32,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <div class="p-2 border rounded" style="background-color: #FEF2F2;">
                             <div class="text-muted small">إجمالي تكلفة الموظفين</div>
                             <div class="fs-5 fw-bold" style="color: #B91C1C;">
@@ -45,6 +45,14 @@
                             <div class="text-muted small">أوفر تايم معتمد</div>
                             <div class="fs-5 fw-bold" style="color: #047857;">
                                 <field name="total_approved_ot" readonly="1"/> <small>ساعة</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="p-2 border rounded" style="background-color: #F0FDF4;">
+                            <div class="text-muted small">تكلفة الأوفر تايم المعتمد</div>
+                            <div class="fs-5 fw-bold" style="color: #15803D;">
+                                <field name="total_approved_ot_cost" widget="monetary" options="{'currency_field': 'currency_id'}" readonly="1"/>
                             </div>
                         </div>
                     </div>
@@ -87,9 +95,9 @@
                                 <field name="attendance_days"/>
                                 <field name="labor_cost" widget="monetary" options="{'currency_field': 'currency_id'}" class="text-danger fw-bold"/>
                                 <field name="approved_ot_hours" class="text-success"/>
+                                <field name="approved_ot_cost" widget="monetary" options="{'currency_field': 'currency_id'}" class="text-success fw-bold"/>
                                 <field name="unapproved_ot_hours" class="text-warning"/>
                                 <field name="total_ot_hours" class="fw-bold"/>
-                                <field name="net_margin" widget="monetary" options="{'currency_field': 'currency_id'}"/>
                                 <field name="labor_pct" string="Labor %"/>
                                 <field name="pos_config_names" optional="hide"/>
                                 <field name="currency_id" column_invisible="1"/>
