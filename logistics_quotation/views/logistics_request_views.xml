@@ -5,7 +5,7 @@
         <field name="name">logistics.request.list</field>
         <field name="model">logistics.request</field>
         <field name="arch" type="xml">
-            <list string="Logistics Requests">
+            <tree string="Logistics Requests">
                 <field name="name"/>
                 <field name="source_type"/>
                 <field name="sale_order_id" optional="show"/>
@@ -16,7 +16,7 @@
                 <field name="selected_line_id"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="state" widget="badge" decoration-info="state == 'rfq'" decoration-warning="state == 'quoted'" decoration-success="state == 'confirmed'" decoration-muted="state == 'cancelled'"/>
-            </list>
+            </tree>
         </field>
     </record>
 
@@ -72,7 +72,7 @@
                     <notebook>
                         <page string="Forwarder Bids / Quotations" name="forwarder_bids">
                             <field name="line_ids">
-                                <list editable="bottom">
+                                <tree editable="bottom">
                                     <field name="partner_id"/>
                                     <field name="currency_id" invisible="1"/>
                                     <field name="price_subtotal" widget="monetary"/>
@@ -80,7 +80,7 @@
                                     <field name="price_total" widget="monetary" readonly="1"/>
                                     <field name="transit_time_days"/>
                                     <field name="notes"/>
-                                </list>
+                                </tree>
                             </field>
                         </page>
                         <page string="Winning Quote &amp; PO Creation" name="winning_quote">
@@ -142,13 +142,9 @@
         </field>
     </record>
 
-    <!-- Top Level App Menu -->
+    <!-- Top Level App Menu & Submenu -->
     <menuitem id="menu_logistics_root" name="Logistics" sequence="35" web_icon="logistics_quotation,static/description/icon.png"/>
     <menuitem id="menu_logistics_requests" name="Logistics Requests" parent="menu_logistics_root" action="action_logistics_request" sequence="10"/>
-
-    <!-- Convenient Submenus under Purchase and Sales -->
-    <menuitem id="menu_purchase_logistics_requests" name="Logistics Requests" parent="purchase.menu_procurement_management" action="action_logistics_request" sequence="90"/>
-    <menuitem id="menu_sale_logistics_requests" name="Logistics Requests" parent="sale.sale_order_menu" action="action_logistics_request" sequence="90"/>
 
     <!-- Inherit Sales Order Form to add Smart Button -->
     <record id="view_order_form_inherit_logistics" model="ir.ui.view">

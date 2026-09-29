@@ -7,7 +7,7 @@
     'author': 'Anabtawi Group',
     'depends': [
         'base',
-        'sale_management',
+        'sale',
         'purchase',
         'stock',
         'stock_landed_costs',
