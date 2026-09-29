@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Logistics Request List View -->
+    <record id="view_logistics_request_tree" model="ir.ui.view">
+        <field name="name">logistics.request.list</field>
+        <field name="model">logistics.request</field>
+        <field name="arch" type="xml">
+            <list string="Logistics Requests">
+                <field name="name"/>
+                <field name="source_type"/>
+                <field name="sale_order_id" optional="show"/>
+                <field name="purchase_order_id" optional="show"/>
+                <field name="shipping_mode"/>
+                <field name="shipment_type"/>
+                <field name="container_size"/>
+                <field name="selected_line_id"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="state" widget="badge" decoration-info="state == 'rfq'" decoration-warning="state == 'quoted'" decoration-success="state == 'confirmed'" decoration-muted="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Logistics Request Form View -->
+    <record id="view_logistics_request_form" model="ir.ui.view">
+        <field name="name">logistics.request.form</field>
+        <field name="model">logistics.request</field>
+        <field name="arch" type="xml">
+            <form string="Logistics Request">
+                <header>
+                    <button name="action_send_rfq" string="Send RFQs" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_quotes_received" string="Quotes Received" type="object" class="btn-primary" invisible="state != 'rfq'"/>
+                    <button name="action_confirm_logistics" string="Confirm Logistics Order" type="object" class="oe_highlight" invisible="state not in ('quoted', 'rfq', 'draft')"/>
+                    <button name="action_reset_draft" string="Reset to Draft" type="object" class="btn-secondary" invisible="state not in ('cancelled')"/>
+                    <button name="action_cancel" string="Cancel" type="object" class="btn-secondary" invisible="state in ('confirmed', 'cancelled')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,rfq,quoted,confirmed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_po" type="object" class="oe_stat_button" icon="fa-shopping-cart" invisible="not generated_po_id">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Forwarder PO</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Origin &amp; Request Info">
+                            <field name="source_type" widget="radio" options="{'horizontal': true}"/>
+                            <field name="sale_order_id" invisible="source_type != 'sale'" required="source_type == 'sale'"/>
+                            <field name="purchase_order_id" invisible="source_type != 'purchase'" required="source_type == 'purchase'"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Shipping Specifications">
+                            <field name="shipping_mode"/>
+                            <field name="shipment_type"/>
+                            <field name="container_size"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Package &amp; Weight Details">
+                            <field name="package_details" placeholder="Dimensions, gross weight, volume (CBM), special handling notes..."/>
+                        </group>
+                        <group string="Destination / Delivery">
+                            <field name="destination_address" placeholder="Destination port or warehouse address..."/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Forwarder Bids / Quotations" name="forwarder_bids">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="partner_id"/>
+                                    <field name="currency_id" invisible="1"/>
+                                    <field name="price_subtotal" widget="monetary"/>
+                                    <field name="handling_fee" widget="monetary"/>
+                                    <field name="price_total" widget="monetary" readonly="1"/>
+                                    <field name="transit_time_days"/>
+                                    <field name="notes"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Winning Quote &amp; PO Creation" name="winning_quote">
+                            <group>
+                                <field name="selected_line_id" options="{'no_create': True}"/>
+                                <field name="generated_po_id"/>
+                            </group>
+                        </page>
+                        <page string="Internal Notes" name="notes">
+                            <field name="notes" placeholder="Additional internal observations..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Logistics Request Search View -->
+    <record id="view_logistics_request_search" model="ir.ui.view">
+        <field name="name">logistics.request.search</field>
+        <field name="model">logistics.request</field>
+        <field name="arch" type="xml">
+            <search string="Logistics Requests">
+                <field name="name"/>
+                <field name="sale_order_id"/>
+                <field name="purchase_order_id"/>
+                <field name="selected_line_id"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="RFQs Sent" name="rfq" domain="[('state', '=', 'rfq')]"/>
+                <filter string="Quotes Received" name="quoted" domain="[('state', '=', 'quoted')]"/>
+                <filter string="Confirmed" name="confirmed" domain="[('state', '=', 'confirmed')]"/>
+                <separator/>
+                <filter string="Outbound (Sales)" name="sales" domain="[('source_type', '=', 'sale')]"/>
+                <filter string="Inbound (Purchase)" name="purchase" domain="[('source_type', '=', 'purchase')]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Source Type" name="group_source" context="{'group_by': 'source_type'}"/>
+                    <filter string="Shipping Mode" name="group_mode" context="{'group_by': 'shipping_mode'}"/>
+                    <filter string="Environment" name="group_env" context="{'group_by': 'shipment_type'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Window for Logistics Request -->
+    <record id="action_logistics_request" model="ir.actions.act_window">
+        <field name="name">Logistics Requests</field>
+        <field name="res_model">logistics.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_logistics_request_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Logistics Quotation Request!
+            </p>
+            <p>
+                Manage forwarder RFQs, compare freight bids, and generate forwarder purchase orders or customer shipping charges seamlessly.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Items -->
+    <menuitem id="menu_logistics_root" name="Logistics" sequence="35" web_icon="logistics_quotation,static/description/icon.png"/>
+    <menuitem id="menu_logistics_requests" name="Logistics Requests" parent="menu_logistics_root" action="action_logistics_request" sequence="10"/>
+
+    <!-- Inherit Sales Order Form to add Smart Button -->
+    <record id="view_order_form_inherit_logistics" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.logistics</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_open_logistics_requests" type="object" class="oe_stat_button" icon="fa-truck">
+                    <field name="logistics_count" widget="statinfo" string="Logistics"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Inherit Purchase Order Form to add Smart Button -->
+    <record id="view_purchase_order_form_inherit_logistics" model="ir.ui.view">
+        <field name="name">purchase.order.form.inherit.logistics</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_open_logistics_requests" type="object" class="oe_stat_button" icon="fa-truck">
+                    <field name="logistics_count" widget="statinfo" string="Logistics"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+</odoo>
