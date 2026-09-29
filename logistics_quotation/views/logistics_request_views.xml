@@ -29,7 +29,9 @@
         <field name="arch" type="xml">
             <form string="Logistics Request">
                 <header>
-                    <button name="action_send_rfq" string="Send RFQs" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_send_rfq_email" string="Send RFQ by Email" type="object" class="btn-primary" invisible="state not in ('draft', 'rfq')"/>
+                    <button name="action_print_rfq" string="Download RFQ (PDF)" type="object" class="btn-secondary" icon="fa-download"/>
+                    <button name="action_send_rfq" string="Mark RFQ Sent" type="object" class="btn-secondary" invisible="state != 'draft'"/>
                     <button name="action_quotes_received" string="Quotes Received" type="object" class="btn-primary" invisible="state != 'rfq'"/>
                     <button name="action_confirm_logistics" string="Confirm Logistics Order" type="object" class="oe_highlight" invisible="state not in ('quoted', 'rfq', 'draft')"/>
                     <button name="action_reset_draft" string="Reset to Draft" type="object" class="btn-secondary" invisible="state not in ('cancelled')"/>
@@ -97,6 +99,8 @@
                                     <field name="handling_fee" widget="monetary"/>
                                     <field name="price_total" widget="monetary" readonly="1"/>
                                     <field name="transit_time_days"/>
+                                    <field name="quote_filename" invisible="1"/>
+                                    <field name="quote_attachment" widget="binary" filename="quote_filename" string="Quote PDF / Scan"/>
                                     <field name="notes"/>
                                 </list>
                             </field>

@@ -36,6 +36,7 @@ Features:
         'security/ir.model.access.csv',
         'data/ir_sequence_data.xml',
         'data/product_data.xml',
+        'data/mail_template_data.xml',
         'report/logistics_request_report.xml',
         'views/logistics_request_views.xml',
     ],

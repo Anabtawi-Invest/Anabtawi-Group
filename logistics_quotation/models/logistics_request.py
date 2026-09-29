@@ -163,6 +163,39 @@ class LogisticsRequest(models.Model):
             rec.state = 'rfq'
             rec.message_post(body=_("RFQs sent to logistics forwarders."))
 
+    def action_print_rfq(self):
+        self.ensure_one()
+        return self.env.ref('logistics_quotation.action_report_logistics_request').report_action(self)
+
+    def action_send_rfq_email(self):
+        self.ensure_one()
+        template = self.env.ref(
+            'logistics_quotation.email_template_logistics_rfq',
+            raise_if_not_found=False,
+        )
+        compose_form = self.env.ref('mail.email_compose_message_wizard_form', raise_if_not_found=False)
+
+        if self.state == 'draft':
+            self.state = 'rfq'
+            self.message_post(body=_("RFQs sent to logistics forwarders via Email."))
+
+        ctx = {
+            'default_model': 'logistics.request',
+            'default_res_ids': [self.id],
+            'default_template_id': template.id if template else False,
+            'default_composition_mode': 'comment',
+            'force_email': True,
+        }
+        return {
+            'type': 'ir.actions.act_window',
+            'view_mode': 'form',
+            'res_model': 'mail.compose.message',
+            'views': [(compose_form.id if compose_form else False, 'form')],
+            'view_id': compose_form.id if compose_form else False,
+            'target': 'new',
+            'context': ctx,
+        }
+
     def action_quotes_received(self):
         for rec in self:
             if not rec.line_ids:
@@ -345,6 +378,14 @@ class LogisticsRequestLine(models.Model):
     )
     transit_time_days = fields.Integer(
         string='Transit Time (Days)',
+    )
+    quote_attachment = fields.Binary(
+        string='Quote PDF / Document',
+        attachment=True,
+        help='Upload the original PDF or scanned document received from the freight forwarder',
+    )
+    quote_filename = fields.Char(
+        string='File Name',
     )
     notes = fields.Text(
         string='Conditions / Remarks',
