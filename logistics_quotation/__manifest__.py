@@ -25,6 +25,7 @@ Features:
     'depends': [
         'base',
         'mail',
+        'product',
         'sale_management',
         'purchase',
         'stock',

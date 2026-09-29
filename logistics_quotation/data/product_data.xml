@@ -5,7 +5,6 @@
         <record id="product_freight_service" model="product.product">
             <field name="name">Freight &amp; Handling Service</field>
             <field name="type">service</field>
-            <field name="categ_id" ref="product.product_category_all"/>
             <field name="list_price">0.0</field>
             <field name="standard_price">0.0</field>
             <field name="landed_cost_ok">True</field>
