@@ -142,9 +142,13 @@
         </field>
     </record>
 
-    <!-- Menu Items -->
+    <!-- Top Level App Menu -->
     <menuitem id="menu_logistics_root" name="Logistics" sequence="35" web_icon="logistics_quotation,static/description/icon.png"/>
     <menuitem id="menu_logistics_requests" name="Logistics Requests" parent="menu_logistics_root" action="action_logistics_request" sequence="10"/>
+
+    <!-- Convenient Submenus under Purchase and Sales -->
+    <menuitem id="menu_purchase_logistics_requests" name="Logistics Requests" parent="purchase.menu_procurement_management" action="action_logistics_request" sequence="90"/>
+    <menuitem id="menu_sale_logistics_requests" name="Logistics Requests" parent="sale.sale_order_menu" action="action_logistics_request" sequence="90"/>
 
     <!-- Inherit Sales Order Form to add Smart Button -->
     <record id="view_order_form_inherit_logistics" model="ir.ui.view">
