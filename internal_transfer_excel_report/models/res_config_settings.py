@@ -18,6 +18,6 @@ class ResConfigSettings(models.TransientModel):
     itr_receipt_location_id = fields.Many2one(
         'stock.location',
         string='Source Location',
-        domain="[('usage', '=', 'internal'), ('company_id', 'in', [itr_receipt_company_id, False])]",
+        domain="[('company_id', 'in', [itr_receipt_company_id, False])]",
         config_parameter='internal_transfer_excel_report.receipt_location_id',
     )
