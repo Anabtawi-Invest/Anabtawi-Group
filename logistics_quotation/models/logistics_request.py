@@ -296,9 +296,9 @@ class LogisticsRequestLine(models.Model):
         for line in self:
             line.price_total = (line.price_subtotal or 0.0) + (line.handling_fee or 0.0)
 
-    def name_get(self):
-        result = []
+    @api.depends('partner_id.name', 'price_total', 'currency_id.symbol')
+    def _compute_display_name(self):
         for line in self:
-            name = f"{line.partner_id.name or 'Forwarder'} - {line.price_total} {line.currency_id.symbol or ''}"
-            result.append((line.id, name))
-        return result
+            partner_name = line.partner_id.name or _('Forwarder')
+            currency = line.currency_id.symbol or ''
+            line.display_name = f"{partner_name} - {line.price_total} {currency}".strip()

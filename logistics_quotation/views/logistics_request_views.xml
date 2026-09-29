@@ -115,7 +115,7 @@
                 <separator/>
                 <filter string="Outbound (Sales)" name="sales" domain="[('source_type', '=', 'sale')]"/>
                 <filter string="Inbound (Purchase)" name="purchase" domain="[('source_type', '=', 'purchase')]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter string="Source Type" name="group_source" domain="[]" context="{'group_by': 'source_type'}"/>
                     <filter string="Shipping Mode" name="group_mode" domain="[]" context="{'group_by': 'shipping_mode'}"/>
                     <filter string="Environment" name="group_env" domain="[]" context="{'group_by': 'shipment_type'}"/>
