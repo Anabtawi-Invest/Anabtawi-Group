@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
 
 
 class ResPartner(models.Model):
@@ -9,6 +8,7 @@ class ResPartner(models.Model):
     is_freight_forwarder = fields.Boolean(
         string='Is Freight Forwarder',
         default=False,
+        copy=False,
         help='Check if this vendor is a freight forwarder / logistics carrier.',
     )
     forwarder_approval_state = fields.Selection(
@@ -19,6 +19,7 @@ class ResPartner(models.Model):
         ],
         string='Forwarder Approval Status',
         default='draft',
+        copy=False,
         tracking=True,
         help='Accounting approval status required before broadcasting RFQs.',
     )
