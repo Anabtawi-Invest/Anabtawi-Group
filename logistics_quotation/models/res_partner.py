@@ -5,6 +5,17 @@ from odoo import _, api, fields, models
 class ResPartner(models.Model):
     _inherit = 'res.partner'
 
+    def _auto_init(self):
+        # Auto-create missing columns in PostgreSQL table if module upgrade was not triggered
+        cr = self.env.cr
+        cr.execute("""
+            ALTER TABLE res_partner ADD COLUMN IF NOT EXISTS is_freight_forwarder BOOLEAN DEFAULT FALSE;
+            ALTER TABLE res_partner ADD COLUMN IF NOT EXISTS forwarder_approval_state VARCHAR DEFAULT 'draft';
+            ALTER TABLE res_partner ADD COLUMN IF NOT EXISTS forwarder_approved_by INTEGER;
+            ALTER TABLE res_partner ADD COLUMN IF NOT EXISTS forwarder_approved_date TIMESTAMP;
+        """)
+        return super()._auto_init()
+
     is_freight_forwarder = fields.Boolean(
         string='Is Freight Forwarder',
         default=False,
