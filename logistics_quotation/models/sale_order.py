@@ -28,12 +28,13 @@ class SaleOrder(models.Model):
         for line in self.order_line.filtered(lambda l: not l.display_type and l.product_id):
             weight = (line.product_id.weight or 0.0) * line.product_uom_qty
             volume = (line.product_id.volume or 0.0) * line.product_uom_qty
+            uom = getattr(line, 'product_uom_id', False) or getattr(line, 'product_uom', False)
             item_vals.append(
                 Command.create({
                     'product_id': line.product_id.id,
                     'name': line.name or line.product_id.display_name,
                     'quantity': line.product_uom_qty,
-                    'product_uom_id': line.product_uom.id,
+                    'product_uom_id': uom.id if uom else False,
                     'weight': weight,
                     'volume': volume,
                 })
