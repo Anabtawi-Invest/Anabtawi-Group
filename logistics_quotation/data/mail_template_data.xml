@@ -10,8 +10,8 @@
             <field name="report_template_ids" eval="[(4, ref('action_report_logistics_request'))]"/>
             <field name="description">Template sent to freight forwarders with RFQ details and PDF attachment</field>
             <field name="body_html" type="html">
-                <div style="margin: 0px; padding: 0px; font-family: Arial, sans-serif; font-size: 14px; color: #333333;">
-                    <p style="margin: 0px; padding: 0px;">
+                <div style="margin: 0px; padding: 0px; font-size: 14px; color: inherit;">
+                    <p style="margin: 0px; padding: 0px; color: inherit;">
                         Dear Freight Forwarder,
                         <br/><br/>
                         Please find attached our <strong>Freight Quotation Request (RFQ <t t-out="object.name or ''"/>)</strong> for your review and bidding.

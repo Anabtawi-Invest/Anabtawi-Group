@@ -31,8 +31,10 @@ class LogisticsPortalController(http.Controller):
         logistics_request = invitation.request_id
         partner = invitation.partner_id
 
-        price_subtotal = float(post.get('price_subtotal') or 0.0)
-        handling_fee = float(post.get('handling_fee') or 0.0)
+        origin_handling_fee = float(post.get('origin_handling_fee') or 0.0)
+        freight_cost = float(post.get('freight_cost') or 0.0)
+        destination_handling_fee = float(post.get('destination_handling_fee') or 0.0)
+        customs_clearance_fee = float(post.get('customs_clearance_fee') or 0.0)
         transit_time_days = int(post.get('transit_time_days') or 0)
         notes = post.get('notes') or ''
 
@@ -49,8 +51,10 @@ class LogisticsPortalController(http.Controller):
         line_vals = {
             'request_id': logistics_request.id,
             'partner_id': partner.id,
-            'price_subtotal': price_subtotal,
-            'handling_fee': handling_fee,
+            'origin_handling_fee': origin_handling_fee,
+            'freight_cost': freight_cost,
+            'destination_handling_fee': destination_handling_fee,
+            'customs_clearance_fee': customs_clearance_fee,
             'transit_time_days': transit_time_days,
             'notes': notes,
         }
@@ -77,12 +81,16 @@ class LogisticsPortalController(http.Controller):
             logistics_request.sudo().write({'state': 'quoted'})
 
         # Post chatter notification
+        total_cost = quote_line.price_total
         logistics_request.sudo().message_post(
             body=_(
-                "Forwarder <b>%s</b> submitted quotation via Web Portal.<br/> Freight: %s | Handling: %s | Transit: %s Days.",
+                "Forwarder <b>%s</b> submitted quotation via Web Portal.<br/> Origin Handling: %s | Freight: %s | Dest Handling: %s | Clearance: %s | <b>Total: %s</b> | Transit: %s Days.",
                 partner.display_name,
-                price_subtotal,
-                handling_fee,
+                origin_handling_fee,
+                freight_cost,
+                destination_handling_fee,
+                customs_clearance_fee,
+                total_cost,
                 transit_time_days,
             )
         )

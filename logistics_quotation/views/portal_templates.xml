@@ -108,38 +108,75 @@
                                     
                                     <div class="row g-3 mb-3">
                                         <div class="col-md-6">
-                                            <label class="form-label fw-bold">Freight Cost (<t t-esc="request.currency_id.name"/>)</label>
-                                            <input type="number" step="0.01" name="price_subtotal" class="form-control form-control-lg" placeholder="0.00" required="required"/>
+                                            <label class="form-label fw-bold">🛫 Origin Handling (Shipping Country) / المناولة في بلد الشحن (<t t-esc="request.currency_id.name"/>)</label>
+                                            <input type="number" step="0.01" name="origin_handling_fee" id="origin_handling_fee" class="form-control form-control-lg cost-input" placeholder="0.00"/>
                                         </div>
                                         <div class="col-md-6">
-                                            <label class="form-label fw-bold">Handling / Port Fee (<t t-esc="request.currency_id.name"/>)</label>
-                                            <input type="number" step="0.01" name="handling_fee" class="form-control form-control-lg" placeholder="0.00"/>
+                                            <label class="form-label fw-bold">🚢 Main Freight Shipping Cost / تكلفة الشحن الرئيسي (<t t-esc="request.currency_id.name"/>)</label>
+                                            <input type="number" step="0.01" name="freight_cost" id="freight_cost" class="form-control form-control-lg cost-input" placeholder="0.00" required="required"/>
                                         </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">🛬 Destination Handling (Receiving Country) / المناولة في بلد الوصول (<t t-esc="request.currency_id.name"/>)</label>
+                                            <input type="number" step="0.01" name="destination_handling_fee" id="destination_handling_fee" class="form-control form-control-lg cost-input" placeholder="0.00"/>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">📑 Customs Clearance Fees / رسوم التخليص الجمركي (<t t-esc="request.currency_id.name"/>)</label>
+                                            <input type="number" step="0.01" name="customs_clearance_fee" id="customs_clearance_fee" class="form-control form-control-lg cost-input" placeholder="0.00"/>
+                                        </div>
+                                    </div>
+
+                                    <!-- Total Calculation Display -->
+                                    <div class="alert alert-primary d-flex align-items-center justify-content-between p-3 mb-3">
+                                        <span class="fw-bold fs-5">💵 Total Freight Cost / إجمالي تكلفة الشحن:</span>
+                                        <span class="fw-bold fs-3 text-primary" id="total_cost_display">0.00 <t t-esc="request.currency_id.name"/></span>
                                     </div>
 
                                     <div class="row g-3 mb-3">
                                         <div class="col-md-6">
-                                            <label class="form-label fw-bold">Estimated Transit Time (Days)</label>
+                                            <label class="form-label fw-bold">Estimated Transit Time (Days) / مدة الشحن بالأيام</label>
                                             <input type="number" name="transit_time_days" class="form-control" placeholder="e.g. 14" required="required"/>
                                         </div>
                                         <div class="col-md-6">
-                                            <label class="form-label fw-bold">Upload Quotation PDF / File</label>
+                                            <label class="form-label fw-bold">Upload Quotation PDF / File / إرفاق عرض السعر PDF</label>
                                             <input type="file" name="quote_file" class="form-control" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"/>
                                             <span class="form-text text-muted">Attach your official stamped quote document.</span>
                                         </div>
                                     </div>
 
                                     <div class="mb-4">
-                                        <label class="form-label fw-bold">Terms, Remarks &amp; Free Demurrage Days</label>
+                                        <label class="form-label fw-bold">Terms, Remarks &amp; Free Demurrage Days / الشروط والأحكام وأيام الإعفاء</label>
                                         <textarea name="notes" class="form-control" rows="3" placeholder="Enter demurrage days, validity period, or special conditions..."></textarea>
                                     </div>
 
                                     <div class="d-grid">
                                         <button type="submit" class="btn btn-primary btn-lg fw-bold py-3 shadow-sm">
-                                            🚀 Submit Official Freight Quotation
+                                            🚀 Submit Official Freight Quotation / إرسال عرض السعر الرسمي
                                         </button>
                                     </div>
                                 </form>
+
+                                <script type="text/javascript">
+                                    document.addEventListener('DOMContentLoaded', function () {
+                                        const inputs = document.querySelectorAll('.cost-input');
+                                        const totalDisplay = document.getElementById('total_cost_display');
+                                        const currency = "<t t-esc="request.currency_id.name"/>";
+
+                                        function calculateTotal() {
+                                            let total = 0.0;
+                                            inputs.forEach(input => {
+                                                const val = parseFloat(input.value) || 0.0;
+                                                total += val;
+                                            });
+                                            if (totalDisplay) {
+                                                totalDisplay.textContent = total.toFixed(2) + ' ' + currency;
+                                            }
+                                        }
+
+                                        inputs.forEach(input => {
+                                            input.addEventListener('input', calculateTotal);
+                                        });
+                                    });
+                                </script>
                             </div>
                         </div>
                     </div>

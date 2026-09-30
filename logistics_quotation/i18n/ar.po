@@ -1,0 +1,148 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* logistics_quotation
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-30 14:00+0000\n"
+"PO-Revision-Date: 2026-09-30 14:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Arabic (ar)\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+
+#. module: logistics_quotation
+#: model:ir.ui.menu,name:logistics_quotation.menu_logistics_root
+msgid "Logistics"
+msgstr "اللوجستيات"
+
+#. module: logistics_quotation
+#: model:ir.ui.menu,name:logistics_quotation.menu_logistics_requests
+#: model:ir.actions.act_window,name:logistics_quotation.action_logistics_request
+msgid "Logistics Requests"
+msgstr "طلبات أسعار الشحن"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request__name
+msgid "Request Reference"
+msgstr "رقم الطلب"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request__shipping_mode
+msgid "Shipping Mode"
+msgstr "طريقة الشحن"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request__shipment_type
+msgid "Environment"
+msgstr "بيئة التخزين والشحن"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request__container_size
+msgid "Container / Package Size"
+msgstr "نوع وحجم الحاوية / الطرد"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request__total_weight
+msgid "Total Weight (kg)"
+msgstr "إجمالي الوزن (كجم)"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request__total_volume
+msgid "Total Volume (m³ / CBM)"
+msgstr "إجمالي الحجم (متر مكعب)"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request__destination_address
+msgid "Destination / Shipping Address"
+msgstr "عنوان وميناء الوصول"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request_line__origin_handling_fee
+msgid "Origin Handling (Shipping Country)"
+msgstr "رسوم المناولة في بلد الشحن"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request_line__freight_cost
+msgid "Main Freight Shipping Cost"
+msgstr "تكلفة الشحن الرئيسي"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request_line__destination_handling_fee
+msgid "Destination Handling (Receiving Country)"
+msgstr "رسوم المناولة في بلد الوصول"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request_line__customs_clearance_fee
+msgid "Customs Clearance Fees"
+msgstr "رسوم التخليص الجمركي"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request_line__price_total
+msgid "Total Cost"
+msgstr "إجمالي التكلفة"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request_line__transit_time_days
+msgid "Transit Time (Days)"
+msgstr "مدة الشحن بالأيام"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_res_partner__is_freight_forwarder
+msgid "Is Freight Forwarder"
+msgstr "شركات الشحن والتخليص"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_res_partner__forwarder_approval_state
+msgid "Forwarder Approval Status"
+msgstr "حالة اعتماد شركة الشحن من المحاسبة"
+
+#. module: logistics_quotation
+#: selection:res.partner,forwarder_approval_state:0
+msgid "Pending Accounting Approval"
+msgstr "بانتظار موافقة المحاسبة"
+
+#. module: logistics_quotation
+#: selection:res.partner,forwarder_approval_state:0
+msgid "Approved"
+msgstr "معتمد"
+
+#. module: logistics_quotation
+#: selection:res.partner,forwarder_approval_state:0
+msgid "Rejected"
+msgstr "مرفوض"
+
+#. module: logistics_quotation
+#: model:ir.model.fields,field_description:logistics_quotation.field_logistics_request__state
+msgid "Status"
+msgstr "الحالة"
+
+#. module: logistics_quotation
+#: selection:logistics.request,state:0
+msgid "Draft"
+msgstr "مسودة"
+
+#. module: logistics_quotation
+#: selection:logistics.request,state:0
+msgid "RFQs Sent"
+msgstr "تم إرسال طلبات الأسعار"
+
+#. module: logistics_quotation
+#: selection:logistics.request,state:0
+msgid "Quotes Received"
+msgstr "تم استلام العروض"
+
+#. module: logistics_quotation
+#: selection:logistics.request,state:0
+msgid "Confirmed"
+msgstr "مؤكد"
+
+#. module: logistics_quotation
+#: selection:logistics.request,state:0
+msgid "Cancelled"
+msgstr "ملغى"

@@ -118,8 +118,10 @@
                                 <list editable="bottom">
                                     <field name="partner_id"/>
                                     <field name="currency_id" invisible="1"/>
-                                    <field name="price_subtotal" widget="monetary"/>
-                                    <field name="handling_fee" widget="monetary"/>
+                                    <field name="origin_handling_fee" widget="monetary"/>
+                                    <field name="freight_cost" widget="monetary"/>
+                                    <field name="destination_handling_fee" widget="monetary"/>
+                                    <field name="customs_clearance_fee" widget="monetary"/>
                                     <field name="price_total" widget="monetary" readonly="1"/>
                                     <field name="transit_time_days"/>
                                     <field name="quote_filename" invisible="1"/>

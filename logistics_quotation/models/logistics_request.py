@@ -74,6 +74,10 @@ class LogisticsRequest(models.Model):
                     company_id INTEGER,
                     currency_id INTEGER,
                     partner_id INTEGER,
+                    origin_handling_fee NUMERIC,
+                    freight_cost NUMERIC,
+                    destination_handling_fee NUMERIC,
+                    customs_clearance_fee NUMERIC,
                     price_subtotal NUMERIC,
                     handling_fee NUMERIC,
                     price_total NUMERIC,
@@ -86,6 +90,10 @@ class LogisticsRequest(models.Model):
                     write_uid INTEGER,
                     write_date TIMESTAMP
                 );
+                ALTER TABLE logistics_request_line ADD COLUMN IF NOT EXISTS origin_handling_fee NUMERIC DEFAULT 0.0;
+                ALTER TABLE logistics_request_line ADD COLUMN IF NOT EXISTS freight_cost NUMERIC DEFAULT 0.0;
+                ALTER TABLE logistics_request_line ADD COLUMN IF NOT EXISTS destination_handling_fee NUMERIC DEFAULT 0.0;
+                ALTER TABLE logistics_request_line ADD COLUMN IF NOT EXISTS customs_clearance_fee NUMERIC DEFAULT 0.0;
             """)
         except Exception:
             pass
@@ -554,14 +562,25 @@ class LogisticsRequestLine(models.Model):
         required=True,
         domain="['|', ('supplier_rank', '>', 0), ('is_company', '=', True)]",
     )
-    price_subtotal = fields.Monetary(
-        string='Freight Cost',
-        required=True,
+    origin_handling_fee = fields.Monetary(
+        string='Origin Handling (Shipping Country)',
         default=0.0,
+        help='Handling and export documentation fees in origin shipping country',
     )
-    handling_fee = fields.Monetary(
-        string='Handling Fee',
+    freight_cost = fields.Monetary(
+        string='Main Freight Shipping Cost',
         default=0.0,
+        help='Main ocean, air, or land shipping transport cost',
+    )
+    destination_handling_fee = fields.Monetary(
+        string='Destination Handling (Receiving Country)',
+        default=0.0,
+        help='Terminal handling (THC), port, and unloading fees in receiving country',
+    )
+    customs_clearance_fee = fields.Monetary(
+        string='Customs Clearance Fees',
+        default=0.0,
+        help='Customs clearance, brokerage, and documentation fees at destination',
     )
     price_total = fields.Monetary(
         string='Total Cost',
@@ -583,10 +602,15 @@ class LogisticsRequestLine(models.Model):
         string='Conditions / Remarks',
     )
 
-    @api.depends('price_subtotal', 'handling_fee')
+    @api.depends('origin_handling_fee', 'freight_cost', 'destination_handling_fee', 'customs_clearance_fee')
     def _compute_price_total(self):
         for line in self:
-            line.price_total = (line.price_subtotal or 0.0) + (line.handling_fee or 0.0)
+            line.price_total = (
+                (line.origin_handling_fee or 0.0) +
+                (line.freight_cost or 0.0) +
+                (line.destination_handling_fee or 0.0) +
+                (line.customs_clearance_fee or 0.0)
+            )
 
     @api.depends('partner_id.name', 'price_total', 'currency_id.symbol')
     def _compute_display_name(self):

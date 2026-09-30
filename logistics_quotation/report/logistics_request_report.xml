@@ -91,9 +91,29 @@
                             </div>
                         </div>
 
-                        <div class="mt-4" t-if="doc.package_details">
-                            <strong>Special Handling / Package Notes:</strong>
-                            <p t-field="doc.package_details"/>
+                        <div class="mt-4 p-3 bg-light border rounded">
+                            <h5 class="fw-bold mb-2">📋 Quotation Submission Requirements / متطلبات تقديم عرض السعر:</h5>
+                            <p class="mb-2">Please submit your itemized quotation breakdown online or via email with the following cost lines:</p>
+                            <table class="table table-sm table-bordered bg-white mb-0">
+                                <thead>
+                                    <tr class="table-secondary">
+                                        <th>1. Origin Handling / المناولة في بلد الشحن</th>
+                                        <th>2. Main Freight / الشحن الرئيسي</th>
+                                        <th>3. Destination Handling / المناولة في بلد الوصول</th>
+                                        <th>4. Customs Clearance / التخليص الجمركي</th>
+                                        <th>Estimated Transit Days / مدة الشحن</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Export fees, documentation, origin THC</td>
+                                        <td>Ocean / Air / Land freight rate</td>
+                                        <td>Terminal handling, destination port fees</td>
+                                        <td>Customs brokerage &amp; clearance fees</td>
+                                        <td>Specify days</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
 
                         <div class="oe_structure"/>
