@@ -5,7 +5,10 @@ from datetime import date, datetime
 
 from dateutil.relativedelta import relativedelta
 
+from werkzeug.urls import url_encode
+
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -41,6 +44,29 @@ class HrHealthEmployeeDocument(models.Model):
         ),
     ]
 
+    def action_preview_document_file(self):
+        """Open the uploaded file in a new tab without forcing a download."""
+        self.ensure_one()
+        if not self.document_file or not isinstance(self.id, int):
+            raise UserError(_("Save the line and upload a file before previewing it."))
+        filename = (
+            self.document_filename
+            or (self.document_type_id.name if self.document_type_id else False)
+            or 'document'
+        )
+        query = url_encode({
+            'model': self._name,
+            'id': self.id,
+            'field': 'document_file',
+            'filename': filename,
+            'filename_field': 'document_filename',
+        })
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f'/web/content?{query}',
+            'target': 'new',
+        }
+
     @api.onchange('document_type_id', 'probation_start_date')
     def _onchange_probation_dates(self):
         self._sync_probation_expiry_date()
@@ -50,6 +76,7 @@ class HrHealthEmployeeDocument(models.Model):
         records = super().create(vals_list)
         if not self.env.context.get('skip_probation_expiry_sync'):
             records._sync_probation_expiry_date()
+        records.filtered('document_file')._sync_file_to_employee_documents()
         return records
 
     def write(self, vals):
@@ -59,7 +86,109 @@ class HrHealthEmployeeDocument(models.Model):
             and {'document_type_id', 'probation_start_date'} & set(vals)
         ):
             self._sync_probation_expiry_date()
+        if vals.get('document_file'):
+            self._sync_file_to_employee_documents()
         return result
+
+    def _documents_file_extension(self):
+        """Prefer the uploaded filename extension, then the stored attachment name."""
+        self.ensure_one()
+        for candidate in (self.document_filename,):
+            if candidate and '.' in candidate:
+                return candidate.rsplit('.', 1)[-1]
+        attachment = self._get_document_file_attachment()
+        if attachment and attachment.name and '.' in attachment.name:
+            return attachment.name.rsplit('.', 1)[-1]
+        return ''
+
+    def _documents_display_name(self):
+        """Name shown in Documents: document type (+ extension when available)."""
+        self.ensure_one()
+        base_name = (self.document_type_id.name or _('Document')).strip()
+        extension = self._documents_file_extension()
+        return f'{base_name}.{extension}' if extension else base_name
+
+    def _documents_unique_name(self, folder, desired_name):
+        """Keep prior uploads: append (2), (3), ... when the name already exists."""
+        Document = self.env['documents.document'].sudo()
+        existing = set(Document.search([
+            ('folder_id', '=', folder.id),
+            ('type', '=', 'binary'),
+        ]).mapped('name'))
+        if desired_name not in existing:
+            return desired_name
+        if '.' in desired_name:
+            stem, extension = desired_name.rsplit('.', 1)
+            suffix = f'.{extension}'
+        else:
+            stem, suffix = desired_name, ''
+        index = 2
+        while True:
+            candidate = f'{stem} ({index}){suffix}'
+            if candidate not in existing:
+                return candidate
+            index += 1
+
+    def _get_document_file_attachment(self):
+        self.ensure_one()
+        return self.env['ir.attachment'].sudo().search([
+            ('res_model', '=', self._name),
+            ('res_field', '=', 'document_file'),
+            ('res_id', '=', self.id),
+        ], limit=1)
+
+    def _ensure_employee_documents_folder(self):
+        """Reuse documents_hr employee folder; create it if HR Documents is configured."""
+        self.ensure_one()
+        employee = self.employee_id
+        if not employee:
+            return self.env['documents.document']
+        company = employee.company_id
+        if not company.documents_hr_settings or not company.documents_employee_folder_id:
+            return self.env['documents.document']
+        if not employee.hr_employee_folder_id:
+            employee._generate_employee_documents_folders()
+        return employee.hr_employee_folder_id
+
+    def _sync_file_to_employee_documents(self):
+        """Copy each uploaded Binary into Documents under the employee folder.
+
+        Uses a copied attachment so re-uploads keep older Documents versions.
+        """
+        if self.env.context.get('skip_documents_sync'):
+            return
+        Document = self.env['documents.document'].sudo()
+        for record in self:
+            if not record.document_file:
+                continue
+            folder = record._ensure_employee_documents_folder()
+            if not folder:
+                _logger.info(
+                    "Skip Documents sync for employee document %s: no HR employee folder "
+                    "(enable Documents HR settings / employee root folder).",
+                    record.id,
+                )
+                continue
+            field_attachment = record._get_document_file_attachment()
+            if not field_attachment or not field_attachment.datas:
+                continue
+
+            doc_name = record._documents_unique_name(folder, record._documents_display_name())
+            # Detached copy: Binary field attachment is overwritten in place on re-upload.
+            documents_attachment = field_attachment.with_context(no_document=True).copy({
+                'name': doc_name,
+                'res_model': False,
+                'res_id': False,
+                'res_field': False,
+            })
+            Document.create({
+                'name': doc_name,
+                'type': 'binary',
+                'folder_id': folder.id,
+                'attachment_id': documents_attachment.id,
+                'company_id': record.employee_id.company_id.id,
+                'partner_id': record.employee_id.work_contact_id.id or False,
+            })
 
     def _sync_probation_expiry_date(self):
         probation_docs = self.filtered('document_type_id.is_probation_document')
