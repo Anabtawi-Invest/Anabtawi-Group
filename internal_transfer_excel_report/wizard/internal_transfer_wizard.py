@@ -219,16 +219,11 @@ class InternalTransferReportWizard(models.TransientModel):
     def _get_sheet1_data(self):
         self.ensure_one()
         rows = []
-        for moves, transfer_type in (
-            (self._get_internal_transfer_moves(), self.env._('Internal Transfer')),
-            (self._get_receipt_moves(), self.env._('Purchase Receipt')),
-        ):
+        for moves in (self._get_internal_transfer_moves(), self._get_receipt_moves()):
             for move in moves:
                 picking = move.picking_id
                 rows.append({
                     'transfer_reference': picking.name or '',
-                    'transfer_type': transfer_type,
-                    'source_document': picking.origin or '',
                     'product_name': move.product_id.display_name,
                     'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
                     'created_by': self._get_picking_created_by_display(picking),
@@ -287,8 +282,6 @@ class InternalTransferReportWizard(models.TransientModel):
 
         sheet1_headers = [
             self.env._('Reference'),
-            self.env._('Type'),
-            self.env._('Source Document'),
             self.env._('Product'),
             self.env._('Factory Plan Category'),
             self.env._('Created By'),
@@ -300,14 +293,12 @@ class InternalTransferReportWizard(models.TransientModel):
             sheet1.write(0, col, header, header_style)
 
         sheet1.set_column(0, 0, 22)
-        sheet1.set_column(1, 1, 18)
-        sheet1.set_column(2, 2, 20)
-        sheet1.set_column(3, 3, 45)
-        sheet1.set_column(4, 4, 25)
-        sheet1.set_column(5, 5, 30)
-        sheet1.set_column(6, 6, 22)
-        sheet1.set_column(7, 7, 18)
-        sheet1.set_column(8, 8, 16)
+        sheet1.set_column(1, 1, 45)
+        sheet1.set_column(2, 2, 25)
+        sheet1.set_column(3, 3, 30)
+        sheet1.set_column(4, 4, 22)
+        sheet1.set_column(5, 5, 18)
+        sheet1.set_column(6, 6, 16)
 
         row = 1
         sheet1_rows = self._get_sheet1_data()
@@ -316,17 +307,15 @@ class InternalTransferReportWizard(models.TransientModel):
         else:
             for data in sheet1_rows:
                 sheet1.write(row, 0, data['transfer_reference'], text_style)
-                sheet1.write(row, 1, data['transfer_type'], text_style)
-                sheet1.write(row, 2, data['source_document'], text_style)
-                sheet1.write(row, 3, data['product_name'], text_style)
-                sheet1.write(row, 4, data['factory_plan_category'], text_style)
-                sheet1.write(row, 5, data['created_by'], text_style)
+                sheet1.write(row, 1, data['product_name'], text_style)
+                sheet1.write(row, 2, data['factory_plan_category'], text_style)
+                sheet1.write(row, 3, data['created_by'], text_style)
                 if data['creating_date']:
-                    sheet1.write_datetime(row, 6, data['creating_date'], datetime_style)
+                    sheet1.write_datetime(row, 4, data['creating_date'], datetime_style)
                 else:
-                    sheet1.write(row, 6, '', text_style)
-                sheet1.write_number(row, 7, data['demand'], number_style)
-                sheet1.write(row, 8, data['product_uom'], text_style)
+                    sheet1.write(row, 4, '', text_style)
+                sheet1.write_number(row, 5, data['demand'], number_style)
+                sheet1.write(row, 6, data['product_uom'], text_style)
                 row += 1
 
         sheet2 = workbook.add_worksheet(self.env._('Summary'))

@@ -214,23 +214,3 @@ msgstr "استلامات المشتريات"
 #: model_terms:ir.ui.view,arch_db:internal_transfer_excel_report.res_config_settings_view_form_internal_transfer_report
 msgid "Include receipts matching these values in the Internal Transfer Report."
 msgstr "تضمين الاستلامات المطابقة لهذه القيم في تقرير التحويل الداخلي."
-
-#. module: internal_transfer_excel_report
-#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
-msgid "Purchase Receipt"
-msgstr "استلام مشتريات"
-
-#. module: internal_transfer_excel_report
-#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
-msgid "Internal Transfer"
-msgstr "تحويل داخلي"
-
-#. module: internal_transfer_excel_report
-#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
-msgid "Type"
-msgstr "النوع"
-
-#. module: internal_transfer_excel_report
-#: code:addons/internal_transfer_excel_report/wizard/internal_transfer_wizard.py:0
-msgid "Source Document"
-msgstr "المستند المصدر"
