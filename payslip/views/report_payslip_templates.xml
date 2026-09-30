@@ -93,6 +93,7 @@
  'gross_codes': ['GROSS'],
  'deduction_sign': 1,
  'worked_codes': ['WORK100', 'ATTENDANCE', 'A'],
+ 'sick_codes': ['LEAVE110', 'SICK', 'STO', 'SIK', 'SICKLEAVE0', 'LEAVE_SICK', 'SL'],
  'unpaid_codes': ['UNP', 'LEAVE90', 'UNPAID', 'ABSENT'],
  'time_deduction_codes': ['OUTCON', 'DED_UNDERTIME', 'DED_UNPAID', 'DED_BFV', 'DED_TRV'],
   'employee_number_field': 'barcode',
@@ -155,13 +156,18 @@
                 <t t-set="annual_days" t-value="annual_input[0].quantity if annual_input and 'quantity' in annual_input._fields else 0.0"/>
                 <t t-set="pto_days" t-value="pto_input[0].quantity if pto_input and 'quantity' in pto_input._fields else 0.0"/>
                 <t t-set="extra_hrs" t-value="extra_input[0].quantity if extra_input and 'quantity' in extra_input._fields else (o.employee_extra_hours_balance if 'employee_extra_hours_balance' in o._fields else 0.0)"/>
-                <t t-set="worked" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['worked_codes'])"/>
-                <t t-set="unpaid" t-value="o.worked_days_line_ids.filtered(lambda d: d.work_entry_type_id.code in cfg['unpaid_codes'])"/>
+                <t t-set="attendance_lines" t-value="o.worked_days_line_ids.filtered(lambda d: (d.work_entry_type_id.code in cfg.get('worked_codes', [])) or ((d.code or '') in cfg.get('worked_codes', [])) or ('attendance' in (d.work_entry_type_id.name or '').lower()) or ('attendance' in (d.name or '').lower()) or ('حضور' in (d.work_entry_type_id.name or '')) or ('حضور' in (d.name or '')))"/>
+                <t t-set="sick_lines" t-value="o.worked_days_line_ids.filtered(lambda d: (d.work_entry_type_id.code in cfg.get('sick_codes', [])) or ((d.code or '') in cfg.get('sick_codes', [])) or ('sick' in (d.work_entry_type_id.name or '').lower()) or ('sick' in (d.name or '').lower()) or ('مرض' in (d.work_entry_type_id.name or '')) or ('مرض' in (d.name or '')))"/>
+                <t t-set="worked" t-value="attendance_lines | sick_lines"/>
+                <t t-set="unpaid" t-value="o.worked_days_line_ids.filtered(lambda d: (d.work_entry_type_id.code in cfg.get('unpaid_codes', [])) or ((d.code or '') in cfg.get('unpaid_codes', [])))"/>
                 <t t-set="rows" t-value="max(cfg['minimum_rows'], len(allowances), len(deductions))"/>
                 <t t-set="ref_date" t-value="o.date_to or o.date_from"/>
                 <t t-set="month_total_days" t-value="((29 if (ref_date.year % 4 == 0 and (ref_date.year % 100 != 0 or ref_date.year % 400 == 0)) else 28) if ref_date.month == 2 else (30 if ref_date.month in (4, 6, 9, 11) else 31)) if ref_date else 30.0"/>
-                <t t-set="worked_days_count" t-value="sum(worked.mapped('number_of_days')) if cfg['worked_codes'] else (sum(o.worked_days_line_ids.mapped('number_of_days')) or 0.0)"/>
+                <t t-set="worked_days_count" t-value="sum(worked.mapped('number_of_days')) if (cfg.get('worked_codes') or cfg.get('sick_codes')) else (sum(o.worked_days_line_ids.mapped('number_of_days')) or 0.0)"/>
                 <t t-set="unpaid_days_count" t-value="max(0.0, month_total_days - worked_days_count)"/>
+                <t t-set="actual_computed_amount" t-value="round((basic_amount / month_total_days) * worked_days_count, precision) if (month_total_days and basic_amount) else 0.0"/>
+                <t t-set="actual_amount" t-value="actual_computed_amount if (sick_lines and actual_computed_amount &gt; (actual.total if actual else 0.0)) else (actual.total if (actual and actual.total) else actual_computed_amount)"/>
+                <t t-set="unpaid_amount" t-value="max(0.0, (basic_amount or 0.0) - (actual_amount or 0.0))"/>
                 <style>
                     .cpr { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 10px; color: #151515; }
                     .cpr table { width: 100%; border-collapse: collapse; table-layout: fixed; direction: ltr; }
