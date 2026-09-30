@@ -10,6 +10,87 @@ class LogisticsRequest(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'create_date desc, id desc'
 
+    def _register_hook(self):
+        res = super()._register_hook()
+        try:
+            self.env.cr.execute("""
+                CREATE TABLE IF NOT EXISTS logistics_request (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR,
+                    company_id INTEGER,
+                    currency_id INTEGER,
+                    source_type VARCHAR,
+                    sale_order_id INTEGER,
+                    purchase_order_id INTEGER,
+                    shipping_mode VARCHAR,
+                    shipment_type VARCHAR,
+                    container_size VARCHAR,
+                    package_details TEXT,
+                    destination_address TEXT,
+                    total_weight NUMERIC,
+                    total_volume NUMERIC,
+                    invitation_count INTEGER,
+                    submitted_count INTEGER,
+                    selected_line_id INTEGER,
+                    generated_po_id INTEGER,
+                    state VARCHAR DEFAULT 'draft',
+                    notes TEXT,
+                    create_uid INTEGER,
+                    create_date TIMESTAMP,
+                    write_uid INTEGER,
+                    write_date TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS logistics_request_item (
+                    id SERIAL PRIMARY KEY,
+                    request_id INTEGER,
+                    product_id INTEGER,
+                    name VARCHAR,
+                    quantity NUMERIC,
+                    product_uom_id INTEGER,
+                    weight NUMERIC,
+                    volume NUMERIC,
+                    create_uid INTEGER,
+                    create_date TIMESTAMP,
+                    write_uid INTEGER,
+                    write_date TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS logistics_request_invitation (
+                    id SERIAL PRIMARY KEY,
+                    request_id INTEGER,
+                    partner_id INTEGER,
+                    email VARCHAR,
+                    token VARCHAR,
+                    state VARCHAR DEFAULT 'pending',
+                    submitted_date TIMESTAMP,
+                    quote_line_id INTEGER,
+                    create_uid INTEGER,
+                    create_date TIMESTAMP,
+                    write_uid INTEGER,
+                    write_date TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS logistics_request_line (
+                    id SERIAL PRIMARY KEY,
+                    request_id INTEGER,
+                    company_id INTEGER,
+                    currency_id INTEGER,
+                    partner_id INTEGER,
+                    price_subtotal NUMERIC,
+                    handling_fee NUMERIC,
+                    price_total NUMERIC,
+                    transit_time_days INTEGER,
+                    quote_attachment BYTEA,
+                    quote_filename VARCHAR,
+                    notes TEXT,
+                    create_uid INTEGER,
+                    create_date TIMESTAMP,
+                    write_uid INTEGER,
+                    write_date TIMESTAMP
+                );
+            """)
+        except Exception:
+            pass
+        return res
+
     name = fields.Char(
         string='Request Reference',
         required=True,

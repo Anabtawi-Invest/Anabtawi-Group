@@ -16,6 +16,19 @@ class ResPartner(models.Model):
         """)
         return super()._auto_init()
 
+    def _register_hook(self):
+        res = super()._register_hook()
+        try:
+            self.env.cr.execute("""
+                ALTER TABLE res_partner ADD COLUMN IF NOT EXISTS is_freight_forwarder BOOLEAN DEFAULT FALSE;
+                ALTER TABLE res_partner ADD COLUMN IF NOT EXISTS forwarder_approval_state VARCHAR DEFAULT 'draft';
+                ALTER TABLE res_partner ADD COLUMN IF NOT EXISTS forwarder_approved_by INTEGER;
+                ALTER TABLE res_partner ADD COLUMN IF NOT EXISTS forwarder_approved_date TIMESTAMP;
+            """)
+        except Exception:
+            pass
+        return res
+
     is_freight_forwarder = fields.Boolean(
         string='Is Freight Forwarder',
         default=False,
