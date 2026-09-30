@@ -2,7 +2,6 @@
 import logging
 from collections import defaultdict
 from datetime import datetime, time, timedelta
-import pytz
 
 from odoo import _, api, fields, models
 
@@ -47,73 +46,45 @@ class PosReportingDashboard(models.TransientModel):
 
     def _parse_datetime_bounds(self, date_from, date_to):
         """
-        Parse date/datetime parameters into exact store shift datetime bounds,
-        converted from local user timezone (e.g. Asia/Amman) to UTC for database queries.
-        Default shift window: 06:00 AM on start day to 05:00 AM on following day (local time).
+        Parse date/datetime parameters into exact store shift datetime bounds.
+        Default shift window: 06:00 AM on start day to 05:00 AM on following day.
         """
-        user_tz_name = self.env.user.tz or self.env.context.get("tz") or "Asia/Amman"
-        try:
-            local_tz = pytz.timezone(user_tz_name)
-        except Exception:
-            local_tz = pytz.timezone("Asia/Amman")
-
         today = fields.Date.context_today(self)
 
-        def _to_local_dt(val, is_end=False):
+        def _to_dt(val, is_end=False):
             if not val:
                 d = today
                 if is_end:
                     tomorrow = d + timedelta(days=1)
                     return datetime.combine(tomorrow, time(5, 0, 0))
                 return datetime.combine(d, time(6, 0, 0))
-
             if isinstance(val, datetime):
                 return val
 
             val_str = str(val).strip().replace("T", " ")
-            dt_val = None
             for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
                 try:
-                    dt_val = datetime.strptime(val_str.split(".")[0], fmt)
-                    break
+                    return datetime.strptime(val_str.split(".")[0], fmt)
                 except Exception:
                     pass
+            try:
+                d = fields.Date.from_string(val_str[:10])
+                if d:
+                    if is_end:
+                        tomorrow = d + timedelta(days=1)
+                        return datetime.combine(tomorrow, time(5, 0, 0))
+                    return datetime.combine(d, time(6, 0, 0))
+            except Exception:
+                pass
 
-            if not dt_val:
-                try:
-                    d = fields.Date.from_string(val_str[:10])
-                    if d:
-                        if is_end:
-                            tomorrow = d + timedelta(days=1)
-                            return datetime.combine(tomorrow, time(5, 0, 0))
-                        return datetime.combine(d, time(6, 0, 0))
-                except Exception:
-                    pass
+            if is_end:
+                tomorrow = today + timedelta(days=1)
+                return datetime.combine(tomorrow, time(5, 0, 0))
+            return datetime.combine(today, time(6, 0, 0))
 
-            if not dt_val:
-                d = today
-                if is_end:
-                    tomorrow = d + timedelta(days=1)
-                    return datetime.combine(tomorrow, time(5, 0, 0))
-                return datetime.combine(d, time(6, 0, 0))
-
-            return dt_val
-
-        local_dt_start = _to_local_dt(date_from, is_end=False)
-        local_dt_end = _to_local_dt(date_to, is_end=True)
-
-        # Convert local shift naive datetimes into UTC naive datetimes for PostgreSQL matching
-        try:
-            utc_start = local_tz.localize(local_dt_start).astimezone(pytz.UTC).replace(tzinfo=None)
-        except Exception:
-            utc_start = local_dt_start - timedelta(hours=3)
-
-        try:
-            utc_end = local_tz.localize(local_dt_end).astimezone(pytz.UTC).replace(tzinfo=None)
-        except Exception:
-            utc_end = local_dt_end - timedelta(hours=3)
-
-        return utc_start, utc_end
+        dt_start = _to_dt(date_from, is_end=False)
+        dt_end = _to_dt(date_to, is_end=True)
+        return dt_start, dt_end
 
     @api.model
     def get_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
@@ -564,8 +535,7 @@ class PosReportingDashboard(models.TransientModel):
                 if not emp or not att.check_in:
                     continue
                 c_dt = att.check_in
-                local_c_dt = fields.Datetime.context_timestamp(self, c_dt) if c_dt else False
-                att_date = local_c_dt.date() if local_c_dt else c_dt.date()
+                att_date = c_dt.date()
                 if not (dt_start <= c_dt <= dt_end):
                     continue
                 cfg = _get_employee_pos_config(emp)
@@ -1203,8 +1173,7 @@ class PosReportingDashboard(models.TransientModel):
                     if not emp or not att.check_in:
                         continue
                     c_dt = att.check_in
-                    local_c_dt = fields.Datetime.context_timestamp(self, c_dt) if c_dt else False
-                    att_date = local_c_dt.date() if local_c_dt else c_dt.date()
+                    att_date = c_dt.date()
                     if not (dt_start <= c_dt <= dt_end):
                         continue
                     cfg = _get_employee_pos_config(emp)
