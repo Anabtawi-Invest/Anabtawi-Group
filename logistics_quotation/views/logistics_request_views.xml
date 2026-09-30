@@ -13,8 +13,8 @@
                 <field name="shipping_mode"/>
                 <field name="shipment_type"/>
                 <field name="container_size"/>
-                <field name="total_weight" string="Weight (kg)"/>
-                <field name="total_volume" string="Volume (m³)"/>
+                <field name="invitation_count" string="Invited Forwarders"/>
+                <field name="submitted_count" string="Responded"/>
                 <field name="selected_line_id"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="state" widget="badge" decoration-info="state == 'rfq'" decoration-warning="state == 'quoted'" decoration-success="state == 'confirmed'" decoration-muted="state == 'cancelled'"/>
@@ -29,10 +29,10 @@
         <field name="arch" type="xml">
             <form string="Logistics Request">
                 <header>
-                    <button name="action_send_rfq_email" string="Send RFQ by Email" type="object" class="btn-primary" invisible="state not in ('draft', 'rfq')"/>
+                    <button name="action_broadcast_rfq" string="🚀 Broadcast RFQ to Approved Forwarders" type="object" class="btn-primary" invisible="state not in ('draft', 'rfq')"/>
+                    <button name="action_send_rfq_email" string="Send Manual RFQ Email" type="object" class="btn-secondary" invisible="state not in ('draft', 'rfq')"/>
                     <button name="action_print_rfq" string="Download RFQ (PDF)" type="object" class="btn-secondary" icon="fa-download"/>
-                    <button name="action_send_rfq" string="Mark RFQ Sent" type="object" class="btn-secondary" invisible="state != 'draft'"/>
-                    <button name="action_quotes_received" string="Quotes Received" type="object" class="btn-primary" invisible="state != 'rfq'"/>
+                    <button name="action_quotes_received" string="Quotes Received" type="object" class="btn-secondary" invisible="state != 'rfq'"/>
                     <button name="action_confirm_logistics" string="Confirm Logistics Order" type="object" class="oe_highlight" invisible="state not in ('quoted', 'rfq', 'draft')"/>
                     <button name="action_reset_draft" string="Reset to Draft" type="object" class="btn-secondary" invisible="state not in ('cancelled')"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-secondary" invisible="state in ('confirmed', 'cancelled')"/>
@@ -43,6 +43,18 @@
                         <button name="action_view_po" type="object" class="oe_stat_button" icon="fa-shopping-cart" invisible="not generated_po_id">
                             <div class="o_stat_info">
                                 <span class="o_stat_text">Forwarder PO</span>
+                            </div>
+                        </button>
+                        <button type="object" name="action_broadcast_rfq" class="oe_stat_button" icon="fa-paper-plane">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value"><field name="invitation_count"/></span>
+                                <span class="o_stat_text">Invited</span>
+                            </div>
+                        </button>
+                        <button type="object" name="action_broadcast_rfq" class="oe_stat_button" icon="fa-check-square-o">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value"><field name="submitted_count"/></span>
+                                <span class="o_stat_text">Responded</span>
                             </div>
                         </button>
                     </div>
@@ -78,7 +90,7 @@
                         <field name="package_details" nolabel="1" placeholder="Dimensions, gross weight, volume (CBM), special handling notes..."/>
                     </group>
                     <notebook>
-                        <page string="Cargo &amp; Item Breakdown (Price Confidential)" name="cargo_items">
+                        <page string="📦 Cargo &amp; Item Breakdown (Price Confidential)" name="cargo_items">
                             <field name="item_ids">
                                 <list editable="bottom">
                                     <field name="product_id"/>
@@ -90,7 +102,18 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Forwarder Bids / Quotations" name="forwarder_bids">
+                        <page string="📊 Live Forwarder Response Tracker" name="invitations">
+                            <field name="invitation_ids" readonly="1">
+                                <list>
+                                    <field name="partner_id"/>
+                                    <field name="email"/>
+                                    <field name="state" widget="badge" decoration-warning="state == 'pending'" decoration-success="state == 'submitted'" decoration-danger="state == 'declined'"/>
+                                    <field name="submitted_date"/>
+                                    <field name="quote_line_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="💵 Forwarder Bids &amp; PDF Quotes" name="forwarder_bids">
                             <field name="line_ids">
                                 <list editable="bottom">
                                     <field name="partner_id"/>
@@ -105,7 +128,7 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Winning Quote &amp; PO Creation" name="winning_quote">
+                        <page string="🏆 Winning Quote &amp; PO Creation" name="winning_quote">
                             <group>
                                 <field name="selected_line_id" options="{'no_create': True}"/>
                                 <field name="generated_po_id"/>

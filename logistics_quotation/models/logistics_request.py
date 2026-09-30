@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import uuid
 from odoo import _, api, fields, models, Command
 from odoo.exceptions import UserError, ValidationError
 
@@ -107,6 +108,20 @@ class LogisticsRequest(models.Model):
         compute='_compute_totals',
         store=True,
     )
+    invitation_ids = fields.One2many(
+        'logistics.request.invitation',
+        'request_id',
+        string='Forwarder Response Tracker',
+        copy=False,
+    )
+    invitation_count = fields.Integer(
+        compute='_compute_invitation_stats',
+        string='Total Forwarders Invited',
+    )
+    submitted_count = fields.Integer(
+        compute='_compute_invitation_stats',
+        string='Responded Forwarders',
+    )
     line_ids = fields.One2many(
         'logistics.request.line',
         'request_id',
@@ -146,6 +161,12 @@ class LogisticsRequest(models.Model):
             rec.total_weight = sum(rec.item_ids.mapped('weight'))
             rec.total_volume = sum(rec.item_ids.mapped('volume'))
 
+    @api.depends('invitation_ids', 'invitation_ids.state')
+    def _compute_invitation_stats(self):
+        for rec in self:
+            rec.invitation_count = len(rec.invitation_ids)
+            rec.submitted_count = len(rec.invitation_ids.filtered(lambda i: i.state == 'submitted'))
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -155,6 +176,47 @@ class LogisticsRequest(models.Model):
                     or _('New')
                 )
         return super().create(vals_list)
+
+    def action_broadcast_rfq(self):
+        """Zero-Selection Broadcast: Auto-detects all Accounting-Approved Freight Forwarders,
+        creates secure portal tokens, and sends email RFQs with token links in 1 click."""
+        for rec in self:
+            rec.ensure_one()
+            approved_forwarders = self.env['res.partner'].search([
+                ('is_freight_forwarder', '=', True),
+                ('forwarder_approval_state', '=', 'approved'),
+            ])
+            if not approved_forwarders:
+                raise UserError(_("No Accounting-Approved Freight Forwarders found! Please ensure forwarders are approved by Accounting Manager."))
+
+            template = self.env.ref('logistics_quotation.email_template_logistics_rfq', raise_if_not_found=False)
+            base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+
+            broadcast_count = 0
+            for partner in approved_forwarders:
+                invitation = rec.invitation_ids.filtered(lambda i: i.partner_id.id == partner.id)
+                if not invitation:
+                    invitation = self.env['logistics.request.invitation'].create({
+                        'request_id': rec.id,
+                        'partner_id': partner.id,
+                    })
+
+                token_url = f"{base_url}/logistics/rfq/submit/{invitation.token}"
+                
+                if template and partner.email:
+                    template.with_context(
+                        custom_token_url=token_url,
+                        email_to=partner.email,
+                    ).send_mail(rec.id, force_send=True)
+                    broadcast_count += 1
+
+            rec.state = 'rfq'
+            rec.message_post(
+                body=_(
+                    "RFQ broadcasted to %s Accounting-Approved Freight Forwarder(s) via secure web upload links.",
+                    broadcast_count or len(approved_forwarders),
+                )
+            )
 
     def action_send_rfq(self):
         for rec in self:
@@ -331,6 +393,55 @@ class LogisticsRequestItem(models.Model):
     volume = fields.Float(
         string='Volume (m³ / CBM)',
         help='Volume for this cargo item line',
+    )
+
+
+class LogisticsRequestInvitation(models.Model):
+    _name = 'logistics.request.invitation'
+    _description = 'Forwarder Response & Invitation Tracker'
+    _rec_name = 'partner_id'
+    _order = 'submitted_date desc, id desc'
+
+    request_id = fields.Many2one(
+        'logistics.request',
+        string='Logistics Request',
+        required=True,
+        ondelete='cascade',
+    )
+    partner_id = fields.Many2one(
+        'res.partner',
+        string='Forwarder Partner',
+        required=True,
+    )
+    email = fields.Char(
+        related='partner_id.email',
+        string='Forwarder Email',
+        readonly=True,
+    )
+    token = fields.Char(
+        string='Secure Access Token',
+        required=True,
+        default=lambda self: uuid.uuid4().hex,
+        copy=False,
+    )
+    state = fields.Selection(
+        [
+            ('pending', 'Pending Response'),
+            ('submitted', 'Submitted'),
+            ('declined', 'Declined'),
+        ],
+        string='Response Status',
+        default='pending',
+        required=True,
+    )
+    submitted_date = fields.Datetime(
+        string='Submission Date',
+        readonly=True,
+    )
+    quote_line_id = fields.Many2one(
+        'logistics.request.line',
+        string='Submitted Quotation Line',
+        readonly=True,
     )
 
 

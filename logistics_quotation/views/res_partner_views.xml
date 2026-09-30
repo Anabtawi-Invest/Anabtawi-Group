@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Inherit Partner Form View for Freight Forwarder Security & Accounting Approval -->
+    <record id="view_partner_form_inherit_forwarder" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.forwarder</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <header invisible="not is_freight_forwarder">
+                    <button name="action_approve_forwarder" string="Approve Forwarder (Accounting)" type="object" class="btn-primary" invisible="forwarder_approval_state == 'approved'"/>
+                    <button name="action_reject_forwarder" string="Reject Forwarder" type="object" class="btn-secondary" invisible="forwarder_approval_state == 'rejected'"/>
+                    <field name="forwarder_approval_state" widget="statusbar" statusbar_visible="draft,approved"/>
+                </header>
+            </xpath>
+            <xpath expr="//field[@name='category_id']" position="after">
+                <field name="is_freight_forwarder"/>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Logistics &amp; Forwarder Security" name="forwarder_security" invisible="not is_freight_forwarder">
+                    <group>
+                        <group string="Accounting Approval">
+                            <field name="forwarder_approval_state" widget="badge" decoration-warning="forwarder_approval_state == 'draft'" decoration-success="forwarder_approval_state == 'approved'" decoration-danger="forwarder_approval_state == 'rejected'"/>
+                            <field name="forwarder_approved_by"/>
+                            <field name="forwarder_approved_date"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Inherit Partner List View to show Forwarder Approval Status -->
+    <record id="view_partner_tree_inherit_forwarder" model="ir.ui.view">
+        <field name="name">res.partner.list.inherit.forwarder</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='display_name']" position="after">
+                <field name="is_freight_forwarder" optional="hide"/>
+                <field name="forwarder_approval_state" widget="badge" decoration-warning="forwarder_approval_state == 'draft'" decoration-success="forwarder_approval_state == 'approved'" decoration-danger="forwarder_approval_state == 'rejected'" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

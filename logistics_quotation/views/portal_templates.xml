@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Web Portal Template for Forwarder Quote Submission -->
+    <template id="portal_rfq_submit_template" name="Freight RFQ Submission Portal">
+        <t t-call="web.frontend_layout">
+            <div id="wrap" class="container py-5">
+                <div class="row justify-content-center">
+                    <div class="col-lg-9">
+                        <!-- Branding Header Card -->
+                        <div class="card border-0 shadow-sm mb-4 bg-primary text-white">
+                            <div class="card-body p-4">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <h3 class="mb-1 fw-bold text-white">Freight Quotation Request</h3>
+                                        <p class="mb-0 text-white-50">Reference: <strong class="text-white" t-esc="request.name"/></p>
+                                    </div>
+                                    <span class="badge bg-light text-primary fs-6 px-3 py-2" t-esc="request.company_id.name"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <t t-if="already_submitted">
+                            <div class="alert alert-info shadow-sm mb-4">
+                                <i class="fa fa-info-circle me-2"></i> You have already submitted a quotation for this request. Submitting again will update your existing offer.
+                            </div>
+                        </t>
+
+                        <!-- Cargo Specification Card -->
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-header bg-light fw-bold py-3">
+                                🚢 Cargo &amp; Shipping Specifications
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <span class="text-muted d-block small">Shipping Mode</span>
+                                        <strong class="fs-6 text-uppercase" t-esc="request.shipping_mode"/>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <span class="text-muted d-block small">Environment Control</span>
+                                        <strong class="fs-6 text-capitalize" t-esc="request.shipment_type"/>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <span class="text-muted d-block small">Container / Cargo Spec</span>
+                                        <strong class="fs-6" t-esc="request.container_size"/>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <span class="text-muted d-block small">Total Gross Weight</span>
+                                        <strong class="fs-6" t-esc="request.total_weight"/> kg
+                                    </div>
+                                    <div class="col-md-4">
+                                        <span class="text-muted d-block small">Total Volume</span>
+                                        <strong class="fs-6" t-esc="request.total_volume"/> m³ (CBM)
+                                    </div>
+                                    <div class="col-md-4">
+                                        <span class="text-muted d-block small">Destination Address</span>
+                                        <strong class="fs-6" t-esc="request.destination_address or 'As specified'"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Item Packaging Table Card (No Prices) -->
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-header bg-light fw-bold py-3">
+                                📦 Packaging &amp; Item Line Breakdown
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th class="ps-3">#</th>
+                                                <th>Packaging Description / Spec</th>
+                                                <th class="text-end">Quantity</th>
+                                                <th class="text-center">UoM</th>
+                                                <th class="text-end">Weight (kg)</th>
+                                                <th class="text-end pe-3">Volume (m³)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-set="count" t-value="1"/>
+                                            <t t-foreach="items" t-as="item">
+                                                <tr>
+                                                    <td class="ps-3" t-esc="count"/>
+                                                    <td><strong t-esc="item.name"/></td>
+                                                    <td class="text-end" t-esc="item.quantity"/>
+                                                    <td class="text-center" t-esc="item.product_uom_id.name or ''"/>
+                                                    <td class="text-end" t-esc="item.weight"/>
+                                                    <td class="text-end pe-3" t-esc="item.volume"/>
+                                                </tr>
+                                                <t t-set="count" t-value="count + 1"/>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quotation Submission Form -->
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-dark text-white fw-bold py-3">
+                                📝 Submit Your Freight Quotation &amp; PDF
+                            </div>
+                            <div class="card-body p-4">
+                                <form t-attf-action="/logistics/rfq/submit/#{invitation.token}/post" method="POST" enctype="multipart/form-data">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Freight Cost (<t t-esc="request.currency_id.name"/>)</label>
+                                            <input type="number" step="0.01" name="price_subtotal" class="form-control form-control-lg" placeholder="0.00" required="required"/>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Handling / Port Fee (<t t-esc="request.currency_id.name"/>)</label>
+                                            <input type="number" step="0.01" name="handling_fee" class="form-control form-control-lg" placeholder="0.00"/>
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Estimated Transit Time (Days)</label>
+                                            <input type="number" name="transit_time_days" class="form-control" placeholder="e.g. 14" required="required"/>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Upload Quotation PDF / File</label>
+                                            <input type="file" name="quote_file" class="form-control" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"/>
+                                            <span class="form-text text-muted">Attach your official stamped quote document.</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">Terms, Remarks &amp; Free Demurrage Days</label>
+                                        <textarea name="notes" class="form-control" rows="3" placeholder="Enter demurrage days, validity period, or special conditions..."></textarea>
+                                    </div>
+
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-primary btn-lg fw-bold py-3 shadow-sm">
+                                            🚀 Submit Official Freight Quotation
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Thank You Confirmation Page -->
+    <template id="portal_rfq_thanks_template" name="Quotation Submission Thank You">
+        <t t-call="web.frontend_layout">
+            <div id="wrap" class="container py-5 text-center">
+                <div class="row justify-content-center">
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm p-5">
+                            <div class="mb-4">
+                                <span class="badge rounded-circle bg-success-subtle text-success p-3 fs-1">
+                                    ✓
+                                </span>
+                            </div>
+                            <h2 class="fw-bold text-dark mb-3">Quotation Submitted Successfully!</h2>
+                            <p class="text-muted fs-5 mb-4">
+                                Thank you for submitting your freight quotation. Our logistics procurement team has received your offer and will review it shortly.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Invalid / Expired Token Page -->
+    <template id="portal_invalid_token_template" name="Invalid RFQ Access Token">
+        <t t-call="web.frontend_layout">
+            <div id="wrap" class="container py-5 text-center">
+                <div class="row justify-content-center">
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm p-5">
+                            <h2 class="fw-bold text-danger mb-3">Invalid or Expired Link</h2>
+                            <p class="text-muted fs-5">
+                                This logistics quotation request link is no longer valid or has expired. Please contact the logistics team.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+</odoo>

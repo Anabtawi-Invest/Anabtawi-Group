@@ -11,14 +11,12 @@ Integrated freight forwarder bidding and quotation management system.
 
 Features:
 ---------
-* Multi-modal shipping support: Air, Land, and Sea freight.
-* Environmental controls: Dry, Cooling, and Freezer cargo specifications.
-* Container specifications: 20ft, 40ft, Reefer, LCL, Pallets, CBM volume.
-* Forwarder RFQs & bid comparison: Log freight costs, handling fees, and transit times per carrier.
-* Inbound Import Logistics: Automatically generates Purchase Orders to winning freight forwarders and enables Landed Cost allocation on stock pickings.
-* Outbound Customer Logistics: Automatically injects Freight & Handling charges into originating Sales Orders.
-* Native Header Action Buttons on Sales Orders and Purchase Orders.
-* Price-confidential Freight RFQ PDF generation for forwarder emailing.
+* Forwarder Security & Accounting Approval Workflow on Vendors (res.partner).
+* Zero-Selection Automated RFQ Broadcast to Accounting-Approved Forwarders.
+* Secure Tokenized Public Web Portal for Forwarders to submit quotes & PDF documents online.
+* Real-Time Bidding Dashboard & Response Tracker (Responded vs Pending).
+* Commercial Confidentiality: Item descriptions & packaging specs extracted without selling/purchase prices.
+* Automatic Forwarder Purchase Order Generation & Sales Order / Landed Cost updates.
 """,
     'author': 'Anabtawi Group',
     'website': 'https://www.anabtawisweets.com',
@@ -31,6 +29,7 @@ Features:
         'purchase',
         'stock',
         'stock_landed_costs',
+        'website',
     ],
     'data': [
         'security/ir.model.access.csv',
@@ -38,6 +37,8 @@ Features:
         'data/product_data.xml',
         'data/mail_template_data.xml',
         'report/logistics_request_report.xml',
+        'views/portal_templates.xml',
+        'views/res_partner_views.xml',
         'views/logistics_request_views.xml',
     ],
     'assets': {},
