@@ -12,6 +12,8 @@ const CHART_WIDTH = 560;
 const CHART_HEIGHT = 150;
 const CHART_PADDING = 22;
 
+const CEO_DASHBOARD_STORAGE_KEY = "ceo_main_dashboard_state";
+
 export class CeoMainDashboard extends Component {
     static template = "ceo_main_dashboard.Dashboard";
     static props = ["*"];
@@ -24,17 +26,39 @@ export class CeoMainDashboard extends Component {
         this.limitOptions = [15, 30, 50, 100];
         const today = DateTime.local().toISODate();
 
+        let saved = this.props.action?._dashboardState || null;
+        if (!saved) {
+            try {
+                const raw = sessionStorage.getItem(CEO_DASHBOARD_STORAGE_KEY);
+                if (raw) {
+                    saved = JSON.parse(raw);
+                }
+            } catch (e) {
+                console.warn("Failed to load CEO dashboard state from sessionStorage", e);
+            }
+        }
+
+        this._restoringFromSaved = !!saved;
+
+        const preset = (saved && saved.preset) || "today";
+        const dateFrom = (saved && saved.dateFrom) || today;
+        const dateTo = (saved && saved.dateTo) || today;
+        const activeTab = (saved && saved.activeTab) || "purchase";
+        const trendFilter = (saved && saved.trendFilter) || "all";
+        const limit = (saved && saved.limit) || 100;
+        const currentPage = (saved && saved.currentPage) || 1;
+
         this.state = useState({
-            activeTab: "purchase",
+            activeTab: activeTab,
             loading: true,
             syncing: false,
-            preset: "today",
-            dateFrom: today,
-            dateTo: today,
+            preset: preset,
+            dateFrom: dateFrom,
+            dateTo: dateTo,
             data: null,
-            trendFilter: "all", // 'all' | 'up' | 'down'
-            limit: 100,
-            currentPage: 1,
+            trendFilter: trendFilter, // 'all' | 'up' | 'down'
+            limit: limit,
+            currentPage: currentPage,
             searchTerm: "",
             searchResults: null,
             searching: false,
@@ -47,10 +71,31 @@ export class CeoMainDashboard extends Component {
         onWillStart(() => this.loadData());
     }
 
+    _saveState() {
+        try {
+            const stateToSave = {
+                preset: this.state.preset,
+                dateFrom: this.state.dateFrom,
+                dateTo: this.state.dateTo,
+                activeTab: this.state.activeTab,
+                trendFilter: this.state.trendFilter,
+                limit: this.state.limit,
+                currentPage: this.state.currentPage,
+            };
+            if (this.props.action) {
+                this.props.action._dashboardState = stateToSave;
+            }
+            sessionStorage.setItem(CEO_DASHBOARD_STORAGE_KEY, JSON.stringify(stateToSave));
+        } catch (e) {
+            console.warn("Failed to save CEO dashboard state", e);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Data loading
     // ------------------------------------------------------------------
     async loadData() {
+        this._saveState();
         this.state.loading = true;
         try {
             this.state.data = await this.orm.call("ceo.main.dashboard", "get_purchase_dashboard", [
@@ -59,7 +104,10 @@ export class CeoMainDashboard extends Component {
             ]);
             this.state.history = {};
             this.state.expandedProductId = null;
-            this.state.currentPage = 1;
+            if (!this._restoringFromSaved) {
+                this.state.currentPage = 1;
+            }
+            this._restoringFromSaved = false;
             if (this.state.searchTerm.trim()) {
                 await this.runSearch();
             }
@@ -80,6 +128,7 @@ export class CeoMainDashboard extends Component {
 
     switchTab(tab) {
         this.state.activeTab = tab;
+        this._saveState();
     }
 
     // ------------------------------------------------------------------
@@ -113,16 +162,19 @@ export class CeoMainDashboard extends Component {
         this.state.preset = preset;
         this.state.dateFrom = from.toISODate();
         this.state.dateTo = to.toISODate();
+        this._saveState();
         this.loadData();
     }
 
     onDateChange(field, ev) {
         this.state.preset = "custom";
         this.state[field] = ev.target.value;
+        this._saveState();
     }
 
     applyCustomRange() {
         if (this.state.dateFrom && this.state.dateTo) {
+            this._saveState();
             this.loadData();
         }
     }
@@ -134,12 +186,14 @@ export class CeoMainDashboard extends Component {
         this.state.trendFilter = trend;
         this.state.currentPage = 1;
         this.state.expandedProductId = null;
+        this._saveState();
     }
 
     onLimitChange(ev) {
         this.state.limit = parseInt(ev.target.value, 10) || 100;
         this.state.currentPage = 1;
         this.state.expandedProductId = null;
+        this._saveState();
     }
 
     onSearchInput(ev) {
@@ -257,6 +311,7 @@ export class CeoMainDashboard extends Component {
         if (this.state.currentPage !== target) {
             this.state.currentPage = target;
             this.state.expandedProductId = null;
+            this._saveState();
             const tableElem = document.querySelector(".cmd_panel .cmd_table_wrap");
             if (tableElem) {
                 tableElem.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -340,6 +395,7 @@ export class CeoMainDashboard extends Component {
         if (!orderId) {
             return;
         }
+        this._saveState();
         this.action.doAction({
             type: "ir.actions.act_window",
             res_model: "purchase.order",
@@ -351,6 +407,7 @@ export class CeoMainDashboard extends Component {
 
     openPeriodOrders() {
         const data = this.state.data;
+        this._saveState();
         this.action.doAction({
             type: "ir.actions.act_window",
             name: _t("Confirmed Purchase Orders"),
@@ -368,6 +425,7 @@ export class CeoMainDashboard extends Component {
     }
 
     openProduct(productId) {
+        this._saveState();
         this.action.doAction({
             type: "ir.actions.act_window",
             res_model: "product.product",
