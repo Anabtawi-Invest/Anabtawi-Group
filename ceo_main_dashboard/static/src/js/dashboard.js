@@ -33,7 +33,8 @@ export class CeoMainDashboard extends Component {
             dateTo: today,
             data: null,
             trendFilter: "all", // 'all' | 'up' | 'down'
-            limit: 15,
+            limit: 100,
+            currentPage: 1,
             searchTerm: "",
             searchResults: null,
             searching: false,
@@ -58,6 +59,7 @@ export class CeoMainDashboard extends Component {
             ]);
             this.state.history = {};
             this.state.expandedProductId = null;
+            this.state.currentPage = 1;
             if (this.state.searchTerm.trim()) {
                 await this.runSearch();
             }
@@ -130,14 +132,20 @@ export class CeoMainDashboard extends Component {
     // ------------------------------------------------------------------
     setTrendFilter(trend) {
         this.state.trendFilter = trend;
+        this.state.currentPage = 1;
+        this.state.expandedProductId = null;
     }
 
     onLimitChange(ev) {
-        this.state.limit = parseInt(ev.target.value, 10) || 15;
+        this.state.limit = parseInt(ev.target.value, 10) || 100;
+        this.state.currentPage = 1;
+        this.state.expandedProductId = null;
     }
 
     onSearchInput(ev) {
         this.state.searchTerm = ev.target.value;
+        this.state.currentPage = 1;
+        this.state.expandedProductId = null;
         if (!this.state.searchTerm.trim()) {
             this.state.searchResults = null;
             return;
@@ -148,6 +156,8 @@ export class CeoMainDashboard extends Component {
     clearSearch() {
         this.state.searchTerm = "";
         this.state.searchResults = null;
+        this.state.currentPage = 1;
+        this.state.expandedProductId = null;
     }
 
     async runSearch() {
@@ -181,12 +191,93 @@ export class CeoMainDashboard extends Component {
         return (this.state.data && this.state.data.price_rows) || [];
     }
 
-    get visibleRows() {
+    get filteredRows() {
         let rows = this.allRows;
         if (this.state.trendFilter !== "all") {
             rows = rows.filter((r) => r.trend === this.state.trendFilter);
         }
-        return this.isSearchMode ? rows : rows.slice(0, this.state.limit);
+        return rows;
+    }
+
+    get totalPages() {
+        return Math.max(1, Math.ceil(this.filteredRows.length / this.state.limit));
+    }
+
+    get currentPage() {
+        if (this.state.currentPage > this.totalPages) {
+            return 1;
+        }
+        if (this.state.currentPage < 1) {
+            return 1;
+        }
+        return this.state.currentPage;
+    }
+
+    get visibleRows() {
+        const page = this.currentPage;
+        const start = (page - 1) * this.state.limit;
+        return this.filteredRows.slice(start, start + this.state.limit);
+    }
+
+    get startItem() {
+        if (!this.filteredRows.length) {
+            return 0;
+        }
+        return (this.currentPage - 1) * this.state.limit + 1;
+    }
+
+    get endItem() {
+        return Math.min(this.currentPage * this.state.limit, this.filteredRows.length);
+    }
+
+    get pages() {
+        const total = this.totalPages;
+        const current = this.currentPage;
+        if (total <= 9) {
+            return Array.from({ length: total }, (_, i) => i + 1);
+        }
+        let start = Math.max(1, current - 4);
+        let end = Math.min(total, current + 4);
+        if (current <= 5) {
+            start = 1;
+            end = 9;
+        } else if (current + 4 >= total) {
+            start = total - 8;
+            end = total;
+        }
+        const pageList = [];
+        for (let p = start; p <= end; p++) {
+            pageList.push(p);
+        }
+        return pageList;
+    }
+
+    setPage(page) {
+        const target = Math.max(1, Math.min(page, this.totalPages));
+        if (this.state.currentPage !== target) {
+            this.state.currentPage = target;
+            this.state.expandedProductId = null;
+            const tableElem = document.querySelector(".cmd_panel .cmd_table_wrap");
+            if (tableElem) {
+                tableElem.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+        }
+    }
+
+    prevPage() {
+        this.setPage(this.currentPage - 1);
+    }
+
+    nextPage() {
+        this.setPage(this.currentPage + 1);
+    }
+
+    firstPage() {
+        this.setPage(1);
+    }
+
+    lastPage() {
+        this.setPage(this.totalPages);
     }
 
     countTrend(trend) {

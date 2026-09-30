@@ -212,7 +212,7 @@
                             <t t-foreach="visibleRows" t-as="row" t-key="row.product_id">
                                 <tr class="cmd_row" t-att-class="'cmd_row_' + row.trend + (state.expandedProductId === row.product_id ? ' cmd_row_open' : '')"
                                     t-on-click="() => this.toggleHistory(row)" title="Click to see price history">
-                                    <td class="cmd_muted" t-esc="row_index + 1"/>
+                                    <td class="cmd_muted" t-esc="(currentPage - 1) * state.limit + row_index + 1"/>
                                     <td>
                                         <div class="cmd_product">
                                             <i class="fa me-1" t-att-class="state.expandedProductId === row.product_id ? 'fa-caret-down' : 'fa-caret-right'"/>
@@ -326,8 +326,58 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="cmd_table_foot" t-if="!isSearchMode and allRows.length > visibleRows.length and state.trendFilter === 'all'">
-                    <span>Showing</span> <t t-esc="visibleRows.length"/> <span>of</span> <t t-esc="allRows.length"/> <span>products — sorted by biggest price change.</span>
+                <div class="cmd_table_foot" t-if="filteredRows.length">
+                    <div class="cmd_table_info">
+                        <span>Showing</span>
+                        <strong t-esc="startItem"/>–<strong t-esc="endItem"/>
+                        <span>of</span>
+                        <strong t-esc="filteredRows.length"/>
+                        <span>products</span>
+                        <t t-if="!isSearchMode and state.trendFilter === 'all'">
+                            <span class="cmd_muted"> — sorted by biggest price change.</span>
+                        </t>
+                        <t t-elif="state.trendFilter !== 'all'">
+                            <span class="cmd_muted"> (<t t-esc="trendLabel(state.trendFilter)"/>)</span>
+                        </t>
+                    </div>
+
+                    <div class="cmd_pagination_wrap" t-if="totalPages > 1">
+                        <div class="cmd_pagination">
+                            <button type="button" class="cmd_page_btn cmd_page_nav"
+                                    t-att-disabled="currentPage === 1"
+                                    t-on-click="() => this.firstPage()"
+                                    title="First page">
+                                <i class="fa fa-step-backward"/>
+                            </button>
+                            <button type="button" class="cmd_page_btn cmd_page_nav"
+                                    t-att-disabled="currentPage === 1"
+                                    t-on-click="() => this.prevPage()"
+                                    title="Previous page">
+                                <i class="fa fa-caret-left"/>
+                            </button>
+
+                            <t t-foreach="pages" t-as="p" t-key="p">
+                                <button type="button" class="cmd_page_btn"
+                                        t-att-class="{ 'cmd_page_active': p === currentPage }"
+                                        t-on-click="() => this.setPage(p)">
+                                    <t t-esc="p"/>
+                                </button>
+                            </t>
+
+                            <button type="button" class="cmd_page_btn cmd_page_nav"
+                                    t-att-disabled="currentPage === totalPages"
+                                    t-on-click="() => this.nextPage()"
+                                    title="Next page">
+                                <i class="fa fa-caret-right"/>
+                            </button>
+                            <button type="button" class="cmd_page_btn cmd_page_nav"
+                                    t-att-disabled="currentPage === totalPages"
+                                    t-on-click="() => this.lastPage()"
+                                    title="Last page">
+                                <i class="fa fa-step-forward"/>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
