@@ -4,8 +4,6 @@ import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
-const POS_DASHBOARD_STORAGE_KEY = "anabtawi_pos_dashboard_state";
-
 export class PosReportingDashboard extends Component {
     static template = "anabtawi_pos_reporting_dashboard.PosReportingDashboard";
 
@@ -18,36 +16,18 @@ export class PosReportingDashboard extends Component {
         const today6am = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const tomorrow5am = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
-        const defaultFrom = this._formatLocalDatetimeWithTime(today6am, "06", "00");
-        const defaultTo = this._formatLocalDatetimeWithTime(tomorrow5am, "05", "00");
-
-        let saved = this.props.action?._dashboardState || null;
-        if (!saved) {
-            try {
-                const raw = sessionStorage.getItem(POS_DASHBOARD_STORAGE_KEY);
-                if (raw) {
-                    saved = JSON.parse(raw);
-                }
-            } catch (e) {
-                console.warn("Failed to load POS dashboard state from sessionStorage", e);
-            }
-        }
-
-        const period = params.period || (saved && saved.period) || "today";
-        const initFrom = params.date_from || (saved && saved.date_from) || defaultFrom;
-        const initTo = params.date_to || (saved && saved.date_to) || defaultTo;
-        const initConfigs = params.config_ids || (saved && saved.config_ids) || [];
-        const initSortKey = (saved && saved.sortKey) || "sales";
-        const initSortOrder = (saved && saved.sortOrder) || "desc";
+        const initFrom = params.date_from || this._formatLocalDatetimeWithTime(today6am, "06", "00");
+        const initTo = params.date_to || this._formatLocalDatetimeWithTime(tomorrow5am, "05", "00");
+        const initConfigs = params.config_ids || [];
 
         this.state = useState({
-            period: period,
+            period: "today",
             date_from: initFrom,
             date_to: initTo,
             config_ids: initConfigs,
             loading: true,
-            sortKey: initSortKey,
-            sortOrder: initSortOrder,
+            sortKey: "sales",
+            sortOrder: "desc",
         });
 
         this.data = useState({
@@ -65,30 +45,6 @@ export class PosReportingDashboard extends Component {
         onWillStart(async () => {
             await this.fetchDashboardData();
         });
-    }
-
-    _saveState() {
-        try {
-            const dataToSave = {
-                period: this.state.period,
-                date_from: this.state.date_from,
-                date_to: this.state.date_to,
-                config_ids: this.state.config_ids,
-                sortKey: this.state.sortKey,
-                sortOrder: this.state.sortOrder,
-            };
-            if (this.props.action) {
-                this.props.action._dashboardState = dataToSave;
-            }
-            sessionStorage.setItem(POS_DASHBOARD_STORAGE_KEY, JSON.stringify(dataToSave));
-        } catch (e) {
-            console.warn("Failed to save POS dashboard state", e);
-        }
-    }
-
-    onCustomDateChange() {
-        this.state.period = "custom";
-        this._saveState();
     }
 
     _formatLocalDatetimeWithTime(dateObj, hourStr = "06", minStr = "00") {
@@ -112,7 +68,6 @@ export class PosReportingDashboard extends Component {
     }
 
     async fetchDashboardData() {
-        this._saveState();
         this.state.loading = true;
         try {
             const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
@@ -176,7 +131,6 @@ export class PosReportingDashboard extends Component {
             this.state.sortKey = key;
             this.state.sortOrder = key === "branch_name" ? "asc" : "desc";
         }
-        this._saveState();
     }
 
     selectBranch(branchId) {
@@ -185,7 +139,6 @@ export class PosReportingDashboard extends Component {
         } else {
             this.state.config_ids = [branchId];
         }
-        this._saveState();
         this.fetchDashboardData();
     }
 
@@ -220,7 +173,6 @@ export class PosReportingDashboard extends Component {
 
         this.state.date_from = this._formatLocalDatetimeWithTime(fromDate, "06", "00");
         this.state.date_to = this._formatLocalDatetimeWithTime(toDate, "05", "00");
-        this._saveState();
         this.fetchDashboardData();
     }
 
@@ -246,7 +198,6 @@ export class PosReportingDashboard extends Component {
     }
 
     async onKpiClick(metricType, configId = null) {
-        this._saveState();
         try {
             const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
             const strTo = this._formatDatetimeForRPC(this.state.date_to, true);
@@ -273,7 +224,6 @@ export class PosReportingDashboard extends Component {
     }
 
     async exportExcel() {
-        this._saveState();
         try {
             const strFrom = this._formatDatetimeForRPC(this.state.date_from, false);
             const strTo = this._formatDatetimeForRPC(this.state.date_to, true);
