@@ -1,0 +1,107 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+#	* sale_delivery_split_group
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-01 00:00+0000\n"
+"PO-Revision-Date: 2026-10-01 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: sale_delivery_split_group
+#: model:ir.model,name:sale_delivery_split_group.model_sale_delivery_group
+msgid "Sale Delivery Group"
+msgstr "مجموعة التوصيل للمبيعات"
+
+#. module: sale_delivery_split_group
+#: model:ir.actions.act_window,name:sale_delivery_split_group.sale_delivery_group_action
+#: model:ir.ui.menu,name:sale_delivery_split_group.menu_sale_delivery_group_sale
+#: model:ir.ui.menu,name:sale_delivery_split_group.menu_sale_delivery_group_stock
+#: model_terms:ir.ui.view,arch_db:sale_delivery_split_group.res_config_settings_view_form_delivery_split
+msgid "Delivery Groups"
+msgstr "مجموعات التوصيل"
+
+#. module: sale_delivery_split_group
+#: model:ir.model.fields,field_description:sale_delivery_split_group.field_sale_order_line__delivery_group_id
+#: model:ir.model.fields,field_description:sale_delivery_split_group.field_stock_move__delivery_group_id
+#: model:ir.model.fields,field_description:sale_delivery_split_group.field_stock_picking__delivery_group_id
+#: model_terms:ir.ui.view,arch_db:sale_delivery_split_group.view_picking_internal_search_delivery_split
+msgid "Delivery Group"
+msgstr "مجموعة التوصيل"
+
+#. module: sale_delivery_split_group
+#: model:ir.model.fields,field_description:sale_delivery_split_group.field_sale_delivery_group__name
+msgid "Name"
+msgstr "الاسم"
+
+#. module: sale_delivery_split_group
+#: model:ir.model.fields,field_description:sale_delivery_split_group.field_sale_delivery_group__sequence
+msgid "Sequence"
+msgstr "التسلسل"
+
+#. module: sale_delivery_split_group
+#: model:ir.model.fields,field_description:sale_delivery_split_group.field_sale_delivery_group__active
+msgid "Active"
+msgstr "نشط"
+
+#. module: sale_delivery_split_group
+#: model_terms:ir.ui.view,arch_db:sale_delivery_split_group.sale_delivery_group_view_search
+msgid "Archived"
+msgstr "مؤرشف"
+
+#. module: sale_delivery_split_group
+#: model:ir.model.fields,field_description:sale_delivery_split_group.field_res_company__delivery_split_location_ids
+#: model:ir.model.fields,field_description:sale_delivery_split_group.field_res_config_settings__delivery_split_location_ids
+msgid "Split Delivery Customer Locations"
+msgstr "مواقع العملاء لتقسيم التوصيل"
+
+#. module: sale_delivery_split_group
+#: model:ir.model.fields,field_description:sale_delivery_split_group.field_sale_order__use_delivery_group
+msgid "Split Delivery by Group"
+msgstr "تقسيم التوصيل حسب المجموعة"
+
+#. module: sale_delivery_split_group
+#: model_terms:ir.ui.view,arch_db:sale_delivery_split_group.res_config_settings_view_form_delivery_split
+msgid "Split Deliveries by Group"
+msgstr "تقسيم أوامر التوصيل حسب المجموعة"
+
+#. module: sale_delivery_split_group
+#: model_terms:ir.ui.view,arch_db:sale_delivery_split_group.res_config_settings_view_form_delivery_split
+msgid ""
+"When the customer location of a sale order is one of these locations, each "
+"sale order line requires a Delivery Group and one delivery order is created "
+"per group."
+msgstr ""
+"عندما يكون موقع العميل في أمر البيع أحد هذه المواقع، يجب تحديد مجموعة توصيل "
+"لكل بند، ويتم إنشاء أمر توصيل منفصل لكل مجموعة."
+
+#. module: sale_delivery_split_group
+#: model_terms:ir.actions.act_window,help:sale_delivery_split_group.sale_delivery_group_action
+msgid "Create a delivery group"
+msgstr "أنشئ مجموعة توصيل"
+
+#. module: sale_delivery_split_group
+#: model_terms:ir.actions.act_window,help:sale_delivery_split_group.sale_delivery_group_action
+msgid ""
+"Each delivery group on the sale order lines becomes a separate delivery "
+"order."
+msgstr "كل مجموعة توصيل في بنود أمر البيع تصبح أمر توصيل منفصل."
+
+#. module: sale_delivery_split_group
+#. odoo-python
+#: code:addons/sale_delivery_split_group/models/sale_order_line.py:0
+msgid "Please set a Delivery Group on the following lines:\n%s"
+msgstr "يرجى تحديد مجموعة التوصيل للبنود التالية:\n%s"
+
+#. module: sale_delivery_split_group
+#. odoo-python
+#: code:addons/sale_delivery_split_group/models/sale_order_line.py:0
+msgid "You cannot change the delivery group of lines that already have deliveries:\n%s"
+msgstr "لا يمكن تغيير مجموعة التوصيل للبنود التي تم إنشاء أوامر توصيل لها:\n%s"

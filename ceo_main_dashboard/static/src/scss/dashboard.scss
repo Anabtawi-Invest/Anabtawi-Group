@@ -206,6 +206,49 @@ $cmd-text: #1e293b;
         }
     }
 
+    .cmd_billing_filter {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+
+        .cmd_pill_invoiced.cmd_pill_active {
+            color: $cmd-down;
+        }
+
+        .cmd_pill_not_invoiced.cmd_pill_active {
+            color: #c2410c;
+        }
+    }
+
+    .cmd_bill {
+        display: inline-block;
+        margin-top: 3px;
+        font-size: 10.5px;
+        font-weight: 600;
+        padding: 1px 7px;
+        border-radius: 10px;
+        white-space: nowrap;
+        border: 1px solid transparent;
+
+        &.cmd_bill_invoiced {
+            background: $cmd-down-bg;
+            color: $cmd-down;
+            border-color: $cmd-down-border;
+        }
+
+        &.cmd_bill_none {
+            background: #fff7ed;
+            color: #c2410c;
+            border-color: #fed7aa;
+        }
+
+        &.cmd_bill_partial {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border-color: #bfdbfe;
+        }
+    }
+
     .cmd_currency {
         display: flex;
         align-items: center;

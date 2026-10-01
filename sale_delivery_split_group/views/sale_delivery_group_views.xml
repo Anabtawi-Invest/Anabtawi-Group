@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="sale_delivery_group_view_list" model="ir.ui.view">
+        <field name="name">sale.delivery.group.list</field>
+        <field name="model">sale.delivery.group</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="active" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="sale_delivery_group_view_search" model="ir.ui.view">
+        <field name="name">sale.delivery.group.search</field>
+        <field name="model">sale.delivery.group</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="sale_delivery_group_action" model="ir.actions.act_window">
+        <field name="name">Delivery Groups</field>
+        <field name="res_model">sale.delivery.group</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a delivery group</p>
+            <p>Each delivery group on the sale order lines becomes a separate delivery order.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_sale_delivery_group_stock"
+              name="Delivery Groups"
+              parent="stock.menu_delivery"
+              action="sale_delivery_group_action"
+              sequence="90"/>
+
+    <menuitem id="menu_sale_delivery_group_sale"
+              name="Delivery Groups"
+              parent="sale.menu_sales_config"
+              action="sale_delivery_group_action"
+              groups="sales_team.group_sale_manager"
+              sequence="90"/>
+</odoo>

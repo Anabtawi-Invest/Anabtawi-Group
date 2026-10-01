@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_delivery_split" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.delivery.split</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="stock.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@name='shipping_setting_container']" position="inside">
+                <setting id="delivery_split_locations"
+                         string="Split Deliveries by Group"
+                         company_dependent="1"
+                         help="When the customer location of a sale order is one of these locations, each sale order line requires a Delivery Group and one delivery order is created per group.">
+                    <div class="content-group">
+                        <div class="mt8">
+                            <field name="delivery_split_location_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                        </div>
+                        <div class="mt8">
+                            <button name="%(sale_delivery_split_group.sale_delivery_group_action)d"
+                                    icon="oi-arrow-right" type="action"
+                                    string="Delivery Groups" class="btn-link"/>
+                        </div>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -32,6 +32,7 @@ export class CeoMainDashboard extends Component {
             dateFrom: today,
             dateTo: today,
             data: null,
+            billing: "all", // 'all' | 'invoiced' | 'not_invoiced'
             trendFilter: "all", // 'all' | 'up' | 'down'
             limit: 100,
             currentPage: 1,
@@ -56,6 +57,7 @@ export class CeoMainDashboard extends Component {
             this.state.data = await this.orm.call("ceo.main.dashboard", "get_purchase_dashboard", [
                 this.state.dateFrom,
                 this.state.dateTo,
+                this.state.billing,
             ]);
             this.state.history = {};
             this.state.expandedProductId = null;
@@ -127,6 +129,13 @@ export class CeoMainDashboard extends Component {
         }
     }
 
+    setBilling(billing) {
+        if (this.state.billing !== billing) {
+            this.state.billing = billing;
+            this.loadData();
+        }
+    }
+
     // ------------------------------------------------------------------
     // Price comparison table: filters, search, history
     // ------------------------------------------------------------------
@@ -171,6 +180,7 @@ export class CeoMainDashboard extends Component {
             const rows = await this.orm.call("ceo.main.dashboard", "search_purchase_prices", [
                 term,
                 this.state.dateTo,
+                this.state.billing,
             ]);
             if (term === this.state.searchTerm.trim()) {
                 this.state.searchResults = rows;
@@ -300,7 +310,7 @@ export class CeoMainDashboard extends Component {
                 this.state.history[productId] = await this.orm.call(
                     "ceo.main.dashboard",
                     "get_product_price_history",
-                    [productId, this.state.dateTo]
+                    [productId, this.state.dateTo, this.state.billing]
                 );
             } finally {
                 this.state.historyLoading = false;
@@ -349,20 +359,31 @@ export class CeoMainDashboard extends Component {
         });
     }
 
-    openPeriodOrders() {
+    openReceipt(pickingId) {
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "stock.picking",
+            res_id: pickingId,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
+    openPeriodReceipts() {
         const data = this.state.data;
         this.action.doAction({
             type: "ir.actions.act_window",
-            name: _t("Confirmed Purchase Orders"),
-            res_model: "purchase.order",
+            name: _t("Purchase Receipts"),
+            res_model: "stock.picking",
             views: [
                 [false, "list"],
                 [false, "form"],
             ],
             domain: [
-                ["state", "=", "purchase"],
-                ["date_approve", ">=", data.utc_from],
-                ["date_approve", "<=", data.utc_to],
+                ["state", "=", "done"],
+                ["move_ids.purchase_line_id", "!=", false],
+                ["date_done", ">=", data.utc_from],
+                ["date_done", "<=", data.utc_to],
             ],
         });
     }
@@ -389,6 +410,14 @@ export class CeoMainDashboard extends Component {
         }[trend];
     }
 
+    billingLabel(status) {
+        return {
+            invoiced: _t("Invoiced"),
+            none: _t("Not invoiced"),
+            partial: _t("Partially invoiced"),
+        }[status];
+    }
+
     trendIcon(trend) {
         return {
             up: "fa-arrow-up",
@@ -403,6 +432,10 @@ export class CeoMainDashboard extends Component {
             return "";
         }
         return value > 0 ? "cmd_text_up" : "cmd_text_down";
+    }
+
+    qtyDiffers(received, ordered) {
+        return Math.abs((Number(received) || 0) - (Number(ordered) || 0)) > 1e-6;
     }
 
     barHeight(amount) {

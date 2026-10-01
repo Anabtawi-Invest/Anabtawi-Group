@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_picking_form_delivery_split" model="ir.ui.view">
+        <field name="name">stock.picking.form.inherit.delivery.split</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='origin']" position="after">
+                <field name="delivery_group_id" invisible="not delivery_group_id"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="vpicktree_delivery_split" model="ir.ui.view">
+        <field name="name">stock.picking.list.inherit.delivery.split</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='origin']" position="after">
+                <field name="delivery_group_id" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_picking_internal_search_delivery_split" model="ir.ui.view">
+        <field name="name">stock.picking.search.inherit.delivery.split</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_internal_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='origin']" position="after">
+                <field name="delivery_group_id"/>
+            </xpath>
+            <xpath expr="//search" position="inside">
+                <filter string="Delivery Group" name="group_by_delivery_group" context="{'group_by': 'delivery_group_id'}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
