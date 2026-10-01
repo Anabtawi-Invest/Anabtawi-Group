@@ -45,5 +45,5 @@ class SaleOrderLine(models.Model):
     def _prepare_procurement_values(self):
         values = super()._prepare_procurement_values()
         if self.order_id.use_delivery_group:
-            values["delivery_group_id"] = self.delivery_group_id
+            values["delivery_group_id"] = self.delivery_group_id.id
         return values

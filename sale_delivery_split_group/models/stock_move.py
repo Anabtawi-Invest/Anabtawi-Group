@@ -29,5 +29,5 @@ class StockMove(models.Model):
 
     def _prepare_procurement_values(self):
         values = super()._prepare_procurement_values()
-        values["delivery_group_id"] = self.delivery_group_id
+        values["delivery_group_id"] = self.delivery_group_id.id
         return values
