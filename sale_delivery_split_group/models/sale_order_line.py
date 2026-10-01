@@ -9,6 +9,7 @@ class SaleOrderLine(models.Model):
         "sale.delivery.group",
         string="Delivery Group",
         index="btree_not_null",
+        copy=False,
     )
 
     def write(self, vals):

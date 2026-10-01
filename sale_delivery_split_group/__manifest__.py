@@ -1,6 +1,6 @@
 {
     "name": "Sale Delivery Split by Group",
-    "version": "19.0.1.0.1",
+    "version": "19.0.1.0.2",
     "category": "Inventory/Delivery",
     "author": "Anabtawi",
     "summary": "Split sale order deliveries by a delivery group set on each line "
