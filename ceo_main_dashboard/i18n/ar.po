@@ -49,8 +49,8 @@ msgstr "تم تحديث لوحة المعلومات"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/js/dashboard.js:0
-msgid "Confirmed Purchase Orders"
-msgstr "أوامر الشراء المؤكدة"
+msgid "Purchase Receipts"
+msgstr "إيصالات استلام المشتريات"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -171,14 +171,14 @@ msgstr "جاري تحميل بيانات المشتريات…"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Purchases in period"
-msgstr "المشتريات خلال الفترة"
+msgid "Received in period"
+msgstr "المستلم خلال الفترة"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "confirmed orders"
-msgstr "أوامر مؤكدة"
+msgid "receipts"
+msgstr "إيصالات استلام"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -189,14 +189,14 @@ msgstr "مقارنة بالفترة السابقة"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Today's purchases"
-msgstr "مشتريات اليوم"
+msgid "Received today"
+msgstr "المستلم اليوم"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "orders"
-msgstr "أوامر"
+msgid "Ordered:"
+msgstr "المطلوب:"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -213,8 +213,8 @@ msgstr "الموردون"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Average order"
-msgstr "متوسط الأمر"
+msgid "Average receipt"
+msgstr "متوسط قيمة الاستلام"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -237,8 +237,8 @@ msgstr "من"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "products bought"
-msgstr "منتجات تم شراؤها"
+msgid "products received"
+msgstr "منتجات مستلمة"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -250,9 +250,9 @@ msgstr "الأثر المالي لتغير الأسعار"
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
 msgid ""
-"Every purchase in the period compared with the previous purchase price of "
-"the same product × quantity bought"
-msgstr "كل عملية شراء في الفترة مقارنة بسعر الشراء السابق لنفس المنتج × الكمية المشتراة"
+"Every receipt in the period compared with the previous purchase price of "
+"the same product × quantity received"
+msgstr "كل عملية استلام في الفترة مقارنة بسعر الشراء السابق لنفس المنتج × الكمية المستلمة"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -377,8 +377,8 @@ msgstr "الحالة"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Last qty"
-msgstr "آخر كمية"
+msgid "Received qty"
+msgstr "الكمية المستلمة"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -389,8 +389,8 @@ msgstr "آخر مورد"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Last purchase"
-msgstr "آخر شراء"
+msgid "Last receipt"
+msgstr "آخر استلام"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -425,14 +425,14 @@ msgstr "جاري تحميل سجل الأسعار…"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Price trend (last purchases)"
-msgstr "اتجاه السعر (آخر المشتريات)"
+msgid "Price trend (last receipts)"
+msgstr "اتجاه السعر (آخر الاستلامات)"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Date"
-msgstr "التاريخ"
+msgid "Received on"
+msgstr "تاريخ الاستلام"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -449,8 +449,8 @@ msgstr "المورد"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Qty"
-msgstr "الكمية"
+msgid "Purchase order"
+msgstr "أمر الشراء"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -461,14 +461,14 @@ msgstr "سعر الوحدة"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "No purchases found for this product."
-msgstr "لا توجد مشتريات لهذا المنتج."
+msgid "No received purchases found for this product."
+msgstr "لا توجد مشتريات مستلمة لهذا المنتج."
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "No confirmed purchases for the selected period."
-msgstr "لا توجد مشتريات مؤكدة في الفترة المحددة."
+msgid "No received purchases for the selected period."
+msgstr "لا توجد مشتريات مستلمة في الفترة المحددة."
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -479,26 +479,26 @@ msgstr "عرض"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "products — sorted by biggest price change."
-msgstr "منتجات — مرتبة حسب أكبر تغير في السعر."
+msgid "— sorted by biggest price change."
+msgstr "— مرتبة حسب أكبر تغير في السعر."
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Monthly purchases"
-msgstr "المشتريات الشهرية"
+msgid "Monthly received purchases"
+msgstr "المشتريات المستلمة شهرياً"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Daily purchases"
-msgstr "المشتريات اليومية"
+msgid "Daily received purchases"
+msgstr "المشتريات المستلمة يومياً"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Latest confirmed purchase orders"
-msgstr "أحدث أوامر الشراء المؤكدة"
+msgid "Latest receipts"
+msgstr "أحدث الاستلامات"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
@@ -509,17 +509,86 @@ msgstr "عرض الكل ←"
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Confirmed"
-msgstr "تاريخ التأكيد"
+msgid "Receipt"
+msgstr "الاستلام"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Lines"
-msgstr "البنود"
+msgid "Value"
+msgstr "القيمة"
 
 #. module: ceo_main_dashboard
 #. odoo-javascript
 #: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
-msgid "Total"
-msgstr "الإجمالي"
+msgid "Return"
+msgstr "مرتجع"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "products"
+msgstr "منتجات"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "First page"
+msgstr "الصفحة الأولى"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Previous page"
+msgstr "الصفحة السابقة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Next page"
+msgstr "الصفحة التالية"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Last page"
+msgstr "الصفحة الأخيرة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Billing"
+msgstr "الفوترة"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "All receipts"
+msgstr "كل الاستلامات"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/js/dashboard.js:0
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Invoiced"
+msgstr "مفوتر"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/js/dashboard.js:0
+#: code:addons/ceo_main_dashboard/static/src/xml/dashboard.xml:0
+msgid "Not invoiced"
+msgstr "غير مفوتر"
+
+#. module: ceo_main_dashboard
+#. odoo-javascript
+#: code:addons/ceo_main_dashboard/static/src/js/dashboard.js:0
+msgid "Partially invoiced"
+msgstr "مفوتر جزئياً"
+
+#. module: ceo_main_dashboard
+#. odoo-python
+#: code:addons/ceo_main_dashboard/models/ceo_main_dashboard.py:0
+#, python-format
+msgid "Invalid billing filter: %s"
+msgstr "فلتر فوترة غير صالح: %s"

@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Executive Dashboard',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.2.0',
     'category': 'Productivity/Dashboards',
-    'summary': 'Executive dashboard: daily purchases and purchase price increase / decrease tracking.',
+    'summary': 'Executive dashboard: daily received purchases and purchase price increase / decrease tracking.',
     'author': 'ANABTAWI',
     'website': '',
     'license': 'LGPL-3',
     'depends': [
         'web',
-        'purchase',
+        'purchase_stock',
     ],
     'data': [
         'security/security.xml',

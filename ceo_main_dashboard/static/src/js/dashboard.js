@@ -13,6 +13,7 @@ const CHART_HEIGHT = 150;
 const CHART_PADDING = 22;
 
 const CEO_DASHBOARD_STORAGE_KEY = "ceo_main_dashboard_state";
+const BILLING_FILTERS = ["all", "invoiced", "not_invoiced"];
 
 export class CeoMainDashboard extends Component {
     static template = "ceo_main_dashboard.Dashboard";
@@ -44,6 +45,7 @@ export class CeoMainDashboard extends Component {
         const dateFrom = (saved && saved.dateFrom) || today;
         const dateTo = (saved && saved.dateTo) || today;
         const activeTab = (saved && saved.activeTab) || "purchase";
+        const billing = saved && BILLING_FILTERS.includes(saved.billing) ? saved.billing : "all";
         const trendFilter = (saved && saved.trendFilter) || "all";
         const limit = (saved && saved.limit) || 100;
         const currentPage = (saved && saved.currentPage) || 1;
@@ -56,6 +58,7 @@ export class CeoMainDashboard extends Component {
             dateFrom: dateFrom,
             dateTo: dateTo,
             data: null,
+            billing: billing, // 'all' | 'invoiced' | 'not_invoiced'
             trendFilter: trendFilter, // 'all' | 'up' | 'down'
             limit: limit,
             currentPage: currentPage,
@@ -78,6 +81,7 @@ export class CeoMainDashboard extends Component {
                 dateFrom: this.state.dateFrom,
                 dateTo: this.state.dateTo,
                 activeTab: this.state.activeTab,
+                billing: this.state.billing,
                 trendFilter: this.state.trendFilter,
                 limit: this.state.limit,
                 currentPage: this.state.currentPage,
@@ -101,6 +105,7 @@ export class CeoMainDashboard extends Component {
             this.state.data = await this.orm.call("ceo.main.dashboard", "get_purchase_dashboard", [
                 this.state.dateFrom,
                 this.state.dateTo,
+                this.state.billing,
             ]);
             this.state.history = {};
             this.state.expandedProductId = null;
@@ -162,7 +167,6 @@ export class CeoMainDashboard extends Component {
         this.state.preset = preset;
         this.state.dateFrom = from.toISODate();
         this.state.dateTo = to.toISODate();
-        this._saveState();
         this.loadData();
     }
 
@@ -174,7 +178,13 @@ export class CeoMainDashboard extends Component {
 
     applyCustomRange() {
         if (this.state.dateFrom && this.state.dateTo) {
-            this._saveState();
+            this.loadData();
+        }
+    }
+
+    setBilling(billing) {
+        if (this.state.billing !== billing) {
+            this.state.billing = billing;
             this.loadData();
         }
     }
@@ -225,6 +235,7 @@ export class CeoMainDashboard extends Component {
             const rows = await this.orm.call("ceo.main.dashboard", "search_purchase_prices", [
                 term,
                 this.state.dateTo,
+                this.state.billing,
             ]);
             if (term === this.state.searchTerm.trim()) {
                 this.state.searchResults = rows;
@@ -355,7 +366,7 @@ export class CeoMainDashboard extends Component {
                 this.state.history[productId] = await this.orm.call(
                     "ceo.main.dashboard",
                     "get_product_price_history",
-                    [productId, this.state.dateTo]
+                    [productId, this.state.dateTo, this.state.billing]
                 );
             } finally {
                 this.state.historyLoading = false;
@@ -405,21 +416,33 @@ export class CeoMainDashboard extends Component {
         });
     }
 
-    openPeriodOrders() {
+    openReceipt(pickingId) {
+        this._saveState();
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "stock.picking",
+            res_id: pickingId,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
+    openPeriodReceipts() {
         const data = this.state.data;
         this._saveState();
         this.action.doAction({
             type: "ir.actions.act_window",
-            name: _t("Confirmed Purchase Orders"),
-            res_model: "purchase.order",
+            name: _t("Purchase Receipts"),
+            res_model: "stock.picking",
             views: [
                 [false, "list"],
                 [false, "form"],
             ],
             domain: [
-                ["state", "=", "purchase"],
-                ["date_approve", ">=", data.utc_from],
-                ["date_approve", "<=", data.utc_to],
+                ["state", "=", "done"],
+                ["move_ids.purchase_line_id", "!=", false],
+                ["date_done", ">=", data.utc_from],
+                ["date_done", "<=", data.utc_to],
             ],
         });
     }
@@ -447,6 +470,14 @@ export class CeoMainDashboard extends Component {
         }[trend];
     }
 
+    billingLabel(status) {
+        return {
+            invoiced: _t("Invoiced"),
+            none: _t("Not invoiced"),
+            partial: _t("Partially invoiced"),
+        }[status];
+    }
+
     trendIcon(trend) {
         return {
             up: "fa-arrow-up",
@@ -461,6 +492,10 @@ export class CeoMainDashboard extends Component {
             return "";
         }
         return value > 0 ? "cmd_text_up" : "cmd_text_down";
+    }
+
+    qtyDiffers(received, ordered) {
+        return Math.abs((Number(received) || 0) - (Number(ordered) || 0)) > 1e-6;
     }
 
     barHeight(amount) {

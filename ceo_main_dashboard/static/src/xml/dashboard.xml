@@ -52,6 +52,21 @@
                     <i class="fa fa-check"/>
                 </button>
             </div>
+            <div class="cmd_billing_filter">
+                <span class="cmd_muted">Billing</span>
+                <div class="cmd_pills cmd_pills_sm">
+                    <button class="cmd_pill" t-att-class="{ 'cmd_pill_active': state.billing === 'all' }"
+                            t-on-click="() => this.setBilling('all')">All receipts</button>
+                    <button class="cmd_pill cmd_pill_invoiced" t-att-class="{ 'cmd_pill_active': state.billing === 'invoiced' }"
+                            t-on-click="() => this.setBilling('invoiced')">
+                        <i class="fa fa-file-text-o"/> <span>Invoiced</span>
+                    </button>
+                    <button class="cmd_pill cmd_pill_not_invoiced" t-att-class="{ 'cmd_pill_active': state.billing === 'not_invoiced' }"
+                            t-on-click="() => this.setBilling('not_invoiced')">
+                        <i class="fa fa-hourglass-half"/> <span>Not invoiced</span>
+                    </button>
+                </div>
+            </div>
             <div class="cmd_currency" t-if="state.data">
                 <span class="cmd_muted">Currency</span>
                 <span class="cmd_currency_val" t-esc="state.data.currency.name"/>
@@ -69,11 +84,11 @@
 
             <!-- KPI cards -->
             <div class="cmd_grid cmd_grid_5">
-                <div class="cmd_card cmd_card_click" t-on-click="openPeriodOrders">
-                    <div class="cmd_card_label"><i class="fa fa-shopping-bag me-1"/> Purchases in period</div>
+                <div class="cmd_card cmd_card_click" t-on-click="openPeriodReceipts">
+                    <div class="cmd_card_label"><i class="fa fa-truck me-1"/> Received in period</div>
                     <div class="cmd_card_value" t-esc="fmtMoney(summary.period_total)"/>
                     <div class="cmd_card_sub">
-                        <span><t t-esc="summary.period_count"/> <span>confirmed orders</span></span>
+                        <span><t t-esc="summary.period_count"/> <span>receipts</span></span>
                         <span class="cmd_badge cmd_badge_neutral" t-if="summary.period_change_pct !== null"
                               t-att-title="fmtDate(summary.prev_period_from) + ' → ' + fmtDate(summary.prev_period_to) + ': ' + fmtMoney(summary.prev_period_total)">
                             <t t-esc="fmtPct(summary.period_change_pct)"/> <span>vs previous period</span>
@@ -82,10 +97,10 @@
                 </div>
 
                 <div class="cmd_card">
-                    <div class="cmd_card_label"><i class="fa fa-calendar-check-o me-1"/> Today's purchases</div>
+                    <div class="cmd_card_label"><i class="fa fa-calendar-check-o me-1"/> Received today</div>
                     <div class="cmd_card_value" t-esc="fmtMoney(summary.today_total)"/>
                     <div class="cmd_card_sub">
-                        <span><t t-esc="summary.today_count"/> <span>orders</span></span>
+                        <span><t t-esc="summary.today_count"/> <span>receipts</span></span>
                         <span class="cmd_badge cmd_badge_neutral" t-if="summary.today_change_pct !== null"
                               t-att-title="fmtMoney(summary.yesterday_total)">
                             <t t-esc="fmtPct(summary.today_change_pct)"/> <span>vs yesterday</span>
@@ -94,11 +109,11 @@
                 </div>
 
                 <div class="cmd_card">
-                    <div class="cmd_card_label"><i class="fa fa-truck me-1"/> Vendors</div>
+                    <div class="cmd_card_label"><i class="fa fa-users me-1"/> Vendors</div>
                     <div class="cmd_card_value" t-esc="summary.vendor_count"/>
                     <div class="cmd_card_sub">
-                        <span>Average order</span>
-                        <span class="cmd_strong" t-esc="fmtMoney(summary.avg_order)"/>
+                        <span>Average receipt</span>
+                        <span class="cmd_strong" t-esc="fmtMoney(summary.avg_receipt)"/>
                     </div>
                 </div>
 
@@ -106,7 +121,7 @@
                     <div class="cmd_card_label"><i class="fa fa-arrow-up me-1"/> Price increased</div>
                     <div class="cmd_card_value" t-esc="impact.up_count"/>
                     <div class="cmd_card_sub">
-                        <span>of</span> <t t-esc="impact.product_count"/> <span>products bought</span>
+                        <span>of</span> <t t-esc="impact.product_count"/> <span>products received</span>
                     </div>
                 </div>
 
@@ -114,7 +129,7 @@
                     <div class="cmd_card_label"><i class="fa fa-arrow-down me-1"/> Price decreased</div>
                     <div class="cmd_card_value" t-esc="impact.down_count"/>
                     <div class="cmd_card_sub">
-                        <span>of</span> <t t-esc="impact.product_count"/> <span>products bought</span>
+                        <span>of</span> <t t-esc="impact.product_count"/> <span>products received</span>
                     </div>
                 </div>
             </div>
@@ -123,7 +138,7 @@
             <div class="cmd_panel cmd_impact">
                 <div class="cmd_panel_head">
                     <span class="cmd_panel_title"><i class="fa fa-balance-scale me-1"/> Money impact of price changes</span>
-                    <span class="cmd_muted">Every purchase in the period compared with the previous purchase price of the same product × quantity bought</span>
+                    <span class="cmd_muted">Every receipt in the period compared with the previous purchase price of the same product × quantity received</span>
                 </div>
                 <div class="cmd_grid cmd_grid_3">
                     <div class="cmd_impact_box cmd_impact_up">
@@ -202,9 +217,9 @@
                                 <th class="text-end">Change</th>
                                 <th class="text-end">Change %</th>
                                 <th>Status</th>
-                                <th class="text-end">Last qty</th>
+                                <th class="text-end">Received qty</th>
                                 <th>Last vendor</th>
-                                <th>Last purchase</th>
+                                <th>Last receipt</th>
                                 <th class="text-end" t-if="!isSearchMode">Period impact</th>
                             </tr>
                         </thead>
@@ -212,7 +227,7 @@
                             <t t-foreach="visibleRows" t-as="row" t-key="row.product_id">
                                 <tr class="cmd_row" t-att-class="'cmd_row_' + row.trend + (state.expandedProductId === row.product_id ? ' cmd_row_open' : '')"
                                     t-on-click="() => this.toggleHistory(row)" title="Click to see price history">
-                                    <td class="cmd_muted" t-esc="row_index + 1"/>
+                                    <td class="cmd_muted" t-esc="(currentPage - 1) * state.limit + row_index + 1"/>
                                     <td>
                                         <div class="cmd_product">
                                             <i class="fa me-1" t-att-class="state.expandedProductId === row.product_id ? 'fa-caret-down' : 'fa-caret-right'"/>
@@ -240,7 +255,16 @@
                                             <t t-esc="trendLabel(row.trend)"/>
                                         </span>
                                     </td>
-                                    <td class="text-end"><t t-esc="fmtQty(row.last_qty)"/> <span class="cmd_muted cmd_small" t-esc="row.uom"/></td>
+                                    <td class="text-end">
+                                        <div><t t-esc="fmtQty(row.last_qty)"/> <span class="cmd_muted cmd_small" t-esc="row.uom"/></div>
+                                        <div class="cmd_muted cmd_small" t-if="qtyDiffers(row.last_qty, row.last_ordered_qty)">
+                                            <span>Ordered:</span> <t t-esc="fmtQty(row.last_ordered_qty)"/>
+                                        </div>
+                                        <span class="cmd_bill" t-att-class="'cmd_bill_' + row.billing_status"
+                                              t-att-title="fmtQty(row.billed_qty) + ' / ' + fmtQty(row.last_qty) + ' ' + row.uom">
+                                            <t t-esc="billingLabel(row.billing_status)"/>
+                                        </span>
+                                    </td>
                                     <td>
                                         <div t-esc="row.last_vendor"/>
                                         <div class="cmd_muted cmd_small" t-if="row.prev_vendor and row.prev_vendor !== row.last_vendor">
@@ -267,7 +291,7 @@
                                         <div class="cmd_history" t-elif="state.history[row.product_id]">
                                             <t t-set="chart" t-value="historyChart(row.product_id)"/>
                                             <div class="cmd_history_chart">
-                                                <div class="cmd_small cmd_strong mb-1">Price trend (last purchases)</div>
+                                                <div class="cmd_small cmd_strong mb-1">Price trend (last receipts)</div>
                                                 <svg t-att-viewBox="'0 0 ' + chart.width + ' ' + chart.height" preserveAspectRatio="none">
                                                     <polyline class="cmd_chart_line" t-att-points="chart.path"/>
                                                     <t t-foreach="chart.dots" t-as="dot" t-key="dot.key">
@@ -281,10 +305,10 @@
                                             <table class="cmd_table cmd_table_sm">
                                                 <thead>
                                                     <tr>
-                                                        <th>Date</th>
+                                                        <th>Received on</th>
                                                         <th>Order</th>
                                                         <th>Vendor</th>
-                                                        <th class="text-end">Qty</th>
+                                                        <th class="text-end">Received qty</th>
                                                         <th class="text-end">Unit price</th>
                                                         <th class="text-end">Change</th>
                                                     </tr>
@@ -298,7 +322,16 @@
                                                                    t-on-click.prevent.stop="() => this.openOrder(h.order_id)"/>
                                                             </td>
                                                             <td t-esc="h.vendor"/>
-                                                            <td class="text-end"><t t-esc="fmtQty(h.qty)"/> <span class="cmd_muted" t-esc="h.uom"/></td>
+                                                            <td class="text-end">
+                                                                <t t-esc="fmtQty(h.qty)"/> <span class="cmd_muted" t-esc="h.uom"/>
+                                                                <div class="cmd_muted" t-if="qtyDiffers(h.qty, h.ordered_qty)">
+                                                                    <span>Ordered:</span> <t t-esc="fmtQty(h.ordered_qty)"/>
+                                                                </div>
+                                                                <span class="cmd_bill" t-att-class="'cmd_bill_' + h.billing_status"
+                                                                      t-att-title="fmtQty(h.billed_qty) + ' / ' + fmtQty(h.qty) + ' ' + h.uom">
+                                                                    <t t-esc="billingLabel(h.billing_status)"/>
+                                                                </span>
+                                                            </td>
                                                             <td class="text-end cmd_strong" t-esc="fmtPrice(h.price)"/>
                                                             <td class="text-end" t-att-class="changeClass(h.diff)">
                                                                 <t t-if="h.trend === 'new'">—</t>
@@ -319,15 +352,65 @@
                             <tr t-if="!visibleRows.length">
                                 <td class="cmd_empty" t-att-colspan="isSearchMode ? 10 : 11">
                                     <i class="fa fa-inbox fa-2x d-block mb-2"/>
-                                    <span t-if="isSearchMode">No purchases found for this product.</span>
-                                    <span t-else="">No confirmed purchases for the selected period.</span>
+                                    <span t-if="isSearchMode">No received purchases found for this product.</span>
+                                    <span t-else="">No received purchases for the selected period.</span>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-                <div class="cmd_table_foot" t-if="!isSearchMode and allRows.length > visibleRows.length and state.trendFilter === 'all'">
-                    <span>Showing</span> <t t-esc="visibleRows.length"/> <span>of</span> <t t-esc="allRows.length"/> <span>products — sorted by biggest price change.</span>
+                <div class="cmd_table_foot" t-if="filteredRows.length">
+                    <div class="cmd_table_info">
+                        <span>Showing</span>
+                        <strong t-esc="startItem"/>–<strong t-esc="endItem"/>
+                        <span>of</span>
+                        <strong t-esc="filteredRows.length"/>
+                        <span>products</span>
+                        <t t-if="!isSearchMode and state.trendFilter === 'all'">
+                            <span class="cmd_muted"> — sorted by biggest price change.</span>
+                        </t>
+                        <t t-elif="state.trendFilter !== 'all'">
+                            <span class="cmd_muted"> (<t t-esc="trendLabel(state.trendFilter)"/>)</span>
+                        </t>
+                    </div>
+
+                    <div class="cmd_pagination_wrap" t-if="totalPages > 1">
+                        <div class="cmd_pagination">
+                            <button type="button" class="cmd_page_btn cmd_page_nav"
+                                    t-att-disabled="currentPage === 1"
+                                    t-on-click="() => this.firstPage()"
+                                    title="First page">
+                                <i class="fa fa-step-backward"/>
+                            </button>
+                            <button type="button" class="cmd_page_btn cmd_page_nav"
+                                    t-att-disabled="currentPage === 1"
+                                    t-on-click="() => this.prevPage()"
+                                    title="Previous page">
+                                <i class="fa fa-caret-left"/>
+                            </button>
+
+                            <t t-foreach="pages" t-as="p" t-key="p">
+                                <button type="button" class="cmd_page_btn"
+                                        t-att-class="{ 'cmd_page_active': p === currentPage }"
+                                        t-on-click="() => this.setPage(p)">
+                                    <t t-esc="p"/>
+                                </button>
+                            </t>
+
+                            <button type="button" class="cmd_page_btn cmd_page_nav"
+                                    t-att-disabled="currentPage === totalPages"
+                                    t-on-click="() => this.nextPage()"
+                                    title="Next page">
+                                <i class="fa fa-caret-right"/>
+                            </button>
+                            <button type="button" class="cmd_page_btn cmd_page_nav"
+                                    t-att-disabled="currentPage === totalPages"
+                                    t-on-click="() => this.lastPage()"
+                                    title="Last page">
+                                <i class="fa fa-step-forward"/>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -337,8 +420,8 @@
                     <div class="cmd_panel_head">
                         <span class="cmd_panel_title">
                             <i class="fa fa-bar-chart me-1"/>
-                            <t t-if="state.data.daily.granularity === 'month'">Monthly purchases</t>
-                            <t t-else="">Daily purchases</t>
+                            <t t-if="state.data.daily.granularity === 'month'">Monthly received purchases</t>
+                            <t t-else="">Daily received purchases</t>
                         </span>
                         <span class="cmd_muted" t-esc="fmtDate(state.data.date_from) + ' → ' + fmtDate(state.data.date_to)"/>
                     </div>
@@ -356,31 +439,39 @@
 
                 <div class="cmd_panel">
                     <div class="cmd_panel_head">
-                        <span class="cmd_panel_title"><i class="fa fa-list me-1"/> Latest confirmed purchase orders</span>
-                        <a href="#" class="cmd_link" t-on-click.prevent="openPeriodOrders">View all →</a>
+                        <span class="cmd_panel_title"><i class="fa fa-list me-1"/> Latest receipts</span>
+                        <a href="#" class="cmd_link" t-on-click.prevent="openPeriodReceipts">View all →</a>
                     </div>
                     <table class="cmd_table cmd_table_sm">
                         <thead>
                             <tr>
-                                <th>Order</th>
+                                <th>Receipt</th>
                                 <th>Vendor</th>
-                                <th>Confirmed</th>
-                                <th class="text-end">Lines</th>
-                                <th class="text-end">Total</th>
+                                <th>Purchase order</th>
+                                <th>Received on</th>
+                                <th class="text-end">Value</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <t t-foreach="state.data.recent_orders" t-as="order" t-key="order.id">
-                                <tr class="cmd_row" t-on-click="() => this.openOrder(order.id)">
-                                    <td class="cmd_strong" t-esc="order.name"/>
-                                    <td t-esc="order.vendor"/>
-                                    <td class="cmd_muted" t-esc="fmtDateTime(order.date)"/>
-                                    <td class="text-end" t-esc="order.line_count"/>
-                                    <td class="text-end cmd_strong" t-esc="fmtMoney(order.amount)"/>
+                            <t t-foreach="state.data.recent_receipts" t-as="receipt" t-key="receipt.id">
+                                <tr class="cmd_row" t-on-click="() => this.openReceipt(receipt.id)">
+                                    <td class="cmd_strong">
+                                        <t t-esc="receipt.name"/>
+                                        <span class="cmd_trend cmd_trend_up ms-1" t-if="receipt.is_return">Return</span>
+                                        <div>
+                                            <span class="cmd_bill" t-att-class="'cmd_bill_' + receipt.billing_status"
+                                                  t-esc="billingLabel(receipt.billing_status)"/>
+                                        </div>
+                                    </td>
+                                    <td t-esc="receipt.vendor"/>
+                                    <td class="cmd_muted" t-esc="receipt.orders"/>
+                                    <td class="cmd_muted" t-esc="fmtDateTime(receipt.date)"/>
+                                    <td class="text-end cmd_strong" t-att-class="receipt.amount &lt; 0 ? 'cmd_text_up' : ''"
+                                        t-esc="fmtMoney(receipt.amount)"/>
                                 </tr>
                             </t>
-                            <tr t-if="!state.data.recent_orders.length">
-                                <td class="cmd_empty" colspan="5">No confirmed purchases for the selected period.</td>
+                            <tr t-if="!state.data.recent_receipts.length">
+                                <td class="cmd_empty" colspan="5">No received purchases for the selected period.</td>
                             </tr>
                         </tbody>
                     </table>
