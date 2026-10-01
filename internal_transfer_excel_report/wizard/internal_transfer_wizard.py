@@ -106,6 +106,17 @@ class InternalTransferReportWizard(models.TransientModel):
             return picking.create_uid.display_name
         return self.env._('Undefined')
 
+    def _get_receipt_created_by_display(self, move):
+        """Return the purchase order creator, falling back to the receipt creator."""
+        purchase_order = (
+            move.purchase_line_id.order_id if 'purchase_line_id' in move._fields else False
+        ) or (
+            move.picking_id.purchase_id if 'purchase_id' in move.picking_id._fields else False
+        )
+        if purchase_order and purchase_order.create_uid:
+            return purchase_order.create_uid.display_name
+        return self._get_picking_created_by_display(move.picking_id)
+
     def _get_move_uom_name(self, move):
         return move.product_uom.display_name or move.product_id.uom_id.display_name or ''
 
@@ -219,14 +230,17 @@ class InternalTransferReportWizard(models.TransientModel):
     def _get_sheet1_data(self):
         self.ensure_one()
         rows = []
-        for moves in (self._get_internal_transfer_moves(), self._get_receipt_moves()):
+        for moves, get_created_by in (
+            (self._get_internal_transfer_moves(), lambda move: self._get_picking_created_by_display(move.picking_id)),
+            (self._get_receipt_moves(), self._get_receipt_created_by_display),
+        ):
             for move in moves:
                 picking = move.picking_id
                 rows.append({
                     'transfer_reference': picking.name or '',
                     'product_name': move.product_id.display_name,
                     'factory_plan_category': self._get_factory_plan_category_display(move.product_id),
-                    'created_by': self._get_picking_created_by_display(picking),
+                    'created_by': get_created_by(move),
                     'creating_date': picking.create_date,
                     'demand': move.product_uom_qty,
                     'product_uom': self._get_move_uom_name(move),
