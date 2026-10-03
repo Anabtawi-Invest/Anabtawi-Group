@@ -86,6 +86,18 @@ class HrPayslipRun(models.Model):
             }
         )
 
+        group_header_comp_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "font_color": "#FFFFFF",
+                "bg_color": "#203764",
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "font_size": 11,
+            }
+        )
+
         text_left_fmt = workbook.add_format({"border": 1, "align": "left", "font_size": 10})
         text_center_fmt = workbook.add_format({"border": 1, "align": "center", "font_size": 10})
         number_fmt = workbook.add_format({"border": 1, "align": "right", "num_format": "#,##0.00", "font_size": 10})
@@ -202,6 +214,9 @@ class HrPayslipRun(models.Model):
         fixed_ded_cols = [
             (_("Income Tax"), 16),
             (_("SSC Employee Contrib"), 20),
+        ]
+
+        fixed_comp_cols = [
             (_("SSC Company Contrib"), 20),
         ]
 
@@ -418,12 +433,16 @@ class HrPayslipRun(models.Model):
         all_ded_headers = [c[0] for c in fixed_ded_cols] + [c[0] for c in dynamic_ded_cols]
         all_ded_widths = [c[1] for c in fixed_ded_cols] + [c[1] for c in dynamic_ded_cols]
 
+        all_comp_headers = [c[0] for c in fixed_comp_cols]
+        all_comp_widths = [c[1] for c in fixed_comp_cols]
+
         info_headers = [c[0] for c in info_cols]
         summary_headers = [c[0] for c in summary_cols]
 
         info_count = len(info_cols)
         alw_count = len(all_alw_headers)
         ded_count = len(all_ded_headers)
+        comp_count = len(all_comp_headers)
         sum_count = len(summary_cols)
 
         alw_start_col = info_count
@@ -432,7 +451,10 @@ class HrPayslipRun(models.Model):
         ded_start_col = alw_end_col + 1
         ded_end_col = ded_start_col + ded_count - 1
 
-        sum_start_col = ded_end_col + 1
+        comp_start_col = ded_end_col + 1
+        comp_end_col = comp_start_col + comp_count - 1
+
+        sum_start_col = comp_end_col + 1
         sum_end_col = sum_start_col + sum_count - 1
 
         total_num_cols = sum_end_col + 1
@@ -442,6 +464,7 @@ class HrPayslipRun(models.Model):
             [c[1] for c in info_cols]
             + all_alw_widths
             + all_ded_widths
+            + all_comp_widths
             + [c[1] for c in summary_cols]
         )
         for col_idx, width in enumerate(all_col_widths):
@@ -472,6 +495,15 @@ class HrPayslipRun(models.Model):
 
         for idx, name in enumerate(all_ded_headers):
             sheet1.write(row_sub, ded_start_col + idx, name, header_fmt)
+
+        # COMPANY CONTRIBUTIONS Group Super-Header & Sub-Headers
+        if comp_count > 1:
+            sheet1.merge_range(row_super, comp_start_col, row_super, comp_end_col, _("COMPANY CONTRIBUTIONS"), group_header_comp_fmt)
+        else:
+            sheet1.write(row_super, comp_start_col, _("COMPANY CONTRIBUTIONS"), group_header_comp_fmt)
+
+        for idx, name in enumerate(all_comp_headers):
+            sheet1.write(row_sub, comp_start_col + idx, name, header_fmt)
 
         # Summary / Attendance Columns (Vertically merged across row_super and row_sub)
         for idx, name in enumerate(summary_headers):
@@ -607,11 +639,11 @@ class HrPayslipRun(models.Model):
                 else:
                     note_val = base_note
 
-                # Retrieve SSC Subject Wage (from employee profile or contract fallback)
+                # Retrieve SSC Subject Wage (from studio field x_studio_x_studio_ssc_wage, employee profile or contract fallback)
                 emp_rec = payslip.employee_id
                 ssc_wage_val = 0.0
                 if emp_rec:
-                    for attr in ("sb_ss_salary", "ssc_wage", "ss_wage", "social_security_wage", "ss_salary"):
+                    for attr in ("x_studio_x_studio_ssc_wage", "x_studio_ssc_wage", "sb_ss_salary", "ssc_wage", "ss_wage", "social_security_wage", "ss_salary"):
                         val = getattr(emp_rec, attr, 0.0)
                         if val:
                             ssc_wage_val = float(val)
@@ -645,11 +677,13 @@ class HrPayslipRun(models.Model):
                 # Write DEDUCTION Section
                 sheet1.write_number(data_row, col_curr, tax_val, number_fmt); col_curr += 1
                 sheet1.write_number(data_row, col_curr, ssce_val, number_fmt); col_curr += 1
-                sheet1.write_number(data_row, col_curr, sscc_val, number_fmt); col_curr += 1
 
                 for ded_val in dyn_ded_vals:
                     sheet1.write_number(data_row, col_curr, ded_val, number_fmt)
                     col_curr += 1
+
+                # Write COMPANY CONTRIBUTIONS Section
+                sheet1.write_number(data_row, col_curr, sscc_val, number_fmt); col_curr += 1
 
                 # Write Summary / Attendance Section
                 net_style = net_negative_fmt if net_sal < 0 else number_fmt
