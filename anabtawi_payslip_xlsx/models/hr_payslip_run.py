@@ -187,6 +187,7 @@ class HrPayslipRun(models.Model):
             (_("Department"), 22),
             (_("Job Title / Position"), 22),
             (_("Internal Code"), 16),
+            (_("SSC Subject Wage"), 18),
             (_("Period From"), 14),
             (_("Period To"), 14),
         ]
@@ -201,6 +202,7 @@ class HrPayslipRun(models.Model):
         fixed_ded_cols = [
             (_("Income Tax"), 16),
             (_("SSC Employee Contrib"), 20),
+            (_("SSC Company Contrib"), 20),
         ]
 
         summary_cols = [
@@ -548,6 +550,7 @@ class HrPayslipRun(models.Model):
                 # Fixed Deductions
                 tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in l.name).mapped("total"))
                 ssce_val = sum(lines.filtered(lambda l: l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in l.name and "موظف" in l.name)).mapped("total"))
+                sscc_val = sum(lines.filtered(lambda l: l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in l.name and "شركة" in l.name)).mapped("total"))
 
                 # Dynamic Deduction Values (Prioritize computed rule lines over raw input lines to avoid double counting)
                 dyn_ded_vals = []
@@ -604,14 +607,27 @@ class HrPayslipRun(models.Model):
                 else:
                     note_val = base_note
 
-                # Write Info Columns (0..6)
+                # Retrieve SSC Subject Wage (from employee profile or contract fallback)
+                emp_rec = payslip.employee_id
+                ssc_wage_val = 0.0
+                if emp_rec:
+                    for attr in ("sb_ss_salary", "ssc_wage", "ss_wage", "social_security_wage", "ss_salary"):
+                        val = getattr(emp_rec, attr, 0.0)
+                        if val:
+                            ssc_wage_val = float(val)
+                            break
+                if not ssc_wage_val and hasattr(payslip, "version_id") and payslip.version_id:
+                    ssc_wage_val = payslip.version_id._get_contract_wage()
+
+                # Write Info Columns (0..7)
                 sheet1.write(data_row, 0, emp_id_val, text_center_fmt)
                 sheet1.write(data_row, 1, emp_name_val, text_left_fmt)
                 sheet1.write(data_row, 2, dept_val, text_left_fmt)
                 sheet1.write(data_row, 3, job_val, text_left_fmt)
                 sheet1.write(data_row, 4, code_val, text_center_fmt)
-                sheet1.write(data_row, 5, period_from_val, text_center_fmt)
-                sheet1.write(data_row, 6, period_to_val, text_center_fmt)
+                sheet1.write_number(data_row, 5, ssc_wage_val, number_fmt)
+                sheet1.write(data_row, 6, period_from_val, text_center_fmt)
+                sheet1.write(data_row, 7, period_to_val, text_center_fmt)
 
                 # Write ALLOWANCE Section
                 col_curr = alw_start_col
@@ -629,6 +645,7 @@ class HrPayslipRun(models.Model):
                 # Write DEDUCTION Section
                 sheet1.write_number(data_row, col_curr, tax_val, number_fmt); col_curr += 1
                 sheet1.write_number(data_row, col_curr, ssce_val, number_fmt); col_curr += 1
+                sheet1.write_number(data_row, col_curr, sscc_val, number_fmt); col_curr += 1
 
                 for ded_val in dyn_ded_vals:
                     sheet1.write_number(data_row, col_curr, ded_val, number_fmt)
