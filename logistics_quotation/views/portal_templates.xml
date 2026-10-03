@@ -12,9 +12,9 @@
                                 <div class="d-flex align-items-center justify-content-between">
                                     <div>
                                         <h3 class="mb-1 fw-bold text-white">Freight Quotation Request</h3>
-                                        <p class="mb-0 text-white-50">Reference: <strong class="text-white" t-esc="request.name"/></p>
+                                        <p class="mb-0 text-white-50">Reference: <strong class="text-white" t-esc="logistics_request.name"/></p>
                                     </div>
-                                    <span class="badge bg-light text-primary fs-6 px-3 py-2" t-esc="request.company_id.name"/>
+                                    <span class="badge bg-light text-primary fs-6 px-3 py-2" t-esc="logistics_request.company_id.name"/>
                                 </div>
                             </div>
                         </div>
@@ -34,27 +34,27 @@
                                 <div class="row g-3">
                                     <div class="col-md-4">
                                         <span class="text-muted d-block small">Shipping Mode</span>
-                                        <strong class="fs-6 text-uppercase" t-esc="request.shipping_mode"/>
+                                        <strong class="fs-6 text-uppercase" t-esc="logistics_request.shipping_mode"/>
                                     </div>
                                     <div class="col-md-4">
                                         <span class="text-muted d-block small">Environment Control</span>
-                                        <strong class="fs-6 text-capitalize" t-esc="request.shipment_type"/>
+                                        <strong class="fs-6 text-capitalize" t-esc="logistics_request.shipment_type"/>
                                     </div>
                                     <div class="col-md-4">
                                         <span class="text-muted d-block small">Container / Cargo Spec</span>
-                                        <strong class="fs-6" t-esc="request.container_size"/>
+                                        <strong class="fs-6" t-esc="logistics_request.container_size"/>
                                     </div>
                                     <div class="col-md-4">
                                         <span class="text-muted d-block small">Total Gross Weight</span>
-                                        <strong class="fs-6" t-esc="request.total_weight"/> kg
+                                        <strong class="fs-6" t-esc="logistics_request.total_weight"/> kg
                                     </div>
                                     <div class="col-md-4">
                                         <span class="text-muted d-block small">Total Volume</span>
-                                        <strong class="fs-6" t-esc="request.total_volume"/> m³ (CBM)
+                                        <strong class="fs-6" t-esc="logistics_request.total_volume"/> m³ (CBM)
                                     </div>
                                     <div class="col-md-4">
                                         <span class="text-muted d-block small">Destination Address</span>
-                                        <strong class="fs-6" t-esc="request.destination_address or 'As specified'"/>
+                                        <strong class="fs-6" t-esc="logistics_request.destination_address or 'As specified'"/>
                                     </div>
                                 </div>
                             </div>
@@ -108,19 +108,19 @@
                                     
                                     <div class="row g-3 mb-3">
                                         <div class="col-md-6">
-                                            <label class="form-label fw-bold">🛫 Origin Handling (Shipping Country) / المناولة في بلد الشحن (<t t-esc="request.currency_id.name"/>)</label>
+                                            <label class="form-label fw-bold">🛫 Origin Handling (Shipping Country) / المناولة في بلد الشحن (<t t-esc="logistics_request.currency_id.name or ''"/>)</label>
                                             <input type="number" step="0.01" name="origin_handling_fee" id="origin_handling_fee" class="form-control form-control-lg cost-input" placeholder="0.00"/>
                                         </div>
                                         <div class="col-md-6">
-                                            <label class="form-label fw-bold">🚢 Main Freight Shipping Cost / تكلفة الشحن الرئيسي (<t t-esc="request.currency_id.name"/>)</label>
+                                            <label class="form-label fw-bold">🚢 Main Freight Shipping Cost / تكلفة الشحن الرئيسي (<t t-esc="logistics_request.currency_id.name or ''"/>)</label>
                                             <input type="number" step="0.01" name="freight_cost" id="freight_cost" class="form-control form-control-lg cost-input" placeholder="0.00" required="required"/>
                                         </div>
                                         <div class="col-md-6">
-                                            <label class="form-label fw-bold">🛬 Destination Handling (Receiving Country) / المناولة في بلد الوصول (<t t-esc="request.currency_id.name"/>)</label>
+                                            <label class="form-label fw-bold">🛬 Destination Handling (Receiving Country) / المناولة في بلد الوصول (<t t-esc="logistics_request.currency_id.name or ''"/>)</label>
                                             <input type="number" step="0.01" name="destination_handling_fee" id="destination_handling_fee" class="form-control form-control-lg cost-input" placeholder="0.00"/>
                                         </div>
                                         <div class="col-md-6">
-                                            <label class="form-label fw-bold">📑 Customs Clearance Fees / رسوم التخليص الجمركي (<t t-esc="request.currency_id.name"/>)</label>
+                                            <label class="form-label fw-bold">📑 Customs Clearance Fees / رسوم التخليص الجمركي (<t t-esc="logistics_request.currency_id.name or ''"/>)</label>
                                             <input type="number" step="0.01" name="customs_clearance_fee" id="customs_clearance_fee" class="form-control form-control-lg cost-input" placeholder="0.00"/>
                                         </div>
                                     </div>
@@ -128,7 +128,7 @@
                                     <!-- Total Calculation Display -->
                                     <div class="alert alert-primary d-flex align-items-center justify-content-between p-3 mb-3">
                                         <span class="fw-bold fs-5">💵 Total Freight Cost / إجمالي تكلفة الشحن:</span>
-                                        <span class="fw-bold fs-3 text-primary" id="total_cost_display">0.00 <t t-esc="request.currency_id.name"/></span>
+                                        <span class="fw-bold fs-3 text-primary" id="total_cost_display">0.00 <t t-esc="logistics_request.currency_id.name or ''"/></span>
                                     </div>
 
                                     <div class="row g-3 mb-3">
@@ -163,7 +163,7 @@
                                     document.addEventListener('DOMContentLoaded', function () {
                                         const inputs = document.querySelectorAll('.cost-input');
                                         const totalDisplay = document.getElementById('total_cost_display');
-                                        const currency = "<t t-esc="request.currency_id.name"/>";
+                                        const currency = "<t t-esc="logistics_request.currency_id.name or ''"/>";
 
                                         function calculateTotal() {
                                             let total = 0.0;

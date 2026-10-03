@@ -12,12 +12,12 @@ class LogisticsPortalController(http.Controller):
         if not invitation:
             return request.render('logistics_quotation.portal_invalid_token_template', {})
 
-        logistics_request = invitation.request_id
+        logistics_req = invitation.request_id
         values = {
             'invitation': invitation,
-            'request': logistics_request,
-            'company': logistics_request.company_id,
-            'items': logistics_request.item_ids,
+            'logistics_request': logistics_req,
+            'company': logistics_req.company_id,
+            'items': logistics_req.item_ids,
             'already_submitted': invitation.state == 'submitted',
         }
         return request.render('logistics_quotation.portal_rfq_submit_template', values)
@@ -28,7 +28,7 @@ class LogisticsPortalController(http.Controller):
         if not invitation:
             return request.render('logistics_quotation.portal_invalid_token_template', {})
 
-        logistics_request = invitation.request_id
+        logistics_req = invitation.request_id
         partner = invitation.partner_id
 
         origin_handling_fee = float(post.get('origin_handling_fee') or 0.0)
@@ -50,7 +50,7 @@ class LogisticsPortalController(http.Controller):
         # Check or create quote line
         quote_line = invitation.quote_line_id
         line_vals = {
-            'request_id': logistics_request.id,
+            'request_id': logistics_req.id,
             'partner_id': partner.id,
             'origin_handling_fee': origin_handling_fee,
             'freight_cost': freight_cost,
@@ -79,12 +79,12 @@ class LogisticsPortalController(http.Controller):
         })
 
         # Update logistics request status if draft or rfq
-        if logistics_request.state in ('draft', 'rfq'):
-            logistics_request.sudo().write({'state': 'quoted'})
+        if logistics_req.state in ('draft', 'rfq'):
+            logistics_req.sudo().write({'state': 'quoted'})
 
         # Post chatter notification
         total_cost = quote_line.price_total
-        logistics_request.sudo().message_post(
+        logistics_req.sudo().message_post(
             body=_(
                 "Forwarder <b>%s</b> submitted quotation via Web Portal.<br/> Origin Handling: %s | Freight: %s | Dest Handling: %s | Clearance: %s | <b>Total: %s</b> | Transit: %s Days.",
                 partner.display_name,
