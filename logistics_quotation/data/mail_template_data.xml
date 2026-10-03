@@ -28,7 +28,7 @@
                         </ul>
                         <br/>
                         <div style="margin: 20px 0px; text-align: center;">
-                            <a t-att-href="ctx.get('custom_token_url')" style="background-color: #875A7B; padding: 12px 24px; text-decoration: none; color: #ffffff; border-radius: 6px; font-weight: bold; display: inline-block;">
+                            <a t-att-href="ctx.get('custom_token_url') or object.get_portal_url()" style="background-color: #875A7B; padding: 12px 24px; text-decoration: none; color: #ffffff; border-radius: 6px; font-weight: bold; display: inline-block;">
                                 📤 Submit Your Quotation Online
                             </a>
                         </div>

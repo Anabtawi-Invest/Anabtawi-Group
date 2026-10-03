@@ -293,6 +293,28 @@ class LogisticsRequest(models.Model):
                 )
             )
 
+    def get_portal_url(self, partner_id=None):
+        self.ensure_one()
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        invitation = False
+        if partner_id:
+            invitation = self.invitation_ids.filtered(lambda i: i.partner_id.id == partner_id)
+        if not invitation and self.invitation_ids:
+            invitation = self.invitation_ids[0]
+        if not invitation:
+            approved_forwarder = self.env['res.partner'].search([
+                ('is_freight_forwarder', '=', True),
+                ('forwarder_approval_state', '=', 'approved'),
+            ], limit=1)
+            if approved_forwarder:
+                invitation = self.env['logistics.request.invitation'].create({
+                    'request_id': self.id,
+                    'partner_id': approved_forwarder.id,
+                })
+        if invitation:
+            return f"{base_url}/logistics/rfq/submit/{invitation.token}"
+        return f"{base_url}/web"
+
     def action_send_rfq_email(self):
         self.ensure_one()
         template = self.env.ref(
@@ -304,11 +326,14 @@ class LogisticsRequest(models.Model):
         if self.state == 'draft':
             self.state = 'rfq'
 
+        token_url = self.get_portal_url()
+
         ctx = {
             'default_model': 'logistics.request',
             'default_res_ids': [self.id],
             'default_template_id': template.id if template else False,
             'default_composition_mode': 'comment',
+            'custom_token_url': token_url,
             'force_email': True,
         }
         return {
