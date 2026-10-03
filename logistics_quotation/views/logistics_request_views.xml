@@ -235,8 +235,11 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='state']" position="before">
+                <field name="show_shipping_request_button" invisible="1"/>
+            </xpath>
             <xpath expr="//header" position="inside">
-                <button name="action_request_shipping_cost" string="Request Shipping Cost" type="object" class="btn-primary" invisible="state in ('done', 'cancel')"/>
+                <button name="action_request_shipping_cost" string="Request Shipping Cost" type="object" class="btn-primary" invisible="not show_shipping_request_button or state in ('done', 'cancel')"/>
             </xpath>
         </field>
     </record>

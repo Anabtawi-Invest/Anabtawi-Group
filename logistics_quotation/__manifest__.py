@@ -39,6 +39,7 @@ Features:
         'report/logistics_request_report.xml',
         'views/portal_templates.xml',
         'views/res_partner_views.xml',
+        'views/crm_team_views.xml',
         'views/logistics_request_views.xml',
     ],
     'assets': {},

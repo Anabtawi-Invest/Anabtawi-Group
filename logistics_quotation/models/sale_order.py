@@ -14,11 +14,23 @@ class SaleOrder(models.Model):
         compute='_compute_logistics_count',
         string='Logistics Count',
     )
+    show_shipping_request_button = fields.Boolean(
+        string='Show Shipping Request Button',
+        compute='_compute_show_shipping_request_button',
+        store=True,
+    )
 
     @api.depends('logistics_request_ids')
     def _compute_logistics_count(self):
         for order in self:
             order.logistics_count = len(order.logistics_request_ids)
+
+    @api.depends('team_id', 'team_id.use_logistics_shipping_request')
+    def _compute_show_shipping_request_button(self):
+        for order in self:
+            order.show_shipping_request_button = bool(
+                order.team_id and order.team_id.use_logistics_shipping_request
+            )
 
     def action_request_shipping_cost(self):
         self.ensure_one()

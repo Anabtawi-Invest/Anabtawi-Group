@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Inherit Sales Team Form View for Shipping Request Toggle -->
+    <record id="crm_team_view_form_inherit_logistics" model="ir.ui.view">
+        <field name="name">crm.team.form.inherit.logistics</field>
+        <field name="model">crm.team</field>
+        <field name="inherit_id" ref="sales_team.crm_team_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/group" position="inside">
+                <group string="Logistics &amp; Shipping Requests">
+                    <field name="use_logistics_shipping_request"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
