@@ -36,6 +36,7 @@ class LogisticsPortalController(http.Controller):
         destination_handling_fee = float(post.get('destination_handling_fee') or 0.0)
         customs_clearance_fee = float(post.get('customs_clearance_fee') or 0.0)
         transit_time_days = int(post.get('transit_time_days') or 0)
+        free_days_port = int(post.get('free_days_port') or 14)
         notes = post.get('notes') or ''
 
         # File upload handling
@@ -56,6 +57,7 @@ class LogisticsPortalController(http.Controller):
             'destination_handling_fee': destination_handling_fee,
             'customs_clearance_fee': customs_clearance_fee,
             'transit_time_days': transit_time_days,
+            'free_days_port': free_days_port,
             'notes': notes,
         }
         if file_content:

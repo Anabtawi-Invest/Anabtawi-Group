@@ -132,14 +132,18 @@
                                     </div>
 
                                     <div class="row g-3 mb-3">
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-bold">Estimated Transit Time (Days) / مدة الشحن بالأيام</label>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold">Transit Time (Days) / مدة الشحن بالأيام</label>
                                             <input type="number" name="transit_time_days" class="form-control" placeholder="e.g. 14" required="required"/>
                                         </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label fw-bold">Upload Quotation PDF / File / إرفاق عرض السعر PDF</label>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold">Free Demurrage Days / أيام الإعفاء بالميناء</label>
+                                            <input type="number" name="free_days_port" class="form-control" placeholder="14" value="14"/>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold">Upload Quote PDF / إرفاق عرض السعر PDF</label>
                                             <input type="file" name="quote_file" class="form-control" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"/>
-                                            <span class="form-text text-muted">Attach your official stamped quote document.</span>
+                                            <span class="form-text text-muted">Attach official quote document.</span>
                                         </div>
                                     </div>
 

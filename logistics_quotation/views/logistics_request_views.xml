@@ -8,6 +8,7 @@
             <list string="Logistics Requests">
                 <field name="name"/>
                 <field name="source_type"/>
+                <field name="incoterm_id"/>
                 <field name="sale_order_id" optional="show"/>
                 <field name="purchase_order_id" optional="show"/>
                 <field name="shipping_mode"/>
@@ -16,6 +17,7 @@
                 <field name="invitation_count" string="Invited Forwarders"/>
                 <field name="submitted_count" string="Responded"/>
                 <field name="selected_line_id"/>
+                <field name="approval_state" widget="badge" decoration-warning="approval_state == 'pending'" decoration-success="approval_state == 'approved'" decoration-danger="approval_state == 'rejected'" optional="show"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="state" widget="badge" decoration-info="state == 'rfq'" decoration-warning="state == 'quoted'" decoration-success="state == 'confirmed'" decoration-muted="state == 'cancelled'"/>
             </list>
@@ -32,10 +34,14 @@
                     <button name="action_broadcast_rfq" string="🚀 Broadcast RFQ to Approved Forwarders" type="object" class="btn-primary" invisible="state not in ('draft', 'rfq')"/>
                     <button name="action_send_rfq_email" string="Send Manual RFQ Email" type="object" class="btn-secondary" invisible="state not in ('draft', 'rfq')"/>
                     <button name="action_print_rfq" string="Download RFQ (PDF)" type="object" class="btn-secondary" icon="fa-download"/>
-                    <button name="action_quotes_received" string="Quotes Received" type="object" class="btn-secondary" invisible="state != 'rfq'"/>
+                    
+                    <button name="action_approve_logistics" string="✓ Approve Quotation" type="object" class="btn-success" invisible="approval_state != 'pending'"/>
+                    <button name="action_reject_logistics" string="✗ Reject Quotation" type="object" class="btn-danger" invisible="approval_state != 'pending'"/>
+
                     <button name="action_confirm_logistics" string="Confirm Logistics Order" type="object" class="oe_highlight" invisible="state not in ('quoted', 'rfq', 'draft')"/>
                     <button name="action_reset_draft" string="Reset to Draft" type="object" class="btn-secondary" invisible="state not in ('cancelled')"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-secondary" invisible="state in ('confirmed', 'cancelled')"/>
+                    
                     <field name="state" widget="statusbar" statusbar_visible="draft,rfq,quoted,confirmed"/>
                 </header>
                 <sheet>
@@ -58,6 +64,11 @@
                             </div>
                         </button>
                     </div>
+                    
+                    <div class="alert alert-warning mb-3" role="alert" invisible="approval_state != 'pending'">
+                        ⚠️ <strong>Manager Approval Required:</strong> The selected freight quotation exceeds the threshold limit. Please review and approve before confirming the order.
+                    </div>
+                    
                     <div class="oe_title">
                         <h1>
                             <field name="name" readonly="1"/>
@@ -68,6 +79,7 @@
                             <field name="source_type" widget="radio" options="{'horizontal': true}"/>
                             <field name="sale_order_id" invisible="source_type != 'sale'" required="source_type == 'sale'"/>
                             <field name="purchase_order_id" invisible="source_type != 'purchase'" required="source_type == 'purchase'"/>
+                            <field name="incoterm_id"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="currency_id" invisible="1"/>
                         </group>
@@ -75,18 +87,23 @@
                             <field name="shipping_mode"/>
                             <field name="shipment_type"/>
                             <field name="container_size"/>
+                            <field name="temperature_control_notes"/>
                         </group>
                     </group>
                     <group>
+                        <group string="Compliance &amp; Insurance">
+                            <field name="cargo_insurance_required"/>
+                            <field name="is_hazardous"/>
+                        </group>
                         <group string="Calculated Cargo Totals">
                             <field name="total_weight"/>
                             <field name="total_volume"/>
                         </group>
-                        <group string="Destination / Delivery">
-                            <field name="destination_address" placeholder="Destination port or warehouse address..."/>
-                        </group>
                     </group>
-                    <group string="Special Package &amp; Handling Notes">
+                    <group string="Destination / Shipping Address">
+                        <field name="destination_address" nolabel="1" placeholder="Destination port or warehouse address..."/>
+                    </group>
+                    <group string="Special Package &amp; Cargo Notes">
                         <field name="package_details" nolabel="1" placeholder="Dimensions, gross weight, volume (CBM), special handling notes..."/>
                     </group>
                     <notebook>
@@ -124,6 +141,7 @@
                                     <field name="customs_clearance_fee" widget="monetary"/>
                                     <field name="price_total" widget="monetary" readonly="1"/>
                                     <field name="transit_time_days"/>
+                                    <field name="free_days_port"/>
                                     <field name="quote_filename" invisible="1"/>
                                     <field name="quote_attachment" widget="binary" filename="quote_filename" string="Quote PDF / Scan"/>
                                     <field name="notes"/>
@@ -133,7 +151,22 @@
                         <page string="🏆 Winning Quote &amp; PO Creation" name="winning_quote">
                             <group>
                                 <field name="selected_line_id" options="{'no_create': True}"/>
+                                <field name="requires_approval"/>
+                                <field name="approval_state" widget="badge" decoration-warning="approval_state == 'pending'" decoration-success="approval_state == 'approved'" decoration-danger="approval_state == 'rejected'"/>
                                 <field name="generated_po_id"/>
+                            </group>
+                        </page>
+                        <page string="🚢 Post-Award Shipment Tracking" name="shipment_tracking">
+                            <group>
+                                <group string="Carrier &amp; Document Tracking">
+                                    <field name="bl_awb_number" placeholder="e.g., MAEU123456789"/>
+                                    <field name="container_number" placeholder="e.g., MSCU9876543 / Truck #"/>
+                                    <field name="vessel_flight_name" placeholder="e.g., MAERSK MC-KINNEY MOLLER V.2401"/>
+                                </group>
+                                <group string="Milestone Dates">
+                                    <field name="etd_date"/>
+                                    <field name="eta_date"/>
+                                </group>
                             </group>
                         </page>
                         <page string="Internal Notes" name="notes">
@@ -155,18 +188,22 @@
                 <field name="name"/>
                 <field name="sale_order_id"/>
                 <field name="purchase_order_id"/>
+                <field name="bl_awb_number"/>
+                <field name="container_number"/>
                 <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="RFQs Sent" name="rfq" domain="[('state', '=', 'rfq')]"/>
                 <filter string="Quotes Received" name="quoted" domain="[('state', '=', 'quoted')]"/>
+                <filter string="Pending Approval" name="pending_approval" domain="[('approval_state', '=', 'pending')]"/>
                 <filter string="Confirmed" name="confirmed" domain="[('state', '=', 'confirmed')]"/>
                 <separator/>
-                <filter string="Outbound (Sales)" name="sales" domain="[('source_type', '=', 'sale')]"/>
-                <filter string="Inbound (Purchase)" name="purchase" domain="[('source_type', '=', 'purchase')]"/>
+                <filter string="Outbound (Sales Export)" name="sales" domain="[('source_type', '=', 'sale')]"/>
+                <filter string="Inbound (Purchase Import)" name="purchase" domain="[('source_type', '=', 'purchase')]"/>
                 <group>
                     <filter string="Source Type" name="group_source" domain="[]" context="{'group_by': 'source_type'}"/>
                     <filter string="Shipping Mode" name="group_mode" domain="[]" context="{'group_by': 'shipping_mode'}"/>
-                    <filter string="Environment" name="group_env" domain="[]" context="{'group_by': 'shipment_type'}"/>
+                    <filter string="Incoterm" name="group_incoterm" domain="[]" context="{'group_by': 'incoterm_id'}"/>
                     <filter string="Status" name="group_state" domain="[]" context="{'group_by': 'state'}"/>
+                    <filter string="Approval Status" name="group_approval" domain="[]" context="{'group_by': 'approval_state'}"/>
                 </group>
             </search>
         </field>
@@ -183,7 +220,7 @@
                 Create a new Logistics Quotation Request!
             </p>
             <p>
-                Manage forwarder RFQs, compare freight bids, and generate forwarder purchase orders or customer shipping charges seamlessly.
+                Manage forwarder RFQs, compare freight bids, enforce financial approval guardrails, and track post-award shipments seamlessly.
             </p>
         </field>
     </record>

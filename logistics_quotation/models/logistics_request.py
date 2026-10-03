@@ -10,95 +10,6 @@ class LogisticsRequest(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'create_date desc, id desc'
 
-    def _register_hook(self):
-        res = super()._register_hook()
-        try:
-            self.env.cr.execute("""
-                CREATE TABLE IF NOT EXISTS logistics_request (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR,
-                    company_id INTEGER,
-                    currency_id INTEGER,
-                    source_type VARCHAR,
-                    sale_order_id INTEGER,
-                    purchase_order_id INTEGER,
-                    shipping_mode VARCHAR,
-                    shipment_type VARCHAR,
-                    container_size VARCHAR,
-                    package_details TEXT,
-                    destination_address TEXT,
-                    total_weight NUMERIC,
-                    total_volume NUMERIC,
-                    invitation_count INTEGER,
-                    submitted_count INTEGER,
-                    selected_line_id INTEGER,
-                    generated_po_id INTEGER,
-                    state VARCHAR DEFAULT 'draft',
-                    notes TEXT,
-                    create_uid INTEGER,
-                    create_date TIMESTAMP,
-                    write_uid INTEGER,
-                    write_date TIMESTAMP
-                );
-                CREATE TABLE IF NOT EXISTS logistics_request_item (
-                    id SERIAL PRIMARY KEY,
-                    request_id INTEGER,
-                    product_id INTEGER,
-                    name VARCHAR,
-                    quantity NUMERIC,
-                    product_uom_id INTEGER,
-                    weight NUMERIC,
-                    volume NUMERIC,
-                    create_uid INTEGER,
-                    create_date TIMESTAMP,
-                    write_uid INTEGER,
-                    write_date TIMESTAMP
-                );
-                CREATE TABLE IF NOT EXISTS logistics_request_invitation (
-                    id SERIAL PRIMARY KEY,
-                    request_id INTEGER,
-                    partner_id INTEGER,
-                    email VARCHAR,
-                    token VARCHAR,
-                    state VARCHAR DEFAULT 'pending',
-                    submitted_date TIMESTAMP,
-                    quote_line_id INTEGER,
-                    create_uid INTEGER,
-                    create_date TIMESTAMP,
-                    write_uid INTEGER,
-                    write_date TIMESTAMP
-                );
-                CREATE TABLE IF NOT EXISTS logistics_request_line (
-                    id SERIAL PRIMARY KEY,
-                    request_id INTEGER,
-                    company_id INTEGER,
-                    currency_id INTEGER,
-                    partner_id INTEGER,
-                    origin_handling_fee NUMERIC,
-                    freight_cost NUMERIC,
-                    destination_handling_fee NUMERIC,
-                    customs_clearance_fee NUMERIC,
-                    price_subtotal NUMERIC,
-                    handling_fee NUMERIC,
-                    price_total NUMERIC,
-                    transit_time_days INTEGER,
-                    quote_attachment BYTEA,
-                    quote_filename VARCHAR,
-                    notes TEXT,
-                    create_uid INTEGER,
-                    create_date TIMESTAMP,
-                    write_uid INTEGER,
-                    write_date TIMESTAMP
-                );
-                ALTER TABLE logistics_request_line ADD COLUMN IF NOT EXISTS origin_handling_fee NUMERIC DEFAULT 0.0;
-                ALTER TABLE logistics_request_line ADD COLUMN IF NOT EXISTS freight_cost NUMERIC DEFAULT 0.0;
-                ALTER TABLE logistics_request_line ADD COLUMN IF NOT EXISTS destination_handling_fee NUMERIC DEFAULT 0.0;
-                ALTER TABLE logistics_request_line ADD COLUMN IF NOT EXISTS customs_clearance_fee NUMERIC DEFAULT 0.0;
-            """)
-        except Exception:
-            pass
-        return res
-
     name = fields.Char(
         string='Request Reference',
         required=True,
@@ -119,8 +30,8 @@ class LogisticsRequest(models.Model):
     )
     source_type = fields.Selection(
         [
-            ('sale', 'Sales Order'),
-            ('purchase', 'Purchase Order'),
+            ('sale', 'Sales Order (Outbound Export)'),
+            ('purchase', 'Purchase Order (Inbound Import)'),
         ],
         string='Source Type',
         required=True,
@@ -139,11 +50,17 @@ class LogisticsRequest(models.Model):
         tracking=True,
         domain="[('company_id', '=', company_id)]",
     )
+    incoterm_id = fields.Many2one(
+        'account.incoterms',
+        string='Incoterm',
+        help='International Commercial Terms (e.g. FOB, CIF, DDP, EXW)',
+        tracking=True,
+    )
     shipping_mode = fields.Selection(
         [
-            ('air', 'Air'),
-            ('land', 'Land'),
-            ('sea', 'Sea'),
+            ('air', 'Air Freight'),
+            ('land', 'Land Transport'),
+            ('sea', 'Sea Freight'),
         ],
         string='Shipping Mode',
         required=True,
@@ -152,31 +69,46 @@ class LogisticsRequest(models.Model):
     )
     shipment_type = fields.Selection(
         [
-            ('dry', 'Dry'),
-            ('cooling', 'Cooling'),
-            ('freezer', 'Freezer'),
+            ('dry', 'Dry / Ambient'),
+            ('cooling', 'Chilled / Cooling (Chocolates & Confectionery)'),
+            ('freezer', 'Frozen (-18°C)'),
         ],
-        string='Environment',
+        string='Environment Control',
         required=True,
         default='dry',
         tracking=True,
     )
     container_size = fields.Selection(
         [
-            ('20ft', '20ft Container'),
-            ('40ft', '40ft Container'),
-            ('reefer', 'Reefer Container'),
-            ('lcl', 'LCL (Less than Container)'),
-            ('pallet', 'Pallet Cargo'),
-            ('cbm', 'CBM Volume'),
+            ('20ft', '20ft Dry Container'),
+            ('40ft', '40ft Dry Container'),
+            ('20ft_reefer', '20ft Reefer Container'),
+            ('40ft_reefer', '40ft Reefer Container'),
+            ('lcl', 'LCL (Less than Container Load)'),
+            ('pallet', 'Palletised Truck Cargo'),
+            ('cbm', 'CBM Volume Cargo'),
         ],
-        string='Container / Package Size',
+        string='Container / Equipment Spec',
         default='40ft',
         tracking=True,
     )
+    cargo_insurance_required = fields.Boolean(
+        string='Cargo Insurance Required',
+        default=False,
+        help='Check if marine/transit cargo insurance quotation is required from forwarder',
+    )
+    is_hazardous = fields.Boolean(
+        string='Hazardous / Dangerous Goods (DG)',
+        default=False,
+        help='Check if cargo contains hazardous materials requiring MSDS',
+    )
+    temperature_control_notes = fields.Char(
+        string='Temperature Target / Specs',
+        placeholder='e.g., +15°C to +18°C constant temperature',
+    )
     package_details = fields.Text(
-        string='Package & Weight Summary',
-        help='Calculated weight, dimensions, CBM volume, special handling requirements',
+        string='Package & Cargo Summary',
+        help='Dimensions, total packages, gross weight, CBM volume, and special handling instructions',
     )
     destination_address = fields.Text(
         string='Destination / Shipping Address',
@@ -184,7 +116,7 @@ class LogisticsRequest(models.Model):
     item_ids = fields.One2many(
         'logistics.request.item',
         'request_id',
-        string='Packaging / Cargo Breakdown',
+        string='Packaging & Cargo Breakdown',
         copy=True,
     )
     total_weight = fields.Float(
@@ -219,20 +151,20 @@ class LogisticsRequest(models.Model):
     )
     selected_line_id = fields.Many2one(
         'logistics.request.line',
-        string='Selected Quote',
+        string='Selected Winning Quote',
         tracking=True,
         domain="[('request_id', '=', id)]",
     )
     generated_po_id = fields.Many2one(
         'purchase.order',
-        string='Logistics PO',
+        string='Forwarder PO',
         readonly=True,
         copy=False,
     )
     state = fields.Selection(
         [
             ('draft', 'Draft'),
-            ('rfq', 'RFQs Sent'),
+            ('rfq', 'RFQs Broadcasted'),
             ('quoted', 'Quotes Received'),
             ('confirmed', 'Confirmed'),
             ('cancelled', 'Cancelled'),
@@ -240,6 +172,47 @@ class LogisticsRequest(models.Model):
         string='Status',
         default='draft',
         required=True,
+        tracking=True,
+    )
+    
+    # Financial Approval Guardrails
+    requires_approval = fields.Boolean(
+        string='Requires Manager Approval',
+        compute='_compute_requires_approval',
+        store=True,
+    )
+    approval_state = fields.Selection(
+        [
+            ('none', 'Not Required'),
+            ('pending', 'Pending Manager Approval'),
+            ('approved', 'Approved'),
+            ('rejected', 'Rejected'),
+        ],
+        string='Financial Approval Status',
+        default='none',
+        tracking=True,
+    )
+    
+    # Shipment Milestone Tracking (Post-Award Execution)
+    bl_awb_number = fields.Char(
+        string='Bill of Lading / Air Waybill #',
+        tracking=True,
+        help='Master BL or AWB tracking number provided by carrier/forwarder',
+    )
+    container_number = fields.Char(
+        string='Container / Truck Number',
+        tracking=True,
+    )
+    vessel_flight_name = fields.Char(
+        string='Vessel / Flight Name',
+        tracking=True,
+    )
+    etd_date = fields.Date(
+        string='Estimated Time of Departure (ETD)',
+        tracking=True,
+    )
+    eta_date = fields.Date(
+        string='Estimated Time of Arrival (ETA)',
         tracking=True,
     )
     notes = fields.Text(string='Internal Notes')
@@ -256,6 +229,20 @@ class LogisticsRequest(models.Model):
             rec.invitation_count = len(rec.invitation_ids)
             rec.submitted_count = len(rec.invitation_ids.filtered(lambda i: i.state == 'submitted'))
 
+    @api.depends('selected_line_id', 'selected_line_id.price_total')
+    def _compute_requires_approval(self):
+        # High-cost freight threshold guardrail (e.g. > 5000)
+        THRESHOLD = 5000.0
+        for rec in self:
+            if rec.selected_line_id and rec.selected_line_id.price_total > THRESHOLD:
+                rec.requires_approval = True
+                if rec.approval_state == 'none':
+                    rec.approval_state = 'pending'
+            else:
+                rec.requires_approval = False
+                if rec.approval_state == 'pending':
+                    rec.approval_state = 'none'
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -267,8 +254,7 @@ class LogisticsRequest(models.Model):
         return super().create(vals_list)
 
     def action_broadcast_rfq(self):
-        """Zero-Selection Broadcast: Auto-detects all Accounting-Approved Freight Forwarders,
-        creates secure portal tokens, and sends email RFQs with token links in 1 click."""
+        """Broadcast RFQs in 1 click to all Accounting-Approved Freight Forwarders."""
         for rec in self:
             rec.ensure_one()
             approved_forwarders = self.env['res.partner'].search([
@@ -276,7 +262,7 @@ class LogisticsRequest(models.Model):
                 ('forwarder_approval_state', '=', 'approved'),
             ])
             if not approved_forwarders:
-                raise UserError(_("No Accounting-Approved Freight Forwarders found! Please ensure forwarders are approved by Accounting Manager."))
+                raise UserError(_("No Accounting-Approved Freight Forwarders found! Please ensure forwarders are verified by Accounting Manager."))
 
             template = self.env.ref('logistics_quotation.email_template_logistics_rfq', raise_if_not_found=False)
             base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
@@ -307,17 +293,6 @@ class LogisticsRequest(models.Model):
                 )
             )
 
-    def action_send_rfq(self):
-        for rec in self:
-            if rec.state != 'draft':
-                continue
-            rec.state = 'rfq'
-            rec.message_post(body=_("RFQs sent to logistics forwarders."))
-
-    def action_print_rfq(self):
-        self.ensure_one()
-        return self.env.ref('logistics_quotation.action_report_logistics_request').report_action(self)
-
     def action_send_rfq_email(self):
         self.ensure_one()
         template = self.env.ref(
@@ -328,7 +303,6 @@ class LogisticsRequest(models.Model):
 
         if self.state == 'draft':
             self.state = 'rfq'
-            self.message_post(body=_("RFQs sent to logistics forwarders via Email."))
 
         ctx = {
             'default_model': 'logistics.request',
@@ -347,18 +321,30 @@ class LogisticsRequest(models.Model):
             'context': ctx,
         }
 
-    def action_quotes_received(self):
+    def action_print_rfq(self):
+        self.ensure_one()
+        return self.env.ref('logistics_quotation.action_report_logistics_request').report_action(self)
+
+    def action_approve_logistics(self):
+        """Manager Approval action for high-cost freight orders."""
         for rec in self:
-            if not rec.line_ids:
-                raise UserError(_("Please add at least one forwarder quotation line before moving to Quotes Received."))
-            rec.state = 'quoted'
-            rec.message_post(body=_("Forwarder quotes received."))
+            rec.approval_state = 'approved'
+            rec.message_post(body=_("Logistics quotation approved by Manager %s.", self.env.user.name))
+
+    def action_reject_logistics(self):
+        """Manager Rejection action."""
+        for rec in self:
+            rec.approval_state = 'rejected'
+            rec.message_post(body=_("Logistics quotation rejected by Manager %s.", self.env.user.name))
 
     def action_confirm_logistics(self):
         for rec in self:
             rec.ensure_one()
             if not rec.selected_line_id:
                 raise UserError(_("Please select a winning forwarder quote before confirming."))
+
+            if rec.requires_approval and rec.approval_state != 'approved':
+                raise UserError(_("This logistics request requires Manager Approval before confirmation because total freight cost exceeds threshold."))
 
             # Fetch or create default freight service product
             freight_product = self.env.ref(
@@ -367,7 +353,7 @@ class LogisticsRequest(models.Model):
             )
             if not freight_product:
                 freight_product = self.env['product.product'].create({
-                    'name': 'Freight & Handling Service',
+                    'name': 'Freight & Shipping Service',
                     'type': 'service',
                     'list_price': 0.0,
                     'landed_cost_ok': True,
@@ -379,11 +365,14 @@ class LogisticsRequest(models.Model):
             forwarder_partner = selected_line.partner_id
             total_price = selected_line.price_total
 
-            # 1. Create Purchase Order to Freight Forwarder
+            # 1. Create Purchase Order for Freight Forwarder
             po_description = (
-                f"Freight Service ({rec.shipping_mode.upper()} - "
-                f"{rec.shipment_type.upper()}) - {rec.name}"
+                f"Freight Shipping Service ({rec.shipping_mode.upper()} - "
+                f"{rec.shipment_type.upper()}) - Request: {rec.name}"
             )
+            if selected_line.free_days_port:
+                po_description += f" ({selected_line.free_days_port} Port Free Days Included)"
+
             po_vals = {
                 'partner_id': forwarder_partner.id,
                 'company_id': rec.company_id.id,
@@ -400,10 +389,10 @@ class LogisticsRequest(models.Model):
             logistics_po = self.env['purchase.order'].create(po_vals)
             rec.generated_po_id = logistics_po.id
 
-            # 2. If source is Sales Order, inject shipping line into Sales Order
+            # 2. If source is Sales Order, inject freight cost line into Sales Order
             if rec.source_type == 'sale' and rec.sale_order_id:
                 so_description = (
-                    f"Shipping & Handling ({rec.shipping_mode.upper()} - "
+                    f"International Shipping & Freight ({rec.shipping_mode.upper()} - "
                     f"{rec.shipment_type.upper()})"
                 )
                 rec.sale_order_id.write({
@@ -420,9 +409,10 @@ class LogisticsRequest(models.Model):
             rec.state = 'confirmed'
             rec.message_post(
                 body=_(
-                    "Logistics order confirmed. Purchase Order %s created for forwarder %s.",
+                    "Logistics order confirmed successfully. Forwarder Purchase Order %s created for %s (Total: %s).",
                     logistics_po.name,
                     forwarder_partner.display_name,
+                    total_price,
                 )
             )
 
@@ -450,7 +440,7 @@ class LogisticsRequest(models.Model):
 
 class LogisticsRequestItem(models.Model):
     _name = 'logistics.request.item'
-    _description = 'Logistics Request Packaging Item (Without Price)'
+    _description = 'Logistics Cargo Item (Price Confidential)'
 
     request_id = fields.Many2one(
         'logistics.request',
@@ -563,9 +553,9 @@ class LogisticsRequestLine(models.Model):
         domain="['|', ('supplier_rank', '>', 0), ('is_company', '=', True)]",
     )
     origin_handling_fee = fields.Monetary(
-        string='Origin Handling (Shipping Country)',
+        string='Origin Handling Fee',
         default=0.0,
-        help='Handling and export documentation fees in origin shipping country',
+        help='Handling and export documentation fees in origin country',
     )
     freight_cost = fields.Monetary(
         string='Main Freight Shipping Cost',
@@ -573,7 +563,7 @@ class LogisticsRequestLine(models.Model):
         help='Main ocean, air, or land shipping transport cost',
     )
     destination_handling_fee = fields.Monetary(
-        string='Destination Handling (Receiving Country)',
+        string='Destination Handling Fee',
         default=0.0,
         help='Terminal handling (THC), port, and unloading fees in receiving country',
     )
@@ -590,16 +580,21 @@ class LogisticsRequestLine(models.Model):
     transit_time_days = fields.Integer(
         string='Transit Time (Days)',
     )
+    free_days_port = fields.Integer(
+        string='Free Demurrage Days (Port)',
+        default=14,
+        help='Number of free demurrage/detention storage days granted at destination port',
+    )
     quote_attachment = fields.Binary(
         string='Quote PDF / Document',
         attachment=True,
-        help='Upload the original PDF or scanned document received from the freight forwarder',
+        help='Uploaded PDF or scanned document from freight forwarder',
     )
     quote_filename = fields.Char(
         string='File Name',
     )
     notes = fields.Text(
-        string='Conditions / Remarks',
+        string='Conditions & Remarks',
     )
 
     @api.depends('origin_handling_fee', 'freight_cost', 'destination_handling_fee', 'customs_clearance_fee')
