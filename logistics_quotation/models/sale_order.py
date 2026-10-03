@@ -55,13 +55,22 @@ class SaleOrder(models.Model):
         }
         logistics_req = self.env['logistics.request'].create(req_vals)
 
+        self.message_post(
+            body=_(
+                "Logistics Request <b>%s</b> created and routed to Logistics Officer for freight quotation.",
+                logistics_req.name,
+            )
+        )
+
         return {
-            'type': 'ir.actions.act_window',
-            'name': _('Logistics Request'),
-            'res_model': 'logistics.request',
-            'res_id': logistics_req.id,
-            'view_mode': 'form',
-            'target': 'current',
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Logistics Request Created'),
+                'message': _('Logistics Request %s has been submitted to the Logistics Officer.', logistics_req.name),
+                'type': 'success',
+                'sticky': False,
+            }
         }
 
     def action_open_logistics_requests(self):
