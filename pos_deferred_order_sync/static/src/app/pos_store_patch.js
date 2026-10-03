@@ -21,22 +21,48 @@ patch(PosStore.prototype, {
      * because a server-side flow depends on them during the session.
      */
     mustSyncOrderImmediately(order) {
-        if (!order.finalized || order.isSynced) {
-            return true;
+        return Boolean(this.getImmediateSyncReason(order));
+    },
+
+    /**
+     * Returns why the order must be sent now, or null if it can wait until closing.
+     */
+    getImmediateSyncReason(order) {
+        if (!order.finalized) {
+            return `draft order (state: ${order.state})`;
+        }
+        if (order.isSynced) {
+            return "already saved on the server";
         }
         if (order.isToInvoice?.()) {
-            return true;
+            return "invoice requested";
         }
-        // pos_custom_cake, pos_scheduled_orders, pos_pledge_order
-        if (order.pos_cake_order_id || order.fulfillment_type || order.hasPledge || order.pledgeData) {
-            return true;
+        if (order.pos_cake_order_id) {
+            return "custom cake order";
         }
-        return order.lines.some(
-            (line) =>
-                line.refunded_orderline_id ||
-                line.is_onsite_auto_pledge_line ||
-                line.product_id?.is_employee_service
-        );
+        if (order.fulfillment_type) {
+            return `scheduled order (${order.fulfillment_type})`;
+        }
+        if (order.hasPledge || order.pledgeData) {
+            return "pledge / employee service order (pos_pledge_order)";
+        }
+        for (const line of order.lines) {
+            const productName = line.product_id?.display_name || line.product_id?.name || "";
+            if (line.refunded_orderline_id) {
+                return `refund line: ${productName}`;
+            }
+            if (line.is_onsite_auto_pledge_line) {
+                return `auto pledge line (pos_onsite_price): ${productName}`;
+            }
+            if (line.product_id?.is_employee_service) {
+                return `employee service product: ${productName}`;
+            }
+        }
+        return null;
+    },
+
+    logDeferredSync(message, ...details) {
+        console.info(`[DEFERRED_SYNC] ${message}`, ...details);
     },
 
     getUnsyncedRefundedOrders(order) {
@@ -61,9 +87,15 @@ patch(PosStore.prototype, {
 
     async syncAllOrders(options = {}) {
         if (!this.isDeferredOrderSyncEnabled) {
+            this.logDeferredSync(
+                `disabled on POS config "${this.config?.name}" (deferred_order_sync=${this.config?.deferred_order_sync}) - normal sync`
+            );
             return await super.syncAllOrders(...arguments);
         }
         if (this.isFlushingDeferredOrders) {
+            this.logDeferredSync(
+                `closing session - sending ${this.getDeferredOrders().length} held order(s)`
+            );
             return await super.syncAllOrders({ ...options, force: true });
         }
 
@@ -72,11 +104,20 @@ patch(PosStore.prototype, {
         const ordersToSync = new Set();
         let includesRefundedOriginals = false;
         for (const order of candidates) {
-            if (!this.mustSyncOrderImmediately(order)) {
+            const reason = this.getImmediateSyncReason(order);
+            if (!reason) {
+                this.logDeferredSync(`HELD until closing: ${order.pos_reference || order.name}`, order);
                 continue;
             }
+            this.logDeferredSync(
+                `SENT NOW: ${order.pos_reference || order.name} - reason: ${reason}`,
+                order
+            );
             // The refunded order must exist on the server before its refund.
             for (const original of this.getUnsyncedRefundedOrders(order)) {
+                this.logDeferredSync(
+                    `SENT NOW: ${original.pos_reference || original.name} - reason: original of refund ${order.pos_reference || order.name}`
+                );
                 ordersToSync.add(original);
                 includesRefundedOriginals = true;
             }
