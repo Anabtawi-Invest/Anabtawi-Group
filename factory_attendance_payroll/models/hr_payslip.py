@@ -725,6 +725,8 @@ class HrPayslip(models.Model):
                 continue
 
             emp = payslip.employee_id
+            if hasattr(emp, '_create_absent_work_entries_for_period'):
+                emp._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
             break_hrs = emp._get_lunch_break_duration() if emp else 1.0
             w = emp.wage if emp else 0.0
 
@@ -945,14 +947,29 @@ class HrPayslip(models.Model):
                         line['amount'] = round(total_net_extra_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
-                elif code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in we_name:
+                elif code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS', 'OUT'] or 'absent' in we_name:
                     WEModel = self.env['hr.work.entry']
+                    abs_type_obj = emp._get_absent_work_entry_type() if hasattr(emp, '_get_absent_work_entry_type') else False
                     absent_we_domain = [
                         ('employee_id', '=', emp.id),
                         ('state', '!=', 'cancelled'),
-                        '|', ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS']),
-                        ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS']),
                     ]
+                    if abs_type_obj:
+                        absent_we_domain += [
+                            '|', '|', '|',
+                            ('work_entry_type_id', '=', abs_type_obj.id),
+                            ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS', 'OUT', 'UNPAID', 'LEAVE500']),
+                            ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS', 'OUT']),
+                            ('work_entry_type_id.name', 'ilike', 'Absent'),
+                        ]
+                    else:
+                        absent_we_domain += [
+                            '|', '|',
+                            ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS', 'OUT', 'UNPAID', 'LEAVE500']),
+                            ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS', 'OUT']),
+                            ('work_entry_type_id.name', 'ilike', 'Absent'),
+                        ]
+
                     if 'date' in WEModel._fields:
                         absent_we_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
                     elif 'date_start' in WEModel._fields:
@@ -963,34 +980,26 @@ class HrPayslip(models.Model):
                     absent_entries = WEModel.sudo().search(absent_we_domain)
                     actual_absent_hrs = round(sum(getattr(we, 'duration', 8.0) or 8.0 for we in absent_entries), 2)
 
-                    if rem_cash_deduction_hrs > 0.01:
-                        absent_cash_hrs = min(actual_absent_hrs, rem_cash_deduction_hrs)
-                        if absent_cash_hrs > 0.01:
-                            line['number_of_hours'] = absent_cash_hrs
-                            line['number_of_days'] = round(absent_cash_hrs / 8.0, 2)
-                            line['amount'] = round(absent_cash_hrs * hourly_rate, 3)
-                            filtered_lines.append(line)
-
-                        lateness_cash_hrs = round(max(0.0, rem_cash_deduction_hrs - absent_cash_hrs), 2)
-                        if lateness_cash_hrs > 0.01:
-                            lat_type = self.env['hr.work.entry.type'].sudo().search([
-                                '|', ('code', 'in', ['LAT', 'LATENESS', 'LATE']),
-                                ('name', 'ilike', 'Lateness')
-                            ], limit=1)
-                            filtered_lines.append({
-                                'name': 'Lateness / Undertime Deduction',
-                                'code': 'LATENESS',
-                                'work_entry_type_id': lat_type.id if lat_type else (work_entry_type.id if work_entry_type else False),
-                                'number_of_hours': lateness_cash_hrs,
-                                'number_of_days': 0.0,
-                                'amount': round(lateness_cash_hrs * hourly_rate, 3),
-                                'sequence': line.get('sequence', 25) + 1,
-                            })
-                    elif actual_absent_hrs > 0.01:
+                    if actual_absent_hrs > 0.01:
                         line['number_of_hours'] = actual_absent_hrs
                         line['number_of_days'] = round(actual_absent_hrs / 8.0, 2)
                         line['amount'] = round(actual_absent_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
+
+                    if rem_cash_deduction_hrs > 0.01:
+                        lat_type = self.env['hr.work.entry.type'].sudo().search([
+                            '|', ('code', 'in', ['LAT', 'LATENESS', 'LATE']),
+                            ('name', 'ilike', 'Lateness')
+                        ], limit=1)
+                        filtered_lines.append({
+                            'name': 'Lateness / Undertime Deduction',
+                            'code': 'LATENESS',
+                            'work_entry_type_id': lat_type.id if lat_type else (work_entry_type.id if work_entry_type else False),
+                            'number_of_hours': rem_cash_deduction_hrs,
+                            'number_of_days': 0.0,
+                            'amount': round(rem_cash_deduction_hrs * hourly_rate, 3),
+                            'sequence': line.get('sequence', 25) + 1,
+                        })
                 else:
                     filtered_lines.append(line)
 

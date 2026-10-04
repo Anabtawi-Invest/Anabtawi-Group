@@ -221,8 +221,11 @@ class HrEmployee(models.Model):
             code = (type_obj.code or "").strip().upper()
             display_code = (getattr(type_obj, "display_code", False) or "").strip().upper()
             name = (type_obj.name or "").strip().upper()
-            if type_obj.is_leave or code in EXCUSED_LEAVE_WORK_ENTRY_CODES or display_code in EXCUSED_LEAVE_WORK_ENTRY_CODES or \
-               any(c in code or c in display_code or c in name for c in ["RST", "RESTDAY", "REST_DAY"]):
+            is_absent = (type_obj.id == absent_type.id) if 'absent_type' in locals() else False
+            if not is_absent:
+                is_absent = code in ["ABSENT", "ABS", "OUT"] or display_code in ["ABSENT", "ABS", "OUT"]
+            if not is_absent and (type_obj.is_leave or code in EXCUSED_LEAVE_WORK_ENTRY_CODES or display_code in EXCUSED_LEAVE_WORK_ENTRY_CODES or \
+               any(c in code or c in display_code or c in name for c in ["RST", "RESTDAY", "REST_DAY"])):
                 we_date = getattr(we, "date", False) or (we.date_start.date() if hasattr(we, "date_start") and we.date_start else False)
                 if isinstance(we_date, datetime):
                     we_date = we_date.date()
@@ -248,7 +251,7 @@ class HrEmployee(models.Model):
         yesterday = fields.Date.context_today(self) - timedelta(days=1)
 
         for m_from, m_to in months:
-            eval_to = min(m_to, yesterday)
+            eval_to = m_to
             if m_from > eval_to:
                 continue
 
@@ -299,7 +302,9 @@ class HrEmployee(models.Model):
                 # 1. HEADOFFICE: Fixed Structure with Fixed Working Hours (or if not flexible)
                 if work_station == 'headoffice' or not is_flexible:
                     cal = employee.resource_calendar_id
-                    working_weekdays = set(int(att.dayofweek) for att in cal.attendance_ids if att.dayofweek is not False and att.dayofweek is not None) if (cal and cal.attendance_ids) else {0, 1, 2, 3, 4, 5}
+                    cal_weekdays = set(int(att.dayofweek) for att in cal.attendance_ids if att.dayofweek is not False and att.dayofweek is not None) if (cal and cal.attendance_ids) else set()
+                    # For Headoffice / Fixed structure, Friday (4) is weekly off; Saturday (5) and Sunday-Thursday are working weekdays.
+                    working_weekdays = (cal_weekdays | {5}) - {4} if cal_weekdays else {0, 1, 2, 3, 5, 6}
                     for target_date, exp_hours in candidate_unpunched_days:
                         if target_date.weekday() in working_weekdays:
                             employee._apply_absence_for_day(target_date, exp_hours, absent_type)
