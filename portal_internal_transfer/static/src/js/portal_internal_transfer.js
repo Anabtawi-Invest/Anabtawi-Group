@@ -43,13 +43,13 @@ async function fetchLocations(term) {
 }
 
 function initCreatePage(root) {
-    const sourceId = parseInt(root.dataset.sourceId || "", 10);
-    const sourceName = root.dataset.sourceName || "";
+    const destId = parseInt(root.dataset.destId || "", 10);
+    const destName = root.dataset.destName || "";
     const state = {
-        locationSrc: sourceId
-            ? {id: sourceId, name: sourceName}
+        locationSrc: null,
+        locationDest: destId
+            ? {id: destId, name: destName}
             : null,
-        locationDest: null,
         cart: {},
         productOffset: 0,
         productTerm: "",
@@ -186,14 +186,14 @@ function initCreatePage(root) {
         });
     }
 
-    // Source comes from backend mapping; destination remains selectable.
+    // Destination comes from backend mapping; source remains selectable.
     setupLocationSearch({
-        inputId: "#location_dest_search",
-        resultsId: "#location_dest_results",
-        selectedId: "#selected_location_dest",
-        labelId: "#selected_location_dest_label",
-        clearId: "#btn_clear_location_dest",
-        stateKey: "locationDest",
+        inputId: "#location_src_search",
+        resultsId: "#location_src_results",
+        selectedId: "#selected_location_src",
+        labelId: "#selected_location_src_label",
+        clearId: "#btn_clear_location_src",
+        stateKey: "locationSrc",
     });
     function renderCart() {
         const items = Object.values(state.cart);
@@ -362,15 +362,15 @@ function initCreatePage(root) {
 
     qs("#btn_confirm_transfer", root).addEventListener("click", async () => {
         confirmError.classList.add("d-none");
-        if (!state.locationSrc) {
+        if (!state.locationDest) {
             showError(
                 confirmError,
-                "No source location is mapped for your user. Please contact an administrator."
+                "No destination location is mapped for your user. Please contact an administrator."
             );
             return;
         }
-        if (!state.locationDest) {
-            showError(confirmError, "Please select a destination location.");
+        if (!state.locationSrc) {
+            showError(confirmError, "Please select a source location.");
             return;
         }
         if (state.locationSrc.id === state.locationDest.id) {
@@ -386,7 +386,7 @@ function initCreatePage(root) {
         btn.disabled = true;
         try {
             const result = await rpc("/my/transfers/api/confirm", {
-                location_dest_id: state.locationDest.id,
+                location_id: state.locationSrc.id,
                 lines,
             });
             window.location.href = result.redirect_url;

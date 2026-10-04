@@ -5,7 +5,7 @@ from odoo.exceptions import ValidationError
 
 class PortalTransferLocationMap(models.Model):
     _name = "portal.transfer.location.map"
-    _description = "Portal Transfer Source Location Mapping"
+    _description = "Portal Transfer Destination Location Mapping"
     _rec_name = "user_id"
     _order = "user_id"
 
@@ -19,7 +19,7 @@ class PortalTransferLocationMap(models.Model):
     )
     location_id = fields.Many2one(
         "stock.location",
-        string="Source Location",
+        string="Destination Location",
         required=True,
         ondelete="restrict",
     )
@@ -36,7 +36,7 @@ class PortalTransferLocationMap(models.Model):
         (
             "portal_transfer_location_map_user_uniq",
             "unique(user_id)",
-            "Each portal user can have only one source location mapping.",
+            "Each portal user can have only one destination location mapping.",
         ),
     ]
 
@@ -44,4 +44,4 @@ class PortalTransferLocationMap(models.Model):
     def _check_location_internal(self):
         for rec in self:
             if rec.location_id and rec.location_id.usage != "internal":
-                raise ValidationError(_("Source location must be an internal location."))
+                raise ValidationError(_("Destination location must be an internal location."))

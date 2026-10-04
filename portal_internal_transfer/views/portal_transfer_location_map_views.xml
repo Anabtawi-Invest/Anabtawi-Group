@@ -17,7 +17,7 @@
         <field name="name">portal.transfer.location.map.form</field>
         <field name="model">portal.transfer.location.map</field>
         <field name="arch" type="xml">
-            <form string="Portal Source Location Mapping">
+            <form string="Portal Destination Location Mapping">
                 <sheet>
                     <group>
                         <field name="user_id"/>
@@ -31,21 +31,21 @@
     </record>
 
     <record id="action_portal_transfer_location_map" model="ir.actions.act_window">
-        <field name="name">Portal Source Locations</field>
+        <field name="name">Portal Destination Locations</field>
         <field name="res_model">portal.transfer.location.map</field>
         <field name="view_mode">list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Map each portal user to a fixed source location.
+                Map each portal user to a fixed destination location.
             </p>
             <p>
-                When a portal user creates an internal transfer, the source location is taken from this mapping.
+                When a portal user creates an internal transfer, the destination location is taken from this mapping.
             </p>
         </field>
     </record>
 
     <menuitem id="menu_portal_transfer_location_map"
-              name="Portal Source Locations"
+              name="Portal Destination Locations"
               parent="stock.menu_warehouse_config"
               action="action_portal_transfer_location_map"
               groups="stock.group_stock_manager"
