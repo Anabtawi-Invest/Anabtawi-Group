@@ -2,7 +2,7 @@
 
 import { patch } from "@web/core/utils/patch";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
-import { OrderKitchenTicket } from "./order_kitchen_ticket";
+import { OrderKitchenTicket, kitchenTicketWebPrint } from "./order_kitchen_ticket";
 
 patch(PosStore.prototype, {
     async printReceipt({
@@ -15,22 +15,33 @@ patch(PosStore.prototype, {
             !printBillActionTriggered &&
             Boolean(order?.finalized) &&
             !order.isRefund &&
-            !order.nb_print;
+            !order.nb_print &&
+            this.hasOrderKitchenTicketLines(order);
 
-        const result = await super.printReceipt(...arguments);
+        // Without a receipt printer the browser prints a single document, so the
+        // ticket is added to it on a new page instead of being a second job.
+        const useWebPrint = isFirstPrintAfterPayment && !this.hardwareProxy?.printer;
+        if (useWebPrint) {
+            kitchenTicketWebPrint.orderUuid = order.uuid;
+        }
+        let result;
+        try {
+            result = await super.printReceipt(...arguments);
+        } finally {
+            kitchenTicketWebPrint.orderUuid = null;
+        }
 
-        // `successful` is only set when a real printer printed (not the browser dialog).
-        if (isFirstPrintAfterPayment && result?.successful) {
+        if (isFirstPrintAfterPayment && !useWebPrint && result?.successful) {
             await this.printOrderKitchenTicket(order);
         }
         return result;
     },
 
+    hasOrderKitchenTicketLines(order) {
+        return order.lines.some((line) => !line.isTipLine() && line.qty);
+    },
+
     async printOrderKitchenTicket(order) {
-        const hasLines = order.lines.some((line) => !line.isTipLine() && line.qty);
-        if (!hasLines) {
-            return;
-        }
         return await this.printer.print(OrderKitchenTicket, { order }, this.printOptions);
     },
 });

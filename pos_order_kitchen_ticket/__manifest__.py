@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Order Ticket After Receipt",
-    "version": "19.0.1.0.4",
+    "version": "19.0.1.0.5",
     "category": "Point of Sale",
     "summary": "Print a second ticket (order number and products, no prices) after the customer receipt",
     "description": """
@@ -30,6 +30,8 @@ the order. Reprints and refund orders do not print this ticket.
             "pos_order_kitchen_ticket/static/src/app/pos_store_patch.js",
             "pos_order_kitchen_ticket/static/src/app/receipt_screen_patch.js",
             "pos_order_kitchen_ticket/static/src/app/receipt_screen.xml",
+            "pos_order_kitchen_ticket/static/src/app/order_receipt_patch.js",
+            "pos_order_kitchen_ticket/static/src/app/order_receipt.xml",
         ],
     },
     "installable": True,
