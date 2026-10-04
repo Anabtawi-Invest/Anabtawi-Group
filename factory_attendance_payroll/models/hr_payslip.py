@@ -1039,8 +1039,9 @@ class HrPayslip(models.Model):
         for payslip in valid_slips:
             try:
                 emp = payslip.employee_id
+                work_station = getattr(emp, 'employee_work_station', False) or 'factory'
                 is_flexible = getattr(emp.resource_calendar_id, 'flexible_hours', False) or getattr(emp, 'flexible_hours', False)
-                if not is_flexible:
+                if work_station == 'headoffice' or not is_flexible:
                     continue
                 emp_id = emp.id
                 emp_work_entries = we_by_emp.get(emp_id, [])

@@ -296,15 +296,16 @@ class HrEmployee(models.Model):
                 is_flexible = getattr(employee.resource_calendar_id, 'flexible_hours', False) or getattr(employee, 'flexible_hours', False)
                 work_station = getattr(employee, 'employee_work_station', False) or 'factory'
 
-                if not is_flexible:
-                    # FIXED SCHEDULE: Check exact working weekdays from calendar. Unpunched working weekdays get ABSENT.
+                # 1. HEADOFFICE: Fixed Structure with Fixed Working Hours (or if not flexible)
+                if work_station == 'headoffice' or not is_flexible:
                     cal = employee.resource_calendar_id
                     working_weekdays = set(int(att.dayofweek) for att in cal.attendance_ids if att.dayofweek is not False and att.dayofweek is not None) if (cal and cal.attendance_ids) else {0, 1, 2, 3, 4, 5}
                     for target_date, exp_hours in candidate_unpunched_days:
                         if target_date.weekday() in working_weekdays:
                             employee._apply_absence_for_day(target_date, exp_hours, absent_type)
                 else:
-                    # FLEXIBLE SCHEDULE: Factory uses Monday count, Retail/Branches uses Friday count.
+                    # 2. FACTORY: Flexible with Monday Rule (number of Mondays in month)
+                    # 3. RETAIL: Flexible with Friday Rule (number of Fridays in month)
                     target_weekday = 0 if work_station == 'factory' else 4
                     if (c_start and c_start > m_from) or (c_end and c_end < m_to):
                         active_start = max(m_from, c_start) if c_start else m_from
