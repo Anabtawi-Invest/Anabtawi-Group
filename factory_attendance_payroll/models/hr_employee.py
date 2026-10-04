@@ -256,9 +256,6 @@ class HrEmployee(models.Model):
                 continue
 
             for employee in self:
-                if employee.is_manager_exempt():
-                    continue
-
                 candidate_unpunched_days = []
                 current = m_from
                 while current <= eval_to:
