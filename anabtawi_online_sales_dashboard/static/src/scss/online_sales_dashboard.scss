@@ -254,106 +254,103 @@
     }
 }
 
-/* ------------------------------------------------------------- */
-/* DARK MODE CONTRAST STYLING (@media & Odoo .o_dark)            */
-/* ------------------------------------------------------------- */
-@media (prefers-color-scheme: dark), body.o_dark .o_online_sales_dashboard {
-    .o_online_sales_dashboard {
-        background-color: #0f172a;
-        color: #f8fafc;
+/* Dark Theme Overrides */
+body.o_dark .o_online_sales_dashboard,
+[data-bs-theme="dark"] .o_online_sales_dashboard {
+    background-color: #0f172a;
+    color: #f8fafc;
 
-        .dashboard-header {
-            background: #1e293b;
-            border-color: #334155;
+    .dashboard-header {
+        background: #1e293b;
+        border-color: #334155;
 
-            .title-section {
-                h2 { color: #ffffff; }
-                p { color: #cbd5e1; }
-            }
-
-            .filter-controls {
-                .form-control {
-                    background-color: #0f172a;
-                    color: #ffffff;
-                    border-color: #475569;
-                }
-
-                .btn-outline-secondary {
-                    color: #ffffff;
-                    border-color: #475569;
-                    background-color: #1e293b;
-
-                    &:hover {
-                        background-color: #334155;
-                    }
-                }
-            }
+        .title-section {
+            h2 { color: #ffffff; }
+            p { color: #cbd5e1; }
         }
 
-        .kpi-cards-grid {
-            .kpi-card {
-                background: #1e293b;
-                border-color: #334155;
-
-                .kpi-title { color: #e2e8f0; }
-                .kpi-value { color: #ffffff; }
-                .kpi-subtext { color: #cbd5e1; }
-
-                &.card-gross {
-                    background: linear-gradient(135deg, #1e293b 0%, #1e3a8a 100%);
-                    .kpi-title { color: #93c5fd; }
-                    .kpi-value { color: #ffffff; }
-                }
-
-                &.card-commission {
-                    background: linear-gradient(135deg, #1e293b 0%, #7f1d1d 100%);
-                    .kpi-title { color: #fca5a5; }
-                    .kpi-value { color: #ffffff; }
-                }
-
-                &.card-net {
-                    background: linear-gradient(135deg, #1e293b 0%, #14532d 100%);
-                    .kpi-title { color: #86efac; }
-                    .kpi-value { color: #ffffff; }
-                }
-
-                &.card-orders {
-                    background: linear-gradient(135deg, #1e293b 0%, #78350f 100%);
-                    .kpi-title { color: #fde68a; }
-                    .kpi-value { color: #ffffff; }
-                }
-
-                &.card-aov {
-                    background: linear-gradient(135deg, #1e293b 0%, #4c1d95 100%);
-                    .kpi-title { color: #ddd6fe; }
-                    .kpi-value { color: #ffffff; }
-                }
-            }
-        }
-
-        .charts-grid .chart-box, .data-tables-grid .table-box {
-            background: #1e293b;
-            border-color: #334155;
-
-            .chart-title, .table-title {
+        .filter-controls {
+            .form-control {
+                background-color: #0f172a;
                 color: #ffffff;
+                border-color: #475569;
             }
 
-            .table {
-                th {
-                    background-color: #0f172a;
-                    color: #f8fafc;
-                    border-bottom-color: #475569;
-                }
+            .btn-outline-secondary {
+                color: #ffffff;
+                border-color: #475569;
+                background-color: #1e293b;
 
-                td {
-                    color: #f8fafc;
-                    border-bottom-color: #334155;
-                }
-
-                tbody tr:hover {
+                &:hover {
                     background-color: #334155;
                 }
+            }
+        }
+    }
+
+    .kpi-cards-grid {
+        .kpi-card {
+            background: #1e293b;
+            border-color: #334155;
+
+            .kpi-title { color: #e2e8f0; }
+            .kpi-value { color: #ffffff; }
+            .kpi-subtext { color: #cbd5e1; }
+
+            &.card-gross {
+                background: linear-gradient(135deg, #1e293b 0%, #1e3a8a 100%);
+                .kpi-title { color: #93c5fd; }
+                .kpi-value { color: #ffffff; }
+            }
+
+            &.card-commission {
+                background: linear-gradient(135deg, #1e293b 0%, #7f1d1d 100%);
+                .kpi-title { color: #fca5a5; }
+                .kpi-value { color: #ffffff; }
+            }
+
+            &.card-net {
+                background: linear-gradient(135deg, #1e293b 0%, #14532d 100%);
+                .kpi-title { color: #86efac; }
+                .kpi-value { color: #ffffff; }
+            }
+
+            &.card-orders {
+                background: linear-gradient(135deg, #1e293b 0%, #78350f 100%);
+                .kpi-title { color: #fde68a; }
+                .kpi-value { color: #ffffff; }
+            }
+
+            &.card-aov {
+                background: linear-gradient(135deg, #1e293b 0%, #4c1d95 100%);
+                .kpi-title { color: #ddd6fe; }
+                .kpi-value { color: #ffffff; }
+            }
+        }
+    }
+
+    .charts-grid .chart-box, .data-tables-grid .table-box {
+        background: #1e293b;
+        border-color: #334155;
+
+        .chart-title, .table-title {
+            color: #ffffff;
+        }
+
+        .table {
+            th {
+                background-color: #0f172a;
+                color: #f8fafc;
+                border-bottom-color: #475569;
+            }
+
+            td {
+                color: #f8fafc;
+                border-bottom-color: #334155;
+            }
+
+            tbody tr:hover {
+                background-color: #334155;
             }
         }
     }
