@@ -354,7 +354,7 @@ class HrPayslip(models.Model):
                     dur = getattr(we, 'duration', 8.0) or 8.0
                     total_undertime += dur
 
-            # Weekly rest/off days: monthly allowance 4; unused × 8 × 1.5 → Monthly OT
+            # Weekly rest/off days: monthly allowance 4; unused × 8 × 1.5 → Monthly OT (only if employee physically worked)
             worked_days_count = len(daily_hours)
             emp_leave_dates = leave_dates_by_emp.get(emp_id, set())
             approved_leave_days_count = sum(
@@ -363,9 +363,14 @@ class HrPayslip(models.Model):
                 and ((payslip.date_from + datetime.timedelta(days=d)) in emp_leave_dates or
                      (payslip.date_from + datetime.timedelta(days=d)) in public_holiday_dates)
             )
-            rest_days_taken = max(0, total_days_in_month - worked_days_count - approved_leave_days_count)
-            unused_rest_days = max(0, monthly_rest_allowance - rest_days_taken)
-            if allow_ot and unused_rest_days > 0:
+            if worked_days_count > 0:
+                rest_days_taken = max(0, total_days_in_month - worked_days_count - approved_leave_days_count)
+                unused_rest_days = max(0, monthly_rest_allowance - rest_days_taken)
+            else:
+                rest_days_taken = 0
+                unused_rest_days = 0
+
+            if allow_ot and unused_rest_days > 0 and worked_days_count > 0:
                 total_ot += (unused_rest_days * 8.0 * 1.5)
 
             gross_ot = round(total_ot, 2)
@@ -730,7 +735,18 @@ class HrPayslip(models.Model):
             ])
 
             cal_id = emp.resource_calendar_id.id if emp and emp.resource_calendar_id else False
-            holiday_dates = self.env['hr.attendance']._get_public_holiday_dates_batch(payslip.date_from, payslip.date_to, calendar_id=cal_id)
+            holiday_dates = set(self.env['hr.attendance']._get_public_holiday_dates_batch(payslip.date_from, payslip.date_to, calendar_id=cal_id))
+            if 'hr.work.entry' in self.env:
+                we_ph = self.env['hr.work.entry'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '!=', 'cancelled'),
+                    '|', '|', ('work_entry_type_id.code', 'in', ['PHD', 'GTO', 'HOLIDAY', 'LEAVE110']),
+                    ('work_entry_type_id.display_code', 'in', ['PHD', 'GTO', 'HOLIDAY', 'LEAVE110']),
+                    ('work_entry_type_id.name', 'ilike', 'Public Holiday'),
+                ])
+                we_dates = set(we.date_start.date() for we in we_ph if getattr(we, 'date_start', None) and payslip.date_from <= we.date_start.date() <= payslip.date_to)
+                holiday_dates = holiday_dates | we_dates
+
             regular_attendances = attendances.filtered(lambda a: a.check_in.date() not in holiday_dates)
             holiday_attendances = attendances.filtered(lambda a: a.check_in.date() in holiday_dates)
 
@@ -760,6 +776,116 @@ class HrPayslip(models.Model):
             allow_ot = getattr(company, 'enable_overtime_calculation', True)
             net_extra_hrs = round(payslip.attendance_gross_overtime - payslip.lateness_covered_by_extra_hours, 2) if allow_ot else 0.0
 
+            # Pre-compute final attendance days for the period
+            computed_attendance_days = 0.0
+            if total_regular_attendance_hrs > 0.01:
+                if regular_attendances:
+                    regular_physical_days = len(set(att.check_in.date() for att in regular_attendances if att.check_in))
+                else:
+                    regular_physical_days = round(total_regular_attendance_hrs / 8.0, 2)
+
+                if attendances:
+                    total_physical_days = len(set(att.check_in.date() for att in attendances if att.check_in))
+                else:
+                    total_physical_days = regular_physical_days
+
+                c_start = payslip.date_from
+                c_end = payslip.date_to
+
+                contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or getattr(emp, 'contract_id', None)
+                c_vers = emp._get_versions_with_contract_overlap_with_period(payslip.date_from, payslip.date_to) if hasattr(emp, '_get_versions_with_contract_overlap_with_period') else []
+                c_starts = [c.date_start for c in c_vers if getattr(c, 'date_start', None)]
+                c_ends = [c.date_end for c in c_vers if getattr(c, 'date_end', None)]
+
+                if contract_obj and getattr(contract_obj, 'date_start', None) and contract_obj.date_start > payslip.date_from:
+                    c_start = contract_obj.date_start
+                elif c_starts and max(c_starts) > payslip.date_from:
+                    c_start = max(c_starts)
+
+                if contract_obj and getattr(contract_obj, 'date_end', None) and contract_obj.date_end < payslip.date_to:
+                    c_end = contract_obj.date_end
+                elif c_ends and min(c_ends) < payslip.date_to:
+                    c_end = min(c_ends)
+
+                is_flexible = getattr(emp.resource_calendar_id, 'flexible_hours', False) or getattr(emp, 'flexible_hours', False)
+                if is_flexible:
+                    if (c_start and c_start > payslip.date_from) or (c_end and c_end < payslip.date_to):
+                        active_m_from = max(payslip.date_from, c_start) if c_start else payslip.date_from
+                        active_m_to = min(payslip.date_to, c_end) if c_end else payslip.date_to
+                        earned_rest_days = sum(
+                            1 for d_idx in range(max(0, (active_m_to - active_m_from).days + 1))
+                            if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == 0
+                        )
+                    else:
+                        earned_rest_days = int(regular_physical_days // 6)
+                else:
+                    earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
+
+                active_period_days = max(0, (c_end - c_start).days + 1)
+
+                # Calculate worked rest days (physical punches on scheduled off days)
+                if not is_flexible and emp.resource_calendar_id:
+                    cal = emp.resource_calendar_id
+                    working_weekdays = set(int(att.dayofweek) for att in cal.attendance_ids if att.dayofweek is not False and att.dayofweek is not None)
+                    worked_rest_days = sum(1 for att in regular_attendances if att.check_in and att.check_in.weekday() not in working_weekdays)
+                else:
+                    worked_rest_days = max(0, regular_physical_days - max(0, active_period_days - earned_rest_days - len(holiday_dates)))
+
+                active_holiday_dates = [d for d in holiday_dates if c_start <= d <= c_end]
+                unworked_holiday_dates = [d for d in active_holiday_dates if d not in set(att.check_in.date() for att in holiday_attendances if att.check_in)]
+                unworked_holiday_days = len(unworked_holiday_dates)
+
+                unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
+                covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
+                covered_lateness_days = covered_lateness_hours / 8.0
+                final_attendance_days = total_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
+                if active_period_days > 0 and final_attendance_days > active_period_days:
+                    final_attendance_days = active_period_days
+
+                computed_attendance_days = float(round(final_attendance_days))
+
+            travel_days_count = 0.0
+            trv_dates = []
+            if 'hr.leave' in self.env:
+                leaves_all = self.env['hr.leave'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('state', 'in', ['validate', 'validate1']),
+                    ('date_from', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                    ('date_to', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                ])
+                leaves_trv = leaves_all.filtered(lambda l: l.holiday_status_id and (
+                    any(term in (l.holiday_status_id.name or '').lower() for term in ['travel', 'سفر', 'مهمة']) or
+                    (hasattr(l.holiday_status_id, 'work_entry_type_id') and l.holiday_status_id.work_entry_type_id and l.holiday_status_id.work_entry_type_id.code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110']) or
+                    (hasattr(l.holiday_status_id, 'code') and l.holiday_status_id.code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'])
+                ))
+                for lve in leaves_trv:
+                    if getattr(lve, 'date_from', None):
+                        trv_dates.append(lve.date_from.date())
+                    if getattr(lve, 'date_to', None):
+                        trv_dates.append(lve.date_to.date())
+
+            if 'hr.work.entry' in self.env:
+                we_trv = self.env['hr.work.entry'].sudo().search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '!=', 'cancelled'),
+                    '|', '|', '|',
+                    ('work_entry_type_id.code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110']),
+                    ('work_entry_type_id.display_code', 'in', ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110']),
+                    ('work_entry_type_id.name', 'ilike', 'Travel'),
+                    ('work_entry_type_id.name', 'ilike', 'سفر'),
+                ])
+                for we in we_trv:
+                    if getattr(we, 'date_start', None):
+                        trv_dates.append(we.date_start.date())
+                    if getattr(we, 'date_stop', None):
+                        trv_dates.append(we.date_stop.date())
+
+            if trv_dates:
+                min_trv = max(payslip.date_from, min(trv_dates))
+                max_trv = min(payslip.date_to, max(trv_dates))
+                if min_trv <= max_trv:
+                    travel_days_count = float((max_trv - min_trv).days + 1)
+
             filtered_lines = []
             for line in res:
                 code = (line.get('code') or '').strip()
@@ -773,51 +899,32 @@ class HrPayslip(models.Model):
                 if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
                     continue
 
-                if code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
+                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'] or 'travel' in we_name or 'travel' in line_name or 'سفر' in we_name or 'سفر' in line_name or 'مهمة' in we_name or 'مهمة' in line_name:
+                    trv_days = travel_days_count if travel_days_count > 0.0 else line.get('number_of_days', 0.0)
+                    line['number_of_days'] = trv_days
+                    line['number_of_hours'] = round(trv_days * 9.0, 2)
+                    daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
+                    line['amount'] = round(trv_days * daily_rate, 3)
+                    filtered_lines.append(line)
+
+                elif code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
-                        
-                        if regular_attendances:
-                            regular_physical_days = len(set(att.check_in.date() for att in regular_attendances if att.check_in))
-                        else:
-                            regular_physical_days = round(total_regular_attendance_hrs / 8.0, 2)
-
-                        if attendances:
-                            total_physical_days = len(set(att.check_in.date() for att in attendances if att.check_in))
-                        else:
-                            total_physical_days = regular_physical_days
-
-                        c_start = payslip.date_from
-                        c_end = payslip.date_to
-
-                        contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or getattr(emp, 'contract_id', None)
-                        if contract_obj and getattr(contract_obj, 'date_start', None) and contract_obj.date_start > payslip.date_from:
-                            c_start = contract_obj.date_start
-                        elif hasattr(emp, '_get_versions_with_contract_overlap_with_period'):
-                            c_vers = emp._get_versions_with_contract_overlap_with_period(payslip.date_from, payslip.date_to)
-                            c_starts = [c.date_start for c in c_vers if getattr(c, 'date_start', None)]
-                            if c_starts and max(c_starts) > payslip.date_from:
-                                c_start = max(c_starts)
-
-                        if contract_obj and getattr(contract_obj, 'date_end', None) and contract_obj.date_end < payslip.date_to:
-                            c_end = contract_obj.date_end
-
-                        is_flexible = getattr(emp.resource_calendar_id, 'flexible_hours', False) or getattr(emp, 'flexible_hours', False)
-                        if is_flexible:
-                            if c_start and c_start > payslip.date_from:
-                                active_m_from = max(payslip.date_from, c_start)
-                                earned_rest_days = sum(
-                                    1 for d_idx in range((payslip.date_to - active_m_from).days + 1)
-                                    if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == 0
-                                )
-                            else:
-                                earned_rest_days = int(total_physical_days // 6)
-                        else:
-                            earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
-
-                        line['number_of_days'] = float(regular_physical_days + earned_rest_days)
+                        line['number_of_days'] = computed_attendance_days
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
+
+                elif code in ['OUT', 'OUTCON', 'OUT_OF_CONTRACT'] or 'out of contract' in line_name or 'out of contract' in we_name:
+                    pre_out_days = (c_start - payslip.date_from).days if ('c_start' in locals() and c_start and c_start > payslip.date_from) else 0
+                    post_out_days = (payslip.date_to - c_end).days if ('c_end' in locals() and c_end and c_end < payslip.date_to) else 0
+                    out_of_contract_days = float(max(0, pre_out_days + post_out_days))
+                    if out_of_contract_days <= 0.0 and 'computed_attendance_days' in locals():
+                        total_calendar_days = float((payslip.date_to - payslip.date_from).days + 1)
+                        out_of_contract_days = max(0.0, round(total_calendar_days - computed_attendance_days, 2))
+                    line['number_of_days'] = out_of_contract_days
+                    line['number_of_hours'] = round(out_of_contract_days * 8.0, 2)
+                    line['amount'] = 0.0
+                    filtered_lines.append(line)
 
                 elif code in ['GTO', 'PHD', 'HOLIDAY', 'LEAVE110', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name:
                     if total_holiday_worked_hrs > 0.01:
@@ -825,26 +932,64 @@ class HrPayslip(models.Model):
                         line['number_of_hours'] = weighted_hol_hrs
                         line['number_of_days'] = float(len(set(att.check_in.date() for att in holiday_attendances))) if holiday_attendances else round(weighted_hol_hrs / 8.0, 2)
                         line['amount'] = round(weighted_hol_hrs * hourly_rate, 3)
+                        filtered_lines.append(line)
                     else:
-                        actual_hol_days = len(holiday_dates) if holiday_dates else 1.0
-                        base_hrs = round(actual_hol_days * 8.0, 2)
-                        line['number_of_hours'] = base_hrs
-                        line['number_of_days'] = round(actual_hol_days, 2)
-                        line['amount'] = 0.0
-                    filtered_lines.append(line)
+                        # Hide Public Holiday line if employee did not work on the holiday
+                        continue
 
-                elif code in ['OVERTIME', 'EXTRA', 'OUT'] or 'overtime' in we_name or 'extra' in we_name:
-                    if net_extra_hrs > 0.01:
-                        line['number_of_hours'] = net_extra_hrs
-                        line['number_of_days'] = round(net_extra_hrs / 8.0, 2)
-                        line['amount'] = round(net_extra_hrs * hourly_rate, 3)
+                elif code in ['OVERTIME', 'EXTRA'] or 'overtime' in we_name or 'extra' in we_name:
+                    total_net_extra_hrs = round(net_extra_hrs + (extra_day_off_hrs if 'extra_day_off_hrs' in locals() else 0.0), 2)
+                    if total_net_extra_hrs > 0.01:
+                        line['number_of_hours'] = total_net_extra_hrs
+                        line['number_of_days'] = round(total_net_extra_hrs / 8.0, 2)
+                        line['amount'] = round(total_net_extra_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
                 elif code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in we_name:
+                    WEModel = self.env['hr.work.entry']
+                    absent_we_domain = [
+                        ('employee_id', '=', emp.id),
+                        ('state', '!=', 'cancelled'),
+                        '|', ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS']),
+                        ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS']),
+                    ]
+                    if 'date' in WEModel._fields:
+                        absent_we_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
+                    elif 'date_start' in WEModel._fields:
+                        absent_we_domain += [
+                            ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                            ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                        ]
+                    absent_entries = WEModel.sudo().search(absent_we_domain)
+                    actual_absent_hrs = round(sum(getattr(we, 'duration', 8.0) or 8.0 for we in absent_entries), 2)
+
                     if rem_cash_deduction_hrs > 0.01:
-                        line['number_of_hours'] = rem_cash_deduction_hrs
-                        line['number_of_days'] = round(rem_cash_deduction_hrs / 8.0, 2)
-                        line['amount'] = round(rem_cash_deduction_hrs * hourly_rate, 3)
+                        absent_cash_hrs = min(actual_absent_hrs, rem_cash_deduction_hrs)
+                        if absent_cash_hrs > 0.01:
+                            line['number_of_hours'] = absent_cash_hrs
+                            line['number_of_days'] = round(absent_cash_hrs / 8.0, 2)
+                            line['amount'] = round(absent_cash_hrs * hourly_rate, 3)
+                            filtered_lines.append(line)
+
+                        lateness_cash_hrs = round(max(0.0, rem_cash_deduction_hrs - absent_cash_hrs), 2)
+                        if lateness_cash_hrs > 0.01:
+                            lat_type = self.env['hr.work.entry.type'].sudo().search([
+                                '|', ('code', 'in', ['LAT', 'LATENESS', 'LATE']),
+                                ('name', 'ilike', 'Lateness')
+                            ], limit=1)
+                            filtered_lines.append({
+                                'name': 'Lateness / Undertime Deduction',
+                                'code': 'LATENESS',
+                                'work_entry_type_id': lat_type.id if lat_type else (work_entry_type.id if work_entry_type else False),
+                                'number_of_hours': lateness_cash_hrs,
+                                'number_of_days': 0.0,
+                                'amount': round(lateness_cash_hrs * hourly_rate, 3),
+                                'sequence': line.get('sequence', 25) + 1,
+                            })
+                    elif actual_absent_hrs > 0.01:
+                        line['number_of_hours'] = actual_absent_hrs
+                        line['number_of_days'] = round(actual_absent_hrs / 8.0, 2)
+                        line['amount'] = round(actual_absent_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
                 else:
                     filtered_lines.append(line)
@@ -905,11 +1050,17 @@ class HrPayslip(models.Model):
                 )
                 physical_attendance_days = len(slip_worked_dates)
                 contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or getattr(emp, 'contract_id', None)
-                c_start = getattr(contract_obj, 'date_start', None) if contract_obj else None
-                if c_start and c_start > payslip.date_from:
-                    active_m_from = max(payslip.date_from, c_start)
+                c_vers = emp._get_versions_with_contract_overlap_with_period(payslip.date_from, payslip.date_to) if hasattr(emp, '_get_versions_with_contract_overlap_with_period') else []
+                c_starts = [c.date_start for c in c_vers if getattr(c, 'date_start', None)]
+                c_ends = [c.date_end for c in c_vers if getattr(c, 'date_end', None)]
+                c_start = getattr(contract_obj, 'date_start', None) if contract_obj else (max(c_starts) if c_starts else None)
+                c_end = getattr(contract_obj, 'date_end', None) if contract_obj else (min(c_ends) if c_ends else None)
+
+                if (c_start and c_start > payslip.date_from) or (c_end and c_end < payslip.date_to):
+                    active_m_from = max(payslip.date_from, c_start) if c_start else payslip.date_from
+                    active_m_to = min(payslip.date_to, c_end) if c_end else payslip.date_to
                     allowed_rest_days = sum(
-                        1 for d_idx in range((payslip.date_to - active_m_from).days + 1)
+                        1 for d_idx in range(max(0, (active_m_to - active_m_from).days + 1))
                         if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == 0
                     )
                 else:
@@ -1515,133 +1666,9 @@ class HrPayslip(models.Model):
         )
 
     def _fap_create_balance_sync_leave(self, leave_type, hours):
-        """Consume Extra Hours surplus (payslip hours → days/8) so UI days match Remaining/8."""
+        """Do NOT create fake hr.leave records on employee calendar. Balance sync is managed via allocations."""
         self.ensure_one()
-        if hours <= 0.01 or 'hr.leave' not in self.env or not leave_type:
-            return
-
-        Leave = self.env['hr.leave'].sudo()
-        alloc = self.env['hr.leave.allocation'].sudo().search([
-            ('employee_id', '=', self.employee_id.id),
-            ('holiday_status_id', '=', leave_type.id),
-            ('state', '=', 'validate'),
-        ], order='date_to desc, id desc', limit=1)
-
-        ctx_leave = Leave.with_context(
-            employee_id=self.employee_id.id,
-            mail_create_nolog=True,
-            mail_notrack=True,
-            tracking_disable=True,
-            leave_skip_state_check=True,
-            leave_skip_work_entries=True,
-            no_work_entry=True,
-            leave_skip_payslip_check=True,
-            leave_skip_date_check=True,
-            skip_payslip_validation=True,
-            payslip_skip_leave_check=True,
-            leave_fast_create=True,
-        )
-
-        payslip_hpd = self.FAP_PAYSLIP_HOURS_PER_DAY
-        remaining_hours = hours
-        curr_d = self.date_from
-        created_ids = []
-        _logger.info(
-            "[FAP-RECON] slip=%s Balance Sync START hours=%s days=%s payslip_hpd=%s",
-            self.id,
-            hours,
-            round(hours / payslip_hpd, 4),
-            payslip_hpd,
-        )
-        while curr_d <= self.date_to and remaining_hours >= (payslip_hpd - 0.01):
-            dt_start = datetime.datetime.combine(curr_d, datetime.time(8, 0, 0))
-            dt_stop = datetime.datetime.combine(curr_d, datetime.time(17, 0, 0))
-            vals = {
-                'name': f"Extra Hours Balance Sync - {curr_d.strftime('%d/%m/%Y')}",
-                'employee_id': self.employee_id.id,
-                'holiday_status_id': leave_type.id,
-                'request_date_from': curr_d,
-                'request_date_to': curr_d,
-                'date_from': dt_start,
-                'date_to': dt_stop,
-                'number_of_days': 1.0,
-                'state': 'validate',
-            }
-            if alloc and 'holiday_allocation_id' in Leave._fields:
-                vals['holiday_allocation_id'] = alloc.id
-            try:
-                new_lve = ctx_leave.create(vals)
-                new_lve.sudo().write({'state': 'validate'})
-                created_ids.append(new_lve.id)
-                _logger.info(
-                    "[FAP-RECON] slip=%s Balance Sync FULL-DAY leave created id=%s days=1.0 state=%s",
-                    self.id,
-                    new_lve.id,
-                    new_lve.state,
-                )
-            except Exception:
-                _logger.exception(
-                    "[FAP-RECON] slip=%s balance sync full-day leave FAILED vals=%s",
-                    self.id,
-                    vals,
-                )
-            remaining_hours -= payslip_hpd
-            curr_d += datetime.timedelta(days=1)
-
-        if remaining_hours > 0.01 and curr_d <= self.date_to:
-            frac_hours = round(remaining_hours, 2)
-            frac_days = round(frac_hours / payslip_hpd, 4)
-            dt_start = datetime.datetime.combine(curr_d, datetime.time(8, 0, 0))
-            dt_stop = dt_start + datetime.timedelta(hours=min(frac_hours, payslip_hpd))
-            vals = {
-                'name': f"Extra Hours Balance Sync - {frac_hours}h ({curr_d.strftime('%d/%m/%Y')})",
-                'employee_id': self.employee_id.id,
-                'holiday_status_id': leave_type.id,
-                'request_date_from': curr_d,
-                'request_date_to': curr_d,
-                'date_from': dt_start,
-                'date_to': dt_stop,
-                'number_of_days': frac_days,
-                'state': 'validate',
-            }
-            if alloc and 'holiday_allocation_id' in Leave._fields:
-                vals['holiday_allocation_id'] = alloc.id
-            try:
-                new_lve = ctx_leave.create(vals)
-                new_lve.sudo().write({'state': 'validate'})
-                created_ids.append(new_lve.id)
-                _logger.info(
-                    "[FAP-RECON] slip=%s Balance Sync FRAC leave created id=%s "
-                    "hours=%s days=%s (payslip_hpd=%s) state=%s",
-                    self.id,
-                    new_lve.id,
-                    frac_hours,
-                    frac_days,
-                    payslip_hpd,
-                    new_lve.state,
-                )
-            except Exception:
-                _logger.exception(
-                    "[FAP-RECON] slip=%s balance sync fractional leave FAILED vals=%s",
-                    self.id,
-                    vals,
-                )
-        elif remaining_hours > 0.01 and curr_d > self.date_to:
-            _logger.error(
-                "[FAP-RECON] slip=%s Balance Sync could not place remaining %sh — "
-                "no days left in payslip period %s→%s",
-                self.id,
-                remaining_hours,
-                self.date_from,
-                self.date_to,
-            )
-
-        _logger.info(
-            "[FAP-RECON] slip=%s Balance Sync DONE requested_hours=%s created_leave_ids=%s",
-            self.id,
-            hours,
-            created_ids,
-        )
+        return
 
     def _fap_validate_allocation(self, allocation):
         """Approve allocation to validated state (Odoo 19-safe)."""
