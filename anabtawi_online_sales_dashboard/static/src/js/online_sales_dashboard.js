@@ -13,13 +13,15 @@ export class OnlineSalesDashboard extends Component {
         this.action = useService("action");
         this.chartInstances = {};
 
-        const today = new Date();
-        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const now = new Date();
+        const defaultStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 0, 0);
+        const defaultEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 5, 0, 0);
 
         this.state = useState({
             isLoading: true,
-            dateFrom: firstDay.toISOString().split('T')[0],
-            dateTo: today.toISOString().split('T')[0],
+            activePreset: "today",
+            dateFrom: this.formatDateTimeLocal(defaultStart),
+            dateTo: this.formatDateTimeLocal(defaultEnd),
             data: {
                 summary: {},
                 channel_breakdown: [],
@@ -38,6 +40,43 @@ export class OnlineSalesDashboard extends Component {
         onMounted(() => {
             this.renderCharts();
         });
+    }
+
+    formatDateTimeLocal(dt) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+    }
+
+    setPreset(preset) {
+        this.state.activePreset = preset;
+        const now = new Date();
+
+        if (preset === "today") {
+            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 0, 0);
+            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 5, 0, 0);
+            this.state.dateFrom = this.formatDateTimeLocal(start);
+            this.state.dateTo = this.formatDateTimeLocal(end);
+        } else if (preset === "yesterday") {
+            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 6, 0, 0);
+            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 5, 0, 0);
+            this.state.dateFrom = this.formatDateTimeLocal(start);
+            this.state.dateTo = this.formatDateTimeLocal(end);
+        } else if (preset === "this_week") {
+            const day = now.getDay() || 7;
+            const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1, 6, 0, 0);
+            this.state.dateFrom = this.formatDateTimeLocal(monday);
+            this.state.dateTo = this.formatDateTimeLocal(now);
+        } else if (preset === "this_month") {
+            const first = new Date(now.getFullYear(), now.getMonth(), 1, 6, 0, 0);
+            this.state.dateFrom = this.formatDateTimeLocal(first);
+            this.state.dateTo = this.formatDateTimeLocal(now);
+        }
+
+        this.loadDashboardData();
+    }
+
+    onDateInputCustom() {
+        this.state.activePreset = "custom";
     }
 
     async loadDashboardData() {
@@ -61,7 +100,7 @@ export class OnlineSalesDashboard extends Component {
         }
     }
 
-    async onFilterChange() {
+    async onFilterApply() {
         await this.loadDashboardData();
     }
 
@@ -175,8 +214,8 @@ export class OnlineSalesDashboard extends Component {
             view_mode: "form",
             target: "new",
             context: {
-                default_date_from: this.state.dateFrom,
-                default_date_to: this.state.dateTo,
+                default_date_from: this.state.dateFrom.split('T')[0],
+                default_date_to: this.state.dateTo.split('T')[0],
             },
         });
     }

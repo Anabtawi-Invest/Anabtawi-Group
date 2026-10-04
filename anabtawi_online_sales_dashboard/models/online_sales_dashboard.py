@@ -80,21 +80,38 @@ class OnlineSalesDashboard(models.TransientModel):
         return channel_list[0] if channel_list else {"id": 0, "name": "Other Online", "code": "OTHER", "color": "#757575", "commission_rate": 0.0}
 
     @api.model
+    def _parse_dt(self, dt_val, default_time_min=True):
+        """Parse string or date/datetime into python datetime object."""
+        if not dt_val:
+            return None
+        if isinstance(dt_val, datetime):
+            return dt_val
+        if isinstance(dt_val, date):
+            return datetime.combine(dt_val, datetime.min.time() if default_time_min else datetime.max.time())
+
+        clean_str = str(dt_val).replace("T", " ").strip()
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+            try:
+                res = datetime.strptime(clean_str, fmt)
+                if fmt == "%Y-%m-%d":
+                    res = datetime.combine(res.date(), datetime.min.time() if default_time_min else datetime.max.time())
+                return res
+            except ValueError:
+                pass
+        return None
+
+    @api.model
     def get_online_dashboard_data(self, date_from=None, date_to=None, config_ids=None, channel_ids=None):
         """Main API endpoint returning all online sales metrics, charts, and channel breakdowns."""
-        today = fields.Date.today()
-        if not date_from:
-            date_from = today.replace(day=1)
-        else:
-            date_from = fields.Date.to_date(date_from)
+        dt_start = self._parse_dt(date_from, default_time_min=True)
+        dt_end = self._parse_dt(date_to, default_time_min=False)
 
-        if not date_to:
-            date_to = today
-        else:
-            date_to = fields.Date.to_date(date_to)
-
-        dt_start = datetime.combine(date_from, datetime.min.time())
-        dt_end = datetime.combine(date_to, datetime.max.time())
+        if not dt_start:
+            today = fields.Date.today()
+            dt_start = datetime.combine(today.replace(day=1), datetime.min.time())
+        if not dt_end:
+            today = fields.Date.today()
+            dt_end = datetime.combine(today, datetime.max.time())
 
         # Load channel configuration maps
         channel_list = self._get_channel_mapping()
@@ -272,12 +289,15 @@ class OnlineSalesDashboard(models.TransientModel):
     @api.model
     def get_online_sales_drilldown(self, channel_code=None, branch_name=None, date_from=None, date_to=None):
         """Action handler to return underlying POS orders for interactive drill-down."""
-        today = fields.Date.today()
-        d_from = fields.Date.to_date(date_from) if date_from else today.replace(day=1)
-        d_to = fields.Date.to_date(date_to) if date_to else today
-        
-        dt_start = datetime.combine(d_from, datetime.min.time())
-        dt_end = datetime.combine(d_to, datetime.max.time())
+        dt_start = self._parse_dt(date_from, default_time_min=True)
+        dt_end = self._parse_dt(date_to, default_time_min=False)
+
+        if not dt_start:
+            today = fields.Date.today()
+            dt_start = datetime.combine(today.replace(day=1), datetime.min.time())
+        if not dt_end:
+            today = fields.Date.today()
+            dt_end = datetime.combine(today, datetime.max.time())
 
         domain = [
             ("date_order", ">=", dt_start),

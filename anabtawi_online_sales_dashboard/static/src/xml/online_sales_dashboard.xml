@@ -9,13 +9,24 @@
                     <p>Real-time channel breakdown for Talabat, Careem, Website, and Delivery platforms</p>
                 </div>
                 <div class="filter-controls">
-                    <input type="date" class="form-control" t-model="state.dateFrom" t-on-change="onFilterChange"/>
-                    <span class="align-self-center text-muted">to</span>
-                    <input type="date" class="form-control" t-model="state.dateTo" t-on-change="onFilterChange"/>
-                    <button class="btn btn-primary" t-on-click="loadDashboardData">
-                        <i class="fa fa-refresh me-1"></i> Refresh
+                    <div class="btn-group preset-btn-group me-2" role="group">
+                        <button type="button" class="btn btn-preset" t-att-class="{'active': state.activePreset === 'today'}" t-on-click="() => this.setPreset('today')">Today</button>
+                        <button type="button" class="btn btn-preset" t-att-class="{'active': state.activePreset === 'yesterday'}" t-on-click="() => this.setPreset('yesterday')">Yesterday</button>
+                        <button type="button" class="btn btn-preset" t-att-class="{'active': state.activePreset === 'this_week'}" t-on-click="() => this.setPreset('this_week')">This Week</button>
+                        <button type="button" class="btn btn-preset" t-att-class="{'active': state.activePreset === 'this_month'}" t-on-click="() => this.setPreset('this_month')">This Month</button>
+                    </div>
+
+                    <div class="datetime-picker-group d-flex align-items-center me-2">
+                        <input type="datetime-local" class="form-control datetime-input" t-model="state.dateFrom" t-on-change="onDateInputCustom"/>
+                        <span class="range-separator px-2">to</span>
+                        <input type="datetime-local" class="form-control datetime-input" t-model="state.dateTo" t-on-change="onDateInputCustom"/>
+                    </div>
+
+                    <button type="button" class="btn btn-apply me-2" t-on-click="onFilterApply">
+                        <i class="fa fa-refresh me-1"></i> Apply
                     </button>
-                    <button class="btn btn-outline-secondary" t-on-click="onExportExcel">
+
+                    <button type="button" class="btn btn-excel" t-on-click="onExportExcel">
                         <i class="fa fa-file-excel-o me-1"></i> Export Excel
                     </button>
                 </div>
