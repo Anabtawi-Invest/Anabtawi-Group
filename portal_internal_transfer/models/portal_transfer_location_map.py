@@ -22,8 +22,6 @@ class PortalTransferLocationMap(models.Model):
         string="Source Location",
         required=True,
         ondelete="restrict",
-        domain="[('usage', '=', 'internal'), ('active', '=', True)]",
-        check_company=True,
     )
     company_id = fields.Many2one(
         "res.company",
