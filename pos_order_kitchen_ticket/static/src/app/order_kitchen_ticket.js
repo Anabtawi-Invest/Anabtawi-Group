@@ -26,7 +26,7 @@ export class OrderKitchenTicket extends Component {
             .filter((line) => !line.isTipLine() && line.qty)
             .map((line) => ({
                 id: line.uuid,
-                qty: line.getQuantityStr(),
+                qty: line.getQuantityStr().qtyStr,
                 name: line.getFullProductName(),
             }));
     }

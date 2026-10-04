@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Order Ticket After Receipt",
-    "version": "19.0.1.0.3",
+    "version": "19.0.1.0.4",
     "category": "Point of Sale",
     "summary": "Print a second ticket (order number and products, no prices) after the customer receipt",
     "description": """
