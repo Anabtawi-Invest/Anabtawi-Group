@@ -3,7 +3,7 @@
     <record id="pos_category_form_view_hidden" model="ir.ui.view">
         <field name="name">pos.category.form.hidden</field>
         <field name="model">pos.category</field>
-        <field name="inherit_id">point_of_sale.product_pos_category_form_view</field>
+        <field name="inherit_id" ref="point_of_sale.product_pos_category_form_view"/>
         <field name="arch" type="xml">
             <field name="parent_id" position="after">
                 <field name="hide_in_pos_ui"/>
@@ -14,7 +14,7 @@
     <record id="pos_category_list_view_hidden" model="ir.ui.view">
         <field name="name">pos.category.list.hidden</field>
         <field name="model">pos.category</field>
-        <field name="inherit_id">point_of_sale.product_pos_category_tree_view</field>
+        <field name="inherit_id" ref="point_of_sale.product_pos_category_tree_view"/>
         <field name="arch" type="xml">
             <field name="color" position="after">
                 <field name="hide_in_pos_ui" optional="show"/>
