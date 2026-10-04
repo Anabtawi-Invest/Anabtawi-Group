@@ -1056,15 +1056,22 @@ class HrPayslip(models.Model):
                 c_start = getattr(contract_obj, 'date_start', None) if contract_obj else (max(c_starts) if c_starts else None)
                 c_end = getattr(contract_obj, 'date_end', None) if contract_obj else (min(c_ends) if c_ends else None)
 
+                work_station = getattr(emp, 'employee_work_station', False) or 'factory'
+                target_weekday = 0 if work_station == 'factory' else 4
+
                 if (c_start and c_start > payslip.date_from) or (c_end and c_end < payslip.date_to):
                     active_m_from = max(payslip.date_from, c_start) if c_start else payslip.date_from
                     active_m_to = min(payslip.date_to, c_end) if c_end else payslip.date_to
                     allowed_rest_days = sum(
                         1 for d_idx in range(max(0, (active_m_to - active_m_from).days + 1))
-                        if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == 0
+                        if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == target_weekday
                     )
                 else:
-                    allowed_rest_days = physical_attendance_days // 6
+                    num_weekday_in_month = sum(
+                        1 for d_idx in range((payslip.date_to - payslip.date_from).days + 1)
+                        if (payslip.date_from + datetime.timedelta(days=d_idx)).weekday() == target_weekday
+                    )
+                    allowed_rest_days = max(num_weekday_in_month, physical_attendance_days // 6)
                 converted_count = 0
                 for we in emp_work_entries:
                     code = (we.work_entry_type_id.code or '').strip().upper()

@@ -285,50 +285,66 @@ class HrEmployee(models.Model):
                     candidate_unpunched_days.append((current, expected_hours))
                     current += timedelta(days=1)
 
-                # Monthly Grace Threshold Rule:
-                # For employees with Out of Contract days (start date after m_from), grace/rest days equal the count of Mondays on/after start date.
                 emp_contracts = cached_contracts.get(employee.id, [])
-                first_contract = emp_contracts[0] if emp_contracts else False
-                c_start = first_contract.date_start if (first_contract and first_contract.date_start) else m_from
+                c_vers = employee._get_versions_with_contract_overlap_with_period(m_from, m_to) if hasattr(employee, '_get_versions_with_contract_overlap_with_period') else []
+                c_starts = [c.date_start for c in c_vers if getattr(c, 'date_start', None)] or [c.date_start for c in emp_contracts if getattr(c, 'date_start', None)]
+                c_ends = [c.date_end for c in c_vers if getattr(c, 'date_end', None)] or [c.date_end for c in emp_contracts if getattr(c, 'date_end', None)]
 
-                if c_start > m_from:
-                    active_start = max(m_from, c_start)
-                    num_mondays_active = sum(
-                        1 for d_idx in range((m_to - active_start).days + 1)
-                        if (active_start + timedelta(days=d_idx)).weekday() == 0
-                    )
-                    allowed_grace_days = num_mondays_active
+                c_start = max(c_starts) if c_starts else m_from
+                c_end = min(c_ends) if c_ends else m_to
+
+                is_flexible = getattr(employee.resource_calendar_id, 'flexible_hours', False) or getattr(employee, 'flexible_hours', False)
+                work_station = getattr(employee, 'employee_work_station', False) or 'factory'
+
+                if not is_flexible:
+                    # FIXED SCHEDULE: Check exact working weekdays from calendar. Unpunched working weekdays get ABSENT.
+                    cal = employee.resource_calendar_id
+                    working_weekdays = set(int(att.dayofweek) for att in cal.attendance_ids if att.dayofweek is not False and att.dayofweek is not None) if (cal and cal.attendance_ids) else {0, 1, 2, 3, 4, 5}
+                    for target_date, exp_hours in candidate_unpunched_days:
+                        if target_date.weekday() in working_weekdays:
+                            employee._apply_absence_for_day(target_date, exp_hours, absent_type)
                 else:
-                    emp_checked_in_count = sum(1 for (e_id, d) in checked_in_keys if e_id == employee.id and m_from <= d <= eval_to)
-                    num_mondays_in_month = sum(
-                        1 for d_idx in range((m_to - m_from).days + 1)
-                        if (m_from + timedelta(days=d_idx)).weekday() == 0
-                    )
-                    allowed_grace_days = max(num_mondays_in_month, emp_checked_in_count // 6)
-                forgiven_days = [d[0] for d in candidate_unpunched_days[:allowed_grace_days]]
-                if forgiven_days:
-                    WEModel = self.env["hr.work.entry"]
-                    fg_domain = [
-                        ("employee_id", "=", employee.id),
-                        ("work_entry_type_id", "=", absent_type.id),
-                        ("state", "!=", "validated"),
-                    ]
-                    if "date" in WEModel._fields:
-                        fg_domain += [("date", "in", forgiven_days)]
-                    elif "date_start" in WEModel._fields:
-                        fg_domain += [
-                            ("date_start", ">=", datetime.combine(min(forgiven_days), time.min)),
-                            ("date_start", "<=", datetime.combine(max(forgiven_days), time.max)),
-                        ]
-                    forgiven_we = WEModel.sudo().search(fg_domain)
-                    if "date_start" in WEModel._fields and "date" not in WEModel._fields:
-                        forgiven_we = forgiven_we.filtered(lambda w: w.date_start and w.date_start.date() in forgiven_days)
-                    if forgiven_we:
-                        forgiven_we.unlink()
+                    # FLEXIBLE SCHEDULE: Factory uses Monday count, Retail/Branches uses Friday count.
+                    target_weekday = 0 if work_station == 'factory' else 4
+                    if (c_start and c_start > m_from) or (c_end and c_end < m_to):
+                        active_start = max(m_from, c_start) if c_start else m_from
+                        active_end = min(m_to, c_end) if c_end else m_to
+                        allowed_grace_days = sum(
+                            1 for d_idx in range(max(0, (active_end - active_start).days + 1))
+                            if (active_start + timedelta(days=d_idx)).weekday() == target_weekday
+                        )
+                    else:
+                        emp_checked_in_count = sum(1 for (e_id, d) in checked_in_keys if e_id == employee.id and m_from <= d <= eval_to)
+                        num_weekday_in_month = sum(
+                            1 for d_idx in range((m_to - m_from).days + 1)
+                            if (m_from + timedelta(days=d_idx)).weekday() == target_weekday
+                        )
+                        allowed_grace_days = max(num_weekday_in_month, emp_checked_in_count // 6)
 
-                excess_absent_days = candidate_unpunched_days[allowed_grace_days:]
-                for target_date, exp_hours in excess_absent_days:
-                    employee._apply_absence_for_day(target_date, exp_hours, absent_type)
+                    forgiven_days = [d[0] for d in candidate_unpunched_days[:allowed_grace_days]]
+                    if forgiven_days:
+                        WEModel = self.env["hr.work.entry"]
+                        fg_domain = [
+                            ("employee_id", "=", employee.id),
+                            ("work_entry_type_id", "=", absent_type.id),
+                            ("state", "!=", "validated"),
+                        ]
+                        if "date" in WEModel._fields:
+                            fg_domain += [("date", "in", forgiven_days)]
+                        elif "date_start" in WEModel._fields:
+                            fg_domain += [
+                                ("date_start", ">=", datetime.combine(min(forgiven_days), time.min)),
+                                ("date_start", "<=", datetime.combine(max(forgiven_days), time.max)),
+                            ]
+                        forgiven_we = WEModel.sudo().search(fg_domain)
+                        if "date_start" in WEModel._fields and "date" not in WEModel._fields:
+                            forgiven_we = forgiven_we.filtered(lambda w: w.date_start and w.date_start.date() in forgiven_days)
+                        if forgiven_we:
+                            forgiven_we.unlink()
+
+                    excess_absent_days = candidate_unpunched_days[allowed_grace_days:]
+                    for target_date, exp_hours in excess_absent_days:
+                        employee._apply_absence_for_day(target_date, exp_hours, absent_type)
 
     def _apply_absence_for_day(self, target_date, duration, absent_type):
         self.ensure_one()
