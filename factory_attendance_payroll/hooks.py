@@ -110,7 +110,7 @@ def post_init_hook(env):
     """
     try:
         rules = env['hr.salary.rule'].sudo().search([
-            ('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME'])
+            ('code', 'in', ['ATT_RECON_VAR', 'OT_NET', 'DED_UNDERTIME', 'ACTUAL'])
         ])
         structures = env['hr.payroll.structure'].sudo().search([])
         if rules and structures:

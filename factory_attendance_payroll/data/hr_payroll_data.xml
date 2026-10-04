@@ -63,5 +63,66 @@ else:
             </field>
             <field name="struct_id" search="[]"/>
         </record>
+
+        <!-- Actual Salary Rule (Paid Attendance Days x Daily Wage) -->
+        <record id="rule_actual_salary" model="hr.salary.rule">
+            <field name="name">Actual Salary</field>
+            <field name="code">ACTUAL</field>
+            <field name="category_id" ref="hr_payroll.NET"/>
+            <field name="sequence">90</field>
+            <field name="appears_on_payslip" eval="True"/>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+# Determine calendar days in the payslip month
+month = payslip.date_to.month if payslip and payslip.date_to else 8
+year = payslip.date_to.year if payslip and payslip.date_to else 2026
+
+if month in (1, 3, 5, 7, 8, 10, 12):
+    days_in_month = 31
+elif month in (4, 6, 9, 11):
+    days_in_month = 30
+else:
+    if (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0):
+        days_in_month = 29
+    else:
+        days_in_month = 28
+
+emp = payslip.employee_id if payslip else None
+w = emp.wage if emp else 0.0
+daily_wage = w / float(days_in_month) if (w &gt; 0 and days_in_month &gt; 0) else 0.0
+
+if w &lt;= 0 or not payslip:
+    result = 0.0
+else:
+    # Exclude unpaid absences, undertime deductions, out of contract, and EXTRA HOURS / OVERTIME
+    unpaid_or_extra_codes = [
+        'ABS', 'ABSENT', 'LEAVEUNPAID', 'un_paid', 'SICKLEAVE0',
+        'LAT', 'LATENESS', 'OUTCON',
+        'OVERTIME', 'EXTRA', 'EXTRA_HOURS', 'OT', 'OTW', 'OTR', 'PHO'
+    ]
+    total_paid_days = 0.0
+
+    for wd in payslip.worked_days_line_ids:
+        code = (wd.work_entry_type_id.code or '').strip().upper()
+        name = (wd.name or '').lower()
+
+        is_excluded = (
+            code in unpaid_or_extra_codes or
+            'absent' in name or
+            'lateness' in name or
+            'extra' in name or
+            'overtime' in name
+        )
+        if not is_excluded:
+            total_paid_days += (wd.number_of_days or 0.0)
+
+    if total_paid_days &lt;= 0:
+        result = w
+    else:
+        result = round(total_paid_days * daily_wage, 3)
+            </field>
+            <field name="struct_id" search="[]"/>
+        </record>
     </data>
 </odoo>

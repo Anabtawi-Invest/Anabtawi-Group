@@ -725,6 +725,8 @@ class HrPayslip(models.Model):
                 continue
 
             emp = payslip.employee_id
+            if hasattr(emp, '_create_absent_work_entries_for_period'):
+                emp._create_absent_work_entries_for_period(payslip.date_from, payslip.date_to)
             break_hrs = emp._get_lunch_break_duration() if emp else 1.0
             w = emp.wage if emp else 0.0
 
@@ -838,7 +840,7 @@ class HrPayslip(models.Model):
                 unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
                 covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
                 covered_lateness_days = covered_lateness_hours / 8.0
-                final_attendance_days = total_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
+                final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
                 if active_period_days > 0 and final_attendance_days > active_period_days:
                     final_attendance_days = active_period_days
 
@@ -945,12 +947,59 @@ class HrPayslip(models.Model):
                         line['amount'] = round(total_net_extra_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
-                elif code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS'] or 'absent' in we_name:
-                    if rem_cash_deduction_hrs > 0.01:
-                        line['number_of_hours'] = rem_cash_deduction_hrs
-                        line['number_of_days'] = round(rem_cash_deduction_hrs / 8.0, 2)
-                        line['amount'] = round(rem_cash_deduction_hrs * hourly_rate, 3)
+                elif code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS', 'OUT'] or 'absent' in we_name:
+                    WEModel = self.env['hr.work.entry']
+                    abs_type_obj = emp._get_absent_work_entry_type() if hasattr(emp, '_get_absent_work_entry_type') else False
+                    absent_we_domain = [
+                        ('employee_id', '=', emp.id),
+                        ('state', '!=', 'cancelled'),
+                    ]
+                    if abs_type_obj:
+                        absent_we_domain += [
+                            '|', '|', '|',
+                            ('work_entry_type_id', '=', abs_type_obj.id),
+                            ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS', 'OUT', 'UNPAID', 'LEAVE500']),
+                            ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS', 'OUT']),
+                            ('work_entry_type_id.name', 'ilike', 'Absent'),
+                        ]
+                    else:
+                        absent_we_domain += [
+                            '|', '|',
+                            ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS', 'OUT', 'UNPAID', 'LEAVE500']),
+                            ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS', 'OUT']),
+                            ('work_entry_type_id.name', 'ilike', 'Absent'),
+                        ]
+
+                    if 'date' in WEModel._fields:
+                        absent_we_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
+                    elif 'date_start' in WEModel._fields:
+                        absent_we_domain += [
+                            ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                            ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                        ]
+                    absent_entries = WEModel.sudo().search(absent_we_domain)
+                    actual_absent_hrs = round(sum(getattr(we, 'duration', 8.0) or 8.0 for we in absent_entries), 2)
+
+                    if actual_absent_hrs > 0.01:
+                        line['number_of_hours'] = actual_absent_hrs
+                        line['number_of_days'] = round(actual_absent_hrs / 8.0, 2)
+                        line['amount'] = round(actual_absent_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
+
+                    if rem_cash_deduction_hrs > 0.01:
+                        lat_type = self.env['hr.work.entry.type'].sudo().search([
+                            '|', ('code', 'in', ['LAT', 'LATENESS', 'LATE']),
+                            ('name', 'ilike', 'Lateness')
+                        ], limit=1)
+                        filtered_lines.append({
+                            'name': 'Lateness / Undertime Deduction',
+                            'code': 'LATENESS',
+                            'work_entry_type_id': lat_type.id if lat_type else (work_entry_type.id if work_entry_type else False),
+                            'number_of_hours': rem_cash_deduction_hrs,
+                            'number_of_days': 0.0,
+                            'amount': round(rem_cash_deduction_hrs * hourly_rate, 3),
+                            'sequence': line.get('sequence', 25) + 1,
+                        })
                 else:
                     filtered_lines.append(line)
 
@@ -999,8 +1048,9 @@ class HrPayslip(models.Model):
         for payslip in valid_slips:
             try:
                 emp = payslip.employee_id
+                work_station = getattr(emp, 'employee_work_station', False) or 'factory'
                 is_flexible = getattr(emp.resource_calendar_id, 'flexible_hours', False) or getattr(emp, 'flexible_hours', False)
-                if not is_flexible:
+                if work_station == 'headoffice' or not is_flexible:
                     continue
                 emp_id = emp.id
                 emp_work_entries = we_by_emp.get(emp_id, [])
@@ -1016,15 +1066,22 @@ class HrPayslip(models.Model):
                 c_start = getattr(contract_obj, 'date_start', None) if contract_obj else (max(c_starts) if c_starts else None)
                 c_end = getattr(contract_obj, 'date_end', None) if contract_obj else (min(c_ends) if c_ends else None)
 
+                work_station = getattr(emp, 'employee_work_station', False) or 'factory'
+                target_weekday = 0 if work_station == 'factory' else 4
+
                 if (c_start and c_start > payslip.date_from) or (c_end and c_end < payslip.date_to):
                     active_m_from = max(payslip.date_from, c_start) if c_start else payslip.date_from
                     active_m_to = min(payslip.date_to, c_end) if c_end else payslip.date_to
                     allowed_rest_days = sum(
                         1 for d_idx in range(max(0, (active_m_to - active_m_from).days + 1))
-                        if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == 0
+                        if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == target_weekday
                     )
                 else:
-                    allowed_rest_days = physical_attendance_days // 6
+                    num_weekday_in_month = sum(
+                        1 for d_idx in range((payslip.date_to - payslip.date_from).days + 1)
+                        if (payslip.date_from + datetime.timedelta(days=d_idx)).weekday() == target_weekday
+                    )
+                    allowed_rest_days = max(num_weekday_in_month, physical_attendance_days // 6)
                 converted_count = 0
                 for we in emp_work_entries:
                     code = (we.work_entry_type_id.code or '').strip().upper()
