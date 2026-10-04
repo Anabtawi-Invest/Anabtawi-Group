@@ -33,7 +33,7 @@
             <t t-else="">
                 <!-- Executive KPI Cards -->
                 <div class="kpi-cards-grid">
-                    <div class="kpi-card">
+                    <div class="kpi-card card-gross">
                         <div class="kpi-title">Gross Online Sales</div>
                         <div class="kpi-value"><t t-esc="state.data.summary.total_gross_sales"/> <t t-esc="state.data.summary.currency"/></div>
                         <div class="kpi-subtext">Total Revenue across all channels</div>

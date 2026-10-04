@@ -87,7 +87,10 @@ export class OnlineSalesDashboard extends Component {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    legend: { position: "right" },
+                    legend: {
+                        position: "right",
+                        labels: { fontColor: "#0f172a", fontSize: 12, fontStyle: "bold" }
+                    },
                 }
             });
         }
@@ -106,8 +109,11 @@ export class OnlineSalesDashboard extends Component {
                     datasets: [{
                         label: "Gross Sales (JOD)",
                         data: hourly.map(h => h.gross_amount),
-                        borderColor: "#0083B0",
-                        backgroundColor: "rgba(0, 131, 176, 0.1)",
+                        borderColor: "#2563eb",
+                        backgroundColor: "rgba(37, 99, 235, 0.15)",
+                        borderWidth: 3,
+                        pointBackgroundColor: "#2563eb",
+                        pointRadius: 4,
                         fill: true,
                         tension: 0.3,
                     }]
@@ -115,8 +121,18 @@ export class OnlineSalesDashboard extends Component {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    legend: {
+                        labels: { fontColor: "#0f172a", fontSize: 12, fontStyle: "bold" }
+                    },
                     scales: {
-                        yAxes: [{ ticks: { beginAtZero: true } }]
+                        xAxes: [{
+                            ticks: { fontColor: "#0f172a", fontStyle: "bold" },
+                            gridLines: { color: "#e2e8f0" }
+                        }],
+                        yAxes: [{
+                            ticks: { beginAtZero: true, fontColor: "#0f172a", fontStyle: "bold" },
+                            gridLines: { color: "#e2e8f0" }
+                        }]
                     }
                 }
             });
