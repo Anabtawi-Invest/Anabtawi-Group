@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "POS Order Ticket After Receipt",
-    "version": "19.0.1.0.6",
+    "version": "19.0.1.0.8",
     "category": "Point of Sale",
     "summary": "Print a second ticket (order number and products, no prices) after the customer receipt",
     "description": """
@@ -25,6 +25,7 @@ the order. Reprints and refund orders do not print this ticket.
     ],
     "assets": {
         "point_of_sale._assets_pos": [
+            "pos_order_kitchen_ticket/static/src/app/receipt_header.xml",
             "pos_order_kitchen_ticket/static/src/app/order_kitchen_ticket.js",
             "pos_order_kitchen_ticket/static/src/app/order_kitchen_ticket.xml",
             "pos_order_kitchen_ticket/static/src/app/pos_store_patch.js",

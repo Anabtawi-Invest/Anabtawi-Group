@@ -1,7 +1,6 @@
 .o_kitchen_ticket_cut {
     border-top: 2px dashed black;
 }
-
 @media print {
     // The default receipt print styles (absolute positioning, `contain: paint`)
     // clip everything after a page break, leaving the second sheet blank.
