@@ -1,0 +1,21 @@
+.o_kitchen_ticket_cut {
+    border-top: 2px dashed black;
+}
+
+@media print {
+    // The default receipt print styles (absolute positioning, `contain: paint`)
+    // clip everything after a page break, leaving the second sheet blank.
+    .o-main-components-container:has(.o_kitchen_ticket_page),
+    .render-container:has(.o_kitchen_ticket_page) {
+        position: static !important;
+    }
+    .render-container .pos-receipt:has(.o_kitchen_ticket_page),
+    .o_kitchen_ticket_page .pos-receipt {
+        contain: none !important;
+        overflow: visible !important;
+    }
+    .o_kitchen_ticket_page {
+        break-before: page;
+        page-break-before: always;
+    }
+}
