@@ -1,6 +1,15 @@
 .o_kitchen_ticket_cut {
     border-top: 2px dashed black;
 }
+
+// The receipt screen already shows the ticket under the receipt; this copy is
+// only for the browser printout.
+.o_kitchen_ticket_page {
+    display: none;
+}
+.render-container .o_kitchen_ticket_page {
+    display: block;
+}
 @media print {
     // The default receipt print styles (absolute positioning, `contain: paint`)
     // clip everything after a page break, leaving the second sheet blank.
