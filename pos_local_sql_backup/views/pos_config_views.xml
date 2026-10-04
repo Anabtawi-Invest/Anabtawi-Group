@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_config_form_local_sql_backup" model="ir.ui.view">
+        <field name="name">pos.config.form.local.sql.backup</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Local SQL Backup" name="pos_local_sql_backup">
+                    <group>
+                        <field name="local_backup_enabled"/>
+                        <field name="local_backup_url" invisible="not local_backup_enabled" required="local_backup_enabled"/>
+                        <field name="local_backup_api_key" password="True" invisible="not local_backup_enabled" required="local_backup_enabled"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
