@@ -141,6 +141,91 @@ class PosReportingDashboard(models.TransientModel):
 
         return utc_start, utc_end
 
+    def _classify_pm_flags(self, pm):
+        """Return (is_emp, is_hosp, is_online, is_cash, is_visa, pm_name) for a POS payment method."""
+        daily_type = getattr(pm, "daily_ops_report_type", "") or ""
+        pm_type = getattr(pm, "type", "") or ""
+        pm_name = (pm.name or "").lower()
+
+        is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
+        is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
+
+        online_kw = ("talabat", "careem", "mythings", "kabseh", "طلبات", "كريم", "أشياتي", "توصيل", "delivery", "online")
+        is_online = any(k in pm_name for k in online_kw) or daily_type in ("talabat", "careem", "mythings", "kabseh", "online")
+
+        is_cash = not (is_emp or is_hosp or is_online) and (
+            daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name or "صندوق" in pm_name
+        )
+
+        is_visa = not (is_emp or is_hosp or is_online or is_cash) and (
+            daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
+        )
+
+        return is_emp, is_hosp, is_online, is_cash, is_visa, pm_name
+
+    def _pm_channel(self, pm):
+        """Return 'cash', 'visa' or False for a POS payment method."""
+        if not pm:
+            return False
+        flags = self._classify_pm_flags(pm)
+        if flags[3]:
+            return "cash"
+        if flags[4]:
+            return "visa"
+        return False
+
+    def _split_by_payments(self, payments):
+        """Return (cash_ratio, visa_ratio) from the cash/visa payments of an order, or None."""
+        cash = visa = 0.0
+        for pay in payments:
+            channel = self._pm_channel(pay.payment_method_id)
+            if channel == "cash":
+                cash += pay.amount or 0.0
+            elif channel == "visa":
+                visa += pay.amount or 0.0
+        cash, visa = abs(cash), abs(visa)
+        total = cash + visa
+        if not total:
+            return None
+        return cash / total, visa / total
+
+    @staticmethod
+    def _split_by_journal(journal):
+        if journal and journal.type == "cash":
+            return 1.0, 0.0
+        if journal and journal.type == "bank":
+            return 0.0, 1.0
+        return None
+
+    def _pledge_receive_split(self, pledge):
+        """(cash_ratio, visa_ratio) for a received pledge; defaults to cash."""
+        split = None
+        if pledge.pos_order_id:
+            split = self._split_by_payments(pledge.pos_order_id.payment_ids)
+        if not split and pledge._name == "pos.pledge":
+            split = self._split_by_journal(pledge.pledge_payment_id.journal_id)
+        return split or (1.0, 0.0)
+
+    def _pledge_return_split(self, pledge):
+        """(cash_ratio, visa_ratio) for a returned pledge; falls back to the receive split."""
+        split = None
+        if pledge._name == "pos.advance.order.pledge":
+            channel = self._pm_channel(pledge.return_payment_method_id)
+            if channel:
+                split = (1.0, 0.0) if channel == "cash" else (0.0, 1.0)
+            elif pledge.return_pos_order_id:
+                split = self._split_by_payments(pledge.return_pos_order_id.payment_ids)
+        elif pledge._name == "pos.pledge":
+            split = self._split_by_journal(pledge.return_payment_id.journal_id)
+        return split or self._pledge_receive_split(pledge)
+
+    def _advance_channel(self, adv):
+        """'cash' or 'visa' for an advance order deposit."""
+        channel = self._pm_channel(adv.pos_payment_method_id)
+        if channel:
+            return channel
+        return "cash" if (adv.payment_method or "cash") == "cash" else "visa"
+
     @api.model
     def get_dashboard_data(self, date_from=None, date_to=None, config_ids=None):
         """
@@ -192,7 +277,17 @@ class PosReportingDashboard(models.TransientModel):
                 "rahen_in": 0.0,
                 "rahen_out": 0.0,
                 "net_pledges": 0.0,
+                "pledge_cash_in": 0.0,
+                "pledge_cash_out": 0.0,
+                "pledge_cash_net": 0.0,
+                "pledge_visa_in": 0.0,
+                "pledge_visa_out": 0.0,
+                "pledge_visa_net": 0.0,
                 "advance_deposits": 0.0,
+                "advance_cash": 0.0,
+                "advance_visa": 0.0,
+                "advance_cash_count": 0,
+                "advance_visa_count": 0,
                 "advance_order_count": 0,
                 "advance_order_total": 0.0,
                 "advance_pickup_value": 0.0,
@@ -212,26 +307,7 @@ class PosReportingDashboard(models.TransientModel):
         branch_data = defaultdict(_empty_branch_dict)
 
         # Helper for classification
-        def _classify_pm(pm):
-            daily_type = getattr(pm, "daily_ops_report_type", "") or ""
-            pm_type = getattr(pm, "type", "") or ""
-            pm_name = (pm.name or "").lower()
-
-            is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
-            is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
-            
-            online_kw = ("talabat", "careem", "mythings", "kabseh", "طلبات", "كريم", "أشياتي", "توصيل", "delivery", "online")
-            is_online = any(k in pm_name for k in online_kw) or daily_type in ("talabat", "careem", "mythings", "kabseh", "online")
-
-            is_cash = not (is_emp or is_hosp or is_online) and (
-                daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name or "صندوق" in pm_name
-            )
-
-            is_visa = not (is_emp or is_hosp or is_online or is_cash) and (
-                daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
-            )
-
-            return is_emp, is_hosp, is_online, is_cash, is_visa, pm_name
+        _classify_pm = self._classify_pm_flags
 
         # --- A. Collect POS Payments & Channel Breakdown ---
         payments = self.env["pos.payment"].sudo().search([
@@ -436,9 +512,15 @@ class PosReportingDashboard(models.TransientModel):
 
                 if rec_dt and dt_start <= rec_dt <= dt_end:
                     branch_data[cfg_id]["rahen_in"] += amt
+                    cash_r, visa_r = self._pledge_receive_split(pledge)
+                    branch_data[cfg_id]["pledge_cash_in"] += amt * cash_r
+                    branch_data[cfg_id]["pledge_visa_in"] += amt * visa_r
 
                 if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
                     branch_data[cfg_id]["rahen_out"] += amt
+                    cash_r, visa_r = self._pledge_return_split(pledge)
+                    branch_data[cfg_id]["pledge_cash_out"] += amt * cash_r
+                    branch_data[cfg_id]["pledge_visa_out"] += amt * visa_r
 
         if "pos.pledge" in self.env:
             pledges_std = self.env["pos.pledge"].sudo().search([
@@ -456,14 +538,21 @@ class PosReportingDashboard(models.TransientModel):
 
                 if c_dt and dt_start <= c_dt <= dt_end:
                     branch_data[cfg_id]["rahen_in"] += amt
+                    cash_r, visa_r = self._pledge_receive_split(pledge)
+                    branch_data[cfg_id]["pledge_cash_in"] += amt * cash_r
+                    branch_data[cfg_id]["pledge_visa_in"] += amt * visa_r
 
                 if pledge.state == "returned" and r_dt and dt_start <= r_dt <= dt_end:
                     branch_data[cfg_id]["rahen_out"] += amt
+                    cash_r, visa_r = self._pledge_return_split(pledge)
+                    branch_data[cfg_id]["pledge_cash_out"] += amt * cash_r
+                    branch_data[cfg_id]["pledge_visa_out"] += amt * visa_r
 
         for cfg_id in active_config_ids:
-            branch_data[cfg_id]["net_pledges"] = (
-                branch_data[cfg_id]["rahen_in"] - branch_data[cfg_id]["rahen_out"]
-            )
+            branch = branch_data[cfg_id]
+            branch["net_pledges"] = branch["rahen_in"] - branch["rahen_out"]
+            branch["pledge_cash_net"] = branch["pledge_cash_in"] - branch["pledge_cash_out"]
+            branch["pledge_visa_net"] = branch["pledge_visa_in"] - branch["pledge_visa_out"]
 
         # --- E. Collect Advance Orders ---
         if "pos.advance.order" in self.env:
@@ -486,6 +575,9 @@ class PosReportingDashboard(models.TransientModel):
                         branch_data[orig_cfg_id]["advance_deposits"] += dep_amt
                         branch_data[orig_cfg_id]["advance_order_count"] += 1
                         branch_data[orig_cfg_id]["advance_order_total"] += tot_amt
+                        channel = self._advance_channel(adv)
+                        branch_data[orig_cfg_id]["advance_%s" % channel] += dep_amt
+                        branch_data[orig_cfg_id]["advance_%s_count" % channel] += 1
 
                 if adv.picking_date and dt_start <= adv.picking_date <= dt_end:
                     if pick_cfg_id and (not active_config_ids or pick_cfg_id in active_config_ids):
@@ -750,7 +842,17 @@ class PosReportingDashboard(models.TransientModel):
                 "rahen_in": global_totals["rahen_in"],
                 "rahen_out": global_totals["rahen_out"],
                 "net_pledges": global_totals["net_pledges"],
+                "pledge_cash_in": global_totals["pledge_cash_in"],
+                "pledge_cash_out": global_totals["pledge_cash_out"],
+                "pledge_cash_net": global_totals["pledge_cash_net"],
+                "pledge_visa_in": global_totals["pledge_visa_in"],
+                "pledge_visa_out": global_totals["pledge_visa_out"],
+                "pledge_visa_net": global_totals["pledge_visa_net"],
                 "advance_deposits": global_totals["advance_deposits"],
+                "advance_cash": global_totals["advance_cash"],
+                "advance_visa": global_totals["advance_visa"],
+                "advance_cash_count": global_totals["advance_cash_count"],
+                "advance_visa_count": global_totals["advance_visa_count"],
                 "advance_order_count": global_totals["advance_order_count"],
                 "advance_order_total": global_totals["advance_order_total"],
                 "advance_pickup_value": global_totals["advance_pickup_value"],
@@ -885,25 +987,7 @@ class PosReportingDashboard(models.TransientModel):
 
         # Classification helper
         def _classify_pm(pm):
-            daily_type = getattr(pm, "daily_ops_report_type", "") or ""
-            pm_type = getattr(pm, "type", "") or ""
-            pm_name = (pm.name or "").lower()
-
-            is_emp = "ذمم" in pm_name or "موظف" in pm_name or "employee" in pm_name or "ذمة" in pm_name or "ذمه" in pm_name or daily_type == "employee_debt"
-            is_hosp = daily_type == "hospitality" or "hospitality" in pm_name or "ضيافة" in pm_name
-
-            online_kw = ("talabat", "careem", "mythings", "kabseh", "طلبات", "كريم", "أشياتي", "توصيل", "delivery", "online")
-            is_online = any(k in pm_name for k in online_kw) or daily_type in ("talabat", "careem", "mythings", "kabseh", "online")
-
-            is_cash = not (is_emp or is_hosp or is_online) and (
-                daily_type == "cash" or pm_type == "cash" or "cash" in pm_name or "نقد" in pm_name or "صندوق" in pm_name
-            )
-
-            is_visa = not (is_emp or is_hosp or is_online or is_cash) and (
-                daily_type == "visa" or pm_type in ("bank", "pay_later") or "visa" in pm_name or "بطاقة" in pm_name or "card" in pm_name
-            )
-
-            return is_emp, is_hosp, is_online, is_cash, is_visa
+            return self._classify_pm_flags(pm)[:5]
 
         if metric_type in ("sales", "cash_sales", "visa_sales", "employee_debt", "online_sales", "hospitality"):
             payments = self.env["pos.payment"].sudo().search([
@@ -1215,6 +1299,97 @@ class PosReportingDashboard(models.TransientModel):
                             "company_id": cfg.company_id.id,
                         })
 
+        elif metric_type in ("pledge_cash", "pledge_visa"):
+            idx = 0 if metric_type == "pledge_cash" else 1
+            pledges = []
+            if "pos.advance.order.pledge" in self.env:
+                pledges += list(self.env["pos.advance.order.pledge"].sudo().search([
+                    "|",
+                    "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
+                    "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+                ]))
+            if "pos.pledge" in self.env:
+                pledges += list(self.env["pos.pledge"].sudo().search([
+                    ("create_date", ">=", str_start),
+                    ("create_date", "<=", str_end),
+                ]))
+
+            for pledge in pledges:
+                if pledge._name == "pos.pledge":
+                    cfg = pledge.pos_config_id or pledge.pos_order_id.config_id
+                    amt = pledge.pledge_amount or 0.0
+                    rec_dt = pledge.create_date
+                    return_pm = self.env["pos.payment.method"]
+                else:
+                    cfg = pledge.pos_order_id.config_id if pledge.pos_order_id else (
+                        pledge.order_id.pos_config_id or pledge.order_id.from_pos_config_id
+                    )
+                    amt = pledge.pledge_subtotal or (pledge.pledge_qty * pledge.pledge_amount_unit) or 0.0
+                    rec_dt = pledge.receive_date or pledge.create_date
+                    return_pm = pledge.return_payment_method_id
+                if not cfg or cfg.id not in active_config_ids:
+                    continue
+
+                label = pledge.display_name or (pledge.product_id.name if "product_id" in pledge._fields else "")
+                ret_dt = pledge.return_date or (pledge.write_date if pledge.state == "returned" else None)
+                entries = []
+                if rec_dt and dt_start <= rec_dt <= dt_end:
+                    share = amt * self._pledge_receive_split(pledge)[idx]
+                    entries.append(("rahen_in", _("Pledge Received: %s") % label, rec_dt, share, pledge.pos_order_id))
+                if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
+                    share = amt * self._pledge_return_split(pledge)[idx]
+                    ret_order = pledge.return_pos_order_id if "return_pos_order_id" in pledge._fields else pledge.pos_order_id
+                    entries.append(("rahen_out", _("Pledge Returned: %s") % label, ret_dt, share, ret_order))
+
+                for report_type, name, dt, share, po in entries:
+                    if not share:
+                        continue
+                    vals_list.append({
+                        "name": name,
+                        "date": dt,
+                        "config_id": cfg.id,
+                        "report_type": report_type,
+                        "payment_method_id": return_pm.id if (report_type == "rahen_out" and return_pm) else False,
+                        "pos_order_id": po.id if po else False,
+                        "amount": share,
+                        "rahen_in_amount": share if report_type == "rahen_in" else 0.0,
+                        "rahen_out_amount": share if report_type == "rahen_out" else 0.0,
+                        "cash_amount": share if idx == 0 else 0.0,
+                        "visa_amount": share if idx == 1 else 0.0,
+                        "partner_id": pledge.partner_id.id if pledge.partner_id else False,
+                        "company_id": cfg.company_id.id,
+                    })
+
+        elif metric_type in ("advance_cash", "advance_visa"):
+            channel = "cash" if metric_type == "advance_cash" else "visa"
+            if "pos.advance.order" in self.env:
+                adv_orders = self.env["pos.advance.order"].sudo().search([
+                    ("state", "not in", ("draft", "cancel")),
+                    ("create_date", ">=", str_start),
+                    ("create_date", "<=", str_end),
+                ])
+                for adv in adv_orders:
+                    cfg = adv.from_pos_config_id or adv.pos_config_id
+                    if not cfg or cfg.id not in active_config_ids:
+                        continue
+                    if self._advance_channel(adv) != channel:
+                        continue
+                    amt = adv.advance_amount or 0.0
+                    vals_list.append({
+                        "name": adv.name or _("Advance Order Deposit"),
+                        "date": adv.create_date,
+                        "config_id": cfg.id,
+                        "report_type": "advance_deposit",
+                        "payment_method_id": adv.pos_payment_method_id.id or False,
+                        "pos_order_id": adv.advance_pos_order_id.id or False,
+                        "amount": amt,
+                        "advance_amount": amt,
+                        "cash_amount": amt if channel == "cash" else 0.0,
+                        "visa_amount": amt if channel == "visa" else 0.0,
+                        "partner_id": adv.partner_id.id or False,
+                        "company_id": cfg.company_id.id,
+                    })
+
         elif metric_type in ("attendant_employees", "labor_cost", "extra_hours", "unapproved_extra_hours"):
             if "hr.attendance" in self.env:
                 import calendar
@@ -1330,6 +1505,10 @@ class PosReportingDashboard(models.TransientModel):
             "rahen_in": _("Pledges Received (Rahen In) Transactions"),
             "rahen_out": _("Pledges Returned (Rahen Out) Transactions"),
             "advance_deposits": _("Advance Order Deposit Transactions"),
+            "pledge_cash": _("Pledge Cash (Received / Returned) Transactions"),
+            "pledge_visa": _("Pledge Visa (Received / Returned) Transactions"),
+            "advance_cash": _("Advance Cash Deposit Transactions"),
+            "advance_visa": _("Advance Visa Deposit Transactions"),
             "attendant_employees": _("Attendant Employees Breakdown"),
             "labor_cost": _("Daily Employee Labor Cost Breakdown"),
             "extra_hours": _("Approved Extra Hours (Overtime) Breakdown"),
@@ -1370,6 +1549,8 @@ class PosReportingDashboard(models.TransientModel):
             "rahen_in": "search_default_filter_rahen_in",
             "rahen_out": "search_default_filter_rahen_out",
             "advance_deposits": "search_default_filter_advance",
+            "advance_cash": "search_default_filter_advance",
+            "advance_visa": "search_default_filter_advance",
         }
 
         context = {
