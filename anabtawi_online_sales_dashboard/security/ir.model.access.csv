@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_online_sales_channel_user,online.sales.channel.user,model_online_sales_channel,group_online_sales_dashboard_user,1,0,0,0
+access_online_sales_channel_manager,online.sales.channel.manager,model_online_sales_channel,group_online_sales_dashboard_manager,1,1,1,1
+access_online_sales_dashboard_user,online.sales.dashboard.user,model_online_sales_dashboard,group_online_sales_dashboard_user,1,0,0,0
+access_online_sales_report_wizard,online.sales.report.wizard,model_online_sales_report_wizard,group_online_sales_dashboard_user,1,1,1,1

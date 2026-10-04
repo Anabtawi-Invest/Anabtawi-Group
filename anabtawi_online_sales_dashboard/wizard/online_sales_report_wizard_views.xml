@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_online_sales_report_wizard_form" model="ir.ui.view">
+            <field name="name">online.sales.report.wizard.form</field>
+            <field name="model">online.sales.report.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Export Online &amp; Delivery Sales Report">
+                    <group>
+                        <group string="Date Period">
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                        </group>
+                        <group string="Filters">
+                            <field name="config_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                            <field name="channel_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <footer>
+                        <button name="action_export_excel" string="Download Excel Report" type="object" class="btn-primary" icon="fa-download"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_online_sales_report_wizard" model="ir.actions.act_window">
+            <field name="name">Export Online Sales Excel</field>
+            <field name="res_model">online.sales.report.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+    </data>
+</odoo>

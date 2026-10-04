@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Online & Delivery Dashboard under Online Campaigns root menu -->
+        <menuitem id="menu_online_sales_dashboard_item"
+                  name="Online &amp; Delivery Sales Dashboard"
+                  parent="online_campaigns_discount.menu_online_campaign_root"
+                  action="action_online_sales_dashboard"
+                  sequence="6"
+                  groups="point_of_sale.group_pos_manager,online_campaigns_discount.group_online_campaign_ecommerce_coordinator,online_campaigns_discount.group_online_campaign_ecommerce_manager,online_campaigns_discount.group_online_campaign_finance_manager"/>
+
+        <!-- Excel Export Menu under Online Campaigns Reporting -->
+        <menuitem id="menu_online_sales_export_item"
+                  name="Export Online Sales Excel"
+                  parent="online_campaigns_discount.menu_online_campaign_reporting"
+                  action="action_online_sales_report_wizard"
+                  sequence="6"
+                  groups="point_of_sale.group_pos_manager,online_campaigns_discount.group_online_campaign_finance_manager"/>
+
+        <!-- Delivery Channels Configuration under Online Campaigns Configuration -->
+        <menuitem id="menu_online_sales_channel_config_item"
+                  name="Delivery Channels &amp; Commissions"
+                  parent="online_campaigns_discount.menu_online_campaign_configuration"
+                  action="action_online_sales_channel_config"
+                  sequence="15"
+                  groups="point_of_sale.group_pos_manager,online_campaigns_discount.group_online_campaign_ecommerce_manager"/>
+    </data>
+</odoo>

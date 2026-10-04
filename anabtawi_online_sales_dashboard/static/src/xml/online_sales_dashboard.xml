@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="anabtawi_online_sales_dashboard.OnlineSalesDashboard" owl="1">
+        <div class="o_online_sales_dashboard">
+            <!-- Header Section -->
+            <div class="dashboard-header">
+                <div class="title-section">
+                    <h2><i class="fa fa-shopping-cart text-primary me-2"></i>Online &amp; Delivery Sales Analytics</h2>
+                    <p>Real-time channel breakdown for Talabat, Careem, Website, and Delivery platforms</p>
+                </div>
+                <div class="filter-controls">
+                    <input type="date" class="form-control" t-model="state.dateFrom" t-on-change="onFilterChange"/>
+                    <span class="align-self-center text-muted">to</span>
+                    <input type="date" class="form-control" t-model="state.dateTo" t-on-change="onFilterChange"/>
+                    <button class="btn btn-primary" t-on-click="loadDashboardData">
+                        <i class="fa fa-refresh me-1"></i> Refresh
+                    </button>
+                    <button class="btn btn-outline-secondary" t-on-click="onExportExcel">
+                        <i class="fa fa-file-excel-o me-1"></i> Export Excel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <t t-if="state.isLoading">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading Online &amp; Delivery Sales Breakdown...</p>
+                </div>
+            </t>
+
+            <!-- Dashboard Content -->
+            <t t-else="">
+                <!-- Executive KPI Cards -->
+                <div class="kpi-cards-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-title">Gross Online Sales</div>
+                        <div class="kpi-value"><t t-esc="state.data.summary.total_gross_sales"/> <t t-esc="state.data.summary.currency"/></div>
+                        <div class="kpi-subtext">Total Revenue across all channels</div>
+                    </div>
+                    <div class="kpi-card card-commission">
+                        <div class="kpi-title">Est. Platform Commission</div>
+                        <div class="kpi-value"><t t-esc="state.data.summary.total_commission"/> <t t-esc="state.data.summary.currency"/></div>
+                        <div class="kpi-subtext">Deducted by delivery partners</div>
+                    </div>
+                    <div class="kpi-card card-net">
+                        <div class="kpi-title">Net Delivery Payout</div>
+                        <div class="kpi-value"><t t-esc="state.data.summary.net_sales"/> <t t-esc="state.data.summary.currency"/></div>
+                        <div class="kpi-subtext">Net sales after commission</div>
+                    </div>
+                    <div class="kpi-card card-orders">
+                        <div class="kpi-title">Total Delivery Orders</div>
+                        <div class="kpi-value"><t t-esc="state.data.summary.total_orders_count"/></div>
+                        <div class="kpi-subtext">Completed online transactions</div>
+                    </div>
+                    <div class="kpi-card card-aov">
+                        <div class="kpi-title">Average Order Value (AOV)</div>
+                        <div class="kpi-value"><t t-esc="state.data.summary.avg_order_value"/> <t t-esc="state.data.summary.currency"/></div>
+                        <div class="kpi-subtext">Average ticket per delivery</div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="charts-grid">
+                    <div class="chart-box">
+                        <div class="chart-title">
+                            <span><i class="fa fa-pie-chart text-info me-2"></i>Channel Sales Distribution</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="canvas_channel_pie"/>
+                        </div>
+                    </div>
+
+                    <div class="chart-box">
+                        <div class="chart-title">
+                            <span><i class="fa fa-clock-o text-warning me-2"></i>Peak Hourly Delivery Trends</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="canvas_hourly_trend"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tables Section -->
+                <div class="data-tables-grid">
+                    <!-- Channel Breakdown Table -->
+                    <div class="table-box">
+                        <div class="table-title"><i class="fa fa-list-alt text-primary me-2"></i>Delivery Channel Breakdown</div>
+                        <table class="table table-hover table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Channel</th>
+                                    <th class="text-end">Gross Sales</th>
+                                    <th class="text-end">Commission</th>
+                                    <th class="text-end">Net Sales</th>
+                                    <th class="text-end">Orders</th>
+                                    <th class="text-end">% Share</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="state.data.channel_breakdown" t-as="ch" t-key="ch.code">
+                                    <tr class="cursor-pointer" t-on-click="() => this.onDrilldownChannel(ch.code)">
+                                        <td>
+                                            <span class="channel-badge" t-attf-style="background-color: {{ch.color}}">
+                                                <t t-esc="ch.name"/>
+                                            </span>
+                                        </td>
+                                        <td class="text-end fw-bold"><t t-esc="ch.gross_amount"/></td>
+                                        <td class="text-end text-danger"><t t-esc="ch.commission_amount"/></td>
+                                        <td class="text-end text-success fw-bold"><t t-esc="ch.net_amount"/></td>
+                                        <td class="text-end"><t t-esc="ch.order_count"/></td>
+                                        <td class="text-end"><t t-esc="ch.percentage"/>%</td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Branch Delivery Performance Table -->
+                    <div class="table-box">
+                        <div class="table-title"><i class="fa fa-building text-success me-2"></i>Branch Delivery Sales Matrix</div>
+                        <table class="table table-hover table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Branch Name</th>
+                                    <th class="text-end">Gross Delivery Sales</th>
+                                    <th class="text-end">Total Orders</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="state.data.branch_breakdown" t-as="b" t-key="b.branch_name">
+                                    <tr class="cursor-pointer" t-on-click="() => this.onDrilldownBranch(b.branch_name)">
+                                        <td class="fw-bold"><t t-esc="b.branch_name"/></td>
+                                        <td class="text-end fw-bold text-primary"><t t-esc="b.gross_amount"/></td>
+                                        <td class="text-end"><t t-esc="b.order_count"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>
