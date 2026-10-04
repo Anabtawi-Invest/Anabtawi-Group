@@ -140,107 +140,65 @@ class PosUnifiedReportWizard(models.TransientModel):
         sheet1.write(0, 0, _("POS Unified Operations Report"), title_fmt)
         sheet1.write(1, 0, _("Period: %s to %s") % (str_start, str_end), sub_fmt)
 
-        headers = [
-            _("Branch Name"),
-            _("Total Sales (Gross)"),
-            _("Orders / Min"),
-            _("Sales Without Tax"),
-            _("Tax Amount"),
-            _("Total Discounts"),
-            _("Cash Sales"),
-            _("Visa Sales"),
-            _("Online & Delivery Sales"),
-            _("Debt Sales (مبيعات الذمم)"),
-            _("Hospitality"),
-            _("Talabat"),
-            _("Careem"),
-            _("Mythings"),
-            _("Kabseh"),
-            _("Cash In"),
-            _("Cash Out"),
-            _("Net Cash Moves"),
-            _("Rahen In (Pledge)"),
-            _("Rahen Out (Return)"),
-            _("Net Pledges"),
-            _("Advance Deposits (Origin)"),
-            _("Scheduled Pickup Value"),
-            _("Pending Pickups"),
-            _("Delivery Fees"),
-            _("Attendant Staff"),
-            _("Daily Labor Cost"),
-            _("Extra Hours (hrs)"),
+        # (header, data key, is_integer)
+        summary_columns = [
+            (_("Total Sales (Gross)"), "sales", False),
+            (_("Orders / Min"), "orders_per_min", False),
+            (_("Sales Without Tax"), "untaxed_sales", False),
+            (_("Tax Amount"), "tax_amount", False),
+            (_("Total Discounts"), "discount_amount", False),
+            (_("Cash Sales"), "cash", False),
+            (_("Visa Sales"), "visa", False),
+            (_("Online & Delivery Sales"), "online_sales", False),
+            (_("Debt Sales (مبيعات الذمم)"), "employee_debt", False),
+            (_("Hospitality"), "hospitality", False),
+            (_("Talabat"), "talabat", False),
+            (_("Careem"), "careem", False),
+            (_("Mythings"), "mythings", False),
+            (_("Kabseh"), "kabseh", False),
+            (_("Cash In"), "cash_in", False),
+            (_("Cash Out"), "cash_out", False),
+            (_("Net Cash Moves"), "net_cash_moves", False),
+            (_("Rahen In (Pledge)"), "rahen_in", False),
+            (_("Rahen Out (Return)"), "rahen_out", False),
+            (_("Net Pledges"), "net_pledges", False),
+            (_("Pledge Cash In"), "pledge_cash_in", False),
+            (_("Pledge Cash Out"), "pledge_cash_out", False),
+            (_("Pledge Cash Net"), "pledge_cash_net", False),
+            (_("Pledge Visa In"), "pledge_visa_in", False),
+            (_("Pledge Visa Out"), "pledge_visa_out", False),
+            (_("Pledge Visa Net"), "pledge_visa_net", False),
+            (_("Advance Deposits (Origin)"), "advance_deposits", False),
+            (_("Advance Cash"), "advance_cash", False),
+            (_("Advance Visa"), "advance_visa", False),
+            (_("Scheduled Pickup Value"), "advance_pickup_value", False),
+            (_("Pending Pickups"), "advance_pending_count", True),
+            (_("Delivery Fees"), "delivery_amount", False),
+            (_("Attendant Staff"), "attendant_employee_count", True),
+            (_("Daily Labor Cost"), "total_labor_cost", False),
+            (_("Extra Hours (hrs)"), "extra_hours", False),
         ]
 
         sheet1.set_column(0, 0, 28)
-        for col_idx in range(1, len(headers)):
-            sheet1.set_column(col_idx, col_idx, 16)
+        sheet1.set_column(1, len(summary_columns), 16)
 
         start_row = 3
-        for col_idx, h in enumerate(headers):
-            sheet1.write(start_row, col_idx, h, header_fmt)
+        sheet1.write(start_row, 0, _("Branch Name"), header_fmt)
+        for col_idx, (header, _key, _is_int) in enumerate(summary_columns, start=1):
+            sheet1.write(start_row, col_idx, header, header_fmt)
 
         curr_row = start_row + 1
         for b in data["branches"]:
             sheet1.write(curr_row, 0, b["branch_name"], text_fmt)
-            sheet1.write_number(curr_row, 1, b["sales"], num_fmt)
-            sheet1.write_number(curr_row, 2, b.get("orders_per_min", 0.0), num_fmt)
-            sheet1.write_number(curr_row, 3, b["untaxed_sales"], num_fmt)
-            sheet1.write_number(curr_row, 4, b["tax_amount"], num_fmt)
-            sheet1.write_number(curr_row, 5, b.get("discount_amount", 0.0), num_fmt)
-            sheet1.write_number(curr_row, 6, b["cash"], num_fmt)
-            sheet1.write_number(curr_row, 7, b["visa"], num_fmt)
-            sheet1.write_number(curr_row, 8, b.get("online_sales", 0.0), num_fmt)
-            sheet1.write_number(curr_row, 9, b.get("employee_debt", 0.0), num_fmt)
-            sheet1.write_number(curr_row, 10, b["hospitality"], num_fmt)
-            sheet1.write_number(curr_row, 11, b["talabat"], num_fmt)
-            sheet1.write_number(curr_row, 12, b["careem"], num_fmt)
-            sheet1.write_number(curr_row, 13, b["mythings"], num_fmt)
-            sheet1.write_number(curr_row, 14, b["kabseh"], num_fmt)
-            sheet1.write_number(curr_row, 15, b["cash_in"], num_fmt)
-            sheet1.write_number(curr_row, 16, b["cash_out"], num_fmt)
-            sheet1.write_number(curr_row, 17, b["net_cash_moves"], num_fmt)
-            sheet1.write_number(curr_row, 18, b["rahen_in"], num_fmt)
-            sheet1.write_number(curr_row, 19, b["rahen_out"], num_fmt)
-            sheet1.write_number(curr_row, 20, b["net_pledges"], num_fmt)
-            sheet1.write_number(curr_row, 21, b["advance_deposits"], num_fmt)
-            sheet1.write_number(curr_row, 22, b.get("advance_pickup_value", 0.0), num_fmt)
-            sheet1.write_number(curr_row, 23, b.get("advance_pending_count", 0), int_fmt)
-            sheet1.write_number(curr_row, 24, b["delivery_amount"], num_fmt)
-            sheet1.write_number(curr_row, 25, b.get("attendant_employee_count", 0), int_fmt)
-            sheet1.write_number(curr_row, 26, b.get("total_labor_cost", 0.0), num_fmt)
-            sheet1.write_number(curr_row, 27, b.get("extra_hours", 0.0), num_fmt)
+            for col_idx, (_header, key, is_int) in enumerate(summary_columns, start=1):
+                sheet1.write_number(curr_row, col_idx, b.get(key, 0) or 0, int_fmt if is_int else num_fmt)
             curr_row += 1
 
         # Global Total Row Sheet 1
         gt = data["global_totals"]
         sheet1.write(curr_row, 0, _("TOTALS"), total_text_fmt)
-        sheet1.write_number(curr_row, 1, gt["sales"], total_num_fmt)
-        sheet1.write_number(curr_row, 2, gt.get("orders_per_min", 0.0), total_num_fmt)
-        sheet1.write_number(curr_row, 3, gt["untaxed_sales"], total_num_fmt)
-        sheet1.write_number(curr_row, 4, gt["tax_amount"], total_num_fmt)
-        sheet1.write_number(curr_row, 5, gt.get("discount_amount", 0.0), total_num_fmt)
-        sheet1.write_number(curr_row, 6, gt["cash"], total_num_fmt)
-        sheet1.write_number(curr_row, 7, gt["visa"], total_num_fmt)
-        sheet1.write_number(curr_row, 8, gt.get("online_sales", 0.0), total_num_fmt)
-        sheet1.write_number(curr_row, 9, gt.get("employee_debt", 0.0), total_num_fmt)
-        sheet1.write_number(curr_row, 10, gt["hospitality"], total_num_fmt)
-        sheet1.write_number(curr_row, 11, gt["talabat"], total_num_fmt)
-        sheet1.write_number(curr_row, 12, gt["careem"], total_num_fmt)
-        sheet1.write_number(curr_row, 13, gt["mythings"], total_num_fmt)
-        sheet1.write_number(curr_row, 14, gt["kabseh"], total_num_fmt)
-        sheet1.write_number(curr_row, 15, gt["cash_in"], total_num_fmt)
-        sheet1.write_number(curr_row, 16, gt["cash_out"], total_num_fmt)
-        sheet1.write_number(curr_row, 17, gt["net_cash_moves"], total_num_fmt)
-        sheet1.write_number(curr_row, 18, gt["rahen_in"], total_num_fmt)
-        sheet1.write_number(curr_row, 19, gt["rahen_out"], total_num_fmt)
-        sheet1.write_number(curr_row, 20, gt["net_pledges"], total_num_fmt)
-        sheet1.write_number(curr_row, 21, gt["advance_deposits"], total_num_fmt)
-        sheet1.write_number(curr_row, 22, gt.get("advance_pickup_value", 0.0), total_num_fmt)
-        sheet1.write_number(curr_row, 23, gt.get("advance_pending_count", 0), total_int_fmt)
-        sheet1.write_number(curr_row, 24, gt["delivery_amount"], total_num_fmt)
-        sheet1.write_number(curr_row, 25, gt.get("attendant_employee_count", 0), total_int_fmt)
-        sheet1.write_number(curr_row, 26, gt.get("total_labor_cost", 0.0), total_num_fmt)
-        sheet1.write_number(curr_row, 27, gt.get("extra_hours", 0.0), total_num_fmt)
+        for col_idx, (_header, key, is_int) in enumerate(summary_columns, start=1):
+            sheet1.write_number(curr_row, col_idx, gt.get(key, 0) or 0, total_int_fmt if is_int else total_num_fmt)
 
         # Target branch config IDs set
         target_config_ids = set(self.config_ids.ids) if self.config_ids else None
@@ -264,6 +222,9 @@ class PosUnifiedReportWizard(models.TransientModel):
                 _("Advance Deposit Paid"),
                 _("Remaining Balance"),
                 _("Pledge Amount"),
+                _("Deposit Payment Method"),
+                _("Deposit Cash"),
+                _("Deposit Visa"),
             ]
 
             sheet2.set_column(0, 0, 20)
@@ -272,6 +233,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet2.set_column(5, 6, 24)
             sheet2.set_column(7, 7, 16)
             sheet2.set_column(8, 11, 18)
+            sheet2.set_column(12, 12, 22)
+            sheet2.set_column(13, 14, 18)
 
             start_row_adv = 3
             for col_idx, h in enumerate(adv_headers):
@@ -284,6 +247,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             tot_dep = 0.0
             tot_rem = 0.0
             tot_plg = 0.0
+            tot_dep_cash = 0.0
+            tot_dep_visa = 0.0
 
             for a in adv_recs:
                 orig_cfg_id = a.from_pos_config_id.id if a.from_pos_config_id else (a.pos_config_id.id if a.pos_config_id else False)
@@ -325,10 +290,20 @@ class PosUnifiedReportWizard(models.TransientModel):
                 sheet2.write_number(c_row, 10, r_amt, num_fmt)
                 sheet2.write_number(c_row, 11, p_amt, num_fmt)
 
+                channel = service._advance_channel(a)
+                dep_cash = d_amt if channel == "cash" else 0.0
+                dep_visa = d_amt if channel == "visa" else 0.0
+                pm_label = a.pos_payment_method_id.name if a.pos_payment_method_id else (channel or "").capitalize()
+                sheet2.write(c_row, 12, pm_label, text_fmt)
+                sheet2.write_number(c_row, 13, dep_cash, num_fmt)
+                sheet2.write_number(c_row, 14, dep_visa, num_fmt)
+
                 tot_grand += g_amt
                 tot_dep += d_amt
                 tot_rem += r_amt
                 tot_plg += p_amt
+                tot_dep_cash += dep_cash
+                tot_dep_visa += dep_visa
                 c_row += 1
 
             # Total Row Sheet 2
@@ -339,6 +314,9 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet2.write_number(c_row, 9, tot_dep, total_num_fmt)
             sheet2.write_number(c_row, 10, tot_rem, total_num_fmt)
             sheet2.write_number(c_row, 11, tot_plg, total_num_fmt)
+            sheet2.write(c_row, 12, "", total_text_fmt)
+            sheet2.write_number(c_row, 13, tot_dep_cash, total_num_fmt)
+            sheet2.write_number(c_row, 14, tot_dep_visa, total_num_fmt)
 
         # --- Sheet 3: Pledges Detail (Rahen In & Rahen Out) ---
         if "pos.advance.order.pledge" in self.env:
@@ -353,8 +331,12 @@ class PosUnifiedReportWizard(models.TransientModel):
                 _("Branch Name"),
                 _("Status"),
                 _("Rahen In Amount"),
+                _("Rahen In Cash"),
+                _("Rahen In Visa"),
                 _("Received On (Date & Time)"),
                 _("Rahen Out Amount"),
+                _("Rahen Out Cash"),
+                _("Rahen Out Visa"),
                 _("Returned On (Date & Time)"),
             ]
 
@@ -363,10 +345,10 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet3.set_column(2, 2, 28)
             sheet3.set_column(3, 3, 24)
             sheet3.set_column(4, 4, 14)
-            sheet3.set_column(5, 5, 18)
-            sheet3.set_column(6, 6, 22)
-            sheet3.set_column(7, 7, 18)
+            sheet3.set_column(5, 7, 16)
             sheet3.set_column(8, 8, 22)
+            sheet3.set_column(9, 11, 16)
+            sheet3.set_column(12, 12, 22)
 
             start_row_plg = 3
             for col_idx, h in enumerate(plg_headers):
@@ -377,6 +359,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             p_row = start_row_plg + 1
             tot_rin = 0.0
             tot_rout = 0.0
+            tot_rin_cash = tot_rin_visa = 0.0
+            tot_rout_cash = tot_rout_visa = 0.0
 
             for p in pledge_recs:
                 cfg = False
@@ -414,18 +398,31 @@ class PosUnifiedReportWizard(models.TransientModel):
                 rec_dt_str = fields.Datetime.to_string(rec_dt) if in_amt > 0 else ""
                 ret_dt_str = fields.Datetime.to_string(ret_dt) if out_amt > 0 else ""
 
+                in_cash_r, in_visa_r = service._pledge_receive_split(p) if in_amt else (0.0, 0.0)
+                out_cash_r, out_visa_r = service._pledge_return_split(p) if out_amt else (0.0, 0.0)
+                in_cash, in_visa = in_amt * in_cash_r, in_amt * in_visa_r
+                out_cash, out_visa = out_amt * out_cash_r, out_amt * out_visa_r
+
                 sheet3.write(p_row, 0, cust_name, text_fmt)
                 sheet3.write(p_row, 1, order_ref, text_fmt)
                 sheet3.write(p_row, 2, prod_name, text_fmt)
                 sheet3.write(p_row, 3, branch_name, text_fmt)
                 sheet3.write(p_row, 4, status_label, center_fmt)
                 sheet3.write_number(p_row, 5, in_amt, num_fmt)
-                sheet3.write(p_row, 6, rec_dt_str, center_fmt)
-                sheet3.write_number(p_row, 7, out_amt, num_fmt)
-                sheet3.write(p_row, 8, ret_dt_str, center_fmt)
+                sheet3.write_number(p_row, 6, in_cash, num_fmt)
+                sheet3.write_number(p_row, 7, in_visa, num_fmt)
+                sheet3.write(p_row, 8, rec_dt_str, center_fmt)
+                sheet3.write_number(p_row, 9, out_amt, num_fmt)
+                sheet3.write_number(p_row, 10, out_cash, num_fmt)
+                sheet3.write_number(p_row, 11, out_visa, num_fmt)
+                sheet3.write(p_row, 12, ret_dt_str, center_fmt)
 
                 tot_rin += in_amt
                 tot_rout += out_amt
+                tot_rin_cash += in_cash
+                tot_rin_visa += in_visa
+                tot_rout_cash += out_cash
+                tot_rout_visa += out_visa
                 p_row += 1
 
             # Total Row Sheet 3
@@ -433,9 +430,13 @@ class PosUnifiedReportWizard(models.TransientModel):
             for col in range(1, 5):
                 sheet3.write(p_row, col, "", total_text_fmt)
             sheet3.write_number(p_row, 5, tot_rin, total_num_fmt)
-            sheet3.write(p_row, 6, "", total_text_fmt)
-            sheet3.write_number(p_row, 7, tot_rout, total_num_fmt)
+            sheet3.write_number(p_row, 6, tot_rin_cash, total_num_fmt)
+            sheet3.write_number(p_row, 7, tot_rin_visa, total_num_fmt)
             sheet3.write(p_row, 8, "", total_text_fmt)
+            sheet3.write_number(p_row, 9, tot_rout, total_num_fmt)
+            sheet3.write_number(p_row, 10, tot_rout_cash, total_num_fmt)
+            sheet3.write_number(p_row, 11, tot_rout_visa, total_num_fmt)
+            sheet3.write(p_row, 12, "", total_text_fmt)
 
         # --- Sheet 4: Cash Movements Detail (Cash In & Cash Out) ---
         sheet4 = workbook.add_worksheet(_("Cash Movements Detail"))
