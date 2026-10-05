@@ -345,12 +345,12 @@ class HrEmployee(models.Model):
 
                 rest_dates_to_skip = set()
                 if is_flexible or work_station != 'headoffice':
-                    emp_checkins = sum(1 for (e_id, d) in checked_in_keys if e_id == employee.id and m_from <= d <= m_to)
-                    earned_rest_days = emp_checkins // 6
                     target_weekday = 0 if work_station == 'factory' else 4
                     rest_day_candidates = [d for (d, h) in candidate_unpunched_days if d.weekday() == target_weekday]
-                    rest_dates_to_skip = set(rest_day_candidates[:earned_rest_days])
-                    if not rest_dates_to_skip and candidate_unpunched_days and earned_rest_days > 0:
+                    rest_dates_to_skip = set(rest_day_candidates)
+                    if not rest_dates_to_skip and candidate_unpunched_days:
+                        emp_checkins = sum(1 for (e_id, d) in checked_in_keys if e_id == employee.id and m_from <= d <= m_to)
+                        earned_rest_days = max(1, emp_checkins // 6)
                         rest_dates_to_skip = set(d for (d, h) in candidate_unpunched_days[:earned_rest_days])
 
                 # Generate ABSENT work entries for candidate unpunched working days, leaving rest days empty

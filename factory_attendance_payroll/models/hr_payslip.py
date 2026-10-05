@@ -862,7 +862,9 @@ class HrPayslip(models.Model):
             )
 
             if is_flexible or work_station != 'headoffice':
-                earned_rest_days = int(regular_physical_days // 6)
+                target_wd = 0 if work_station == 'factory' else 4
+                month_rest_days = sum(1 for d_idx in range((payslip.date_to - payslip.date_from).days + 1) if (payslip.date_from + datetime.timedelta(days=d_idx)).weekday() == target_wd)
+                earned_rest_days = month_rest_days if month_rest_days > 0 else int(regular_physical_days // 6)
                 worked_rest_days = 0
                 unpunched_rest_days = earned_rest_days
             else:
