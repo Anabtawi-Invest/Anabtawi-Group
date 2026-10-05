@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_order_kitchen_ticket.ReceiptScreen" t-inherit="point_of_sale.ReceiptScreen" t-inherit-mode="extension">
+        <xpath expr="//OrderReceipt" position="after">
+            <t t-if="pos.config.print_order_kitchen_ticket and !currentOrder.isRefund">
+                <div class="my-3 text-center text-muted small" style="border-top: 2px dashed #999;">
+                    <i class="fa fa-scissors"/>
+                </div>
+                <OrderKitchenTicket order="this.currentOrder"/>
+            </t>
+        </xpath>
+    </t>
+</templates>

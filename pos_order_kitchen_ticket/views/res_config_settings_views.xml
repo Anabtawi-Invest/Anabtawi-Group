@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_order_kitchen_ticket" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.order.kitchen.ticket</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="point_of_sale.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//setting[@id='basic_receipt']" position="after">
+                <setting id="print_order_kitchen_ticket"
+                         help="After the first receipt of a paid order, print a second ticket with the order number and products (no prices).">
+                    <field name="pos_print_order_kitchen_ticket"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

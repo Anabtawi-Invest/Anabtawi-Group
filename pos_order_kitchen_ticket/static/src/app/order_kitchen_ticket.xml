@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_order_kitchen_ticket.OrderKitchenTicket">
+        <div class="pos-receipt p-2">
+            <div class="text-center">
+                <div t-esc="order.config.name"/>
+                <div class="fw-bolder" style="font-size: 3em; line-height: 1.2;" t-esc="orderNumber"/>
+                <div t-if="order.tracking_number" class="small" t-esc="order.pos_reference"/>
+                <div class="small" t-esc="dateOrder"/>
+            </div>
+            <div class="my-2" style="border-top: 2px dashed black;"/>
+            <div t-foreach="lines" t-as="line" t-key="line.id" style="font-size: 1.3em;">
+                <span class="fw-bolder" t-esc="line.qty"/> x <span t-esc="line.name"/>
+            </div>
+            <div class="my-2" style="border-top: 2px dashed black;"/>
+        </div>
+    </t>
+</templates>
