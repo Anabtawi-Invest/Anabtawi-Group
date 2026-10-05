@@ -48,6 +48,11 @@ class HrAttendance(models.Model):
         default=False
     )
 
+    def _write(self, vals):
+        ctx = dict(self.env.context)
+        ctx['skip_work_entry_check'] = True
+        return super(HrAttendance, self.with_context(ctx))._write(vals)
+
     def write(self, vals):
         ctx = dict(self.env.context)
         ctx['skip_work_entry_check'] = True
