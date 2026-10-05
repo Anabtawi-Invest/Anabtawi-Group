@@ -809,35 +809,33 @@ class HrPayslip(models.Model):
                 elif c_ends and min(c_ends) < payslip.date_to:
                     c_end = min(c_ends)
 
-                is_flexible = getattr(emp.resource_calendar_id, 'flexible_hours', False) or getattr(emp, 'flexible_hours', False)
-                if is_flexible:
-                    if (c_start and c_start > payslip.date_from) or (c_end and c_end < payslip.date_to):
-                        active_m_from = max(payslip.date_from, c_start) if c_start else payslip.date_from
-                        active_m_to = min(payslip.date_to, c_end) if c_end else payslip.date_to
-                        earned_rest_days = sum(
-                            1 for d_idx in range(max(0, (active_m_to - active_m_from).days + 1))
-                            if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == 0
-                        )
-                    else:
-                        earned_rest_days = int(regular_physical_days // 6)
+                cal = emp.resource_calendar_id
+                work_station = getattr(emp, 'employee_work_station', False) or 'factory'
+                is_flexible = bool(
+                    (cal and 'flexible' in (cal.name or '').lower())
+                    or getattr(cal, 'flexible_hours', False)
+                    or getattr(cal, 'flexible', False)
+                    or getattr(emp, 'flexible_hours', False)
+                    or (work_station in ['factory', 'retail'])
+                )
+                if is_flexible and work_station != 'headoffice':
+                    earned_rest_days = int(regular_physical_days // 6)
+                    worked_rest_days = 0
+                    unpunched_rest_days = earned_rest_days
                 else:
                     earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
+                    if cal:
+                        working_weekdays = set(int(att.dayofweek) for att in cal.attendance_ids if att.dayofweek is not False and att.dayofweek is not None)
+                        worked_rest_days = sum(1 for att in regular_attendances if att.check_in and att.check_in.weekday() not in working_weekdays)
+                    else:
+                        worked_rest_days = max(0, regular_physical_days - max(0, active_period_days - earned_rest_days - len(holiday_dates)))
+                    unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
 
                 active_period_days = max(0, (c_end - c_start).days + 1)
-
-                # Calculate worked rest days (physical punches on scheduled off days)
-                if not is_flexible and emp.resource_calendar_id:
-                    cal = emp.resource_calendar_id
-                    working_weekdays = set(int(att.dayofweek) for att in cal.attendance_ids if att.dayofweek is not False and att.dayofweek is not None)
-                    worked_rest_days = sum(1 for att in regular_attendances if att.check_in and att.check_in.weekday() not in working_weekdays)
-                else:
-                    worked_rest_days = max(0, regular_physical_days - max(0, active_period_days - earned_rest_days - len(holiday_dates)))
-
                 active_holiday_dates = [d for d in holiday_dates if c_start <= d <= c_end]
                 unworked_holiday_dates = [d for d in active_holiday_dates if d not in set(att.check_in.date() for att in holiday_attendances if att.check_in)]
                 unworked_holiday_days = len(unworked_holiday_dates)
 
-                unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
                 covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
                 covered_lateness_days = covered_lateness_hours / 8.0
                 final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
