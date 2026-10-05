@@ -1138,90 +1138,28 @@ class HrPayslip(models.Model):
         rest_type = self.env['hr.work.entry.type'].sudo().search([
             '|', ('code', '=', 'ARS'), ('name', 'ilike', 'Rest')
         ], limit=1)
-        if not rest_type:
-            return
+        abs_type = self.env['hr.work.entry.type'].sudo().search([
+            '|', ('code', 'in', ['ABSENT', 'ABS']), ('name', '=ilike', 'Absent')
+        ], limit=1)
 
-        emp_ids = valid_slips.mapped('employee_id').ids
-        min_date = min(valid_slips.mapped('date_from'))
-        max_date = max(valid_slips.mapped('date_to'))
-
-        attendances = self.env['hr.attendance'].sudo().search([
-            ('employee_id', 'in', emp_ids),
-            ('check_in', '>=', datetime.datetime.combine(min_date, datetime.time.min)),
-            ('check_in', '<=', datetime.datetime.combine(max_date, datetime.time.max))
-        ])
-        worked_dates_by_emp = defaultdict(set)
-        for att in attendances:
-            worked_dates_by_emp[att.employee_id.id].add(att.check_in.date())
-
-        we_domain = [('employee_id', 'in', emp_ids)]
-        WEModel = self.env['hr.work.entry']
-        if 'date' in WEModel._fields:
-            we_domain += [('date', '>=', min_date), ('date', '<=', max_date)]
-        elif 'date_start' in WEModel._fields:
-            we_domain += [
-                ('date_start', '>=', datetime.datetime.combine(min_date, datetime.time.min)),
-                ('date_start', '<=', datetime.datetime.combine(max_date, datetime.time.max))
-            ]
-        work_entries = WEModel.sudo().search(we_domain)
-        we_by_emp = defaultdict(list)
-        for we in work_entries:
-            we_by_emp[we.employee_id.id].append(we)
-
-        to_update = self.env['hr.work.entry']
-        for payslip in valid_slips:
-            try:
-                emp = payslip.employee_id
-                work_station = getattr(emp, 'employee_work_station', False) or 'factory'
-                is_flexible = getattr(emp.resource_calendar_id, 'flexible_hours', False) or getattr(emp, 'flexible_hours', False)
-                if work_station == 'headoffice' or not is_flexible:
-                    continue
-                emp_id = emp.id
-                emp_work_entries = we_by_emp.get(emp_id, [])
-                slip_worked_dates = set(
-                    d for d in worked_dates_by_emp.get(emp_id, set())
-                    if payslip.date_from <= d <= payslip.date_to
-                )
-                physical_attendance_days = len(slip_worked_dates)
-                contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or getattr(emp, 'contract_id', None)
-                c_vers = emp._get_versions_with_contract_overlap_with_period(payslip.date_from, payslip.date_to) if hasattr(emp, '_get_versions_with_contract_overlap_with_period') else []
-                c_starts = [c.date_start for c in c_vers if getattr(c, 'date_start', None)]
-                c_ends = [c.date_end for c in c_vers if getattr(c, 'date_end', None)]
-                c_start = getattr(contract_obj, 'date_start', None) if contract_obj else (max(c_starts) if c_starts else None)
-                c_end = getattr(contract_obj, 'date_end', None) if contract_obj else (min(c_ends) if c_ends else None)
-
-                work_station = getattr(emp, 'employee_work_station', False) or 'factory'
-                target_weekday = 0 if work_station == 'factory' else 4
-
-                if (c_start and c_start > payslip.date_from) or (c_end and c_end < payslip.date_to):
-                    active_m_from = max(payslip.date_from, c_start) if c_start else payslip.date_from
-                    active_m_to = min(payslip.date_to, c_end) if c_end else payslip.date_to
-                    allowed_rest_days = sum(
-                        1 for d_idx in range(max(0, (active_m_to - active_m_from).days + 1))
-                        if (active_m_from + datetime.timedelta(days=d_idx)).weekday() == target_weekday
-                    )
-                else:
-                    num_weekday_in_month = sum(
-                        1 for d_idx in range((payslip.date_to - payslip.date_from).days + 1)
-                        if (payslip.date_from + datetime.timedelta(days=d_idx)).weekday() == target_weekday
-                    )
-                    allowed_rest_days = max(num_weekday_in_month, physical_attendance_days // 6)
-                converted_count = 0
-                for we in emp_work_entries:
-                    code = (we.work_entry_type_id.code or '').strip().upper()
-                    name = (we.work_entry_type_id.name or '').lower()
-                    if code in ['LEAVE500', 'UNPAID', 'UNP', 'ABSENT', 'ABS'] or 'absent' in name:
-                        if converted_count < allowed_rest_days:
-                            to_update |= we
-                            converted_count += 1
-            except Exception as e:
-                _logger.error("Error in _convert_flexible_rest_days_to_ars for payslip %s: %s", payslip.id, e)
-
-        if to_update:
-            draft_we = to_update.filtered(lambda w: hasattr(w, 'state') and w.state == 'validated')
-            if draft_we:
-                draft_we.sudo().write({'state': 'draft'})
-            to_update.sudo().write({'work_entry_type_id': rest_type.id})
+        if rest_type and abs_type:
+            emp_ids = valid_slips.mapped('employee_id').ids
+            min_date = min(valid_slips.mapped('date_from'))
+            max_date = max(valid_slips.mapped('date_to'))
+            WEModel = self.env['hr.work.entry']
+            corrupted_we = WEModel.sudo().search([
+                ('employee_id', 'in', emp_ids),
+                ('work_entry_type_id', '=', rest_type.id),
+            ])
+            if 'date' in WEModel._fields:
+                corrupted_we = corrupted_we.filtered(lambda w: getattr(w, 'date', None) and min_date <= w.date <= max_date)
+            elif 'date_start' in WEModel._fields:
+                corrupted_we = corrupted_we.filtered(lambda w: getattr(w, 'date_start', None) and min_date <= w.date_start.date() <= max_date)
+            if corrupted_we:
+                draft_we = corrupted_we.filtered(lambda w: hasattr(w, 'state') and w.state == 'validated')
+                if draft_we:
+                    draft_we.sudo().write({'state': 'draft'})
+                corrupted_we.sudo().write({'work_entry_type_id': abs_type.id})
 
     def _create_or_update_settlement_leave(self, leave_type_name, hours, leave_desc):
         self.ensure_one()
