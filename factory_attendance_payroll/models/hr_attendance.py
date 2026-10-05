@@ -51,11 +51,19 @@ class HrAttendance(models.Model):
     def _write(self, vals):
         ctx = dict(self.env.context)
         ctx['skip_work_entry_check'] = True
+        ctx['bypass_work_entry_check'] = True
         return super(HrAttendance, self.with_context(ctx))._write(vals)
 
     def write(self, vals):
+        if vals.get('overtime_status') == 'approved' and 'validated_overtime_hours' not in vals:
+            for att in self:
+                att_ot = att.daily_overtime_hours if att.daily_overtime_hours >= 0.75 else 0.0
+                vals['validated_overtime_hours'] = att_ot
+        elif vals.get('overtime_status') == 'refused' and 'validated_overtime_hours' not in vals:
+            vals['validated_overtime_hours'] = 0.0
         ctx = dict(self.env.context)
         ctx['skip_work_entry_check'] = True
+        ctx['bypass_work_entry_check'] = True
         return super(HrAttendance, self.with_context(ctx)).write(vals)
 
     def _get_public_holiday_dates_batch(self, min_date, max_date, calendar_id=None):
@@ -402,15 +410,6 @@ class HrAttendance(models.Model):
                 att.validated_overtime_hours = att.daily_overtime_hours if att.daily_overtime_hours >= 0.75 else 0.0
             elif att.overtime_status == 'refused':
                 att.validated_overtime_hours = 0.0
-
-    def write(self, vals):
-        if vals.get('overtime_status') == 'approved' and 'validated_overtime_hours' not in vals:
-            for att in self:
-                att_ot = att.daily_overtime_hours if att.daily_overtime_hours >= 0.75 else 0.0
-                vals['validated_overtime_hours'] = att_ot
-        elif vals.get('overtime_status') == 'refused' and 'validated_overtime_hours' not in vals:
-            vals['validated_overtime_hours'] = 0.0
-        return super(HrAttendance, self.with_context(bypass_work_entry_check=True)).write(vals)
 
     def _check_weekly_overtime_eligibility(self):
         """Allow approval if attendance has valid positive extra hours."""
