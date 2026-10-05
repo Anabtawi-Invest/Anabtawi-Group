@@ -888,26 +888,8 @@ class HrPayslip(models.Model):
                 if min_trv <= max_trv:
                     travel_days_count = float((max_trv - min_trv).days + 1)
 
-            # Sum total days from separate approved leave lines (e.g. Sick Leave, Annual Leave, Unpaid Leave) to deduct from Attendance
-            approved_leave_days_in_res = 0.0
-            for l_item in res:
-                l_code = (l_item.get('code') or '').strip()
-                l_wet = self.env['hr.work.entry.type'].browse(l_item.get('work_entry_type_id')) if l_item.get('work_entry_type_id') else None
-                l_wname = (l_wet.name or '').lower() if l_wet else ''
-                l_lname = (l_item.get('name') or '').lower()
-                is_leave_type = (
-                    (l_wet and getattr(l_wet, 'is_leave', False)) or
-                    any(t in l_code.lower() or t in l_wname or t in l_lname for t in ['leave', 'sick', 'annual', 'vacation', 'unpaid', 'إجازة', 'مرضي', 'سنوي', 'بدون'])
-                )
-                is_non_leave = (
-                    l_code in ['WORK100', 'A', 'ATTENDANCE', 'OUT', 'OUTCON', 'OUT_OF_CONTRACT', 'ABSENT', 'ABS', 'OVERTIME', 'EXTRA', 'TRV', 'TRAVEL', 'ARS', 'REST'] or
-                    'attendance' in l_wname or 'absent' in l_wname or 'out of contract' in l_lname or 'travel' in l_wname or 'سفر' in l_wname or 'rest' in l_wname
-                )
-                if is_leave_type and not is_non_leave:
-                    approved_leave_days_in_res += l_item.get('number_of_days', 0.0)
-
-            # Deduct approved leave days from Attendance line so total paid days equals active period days
-            net_computed_attendance_days = max(0.0, computed_attendance_days - approved_leave_days_in_res)
+            # Computed attendance days is built directly from physical attendance check-ins + earned rest days
+            net_computed_attendance_days = computed_attendance_days
 
             filtered_lines = []
             added_categories = set()
@@ -954,7 +936,7 @@ class HrPayslip(models.Model):
                     out_of_contract_days = float(max(0, pre_out_days + post_out_days))
                     if out_of_contract_days <= 0.0 and 'net_computed_attendance_days' in locals():
                         total_calendar_days = float((payslip.date_to - payslip.date_from).days + 1)
-                        out_of_contract_days = max(0.0, round(total_calendar_days - (net_computed_attendance_days + approved_leave_days_in_res), 2))
+                        out_of_contract_days = max(0.0, round(total_calendar_days - net_computed_attendance_days, 2))
                     line['number_of_days'] = out_of_contract_days
                     line['number_of_hours'] = round(out_of_contract_days * 8.0, 2)
                     line['amount'] = 0.0
