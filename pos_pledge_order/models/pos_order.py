@@ -472,6 +472,27 @@ class PosOrder(models.Model):
             order._compute_prices()
         return super()._process_payment_lines(order_data, order, pos_session, draft)
 
+    def _process_saved_order(self, draft):
+        res = super()._process_saved_order(draft)
+        if not draft and self.state in ("paid", "done", "invoiced"):
+            self._pledge_close_refunded_pledges()
+        return res
+
+    def _pledge_close_refunded_pledges(self):
+        """Mark origin-order pledges as returned when this refund gives back their pledge product."""
+        if self.env.context.get("pledge_return_in_progress"):
+            return
+        origin_orders = self.lines.refunded_orderline_id.order_id
+        if not origin_orders:
+            return
+        try:
+            with self.env.cr.savepoint():
+                self.env["pos.advance.order.pledge"].sudo()._sync_pledges_with_pos_refunds(origin_orders)
+        except Exception:
+            _logger.exception(
+                "[PLEDGE] Could not sync pledges with refund order(s) %s", self.mapped("name")
+            )
+
     def _prepare_pos_pledge_tracking_vals(self, pledge_total, pledge_product_ids):
         """Prepare payload to create pos.pledge tracking record from a paid POS order."""
         self.ensure_one()

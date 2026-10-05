@@ -5,7 +5,7 @@ import logging
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
-from odoo.tools import float_is_zero
+from odoo.tools import float_compare, float_is_zero
 
 _logger = logging.getLogger(__name__)
 
@@ -233,6 +233,71 @@ class PosAdvanceOrderPledgeReturn(models.Model):
         )
 
     @api.model
+    def _sync_pledges_with_pos_refunds(self, collection_orders):
+        """Close active pledges whose pledge-product line was already refunded by a paid POS refund.
+
+        Only pledges collected as POS product lines (no posted deposit JE) are closed:
+        the refund order already paid the customer back, so no extra accounting is needed.
+        """
+        PledgeLine = self.env["pos.advance.order.pledge"].sudo()
+        closed = PledgeLine
+        for order in collection_orders.sudo():
+            active = PledgeLine.search(
+                [("pos_order_id", "=", order.id), ("state", "=", "active")], order="id"
+            )
+            for product in active.product_id:
+                pledges = active.filtered(
+                    lambda p: p.product_id == product and not p._get_pledge_deposit_move(order)
+                )
+                lines = order.lines.filtered(lambda l: l.product_id == product and (l.qty or 0.0) > 0)
+                if not pledges or not lines:
+                    continue
+                rounding = lines[:1].product_uom_id.rounding or 0.001
+                refund_lines = lines.refund_orderline_ids.filtered(
+                    lambda l: l.order_id.state in ("paid", "done", "invoiced")
+                )
+                remaining = sum(lines.mapped("qty")) + sum(refund_lines.mapped("qty"))
+                excess = sum(pledges.mapped("pledge_qty")) - max(remaining, 0.0)
+                if float_compare(excess, 0.0, precision_rounding=rounding) <= 0:
+                    continue
+
+                refund_order = refund_lines.order_id.sorted("id")[-1:]
+                close_vals = {
+                    "state": "returned",
+                    "return_date": refund_order.date_order or fields.Datetime.now(),
+                    "return_pos_order_id": refund_order.id,
+                    "return_pos_session_id": refund_order.session_id.id,
+                    "return_payment_method_id": refund_order.payment_ids[:1].payment_method_id.id,
+                    "return_move_id": False,
+                }
+                for pledge in pledges:
+                    if float_compare(excess, 0.0, precision_rounding=rounding) <= 0:
+                        break
+                    qty = pledge.pledge_qty or 0.0
+                    if float_compare(qty, excess, precision_rounding=rounding) <= 0:
+                        to_close = pledge
+                        excess -= qty
+                    else:
+                        to_close = pledge.copy({
+                            "pledge_qty": excess,
+                            "receive_date": pledge.receive_date,
+                            "pledge_move_id": pledge.pledge_move_id.id,
+                        })
+                        pledge.write({"pledge_qty": qty - excess})
+                        excess = 0.0
+                    to_close.write(close_vals)
+                    closed |= to_close
+                    _logger.info(
+                        "[PLEDGE] Closed pledge %s (%s x%s) on %s: already refunded by %s",
+                        to_close.id,
+                        product.display_name,
+                        to_close.pledge_qty,
+                        order.name,
+                        refund_order.name,
+                    )
+        return closed
+
+    @api.model
     def _action_return_pledges_via_pos_refund(
         self,
         pledges,
@@ -300,8 +365,29 @@ class PosAdvanceOrderPledgeReturn(models.Model):
             groups.setdefault(collection_order.id, PledgeLine)
             groups[collection_order.id] |= pledge
 
+        healed = self._sync_pledges_with_pos_refunds(
+            self.env["pos.order"].browse(list(collection_orders))
+        )
+
         for order_id, group_pledges in groups.items():
             collection_order = collection_orders[order_id]
+            group_pledges = group_pledges.filtered(lambda p: p.state == "active")
+            if not group_pledges:
+                healed_here = healed.filtered(lambda p: p.pos_order_id == collection_order)
+                refund_order = healed_here.return_pos_order_id[:1]
+                results.append(
+                    {
+                        "pledge_ids": healed_here.ids,
+                        "refund_order_id": refund_order.id,
+                        "refund_order_name": refund_order.name,
+                        "origin_order_name": collection_order.name,
+                        "payment_method_name": healed_here.return_payment_method_id[:1].display_name,
+                        "amount": sum(abs(p.pledge_subtotal or 0.0) for p in healed_here),
+                        "return_via": "pos_refund",
+                        "already_refunded": True,
+                    }
+                )
+                continue
             return_pm = group_pledges[:1]._resolve_return_payment_method(
                 collection_order,
                 pos_payment_method_id,
@@ -464,7 +550,9 @@ class PosAdvanceOrderPledgeReturn(models.Model):
         if invalid:
             raise UserError(_("Only active pledges can be returned."))
 
-        return self._action_return_pledges_accounting(
+        # The refund order created here must not auto-close other pledges via the refund sync hook.
+        pledges = pledges.with_context(pledge_return_in_progress=True)
+        return pledges._action_return_pledges_accounting(
             pledges,
             pos_payment_method_id=pos_payment_method_id,
             pos_session_id=pos_session_id,
