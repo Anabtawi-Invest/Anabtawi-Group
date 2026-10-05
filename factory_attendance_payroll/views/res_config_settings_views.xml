@@ -10,6 +10,11 @@
                 <setting string="Factory Overtime Calculation" help="When unchecked, any extra hours worked by employees are treated as unpaid hours and will not generate overtime or affect payslips.">
                     <field name="enable_overtime_calculation"/>
                 </setting>
+                <setting string="Reconciliation Annual Leave Type" help="Time off type used when lateness is deducted from annual leave and for the annual leave balance in termination settlement.">
+                    <field name="fap_annual_leave_type_id"
+                           domain="[('time_type', '=', 'leave'), ('company_id', 'in', [False, company_id])]"
+                           options="{'no_create': True}"/>
+                </setting>
             </xpath>
         </field>
     </record>

@@ -10,6 +10,13 @@ class ResCompany(models.Model):
         default=True,
         help="When unchecked, extra hours worked by employees will not generate overtime on payslips."
     )
+    fap_annual_leave_type_id = fields.Many2one(
+        'hr.leave.type',
+        string="Reconciliation Annual Leave Type",
+        domain="[('time_type', '=', 'leave'), ('company_id', 'in', [False, id])]",
+        help="Annual leave type used by the attendance reconciliation: lateness deducted from annual leave "
+             "and the annual leave balance used in termination settlement."
+    )
 
 
 class ResConfigSettings(models.TransientModel):
@@ -19,4 +26,8 @@ class ResConfigSettings(models.TransientModel):
         related='company_id.enable_overtime_calculation',
         readonly=False,
         string="Factory Overtime Calculation"
+    )
+    fap_annual_leave_type_id = fields.Many2one(
+        related='company_id.fap_annual_leave_type_id',
+        readonly=False,
     )
