@@ -674,6 +674,31 @@ class HrPayslip(models.Model):
         self._revert_reconciliation_settlements()
         return super().unlink()
 
+    def _sanitize_issue_item(self, item):
+        if isinstance(item, (str, int, float, bool, type(None))):
+            return item
+        elif isinstance(item, (list, tuple, set)):
+            return [self._sanitize_issue_item(x) for x in item]
+        elif isinstance(item, dict):
+            return {str(k): self._sanitize_issue_item(v) for k, v in item.items()}
+        elif hasattr(item, '_name') or hasattr(item, 'display_name'):
+            return getattr(item, 'display_name', False) or getattr(item, 'name', False) or str(item)
+        else:
+            return str(item)
+
+    def _compute_issues(self):
+        try:
+            super()._compute_issues()
+        except Exception as e:
+            _logger.warning("Error calling super()._compute_issues(): %s", e)
+        for slip in self:
+            if slip.issues:
+                try:
+                    sanitized = self._sanitize_issue_item(slip.issues)
+                    slip.issues = sanitized
+                except Exception:
+                    slip.issues = False
+
     def write(self, vals):
         if vals.get('state') == 'cancel' and not self._context.get('skip_reconcile_revert'):
             _logger.info("[FAP-RECON] write(state=cancel) → revert slips=%s", self.ids)
