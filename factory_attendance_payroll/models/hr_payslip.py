@@ -888,7 +888,30 @@ class HrPayslip(models.Model):
                 if min_trv <= max_trv:
                     travel_days_count = float((max_trv - min_trv).days + 1)
 
+            # Sum total days from separate approved leave lines (e.g. Sick Leave, Annual Leave) to deduct from Attendance
+            approved_leave_days_in_res = 0.0
+            for l_item in res:
+                l_code = (l_item.get('code') or '').strip()
+                l_wet = self.env['hr.work.entry.type'].browse(l_item.get('work_entry_type_id')) if l_item.get('work_entry_type_id') else None
+                l_wname = (l_wet.name or '').lower() if l_wet else ''
+                l_lname = (l_item.get('name') or '').lower()
+                is_leave_type = (
+                    (l_wet and getattr(l_wet, 'is_leave', False)) or
+                    any(t in l_code.lower() or t in l_wname or t in l_lname for t in ['leave', 'sick', 'annual', 'vacation', 'إجازة', 'مرضي', 'سنوي'])
+                )
+                is_non_leave = (
+                    l_code in ['WORK100', 'A', 'ATTENDANCE', 'OUT', 'OUTCON', 'OUT_OF_CONTRACT', 'ABSENT', 'ABS', 'UNPAID', 'OVERTIME', 'EXTRA', 'TRV', 'TRAVEL', 'ARS', 'REST'] or
+                    'attendance' in l_wname or 'absent' in l_wname or 'out of contract' in l_lname or 'travel' in l_wname or 'سفر' in l_wname or 'rest' in l_wname
+                )
+                if is_leave_type and not is_non_leave:
+                    approved_leave_days_in_res += l_item.get('number_of_days', 0.0)
+
+            # Deduct approved leave days from Attendance line so total paid days equals active period days
+            net_computed_attendance_days = max(0.0, computed_attendance_days - approved_leave_days_in_res)
+
             filtered_lines = []
+            added_categories = set()
+
             for line in res:
                 code = (line.get('code') or '').strip()
                 work_entry_type = self.env['hr.work.entry.type'].browse(line.get('work_entry_type_id')) if line.get('work_entry_type_id') else None
@@ -902,6 +925,9 @@ class HrPayslip(models.Model):
                     continue
 
                 if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'] or 'travel' in we_name or 'travel' in line_name or 'سفر' in we_name or 'سفر' in line_name or 'مهمة' in we_name or 'مهمة' in line_name:
+                    if 'TRAVEL' in added_categories:
+                        continue
+                    added_categories.add('TRAVEL')
                     trv_days = travel_days_count if travel_days_count > 0.0 else line.get('number_of_days', 0.0)
                     line['number_of_days'] = trv_days
                     line['number_of_hours'] = round(trv_days * 9.0, 2)
@@ -910,36 +936,45 @@ class HrPayslip(models.Model):
                     filtered_lines.append(line)
 
                 elif code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
+                    if 'ATTENDANCE' in added_categories:
+                        continue
+                    added_categories.add('ATTENDANCE')
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
-                        line['number_of_days'] = computed_attendance_days
+                        line['number_of_days'] = net_computed_attendance_days
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
                 elif code in ['OUT', 'OUTCON', 'OUT_OF_CONTRACT'] or 'out of contract' in line_name or 'out of contract' in we_name:
+                    if 'OUT_OF_CONTRACT' in added_categories:
+                        continue
+                    added_categories.add('OUT_OF_CONTRACT')
                     pre_out_days = (c_start - payslip.date_from).days if ('c_start' in locals() and c_start and c_start > payslip.date_from) else 0
                     post_out_days = (payslip.date_to - c_end).days if ('c_end' in locals() and c_end and c_end < payslip.date_to) else 0
                     out_of_contract_days = float(max(0, pre_out_days + post_out_days))
-                    if out_of_contract_days <= 0.0 and 'computed_attendance_days' in locals():
+                    if out_of_contract_days <= 0.0 and 'net_computed_attendance_days' in locals():
                         total_calendar_days = float((payslip.date_to - payslip.date_from).days + 1)
-                        out_of_contract_days = max(0.0, round(total_calendar_days - computed_attendance_days, 2))
+                        out_of_contract_days = max(0.0, round(total_calendar_days - (net_computed_attendance_days + approved_leave_days_in_res), 2))
                     line['number_of_days'] = out_of_contract_days
                     line['number_of_hours'] = round(out_of_contract_days * 8.0, 2)
                     line['amount'] = 0.0
                     filtered_lines.append(line)
 
                 elif code in ['GTO', 'PHD', 'HOLIDAY', 'LEAVE110', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name:
+                    if 'HOLIDAY' in added_categories:
+                        continue
+                    added_categories.add('HOLIDAY')
                     if total_holiday_worked_hrs > 0.01:
                         weighted_hol_hrs = round(total_holiday_worked_hrs * 1.5, 2)
                         line['number_of_hours'] = weighted_hol_hrs
                         line['number_of_days'] = float(len(set(att.check_in.date() for att in holiday_attendances))) if holiday_attendances else round(weighted_hol_hrs / 8.0, 2)
                         line['amount'] = round(weighted_hol_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
-                    else:
-                        # Hide Public Holiday line if employee did not work on the holiday
-                        continue
 
                 elif code in ['OVERTIME', 'EXTRA'] or 'overtime' in we_name or 'extra' in we_name:
+                    if 'OVERTIME' in added_categories:
+                        continue
+                    added_categories.add('OVERTIME')
                     total_net_extra_hrs = round(net_extra_hrs + (extra_day_off_hrs if 'extra_day_off_hrs' in locals() else 0.0), 2)
                     if total_net_extra_hrs > 0.01:
                         line['number_of_hours'] = total_net_extra_hrs
@@ -948,6 +983,9 @@ class HrPayslip(models.Model):
                         filtered_lines.append(line)
 
                 elif code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS', 'OUT'] or 'absent' in we_name:
+                    if 'ABSENT' in added_categories:
+                        continue
+                    added_categories.add('ABSENT')
                     WEModel = self.env['hr.work.entry']
                     abs_type_obj = emp._get_absent_work_entry_type() if hasattr(emp, '_get_absent_work_entry_type') else False
                     absent_we_domain = [
@@ -1001,6 +1039,10 @@ class HrPayslip(models.Model):
                             'sequence': line.get('sequence', 25) + 1,
                         })
                 else:
+                    line_key = (code, line.get('work_entry_type_id'), line.get('name'))
+                    if line_key in added_categories:
+                        continue
+                    added_categories.add(line_key)
                     filtered_lines.append(line)
 
             res = filtered_lines
