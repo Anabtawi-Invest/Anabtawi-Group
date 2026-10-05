@@ -94,7 +94,8 @@ class HrPayslipRun(models.Model):
                 "border": 1,
                 "align": "center",
                 "valign": "vcenter",
-                "font_size": 11,
+                "text_wrap": True,
+                "font_size": 10,
             }
         )
 
@@ -496,14 +497,10 @@ class HrPayslipRun(models.Model):
         for idx, name in enumerate(all_ded_headers):
             sheet1.write(row_sub, ded_start_col + idx, name, header_fmt)
 
-        # COMPANY CONTRIBUTIONS Group Super-Header & Sub-Headers
-        if comp_count > 1:
-            sheet1.merge_range(row_super, comp_start_col, row_super, comp_end_col, _("COMPANY CONTRIBUTIONS"), group_header_comp_fmt)
-        else:
-            sheet1.write(row_super, comp_start_col, _("COMPANY CONTRIBUTIONS"), group_header_comp_fmt)
-
+        # COMPANY CONTRIBUTIONS Columns (Vertically merged across row_super and row_sub)
         for idx, name in enumerate(all_comp_headers):
-            sheet1.write(row_sub, comp_start_col + idx, name, header_fmt)
+            c_idx = comp_start_col + idx
+            sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, group_header_comp_fmt)
 
         # Summary / Attendance Columns (Vertically merged across row_super and row_sub)
         for idx, name in enumerate(summary_headers):
@@ -574,10 +571,8 @@ class HrPayslipRun(models.Model):
                                 val = in_val
                     dyn_alw_vals.append(val)
 
-                # Gross Salary
-                gross_sal = payslip.gross_wage if hasattr(payslip, "gross_wage") and payslip.gross_wage else sum(lines.filtered(lambda l: l.code == "GROSS" or (l.category_id and l.category_id.code in ("GROSS", "Gross"))).mapped("total"))
-                if not gross_sal:
-                    gross_sal = basic_sal + rem_leave + gross_att_ot + sum(dyn_alw_vals)
+                # Gross Salary (calculated from Actual Salary + Allowances)
+                gross_sal = actual_sal + rem_leave + gross_att_ot + sum(dyn_alw_vals)
 
                 # Fixed Deductions
                 tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in l.name).mapped("total"))
@@ -606,17 +601,24 @@ class HrPayslipRun(models.Model):
                 if net_sal < 0:
                     issues.append(_("Negative Net Salary (%.2f JOD)") % net_sal)
 
-                # Attendance metrics (Take ONLY Attendance days, excluding Public Holidays, Leaves, and Absence)
+                # Attendance metrics (Take Attendance days + Sick days + Annual days + Paid Leaves, excluding Unpaid/Absence)
                 worked_days = payslip.worked_days_line_ids
-                att_lines = worked_days.filtered(lambda wd: (
-                    (
-                        (wd.code or '').strip().upper() in ('WORK100', 'ATTENDANCE', 'WORK') or
-                        'attendance' in (wd.name or '').lower() or
-                        'حضور' in (wd.name or '')
-                    ) and
-                    not any(h in (wd.name or '').lower() for h in ['public holiday', 'holiday', 'عطلة', 'leave', 'إجازة']) and
-                    not any(h in (wd.code or '').lower() for h in ['holiday', 'leave', 'public'])
-                ))
+                def _is_paid_attendance_or_leave(wd):
+                    code = (wd.code or '').strip().upper()
+                    name = (wd.name or '').strip().lower()
+
+                    # Exclude OUT, Overtime, Lateness
+                    if code in ('OUT', 'LAT', 'LATE', 'OVERTIME', 'OT', 'OTW', 'OTR', 'PHO') or 'overtime' in name or 'lateness' in name or 'تأخير' in name:
+                        return False
+
+                    # Exclude Unpaid leave and Absence
+                    unpaid_keywords = ['unpaid', 'absent', 'absence', 'بدون راتب', 'غير مدفوع', 'خصم غياب']
+                    if any(u in code.lower() or u in name for u in unpaid_keywords):
+                        return False
+
+                    return True
+
+                att_lines = worked_days.filtered(_is_paid_attendance_or_leave)
                 att_days = sum(att_lines.mapped("number_of_days"))
                 if payslip.date_from and payslip.date_to:
                     days_in_period = (payslip.date_to - payslip.date_from).days + 1
