@@ -787,8 +787,6 @@ class HrPayslip(models.Model):
             computed_attendance_days = 0.0
             if regular_attendances:
                 regular_physical_days = float(len(set(att.check_in.date() for att in regular_attendances if att.check_in)))
-            elif attendances:
-                regular_physical_days = float(len(set(att.check_in.date() for att in attendances if att.check_in)))
             else:
                 WEModel = self.env['hr.work.entry']
                 att_we_domain = [
@@ -865,9 +863,9 @@ class HrPayslip(models.Model):
             covered_lateness_days = covered_lateness_hours / 8.0
 
             if is_flexible or work_station != 'headoffice':
-                final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
+                final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days
             else:
-                final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
+                final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days
                 if active_period_days > 0 and final_attendance_days > active_period_days:
                     final_attendance_days = active_period_days
 
