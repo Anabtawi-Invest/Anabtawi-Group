@@ -318,11 +318,7 @@ class HrPayslipRun(models.Model):
                     or itype_is_adv2
                     or any(
                         t_norm == d_name
-                        or d_name == t_norm
-                        or (
-                            (t_norm in d_name or d_name in t_norm)
-                            and (_is_adv_2(d_name, d_name) == itype_is_adv2)
-                        )
+                        or (t_code and t_code == d_name)
                         for d_name in ded_rule_names
                     )
                 )
@@ -333,12 +329,6 @@ class HrPayslipRun(models.Model):
                         k_is_adv2 = _is_adv_2(k, k)
                         if k_is_adv2 == itype_is_adv2:
                             if k == t_norm or (t_code and t_code == k):
-                                matched_key = k
-                                break
-                    if not matched_key:
-                        for k in ded_map:
-                            k_is_adv2 = _is_adv_2(k, k)
-                            if k_is_adv2 == itype_is_adv2 and (k in t_norm or t_norm in k):
                                 matched_key = k
                                 break
                     if matched_key:
@@ -352,12 +342,6 @@ class HrPayslipRun(models.Model):
                         k_is_adv2 = _is_adv_2(k, k)
                         if k_is_adv2 == itype_is_adv2:
                             if k == clean_input_norm or (t_code and t_code == k):
-                                matched_key = k
-                                break
-                    if not matched_key:
-                        for k in alw_map:
-                            k_is_adv2 = _is_adv_2(k, k)
-                            if k_is_adv2 == itype_is_adv2 and (k in clean_input_norm or clean_input_norm in k):
                                 matched_key = k
                                 break
                     if matched_key:
