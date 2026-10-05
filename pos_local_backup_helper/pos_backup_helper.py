@@ -84,14 +84,19 @@ def log_dir():
 
 
 def setup_logging(to_console=True):
-    os.makedirs(log_dir(), exist_ok=True)
     _logger.setLevel(logging.INFO)
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-    file_handler = logging.handlers.RotatingFileHandler(
-        os.path.join(log_dir(), "helper.log"), maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
-    )
-    file_handler.setFormatter(fmt)
-    _logger.addHandler(file_handler)
+    try:
+        os.makedirs(log_dir(), exist_ok=True)
+        file_handler = logging.handlers.RotatingFileHandler(
+            os.path.join(log_dir(), "helper.log"), maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        )
+        file_handler.setFormatter(fmt)
+        _logger.addHandler(file_handler)
+    except OSError as error:
+        # The log file must never prevent the helper from running.
+        print(f"Warning: cannot write the log file ({error}); logging to the console only.")
+        to_console = True
     if to_console:
         console = logging.StreamHandler()
         console.setFormatter(fmt)
@@ -217,13 +222,18 @@ def restrict_data_dir():
     if not IS_WINDOWS:
         os.chmod(data_dir(), 0o700)
         return
+    # Restrict the folder itself, then make every file inside inherit from it:
+    # (OI)(CI) inheritance flags are only valid on folders, never on files.
     subprocess.run(
         [
             "icacls", data_dir(), "/inheritance:r",
-            "/grant:r", "*S-1-5-32-544:(OI)(CI)F",
-            "/grant:r", "*S-1-5-18:(OI)(CI)F",
-            "/T",
+            "/grant:r", "*S-1-5-32-544:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F",
         ],
+        check=False,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["icacls", os.path.join(data_dir(), "*"), "/reset", "/T", "/C"],
         check=False,
         capture_output=True,
     )
@@ -680,6 +690,7 @@ class HelperServer(ThreadingHTTPServer):
         self.sessions_lock = threading.Lock()
         self.login_failures = 0
         self.login_locked_until = 0.0
+        self.last_rejection_log = {}
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -747,10 +758,23 @@ class RequestHandler(BaseHTTPRequestHandler):
     # -- auth ----------------------------------------------------------------
 
     def _api_authorized(self):
+        origin = self.headers.get("Origin")
+        if not self._origin_allowed(origin):
+            self._log_rejection("origin_not_allowed", f"request from website {origin or '(none)'} is not in the allowed list")
+            return False
         key = self.headers.get("X-Api-Key") or ""
-        return self._origin_allowed(self.headers.get("Origin")) and hmac.compare_digest(
-            key.encode(), self.server.api_key.encode()
-        )
+        if not hmac.compare_digest(key.encode(), self.server.api_key.encode()):
+            self._log_rejection("wrong_api_key", f"request from {origin} used a wrong API key")
+            return False
+        return True
+
+    def _log_rejection(self, event, message):
+        # At most one entry per reason per minute, the POS retries every few seconds.
+        now = time.time()
+        last = self.server.last_rejection_log.get(event, 0)
+        if now - last >= 60:
+            self.server.last_rejection_log[event] = now
+            self.db.log("error", event, message)
 
     def _session_token(self):
         raw = self.headers.get("Cookie")
@@ -775,7 +799,11 @@ class RequestHandler(BaseHTTPRequestHandler):
     # -- routing -------------------------------------------------------------
 
     def do_OPTIONS(self):
-        self.send_response(204 if self._origin_allowed(self.headers.get("Origin")) else 403)
+        origin = self.headers.get("Origin")
+        allowed = self._origin_allowed(origin)
+        if not allowed:
+            self._log_rejection("origin_not_allowed", f"request from website {origin or '(none)'} is not in the allowed list")
+        self.send_response(204 if allowed else 403)
         self._cors_headers()
         self.send_header("Content-Length", "0")
         self.end_headers()
