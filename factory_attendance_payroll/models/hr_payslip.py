@@ -780,86 +780,88 @@ class HrPayslip(models.Model):
 
             # Pre-compute final attendance days for the period
             computed_attendance_days = 0.0
-            if regular_attendances or attendances or 'hr.work.entry' in self.env or total_regular_attendance_hrs > 0.01:
-                if regular_attendances:
-                    regular_physical_days = len(set(att.check_in.date() for att in regular_attendances if att.check_in))
-                else:
-                    WEModel = self.env['hr.work.entry']
-                    we_att_domain = [
-                        ('employee_id', '=', emp.id),
-                        ('state', '!=', 'cancelled'),
-                        '|', '|',
-                        ('work_entry_type_id.code', 'in', ['WORK100', 'ATTENDANCE', 'A', 'ATTD', 'WORK']),
-                        ('work_entry_type_id.display_code', 'in', ['WORK100', 'ATTENDANCE', 'A', 'ATTD', 'WORK']),
-                        ('work_entry_type_id.name', 'ilike', 'Attendance'),
+            att_dates = set()
+            if regular_attendances:
+                att_dates |= set(att.check_in.date() for att in regular_attendances if att.check_in)
+
+            if 'hr.work.entry' in self.env:
+                WEModel = self.env['hr.work.entry']
+                we_att_domain = [
+                    ('employee_id', '=', emp.id),
+                    ('state', '!=', 'cancelled'),
+                    '|', '|', '|',
+                    ('work_entry_type_id.code', 'in', ['WORK100', 'WORK1000', 'ATTENDANCE', 'A', 'ATTD', 'WORK', 'FULL', 'STD']),
+                    ('work_entry_type_id.display_code', 'in', ['WORK100', 'WORK1000', 'ATTENDANCE', 'A', 'ATTD', 'WORK', 'FULL', 'STD']),
+                    ('work_entry_type_id.name', 'ilike', 'Attendance'),
+                    ('work_entry_type_id.name', 'ilike', 'حضور'),
+                ]
+                if 'date' in WEModel._fields:
+                    we_att_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
+                elif 'date_start' in WEModel._fields:
+                    we_att_domain += [
+                        ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                        ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
                     ]
-                    if 'date' in WEModel._fields:
-                        we_att_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
-                    elif 'date_start' in WEModel._fields:
-                        we_att_domain += [
-                            ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
-                            ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
-                        ]
-                    att_entries = WEModel.sudo().search(we_att_domain)
-                    we_att_dates = set()
-                    for we in att_entries:
-                        d = getattr(we, 'date', False) or (we.date_start.date() if hasattr(we, 'date_start') and we.date_start else False)
-                        if d and payslip.date_from <= d <= payslip.date_to:
-                            we_att_dates.add(d)
-                    regular_physical_days = float(len(we_att_dates)) if we_att_dates else (round(total_regular_attendance_hrs / 8.0, 2) if total_regular_attendance_hrs > 0 else 0.0)
+                att_entries = WEModel.sudo().search(we_att_domain)
+                for we in att_entries:
+                    d = getattr(we, 'date', False) or (we.date_start.date() if hasattr(we, 'date_start') and we.date_start else False)
+                    if d and payslip.date_from <= d <= payslip.date_to:
+                        att_dates.add(d)
 
-                c_start = payslip.date_from
-                c_end = payslip.date_to
+            regular_physical_days = float(len(att_dates)) if att_dates else (round(total_regular_attendance_hrs / 8.0, 2) if total_regular_attendance_hrs > 0 else 0.0)
 
-                contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or getattr(emp, 'contract_id', None)
-                c_vers = emp._get_versions_with_contract_overlap_with_period(payslip.date_from, payslip.date_to) if hasattr(emp, '_get_versions_with_contract_overlap_with_period') else []
-                c_starts = [c.date_start for c in c_vers if getattr(c, 'date_start', None)]
-                c_ends = [c.date_end for c in c_vers if getattr(c, 'date_end', None)]
+            c_start = payslip.date_from
+            c_end = payslip.date_to
 
-                if contract_obj and getattr(contract_obj, 'date_start', None) and contract_obj.date_start > payslip.date_from:
-                    c_start = contract_obj.date_start
-                elif c_starts and max(c_starts) > payslip.date_from:
-                    c_start = max(c_starts)
+            contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or getattr(emp, 'contract_id', None)
+            c_vers = emp._get_versions_with_contract_overlap_with_period(payslip.date_from, payslip.date_to) if hasattr(emp, '_get_versions_with_contract_overlap_with_period') else []
+            c_starts = [c.date_start for c in c_vers if getattr(c, 'date_start', None)]
+            c_ends = [c.date_end for c in c_vers if getattr(c, 'date_end', None)]
 
-                if contract_obj and getattr(contract_obj, 'date_end', None) and contract_obj.date_end < payslip.date_to:
-                    c_end = contract_obj.date_end
-                elif c_ends and min(c_ends) < payslip.date_to:
-                    c_end = min(c_ends)
+            if contract_obj and getattr(contract_obj, 'date_start', None) and contract_obj.date_start > payslip.date_from:
+                c_start = contract_obj.date_start
+            elif c_starts and max(c_starts) > payslip.date_from:
+                c_start = max(c_starts)
 
-                cal = emp.resource_calendar_id
-                work_station = getattr(emp, 'employee_work_station', False) or 'factory'
-                is_flexible = bool(
-                    (cal and 'flexible' in (cal.name or '').lower())
-                    or getattr(cal, 'flexible_hours', False)
-                    or getattr(cal, 'flexible', False)
-                    or getattr(emp, 'flexible_hours', False)
-                    or (work_station in ['factory', 'retail'])
-                )
-                if is_flexible and work_station != 'headoffice':
-                    earned_rest_days = int(regular_physical_days // 6)
-                    worked_rest_days = 0
-                    unpunched_rest_days = earned_rest_days
+            if contract_obj and getattr(contract_obj, 'date_end', None) and contract_obj.date_end < payslip.date_to:
+                c_end = contract_obj.date_end
+            elif c_ends and min(c_ends) < payslip.date_to:
+                c_end = min(c_ends)
+
+            cal = emp.resource_calendar_id
+            work_station = getattr(emp, 'employee_work_station', False) or 'factory'
+            is_flexible = bool(
+                (cal and 'flexible' in (cal.name or '').lower())
+                or getattr(cal, 'flexible_hours', False)
+                or getattr(cal, 'flexible', False)
+                or getattr(emp, 'flexible_hours', False)
+                or (work_station in ['factory', 'retail'])
+            )
+            if is_flexible and work_station != 'headoffice':
+                earned_rest_days = int(regular_physical_days // 6)
+                worked_rest_days = 0
+                unpunched_rest_days = earned_rest_days
+            else:
+                earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
+                if cal:
+                    working_weekdays = set(int(att.dayofweek) for att in cal.attendance_ids if att.dayofweek is not False and att.dayofweek is not None)
+                    worked_rest_days = sum(1 for att in regular_attendances if att.check_in and att.check_in.weekday() not in working_weekdays)
                 else:
-                    earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
-                    if cal:
-                        working_weekdays = set(int(att.dayofweek) for att in cal.attendance_ids if att.dayofweek is not False and att.dayofweek is not None)
-                        worked_rest_days = sum(1 for att in regular_attendances if att.check_in and att.check_in.weekday() not in working_weekdays)
-                    else:
-                        worked_rest_days = max(0, regular_physical_days - max(0, active_period_days - earned_rest_days - len(holiday_dates)))
-                    unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
+                    worked_rest_days = max(0, regular_physical_days - max(0, active_period_days - earned_rest_days - len(holiday_dates)))
+                unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
 
-                active_period_days = max(0, (c_end - c_start).days + 1)
-                active_holiday_dates = [d for d in holiday_dates if c_start <= d <= c_end]
-                unworked_holiday_dates = [d for d in active_holiday_dates if d not in set(att.check_in.date() for att in holiday_attendances if att.check_in)]
-                unworked_holiday_days = len(unworked_holiday_dates)
+            active_period_days = max(0, (c_end - c_start).days + 1)
+            active_holiday_dates = [d for d in holiday_dates if c_start <= d <= c_end]
+            unworked_holiday_dates = [d for d in active_holiday_dates if d not in set(att.check_in.date() for att in holiday_attendances if att.check_in)]
+            unworked_holiday_days = len(unworked_holiday_dates)
 
-                covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
-                covered_lateness_days = covered_lateness_hours / 8.0
-                final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
-                if active_period_days > 0 and final_attendance_days > active_period_days:
-                    final_attendance_days = active_period_days
+            covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
+            covered_lateness_days = covered_lateness_hours / 8.0
+            final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
+            if active_period_days > 0 and final_attendance_days > active_period_days:
+                final_attendance_days = active_period_days
 
-                computed_attendance_days = float(round(final_attendance_days))
+            computed_attendance_days = float(round(final_attendance_days))
 
             travel_days_count = 0.0
             trv_dates = []
@@ -932,7 +934,7 @@ class HrPayslip(models.Model):
                     line['amount'] = round(trv_days * daily_rate, 3)
                     filtered_lines.append(line)
 
-                elif code in ['WORK100', 'A', 'ATTENDANCE', 'ATTD', 'WORK', 'FULL', 'STD'] or any(term in we_name or term in line_name for term in ['attendance', 'work', 'حضور', 'عمل']):
+                elif code in ['WORK100', 'WORK1000', 'A', 'ATTENDANCE', 'ATTD', 'WORK', 'FULL', 'STD'] or any(term in we_name or term in line_name for term in ['attendance', 'work', 'حضور', 'عمل']):
                     if 'ATTENDANCE' in added_categories:
                         continue
                     added_categories.add('ATTENDANCE')
