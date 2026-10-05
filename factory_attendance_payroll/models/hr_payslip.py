@@ -3,8 +3,7 @@
 from collections import defaultdict
 import datetime
 import logging
-from odoo import _, models, fields, api
-from odoo.exceptions import UserError
+from odoo import models, fields, api
 from odoo.tools.float_utils import float_round
 
 _logger = logging.getLogger(__name__)
@@ -99,32 +98,6 @@ class HrPayslip(models.Model):
         help="Tracks duration in days added directly to employee's Extra Hours allocation by this payslip."
     )
 
-    def _fap_get_annual_leave_type(self):
-        self.ensure_one()
-        return (self.company_id or self.env.company).fap_annual_leave_type_id
-
-    def _fap_is_termination_slip(self):
-        self.ensure_one()
-        return bool(
-            getattr(self, 'termination_clearance', False) or
-            (self.struct_id and ('termination' in self.struct_id.name.lower() or 'تيرمنيشن' in self.struct_id.name))
-        )
-
-    def _fap_check_annual_leave_type(self):
-        missing = self.filtered(
-            lambda s: s.employee_id
-            and (s.employee_id.allow_annual_leave_lateness_deduction or s._fap_is_termination_slip())
-            and not s._fap_get_annual_leave_type()
-        )
-        if missing:
-            companies = missing.mapped(lambda s: s.company_id or self.env.company)
-            raise UserError(_(
-                "Please set the \"Reconciliation Annual Leave Type\" in Payroll > Configuration > Settings "
-                "before continuing.\n\nCompany: %(companies)s\nPayslips: %(slips)s",
-                companies=", ".join(companies.mapped('name')),
-                slips=", ".join(missing.mapped('display_name')),
-            ))
-
     @api.depends('employee_id', 'date_from', 'date_to')
     def _compute_attendance_reconciliation_fields(self):
         if not getattr(self.env.registry, 'ready', True) or self.env.context.get('install_mode') or self.env.context.get('module_installation') or self.env.context.get('tracking_disable'):
@@ -191,7 +164,7 @@ class HrPayslip(models.Model):
 
         LeaveType = self.env['hr.leave.type'].sudo()
         extra_types = LeaveType.search(['|', '|', ('name', '=', 'Extra Hours'), ('name', 'ilike', 'Extra Hours'), ('name', 'ilike', 'إضافي')])
-        annual_types = valid_slips.mapped(lambda s: s._fap_get_annual_leave_type())
+        annual_types = LeaveType.search(['|', '|', ('name', '=', 'Annual Leave'), ('name', 'ilike', 'Annual Leave'), ('name', 'ilike', 'سنوي')])
         pto_types = LeaveType.search(['|', '|', ('name', '=', 'Paid Time Off'), ('name', 'ilike', 'Paid Time Off'), ('name', 'ilike', 'مدفوع')])
 
         extra_type_ids = set(extra_types.ids)
@@ -425,9 +398,8 @@ class HrPayslip(models.Model):
             rem_lateness = round(lateness - covered_extra, 2)
 
             covered_annual_leave = 0.0
-            slip_annual_type = payslip._fap_get_annual_leave_type()
-            if rem_lateness > 0.01 and slip_annual_type and payslip.employee_id and payslip.employee_id.allow_annual_leave_lateness_deduction:
-                annual_leave_avail = max(0.0, alloc_hours_by_emp_type.get((emp_id, slip_annual_type.id), 0.0))
+            if rem_lateness > 0.01 and payslip.employee_id and payslip.employee_id.allow_annual_leave_lateness_deduction:
+                annual_leave_avail = max(0.0, sum(alloc_hours_by_emp_type.get((emp_id, tid), 0.0) for tid in annual_type_ids))
                 covered_annual_leave = round(min(rem_lateness, annual_leave_avail), 2)
                 rem_lateness = round(rem_lateness - covered_annual_leave, 2)
 
@@ -442,7 +414,6 @@ class HrPayslip(models.Model):
     def compute_sheet(self):
         valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to)
         if valid_slips:
-            valid_slips._fap_check_annual_leave_type()
             valid_slips._compute_attendance_reconciliation_fields()
             valid_slips._apply_termination_clearance_inputs()
             valid_slips._normalize_public_holiday_work_entries()
@@ -537,7 +508,9 @@ class HrPayslip(models.Model):
             # ----------------------------------------------------
             # A. ANNUAL LEAVE BALANCES
             # ----------------------------------------------------
-            annual_types = slip._fap_get_annual_leave_type().sudo()
+            annual_types = self.env['hr.leave.type'].sudo().search([
+                '|', ('name', 'ilike', 'annual'), ('name', 'ilike', 'سنوي')
+            ])
             for atype in annual_types:
                 if hasattr(emp, '_get_consumed_leaves'):
                     try:
@@ -559,11 +532,12 @@ class HrPayslip(models.Model):
                         annual_leave_days = val / 8.0 if 'hours' in field_name else val
                         break
 
-            if not annual_leave_days and annual_types and 'hr.leave.allocation' in self.env:
+            if not annual_leave_days and 'hr.leave.allocation' in self.env:
                 annual_allocs = self.env['hr.leave.allocation'].sudo().search([
                     ('employee_id', '=', emp.id),
                     ('state', '=', 'validate'),
-                    ('holiday_status_id', '=', annual_types.id),
+                    '|', ('holiday_status_id.name', 'ilike', 'annual'),
+                    ('holiday_status_id.name', 'ilike', 'سنوي'),
                 ])
                 if annual_allocs:
                     for a in annual_allocs:
@@ -666,7 +640,6 @@ class HrPayslip(models.Model):
             self.ids,
             {s.id: s.state for s in self},
         )
-        self._fap_check_annual_leave_type()
         res = super().action_payslip_done()
         _logger.info(
             "[FAP-RECON] action_payslip_done AFTER super slips=%s states=%s → sync",
@@ -915,7 +888,7 @@ class HrPayslip(models.Model):
                 if min_trv <= max_trv:
                     travel_days_count = float((max_trv - min_trv).days + 1)
 
-            # Sum total days from separate approved leave lines (e.g. Sick Leave, Annual Leave) to deduct from Attendance
+            # Sum total days from separate approved leave lines (e.g. Sick Leave, Annual Leave, Unpaid Leave) to deduct from Attendance
             approved_leave_days_in_res = 0.0
             for l_item in res:
                 l_code = (l_item.get('code') or '').strip()
@@ -924,10 +897,10 @@ class HrPayslip(models.Model):
                 l_lname = (l_item.get('name') or '').lower()
                 is_leave_type = (
                     (l_wet and getattr(l_wet, 'is_leave', False)) or
-                    any(t in l_code.lower() or t in l_wname or t in l_lname for t in ['leave', 'sick', 'annual', 'vacation', 'إجازة', 'مرضي', 'سنوي'])
+                    any(t in l_code.lower() or t in l_wname or t in l_lname for t in ['leave', 'sick', 'annual', 'vacation', 'unpaid', 'إجازة', 'مرضي', 'سنوي', 'بدون'])
                 )
                 is_non_leave = (
-                    l_code in ['WORK100', 'A', 'ATTENDANCE', 'OUT', 'OUTCON', 'OUT_OF_CONTRACT', 'ABSENT', 'ABS', 'UNPAID', 'OVERTIME', 'EXTRA', 'TRV', 'TRAVEL', 'ARS', 'REST'] or
+                    l_code in ['WORK100', 'A', 'ATTENDANCE', 'OUT', 'OUTCON', 'OUT_OF_CONTRACT', 'ABSENT', 'ABS', 'OVERTIME', 'EXTRA', 'TRV', 'TRAVEL', 'ARS', 'REST'] or
                     'attendance' in l_wname or 'absent' in l_wname or 'out of contract' in l_lname or 'travel' in l_wname or 'سفر' in l_wname or 'rest' in l_wname
                 )
                 if is_leave_type and not is_non_leave:
@@ -1009,7 +982,38 @@ class HrPayslip(models.Model):
                         line['amount'] = round(total_net_extra_hrs * hourly_rate, 3)
                         filtered_lines.append(line)
 
-                elif code in ['LEAVE500', 'UNPAID', 'ABSENT', 'ABS', 'OUT'] or 'absent' in we_name:
+                elif code in ['LEAVE500', 'UNPAID', 'UNP'] or 'unpaid' in we_name or 'بدون' in we_name:
+                    if 'UNPAID' in added_categories:
+                        continue
+                    added_categories.add('UNPAID')
+                    WEModel = self.env['hr.work.entry']
+                    unpaid_we_domain = [
+                        ('employee_id', '=', emp.id),
+                        ('state', '!=', 'cancelled'),
+                        '|', '|',
+                        ('work_entry_type_id.code', 'in', ['UNPAID', 'LEAVE500', 'UNP']),
+                        ('work_entry_type_id.display_code', 'in', ['UNPAID', 'LEAVE500', 'UNP']),
+                        ('work_entry_type_id.name', 'ilike', 'Unpaid'),
+                    ]
+                    if 'date' in WEModel._fields:
+                        unpaid_we_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
+                    elif 'date_start' in WEModel._fields:
+                        unpaid_we_domain += [
+                            ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                            ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                        ]
+                    unpaid_entries = WEModel.sudo().search(unpaid_we_domain)
+                    actual_unpaid_hrs = round(sum(getattr(we, 'duration', 8.0) or 8.0 for we in unpaid_entries), 2)
+                    unpaid_days = line.get('number_of_days', 0.0) or round(actual_unpaid_hrs / 8.0, 2) if actual_unpaid_hrs > 0 else line.get('number_of_days', 0.0)
+
+                    if unpaid_days > 0.01 or actual_unpaid_hrs > 0.01:
+                        line['number_of_hours'] = actual_unpaid_hrs if actual_unpaid_hrs > 0 else round(unpaid_days * 8.0, 2)
+                        line['number_of_days'] = unpaid_days
+                        daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
+                        line['amount'] = round(unpaid_days * daily_rate, 3)
+                        filtered_lines.append(line)
+
+                elif code in ['ABSENT', 'ABS'] or 'absent' in we_name:
                     if 'ABSENT' in added_categories:
                         continue
                     added_categories.add('ABSENT')
@@ -1021,17 +1025,16 @@ class HrPayslip(models.Model):
                     ]
                     if abs_type_obj:
                         absent_we_domain += [
-                            '|', '|', '|',
+                            '|', '|',
                             ('work_entry_type_id', '=', abs_type_obj.id),
-                            ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS', 'OUT', 'UNPAID', 'LEAVE500']),
-                            ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS', 'OUT']),
+                            ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS']),
                             ('work_entry_type_id.name', 'ilike', 'Absent'),
                         ]
                     else:
                         absent_we_domain += [
                             '|', '|',
-                            ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS', 'OUT', 'UNPAID', 'LEAVE500']),
-                            ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS', 'OUT']),
+                            ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS']),
+                            ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS']),
                             ('work_entry_type_id.name', 'ilike', 'Absent'),
                         ]
 
@@ -1039,7 +1042,7 @@ class HrPayslip(models.Model):
                         absent_we_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
                     elif 'date_start' in WEModel._fields:
                         absent_we_domain += [
-                            ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                            ('date_start', '>=', datetime.combine(payslip.date_from, datetime.time.min)),
                             ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
                         ]
                     absent_entries = WEModel.sudo().search(absent_we_domain)
@@ -1048,7 +1051,8 @@ class HrPayslip(models.Model):
                     if actual_absent_hrs > 0.01:
                         line['number_of_hours'] = actual_absent_hrs
                         line['number_of_days'] = round(actual_absent_hrs / 8.0, 2)
-                        line['amount'] = round(actual_absent_hrs * hourly_rate, 3)
+                        daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
+                        line['amount'] = round(round(actual_absent_hrs / 8.0, 2) * daily_rate, 3)
                         filtered_lines.append(line)
 
                     if rem_cash_deduction_hrs > 0.01:
@@ -1181,14 +1185,7 @@ class HrPayslip(models.Model):
         if leave_type_name == 'Extra Hours':
             leave_types = LeaveType.search(comp_domain + ['|', '|', ('name', '=', 'Extra Hours'), ('name', 'ilike', 'Extra Hours'), ('name', 'ilike', 'إضافي')])
         elif leave_type_name == 'Annual Leave':
-            leave_types = self._fap_get_annual_leave_type()
-            if not leave_types:
-                raise UserError(_(
-                    "Please set the \"Reconciliation Annual Leave Type\" in Payroll > Configuration > Settings "
-                    "before confirming payslip %(slip)s (company %(company)s).",
-                    slip=self.display_name,
-                    company=company.name,
-                ))
+            leave_types = LeaveType.search(comp_domain + ['|', '|', ('name', '=', 'Annual Leave'), ('name', 'ilike', 'Annual Leave'), ('name', 'ilike', 'سنوي')])
         else:
             leave_types = LeaveType.search(comp_domain + [('name', '=', leave_type_name)])
 
