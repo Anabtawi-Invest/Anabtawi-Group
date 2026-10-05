@@ -1982,3 +1982,12 @@ class HrPayslip(models.Model):
             ('status', '=', 'approved'),
         ])
         return max(0.0, sum(lines.mapped('duration')))
+
+    def _action_create_account_move(self):
+        """Group payslips by company before creating accounting entries to prevent multi-company ensure_one errors."""
+        slips_by_company = defaultdict(lambda: self.env['hr.payslip'])
+        for slip in self:
+            slips_by_company[slip.company_id] |= slip
+
+        for company, slips in slips_by_company.items():
+            super(HrPayslip, slips)._action_create_account_move()
