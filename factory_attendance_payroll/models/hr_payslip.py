@@ -1004,27 +1004,20 @@ class HrPayslip(models.Model):
                     absent_we_domain = [
                         ('employee_id', '=', emp.id),
                         ('state', '!=', 'cancelled'),
+                        '|', '|',
+                        ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS']),
+                        ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS']),
+                        ('work_entry_type_id.name', '=ilike', 'Absent'),
                     ]
                     if abs_type_obj:
-                        absent_we_domain += [
-                            '|', '|',
-                            ('work_entry_type_id', '=', abs_type_obj.id),
-                            ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS']),
-                            ('work_entry_type_id.name', 'ilike', 'Absent'),
-                        ]
-                    else:
-                        absent_we_domain += [
-                            '|', '|',
-                            ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS']),
-                            ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS']),
-                            ('work_entry_type_id.name', 'ilike', 'Absent'),
-                        ]
+                        absent_we_domain.insert(3, ('work_entry_type_id', '=', abs_type_obj.id))
+                        absent_we_domain.insert(3, '|')
 
                     if 'date' in WEModel._fields:
                         absent_we_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
                     elif 'date_start' in WEModel._fields:
                         absent_we_domain += [
-                            ('date_start', '>=', datetime.combine(payslip.date_from, datetime.time.min)),
+                            ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
                             ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
                         ]
                     absent_entries = WEModel.sudo().search(absent_we_domain)
@@ -1057,6 +1050,42 @@ class HrPayslip(models.Model):
                         continue
                     added_categories.add(line_key)
                     filtered_lines.append(line)
+
+            if 'ABSENT' not in added_categories:
+                WEModel = self.env['hr.work.entry']
+                abs_type_obj = emp._get_absent_work_entry_type() if hasattr(emp, '_get_absent_work_entry_type') else False
+                absent_we_domain = [
+                    ('employee_id', '=', emp.id),
+                    ('state', '!=', 'cancelled'),
+                    '|', '|',
+                    ('work_entry_type_id.code', 'in', ['ABSENT', 'ABS']),
+                    ('work_entry_type_id.display_code', 'in', ['ABSENT', 'ABS']),
+                    ('work_entry_type_id.name', '=ilike', 'Absent'),
+                ]
+                if abs_type_obj:
+                    absent_we_domain.insert(3, ('work_entry_type_id', '=', abs_type_obj.id))
+                    absent_we_domain.insert(3, '|')
+                if 'date' in WEModel._fields:
+                    absent_we_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
+                elif 'date_start' in WEModel._fields:
+                    absent_we_domain += [
+                        ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                        ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                    ]
+                absent_entries = WEModel.sudo().search(absent_we_domain)
+                actual_absent_hrs = round(sum(getattr(we, 'duration', 8.0) or 8.0 for we in absent_entries), 2)
+                if actual_absent_hrs > 0.01:
+                    added_categories.add('ABSENT')
+                    daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
+                    filtered_lines.append({
+                        'name': abs_type_obj.name if abs_type_obj else 'Absent',
+                        'code': 'ABSENT',
+                        'work_entry_type_id': abs_type_obj.id if abs_type_obj else False,
+                        'number_of_hours': actual_absent_hrs,
+                        'number_of_days': round(actual_absent_hrs / 8.0, 2),
+                        'amount': round(round(actual_absent_hrs / 8.0, 2) * daily_rate, 3),
+                        'sequence': 25,
+                    })
 
             res = filtered_lines
         return res

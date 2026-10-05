@@ -12,7 +12,7 @@ _logger = logging.getLogger(__name__)
 EXCUSED_LEAVE_WORK_ENTRY_CODES = [
     "GTO", "CTO", "HW", "STO", "PTO", "SIK", "ANU", "PHD", "BFV", "HIL",
     "FWS", "DIE", "MRD", "NPO", "PID", "HAJ", "MAM", "LDO", "TRV", "MKA", "BRK", "UNP", "ARS", "RST", "RESTDAY", "RestDay", "REST_DAY",
-    "LEAVE100", "LEAVE105", "WORK110", "LEAVE110", "LEAVE120", "SICKLEAVE0",
+    "LEAVE100", "LEAVE105", "WORK110", "LEAVE110", "LEAVE120", "LEAVE500", "SICKLEAVE0",
     "An_le", "un_paid", "REST", "RST", "RESTDAY", "RestDay", "REST_DAY",
     "LEAVE", "SICK", "VAC", "ANNUAL", "UNPAID", "HOLIDAY", "REST_DAY", "RESTDAY", "RestDay",
 ]
@@ -269,11 +269,10 @@ class HrEmployee(models.Model):
             code = (type_obj.code or "").strip().upper()
             display_code = (getattr(type_obj, "display_code", False) or "").strip().upper()
             name = (type_obj.name or "").strip().upper()
-            is_absent = (type_obj.id == absent_type.id) if 'absent_type' in locals() else False
+            is_absent = (type_obj.id == absent_type.id) if 'absent_type' in locals() and absent_type else False
             if not is_absent:
-                is_absent = code in ["ABSENT", "ABS", "OUT"] or display_code in ["ABSENT", "ABS", "OUT"]
-            if not is_absent and (type_obj.is_leave or code in EXCUSED_LEAVE_WORK_ENTRY_CODES or display_code in EXCUSED_LEAVE_WORK_ENTRY_CODES or \
-               any(c in code or c in display_code or c in name for c in ["RST", "RESTDAY", "REST_DAY"])):
+                is_absent = code in ["ABSENT", "ABS"] or display_code in ["ABSENT", "ABS"] or name == "ABSENT"
+            if not is_absent:
                 we_date = getattr(we, "date", False) or (we.date_start.date() if hasattr(we, "date_start") and we.date_start else False)
                 if isinstance(we_date, datetime):
                     we_date = we_date.date()
@@ -358,7 +357,6 @@ class HrEmployee(models.Model):
         day_domain = [
             ("employee_id", "=", self.id),
             ("state", "!=", "cancelled"),
-            ("work_entry_type_id.is_leave", "=", False),
         ]
         if "date" in work_entry_model._fields:
             day_domain += [("date", "=", target_date)]
@@ -373,6 +371,11 @@ class HrEmployee(models.Model):
         t_stop = t_start + timedelta(hours=dur)
 
         if existing_work_entries:
+            non_absent = existing_work_entries.filtered(
+                lambda we: we.work_entry_type_id and (we.work_entry_type_id.code or '').strip().upper() not in ["ABSENT", "ABS"] and (not absent_type or we.work_entry_type_id.id != absent_type.id)
+            )
+            if non_absent:
+                return
             editable_work_entries = existing_work_entries.filtered(lambda we: we.state != "validated")
             if editable_work_entries:
                 update_vals = {"work_entry_type_id": absent_type.id, "duration": dur}
