@@ -785,7 +785,29 @@ class HrPayslip(models.Model):
             elif attendances:
                 regular_physical_days = float(len(set(att.check_in.date() for att in attendances if att.check_in)))
             else:
-                regular_physical_days = round(total_regular_attendance_hrs / 8.0, 2) if total_regular_attendance_hrs > 0 else 0.0
+                WEModel = self.env['hr.work.entry']
+                att_we_domain = [
+                    ('employee_id', '=', emp.id),
+                    ('state', '!=', 'cancelled'),
+                    '|', '|',
+                    ('work_entry_type_id.code', 'in', ['WORK100', 'WORK1000', 'ATTENDANCE', 'ATTD']),
+                    ('work_entry_type_id.display_code', 'in', ['WORK100', 'WORK1000', 'ATTENDANCE', 'ATTD']),
+                    ('work_entry_type_id.name', 'ilike', 'Attendance'),
+                ]
+                if 'date' in WEModel._fields:
+                    att_we_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
+                elif 'date_start' in WEModel._fields:
+                    att_we_domain += [
+                        ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                        ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                    ]
+                att_entries = WEModel.sudo().search(att_we_domain)
+                if att_entries:
+                    att_we_dates = set(getattr(we, 'date', we.date_start.date() if getattr(we, 'date_start', None) else None) for we in att_entries)
+                    att_we_dates = set(d for d in att_we_dates if d and payslip.date_from <= d <= payslip.date_to and d not in holiday_dates)
+                    regular_physical_days = float(len(att_we_dates))
+                else:
+                    regular_physical_days = round(total_regular_attendance_hrs / 8.0, 2) if total_regular_attendance_hrs > 0 else 0.0
 
             c_start = payslip.date_from
             c_end = payslip.date_to
@@ -813,8 +835,10 @@ class HrPayslip(models.Model):
                 or getattr(cal, 'flexible', False)
                 or getattr(emp, 'flexible_hours', False)
                 or (work_station in ['factory', 'retail'])
+                or not cal
             )
-            if is_flexible and work_station != 'headoffice':
+
+            if is_flexible or work_station != 'headoffice':
                 earned_rest_days = int(regular_physical_days // 6)
                 worked_rest_days = 0
                 unpunched_rest_days = earned_rest_days
@@ -834,9 +858,13 @@ class HrPayslip(models.Model):
 
             covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
             covered_lateness_days = covered_lateness_hours / 8.0
-            final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
-            if active_period_days > 0 and final_attendance_days > active_period_days:
-                final_attendance_days = active_period_days
+
+            if is_flexible or work_station != 'headoffice':
+                final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
+            else:
+                final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days + covered_lateness_days
+                if active_period_days > 0 and final_attendance_days > active_period_days:
+                    final_attendance_days = active_period_days
 
             computed_attendance_days = float(round(final_attendance_days))
 
@@ -1044,6 +1072,21 @@ class HrPayslip(models.Model):
                         continue
                     added_categories.add(line_key)
                     filtered_lines.append(line)
+
+            if 'ATTENDANCE' not in added_categories and net_computed_attendance_days > 0.01:
+                added_categories.add('ATTENDANCE')
+                att_type_obj = self.env['hr.work.entry.type'].sudo().search([
+                    '|', ('code', 'in', ['WORK100', 'ATTENDANCE']), ('name', 'ilike', 'Attendance')
+                ], limit=1)
+                filtered_lines.append({
+                    'name': att_type_obj.name if att_type_obj else 'Attendance',
+                    'code': att_type_obj.code if att_type_obj else 'WORK100',
+                    'work_entry_type_id': att_type_obj.id if att_type_obj else False,
+                    'number_of_hours': total_regular_attendance_hrs if total_regular_attendance_hrs > 0 else round(net_computed_attendance_days * 8.0, 2),
+                    'number_of_days': net_computed_attendance_days,
+                    'amount': round((total_regular_attendance_hrs if total_regular_attendance_hrs > 0 else net_computed_attendance_days * 8.0) * hourly_rate, 3),
+                    'sequence': 1,
+                })
 
             if 'ABSENT' not in added_categories:
                 WEModel = self.env['hr.work.entry']
