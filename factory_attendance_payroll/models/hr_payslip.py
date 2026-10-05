@@ -1075,9 +1075,9 @@ class HrPayslip(models.Model):
                         calc_unpaid = unpaid_days if 'unpaid_days' in locals() else 0.0
                         calc_trv = travel_days_count if 'travel_days_count' in locals() else 0.0
                         out_of_contract_days = 0.0
-                        emp_contract = payslip.contract_id or (getattr(emp, 'contract_id', None)) or (emp.contract_ids[0] if getattr(emp, 'contract_ids', None) else None)
-                        c_start = getattr(emp_contract, 'date_start', None)
-                        c_end = getattr(emp_contract, 'date_end', None)
+                        emp_contract = (getattr(payslip, 'contract_id', None)) or (getattr(emp, 'contract_id', None)) or (self.env['hr.contract'].sudo().search([('employee_id', '=', emp.id), ('state', 'in', ['open', 'close'])], limit=1) if 'hr.contract' in self.env else None)
+                        c_start = getattr(emp_contract, 'date_start', None) if emp_contract else None
+                        c_end = getattr(emp_contract, 'date_end', None) if emp_contract else None
                         if c_start and c_start > payslip.date_from:
                             out_of_contract_days += (min(c_start, payslip.date_to + datetime.timedelta(days=1)) - payslip.date_from).days
                         if c_end and c_end < payslip.date_to:
@@ -1156,9 +1156,9 @@ class HrPayslip(models.Model):
                 calc_unpaid = unpaid_days if 'unpaid_days' in locals() else 0.0
                 calc_trv = travel_days_count if 'travel_days_count' in locals() else 0.0
                 out_of_contract_days = 0.0
-                emp_contract = payslip.contract_id or (getattr(emp, 'contract_id', None)) or (emp.contract_ids[0] if getattr(emp, 'contract_ids', None) else None)
-                c_start = getattr(emp_contract, 'date_start', None)
-                c_end = getattr(emp_contract, 'date_end', None)
+                emp_contract = (getattr(payslip, 'contract_id', None)) or (getattr(emp, 'contract_id', None)) or (self.env['hr.contract'].sudo().search([('employee_id', '=', emp.id), ('state', 'in', ['open', 'close'])], limit=1) if 'hr.contract' in self.env else None)
+                c_start = getattr(emp_contract, 'date_start', None) if emp_contract else None
+                c_end = getattr(emp_contract, 'date_end', None) if emp_contract else None
                 if c_start and c_start > payslip.date_from:
                     out_of_contract_days += (min(c_start, payslip.date_to + datetime.timedelta(days=1)) - payslip.date_from).days
                 if c_end and c_end < payslip.date_to:
