@@ -44,9 +44,19 @@ patch(PosStore.prototype, {
     },
 
     startLocalBackup() {
-        if (!this.isLocalBackupEnabled || this.localBackup) {
+        if (this.localBackup) {
             return;
         }
+        if (!this.isLocalBackupEnabled) {
+            console.info(
+                `[LOCAL_BACKUP] disabled on POS config "${this.config?.name}" ` +
+                    `(local_backup_enabled=${Boolean(this.config?.local_backup_enabled)}, ` +
+                    `url=${this.config?.local_backup_url ? "set" : "missing"}, ` +
+                    `api_key=${this.config?.local_backup_api_key ? "set" : "missing"})`
+            );
+            return;
+        }
+        console.info(`[LOCAL_BACKUP] enabled - sending orders to ${this.config.local_backup_url}`);
         this.localBackup = {
             signatures: new Map(),
             deletedQueue: [],
