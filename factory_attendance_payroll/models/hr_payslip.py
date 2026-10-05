@@ -780,16 +780,33 @@ class HrPayslip(models.Model):
 
             # Pre-compute final attendance days for the period
             computed_attendance_days = 0.0
-            if total_regular_attendance_hrs > 0.01:
+            if regular_attendances or attendances or 'hr.work.entry' in self.env or total_regular_attendance_hrs > 0.01:
                 if regular_attendances:
                     regular_physical_days = len(set(att.check_in.date() for att in regular_attendances if att.check_in))
                 else:
-                    regular_physical_days = round(total_regular_attendance_hrs / 8.0, 2)
-
-                if attendances:
-                    total_physical_days = len(set(att.check_in.date() for att in attendances if att.check_in))
-                else:
-                    total_physical_days = regular_physical_days
+                    WEModel = self.env['hr.work.entry']
+                    we_att_domain = [
+                        ('employee_id', '=', emp.id),
+                        ('state', '!=', 'cancelled'),
+                        '|', '|',
+                        ('work_entry_type_id.code', 'in', ['WORK100', 'ATTENDANCE', 'A', 'ATTD', 'WORK']),
+                        ('work_entry_type_id.display_code', 'in', ['WORK100', 'ATTENDANCE', 'A', 'ATTD', 'WORK']),
+                        ('work_entry_type_id.name', 'ilike', 'Attendance'),
+                    ]
+                    if 'date' in WEModel._fields:
+                        we_att_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
+                    elif 'date_start' in WEModel._fields:
+                        we_att_domain += [
+                            ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                            ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                        ]
+                    att_entries = WEModel.sudo().search(we_att_domain)
+                    we_att_dates = set()
+                    for we in att_entries:
+                        d = getattr(we, 'date', False) or (we.date_start.date() if hasattr(we, 'date_start') and we.date_start else False)
+                        if d and payslip.date_from <= d <= payslip.date_to:
+                            we_att_dates.add(d)
+                    regular_physical_days = float(len(we_att_dates)) if we_att_dates else (round(total_regular_attendance_hrs / 8.0, 2) if total_regular_attendance_hrs > 0 else 0.0)
 
                 c_start = payslip.date_from
                 c_end = payslip.date_to
@@ -915,15 +932,15 @@ class HrPayslip(models.Model):
                     line['amount'] = round(trv_days * daily_rate, 3)
                     filtered_lines.append(line)
 
-                elif code in ['WORK100', 'A', 'ATTENDANCE'] or 'attendance' in we_name:
+                elif code in ['WORK100', 'A', 'ATTENDANCE', 'ATTD', 'WORK', 'FULL', 'STD'] or any(term in we_name or term in line_name for term in ['attendance', 'work', 'حضور', 'عمل']):
                     if 'ATTENDANCE' in added_categories:
                         continue
                     added_categories.add('ATTENDANCE')
+                    line['number_of_days'] = net_computed_attendance_days
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
-                        line['number_of_days'] = net_computed_attendance_days
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
-                        filtered_lines.append(line)
+                    filtered_lines.append(line)
 
                 elif code in ['OUT', 'OUTCON', 'OUT_OF_CONTRACT'] or 'out of contract' in line_name or 'out of contract' in we_name:
                     if 'OUT_OF_CONTRACT' in added_categories:
