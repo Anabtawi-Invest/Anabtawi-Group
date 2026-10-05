@@ -307,9 +307,25 @@ class HrEmployee(models.Model):
 
             for employee in self:
                 candidate_unpunched_days = []
+                emp_contracts = cached_contracts.get(employee.id, [])
+                c_vers = employee._get_versions_with_contract_overlap_with_period(m_from, m_to) if hasattr(employee, '_get_versions_with_contract_overlap_with_period') else []
+                active_contracts = c_vers or emp_contracts
+
                 current = m_from
                 while current <= eval_to:
                     emp_key = (employee.id, current)
+
+                    # Out of Contract -> No absence (do not count days before contract start or after contract end as absent)
+                    is_covered = any(
+                        (getattr(c, 'date_start', None) and c.date_start <= current) and
+                        (not getattr(c, 'date_end', None) or c.date_end >= current)
+                        for c in active_contracts
+                    ) if active_contracts else True
+
+                    if not is_covered:
+                        employee._remove_absence_for_day(current, absent_type)
+                        current += timedelta(days=1)
+                        continue
 
                     # Public Holiday -> No absence
                     if current in public_holiday_dates:
@@ -337,14 +353,6 @@ class HrEmployee(models.Model):
 
                     candidate_unpunched_days.append((current, expected_hours))
                     current += timedelta(days=1)
-
-                emp_contracts = cached_contracts.get(employee.id, [])
-                c_vers = employee._get_versions_with_contract_overlap_with_period(m_from, m_to) if hasattr(employee, '_get_versions_with_contract_overlap_with_period') else []
-                c_starts = [c.date_start for c in c_vers if getattr(c, 'date_start', None)] or [c.date_start for c in emp_contracts if getattr(c, 'date_start', None)]
-                c_ends = [c.date_end for c in c_vers if getattr(c, 'date_end', None)] or [c.date_end for c in emp_contracts if getattr(c, 'date_end', None)]
-
-                c_start = max(c_starts) if c_starts else m_from
-                c_end = min(c_ends) if c_ends else m_to
 
                 is_flexible = getattr(employee.resource_calendar_id, 'flexible_hours', False) or getattr(employee, 'flexible_hours', False)
                 work_station = getattr(employee, 'employee_work_station', False) or 'factory'
