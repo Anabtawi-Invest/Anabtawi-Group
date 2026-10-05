@@ -310,16 +310,19 @@ class HrEmployee(models.Model):
 
                     # Public Holiday -> No absence
                     if current in public_holiday_dates:
+                        employee._remove_absence_for_day(current, absent_type)
                         current += timedelta(days=1)
                         continue
 
                     # Has check-in -> No absence
                     if emp_key in checked_in_keys:
+                        employee._remove_absence_for_day(current, absent_type)
                         current += timedelta(days=1)
                         continue
 
-                    # Has approved leave / time off -> No absence
+                    # Has approved leave / time off (Unpaid, Sick, Annual, etc.) -> No absence
                     if emp_key in approved_leave_keys:
+                        employee._remove_absence_for_day(current, absent_type)
                         current += timedelta(days=1)
                         continue
 
