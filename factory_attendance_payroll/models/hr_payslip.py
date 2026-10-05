@@ -780,35 +780,12 @@ class HrPayslip(models.Model):
 
             # Pre-compute final attendance days for the period
             computed_attendance_days = 0.0
-            att_dates = set()
             if regular_attendances:
-                att_dates |= set(att.check_in.date() for att in regular_attendances if att.check_in)
-
-            if 'hr.work.entry' in self.env:
-                WEModel = self.env['hr.work.entry']
-                we_att_domain = [
-                    ('employee_id', '=', emp.id),
-                    ('state', '!=', 'cancelled'),
-                    '|', '|', '|',
-                    ('work_entry_type_id.code', 'in', ['WORK100', 'WORK1000', 'ATTENDANCE', 'A', 'ATTD', 'WORK', 'FULL', 'STD']),
-                    ('work_entry_type_id.display_code', 'in', ['WORK100', 'WORK1000', 'ATTENDANCE', 'A', 'ATTD', 'WORK', 'FULL', 'STD']),
-                    ('work_entry_type_id.name', 'ilike', 'Attendance'),
-                    ('work_entry_type_id.name', 'ilike', 'حضور'),
-                ]
-                if 'date' in WEModel._fields:
-                    we_att_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
-                elif 'date_start' in WEModel._fields:
-                    we_att_domain += [
-                        ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
-                        ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
-                    ]
-                att_entries = WEModel.sudo().search(we_att_domain)
-                for we in att_entries:
-                    d = getattr(we, 'date', False) or (we.date_start.date() if hasattr(we, 'date_start') and we.date_start else False)
-                    if d and payslip.date_from <= d <= payslip.date_to:
-                        att_dates.add(d)
-
-            regular_physical_days = float(len(att_dates)) if att_dates else (round(total_regular_attendance_hrs / 8.0, 2) if total_regular_attendance_hrs > 0 else 0.0)
+                regular_physical_days = float(len(set(att.check_in.date() for att in regular_attendances if att.check_in)))
+            elif attendances:
+                regular_physical_days = float(len(set(att.check_in.date() for att in attendances if att.check_in)))
+            else:
+                regular_physical_days = round(total_regular_attendance_hrs / 8.0, 2) if total_regular_attendance_hrs > 0 else 0.0
 
             c_start = payslip.date_from
             c_end = payslip.date_to
