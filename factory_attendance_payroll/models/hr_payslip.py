@@ -420,6 +420,11 @@ class HrPayslip(models.Model):
 
         self._convert_flexible_rest_days_to_ars()
 
+        # Force refresh worked day lines on draft payslips to wipe stale database records
+        for slip in self:
+            if slip.state == 'draft':
+                slip.worked_days_line_ids.sudo().unlink()
+
         res = super().compute_sheet()
         self.write({'is_reconciled': True})
         return res
