@@ -11,35 +11,35 @@ class HrAttendance(models.Model):
     attendance_break_hours = fields.Float(
         string="Lunch Break Deducted",
         compute="_compute_factory_attendance_metrics",
-        store=True,
+        store=False,
         help="Break hours deducted (1.0h for Factory/Retail, 0.5h for Head Office)."
     )
 
     net_worked_hours = fields.Float(
         string="Net Worked Hours",
         compute="_compute_factory_attendance_metrics",
-        store=True,
+        store=False,
         help="Net worked hours after lunch break deduction."
     )
 
     daily_undertime_hours = fields.Float(
         string="Daily Lateness (Deduction)",
         compute="_compute_factory_attendance_metrics",
-        store=True,
+        store=False,
         help="Hours short of daily shift target (deducted after 15m grace period)."
     )
 
     daily_overtime_hours = fields.Float(
         string="Daily Extra Hours",
         compute="_compute_factory_attendance_metrics",
-        store=True,
+        store=False,
         help="Hours worked beyond daily shift target (eligible after 45m threshold)."
     )
 
     daily_variance_hours = fields.Float(
         string="Daily Variance (Net)",
         compute="_compute_factory_attendance_metrics",
-        store=True,
+        store=False,
         help="Net daily variance: positive for overtime, negative for lateness."
     )
 
