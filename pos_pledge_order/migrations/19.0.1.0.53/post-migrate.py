@@ -18,16 +18,23 @@ def migrate(cr, version):
         return
 
     # Active pledges must not stay linked to REFUND pos orders.
+    # pos.order.refunded_order_id is not stored: resolve the origin through refunded order lines.
     cr.execute(
         """
         UPDATE pos_advance_order_pledge pl
-           SET pos_order_id = po.refunded_order_id,
+           SET pos_order_id = origin.origin_order_id,
                return_pos_order_id = NULL
-          FROM pos_order po
+          FROM (
+                SELECT rl.order_id AS refund_order_id,
+                       MIN(ol.order_id) AS origin_order_id
+                  FROM pos_order_line rl
+                  JOIN pos_order_line ol ON ol.id = rl.refunded_orderline_id
+                 GROUP BY rl.order_id
+               ) origin
+          JOIN pos_order po ON po.id = origin.refund_order_id
          WHERE pl.pos_order_id = po.id
            AND pl.state = 'active'
            AND po.is_refund IS TRUE
-           AND po.refunded_order_id IS NOT NULL
         """
     )
     relinked = cr.rowcount
