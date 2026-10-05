@@ -1074,16 +1074,23 @@ class HrPayslip(models.Model):
                         total_calendar_days = float((payslip.date_to - payslip.date_from).days + 1)
                         calc_unpaid = unpaid_days if 'unpaid_days' in locals() else 0.0
                         calc_trv = travel_days_count if 'travel_days_count' in locals() else 0.0
-                        max_possible_absent = max(0.0, total_calendar_days - net_computed_attendance_days - calc_unpaid - calc_trv)
+                        out_of_contract_days = 0.0
+                        c_start = emp.contract_id.date_start if emp.contract_id else None
+                        c_end = emp.contract_id.date_end if emp.contract_id else None
+                        if c_start and c_start > payslip.date_from:
+                            out_of_contract_days += (min(c_start, payslip.date_to + datetime.timedelta(days=1)) - payslip.date_from).days
+                        if c_end and c_end < payslip.date_to:
+                            out_of_contract_days += (payslip.date_to - max(c_end, payslip.date_from - datetime.timedelta(days=1))).days
+                        max_possible_absent = max(0.0, total_calendar_days - net_computed_attendance_days - calc_unpaid - calc_trv - out_of_contract_days)
                         raw_abs_days = round(actual_absent_hrs / 8.0, 2)
-                        final_abs_days = min(raw_abs_days, max_possible_absent) if raw_abs_days > 0 else max_possible_absent
-                        abs_hrs = round(final_abs_days * 8.0, 2)
-                        daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
-
-                        line['number_of_hours'] = abs_hrs
-                        line['number_of_days'] = final_abs_days
-                        line['amount'] = round(final_abs_days * daily_rate, 3)
-                        filtered_lines.append(line)
+                        final_abs_days = min(raw_abs_days, max_possible_absent) if raw_abs_days > 0 else 0.0
+                        if final_abs_days > 0.01:
+                            abs_hrs = round(final_abs_days * 8.0, 2)
+                            daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
+                            line['number_of_hours'] = abs_hrs
+                            line['number_of_days'] = final_abs_days
+                            line['amount'] = round(final_abs_days * daily_rate, 3)
+                            filtered_lines.append(line)
 
                     if rem_cash_deduction_hrs > 0.01:
                         lat_type = self.env['hr.work.entry.type'].sudo().search([
@@ -1147,9 +1154,16 @@ class HrPayslip(models.Model):
                 total_calendar_days = float((payslip.date_to - payslip.date_from).days + 1)
                 calc_unpaid = unpaid_days if 'unpaid_days' in locals() else 0.0
                 calc_trv = travel_days_count if 'travel_days_count' in locals() else 0.0
-                max_possible_absent = max(0.0, total_calendar_days - net_computed_attendance_days - calc_unpaid - calc_trv)
+                out_of_contract_days = 0.0
+                c_start = emp.contract_id.date_start if emp.contract_id else None
+                c_end = emp.contract_id.date_end if emp.contract_id else None
+                if c_start and c_start > payslip.date_from:
+                    out_of_contract_days += (min(c_start, payslip.date_to + datetime.timedelta(days=1)) - payslip.date_from).days
+                if c_end and c_end < payslip.date_to:
+                    out_of_contract_days += (payslip.date_to - max(c_end, payslip.date_from - datetime.timedelta(days=1))).days
+                max_possible_absent = max(0.0, total_calendar_days - net_computed_attendance_days - calc_unpaid - calc_trv - out_of_contract_days)
                 raw_abs_days = round(actual_absent_hrs / 8.0, 2)
-                final_abs_days = min(raw_abs_days, max_possible_absent) if raw_abs_days > 0 else max_possible_absent
+                final_abs_days = min(raw_abs_days, max_possible_absent) if raw_abs_days > 0 else 0.0
                 if final_abs_days > 0.01:
                     added_categories.add('ABSENT')
                     daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
