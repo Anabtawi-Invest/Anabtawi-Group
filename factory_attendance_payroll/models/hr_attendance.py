@@ -48,6 +48,11 @@ class HrAttendance(models.Model):
         default=False
     )
 
+    def write(self, vals):
+        ctx = dict(self.env.context)
+        ctx['skip_work_entry_check'] = True
+        return super(HrAttendance, self.with_context(ctx)).write(vals)
+
     def _get_public_holiday_dates_batch(self, min_date, max_date, calendar_id=None):
         """
         Ultra-fast single-query batch loader for all public holidays / global leaves
