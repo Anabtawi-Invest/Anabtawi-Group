@@ -349,18 +349,15 @@ class HrEmployee(models.Model):
                 rest_dates_to_skip = set()
                 if is_flexible or work_station != 'headoffice':
                     target_weekday = 0 if work_station == 'factory' else 4
-                    total_month_days = (m_to - m_from).days + 1
-                    rest_quota = sum(1 for d_idx in range(total_month_days) if (m_from + timedelta(days=d_idx)).weekday() == target_weekday)
-                    if rest_quota <= 0:
-                        rest_quota = 4
+                    emp_checkins = sum(1 for (e_id, d) in checked_in_keys if e_id == employee.id and m_from <= d <= m_to)
+                    month_target_weekdays = sum(1 for d_idx in range((m_to - m_from).days + 1) if (m_from + timedelta(days=d_idx)).weekday() == target_weekday)
+                    earned_rest_days = min(month_target_weekdays, emp_checkins // 6) if emp_checkins > 0 else month_target_weekdays
 
-                    # Priority 1: Unpunched target weekdays (Mondays for Factory, Fridays for Retail)
                     primary_rest = [d for (d, h) in candidate_unpunched_days if d.weekday() == target_weekday]
-                    selected_rest = list(primary_rest[:rest_quota])
+                    selected_rest = list(primary_rest[:earned_rest_days])
 
-                    # Priority 2: Compensatory Rest Days if employee worked on target weekdays
-                    if len(selected_rest) < rest_quota:
-                        needed = rest_quota - len(selected_rest)
+                    if len(selected_rest) < earned_rest_days:
+                        needed = earned_rest_days - len(selected_rest)
                         other_unpunched = [d for (d, h) in candidate_unpunched_days if d not in set(selected_rest)]
                         selected_rest.extend(other_unpunched[:needed])
 
