@@ -343,9 +343,42 @@ class HrEmployee(models.Model):
                 is_flexible = getattr(employee.resource_calendar_id, 'flexible_hours', False) or getattr(employee, 'flexible_hours', False)
                 work_station = getattr(employee, 'employee_work_station', False) or 'factory'
 
-                # Generate ABSENT work entries for candidate unpunched working days
+                rest_dates_to_skip = set()
+                if is_flexible or work_station != 'headoffice':
+                    emp_checkins = sum(1 for (e_id, d) in checked_in_keys if e_id == employee.id and m_from <= d <= m_to)
+                    earned_rest_days = emp_checkins // 6
+                    target_weekday = 0 if work_station == 'factory' else 4
+                    rest_day_candidates = [d for (d, h) in candidate_unpunched_days if d.weekday() == target_weekday]
+                    rest_dates_to_skip = set(rest_day_candidates[:earned_rest_days])
+                    if not rest_dates_to_skip and candidate_unpunched_days and earned_rest_days > 0:
+                        rest_dates_to_skip = set(d for (d, h) in candidate_unpunched_days[:earned_rest_days])
+
+                # Generate ABSENT work entries for candidate unpunched working days, leaving rest days empty
                 for target_date, exp_hours in candidate_unpunched_days:
-                    employee._apply_absence_for_day(target_date, exp_hours, absent_type)
+                    if target_date in rest_dates_to_skip:
+                        employee._remove_absence_for_day(target_date, absent_type)
+                    else:
+                        employee._apply_absence_for_day(target_date, exp_hours, absent_type)
+
+    def _remove_absence_for_day(self, target_date, absent_type):
+        self.ensure_one()
+        work_entry_model = self.env["hr.work.entry"].sudo()
+        day_domain = [
+            ("employee_id", "=", self.id),
+            ("state", "!=", "validated"),
+        ]
+        if "date" in work_entry_model._fields:
+            day_domain += [("date", "=", target_date)]
+        elif "date_start" in work_entry_model._fields:
+            day_domain += [
+                ("date_start", ">=", datetime.combine(target_date, time.min)),
+                ("date_start", "<=", datetime.combine(target_date, time.max)),
+            ]
+        existing_absent = work_entry_model.search(day_domain).filtered(
+            lambda we: we.work_entry_type_id and ((we.work_entry_type_id.code or '').strip().upper() in ["ABSENT", "ABS", "ARS", "REST", "RESTDAY"] or (absent_type and we.work_entry_type_id.id == absent_type.id))
+        )
+        if existing_absent:
+            existing_absent.unlink()
 
     def _apply_absence_for_day(self, target_date, duration, absent_type):
         self.ensure_one()
