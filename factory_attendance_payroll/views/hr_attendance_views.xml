@@ -71,18 +71,5 @@
         </field>
     </record>
 
-    <!-- Inherit Attendance Search/Filter View to add quick filters for Lateness and Extra Hours -->
-    <record id="hr_attendance_view_filter_inherit_factory_metrics" model="ir.ui.view">
-        <field name="name">hr.attendance.view.filter.inherit.factory.metrics</field>
-        <field name="model">hr.attendance</field>
-        <field name="inherit_id" ref="hr_attendance.hr_attendance_view_filter"/>
-        <field name="priority">99</field>
-        <field name="arch" type="xml">
-            <xpath expr="//filter[last()]" position="after">
-                <separator/>
-                <filter string="Has Lateness" name="filter_has_lateness" domain="[('daily_undertime_hours', '&gt;', 0)]"/>
-                <filter string="Has Extra Hours" name="filter_has_extra_hours" domain="[('daily_overtime_hours', '&gt;=', 0.75)]"/>
-            </xpath>
-        </field>
     </record>
 </odoo>
