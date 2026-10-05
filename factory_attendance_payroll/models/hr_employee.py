@@ -243,9 +243,12 @@ class HrEmployee(models.Model):
             for lve in leaves:
                 d_curr = lve.date_from.date()
                 d_last = lve.date_to.date()
+                we_type = lve.holiday_status_id.work_entry_type_id if lve.holiday_status_id and lve.holiday_status_id.work_entry_type_id else False
                 while d_curr <= d_last:
                     if date_from <= d_curr <= date_to:
                         approved_leave_keys.add((lve.employee_id.id, d_curr))
+                        if we_type:
+                            lve.employee_id._ensure_leave_work_entry_for_day(d_curr, we_type)
                     d_curr += timedelta(days=1)
 
         # Batch Pre-fetch 4: Leave Work Entries
@@ -389,6 +392,54 @@ class HrEmployee(models.Model):
         )
         if existing_absent:
             existing_absent.unlink()
+
+    def _ensure_leave_work_entry_for_day(self, target_date, work_entry_type):
+        self.ensure_one()
+        if not work_entry_type:
+            return
+        WEModel = self.env["hr.work.entry"].sudo()
+        day_domain = [
+            ("employee_id", "=", self.id),
+            ("state", "!=", "cancelled"),
+        ]
+        if "date" in WEModel._fields:
+            day_domain += [("date", "=", target_date)]
+        elif "date_start" in WEModel._fields:
+            day_domain += [
+                ("date_start", ">=", datetime.combine(target_date, time.min)),
+                ("date_start", "<=", datetime.combine(target_date, time.max)),
+            ]
+        existing = WEModel.search(day_domain)
+        matching_leave_we = existing.filtered(lambda w: w.work_entry_type_id and w.work_entry_type_id.id == work_entry_type.id)
+        if matching_leave_we:
+            return
+
+        absent_we = existing.filtered(
+            lambda w: w.work_entry_type_id and (w.work_entry_type_id.code or '').strip().upper() in ["ABSENT", "ABS"]
+        )
+        if absent_we:
+            absent_we.unlink()
+
+        t_start = datetime.combine(target_date, time(8, 0, 0))
+        dur_hrs = 9.0 if (work_entry_type.code or '').strip().upper() in ['UNPAID', 'LEAVE500', 'UNP'] or 'unpaid' in (work_entry_type.name or '').lower() else 8.0
+        t_stop = t_start + timedelta(hours=dur_hrs)
+        vals = {
+            "name": f"{self.name}: {work_entry_type.name}",
+            "employee_id": self.id,
+            "work_entry_type_id": work_entry_type.id,
+            "duration": dur_hrs,
+            "state": "draft",
+        }
+        if "date" in WEModel._fields:
+            vals["date"] = target_date
+        if "date_start" in WEModel._fields:
+            vals["date_start"] = t_start
+        if "date_stop" in WEModel._fields:
+            vals["date_stop"] = t_stop
+        if "company_id" in WEModel._fields:
+            vals["company_id"] = self.company_id.id if self.company_id else self.env.company.id
+
+        WEModel.create(vals)
 
     def _apply_absence_for_day(self, target_date, duration, absent_type):
         self.ensure_one()
