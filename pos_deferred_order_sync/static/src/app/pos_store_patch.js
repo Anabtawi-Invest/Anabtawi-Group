@@ -1,6 +1,8 @@
 /** @odoo-module **/
 
 import { patch } from "@web/core/utils/patch";
+import { _t } from "@web/core/l10n/translation";
+import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 
 patch(PosStore.prototype, {
@@ -164,6 +166,37 @@ patch(PosStore.prototype, {
         return await this.withDeferredOrdersFlush(() =>
             super.closingSessionNotification(...arguments)
         );
+    },
+
+    async reloadData() {
+        // Reloading wipes the browser storage, which is the only copy of held orders.
+        if (this.isDeferredOrderSyncEnabled && this.getDeferredOrders().length) {
+            const heldOrders = this.getDeferredOrders();
+            this.logDeferredSync(`reload data - sending ${heldOrders.length} held order(s) first`);
+            this.addPendingOrder(heldOrders.map((order) => order.id));
+            let error = null;
+            try {
+                await this.withDeferredOrdersFlush(() => this.syncAllOrders({ throw: true }));
+            } catch (e) {
+                error = e;
+            }
+            const remaining = this.getDeferredOrders().length;
+            if (remaining) {
+                this.logDeferredSync(
+                    `reload data CANCELLED - ${remaining} held order(s) could not be sent`,
+                    error
+                );
+                this.dialog.add(AlertDialog, {
+                    title: _t("Reload cancelled"),
+                    body: _t(
+                        "%s paid order(s) are kept only on this device until the session is closed and could not be sent to the server. Reloading now would delete them. Check the internet connection and try again.",
+                        remaining
+                    ),
+                });
+                return;
+            }
+        }
+        return await super.reloadData(...arguments);
     },
 
     async closeSession() {
