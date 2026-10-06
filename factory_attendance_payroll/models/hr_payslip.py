@@ -934,12 +934,14 @@ class HrPayslip(models.Model):
 
                 period_dates = [c_start + datetime.timedelta(days=i) for i in range(active_period_days)]
                 weekly_rest_dates = [d for d in period_dates if d.weekday() == target_wd]
-                rest_dates = [
-                    d for d in weekly_rest_dates
-                    if d not in att_dates and d not in absent_dates and d not in leave_dates and d not in holiday_dates
-                ]
+                busy_dates = att_dates | absent_dates | leave_dates | holiday_dates
+                rest_dates = [d for d in weekly_rest_dates if d not in busy_dates]
                 earned_rest_days = len(weekly_rest_dates)
                 worked_rest_days = sum(1 for d in weekly_rest_dates if d in att_dates)
+                # A worked weekly rest day is replaced by another free day in the contract period
+                replacement_dates = [d for d in period_dates if d.weekday() != target_wd and d not in busy_dates]
+                rest_dates += replacement_dates[:worked_rest_days]
+                rest_dates.sort()
                 unpunched_rest_days = len(rest_dates)
             else:
                 earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
