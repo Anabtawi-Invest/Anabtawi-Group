@@ -209,6 +209,8 @@ class HrPayslipRun(models.Model):
         key_cols = [
             (_("Net Salary"), 18),
             (_("Attendance Days"), 16),
+            (_("Absent Days"), 16),
+            (_("Lateness Days"), 16),
         ]
 
         fixed_alw_cols = [
@@ -643,6 +645,8 @@ class HrPayslipRun(models.Model):
                     days_in_period = (payslip.date_to - payslip.date_from).days + 1
                     if att_days > days_in_period:
                         att_days = days_in_period
+                absent_days = (absent_hrs / 8.0) if absent_hrs else 0.0
+                lateness_days = (lateness_hrs / 8.0) if lateness_hrs else 0.0
                 worked_hrs = sum(worked_days.mapped("number_of_hours"))
                 ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
 
@@ -682,10 +686,12 @@ class HrPayslipRun(models.Model):
                 sheet1.write(data_row, 6, period_from_val, text_center_fmt)
                 sheet1.write(data_row, 7, period_to_val, text_center_fmt)
 
-                # Write Net Salary / Attendance Days
+                # Write Net Salary / Attendance Days / Absent Days / Lateness Days
                 net_style = net_negative_fmt if net_sal < 0 else number_fmt
                 sheet1.write_number(data_row, key_start_col, net_sal, net_style)
                 sheet1.write_number(data_row, key_start_col + 1, att_days, int_fmt)
+                sheet1.write_number(data_row, key_start_col + 2, absent_days, number_fmt)
+                sheet1.write_number(data_row, key_start_col + 3, lateness_days, number_fmt)
 
                 # Write ALLOWANCE Section
                 col_curr = alw_start_col
