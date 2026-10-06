@@ -842,8 +842,9 @@ class HrPayslip(models.Model):
             c_start = payslip.date_from
             c_end = payslip.date_to
 
-            emp_contracts = self.env['hr.contract'].sudo().search([('employee_id', '=', emp.id), ('state', 'in', ['open', 'close'])]) if 'hr.contract' in self.env else self.env['hr.contract']
-            contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or (emp_contracts[:1] if emp_contracts else None) or getattr(emp, 'contract_id', None)
+            ContractModel = self.env.get('hr.contract')
+            emp_contracts = ContractModel.sudo().search([('employee_id', '=', emp.id), ('state', 'in', ['open', 'close'])]) if ContractModel is not None else []
+            contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or (emp_contracts[0] if emp_contracts else None) or getattr(emp, 'contract_id', None)
             
             first_date = getattr(emp, 'first_contract_date', None) or getattr(contract_obj, 'date_start', None)
             if not first_date and emp_contracts:
