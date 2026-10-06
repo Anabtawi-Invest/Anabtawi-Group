@@ -56,6 +56,16 @@ class HrEmployee(models.Model):
         date_from, date_to = fields.Date.to_date(date_from), fields.Date.to_date(date_to)
         if not self or not date_from or not date_to or date_from > date_to:
             return
+        exempt = self.filtered('pfr_attendance_exempt')
+        if exempt:                                      # no punching: clear any ABSENT entry, never create one
+            WE = self.env['hr.work.entry'].sudo()
+            WE.search([('employee_id', 'in', exempt.ids), ('state', '!=', 'validated')]
+                      + U.we_date_domain(WE, date_from, date_to)).filtered(
+                lambda w: w.work_entry_type_id
+                and self.env['pfr.day.ledger'].classify_type(w.work_entry_type_id) == 'ABSENT').unlink()
+            self = self - exempt
+            if not self:
+                return
         ledger = self.env['pfr.day.ledger']
         lo, hi = U.utc_bounds(date_from, date_to)
         holiday_map = ledger.public_holiday_dates(date_from, date_to)

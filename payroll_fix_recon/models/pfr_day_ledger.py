@@ -185,7 +185,8 @@ class PfrDayLedger(models.AbstractModel):
             elif kind == 'PH':
                 ph_we.add(d)
             elif kind == 'ABSENT':
-                absent[d] = absent.get(d, 0.0) + hrs
+                if not employee.pfr_attendance_exempt:      # exempt employees are never absent
+                    absent[d] = absent.get(d, 0.0) + hrs
             elif kind in ('OUT', 'REST', 'IGNORE'):
                 continue
             else:

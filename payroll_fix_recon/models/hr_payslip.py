@@ -209,7 +209,16 @@ class HrPayslip(models.Model):
                 slip.worked_days_line_ids = [(5, 0, 0)] + [(0, 0, v) for v in slip._get_worked_day_lines()]
         res = super().compute_sheet()
         slips.with_context(skip_reconcile_revert=True).write({'is_reconciled': True})
+        slips._pfr_reset_preview()
         return res
+
+    def _pfr_reset_preview(self):
+        """The side preview shows a stored PDF; drop it on draft slips so it is rebuilt from the new lines."""
+        for fname in ('payslip_file', 'payslip_pdf', 'payslip_report_file'):
+            if fname in self._fields and self._fields[fname].type == 'binary':
+                drafts = self.filtered(lambda s: s.state in ('draft', 'verify'))
+                if drafts:
+                    drafts.with_context(skip_reconcile_revert=True).sudo().write({fname: False})
 
     @api.onchange('employee_id', 'struct_id')
     def _onchange_termination_clearance(self):
