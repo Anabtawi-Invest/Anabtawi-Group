@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="hr_work_entry_type_view_form_pfr" model="ir.ui.view">
+        <field name="name">hr.work.entry.type.form.pfr</field>
+        <field name="model">hr.work.entry.type</field>
+        <field name="inherit_id" ref="hr_work_entry.hr_work_entry_type_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Payroll Fix Recon" name="pfr_pay">
+                    <field name="pfr_pay_percent"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
