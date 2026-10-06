@@ -39,10 +39,18 @@ class HrEmployee(models.Model):
 
     allow_annual_leave_lateness_deduction = fields.Boolean(
         string="Accept Annual Deduction",
-        default=False,
+        default=True,
         tracking=True,
         help="If checked, lateness hours can be deducted from the employee's Annual Leave balance. Requires uploading an approval document."
     )
+
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            UPDATE hr_employee
+               SET allow_annual_leave_lateness_deduction = TRUE
+             WHERE allow_annual_leave_lateness_deduction IS NOT TRUE;
+        """)
 
     annual_deduction_approval_document = fields.Binary(
         string="Approval Document",
