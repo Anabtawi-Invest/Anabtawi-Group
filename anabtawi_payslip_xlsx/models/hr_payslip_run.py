@@ -606,8 +606,9 @@ class HrPayslipRun(models.Model):
                         return 'lateness'
                     if (
                         code in ('OVERTIME', 'EXTRA', 'EXTRA_HOURS', 'OT', 'OTW', 'OTR', 'PHO', 'OUT', 'OUTCON',
-                                 'LEAVEUNPAID', 'UN_PAID', 'UNPAID', 'SICKLEAVE0')
-                        or any(k in text for k in ('overtime', 'extra', 'unpaid', 'بدون راتب', 'غير مدفوع'))
+                                 'OUT_OF_CONTRACT', 'LEAVEUNPAID', 'UN_PAID', 'UNPAID', 'SICKLEAVE0')
+                        or any(k in text for k in ('overtime', 'extra', 'unpaid', 'out of contract',
+                                                   'بدون راتب', 'غير مدفوع'))
                     ):
                         return 'ignore'
                     return 'paid'
