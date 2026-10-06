@@ -875,6 +875,7 @@ class HrPayslip(models.Model):
 
             active_period_days = max(0, (c_end - c_start).days + 1)
             rest_dates = []
+            worked_holiday_dates = set(att.check_in.date() for att in holiday_attendances if att.check_in)
             if is_flexible or work_station != 'headoffice':
                 target_wd = 0 if work_station == 'factory' else 4
                 WEModel = self.env['hr.work.entry']
@@ -926,6 +927,8 @@ class HrPayslip(models.Model):
                             leave_dates.add(d)
                             d += datetime.timedelta(days=1)
 
+                att_dates.update(att.check_in.date() for att in holiday_attendances if att.check_in)
+                worked_holiday_dates = {d for d in att_dates if d in holiday_dates}
                 att_dates = {d for d in att_dates if c_start <= d <= c_end and d not in holiday_dates}
                 regular_physical_days = float(len(att_dates))
 
@@ -948,7 +951,7 @@ class HrPayslip(models.Model):
                 unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
 
             active_holiday_dates = [d for d in holiday_dates if c_start <= d <= c_end]
-            unworked_holiday_dates = [d for d in active_holiday_dates if d not in set(att.check_in.date() for att in holiday_attendances if att.check_in)]
+            unworked_holiday_dates = [d for d in active_holiday_dates if d not in worked_holiday_dates]
             unworked_holiday_days = len(unworked_holiday_dates)
 
             covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
