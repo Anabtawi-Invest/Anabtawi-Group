@@ -640,7 +640,14 @@ class HrPayslip(models.Model):
             self.ids,
             {s.id: s.state for s in self},
         )
-        res = super().action_payslip_done()
+        slips_by_company = defaultdict(lambda: self.env['hr.payslip'])
+        for slip in self:
+            slips_by_company[slip.company_id] |= slip
+
+        res = True
+        for company, slips in slips_by_company.items():
+            res = super(HrPayslip, slips).action_payslip_done()
+
         _logger.info(
             "[FAP-RECON] action_payslip_done AFTER super slips=%s states=%s → sync",
             self.ids,
@@ -835,20 +842,22 @@ class HrPayslip(models.Model):
             c_start = payslip.date_from
             c_end = payslip.date_to
 
-            contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or getattr(emp, 'contract_id', None)
-            c_vers = emp._get_versions_with_contract_overlap_with_period(payslip.date_from, payslip.date_to) if hasattr(emp, '_get_versions_with_contract_overlap_with_period') else []
-            c_starts = [c.date_start for c in c_vers if getattr(c, 'date_start', None)]
-            c_ends = [c.date_end for c in c_vers if getattr(c, 'date_end', None)]
+            emp_contracts = self.env['hr.contract'].sudo().search([('employee_id', '=', emp.id), ('state', 'in', ['open', 'close'])]) if 'hr.contract' in self.env else self.env['hr.contract']
+            contract_obj = getattr(payslip, 'contract_id', None) or getattr(payslip, 'version_id', None) or (emp_contracts[:1] if emp_contracts else None) or getattr(emp, 'contract_id', None)
+            
+            first_date = getattr(emp, 'first_contract_date', None) or getattr(contract_obj, 'date_start', None)
+            if not first_date and emp_contracts:
+                c_starts_valid = [c.date_start for c in emp_contracts if getattr(c, 'date_start', None)]
+                if c_starts_valid:
+                    first_date = min(c_starts_valid)
 
-            if contract_obj and getattr(contract_obj, 'date_start', None) and contract_obj.date_start > payslip.date_from:
+            if first_date and first_date > payslip.date_from:
+                c_start = first_date
+            elif contract_obj and getattr(contract_obj, 'date_start', None) and contract_obj.date_start > payslip.date_from:
                 c_start = contract_obj.date_start
-            elif c_starts and max(c_starts) > payslip.date_from:
-                c_start = max(c_starts)
 
             if contract_obj and getattr(contract_obj, 'date_end', None) and contract_obj.date_end < payslip.date_to:
                 c_end = contract_obj.date_end
-            elif c_ends and min(c_ends) < payslip.date_to:
-                c_end = min(c_ends)
 
             cal = emp.resource_calendar_id
             work_station = getattr(emp, 'employee_work_station', False) or 'factory'
@@ -953,7 +962,7 @@ class HrPayslip(models.Model):
                 if code in ['ARS', 'REST', 'RESTDAY'] or 'rest' in we_name or 'rest day' in line_name or 'restday' in line_name:
                     continue
 
-                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE', 'LEAVE110'] or 'travel' in we_name or 'travel' in line_name or 'سفر' in we_name or 'سفر' in line_name or 'مهمة' in we_name or 'مهمة' in line_name:
+                if code in ['TRV', 'TRAVEL', 'TRAVEL_LEAVE'] or 'travel' in we_name or 'travel' in line_name or 'سفر' in we_name or 'سفر' in line_name or 'مهمة' in we_name or 'مهمة' in line_name:
                     if 'TRAVEL' in added_categories:
                         continue
                     added_categories.add('TRAVEL')
@@ -963,6 +972,39 @@ class HrPayslip(models.Model):
                     daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
                     line['amount'] = round(trv_days * daily_rate, 3)
                     filtered_lines.append(line)
+
+                elif code in ['SIK', 'SICK', 'STO', 'LEAVE110', 'SICKLEAVE0'] or 'sick' in we_name or 'sick time off' in line_name or 'مرضي' in we_name or 'مرضي' in line_name:
+                    if 'SICK' in added_categories:
+                        continue
+                    added_categories.add('SICK')
+                    WEModel = self.env['hr.work.entry']
+                    sick_we_domain = [
+                        ('employee_id', '=', emp.id),
+                        ('state', '!=', 'cancelled'),
+                        '|', '|', '|',
+                        ('work_entry_type_id.code', 'in', ['SIK', 'SICK', 'STO', 'LEAVE110', 'SICKLEAVE0']),
+                        ('work_entry_type_id.display_code', 'in', ['SIK', 'SICK', 'STO', 'LEAVE110', 'SICKLEAVE0']),
+                        ('work_entry_type_id.name', 'ilike', 'Sick'),
+                        ('work_entry_type_id.name', 'ilike', 'مرضي'),
+                    ]
+                    if 'date' in WEModel._fields:
+                        sick_we_domain += [('date', '>=', payslip.date_from), ('date', '<=', payslip.date_to)]
+                    elif 'date_start' in WEModel._fields:
+                        sick_we_domain += [
+                            ('date_start', '>=', datetime.datetime.combine(payslip.date_from, datetime.time.min)),
+                            ('date_start', '<=', datetime.datetime.combine(payslip.date_to, datetime.time.max)),
+                        ]
+                    sick_entries = WEModel.sudo().search(sick_we_domain)
+                    actual_sick_hrs = round(sum(getattr(we, 'duration', 8.0) or 8.0 for we in sick_entries), 2)
+                    sick_dates_set = set(getattr(we, 'date', we.date_start.date() if getattr(we, 'date_start', None) else None) for we in sick_entries)
+                    sick_dates_set = set(d for d in sick_dates_set if d and payslip.date_from <= d <= payslip.date_to)
+                    sick_days = float(len(sick_dates_set)) if sick_dates_set else line.get('number_of_days', 0.0)
+                    if sick_days > 0.01:
+                        line['number_of_days'] = sick_days
+                        line['number_of_hours'] = actual_sick_hrs if actual_sick_hrs > 0 else round(sick_days * 8.0, 2)
+                        daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
+                        line['amount'] = round(sick_days * daily_rate, 3)
+                        filtered_lines.append(line)
 
                 elif code in ['WORK100', 'WORK1000', 'A', 'ATTENDANCE', 'ATTD', 'WORK', 'FULL', 'STD'] or any(term in we_name or term in line_name for term in ['attendance', 'work', 'حضور', 'عمل']):
                     if 'ATTENDANCE' in added_categories:
@@ -981,15 +1023,13 @@ class HrPayslip(models.Model):
                     pre_out_days = (c_start - payslip.date_from).days if ('c_start' in locals() and c_start and c_start > payslip.date_from) else 0
                     post_out_days = (payslip.date_to - c_end).days if ('c_end' in locals() and c_end and c_end < payslip.date_to) else 0
                     out_of_contract_days = float(max(0, pre_out_days + post_out_days))
-                    if out_of_contract_days <= 0.0 and 'net_computed_attendance_days' in locals():
-                        total_calendar_days = float((payslip.date_to - payslip.date_from).days + 1)
-                        out_of_contract_days = max(0.0, round(total_calendar_days - net_computed_attendance_days, 2))
-                    line['number_of_days'] = out_of_contract_days
-                    line['number_of_hours'] = round(out_of_contract_days * 8.0, 2)
-                    line['amount'] = 0.0
-                    filtered_lines.append(line)
+                    if out_of_contract_days > 0.01:
+                        line['number_of_days'] = out_of_contract_days
+                        line['number_of_hours'] = round(out_of_contract_days * 8.0, 2)
+                        line['amount'] = 0.0
+                        filtered_lines.append(line)
 
-                elif code in ['GTO', 'PHD', 'HOLIDAY', 'LEAVE110', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name:
+                elif code in ['GTO', 'PHD', 'HOLIDAY', 'PHW', 'HOLIDAY_WORKED'] or 'public holiday' in we_name or 'holiday' in we_name:
                     if 'HOLIDAY' in added_categories:
                         continue
                     added_categories.add('HOLIDAY')
@@ -1033,10 +1073,10 @@ class HrPayslip(models.Model):
                         ]
                     unpaid_entries = WEModel.sudo().search(unpaid_we_domain)
                     actual_unpaid_hrs = round(sum(getattr(we, 'duration', 8.0) or 8.0 for we in unpaid_entries), 2)
-                    unpaid_days = line.get('number_of_days', 0.0) or round(actual_unpaid_hrs / 8.0, 2) if actual_unpaid_hrs > 0 else line.get('number_of_days', 0.0)
+                    unpaid_days = round(actual_unpaid_hrs / 8.0, 2) if actual_unpaid_hrs > 0 else 0.0
 
-                    if unpaid_days > 0.01 or actual_unpaid_hrs > 0.01:
-                        line['number_of_hours'] = actual_unpaid_hrs if actual_unpaid_hrs > 0 else round(unpaid_days * 8.0, 2)
+                    if actual_unpaid_hrs > 0.01:
+                        line['number_of_hours'] = actual_unpaid_hrs
                         line['number_of_days'] = unpaid_days
                         daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
                         line['amount'] = round(unpaid_days * daily_rate, 3)
@@ -1080,11 +1120,74 @@ class HrPayslip(models.Model):
                         c_end = getattr(emp_contract, 'date_end', None) if emp_contract else None
                         if c_start and c_start > payslip.date_from:
                             out_of_contract_days += (min(c_start, payslip.date_to + datetime.timedelta(days=1)) - payslip.date_from).days
+# 1. Determine calendar days in the payslip month (31, 30, 29, 28)
+month = payslip.date_to.month if payslip and payslip.date_to else 8
+year = payslip.date_to.year if payslip and payslip.date_to else 2026
+
+if month in (1, 3, 5, 7, 8, 10, 12):
+    days_in_month = 31
+elif month in (4, 6, 9, 11):
+    days_in_month = 30
+else:
+    if (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0):
+        days_in_month = 29
+    else:
+        days_in_month = 28
+
+# 2. Compute Daily Contract Wage
+emp = payslip.employee_id if payslip else None
+w = emp.wage if emp else 0.0
+daily_wage = w / float(days_in_month) if (w > 0 and days_in_month > 0) else 0.0
+
+if w <= 0 or not payslip:
+    result = 0.0
+else:
+    covered_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
+    covered_absent_days = round(covered_hours / 8.0, 2)
+
+    unpaid_deduct_days = 0.0
+    absent_deduct_days = 0.0
+    outcon_deduct_days = 0.0
+
+    lines = payslip.worked_days_line_ids if (payslip and payslip.worked_days_line_ids) else (worked_days.values() if 'worked_days' in locals() and worked_days else [])
+
+    for wd in lines:
+        c_type = (wd.work_entry_type_id.code or '') if wd.work_entry_type_id else ''
+        c_line = (wd.code or '')
+        # Combine type code and line code to catch both LEAVE110 and ABSENT
+        code = (c_type + ' ' + c_line).strip().upper()
+
+        n_type = (wd.work_entry_type_id.name or '') if wd.work_entry_type_id else ''
+        n_line = (wd.name or '')
+        name = (n_type + ' ' + n_line).lower()
+
+        days = wd.number_of_days or 0.0
+
+        # 1. Out of contract check
+        if 'OUT' in code or 'ooc' in name or 'out' in name or 'خارج' in name or 'العقد' in name:
+            outcon_deduct_days += days
+
+        # 2. Unpaid leave check
+        elif 'UNP' in code or 'UNPAID' in code or 'SICKLEAVE0' in code or 'unpaid' in name or 'un_paid' in name or 'بدون' in name:
+            unpaid_deduct_days += days
+
+        # 3. Absent check (catches ABS, ABSENT, ARS, LEAVE110 ABSENT, غياب)
+        elif 'ABS' in code or 'ARS' in code or 'absent' in name or 'غياب' in name:
+            reconciled_portion = min(days, covered_absent_days)
+            uncovered_absent = max(0.0, days - reconciled_portion)
+            absent_deduct_days += uncovered_absent
+            covered_absent_days = max(0.0, covered_absent_days - reconciled_portion)
+
+    total_unpaid_deductions = unpaid_deduct_days + absent_deduct_days + outcon_deduct_days
+
+    # Payable Days = 30 Calendar Days - All Deductions
+    payable_days = max(0.0, float(days_in_month) - total_unpaid_deductions)
+
+    result = round(payable_days * daily_wage, 3)
                         if c_end and c_end < payslip.date_to:
                             out_of_contract_days += (payslip.date_to - max(c_end, payslip.date_from - datetime.timedelta(days=1))).days
-                        max_possible_absent = max(0.0, total_calendar_days - net_computed_attendance_days - calc_unpaid - calc_trv - out_of_contract_days)
                         raw_abs_days = round(actual_absent_hrs / 8.0, 2)
-                        final_abs_days = min(raw_abs_days, max_possible_absent) if raw_abs_days > 0 else 0.0
+                        final_abs_days = raw_abs_days if raw_abs_days > 0 else 0.0
                         if final_abs_days > 0.01:
                             abs_hrs = round(final_abs_days * 8.0, 2)
                             daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
@@ -1163,9 +1266,8 @@ class HrPayslip(models.Model):
                     out_of_contract_days += (min(c_start, payslip.date_to + datetime.timedelta(days=1)) - payslip.date_from).days
                 if c_end and c_end < payslip.date_to:
                     out_of_contract_days += (payslip.date_to - max(c_end, payslip.date_from - datetime.timedelta(days=1))).days
-                max_possible_absent = max(0.0, total_calendar_days - net_computed_attendance_days - calc_unpaid - calc_trv - out_of_contract_days)
                 raw_abs_days = round(actual_absent_hrs / 8.0, 2)
-                final_abs_days = min(raw_abs_days, max_possible_absent) if raw_abs_days > 0 else 0.0
+                final_abs_days = raw_abs_days if raw_abs_days > 0 else 0.0
                 if final_abs_days > 0.01:
                     added_categories.add('ABSENT')
                     daily_rate = (w / float((payslip.date_to - payslip.date_from).days + 1)) if w > 0 else 0.0
