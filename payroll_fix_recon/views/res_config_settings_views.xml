@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_pfr" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.pfr</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="hr_payroll.res_config_settings_view_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//app[@name='hr_payroll']/block[@id='hr_payroll_settings']" position="inside">
+                <setting string="Overtime Calculation" help="When unchecked, any extra hours worked by employees are treated as unpaid hours and will not generate overtime or affect payslips.">
+                    <field name="enable_overtime_calculation"/>
+                </setting>
+                <setting string="Reconciliation Annual Leave Type" help="Time off type used when lateness is deducted from annual leave and for the annual leave balance in termination settlement.">
+                    <field name="fap_annual_leave_type_id"
+                           domain="[('time_type', '=', 'leave'), ('company_id', 'in', [False, company_id])]"
+                           options="{'no_create': True}"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>
