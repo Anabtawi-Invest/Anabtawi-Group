@@ -131,13 +131,13 @@ class HrEmployee(models.Model):
 
     def _get_absent_work_entry_type(self):
         """Finds or creates the ABSENT work entry type."""
-        absent_type = self.env.ref("reconciliation_payroll.work_entry_type_absent", raise_if_not_found=False)
-        if not absent_type:
-            absent_type = self.env.ref("factory_attendance_payroll.work_entry_type_absent", raise_if_not_found=False)
-        if not absent_type:
-            absent_type = self.env["hr.work.entry.type"].sudo().search([("code", "=", "ABSENT")], limit=1)
+        absent_type = self.env["hr.work.entry.type"].sudo().search([("code", "=", "ABSENT")], limit=1)
         if not absent_type:
             absent_type = self.env["hr.work.entry.type"].sudo().search([("display_code", "=", "ABS")], limit=1)
+        if not absent_type:
+            absent_type = self.env.ref("reconciliation_payroll.work_entry_type_absent", raise_if_not_found=False)
+        if not absent_type:
+            absent_type = self.env.ref("factory_attendance_payroll.work_entry_type_absent", raise_if_not_found=False)
         if not absent_type:
             absent_type = self.env["hr.work.entry.type"].sudo().create({
                 "name": "Absent",

@@ -8,8 +8,9 @@ def post_init_hook(env):
     """
     Post-Init Hook:
     1. Associates reconciliation salary rules with all existing salary structures.
-    2. Ensures work entry types have valid rounding parameters to avoid Odoo 19 validation crashes.
-    3. Sets allow_annual_leave_lateness_deduction to True for employees.
+    2. Safely ensures ABSENT work entry type exists without code unicity conflicts.
+    3. Ensures work entry types have valid rounding parameters to avoid Odoo 19 validation crashes.
+    4. Sets allow_annual_leave_lateness_deduction to True for employees.
     """
     # 1. Link salary rules to payroll structures
     try:
@@ -25,7 +26,30 @@ def post_init_hook(env):
     except Exception:
         _logger.exception("[reconciliation_payroll] Error linking salary rules to structures.")
 
-    # 2. Fix work entry types rounding
+    # 2. Ensure ABSENT work entry type exists safely without duplicate code conflict
+    try:
+        absent_type = env['hr.work.entry.type'].sudo().search([('code', '=', 'ABSENT')], limit=1)
+        if not absent_type:
+            absent_type = env['hr.work.entry.type'].sudo().search([('display_code', '=', 'ABS')], limit=1)
+        if not absent_type:
+            env['hr.work.entry.type'].sudo().create({
+                'name': 'Absent',
+                'display_code': 'ABS',
+                'code': 'ABSENT',
+                'color': 1,
+                'is_leave': False,
+                'round_days': 'NO',
+                'round_days_type': 'DOWN',
+            })
+            _logger.info("[reconciliation_payroll] Created ABSENT work entry type.")
+        else:
+            if absent_type.round_days != 'NO' or absent_type.round_days_type != 'DOWN':
+                absent_type.sudo().write({'round_days': 'NO', 'round_days_type': 'DOWN'})
+            _logger.info("[reconciliation_payroll] Reused existing ABSENT work entry type (id=%s).", absent_type.id)
+    except Exception:
+        _logger.exception("[reconciliation_payroll] Error ensuring ABSENT work entry type.")
+
+    # 3. Fix work entry types rounding
     try:
         bad_types = env['hr.work.entry.type'].sudo().search([
             ('round_days', 'in', ['HALF', 'FULL']),
@@ -42,7 +66,7 @@ def post_init_hook(env):
     except Exception:
         _logger.exception("[reconciliation_payroll] Error fixing work entry types rounding.")
 
-    # 3. Default allow_annual_leave_lateness_deduction to True
+    # 4. Default allow_annual_leave_lateness_deduction to True
     try:
         employees = env['hr.employee'].sudo().search([
             ('allow_annual_leave_lateness_deduction', '!=', True)

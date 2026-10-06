@@ -12,7 +12,6 @@
         'hr_holidays',
     ],
     'data': [
-        'data/work_entry_type_data.xml',
         'data/hr_payroll_data.xml',
         'data/ir_cron_data.xml',
         'views/hr_attendance_views.xml',
