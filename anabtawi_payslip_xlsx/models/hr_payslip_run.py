@@ -1,4 +1,5 @@
 import io
+import math
 from datetime import datetime, time
 
 from odoo import _, fields, models, exceptions
@@ -344,6 +345,10 @@ class HrPayslipRun(models.Model):
                             if k == clean_input_norm or (t_code and t_code == k):
                                 matched_key = k
                                 break
+                    if not matched_key and "car depreciation" in clean_input_norm:
+                        matched_key = next((k for k in alw_map if "car depreciation" in k), None)
+                        if not matched_key:
+                            continue
                     if matched_key:
                         alw_map[matched_key]["input_type_ids"].add(itype.id)
                     else:
@@ -585,25 +590,43 @@ class HrPayslipRun(models.Model):
                 if net_sal < 0:
                     issues.append(_("Negative Net Salary (%.2f JOD)") % net_sal)
 
-                # Attendance metrics (Take Attendance days + Sick days + Annual days + Paid Leaves, excluding Unpaid/Absence)
+                # Attendance Days = Attendance + Paid Leaves
+                #   + floor(Absent hrs / 8 - Lateness hrs / 8) when Absent hrs > Lateness hrs
                 worked_days = payslip.worked_days_line_ids
-                def _is_paid_attendance_or_leave(wd):
-                    code = (wd.code or '').strip().upper()
+
+                def _classify_worked_day(wd):
+                    code = (wd.work_entry_type_id.code or wd.code or '').strip().upper()
                     name = (wd.name or '').strip().lower()
+                    type_name = (wd.work_entry_type_id.name or '').strip().lower()
+                    text = f"{name} {type_name}"
 
-                    # Exclude OUT, Overtime, Lateness
-                    if code in ('OUT', 'LAT', 'LATE', 'OVERTIME', 'OT', 'OTW', 'OTR', 'PHO') or 'overtime' in name or 'lateness' in name or 'تأخير' in name:
-                        return False
+                    if code in ('ABS', 'ABSENT') or any(k in text for k in ('absent', 'absence', 'غياب')):
+                        return 'absent'
+                    if code in ('LAT', 'LATE', 'LATENESS') or 'lateness' in text or 'تأخير' in text:
+                        return 'lateness'
+                    if (
+                        code in ('OVERTIME', 'EXTRA', 'EXTRA_HOURS', 'OT', 'OTW', 'OTR', 'PHO', 'OUT', 'OUTCON',
+                                 'LEAVEUNPAID', 'UN_PAID', 'UNPAID', 'SICKLEAVE0')
+                        or any(k in text for k in ('overtime', 'extra', 'unpaid', 'بدون راتب', 'غير مدفوع'))
+                    ):
+                        return 'ignore'
+                    return 'paid'
 
-                    # Exclude Unpaid leave and Absence
-                    unpaid_keywords = ['unpaid', 'absent', 'absence', 'بدون راتب', 'غير مدفوع', 'خصم غياب']
-                    if any(u in code.lower() or u in name for u in unpaid_keywords):
-                        return False
+                att_days = 0.0
+                absent_hrs = 0.0
+                lateness_hrs = 0.0
+                for wd in worked_days:
+                    kind = _classify_worked_day(wd)
+                    if kind == 'paid':
+                        att_days += wd.number_of_days or 0.0
+                    elif kind == 'absent':
+                        absent_hrs += wd.number_of_hours or 0.0
+                    elif kind == 'lateness':
+                        lateness_hrs += wd.number_of_hours or 0.0
 
-                    return True
+                if absent_hrs > lateness_hrs:
+                    att_days += math.floor((absent_hrs - lateness_hrs) / 8.0 + 1e-9)
 
-                att_lines = worked_days.filtered(_is_paid_attendance_or_leave)
-                att_days = sum(att_lines.mapped("number_of_days"))
                 if payslip.date_from and payslip.date_to:
                     days_in_period = (payslip.date_to - payslip.date_from).days + 1
                     if att_days > days_in_period:
