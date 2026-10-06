@@ -873,12 +873,71 @@ class HrPayslip(models.Model):
                 or not cal
             )
 
+            active_period_days = max(0, (c_end - c_start).days + 1)
+            rest_dates = []
             if is_flexible or work_station != 'headoffice':
                 target_wd = 0 if work_station == 'factory' else 4
-                month_rest_days = sum(1 for d_idx in range((payslip.date_to - payslip.date_from).days + 1) if (payslip.date_from + datetime.timedelta(days=d_idx)).weekday() == target_wd)
-                earned_rest_days = min(month_rest_days, int(regular_physical_days // 6)) if regular_physical_days > 0 else month_rest_days
-                worked_rest_days = 0
-                unpunched_rest_days = earned_rest_days
+                WEModel = self.env['hr.work.entry']
+
+                def _we_dates(we):
+                    if 'date' in WEModel._fields and getattr(we, 'date', None):
+                        return [we.date]
+                    if getattr(we, 'date_start', None):
+                        d_stop = we.date_stop.date() if getattr(we, 'date_stop', None) else we.date_start.date()
+                        return [we.date_start.date() + datetime.timedelta(days=i) for i in range((d_stop - we.date_start.date()).days + 1)]
+                    return []
+
+                period_we_domain = [('employee_id', '=', emp.id), ('state', '!=', 'cancelled')]
+                if 'date' in WEModel._fields:
+                    period_we_domain += [('date', '>=', c_start), ('date', '<=', c_end)]
+                else:
+                    period_we_domain += [
+                        ('date_start', '<=', datetime.datetime.combine(c_end, datetime.time.max)),
+                        ('date_stop', '>=', datetime.datetime.combine(c_start, datetime.time.min)),
+                    ]
+                period_we = WEModel.sudo().search(period_we_domain)
+                att_codes = ('WORK100', 'WORK1000', 'ATTENDANCE', 'ATTD')
+                absent_codes = ('ABSENT', 'ABS', 'UNPAID', 'LEAVE500')
+                att_dates, absent_dates, leave_dates = set(), set(), set()
+                for we in period_we:
+                    wet = we.work_entry_type_id
+                    code = (wet.code or '').upper()
+                    disp_code = (getattr(wet, 'display_code', '') or '').upper()
+                    wname = (wet.name or '').lower()
+                    if code in att_codes or disp_code in att_codes or 'attendance' in wname:
+                        att_dates.update(_we_dates(we))
+                    elif code in absent_codes or disp_code in ('ABSENT', 'ABS') or 'absent' in wname:
+                        absent_dates.update(_we_dates(we))
+                    elif getattr(wet, 'is_leave', False) and code not in ('ARS', 'REST', 'RESTDAY') and 'rest' not in wname:
+                        leave_dates.update(_we_dates(we))
+                att_dates.update(att.check_in.date() for att in regular_attendances if att.check_in)
+
+                if 'hr.leave' in self.env:
+                    approved_leaves = self.env['hr.leave'].sudo().search([
+                        ('employee_id', '=', emp.id),
+                        ('state', 'in', ['validate', 'validate1']),
+                        ('request_date_from', '<=', c_end),
+                        ('request_date_to', '>=', c_start),
+                        ('name', 'not ilike', 'Lateness Settlement'),
+                    ])
+                    for lve in approved_leaves:
+                        d = lve.request_date_from
+                        while d and d <= lve.request_date_to:
+                            leave_dates.add(d)
+                            d += datetime.timedelta(days=1)
+
+                att_dates = {d for d in att_dates if c_start <= d <= c_end and d not in holiday_dates}
+                regular_physical_days = float(len(att_dates))
+
+                period_dates = [c_start + datetime.timedelta(days=i) for i in range(active_period_days)]
+                weekly_rest_dates = [d for d in period_dates if d.weekday() == target_wd]
+                rest_dates = [
+                    d for d in weekly_rest_dates
+                    if d not in att_dates and d not in absent_dates and d not in leave_dates and d not in holiday_dates
+                ]
+                earned_rest_days = len(weekly_rest_dates)
+                worked_rest_days = sum(1 for d in weekly_rest_dates if d in att_dates)
+                unpunched_rest_days = len(rest_dates)
             else:
                 earned_rest_days = payslip._get_fixed_schedule_rest_days(emp, c_start, c_end)
                 if cal:
@@ -888,7 +947,6 @@ class HrPayslip(models.Model):
                     worked_rest_days = max(0, regular_physical_days - max(0, active_period_days - earned_rest_days - len(holiday_dates)))
                 unpunched_rest_days = max(0, earned_rest_days - worked_rest_days)
 
-            active_period_days = max(0, (c_end - c_start).days + 1)
             active_holiday_dates = [d for d in holiday_dates if c_start <= d <= c_end]
             unworked_holiday_dates = [d for d in active_holiday_dates if d not in set(att.check_in.date() for att in holiday_attendances if att.check_in)]
             unworked_holiday_days = len(unworked_holiday_dates)
@@ -896,28 +954,26 @@ class HrPayslip(models.Model):
             covered_lateness_hours = (payslip.lateness_covered_by_extra_hours or 0.0) + (payslip.lateness_covered_by_annual_leave or 0.0)
             covered_lateness_days = covered_lateness_hours / 8.0
 
-            if is_flexible or work_station != 'headoffice':
-                final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days
-            else:
-                final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days
-                if active_period_days > 0 and final_attendance_days > active_period_days:
-                    final_attendance_days = active_period_days
+            final_attendance_days = regular_physical_days + unpunched_rest_days + unworked_holiday_days
+            if active_period_days > 0 and final_attendance_days > active_period_days:
+                final_attendance_days = active_period_days
 
             computed_attendance_days = float(round(final_attendance_days))
 
             _logger.info(
                 "[FAP ATTENDANCE DAYS] Payslip %s (%s) | Employee: %s | Period: %s -> %s | "
                 "Contract active: %s -> %s (%s days) | Work station: %s | Flexible: %s | "
-                "Punch attendances: %s (regular %s, holiday %s) | Regular physical days: %s %s | "
-                "Earned rest days: %s | Worked rest days: %s | Unpunched rest days: %s | "
+                "Punch attendances: %s (regular %s, holiday %s) | Attendance days (work entries + check-ins): %s %s | "
+                "Weekly rest days in contract period: %s | Worked rest days: %s | Counted rest days: %s %s | "
                 "Public holidays in period: %s | Unworked holidays: %s %s | "
                 "Total = %s + %s + %s = %.2f | Rounded: %s",
                 payslip.id, payslip.name, emp.name, payslip.date_from, payslip.date_to,
                 c_start, c_end, active_period_days, work_station, is_flexible,
                 len(attendances), len(regular_attendances), len(holiday_attendances),
                 regular_physical_days,
-                sorted(set(att.check_in.date().isoformat() for att in regular_attendances if att.check_in)),
-                earned_rest_days, worked_rest_days, unpunched_rest_days,
+                sorted(d.isoformat() for d in att_dates) if (is_flexible or work_station != 'headoffice')
+                else sorted(set(att.check_in.date().isoformat() for att in regular_attendances if att.check_in)),
+                earned_rest_days, worked_rest_days, unpunched_rest_days, [d.isoformat() for d in rest_dates],
                 len(holiday_dates), unworked_holiday_days, sorted(d.isoformat() for d in unworked_holiday_dates),
                 regular_physical_days, unpunched_rest_days, unworked_holiday_days,
                 final_attendance_days, computed_attendance_days,
