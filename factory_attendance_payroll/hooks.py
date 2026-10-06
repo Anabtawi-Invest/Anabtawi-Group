@@ -42,6 +42,18 @@ def pre_init_hook(env):
     with env.cr.savepoint():
         try:
             env.cr.execute("""
+                ALTER TABLE hr_employee 
+                ADD COLUMN IF NOT EXISTS allow_annual_leave_lateness_deduction BOOLEAN DEFAULT TRUE;
+                UPDATE hr_employee 
+                   SET allow_annual_leave_lateness_deduction = TRUE 
+                 WHERE allow_annual_leave_lateness_deduction IS NOT TRUE;
+            """)
+        except Exception:
+            pass
+
+    with env.cr.savepoint():
+        try:
+            env.cr.execute("""
                 UPDATE hr_work_entry_type
                    SET round_days = 'NO',
                        round_days_type = 'DOWN'
@@ -122,5 +134,14 @@ def post_init_hook(env):
 
     try:
         _fix_work_entry_type_rounding(env)
+    except Exception:
+        pass
+
+    try:
+        env.cr.execute("""
+            UPDATE hr_employee
+               SET allow_annual_leave_lateness_deduction = TRUE
+             WHERE allow_annual_leave_lateness_deduction IS NOT TRUE;
+        """)
     except Exception:
         pass
