@@ -412,6 +412,7 @@ class HrPayslip(models.Model):
             payslip.undertime_cash_deduction_hours = rem_lateness
 
     def compute_sheet(self):
+        _logger.info("[FAP ATTENDANCE DAYS] compute_sheet called for payslips %s", self.ids)
         valid_slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to)
         if valid_slips:
             valid_slips._compute_attendance_reconciliation_fields()
@@ -752,6 +753,7 @@ class HrPayslip(models.Model):
 
     def _get_worked_day_lines(self, *args, **kwargs):
         res = super()._get_worked_day_lines(*args, **kwargs)
+        _logger.info("[FAP ATTENDANCE DAYS] _get_worked_day_lines called for payslips %s", self.ids)
         for payslip in self:
             if not payslip.employee_id or not payslip.date_from or not payslip.date_to:
                 continue
@@ -903,6 +905,24 @@ class HrPayslip(models.Model):
 
             computed_attendance_days = float(round(final_attendance_days))
 
+            _logger.info(
+                "[FAP ATTENDANCE DAYS] Payslip %s (%s) | Employee: %s | Period: %s -> %s | "
+                "Contract active: %s -> %s (%s days) | Work station: %s | Flexible: %s | "
+                "Punch attendances: %s (regular %s, holiday %s) | Regular physical days: %s %s | "
+                "Earned rest days: %s | Worked rest days: %s | Unpunched rest days: %s | "
+                "Public holidays in period: %s | Unworked holidays: %s %s | "
+                "Total = %s + %s + %s = %.2f | Rounded: %s",
+                payslip.id, payslip.name, emp.name, payslip.date_from, payslip.date_to,
+                c_start, c_end, active_period_days, work_station, is_flexible,
+                len(attendances), len(regular_attendances), len(holiday_attendances),
+                regular_physical_days,
+                sorted(set(att.check_in.date().isoformat() for att in regular_attendances if att.check_in)),
+                earned_rest_days, worked_rest_days, unpunched_rest_days,
+                len(holiday_dates), unworked_holiday_days, sorted(d.isoformat() for d in unworked_holiday_dates),
+                regular_physical_days, unpunched_rest_days, unworked_holiday_days,
+                final_attendance_days, computed_attendance_days,
+            )
+
             travel_days_count = 0.0
             trv_dates = []
             if 'hr.leave' in self.env:
@@ -1012,6 +1032,12 @@ class HrPayslip(models.Model):
                         continue
                     added_categories.add('ATTENDANCE')
                     line['number_of_days'] = net_computed_attendance_days
+                    _logger.info(
+                        "[FAP ATTENDANCE DAYS] Payslip %s | Attendance line '%s' (code %s): days = %s, "
+                        "hours = %.2f, hourly rate = %.4f",
+                        payslip.id, line.get('name'), code, net_computed_attendance_days,
+                        total_regular_attendance_hrs, hourly_rate,
+                    )
                     if total_regular_attendance_hrs > 0.01:
                         line['number_of_hours'] = total_regular_attendance_hrs
                         line['amount'] = round(total_regular_attendance_hrs * hourly_rate, 3)
