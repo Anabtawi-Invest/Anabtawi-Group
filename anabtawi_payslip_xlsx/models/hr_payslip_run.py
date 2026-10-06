@@ -206,6 +206,11 @@ class HrPayslipRun(models.Model):
             (_("Period To"), 14),
         ]
 
+        key_cols = [
+            (_("Net Salary"), 18),
+            (_("Attendance Days"), 16),
+        ]
+
         fixed_alw_cols = [
             (_("Basic Salary"), 16),
             (_("Actual Salary"), 16),
@@ -223,8 +228,6 @@ class HrPayslipRun(models.Model):
         ]
 
         summary_cols = [
-            (_("Net Salary"), 18),
-            (_("Attendance Days"), 16),
             (_("Worked Hours"), 15),
             (_("Overtime Hours"), 15),
             (_("Note / Description"), 30),
@@ -430,12 +433,14 @@ class HrPayslipRun(models.Model):
         summary_headers = [c[0] for c in summary_cols]
 
         info_count = len(info_cols)
+        key_count = len(key_cols)
         alw_count = len(all_alw_headers)
         ded_count = len(all_ded_headers)
         comp_count = len(all_comp_headers)
         sum_count = len(summary_cols)
 
-        alw_start_col = info_count
+        key_start_col = info_count
+        alw_start_col = key_start_col + key_count
         alw_end_col = alw_start_col + alw_count - 1
 
         ded_start_col = alw_end_col + 1
@@ -452,6 +457,7 @@ class HrPayslipRun(models.Model):
         # Set Column Widths
         all_col_widths = (
             [c[1] for c in info_cols]
+            + [c[1] for c in key_cols]
             + all_alw_widths
             + all_ded_widths
             + all_comp_widths
@@ -466,6 +472,11 @@ class HrPayslipRun(models.Model):
 
         # Info Columns (Vertically merged across row_super and row_sub)
         for c_idx, name in enumerate(info_headers):
+            sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, header_fmt)
+
+        # Net Salary / Attendance Days Columns (Vertically merged across row_super and row_sub)
+        for idx, (name, _w) in enumerate(key_cols):
+            c_idx = key_start_col + idx
             sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, header_fmt)
 
         # ALLOWANCE Group Super-Header & Sub-Headers
@@ -671,6 +682,11 @@ class HrPayslipRun(models.Model):
                 sheet1.write(data_row, 6, period_from_val, text_center_fmt)
                 sheet1.write(data_row, 7, period_to_val, text_center_fmt)
 
+                # Write Net Salary / Attendance Days
+                net_style = net_negative_fmt if net_sal < 0 else number_fmt
+                sheet1.write_number(data_row, key_start_col, net_sal, net_style)
+                sheet1.write_number(data_row, key_start_col + 1, att_days, int_fmt)
+
                 # Write ALLOWANCE Section
                 col_curr = alw_start_col
                 sheet1.write_number(data_row, col_curr, basic_sal, number_fmt); col_curr += 1
@@ -695,10 +711,7 @@ class HrPayslipRun(models.Model):
                 # Write COMPANY CONTRIBUTIONS Section
                 sheet1.write_number(data_row, col_curr, sscc_val, number_fmt); col_curr += 1
 
-                # Write Summary / Attendance Section
-                net_style = net_negative_fmt if net_sal < 0 else number_fmt
-                sheet1.write_number(data_row, col_curr, net_sal, net_style); col_curr += 1
-                sheet1.write_number(data_row, col_curr, att_days, int_fmt); col_curr += 1
+                # Write Summary Section
                 sheet1.write_number(data_row, col_curr, worked_hrs, number_fmt); col_curr += 1
                 sheet1.write_number(data_row, col_curr, ot_hrs, number_fmt); col_curr += 1
                 sheet1.write(data_row, col_curr, note_val, text_left_fmt)
@@ -724,7 +737,7 @@ class HrPayslipRun(models.Model):
         for c in range(1, info_count):
             sheet1.write(data_row, c, "", total_label_fmt)
 
-        att_days_col_idx = sum_start_col + 1
+        att_days_col_idx = key_start_col + 1
 
         for col_idx in range(info_count, total_num_cols - 1):
             col_letter = xlsxwriter.utility.xl_col_to_name(col_idx)
