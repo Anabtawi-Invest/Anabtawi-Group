@@ -209,8 +209,7 @@ class HrPayslipRun(models.Model):
         key_cols = [
             (_("Net Salary"), 18),
             (_("Attendance Days"), 16),
-            (_("Absent Days"), 16),
-            (_("Lateness Days"), 16),
+            (_("Out of Contract Days"), 20),
         ]
 
         fixed_alw_cols = [
@@ -618,9 +617,14 @@ class HrPayslipRun(models.Model):
                     if code in ('LAT', 'LATE', 'LATENESS') or 'lateness' in text or 'تأخير' in text:
                         return 'lateness'
                     if (
-                        code in ('OVERTIME', 'EXTRA', 'EXTRA_HOURS', 'OT', 'OTW', 'OTR', 'PHO', 'OUT', 'OUTCON',
-                                 'OUT_OF_CONTRACT', 'LEAVEUNPAID', 'UN_PAID', 'UNPAID', 'SICKLEAVE0')
-                        or any(k in text for k in ('overtime', 'extra', 'unpaid', 'out of contract',
+                        code in ('OUT', 'OUTCON', 'OUT_OF_CONTRACT')
+                        or any(k in text for k in ('out of contract', 'خارج العقد'))
+                    ):
+                        return 'out_of_contract'
+                    if (
+                        code in ('OVERTIME', 'EXTRA', 'EXTRA_HOURS', 'OT', 'OTW', 'OTR', 'PHO',
+                                 'LEAVEUNPAID', 'UN_PAID', 'UNPAID', 'SICKLEAVE0')
+                        or any(k in text for k in ('overtime', 'extra', 'unpaid',
                                                    'بدون راتب', 'غير مدفوع'))
                     ):
                         return 'ignore'
@@ -629,6 +633,7 @@ class HrPayslipRun(models.Model):
                 att_days = 0.0
                 absent_hrs = 0.0
                 lateness_hrs = 0.0
+                out_of_contract_days = 0.0
                 for wd in worked_days:
                     kind = _classify_worked_day(wd)
                     if kind == 'paid':
@@ -637,6 +642,8 @@ class HrPayslipRun(models.Model):
                         absent_hrs += wd.number_of_hours or 0.0
                     elif kind == 'lateness':
                         lateness_hrs += wd.number_of_hours or 0.0
+                    elif kind == 'out_of_contract':
+                        out_of_contract_days += wd.number_of_days if wd.number_of_days else ((wd.number_of_hours or 0.0) / 8.0)
 
                 if absent_hrs > lateness_hrs:
                     att_days += math.floor((absent_hrs - lateness_hrs) / 8.0 + 1e-9)
@@ -686,12 +693,11 @@ class HrPayslipRun(models.Model):
                 sheet1.write(data_row, 6, period_from_val, text_center_fmt)
                 sheet1.write(data_row, 7, period_to_val, text_center_fmt)
 
-                # Write Net Salary / Attendance Days / Absent Days / Lateness Days
+                # Write Net Salary / Attendance Days / Out of Contract Days
                 net_style = net_negative_fmt if net_sal < 0 else number_fmt
                 sheet1.write_number(data_row, key_start_col, net_sal, net_style)
                 sheet1.write_number(data_row, key_start_col + 1, att_days, int_fmt)
-                sheet1.write_number(data_row, key_start_col + 2, absent_days, number_fmt)
-                sheet1.write_number(data_row, key_start_col + 3, lateness_days, number_fmt)
+                sheet1.write_number(data_row, key_start_col + 2, out_of_contract_days, number_fmt)
 
                 # Write ALLOWANCE Section
                 col_curr = alw_start_col
