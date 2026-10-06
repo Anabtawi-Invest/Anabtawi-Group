@@ -196,8 +196,11 @@ class HrPayslip(models.Model):
     def compute_sheet(self):
         slips = self.filtered(lambda s: s.employee_id and s.date_from and s.date_to
                               and s.state in ('draft', 'verify'))
+        by_period = defaultdict(lambda: self.env['hr.employee'])    # one batched engine run per period
         for slip in slips:                              # explicit writes belong here, not in computes
-            slip.employee_id._pfr_create_absent_entries(slip.date_from, slip.date_to)
+            by_period[(slip.date_from, slip.date_to)] |= slip.employee_id
+        for (d_from, d_to), employees in by_period.items():
+            employees._pfr_create_absent_entries(d_from, d_to)
         if slips:
             self.env.flush_all()
             slips._compute_attendance_reconciliation_fields()
@@ -212,6 +215,16 @@ class HrPayslip(models.Model):
     def _onchange_termination_clearance(self):
         self._compute_attendance_reconciliation_fields()
         self._pfr_apply_termination_inputs()
+
+    def _compute_issues(self):
+        """hr_payroll stores `issues` as JSON; some payloads contain records as dict keys
+        (e.g. base.automation) and make json.dumps raise. Never let that block a slip write."""
+        for slip in self:
+            try:
+                super(HrPayslip, slip)._compute_issues()
+            except (TypeError, ValueError) as exc:
+                _logger.warning("[payroll_fix_recon] slip %s: issues not serialisable (%s), cleared", slip.id, exc)
+                slip.issues = False
 
     def _action_create_account_move(self):
         by_company = defaultdict(lambda: self.env['hr.payslip'])
