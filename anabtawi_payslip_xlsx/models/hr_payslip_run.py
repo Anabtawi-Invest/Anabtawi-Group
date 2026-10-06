@@ -395,6 +395,11 @@ class HrPayslipRun(models.Model):
             c_name = col_info["name"]
             if "copy" in c_name.lower():
                 continue
+
+            c_name_lower = c_name.lower().replace(":", "").replace("_", " ").strip()
+            if c_name_lower in ("deduction", "deductions", "خصم", "استقطاع"):
+                continue
+
             rule_keys = col_info["rule_keys"]
             input_type_ids = col_info["input_type_ids"]
 
