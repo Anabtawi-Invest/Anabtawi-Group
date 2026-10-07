@@ -369,6 +369,16 @@ export class CeoMainDashboard extends Component {
         });
     }
 
+    openBill(moveId) {
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            res_model: "account.move",
+            res_id: moveId,
+            views: [[false, "form"]],
+            target: "current",
+        });
+    }
+
     openPeriodReceipts() {
         const data = this.state.data;
         this.action.doAction({
@@ -386,6 +396,22 @@ export class CeoMainDashboard extends Component {
                 ["date_done", "<=", data.utc_to],
             ],
         });
+    }
+
+    async openBills(dateFrom = null, dateTo = null) {
+        const action = await this.orm.call("ceo.main.dashboard", "action_open_period_bills", [
+            dateFrom,
+            dateTo,
+        ]);
+        this.action.doAction(action);
+    }
+
+    openPeriodBills() {
+        this.openBills(this.state.data.date_from, this.state.data.date_to);
+    }
+
+    openTodayBills() {
+        this.openBills();
     }
 
     openProduct(productId) {

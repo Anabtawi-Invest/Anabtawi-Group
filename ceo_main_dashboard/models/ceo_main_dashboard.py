@@ -122,11 +122,17 @@ class CeoMainDashboard(models.AbstractModel):
             rec for rec in fetched
             if self._billing_factor(ratios.get(rec['id'], 0.0), billing) > RATIO_EPSILON
         ][:self._HISTORY_LIMIT]
+        bill_prices = self._bill_unit_prices(self._lines_recordset({rec['id']: True for rec in matching}))
 
         history = []
         for rec in reversed(matching):
             line = lines[rec['id']]
             row = self._build_row(rec, lines, ratios, currency)
+            bills = bill_prices.get(line.id, [])
+            for bill in bills:
+                diff = bill['price'] - row['last_price']
+                bill['diff'] = 0.0 if currency.is_zero(diff) else diff
+                bill['pct'] = (bill['diff'] / row['last_price'] * 100.0) if row['last_price'] else None
             history.append({
                 'line_id': line.id,
                 'order_id': line.order_id.id,
@@ -139,11 +145,38 @@ class CeoMainDashboard(models.AbstractModel):
                 'billing_status': row['billing_status'],
                 'uom': row['uom'],
                 'price': row['last_price'],
+                'bills': bills,
                 'diff': row['diff'],
                 'pct': row['pct'],
                 'trend': row['trend'],
             })
         return history
+
+    @api.model
+    def action_open_period_bills(self, date_from=None, date_to=None):
+        """Posted vendor bills and refunds of purchase orders, by accounting date in the period."""
+        self._check_dashboard_access()
+        date_from, date_to = self._parse_range(date_from, date_to)
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("Vendor Bills"),
+            'res_model': 'account.move',
+            'views': [
+                (self.env.ref('account.view_in_invoice_bill_tree').id, 'list'),
+                (self.env.ref('account.view_move_form').id, 'form'),
+            ],
+            'search_view_id': [self.env.ref('account.view_account_invoice_filter').id],
+            'domain': [
+                ('company_id', '=', self.env.company.id),
+                ('move_type', 'in', ('in_invoice', 'in_refund')),
+                ('state', '=', 'posted'),
+                ('date', '>=', fields.Date.to_string(date_from)),
+                ('date', '<=', fields.Date.to_string(date_to)),
+                ('line_ids.purchase_line_id', '!=', False),
+            ],
+            'context': {'default_move_type': 'in_invoice', 'create': False},
+            'target': 'current',
+        }
 
     # ---------------------------------------------------------------------
     # Summary, daily totals and recent receipts
@@ -443,6 +476,43 @@ class CeoMainDashboard(models.AbstractModel):
             received = self._line_qty_in_product_uom(line, line.qty_received)
             ratios[line.id] = min(max(billed[line.id] / received, 0.0), 1.0) if received > 0 else 0.0
         return ratios
+
+    def _bill_unit_prices(self, lines):
+        """Per line, one entry per posted vendor bill / refund with its untaxed unit price (discount
+        included, per product base unit, in company currency), ordered by bill date."""
+        if not lines:
+            return {}
+        groups = self.env['account.move.line'].sudo()._read_group(
+            [
+                ('purchase_line_id', 'in', lines.ids),
+                ('parent_state', '=', 'posted'),
+                ('move_id.move_type', 'in', ('in_invoice', 'in_refund')),
+            ],
+            ['purchase_line_id', 'move_id', 'product_uom_id'],
+            ['quantity:sum', 'balance:sum'],
+        )
+        totals = defaultdict(lambda: [0.0, 0.0])
+        for line, move, uom, quantity, balance in groups:
+            to_uom = line.product_id.uom_id
+            if uom and to_uom:
+                quantity = uom._compute_quantity(quantity, to_uom, rounding_method='HALF-UP')
+            totals[line, move][0] += quantity
+            totals[line, move][1] += balance
+
+        bills = defaultdict(list)
+        for (line, move), (quantity, balance) in sorted(
+                totals.items(), key=lambda item: (item[0][1].date, item[0][1].id)):
+            if quantity <= 0:
+                continue
+            bills[line.id].append({
+                'id': move.id,
+                'name': move.name,
+                'date': fields.Date.to_string(move.date),
+                'is_refund': move.move_type == 'in_refund',
+                'qty': quantity,
+                'price': abs(balance) / quantity,
+            })
+        return bills
 
     @staticmethod
     def _billing_factor(ratio, billing):

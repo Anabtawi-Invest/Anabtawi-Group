@@ -84,7 +84,7 @@
 
             <!-- KPI cards -->
             <div class="cmd_grid cmd_grid_5">
-                <div class="cmd_card cmd_card_click" t-on-click="openPeriodReceipts">
+                <div class="cmd_card cmd_card_click" t-on-click="openPeriodBills" title="Click to view the vendor bills posted in the period">
                     <div class="cmd_card_label"><i class="fa fa-truck me-1"/> Received in period</div>
                     <div class="cmd_card_value" t-esc="fmtMoney(summary.period_total)"/>
                     <div class="cmd_card_sub">
@@ -96,7 +96,7 @@
                     </div>
                 </div>
 
-                <div class="cmd_card">
+                <div class="cmd_card cmd_card_click" t-on-click="openTodayBills" title="Click to view the vendor bills posted today">
                     <div class="cmd_card_label"><i class="fa fa-calendar-check-o me-1"/> Received today</div>
                     <div class="cmd_card_value" t-esc="fmtMoney(summary.today_total)"/>
                     <div class="cmd_card_sub">
@@ -309,20 +309,25 @@
                                                         <th>Order</th>
                                                         <th>Vendor</th>
                                                         <th class="text-end">Received qty</th>
-                                                        <th class="text-end">Unit price</th>
+                                                        <th class="text-end">PO unit price</th>
+                                                        <th class="text-end">Bill unit price</th>
+                                                        <th class="text-end">Bill vs PO</th>
                                                         <th class="text-end">Change</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     <t t-foreach="state.history[row.product_id].slice().reverse()" t-as="h" t-key="h.line_id">
+                                                        <t t-set="billRows" t-value="h.bills.length ? h.bills : [null]"/>
+                                                        <t t-foreach="billRows" t-as="b" t-key="b_index">
                                                         <tr>
-                                                            <td t-esc="fmtDate(h.date)"/>
-                                                            <td>
+                                                            <t t-if="b_first">
+                                                            <td t-att-rowspan="billRows.length" t-esc="fmtDate(h.date)"/>
+                                                            <td t-att-rowspan="billRows.length">
                                                                 <a href="#" t-esc="h.order_name"
                                                                    t-on-click.prevent.stop="() => this.openOrder(h.order_id)"/>
                                                             </td>
-                                                            <td t-esc="h.vendor"/>
-                                                            <td class="text-end">
+                                                            <td t-att-rowspan="billRows.length" t-esc="h.vendor"/>
+                                                            <td class="text-end" t-att-rowspan="billRows.length">
                                                                 <t t-esc="fmtQty(h.qty)"/> <span class="cmd_muted" t-esc="h.uom"/>
                                                                 <div class="cmd_muted" t-if="qtyDiffers(h.qty, h.ordered_qty)">
                                                                     <span>Ordered:</span> <t t-esc="fmtQty(h.ordered_qty)"/>
@@ -332,8 +337,30 @@
                                                                     <t t-esc="billingLabel(h.billing_status)"/>
                                                                 </span>
                                                             </td>
-                                                            <td class="text-end cmd_strong" t-esc="fmtPrice(h.price)"/>
-                                                            <td class="text-end" t-att-class="changeClass(h.diff)">
+                                                            <td class="text-end cmd_strong" t-att-rowspan="billRows.length" t-esc="fmtPrice(h.price)"/>
+                                                            </t>
+                                                            <td class="text-end">
+                                                                <t t-if="b">
+                                                                    <t t-esc="fmtPrice(b.price)"/>
+                                                                    <div class="cmd_muted cmd_small">
+                                                                        <a href="#" t-esc="b.name"
+                                                                           t-on-click.prevent.stop="() => this.openBill(b.id)"/>
+                                                                        <span class="cmd_trend cmd_trend_up ms-1" t-if="b.is_refund">Refund</span>
+                                                                        · <t t-esc="fmtQty(b.qty)"/> <t t-esc="h.uom"/>
+                                                                        · <t t-esc="fmtDate(b.date)"/>
+                                                                    </div>
+                                                                </t>
+                                                                <span t-else="" class="cmd_muted">—</span>
+                                                            </td>
+                                                            <td class="text-end" t-att-class="b ? changeClass(b.diff) : ''">
+                                                                <span t-if="!b" class="cmd_muted">—</span>
+                                                                <span t-elif="!b.diff" class="cmd_muted">No difference</span>
+                                                                <t t-else="">
+                                                                    <t t-esc="fmtSignedPrice(b.diff)"/>
+                                                                    <div class="cmd_small" t-if="b.pct !== null" t-esc="fmtPct(b.pct)"/>
+                                                                </t>
+                                                            </td>
+                                                            <td class="text-end" t-if="b_first" t-att-rowspan="billRows.length" t-att-class="changeClass(h.diff)">
                                                                 <t t-if="h.trend === 'new'">—</t>
                                                                 <t t-else="">
                                                                     <i class="fa me-1" t-att-class="trendIcon(h.trend)"/>
@@ -341,6 +368,7 @@
                                                                 </t>
                                                             </td>
                                                         </tr>
+                                                        </t>
                                                     </t>
                                                 </tbody>
                                             </table>
