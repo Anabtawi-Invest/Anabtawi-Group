@@ -102,35 +102,109 @@ class PosReportingDashboard(models.TransientModel):
             return None
         return cash / total, visa / total
 
-    @staticmethod
-    def _split_by_journal(journal):
-        if journal and journal.type == "cash":
-            return 1.0, 0.0
-        if journal and journal.type == "bank":
-            return 0.0, 1.0
-        return None
-
     def _pledge_receive_split(self, pledge):
         """(cash_ratio, visa_ratio) for a received pledge; defaults to cash."""
         split = None
         if pledge.pos_order_id:
             split = self._split_by_payments(pledge.pos_order_id.payment_ids)
-        if not split and pledge._name == "pos.pledge":
-            split = self._split_by_journal(pledge.pledge_payment_id.journal_id)
         return split or (1.0, 0.0)
 
     def _pledge_return_split(self, pledge):
         """(cash_ratio, visa_ratio) for a returned pledge; falls back to the receive split."""
         split = None
-        if pledge._name == "pos.advance.order.pledge":
-            channel = self._pm_channel(pledge.return_payment_method_id)
-            if channel:
-                split = (1.0, 0.0) if channel == "cash" else (0.0, 1.0)
-            elif pledge.return_pos_order_id:
-                split = self._split_by_payments(pledge.return_pos_order_id.payment_ids)
-        elif pledge._name == "pos.pledge":
-            split = self._split_by_journal(pledge.return_payment_id.journal_id)
+        channel = self._pm_channel(pledge.return_payment_method_id)
+        if channel:
+            split = (1.0, 0.0) if channel == "cash" else (0.0, 1.0)
+        elif pledge.return_pos_order_id:
+            split = self._split_by_payments(pledge.return_pos_order_id.payment_ids)
         return split or self._pledge_receive_split(pledge)
+
+    @staticmethod
+    def _pledge_amount(pledge):
+        return pledge.pledge_subtotal or (pledge.pledge_qty or 0.0) * (pledge.pledge_amount_unit or 0.0)
+
+    @staticmethod
+    def _pledge_receive_branch(pledge):
+        if pledge.pos_order_id:
+            return pledge.pos_order_id.config_id
+        return pledge.order_id.pos_config_id or pledge.order_id.from_pos_config_id
+
+    def _pledge_return_branch(self, pledge):
+        return (
+            pledge.return_pos_session_id.config_id
+            or pledge.return_pos_order_id.config_id
+            or self._pledge_receive_branch(pledge)
+        )
+
+    def _get_pledge_movements(self, dt_start, dt_end, config_ids):
+        """Pledge cash-drawer movements between dt_start and dt_end for the given branch ids.
+
+        Rahen In: Active/Returned pledges received in the period, at the receiving branch.
+        Rahen Out: pledges returned in the period (whenever they were received), at the returning branch.
+        Pledges without a resolvable branch are skipped.
+        """
+        if "pos.advance.order.pledge" not in self.env:
+            return []
+        str_start = fields.Datetime.to_string(dt_start)
+        str_end = fields.Datetime.to_string(dt_end)
+        pledges = self.env["pos.advance.order.pledge"].sudo().search([
+            "|", "|", "|",
+            "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
+            "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
+            "&", ("return_date", ">=", str_start), ("return_date", "<=", str_end),
+            "&", "&", ("state", "=", "returned"), ("return_date", "=", False),
+            "&", ("write_date", ">=", str_start), ("write_date", "<=", str_end),
+        ], order="id desc")
+
+        movements = []
+        for pledge in pledges:
+            amount = self._pledge_amount(pledge)
+            if not amount:
+                continue
+
+            rec_dt = pledge.receive_date or pledge.create_date
+            if pledge.state in ("active", "returned") and rec_dt and dt_start <= rec_dt <= dt_end:
+                cfg = self._pledge_receive_branch(pledge)
+                if cfg and cfg.id in config_ids:
+                    cash_r, visa_r = self._pledge_receive_split(pledge)
+                    movements.append({
+                        "pledge": pledge,
+                        "type": "in",
+                        "date": rec_dt,
+                        "config": cfg,
+                        "amount": amount,
+                        "cash": amount * cash_r,
+                        "visa": amount * visa_r,
+                        "pos_order": pledge.pos_order_id,
+                        "payment_method": self.env["pos.payment.method"],
+                    })
+
+            ret_dt = pledge.return_date or pledge.write_date
+            if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
+                cfg = self._pledge_return_branch(pledge)
+                if cfg and cfg.id in config_ids:
+                    cash_r, visa_r = self._pledge_return_split(pledge)
+                    movements.append({
+                        "pledge": pledge,
+                        "type": "out",
+                        "date": ret_dt,
+                        "config": cfg,
+                        "amount": amount,
+                        "cash": amount * cash_r,
+                        "visa": amount * visa_r,
+                        "pos_order": pledge.return_pos_order_id or pledge.pos_order_id,
+                        "payment_method": pledge.return_payment_method_id,
+                    })
+        return movements
+
+    def _get_report_configs(self, config_ids=None):
+        domain = [
+            ("active", "=", True),
+            ("company_id", "in", self.env.companies.ids),
+        ]
+        if config_ids and isinstance(config_ids, (list, tuple)) and len(config_ids) > 0:
+            domain.append(("id", "in", config_ids))
+        return self.env["pos.config"].sudo().search(domain, order="name")
 
     def _advance_channel(self, adv):
         """'cash' or 'visa' for an advance order deposit."""
@@ -154,14 +228,7 @@ class PosReportingDashboard(models.TransientModel):
         total_minutes = max(total_seconds / 60.0, 1.0)
 
         # Identify target POS configurations filtered by active companies
-        config_domain = [
-            ("active", "=", True),
-            ("company_id", "in", self.env.companies.ids),
-        ]
-        if config_ids and isinstance(config_ids, (list, tuple)) and len(config_ids) > 0:
-            config_domain.append(("id", "in", config_ids))
-
-        configs = self.env["pos.config"].sudo().search(config_domain, order="name")
+        configs = self._get_report_configs(config_ids)
         active_config_ids = set(configs.ids)
 
         def _empty_branch_dict():
@@ -387,71 +454,12 @@ class PosReportingDashboard(models.TransientModel):
             )
 
         # --- D. Collect Pledges (Filtered by Date Range) ---
-        if "pos.advance.order.pledge" in self.env:
-            pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([
-                "|",
-                "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
-                "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
-            ])
-            for pledge in pledge_recs:
-                cfg_id = False
-                if pledge.pos_order_id:
-                    cfg_id = pledge.pos_order_id.config_id.id
-                elif pledge.order_id and hasattr(pledge.order_id, "pos_config_id"):
-                    cfg_id = pledge.order_id.pos_config_id.id
-                elif pledge.order_id and hasattr(pledge.order_id, "from_pos_config_id"):
-                    cfg_id = pledge.order_id.from_pos_config_id.id
-
-                if not cfg_id or (active_config_ids and cfg_id not in active_config_ids):
-                    continue
-
-                amt = (
-                    pledge.pledge_subtotal
-                    or (getattr(pledge, "pledge_qty", 1.0) * getattr(pledge, "pledge_amount_unit", 0.0))
-                    or getattr(pledge, "pledge_amount", 0.0)
-                    or 0.0
-                )
-
-                rec_dt = pledge.receive_date or pledge.create_date
-                ret_dt = pledge.return_date or (pledge.write_date if pledge.state == "returned" else None)
-
-                if rec_dt and dt_start <= rec_dt <= dt_end:
-                    branch_data[cfg_id]["rahen_in"] += amt
-                    cash_r, visa_r = self._pledge_receive_split(pledge)
-                    branch_data[cfg_id]["pledge_cash_in"] += amt * cash_r
-                    branch_data[cfg_id]["pledge_visa_in"] += amt * visa_r
-
-                if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
-                    branch_data[cfg_id]["rahen_out"] += amt
-                    cash_r, visa_r = self._pledge_return_split(pledge)
-                    branch_data[cfg_id]["pledge_cash_out"] += amt * cash_r
-                    branch_data[cfg_id]["pledge_visa_out"] += amt * visa_r
-
-        if "pos.pledge" in self.env:
-            pledges_std = self.env["pos.pledge"].sudo().search([
-                ("create_date", ">=", str_start),
-                ("create_date", "<=", str_end),
-            ])
-            for pledge in pledges_std:
-                cfg_id = pledge.pos_config_id.id if pledge.pos_config_id else (pledge.pos_order_id.config_id.id if pledge.pos_order_id else False)
-                if not cfg_id or (active_config_ids and cfg_id not in active_config_ids):
-                    continue
-
-                amt = pledge.pledge_amount or 0.0
-                c_dt = pledge.create_date
-                r_dt = pledge.return_date or (pledge.write_date if pledge.state == "returned" else None)
-
-                if c_dt and dt_start <= c_dt <= dt_end:
-                    branch_data[cfg_id]["rahen_in"] += amt
-                    cash_r, visa_r = self._pledge_receive_split(pledge)
-                    branch_data[cfg_id]["pledge_cash_in"] += amt * cash_r
-                    branch_data[cfg_id]["pledge_visa_in"] += amt * visa_r
-
-                if pledge.state == "returned" and r_dt and dt_start <= r_dt <= dt_end:
-                    branch_data[cfg_id]["rahen_out"] += amt
-                    cash_r, visa_r = self._pledge_return_split(pledge)
-                    branch_data[cfg_id]["pledge_cash_out"] += amt * cash_r
-                    branch_data[cfg_id]["pledge_visa_out"] += amt * visa_r
+        for move in self._get_pledge_movements(dt_start, dt_end, active_config_ids):
+            branch = branch_data[move["config"].id]
+            side = move["type"]
+            branch["rahen_%s" % side] += move["amount"]
+            branch["pledge_cash_%s" % side] += move["cash"]
+            branch["pledge_visa_%s" % side] += move["visa"]
 
         for cfg_id in active_config_ids:
             branch = branch_data[cfg_id]
@@ -707,14 +715,7 @@ class PosReportingDashboard(models.TransientModel):
         str_start = fields.Datetime.to_string(dt_start)
         str_end = fields.Datetime.to_string(dt_end)
 
-        config_domain = [
-            ("active", "=", True),
-            ("company_id", "in", self.env.companies.ids),
-        ]
-        if config_ids and isinstance(config_ids, (list, tuple)) and len(config_ids) > 0:
-            config_domain.append(("id", "in", config_ids))
-
-        configs = self.env["pos.config"].sudo().search(config_domain)
+        configs = self._get_report_configs(config_ids)
         active_config_ids = set(configs.ids)
 
         def _get_employee_pos_config(emp):
@@ -1004,49 +1005,32 @@ class PosReportingDashboard(models.TransientModel):
                     "company_id": cfg.company_id.id,
                 })
 
-        elif metric_type == "net_pledges":
-            if "pos.advance.order.pledge" in self.env:
-                pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([
-                    "|",
-                    "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
-                    "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
-                ])
-                for pledge in pledge_recs:
-                    cfg = pledge.pos_order_id.config_id if pledge.pos_order_id else (
-                        pledge.order_id.pos_config_id if (pledge.order_id and hasattr(pledge.order_id, "pos_config_id")) else (
-                            pledge.order_id.from_pos_config_id if (pledge.order_id and hasattr(pledge.order_id, "from_pos_config_id")) else False
-                        )
-                    )
-                    if not cfg or cfg.id not in active_config_ids:
-                        continue
-
-                    amt = pledge.pledge_subtotal or (getattr(pledge, "pledge_qty", 1.0) * getattr(pledge, "pledge_amount_unit", 0.0)) or 0.0
-                    rec_dt = pledge.receive_date or pledge.create_date
-                    ret_dt = pledge.return_date or (pledge.write_date if pledge.state == "returned" else None)
-
-                    if rec_dt and dt_start <= rec_dt <= dt_end:
-                        vals_list.append({
-                            "name": _("Pledge Received: %s") % (pledge.display_name or pledge.product_id.name),
-                            "date": rec_dt,
-                            "config_id": cfg.id,
-                            "report_type": "rahen_in",
-                            "amount": amt,
-                            "rahen_in_amount": amt,
-                            "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
-                            "company_id": cfg.company_id.id,
-                        })
-
-                    if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
-                        vals_list.append({
-                            "name": _("Pledge Returned: %s") % (pledge.display_name or pledge.product_id.name),
-                            "date": ret_dt,
-                            "config_id": cfg.id,
-                            "report_type": "rahen_out",
-                            "amount": amt,
-                            "rahen_out_amount": amt,
-                            "partner_id": pledge.partner_id.id if hasattr(pledge, "partner_id") else False,
-                            "company_id": cfg.company_id.id,
-                        })
+        elif metric_type in ("net_pledges", "pledge_cash", "pledge_visa"):
+            share_key = {"pledge_cash": "cash", "pledge_visa": "visa"}.get(metric_type, "amount")
+            for move in self._get_pledge_movements(dt_start, dt_end, active_config_ids):
+                share = move[share_key]
+                if not share:
+                    continue
+                pledge = move["pledge"]
+                cfg = move["config"]
+                is_in = move["type"] == "in"
+                sign = 1.0 if is_in else -1.0
+                label = pledge.display_name or pledge.product_id.name
+                vals_list.append({
+                    "name": (_("Pledge Received: %s") if is_in else _("Pledge Returned: %s")) % label,
+                    "date": move["date"],
+                    "config_id": cfg.id,
+                    "report_type": "rahen_in" if is_in else "rahen_out",
+                    "payment_method_id": move["payment_method"].id or False,
+                    "pos_order_id": move["pos_order"].id or False,
+                    "amount": sign * share,
+                    "rahen_in_amount": share if is_in else 0.0,
+                    "rahen_out_amount": 0.0 if is_in else share,
+                    "cash_amount": sign * move["cash"] if share_key in ("amount", "cash") else 0.0,
+                    "visa_amount": sign * move["visa"] if share_key in ("amount", "visa") else 0.0,
+                    "partner_id": pledge.partner_id.id or False,
+                    "company_id": cfg.company_id.id,
+                })
 
         elif metric_type == "advance_deposits":
             if "pos.advance.order" in self.env:
@@ -1073,67 +1057,6 @@ class PosReportingDashboard(models.TransientModel):
                             "partner_id": adv.partner_id.id if hasattr(adv, "partner_id") else False,
                             "company_id": cfg.company_id.id,
                         })
-
-        elif metric_type in ("pledge_cash", "pledge_visa"):
-            idx = 0 if metric_type == "pledge_cash" else 1
-            pledges = []
-            if "pos.advance.order.pledge" in self.env:
-                pledges += list(self.env["pos.advance.order.pledge"].sudo().search([
-                    "|",
-                    "&", ("receive_date", ">=", str_start), ("receive_date", "<=", str_end),
-                    "&", ("create_date", ">=", str_start), ("create_date", "<=", str_end),
-                ]))
-            if "pos.pledge" in self.env:
-                pledges += list(self.env["pos.pledge"].sudo().search([
-                    ("create_date", ">=", str_start),
-                    ("create_date", "<=", str_end),
-                ]))
-
-            for pledge in pledges:
-                if pledge._name == "pos.pledge":
-                    cfg = pledge.pos_config_id or pledge.pos_order_id.config_id
-                    amt = pledge.pledge_amount or 0.0
-                    rec_dt = pledge.create_date
-                    return_pm = self.env["pos.payment.method"]
-                else:
-                    cfg = pledge.pos_order_id.config_id if pledge.pos_order_id else (
-                        pledge.order_id.pos_config_id or pledge.order_id.from_pos_config_id
-                    )
-                    amt = pledge.pledge_subtotal or (pledge.pledge_qty * pledge.pledge_amount_unit) or 0.0
-                    rec_dt = pledge.receive_date or pledge.create_date
-                    return_pm = pledge.return_payment_method_id
-                if not cfg or cfg.id not in active_config_ids:
-                    continue
-
-                label = pledge.display_name or (pledge.product_id.name if "product_id" in pledge._fields else "")
-                ret_dt = pledge.return_date or (pledge.write_date if pledge.state == "returned" else None)
-                entries = []
-                if rec_dt and dt_start <= rec_dt <= dt_end:
-                    share = amt * self._pledge_receive_split(pledge)[idx]
-                    entries.append(("rahen_in", _("Pledge Received: %s") % label, rec_dt, share, pledge.pos_order_id))
-                if pledge.state == "returned" and ret_dt and dt_start <= ret_dt <= dt_end:
-                    share = amt * self._pledge_return_split(pledge)[idx]
-                    ret_order = pledge.return_pos_order_id if "return_pos_order_id" in pledge._fields else pledge.pos_order_id
-                    entries.append(("rahen_out", _("Pledge Returned: %s") % label, ret_dt, share, ret_order))
-
-                for report_type, name, dt, share, po in entries:
-                    if not share:
-                        continue
-                    vals_list.append({
-                        "name": name,
-                        "date": dt,
-                        "config_id": cfg.id,
-                        "report_type": report_type,
-                        "payment_method_id": return_pm.id if (report_type == "rahen_out" and return_pm) else False,
-                        "pos_order_id": po.id if po else False,
-                        "amount": share,
-                        "rahen_in_amount": share if report_type == "rahen_in" else 0.0,
-                        "rahen_out_amount": share if report_type == "rahen_out" else 0.0,
-                        "cash_amount": share if idx == 0 else 0.0,
-                        "visa_amount": share if idx == 1 else 0.0,
-                        "partner_id": pledge.partner_id.id if pledge.partner_id else False,
-                        "company_id": cfg.company_id.id,
-                    })
 
         elif metric_type in ("advance_cash", "advance_visa"):
             channel = "cash" if metric_type == "advance_cash" else "visa"
