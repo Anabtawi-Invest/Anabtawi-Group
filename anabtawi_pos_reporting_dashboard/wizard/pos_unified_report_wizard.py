@@ -159,8 +159,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             (_("Cash In"), "cash_in", False),
             (_("Cash Out"), "cash_out", False),
             (_("Net Cash Moves"), "net_cash_moves", False),
-            (_("Rahen In (Pledge)"), "rahen_in", False),
-            (_("Rahen Out (Return)"), "rahen_out", False),
+            (_("Pledge (Rahen) In"), "rahen_in", False),
+            (_("Pledge (Rahen) Out"), "rahen_out", False),
             (_("Net Pledges"), "net_pledges", False),
             (_("Pledge Cash In"), "pledge_cash_in", False),
             (_("Pledge Cash Out"), "pledge_cash_out", False),
@@ -318,10 +318,10 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet2.write_number(c_row, 13, tot_dep_cash, total_num_fmt)
             sheet2.write_number(c_row, 14, tot_dep_visa, total_num_fmt)
 
-        # --- Sheet 3: Pledges Detail (Rahen In & Rahen Out) ---
+        # --- Sheet 3: Pledge (Rahen) Detail ---
         if "pos.advance.order.pledge" in self.env:
-            sheet3 = workbook.add_worksheet(_("Pledges Detail (Rahen In & Out)"))
-            sheet3.write(0, 0, _("POS Pledges Audit List (Rahen In / Out)"), title_fmt)
+            sheet3 = workbook.add_worksheet(_("Pledge (Rahen) Detail"))
+            sheet3.write(0, 0, _("POS Pledge (Rahen) Audit List - In / Out"), title_fmt)
             sheet3.write(1, 0, _("Period: %s to %s") % (str_start, str_end), sub_fmt)
 
             plg_headers = [
@@ -330,13 +330,13 @@ class PosUnifiedReportWizard(models.TransientModel):
                 _("Pledge Item"),
                 _("Branch Name"),
                 _("Status"),
-                _("Rahen In Amount"),
-                _("Rahen In Cash"),
-                _("Rahen In Visa"),
+                _("Pledge (Rahen) In Amount"),
+                _("Pledge (Rahen) In Cash"),
+                _("Pledge (Rahen) In Visa"),
                 _("Received On (Date & Time)"),
-                _("Rahen Out Amount"),
-                _("Rahen Out Cash"),
-                _("Rahen Out Visa"),
+                _("Pledge (Rahen) Out Amount"),
+                _("Pledge (Rahen) Out Cash"),
+                _("Pledge (Rahen) Out Visa"),
                 _("Returned On (Date & Time)"),
             ]
 
@@ -354,7 +354,10 @@ class PosUnifiedReportWizard(models.TransientModel):
             for col_idx, h in enumerate(plg_headers):
                 sheet3.write(start_row_plg, col_idx, h, header_fmt)
 
-            pledge_recs = self.env["pos.advance.order.pledge"].sudo().search([], order="id desc")
+            pledge_dt_start, pledge_dt_end = service._parse_datetime_bounds(str_start, str_end)
+            report_config_ids = set(service._get_report_configs(config_ids).ids)
+            movements = service._get_pledge_movements(pledge_dt_start, pledge_dt_end, report_config_ids)
+            movements.sort(key=lambda m: m["date"], reverse=True)
 
             p_row = start_row_plg + 1
             tot_rin = 0.0
@@ -362,46 +365,20 @@ class PosUnifiedReportWizard(models.TransientModel):
             tot_rin_cash = tot_rin_visa = 0.0
             tot_rout_cash = tot_rout_visa = 0.0
 
-            for p in pledge_recs:
-                cfg = False
-                if p.pos_order_id:
-                    cfg = p.pos_order_id.config_id
-                elif p.order_id and hasattr(p.order_id, "pos_config_id"):
-                    cfg = p.order_id.pos_config_id
-                elif p.order_id and hasattr(p.order_id, "from_pos_config_id"):
-                    cfg = p.order_id.from_pos_config_id
-
-                if target_config_ids and cfg and (cfg.id not in target_config_ids):
-                    continue
-
-                branch_name = cfg.name if cfg else ""
+            for move in movements:
+                p = move["pledge"]
+                is_in = move["type"] == "in"
+                branch_name = move["config"].name or ""
                 cust_name = p.partner_id.name if p.partner_id else ""
                 order_ref = p.pos_order_id.name if p.pos_order_id else (p.order_id.name if p.order_id else "")
                 prod_name = p.product_id.display_name if p.product_id else ""
                 status_label = dict(p._fields["state"].selection).get(p.state, p.state)
-                amt = p.pledge_subtotal or (getattr(p, "pledge_qty", 1.0) * getattr(p, "pledge_amount_unit", 0.0)) or 0.0
+                move_dt_str = fields.Datetime.to_string(move["date"])
 
-                rec_dt = self._to_datetime(p.receive_date) or self._to_datetime(p.create_date)
-                ret_dt = self._to_datetime(p.return_date) or (self._to_datetime(p.write_date) if p.state == "returned" else None)
-
-                in_amt = 0.0
-                if rec_dt and (dt_start <= rec_dt <= dt_end):
-                    in_amt = amt
-
-                out_amt = 0.0
-                if p.state == "returned" and ret_dt and (dt_start <= ret_dt <= dt_end):
-                    out_amt = amt
-
-                if in_amt == 0.0 and out_amt == 0.0:
-                    continue
-
-                rec_dt_str = fields.Datetime.to_string(rec_dt) if in_amt > 0 else ""
-                ret_dt_str = fields.Datetime.to_string(ret_dt) if out_amt > 0 else ""
-
-                in_cash_r, in_visa_r = service._pledge_receive_split(p) if in_amt else (0.0, 0.0)
-                out_cash_r, out_visa_r = service._pledge_return_split(p) if out_amt else (0.0, 0.0)
-                in_cash, in_visa = in_amt * in_cash_r, in_amt * in_visa_r
-                out_cash, out_visa = out_amt * out_cash_r, out_amt * out_visa_r
+                in_amt, in_cash, in_visa = (move["amount"], move["cash"], move["visa"]) if is_in else (0.0, 0.0, 0.0)
+                out_amt, out_cash, out_visa = (0.0, 0.0, 0.0) if is_in else (move["amount"], move["cash"], move["visa"])
+                rec_dt_str = move_dt_str if is_in else ""
+                ret_dt_str = "" if is_in else move_dt_str
 
                 sheet3.write(p_row, 0, cust_name, text_fmt)
                 sheet3.write(p_row, 1, order_ref, text_fmt)
@@ -437,6 +414,16 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet3.write_number(p_row, 10, tot_rout_cash, total_num_fmt)
             sheet3.write_number(p_row, 11, tot_rout_visa, total_num_fmt)
             sheet3.write(p_row, 12, "", total_text_fmt)
+
+            p_row += 1
+            sheet3.write(p_row, 0, _("NET (In - Out)"), total_text_fmt)
+            for col in range(1, 5):
+                sheet3.write(p_row, col, "", total_text_fmt)
+            sheet3.write_number(p_row, 5, tot_rin - tot_rout, total_num_fmt)
+            sheet3.write_number(p_row, 6, tot_rin_cash - tot_rout_cash, total_num_fmt)
+            sheet3.write_number(p_row, 7, tot_rin_visa - tot_rout_visa, total_num_fmt)
+            for col in range(8, 13):
+                sheet3.write(p_row, col, "", total_text_fmt)
 
         # --- Sheet 4: Cash Movements Detail (Cash In & Cash Out) ---
         sheet4 = workbook.add_worksheet(_("Cash Movements Detail"))

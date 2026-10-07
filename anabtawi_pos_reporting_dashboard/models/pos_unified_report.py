@@ -19,8 +19,8 @@ class PosUnifiedReport(models.TransientModel):
         ("advance_deposit", "Advance Order Deposit"),
         ("cash_in", "Cash In"),
         ("cash_out", "Cash Out"),
-        ("rahen_in", "Pledge Received (Rahen In)"),
-        ("rahen_out", "Pledge Returned (Rahen Out)"),
+        ("rahen_in", "Pledge (Rahen) In"),
+        ("rahen_out", "Pledge (Rahen) Out"),
         ("attendant_employees", "Attendant Employees"),
         ("labor_cost", "Daily Employee Labor Cost"),
         ("extra_hours", "Extra Hours (Overtime)"),
@@ -38,8 +38,8 @@ class PosUnifiedReport(models.TransientModel):
     employee_debt_amount = fields.Float(string="Employee Debt Amount", digits=(16, 3))
     cash_in_amount = fields.Float(string="Cash In Amount", digits=(16, 3))
     cash_out_amount = fields.Float(string="Cash Out Amount", digits=(16, 3))
-    rahen_in_amount = fields.Float(string="Rahen In Amount", digits=(16, 3))
-    rahen_out_amount = fields.Float(string="Rahen Out Amount", digits=(16, 3))
+    rahen_in_amount = fields.Float(string="Pledge (Rahen) In Amount", digits=(16, 3))
+    rahen_out_amount = fields.Float(string="Pledge (Rahen) Out Amount", digits=(16, 3))
     advance_amount = fields.Float(string="Advance Deposit Amount", digits=(16, 3))
     delivery_amount = fields.Float(string="Delivery Amount", digits=(16, 3))
     attendant_employee_count = fields.Integer(string="Attendant Employee Count")

@@ -181,10 +181,10 @@
                         </div>
                     </div>
 
-                    <!-- Pledges (Rahen In / Out) -->
+                    <!-- Pledge (Rahen) In / Out -->
                     <div class="o_kpi_card card-pledges clickable_kpi" t-on-click="() => this.onKpiClick('net_pledges')" title="Click to view detailed transactions &amp; export Excel">
                         <div class="kpi_icon"><i class="fa fa-handshake-o text-danger"/></div>
-                        <div class="kpi_title">Net Pledges (Rahen)</div>
+                        <div class="kpi_title">Net Pledge (Rahen)</div>
                         <div class="kpi_value"><t t-esc="formatCurrency(data.kpis.net_pledges)"/></div>
                         <div class="kpi_subtext d-flex justify-content-between align-items-center">
                             <div>
@@ -479,13 +479,13 @@
                                         <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'net_cash_moves'"/>
                                     </th>
                                     <th class="text-end sortable_th" t-on-click="() => this.sortBy('rahen_in')">
-                                        Rahen In
+                                        Pledge (Rahen) In
                                         <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'rahen_in' &amp;&amp; state.sortOrder === 'desc'"/>
                                         <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'rahen_in' &amp;&amp; state.sortOrder === 'asc'"/>
                                         <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'rahen_in'"/>
                                     </th>
                                     <th class="text-end sortable_th" t-on-click="() => this.sortBy('rahen_out')">
-                                        Rahen Out
+                                        Pledge (Rahen) Out
                                         <i class="fa fa-sort-amount-desc text-primary ms-1" t-if="state.sortKey === 'rahen_out' &amp;&amp; state.sortOrder === 'desc'"/>
                                         <i class="fa fa-sort-amount-asc text-primary ms-1" t-if="state.sortKey === 'rahen_out' &amp;&amp; state.sortOrder === 'asc'"/>
                                         <i class="fa fa-sort text-muted ms-1 opacity-50" t-if="state.sortKey !== 'rahen_out'"/>
