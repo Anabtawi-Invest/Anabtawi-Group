@@ -153,8 +153,8 @@ class PosUnifiedReportWizard(models.TransientModel):
             (_("Cash In"), "cash_in", False),
             (_("Cash Out"), "cash_out", False),
             (_("Net Cash Moves"), "net_cash_moves", False),
-            (_("Rahen In (Pledge)"), "rahen_in", False),
-            (_("Rahen Out (Return)"), "rahen_out", False),
+            (_("Pledge (Rahen) In"), "rahen_in", False),
+            (_("Pledge (Rahen) Out"), "rahen_out", False),
             (_("Net Pledges"), "net_pledges", False),
             (_("Pledge Cash In"), "pledge_cash_in", False),
             (_("Pledge Cash Out"), "pledge_cash_out", False),
@@ -311,10 +311,10 @@ class PosUnifiedReportWizard(models.TransientModel):
             sheet2.write_number(c_row, 13, tot_dep_cash, total_num_fmt)
             sheet2.write_number(c_row, 14, tot_dep_visa, total_num_fmt)
 
-        # --- Sheet 3: Pledges Detail (Rahen In & Rahen Out) ---
+        # --- Sheet 3: Pledge (Rahen) Detail ---
         if "pos.advance.order.pledge" in self.env:
-            sheet3 = workbook.add_worksheet(_("Pledges Detail (Rahen In & Out)"))
-            sheet3.write(0, 0, _("POS Pledges Audit List (Rahen In / Out)"), title_fmt)
+            sheet3 = workbook.add_worksheet(_("Pledge (Rahen) Detail"))
+            sheet3.write(0, 0, _("POS Pledge (Rahen) Audit List - In / Out"), title_fmt)
             sheet3.write(1, 0, _("Period: %s to %s") % (str_start, str_end), sub_fmt)
 
             plg_headers = [
@@ -323,13 +323,13 @@ class PosUnifiedReportWizard(models.TransientModel):
                 _("Pledge Item"),
                 _("Branch Name"),
                 _("Status"),
-                _("Rahen In Amount"),
-                _("Rahen In Cash"),
-                _("Rahen In Visa"),
+                _("Pledge (Rahen) In Amount"),
+                _("Pledge (Rahen) In Cash"),
+                _("Pledge (Rahen) In Visa"),
                 _("Received On (Date & Time)"),
-                _("Rahen Out Amount"),
-                _("Rahen Out Cash"),
-                _("Rahen Out Visa"),
+                _("Pledge (Rahen) Out Amount"),
+                _("Pledge (Rahen) Out Cash"),
+                _("Pledge (Rahen) Out Visa"),
                 _("Returned On (Date & Time)"),
             ]
 

@@ -139,8 +139,8 @@ class PosReportingDashboard(models.TransientModel):
     def _get_pledge_movements(self, dt_start, dt_end, config_ids):
         """Pledge cash-drawer movements between dt_start and dt_end for the given branch ids.
 
-        Rahen In: Active/Returned pledges received in the period, at the receiving branch.
-        Rahen Out: pledges returned in the period (whenever they were received), at the returning branch.
+        Pledge (Rahen) In: Active/Returned pledges received in the period, at the receiving branch.
+        Pledge (Rahen) Out: pledges returned in the period (whenever they were received), at the returning branch.
         Pledges without a resolvable branch are skipped.
         """
         if "pos.advance.order.pledge" not in self.env:
@@ -1139,7 +1139,7 @@ class PosReportingDashboard(models.TransientModel):
             "online_sales": _("Online & Delivery Sales Transactions"),
             "employee_debt": _("Debt Sales (مبيعات الذمم) Transactions"),
             "net_cash_moves": _("Cash Moves (In / Out) Transactions"),
-            "net_pledges": _("Pledges (Rahen In / Out) Transactions"),
+            "net_pledges": _("Pledge (Rahen) In / Out Transactions"),
             "advance_deposits": _("Advance Order Deposit Transactions"),
             "pledge_cash": _("Pledge Cash (Received / Returned) Transactions"),
             "pledge_visa": _("Pledge Visa (Received / Returned) Transactions"),
