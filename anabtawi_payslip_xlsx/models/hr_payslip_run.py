@@ -423,99 +423,52 @@ class HrPayslipRun(models.Model):
             if abs(col_total) > 0.0001:
                 dynamic_ded_cols.append((c_name, max(18, len(c_name) + 4), rule_keys, input_type_ids))
 
-        # --- 4. Column Layout Assembly ---
-        gross_col = (_("Gross Salary (before tax)"), 22)
+        # --- 4. Column Definitions (group, header, width, kind) ---
+        # kind: "text" = always shown, "num" = hidden automatically when the whole column is zero
+        columns = []
+        for name, width in info_cols:
+            columns.append({"group": "info", "name": name, "width": width, "kind": "text"})
+        columns[5]["kind"] = "num"  # SSC Subject Wage (hidden if all zero, not totaled)
+        columns[5]["no_total"] = True
 
-        all_alw_headers = [c[0] for c in fixed_alw_cols] + [c[0] for c in dynamic_alw_cols] + [gross_col[0]]
-        all_alw_widths = [c[1] for c in fixed_alw_cols] + [c[1] for c in dynamic_alw_cols] + [gross_col[1]]
+        columns.append({"group": "key", "name": _("Net Salary"), "width": 18, "kind": "num", "net": True})
+        columns.append({"group": "key", "name": _("Attendance Days"), "width": 16, "kind": "num"})
+        columns.append({"group": "key", "name": _("Out of Contract Days"), "width": 20, "kind": "num"})
 
-        all_ded_headers = [c[0] for c in fixed_ded_cols] + [c[0] for c in dynamic_ded_cols]
-        all_ded_widths = [c[1] for c in fixed_ded_cols] + [c[1] for c in dynamic_ded_cols]
+        for name, width in fixed_alw_cols:
+            columns.append({"group": "alw", "name": name, "width": width, "kind": "num"})
+        for c_name, width, _rk, _it in dynamic_alw_cols:
+            columns.append({"group": "alw", "name": c_name, "width": width, "kind": "num"})
+        columns.append({"group": "alw", "name": _("Gross Salary (before tax)"), "width": 22, "kind": "num"})
 
-        all_comp_headers = [c[0] for c in fixed_comp_cols]
-        all_comp_widths = [c[1] for c in fixed_comp_cols]
+        for name, width in fixed_ded_cols:
+            columns.append({"group": "ded", "name": name, "width": width, "kind": "num"})
+        for c_name, width, _rk, _it in dynamic_ded_cols:
+            columns.append({"group": "ded", "name": c_name, "width": width, "kind": "num"})
 
-        info_headers = [c[0] for c in info_cols]
-        summary_headers = [c[0] for c in summary_cols]
+        for name, width in fixed_comp_cols:
+            columns.append({"group": "comp", "name": name, "width": width, "kind": "num"})
 
-        info_count = len(info_cols)
-        key_count = len(key_cols)
-        alw_count = len(all_alw_headers)
-        ded_count = len(all_ded_headers)
-        comp_count = len(all_comp_headers)
-        sum_count = len(summary_cols)
+        columns.append({"group": "sum", "name": _("Worked Hours"), "width": 15, "kind": "num"})
+        columns.append({"group": "sum", "name": _("Overtime Hours"), "width": 15, "kind": "num"})
+        columns.append({"group": "sum", "name": _("Note / Description"), "width": 30, "kind": "text"})
 
-        key_start_col = info_count
-        alw_start_col = key_start_col + key_count
-        alw_end_col = alw_start_col + alw_count - 1
+        def _rule_or_input_value(payslip, lines, rule_keys, input_type_ids):
+            val = 0.0
+            if rule_keys:
+                r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
+                if r_lines:
+                    val = sum(r_lines.mapped("total"))
+            if abs(val) < 0.0001 and input_type_ids:
+                in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
+                if in_lines:
+                    in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
+                    if abs(in_val) > 0.0001:
+                        val = in_val
+            return val
 
-        ded_start_col = alw_end_col + 1
-        ded_end_col = ded_start_col + ded_count - 1
-
-        comp_start_col = ded_end_col + 1
-        comp_end_col = comp_start_col + comp_count - 1
-
-        sum_start_col = comp_end_col + 1
-        sum_end_col = sum_start_col + sum_count - 1
-
-        total_num_cols = sum_end_col + 1
-
-        # Set Column Widths
-        all_col_widths = (
-            [c[1] for c in info_cols]
-            + [c[1] for c in key_cols]
-            + all_alw_widths
-            + all_ded_widths
-            + all_comp_widths
-            + [c[1] for c in summary_cols]
-        )
-        for col_idx, width in enumerate(all_col_widths):
-            sheet1.set_column(col_idx, col_idx, width)
-
-        # --- 5. Render 2-Tier Header Row ---
-        row_super = row
-        row_sub = row + 1
-
-        # Info Columns (Vertically merged across row_super and row_sub)
-        for c_idx, name in enumerate(info_headers):
-            sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, header_fmt)
-
-        # Net Salary / Attendance Days Columns (Vertically merged across row_super and row_sub)
-        for idx, (name, _w) in enumerate(key_cols):
-            c_idx = key_start_col + idx
-            sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, header_fmt)
-
-        # ALLOWANCE Group Super-Header & Sub-Headers
-        if alw_count > 1:
-            sheet1.merge_range(row_super, alw_start_col, row_super, alw_end_col, _("ALLOWANCE"), group_header_alw_fmt)
-        else:
-            sheet1.write(row_super, alw_start_col, _("ALLOWANCE"), group_header_alw_fmt)
-
-        for idx, name in enumerate(all_alw_headers):
-            sheet1.write(row_sub, alw_start_col + idx, name, header_fmt)
-
-        # DEDUCTION Group Super-Header & Sub-Headers
-        if ded_count > 1:
-            sheet1.merge_range(row_super, ded_start_col, row_super, ded_end_col, _("DEDUCTION"), group_header_ded_fmt)
-        else:
-            sheet1.write(row_super, ded_start_col, _("DEDUCTION"), group_header_ded_fmt)
-
-        for idx, name in enumerate(all_ded_headers):
-            sheet1.write(row_sub, ded_start_col + idx, name, header_fmt)
-
-        # COMPANY CONTRIBUTIONS Columns (Vertically merged across row_super and row_sub)
-        for idx, name in enumerate(all_comp_headers):
-            c_idx = comp_start_col + idx
-            sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, group_header_comp_fmt)
-
-        # Summary / Attendance Columns (Vertically merged across row_super and row_sub)
-        for idx, name in enumerate(summary_headers):
-            c_idx = sum_start_col + idx
-            sheet1.merge_range(row_super, c_idx, row_sub, c_idx, name, header_fmt)
-
-        table_start_row = row_sub + 1
-        data_row = table_start_row
-
+        # --- 5. Collect Row Values (one list per payslip, same order as `columns`) ---
+        rows = []
         audit_entries = []
 
         if not payslips:
@@ -526,213 +479,197 @@ class HrPayslipRun(models.Model):
                 "status": "WARNING",
                 "remarks": _("No employees included in this selection."),
             })
-        else:
-            for payslip in payslips:
-                emp = payslip.employee_id
-                issues = []
-                
-                emp_id_val = (
-                    getattr(emp, "employee_number", False)
-                    or getattr(emp, "registration_number", False)
-                    or getattr(emp, "barcode", False)
-                    or (str(emp.id) if emp else "N/A")
-                )
-                if not emp:
-                    issues.append(_("Missing Employee record"))
-                elif not getattr(emp, "employee_number", False):
-                    issues.append(_("Missing Employee Number"))
 
-                emp_name_val = emp.legal_name or emp.name if emp else "N/A"
-                dept_val = emp.department_id.name if emp and emp.department_id else "N/A"
-                if emp and not emp.department_id:
-                    issues.append(_("Missing Department"))
+        for payslip in payslips:
+            emp = payslip.employee_id
+            issues = []
 
-                job_val = emp.job_id.name if emp and emp.job_id else "N/A"
-                code_val = emp_id_val
+            emp_id_val = (
+                getattr(emp, "employee_number", False)
+                or getattr(emp, "registration_number", False)
+                or getattr(emp, "barcode", False)
+                or (str(emp.id) if emp else "N/A")
+            )
+            if not emp:
+                issues.append(_("Missing Employee record"))
+            elif not getattr(emp, "employee_number", False):
+                issues.append(_("Missing Employee Number"))
 
-                period_from_val = format_date(self.env, payslip.date_from or self.date_start)
-                period_to_val = format_date(self.env, payslip.date_to or self.date_end)
+            emp_name_val = (emp.legal_name or emp.name) if emp else "N/A"
+            dept_val = emp.department_id.name if emp and emp.department_id else "N/A"
+            if emp and not emp.department_id:
+                issues.append(_("Missing Department"))
 
-                lines = payslip.line_ids
+            job_val = emp.job_id.name if emp and emp.job_id else "N/A"
+            code_val = emp_id_val
 
-                # Base Allowances
-                basic_sal = sum(lines.filtered(lambda l: l.code in ("BASIC", "SALARY") or (l.category_id and l.category_id.code in ("BASIC", "Basic")) or (l.category_id and l.category_id.name in ("BASIC", "Basic", "Basic Salary"))).mapped("total"))
-                actual_sal = sum(lines.filtered(lambda l: l.code in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in (l.name or "").lower() or "الراتب الفعلي" in (l.name or "")).mapped("total"))
-                rem_leave = sum(lines.filtered(lambda l: l.code in ("vacation_leave", "remain_lev", "REM_LEAVE", "LEAVE_COMP", "ANNUAL_LEAVE")).mapped("total"))
-                gross_att_ot = sum(lines.filtered(lambda l: l.code in ("OT_NET", "ETH_NET", "RD-S", "OVERTIME", "GROSS_ATT", "OT_COMP", "EXTRA_HOURS")).mapped("total"))
+            period_from_val = format_date(self.env, payslip.date_from or self.date_start)
+            period_to_val = format_date(self.env, payslip.date_to or self.date_end)
 
-                # Dynamic Allowance Values (Prioritize computed rule lines over raw input lines to avoid double counting)
-                dyn_alw_vals = []
-                for _c_name, _w, rule_keys, input_type_ids in dynamic_alw_cols:
-                    val = 0.0
-                    if rule_keys:
-                        r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
-                        if r_lines:
-                            val = sum(r_lines.mapped("total"))
-                    if abs(val) < 0.0001 and input_type_ids:
-                        in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                        if in_lines:
-                            in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
-                            if abs(in_val) > 0.0001:
-                                val = in_val
-                    dyn_alw_vals.append(val)
+            lines = payslip.line_ids
 
-                # Gross Salary (calculated from Actual Salary + Allowances)
-                gross_sal = actual_sal + rem_leave + gross_att_ot + sum(dyn_alw_vals)
+            # Base Allowances
+            basic_sal = sum(lines.filtered(lambda l: l.code in ("BASIC", "SALARY") or (l.category_id and l.category_id.code in ("BASIC", "Basic")) or (l.category_id and l.category_id.name in ("BASIC", "Basic", "Basic Salary"))).mapped("total"))
+            actual_sal = sum(lines.filtered(lambda l: l.code in ("FULL_WAGE", "ACTUAL_SALARY", "ACTUAL") or "actual salary" in (l.name or "").lower() or "الراتب الفعلي" in (l.name or "")).mapped("total"))
+            rem_leave = sum(lines.filtered(lambda l: l.code in ("vacation_leave", "remain_lev", "REM_LEAVE", "LEAVE_COMP", "ANNUAL_LEAVE")).mapped("total"))
+            gross_att_ot = sum(lines.filtered(lambda l: l.code in ("OT_NET", "ETH_NET", "RD-S", "OVERTIME", "GROSS_ATT", "OT_COMP", "EXTRA_HOURS")).mapped("total"))
 
-                # Fixed Deductions
-                tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in l.name).mapped("total"))
-                ssce_val = sum(lines.filtered(lambda l: l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in l.name and "موظف" in l.name)).mapped("total"))
-                sscc_val = sum(lines.filtered(lambda l: l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in l.name and "شركة" in l.name)).mapped("total"))
+            dyn_alw_vals = [_rule_or_input_value(payslip, lines, rk, it) for _n, _w, rk, it in dynamic_alw_cols]
 
-                # Dynamic Deduction Values (Prioritize computed rule lines over raw input lines to avoid double counting)
-                dyn_ded_vals = []
-                for _c_name, _w, rule_keys, input_type_ids in dynamic_ded_cols:
-                    val = 0.0
-                    if rule_keys:
-                        r_lines = lines.filtered(lambda l: (l.salary_rule_id and l.salary_rule_id.id in rule_keys) or l.code in rule_keys)
-                        if r_lines:
-                            val = sum(r_lines.mapped("total"))
-                    if abs(val) < 0.0001 and input_type_ids:
-                        in_lines = payslip.input_line_ids.filtered(lambda l: l.input_type_id and l.input_type_id.id in input_type_ids)
-                        if in_lines:
-                            in_val = sum((l.amount if l.amount != 0.0 else l.quantity) or 0.0 for l in in_lines)
-                            if abs(in_val) > 0.0001:
-                                val = in_val
-                    dyn_ded_vals.append(val)
+            # Gross Salary (Actual Salary + Allowances)
+            gross_sal = actual_sal + rem_leave + gross_att_ot + sum(dyn_alw_vals)
 
-                # Net Salary
-                net_sal = payslip.net_wage if hasattr(payslip, "net_wage") and payslip.net_wage else sum(lines.filtered(lambda l: l.code == "NET" or (l.category_id and l.category_id.code in ("NET", "Net"))).mapped("total"))
+            # Fixed Deductions
+            tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in (l.name or "")).mapped("total"))
+            ssce_val = sum(lines.filtered(lambda l: l.code in ("SSE", "SSCE", "SSC_EMP", "SOC_SEC_EMP") or ("ضمان" in (l.name or "") and "موظف" in (l.name or ""))).mapped("total"))
+            sscc_val = sum(lines.filtered(lambda l: l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in (l.name or "") and "شركة" in (l.name or ""))).mapped("total"))
 
-                if net_sal < 0:
-                    issues.append(_("Negative Net Salary (%.2f JOD)") % net_sal)
+            dyn_ded_vals = [_rule_or_input_value(payslip, lines, rk, it) for _n, _w, rk, it in dynamic_ded_cols]
 
-                worked_days = payslip.worked_days_line_ids
+            # Net Salary
+            net_sal = payslip.net_wage if hasattr(payslip, "net_wage") and payslip.net_wage else sum(lines.filtered(lambda l: l.code == "NET" or (l.category_id and l.category_id.code in ("NET", "Net"))).mapped("total"))
+            if net_sal < 0:
+                issues.append(_("Negative Net Salary (%.2f JOD)") % net_sal)
 
-                # Attendance Days are taken from the payslip itself, not recalculated:
-                #   Attendance Days = Actual Salary / (Wage / calendar days in the month)
-                # This always matches the Actual Salary salary rule on the payslip.
-                ref_date = payslip.date_to or self.date_end
-                days_in_month = calendar.monthrange(ref_date.year, ref_date.month)[1] if ref_date else 30
-                wage_val = (emp.wage if emp else 0.0) or basic_sal or 0.0
-                daily_wage = (wage_val / float(days_in_month)) if wage_val and days_in_month else 0.0
-                att_days = round(actual_sal / daily_wage, 2) if daily_wage else 0.0
+            worked_days = payslip.worked_days_line_ids
 
-                # Out of Contract Days (shown in its own column)
-                out_of_contract_days = 0.0
-                for wd in worked_days:
-                    wd_code = (wd.work_entry_type_id.code or wd.code or '').strip().upper()
-                    wd_text = f"{(wd.name or '').lower()} {(wd.work_entry_type_id.name or '').lower()}"
-                    if (
-                        wd_code in ('OUT', 'OUTCON', 'OUT_OF_CONTRACT')
-                        or any(k in wd_text for k in ('out of contract', 'خارج العقد'))
-                    ):
-                        out_of_contract_days += wd.number_of_days if wd.number_of_days else ((wd.number_of_hours or 0.0) / 8.0)
+            # Attendance Days are taken from the payslip itself, not recalculated:
+            #   Attendance Days = Actual Salary / (Wage / calendar days in the month)
+            # This always matches the Actual Salary salary rule on the payslip.
+            ref_date = payslip.date_to or self.date_end
+            days_in_month = calendar.monthrange(ref_date.year, ref_date.month)[1] if ref_date else 30
+            wage_val = (emp.wage if emp else 0.0) or basic_sal or 0.0
+            daily_wage = (wage_val / float(days_in_month)) if wage_val and days_in_month else 0.0
+            att_days = round(actual_sal / daily_wage, 2) if daily_wage else 0.0
 
-                worked_hrs = sum(worked_days.mapped("number_of_hours"))
-                ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
+            # Out of Contract Days
+            out_of_contract_days = 0.0
+            for wd in worked_days:
+                wd_code = (wd.work_entry_type_id.code or wd.code or '').strip().upper()
+                wd_text = f"{(wd.name or '').lower()} {(wd.work_entry_type_id.name or '').lower()}"
+                if (
+                    wd_code in ('OUT', 'OUTCON', 'OUT_OF_CONTRACT')
+                    or any(k in wd_text for k in ('out of contract', 'خارج العقد'))
+                ):
+                    out_of_contract_days += wd.number_of_days if wd.number_of_days else ((wd.number_of_hours or 0.0) / 8.0)
 
-                # Gather notes
-                input_notes = []
-                for input_line in payslip.input_line_ids:
-                    note_txt = input_line.name or getattr(input_line, "note", False)
-                    if note_txt:
-                        t_label = input_line.input_type_id.name or _("Input")
-                        input_notes.append(f"[{t_label}: {note_txt}]")
+            worked_hrs = sum(worked_days.mapped("number_of_hours"))
+            ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
 
-                base_note = payslip.note or payslip.name or ""
-                if input_notes:
-                    note_val = f"{base_note} {' '.join(input_notes)}".strip()
+            # Notes
+            input_notes = []
+            for input_line in payslip.input_line_ids:
+                note_txt = input_line.name or getattr(input_line, "note", False)
+                if note_txt:
+                    t_label = input_line.input_type_id.name or _("Input")
+                    input_notes.append(f"[{t_label}: {note_txt}]")
+            base_note = payslip.note or payslip.name or ""
+            note_val = f"{base_note} {' '.join(input_notes)}".strip() if input_notes else base_note
+
+            # SSC Subject Wage
+            ssc_wage_val = 0.0
+            if emp:
+                for attr in ("x_studio_x_studio_ssc_wage", "x_studio_ssc_wage", "sb_ss_salary", "ssc_wage", "ss_wage", "social_security_wage", "ss_salary"):
+                    val = getattr(emp, attr, 0.0)
+                    if val:
+                        ssc_wage_val = float(val)
+                        break
+            if not ssc_wage_val and hasattr(payslip, "version_id") and payslip.version_id:
+                ssc_wage_val = payslip.version_id._get_contract_wage()
+
+            row_vals = (
+                [emp_id_val, emp_name_val, dept_val, job_val, code_val, ssc_wage_val, period_from_val, period_to_val]
+                + [net_sal, att_days, out_of_contract_days]
+                + [basic_sal, actual_sal, rem_leave, gross_att_ot] + dyn_alw_vals + [gross_sal]
+                + [tax_val, ssce_val] + dyn_ded_vals
+                + [sscc_val]
+                + [worked_hrs, ot_hrs, note_val]
+            )
+            rows.append(row_vals)
+
+            if not lines and payslip.state != "cancel":
+                issues.append(_("Payslip lines not computed"))
+
+            status = "ERROR" if any("Negative" in i or "not computed" in i for i in issues) else ("WARNING" if issues else "OK")
+            remarks = ", ".join(issues) if issues else _("Computation verified cleanly")
+
+            audit_entries.append({
+                "emp_id": emp_id_val,
+                "emp_name": emp_name_val,
+                "dept": dept_val,
+                "status": status,
+                "remarks": remarks,
+            })
+
+        # --- 6. Drop numeric columns that are zero for every employee ---
+        keep_idx = []
+        col_totals = {}
+        for i, col in enumerate(columns):
+            if col["kind"] == "num":
+                total = sum(float(r[i] or 0.0) for r in rows)
+                col_totals[i] = total
+                if rows and all(abs(float(r[i] or 0.0)) < 0.0001 for r in rows):
+                    continue
+            keep_idx.append(i)
+
+        kept = [columns[i] for i in keep_idx]
+
+        for out_c, col in enumerate(kept):
+            sheet1.set_column(out_c, out_c, col["width"])
+
+        # --- 7. Render 2-Tier Header Row ---
+        row_super = row
+        row_sub = row + 1
+
+        group_ranges = {}
+        for out_c, col in enumerate(kept):
+            g = col["group"]
+            if g not in group_ranges:
+                group_ranges[g] = [out_c, out_c]
+            group_ranges[g][1] = out_c
+
+        for out_c, col in enumerate(kept):
+            g = col["group"]
+            if g in ("alw", "ded"):
+                sheet1.write(row_sub, out_c, col["name"], header_fmt)
+            else:
+                fmt = group_header_comp_fmt if g == "comp" else header_fmt
+                sheet1.merge_range(row_super, out_c, row_sub, out_c, col["name"], fmt)
+
+        for g, label, fmt in (("alw", _("ALLOWANCE"), group_header_alw_fmt), ("ded", _("DEDUCTION"), group_header_ded_fmt)):
+            if g in group_ranges:
+                c1, c2 = group_ranges[g]
+                if c2 > c1:
+                    sheet1.merge_range(row_super, c1, row_super, c2, label, fmt)
                 else:
-                    note_val = base_note
+                    sheet1.write(row_super, c1, label, fmt)
 
-                # Retrieve SSC Subject Wage (from studio field x_studio_x_studio_ssc_wage, employee profile or contract fallback)
-                emp_rec = payslip.employee_id
-                ssc_wage_val = 0.0
-                if emp_rec:
-                    for attr in ("x_studio_x_studio_ssc_wage", "x_studio_ssc_wage", "sb_ss_salary", "ssc_wage", "ss_wage", "social_security_wage", "ss_salary"):
-                        val = getattr(emp_rec, attr, 0.0)
-                        if val:
-                            ssc_wage_val = float(val)
-                            break
-                if not ssc_wage_val and hasattr(payslip, "version_id") and payslip.version_id:
-                    ssc_wage_val = payslip.version_id._get_contract_wage()
+        # --- 8. Write Data Rows ---
+        table_start_row = row_sub + 1
+        data_row = table_start_row
+        for r in rows:
+            for out_c, src_i in enumerate(keep_idx):
+                col = columns[src_i]
+                val = r[src_i]
+                if col["kind"] == "num":
+                    style = net_negative_fmt if col.get("net") and (val or 0.0) < 0 else number_fmt
+                    sheet1.write_number(data_row, out_c, float(val or 0.0), style)
+                else:
+                    style = text_center_fmt if src_i in (0, 4, 6, 7) else text_left_fmt
+                    sheet1.write(data_row, out_c, val, style)
+            data_row += 1
 
-                # Write Info Columns (0..7)
-                sheet1.write(data_row, 0, emp_id_val, text_center_fmt)
-                sheet1.write(data_row, 1, emp_name_val, text_left_fmt)
-                sheet1.write(data_row, 2, dept_val, text_left_fmt)
-                sheet1.write(data_row, 3, job_val, text_left_fmt)
-                sheet1.write(data_row, 4, code_val, text_center_fmt)
-                sheet1.write_number(data_row, 5, ssc_wage_val, number_fmt)
-                sheet1.write(data_row, 6, period_from_val, text_center_fmt)
-                sheet1.write(data_row, 7, period_to_val, text_center_fmt)
-
-                # Write Net Salary / Attendance Days / Out of Contract Days
-                net_style = net_negative_fmt if net_sal < 0 else number_fmt
-                sheet1.write_number(data_row, key_start_col, net_sal, net_style)
-                sheet1.write_number(data_row, key_start_col + 1, att_days, number_fmt)
-                sheet1.write_number(data_row, key_start_col + 2, out_of_contract_days, number_fmt)
-
-                # Write ALLOWANCE Section
-                col_curr = alw_start_col
-                sheet1.write_number(data_row, col_curr, basic_sal, number_fmt); col_curr += 1
-                sheet1.write_number(data_row, col_curr, actual_sal, number_fmt); col_curr += 1
-                sheet1.write_number(data_row, col_curr, rem_leave, number_fmt); col_curr += 1
-                sheet1.write_number(data_row, col_curr, gross_att_ot, number_fmt); col_curr += 1
-
-                for alw_val in dyn_alw_vals:
-                    sheet1.write_number(data_row, col_curr, alw_val, number_fmt)
-                    col_curr += 1
-
-                sheet1.write_number(data_row, col_curr, gross_sal, number_fmt); col_curr += 1
-
-                # Write DEDUCTION Section
-                sheet1.write_number(data_row, col_curr, tax_val, number_fmt); col_curr += 1
-                sheet1.write_number(data_row, col_curr, ssce_val, number_fmt); col_curr += 1
-
-                for ded_val in dyn_ded_vals:
-                    sheet1.write_number(data_row, col_curr, ded_val, number_fmt)
-                    col_curr += 1
-
-                # Write COMPANY CONTRIBUTIONS Section
-                sheet1.write_number(data_row, col_curr, sscc_val, number_fmt); col_curr += 1
-
-                # Write Summary Section
-                sheet1.write_number(data_row, col_curr, worked_hrs, number_fmt); col_curr += 1
-                sheet1.write_number(data_row, col_curr, ot_hrs, number_fmt); col_curr += 1
-                sheet1.write(data_row, col_curr, note_val, text_left_fmt)
-
-                if not lines and payslip.state != "cancel":
-                    issues.append(_("Payslip lines not computed"))
-
-                status = "ERROR" if any("Negative" in i or "not computed" in i for i in issues) else ("WARNING" if issues else "OK")
-                remarks = ", ".join(issues) if issues else _("Computation verified cleanly")
-
-                audit_entries.append({
-                    "emp_id": emp_id_val,
-                    "emp_name": emp_name_val,
-                    "dept": dept_val,
-                    "status": status,
-                    "remarks": remarks,
-                })
-
-                data_row += 1
-
-        # Write Bottom Summary Total Row
-        sheet1.write(data_row, 0, _("Total"), total_label_fmt)
-        for c in range(1, info_count):
-            sheet1.write(data_row, c, "", total_label_fmt)
-
-        att_days_col_idx = key_start_col + 1
-
-        for col_idx in range(info_count, total_num_cols - 1):
-            col_letter = xlsxwriter.utility.xl_col_to_name(col_idx)
-            formula = f"=SUM({col_letter}{table_start_row + 1}:{col_letter}{data_row})"
-            fmt = total_num_fmt
-            sheet1.write_formula(data_row, col_idx, formula, fmt)
-
-        sheet1.write(data_row, total_num_cols - 1, "", total_label_fmt)
+        # --- 9. Bottom Total Row (formula + pre-calculated value so it never shows 0) ---
+        for out_c, src_i in enumerate(keep_idx):
+            col = columns[src_i]
+            if out_c == 0:
+                sheet1.write(data_row, 0, _("Total"), total_label_fmt)
+            elif col["kind"] == "num" and rows and not col.get("no_total"):
+                col_letter = xlsxwriter.utility.xl_col_to_name(out_c)
+                formula = f"=SUM({col_letter}{table_start_row + 1}:{col_letter}{data_row})"
+                sheet1.write_formula(data_row, out_c, formula, total_num_fmt, round(col_totals[src_i], 3))
+            else:
+                sheet1.write(data_row, out_c, "", total_label_fmt)
 
         # -------------------------------------------------------------
         # SHEET 2: Audit
