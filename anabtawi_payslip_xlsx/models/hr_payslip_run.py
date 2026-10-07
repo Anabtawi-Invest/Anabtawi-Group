@@ -1,5 +1,5 @@
+import calendar
 import io
-import math
 from datetime import datetime, time
 
 from odoo import _, fields, models, exceptions
@@ -607,58 +607,28 @@ class HrPayslipRun(models.Model):
                 if net_sal < 0:
                     issues.append(_("Negative Net Salary (%.2f JOD)") % net_sal)
 
-                # Attendance Days = Attendance + Paid Leaves
-                #   + floor(Absent hrs / 8 - Lateness hrs / 8) when Absent hrs > Lateness hrs
                 worked_days = payslip.worked_days_line_ids
 
-                def _classify_worked_day(wd):
-                    code = (wd.work_entry_type_id.code or wd.code or '').strip().upper()
-                    name = (wd.name or '').strip().lower()
-                    type_name = (wd.work_entry_type_id.name or '').strip().lower()
-                    text = f"{name} {type_name}"
+                # Attendance Days are taken from the payslip itself, not recalculated:
+                #   Attendance Days = Actual Salary / (Wage / calendar days in the month)
+                # This always matches the Actual Salary salary rule on the payslip.
+                ref_date = payslip.date_to or self.date_end
+                days_in_month = calendar.monthrange(ref_date.year, ref_date.month)[1] if ref_date else 30
+                wage_val = (emp.wage if emp else 0.0) or basic_sal or 0.0
+                daily_wage = (wage_val / float(days_in_month)) if wage_val and days_in_month else 0.0
+                att_days = round(actual_sal / daily_wage, 2) if daily_wage else 0.0
 
-                    if code in ('ABS', 'ABSENT') or any(k in text for k in ('absent', 'absence', 'غياب')):
-                        return 'absent'
-                    if code in ('LAT', 'LATE', 'LATENESS') or 'lateness' in text or 'تأخير' in text:
-                        return 'lateness'
-                    if (
-                        code in ('OUT', 'OUTCON', 'OUT_OF_CONTRACT')
-                        or any(k in text for k in ('out of contract', 'خارج العقد'))
-                    ):
-                        return 'out_of_contract'
-                    if (
-                        code in ('OVERTIME', 'EXTRA', 'EXTRA_HOURS', 'OT', 'OTW', 'OTR', 'PHO',
-                                 'LEAVEUNPAID', 'UN_PAID', 'UNPAID', 'SICKLEAVE0')
-                        or any(k in text for k in ('overtime', 'extra', 'unpaid',
-                                                   'بدون راتب', 'غير مدفوع'))
-                    ):
-                        return 'ignore'
-                    return 'paid'
-
-                att_days = 0.0
-                absent_hrs = 0.0
-                lateness_hrs = 0.0
+                # Out of Contract Days (shown in its own column)
                 out_of_contract_days = 0.0
                 for wd in worked_days:
-                    kind = _classify_worked_day(wd)
-                    if kind == 'paid':
-                        att_days += wd.number_of_days or 0.0
-                    elif kind == 'absent':
-                        absent_hrs += wd.number_of_hours or 0.0
-                    elif kind == 'lateness':
-                        lateness_hrs += wd.number_of_hours or 0.0
-                    elif kind == 'out_of_contract':
+                    wd_code = (wd.work_entry_type_id.code or wd.code or '').strip().upper()
+                    wd_text = f"{(wd.name or '').lower()} {(wd.work_entry_type_id.name or '').lower()}"
+                    if (
+                        wd_code in ('OUT', 'OUTCON', 'OUT_OF_CONTRACT')
+                        or any(k in wd_text for k in ('out of contract', 'خارج العقد'))
+                    ):
                         out_of_contract_days += wd.number_of_days if wd.number_of_days else ((wd.number_of_hours or 0.0) / 8.0)
 
-                if absent_hrs > lateness_hrs:
-                    att_days += math.floor((absent_hrs - lateness_hrs) / 8.0 + 1e-9)
-
-                if payslip.date_from and payslip.date_to:
-                    days_in_period = (payslip.date_to - payslip.date_from).days + 1
-                    if att_days > days_in_period:
-                        att_days = days_in_period
-                absent_days = (absent_hrs / 8.0) if absent_hrs else 0.0
-                lateness_days = (lateness_hrs / 8.0) if lateness_hrs else 0.0
                 worked_hrs = sum(worked_days.mapped("number_of_hours"))
                 ot_hrs = sum(worked_days.filtered(lambda wd: "overtime" in (wd.code or "").lower() or "ot" in (wd.code or "").lower() or "extra" in (wd.code or "").lower()).mapped("number_of_hours"))
 
@@ -701,7 +671,7 @@ class HrPayslipRun(models.Model):
                 # Write Net Salary / Attendance Days / Out of Contract Days
                 net_style = net_negative_fmt if net_sal < 0 else number_fmt
                 sheet1.write_number(data_row, key_start_col, net_sal, net_style)
-                sheet1.write_number(data_row, key_start_col + 1, att_days, int_fmt)
+                sheet1.write_number(data_row, key_start_col + 1, att_days, number_fmt)
                 sheet1.write_number(data_row, key_start_col + 2, out_of_contract_days, number_fmt)
 
                 # Write ALLOWANCE Section
@@ -759,7 +729,7 @@ class HrPayslipRun(models.Model):
         for col_idx in range(info_count, total_num_cols - 1):
             col_letter = xlsxwriter.utility.xl_col_to_name(col_idx)
             formula = f"=SUM({col_letter}{table_start_row + 1}:{col_letter}{data_row})"
-            fmt = total_int_fmt if col_idx == att_days_col_idx else total_num_fmt
+            fmt = total_num_fmt
             sheet1.write_formula(data_row, col_idx, formula, fmt)
 
         sheet1.write(data_row, total_num_cols - 1, "", total_label_fmt)
