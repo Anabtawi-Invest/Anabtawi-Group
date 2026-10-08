@@ -9,8 +9,14 @@
                 <field name="template_name" invisible="1"/>
 
                 <div invisible="state != 'upload'">
+                    <group>
+                        <field name="one_time"/>
+                    </group>
                     <h4>1. Download the template</h4>
-                    <p class="text-muted">
+                    <p class="text-muted" invisible="not one_time">
+                        Fill one row per employee adjustment. All rows will be imported as One Time adjustments.
+                    </p>
+                    <p class="text-muted" invisible="one_time">
                         Fill one row per employee adjustment. Duration left empty will be imported as One Time.
                         Total Amount is only needed for Limited adjustments.
                     </p>
@@ -45,8 +51,8 @@
                             <field name="employee_id" optional="hide"/>
                             <field name="input_type_name"/>
                             <field name="monthly_amount"/>
-                            <field name="duration_type"/>
-                            <field name="total_amount"/>
+                            <field name="duration_type" column_invisible="parent.one_time"/>
+                            <field name="total_amount" column_invisible="parent.one_time"/>
                             <field name="date_start"/>
                             <field name="note" optional="show"/>
                             <field name="message"/>

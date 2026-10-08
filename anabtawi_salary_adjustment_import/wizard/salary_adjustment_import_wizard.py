@@ -16,16 +16,17 @@ except ImportError:
 TEMPLATE_FILENAME = "salary_adjustment_template.xlsx"
 TEMPLATE_MAX_ROWS = 2000
 
-# (key, header label, required header)
+# (key, header label, required header, column width, number format)
 COLUMNS = [
-    ("employee", "Employee", True),
-    ("input_type", "Type", True),
-    ("monthly_amount", "Payslip Amount", True),
-    ("duration", "Duration", False),
-    ("total_amount", "Total Amount", False),
-    ("date_start", "Start Date", True),
-    ("note", "Note", False),
+    ("employee", "Employee", True, 40, None),
+    ("input_type", "Type", True, 30, None),
+    ("monthly_amount", "Payslip Amount", True, 18, "0.000"),
+    ("duration", "Duration", False, 15, None),
+    ("total_amount", "Total Amount", False, 18, "0.000"),
+    ("date_start", "Start Date", True, 15, "yyyy-mm-dd"),
+    ("note", "Note", False, 40, None),
 ]
+DURATION_COLUMNS = ("duration", "total_amount")
 
 DURATION_LABELS = {
     "one": "One Time",
@@ -51,6 +52,11 @@ class SalaryAdjustmentImportWizard(models.TransientModel):
         default="upload",
         required=True,
     )
+    one_time = fields.Boolean(
+        string="One Time",
+        default=True,
+        help="All imported adjustments are One Time: the Duration and Total Amount columns are not used.",
+    )
     template_file = fields.Binary(readonly=True, attachment=False)
     template_name = fields.Char(default=TEMPLATE_FILENAME)
     excel_file = fields.Binary(string="Excel File", attachment=False)
@@ -65,10 +71,15 @@ class SalaryAdjustmentImportWizard(models.TransientModel):
             wizard.error_count = len(wizard.line_ids.filtered(lambda l: l.status == "error"))
             wizard.valid_count = len(wizard.line_ids) - wizard.error_count
 
-    @api.onchange("excel_file")
+    @api.onchange("excel_file", "one_time")
     def _onchange_excel_file(self):
         self.state = "upload"
         self.line_ids = [fields.Command.clear()]
+
+    def _get_columns(self):
+        if self.one_time:
+            return [column for column in COLUMNS if column[0] not in DURATION_COLUMNS]
+        return COLUMNS
 
     def _reopen(self):
         return {
@@ -102,21 +113,21 @@ class SalaryAdjustmentImportWizard(models.TransientModel):
         sheet = workbook.active
         sheet.title = "Salary Adjustments"
 
+        columns = self._get_columns()
+        column_letters = {}
         header_font = Font(bold=True, color="FFFFFF")
         header_fill = PatternFill("solid", fgColor="714B67")
-        widths = [40, 30, 18, 15, 18, 15, 40]
-        for col_index, (_key, label, required) in enumerate(COLUMNS, start=1):
+        for col_index, (key, label, required, width, number_format) in enumerate(columns, start=1):
             cell = sheet.cell(row=1, column=col_index, value=label + (" *" if required else ""))
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal="center", vertical="center")
-            sheet.column_dimensions[cell.column_letter].width = widths[col_index - 1]
+            sheet.column_dimensions[cell.column_letter].width = width
+            column_letters[key] = cell.column_letter
+            if number_format:
+                for row in range(2, TEMPLATE_MAX_ROWS + 1):
+                    sheet.cell(row=row, column=col_index).number_format = number_format
         sheet.freeze_panes = "A2"
-
-        for row in range(2, TEMPLATE_MAX_ROWS + 1):
-            sheet.cell(row=row, column=3).number_format = "0.000"
-            sheet.cell(row=row, column=5).number_format = "0.000"
-            sheet.cell(row=row, column=6).number_format = "yyyy-mm-dd"
 
         lists = workbook.create_sheet("Lists")
         lists["A1"], lists["B1"], lists["C1"] = "Types", "Durations", "Employees"
@@ -128,8 +139,9 @@ class SalaryAdjustmentImportWizard(models.TransientModel):
             lists.cell(row=index, column=3, value=employee.name)
         lists.sheet_state = "hidden"
 
-        def add_list_validation(list_column, count, target_column, strict):
-            if not count:
+        def add_list_validation(list_column, count, target_key, strict):
+            target_column = column_letters.get(target_key)
+            if not count or not target_column:
                 return
             validation = DataValidation(
                 type="list",
@@ -141,23 +153,28 @@ class SalaryAdjustmentImportWizard(models.TransientModel):
             sheet.add_data_validation(validation)
             validation.add(f"{target_column}2:{target_column}{TEMPLATE_MAX_ROWS}")
 
-        add_list_validation("C", len(employees), "A", strict=False)
-        add_list_validation("A", len(input_types), "B", strict=True)
-        add_list_validation("B", len(DURATION_LABELS), "D", strict=True)
+        add_list_validation("C", len(employees), "employee", strict=False)
+        add_list_validation("A", len(input_types), "input_type", strict=True)
+        add_list_validation("B", len(DURATION_LABELS), "duration", strict=True)
 
         help_sheet = workbook.create_sheet("Instructions")
         help_sheet.column_dimensions["A"].width = 20
         help_sheet.column_dimensions["B"].width = 90
-        instructions = [
-            ("Column", "Description"),
-            ("Employee *", "Employee name exactly as in Odoo (pick from the list)."),
-            ("Type *", "Salary adjustment type (pick from the list)."),
-            ("Payslip Amount *", "Amount applied on each payslip, must be greater than 0."),
-            ("Duration", "One Time, Limited or Unlimited. Empty = One Time."),
-            ("Total Amount", "Required only when Duration is Limited (must be >= Payslip Amount)."),
-            ("Start Date *", "Date from which the adjustment applies (YYYY-MM-DD)."),
-            ("Note", "Optional reason or reference."),
+        descriptions = {
+            "employee": "Employee name exactly as in Odoo (pick from the list).",
+            "input_type": "Salary adjustment type (pick from the list).",
+            "monthly_amount": "Amount applied on each payslip, must be greater than 0.",
+            "duration": "One Time, Limited or Unlimited. Empty = One Time.",
+            "total_amount": "Required only when Duration is Limited (must be >= Payslip Amount).",
+            "date_start": "Date from which the adjustment applies (YYYY-MM-DD).",
+            "note": "Optional reason or reference.",
+        }
+        instructions = [("Column", "Description")] + [
+            (label + (" *" if required else ""), descriptions[key])
+            for key, label, required, _width, _format in columns
         ]
+        if self.one_time:
+            instructions.append(("", "All rows will be imported as One Time adjustments."))
         for row_index, (col_a, col_b) in enumerate(instructions, start=1):
             help_sheet.cell(row=row_index, column=1, value=col_a)
             help_sheet.cell(row=row_index, column=2, value=col_b)
@@ -199,14 +216,15 @@ class SalaryAdjustmentImportWizard(models.TransientModel):
         if not header:
             raise UserError(_("The Excel file is empty."))
 
-        labels = {_normalize(label): key for key, label, _required in COLUMNS}
+        columns = self._get_columns()
+        labels = {_normalize(column[1]): column[0] for column in columns}
         column_map = {}
         for index, title in enumerate(header):
             key = labels.get(_normalize(title).rstrip(" *").strip())
             if key and key not in column_map:
                 column_map[key] = index
 
-        missing = [label for key, label, required in COLUMNS if required and key not in column_map]
+        missing = [label for key, label, required, *_rest in columns if required and key not in column_map]
         if missing:
             raise UserError(_(
                 "The following required columns are missing: %s.\nPlease use the downloaded template.",
