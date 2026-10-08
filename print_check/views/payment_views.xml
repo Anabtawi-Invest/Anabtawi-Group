@@ -23,6 +23,30 @@
             <xpath expr="//field[@name='check_number']" position="attributes">
                 <attribute name="readonly">state not in ['draft']</attribute>
             </xpath>
+
+            <xpath expr="//group[@name='group1']/field[@name='date']" position="attributes">
+                <attribute name="invisible">is_check_payment</attribute>
+            </xpath>
+            <xpath expr="//group[@name='group1']/field[@name='date']" position="after">
+                <field name="is_check_payment" invisible="1"/>
+                <field name="check_date"
+                       invisible="not is_check_payment"
+                       required="is_check_payment"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_account_journal_form_check_payment" model="ir.ui.view">
+        <field name="name">account.journal.form.check_payment</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="account.view_account_journal_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='inbound_payment_method_line_ids']/list/field[@name='name']" position="after">
+                <field name="is_check_payment"/>
+            </xpath>
+            <xpath expr="//field[@name='outbound_payment_method_line_ids']/list/field[@name='name']" position="after">
+                <field name="is_check_payment"/>
+            </xpath>
         </field>
     </record>
 </odoo>

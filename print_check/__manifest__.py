@@ -1,6 +1,6 @@
 {
     'name': 'Print Bank Cheque - Jordan & Arab Countries',
-    'version': '19.0.2.8.0',
+    'version': '19.0.2.10.0',
     'description': """
 Print Bank Cheque Module
 ========================
@@ -29,7 +29,7 @@ Features:
     'website': 'https://www.agilemena.com',
     'license': 'OPL-1',
     'category': 'Accounting/Payments',
-    'depends': ['base', 'account'],
+    'depends': ['base', 'account', 'account_check_printing'],
     'data': [
         'security/ir.model.access.csv',
         'views/print_check_views.xml',
