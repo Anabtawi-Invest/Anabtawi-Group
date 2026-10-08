@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="salary_adjustment_import_wizard_view_form" model="ir.ui.view">
+        <field name="name">salary.adjustment.import.wizard.form</field>
+        <field name="model">salary.adjustment.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Salary Adjustments">
+                <field name="state" invisible="1"/>
+                <field name="template_name" invisible="1"/>
+
+                <div invisible="state != 'upload'">
+                    <h4>1. Download the template</h4>
+                    <p class="text-muted">
+                        Fill one row per employee adjustment. Duration left empty will be imported as One Time.
+                        Total Amount is only needed for Limited adjustments.
+                    </p>
+                    <button name="action_download_template" type="object" string="Download Excel Template"
+                            icon="fa-download" class="btn-secondary"/>
+
+                    <h4 class="mt-4">2. Upload the filled file</h4>
+                    <group>
+                        <field name="excel_file" filename="file_name"/>
+                        <field name="file_name" invisible="1"/>
+                    </group>
+                </div>
+
+                <div invisible="state != 'preview'">
+                    <div class="alert alert-danger" role="alert" invisible="error_count == 0">
+                        <field name="error_count" readonly="1" class="fw-bold"/> row(s) contain errors.
+                        Fix them in the Excel file, upload it again and click "Check File".
+                        Nothing will be imported until all rows are valid.
+                    </div>
+                    <div class="alert alert-success" role="alert" invisible="error_count != 0">
+                        All <field name="valid_count" readonly="1" class="fw-bold"/> row(s) are valid and ready to be imported.
+                    </div>
+                    <group invisible="error_count == 0">
+                        <field name="excel_file" filename="file_name" string="Corrected File"/>
+                    </group>
+                    <field name="line_ids" readonly="1">
+                        <list decoration-danger="status == 'error'" decoration-success="status == 'ok'">
+                            <field name="row_number"/>
+                            <field name="status" widget="badge"
+                                   decoration-danger="status == 'error'" decoration-success="status == 'ok'"/>
+                            <field name="employee_name"/>
+                            <field name="employee_id" optional="hide"/>
+                            <field name="input_type_name"/>
+                            <field name="monthly_amount"/>
+                            <field name="duration_type"/>
+                            <field name="total_amount"/>
+                            <field name="date_start"/>
+                            <field name="note" optional="show"/>
+                            <field name="message"/>
+                        </list>
+                    </field>
+                </div>
+
+                <footer>
+                    <button name="action_check_file" type="object" string="Check File" class="btn-primary"
+                            invisible="state == 'preview' and error_count == 0"/>
+                    <button name="action_import" type="object" string="Import" class="btn-primary"
+                            invisible="state != 'preview' or error_count != 0 or valid_count == 0"/>
+                    <button name="action_back" type="object" string="Back" class="btn-secondary"
+                            invisible="state != 'preview'"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_salary_adjustment_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import Salary Adjustments</field>
+        <field name="res_model">salary.adjustment.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
