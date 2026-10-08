@@ -5,6 +5,8 @@ from datetime import date, datetime
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
+from ..tools import normalize as _normalize
+
 try:
     import openpyxl
     from openpyxl.styles import Alignment, Font, PatternFill
@@ -35,12 +37,6 @@ DURATION_LABELS = {
 }
 
 DATE_FORMATS = ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y")
-
-
-def _normalize(value):
-    if value is None:
-        return ""
-    return " ".join(str(value).split()).casefold()
 
 
 class SalaryAdjustmentImportWizard(models.TransientModel):
@@ -395,32 +391,45 @@ class SalaryAdjustmentImportWizard(models.TransientModel):
         return self._reopen()
 
     def action_import(self):
+        """Import only when every row is valid (after review)."""
         self._build_preview()
         if self.error_count:
             return self._reopen()
+        return self._run_import(mode="review")
 
-        vals_list = []
-        for line in self.line_ids:
-            vals = {
-                "employee_ids": [fields.Command.set(line.employee_id.ids)],
-                "company_id": line.employee_id.company_id.id or self.env.company.id,
-                "other_input_type_id": line.input_type_id.id,
-                "monthly_amount": line.monthly_amount,
-                "duration_type": line.duration_type,
-                "date_start": line.date_start,
-                "description": line.note or False,
-            }
-            if line.duration_type == "limited":
-                vals["total_amount"] = line.total_amount
-            vals_list.append(vals)
+    def action_import_valid_rows(self):
+        """From the preview: import the valid rows and log the rows with problems."""
+        self._build_preview()
+        return self._run_import(mode="review")
 
-        adjustments = self.env["hr.salary.attachment"].create(vals_list)
+    def action_import_direct(self):
+        """Without review: import the valid rows and log the rows with problems."""
+        self._build_preview()
+        return self._run_import(mode="direct")
+
+    def _run_import(self, mode):
+        """Queue the rows in an import log; the adjustments are created by a background job."""
+        self.ensure_one()
+        log = self.env["salary.adjustment.import.log"].create({
+            "mode": mode,
+            "one_time": self.one_time,
+            "file": self.excel_file,
+            "file_name": self.file_name,
+            "line_ids": [
+                fields.Command.create(line._prepare_log_vals())
+                for line in self.line_ids.sorted("row_number")
+            ],
+        })
+        if log.pending_count:
+            log._trigger_processing()
+        else:
+            log._finish()
         return {
             "type": "ir.actions.act_window",
-            "name": _("Imported Salary Adjustments"),
-            "res_model": "hr.salary.attachment",
-            "view_mode": "list,form",
-            "domain": [("id", "in", adjustments.ids)],
+            "name": _("Import Log"),
+            "res_model": "salary.adjustment.import.log",
+            "res_id": log.id,
+            "view_mode": "form",
             "target": "current",
         }
 
@@ -443,3 +452,20 @@ class SalaryAdjustmentImportLine(models.TransientModel):
     note = fields.Char(string="Note")
     status = fields.Selection([("error", "Error"), ("ok", "OK")], required=True, default="ok")
     message = fields.Text(string="Errors")
+
+    def _prepare_log_vals(self):
+        self.ensure_one()
+        return {
+            "status": "failed" if self.status == "error" else "pending",
+            "row_number": self.row_number,
+            "employee_name": self.employee_name,
+            "employee_id": self.employee_id.id,
+            "input_type_name": self.input_type_name,
+            "input_type_id": self.input_type_id.id,
+            "monthly_amount": self.monthly_amount,
+            "duration_type": self.duration_type,
+            "total_amount": self.total_amount,
+            "date_start": self.date_start,
+            "note": self.note,
+            "message": self.message,
+        }

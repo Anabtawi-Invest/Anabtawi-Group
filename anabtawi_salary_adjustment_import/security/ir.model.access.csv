@@ -1,3 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_salary_adjustment_import_wizard,salary.adjustment.import.wizard,model_salary_adjustment_import_wizard,hr_payroll.group_hr_payroll_user,1,1,1,1
 access_salary_adjustment_import_line,salary.adjustment.import.line,model_salary_adjustment_import_line,hr_payroll.group_hr_payroll_user,1,1,1,1
+access_salary_adjustment_import_log_user,salary.adjustment.import.log.user,model_salary_adjustment_import_log,hr_payroll.group_hr_payroll_user,1,1,1,0
+access_salary_adjustment_import_log_line_user,salary.adjustment.import.log.line.user,model_salary_adjustment_import_log_line,hr_payroll.group_hr_payroll_user,1,1,1,0
+access_salary_adjustment_import_log_manager,salary.adjustment.import.log.manager,model_salary_adjustment_import_log,hr_payroll.group_hr_payroll_manager,1,1,1,1
+access_salary_adjustment_import_log_line_manager,salary.adjustment.import.log.line.manager,model_salary_adjustment_import_log_line,hr_payroll.group_hr_payroll_manager,1,1,1,1

@@ -33,8 +33,8 @@
                 <div invisible="state != 'preview'">
                     <div class="alert alert-danger" role="alert" invisible="error_count == 0">
                         <field name="error_count" readonly="1" class="fw-bold"/> row(s) contain errors.
-                        Fix them in the Excel file, upload it again and click "Check File".
-                        Nothing will be imported until all rows are valid.
+                        Fix them in the Excel file, upload it again and click "Check File",
+                        or click "Import Valid Rows Only" to skip them.
                     </div>
                     <div class="alert alert-success" role="alert" invisible="error_count != 0">
                         All <field name="valid_count" readonly="1" class="fw-bold"/> row(s) are valid and ready to be imported.
@@ -63,8 +63,14 @@
                 <footer>
                     <button name="action_check_file" type="object" string="Check File" class="btn-primary"
                             invisible="state == 'preview' and error_count == 0"/>
+                    <button name="action_import_direct" type="object" string="Import Without Review"
+                            class="btn-secondary" invisible="state != 'upload'"
+                            confirm="Valid rows will be imported in the background and rows with problems will be skipped. You can follow the progress in Salary Adjustment Imports. Continue?"/>
                     <button name="action_import" type="object" string="Import" class="btn-primary"
                             invisible="state != 'preview' or error_count != 0 or valid_count == 0"/>
+                    <button name="action_import_valid_rows" type="object" string="Import Valid Rows Only"
+                            class="btn-secondary" invisible="state != 'preview' or error_count == 0 or valid_count == 0"
+                            confirm="Valid rows will be imported in the background; rows with errors will be skipped and saved in the import log. Continue?"/>
                     <button name="action_back" type="object" string="Back" class="btn-secondary"
                             invisible="state != 'preview'"/>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
