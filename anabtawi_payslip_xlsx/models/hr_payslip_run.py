@@ -439,12 +439,14 @@ class HrPayslipRun(models.Model):
             columns.append({"group": "alw", "name": name, "width": width, "kind": "num"})
         for c_name, width, _rk, _it in dynamic_alw_cols:
             columns.append({"group": "alw", "name": c_name, "width": width, "kind": "num"})
+        columns.append({"group": "alw", "name": _("Total Allowance"), "width": 18, "kind": "num"})
         columns.append({"group": "alw", "name": _("Gross Salary (before tax)"), "width": 22, "kind": "num"})
 
         for name, width in fixed_ded_cols:
             columns.append({"group": "ded", "name": name, "width": width, "kind": "num"})
         for c_name, width, _rk, _it in dynamic_ded_cols:
             columns.append({"group": "ded", "name": c_name, "width": width, "kind": "num"})
+        columns.append({"group": "ded", "name": _("Total Deduction"), "width": 18, "kind": "num"})
 
         for name, width in fixed_comp_cols:
             columns.append({"group": "comp", "name": name, "width": width, "kind": "num"})
@@ -516,8 +518,9 @@ class HrPayslipRun(models.Model):
 
             dyn_alw_vals = [_rule_or_input_value(payslip, lines, rk, it) for _n, _w, rk, it in dynamic_alw_cols]
 
-            # Gross Salary (Actual Salary + Allowances)
-            gross_sal = actual_sal + rem_leave + gross_att_ot + sum(dyn_alw_vals)
+            # Total Allowance excludes Basic Salary and Actual Salary
+            total_alw = rem_leave + gross_att_ot + sum(dyn_alw_vals)
+            gross_sal = actual_sal + total_alw
 
             # Fixed Deductions
             tax_val = sum(lines.filtered(lambda l: l.code in ("INCOME_TAX", "TAX", "IT") or "ضريبة" in (l.name or "")).mapped("total"))
@@ -525,6 +528,7 @@ class HrPayslipRun(models.Model):
             sscc_val = sum(lines.filtered(lambda l: l.code in ("SSC", "SSCC", "SSC_COMP", "SOC_SEC_COMP") or ("ضمان" in (l.name or "") and "شركة" in (l.name or ""))).mapped("total"))
 
             dyn_ded_vals = [_rule_or_input_value(payslip, lines, rk, it) for _n, _w, rk, it in dynamic_ded_cols]
+            total_ded = tax_val + ssce_val + sum(dyn_ded_vals)
 
             # Net Salary
             net_sal = payslip.net_wage if hasattr(payslip, "net_wage") and payslip.net_wage else sum(lines.filtered(lambda l: l.code == "NET" or (l.category_id and l.category_id.code in ("NET", "Net"))).mapped("total"))
@@ -580,8 +584,8 @@ class HrPayslipRun(models.Model):
             row_vals = (
                 [emp_id_val, emp_name_val, dept_val, job_val, code_val, ssc_wage_val, period_from_val, period_to_val]
                 + [net_sal, att_days, out_of_contract_days]
-                + [basic_sal, actual_sal, rem_leave, gross_att_ot] + dyn_alw_vals + [gross_sal]
-                + [tax_val, ssce_val] + dyn_ded_vals
+                + [basic_sal, actual_sal, rem_leave, gross_att_ot] + dyn_alw_vals + [total_alw, gross_sal]
+                + [tax_val, ssce_val] + dyn_ded_vals + [total_ded]
                 + [sscc_val]
                 + [worked_hrs, ot_hrs, note_val]
             )
