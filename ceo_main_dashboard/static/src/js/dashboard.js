@@ -180,7 +180,6 @@ export class CeoMainDashboard extends Component {
             const rows = await this.orm.call("ceo.main.dashboard", "search_purchase_prices", [
                 term,
                 this.state.dateTo,
-                this.state.billing,
             ]);
             if (term === this.state.searchTerm.trim()) {
                 this.state.searchResults = rows;
@@ -310,7 +309,7 @@ export class CeoMainDashboard extends Component {
                 this.state.history[productId] = await this.orm.call(
                     "ceo.main.dashboard",
                     "get_product_price_history",
-                    [productId, this.state.dateTo, this.state.billing]
+                    [productId, this.state.dateTo]
                 );
             } finally {
                 this.state.historyLoading = false;
@@ -462,6 +461,10 @@ export class CeoMainDashboard extends Component {
 
     qtyDiffers(received, ordered) {
         return Math.abs((Number(received) || 0) - (Number(ordered) || 0)) > 1e-6;
+    }
+
+    pricesDiffer(a, b) {
+        return Math.abs((Number(a) || 0) - (Number(b) || 0)) > 1e-6;
     }
 
     barHeight(amount) {

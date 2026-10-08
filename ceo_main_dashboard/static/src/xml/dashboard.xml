@@ -138,7 +138,7 @@
             <div class="cmd_panel cmd_impact">
                 <div class="cmd_panel_head">
                     <span class="cmd_panel_title"><i class="fa fa-balance-scale me-1"/> Money impact of price changes</span>
-                    <span class="cmd_muted">Every receipt in the period compared with the previous purchase price of the same product × quantity received</span>
+                    <span class="cmd_muted">Every billed receipt in the period: its highest bill price compared with the highest bill price of the previous billed purchase of the same product × quantity received</span>
                 </div>
                 <div class="cmd_grid cmd_grid_3">
                     <div class="cmd_impact_box cmd_impact_up">
@@ -165,7 +165,7 @@
                 <div class="cmd_panel_head cmd_panel_head_wrap">
                     <span class="cmd_panel_title">
                         <i class="fa fa-exchange me-1"/> Purchase price comparison
-                        <span class="cmd_muted cmd_small ms-2">Latest purchase price vs previous purchase price (any vendor)</span>
+                        <span class="cmd_muted cmd_small ms-2">Highest bill price of the latest billed purchase vs the previous billed purchase (any vendor). Purchases without a posted bill are ignored.</span>
                     </span>
                     <div class="cmd_toolbar">
                         <div class="cmd_search">
@@ -212,8 +212,8 @@
                             <tr>
                                 <th>#</th>
                                 <th>Product</th>
-                                <th class="text-end">Previous price</th>
-                                <th class="text-end">Last price</th>
+                                <th class="text-end">Previous bill price</th>
+                                <th class="text-end">Last bill price</th>
                                 <th class="text-end">Change</th>
                                 <th class="text-end">Change %</th>
                                 <th>Status</th>
@@ -240,10 +240,23 @@
                                         </div>
                                     </td>
                                     <td class="text-end">
-                                        <div t-esc="fmtPrice(row.prev_price)"/>
+                                        <div>
+                                            <i class="fa fa-flag cmd_text_up me-1" t-if="row.prev_multi_price"
+                                               title="Billed at different prices on several bills, the highest one is used"/>
+                                            <t t-esc="fmtPrice(row.prev_price)"/>
+                                        </div>
                                         <div class="cmd_muted cmd_small" t-if="row.prev_date" t-esc="fmtDate(row.prev_date)"/>
                                     </td>
-                                    <td class="text-end cmd_strong" t-esc="fmtPrice(row.last_price)"/>
+                                    <td class="text-end cmd_strong">
+                                        <div>
+                                            <i class="fa fa-flag cmd_text_up me-1" t-if="row.multi_price"
+                                               title="Billed at different prices on several bills, the highest one is used"/>
+                                            <t t-esc="fmtPrice(row.last_price)"/>
+                                        </div>
+                                        <div class="cmd_muted cmd_small" t-if="pricesDiffer(row.last_po_price, row.last_price)">
+                                            <span>PO:</span> <t t-esc="fmtPrice(row.last_po_price)"/>
+                                        </div>
+                                    </td>
                                     <td class="text-end cmd_strong" t-att-class="changeClass(row.diff)">
                                         <t t-if="row.trend !== 'new'" t-esc="fmtSignedPrice(row.diff)"/>
                                         <t t-else="">—</t>
@@ -291,7 +304,7 @@
                                         <div class="cmd_history" t-elif="state.history[row.product_id]">
                                             <t t-set="chart" t-value="historyChart(row.product_id)"/>
                                             <div class="cmd_history_chart">
-                                                <div class="cmd_small cmd_strong mb-1">Price trend (last receipts)</div>
+                                                <div class="cmd_small cmd_strong mb-1">Highest bill price trend (last billed purchases)</div>
                                                 <svg t-att-viewBox="'0 0 ' + chart.width + ' ' + chart.height" preserveAspectRatio="none">
                                                     <polyline class="cmd_chart_line" t-att-points="chart.path"/>
                                                     <t t-foreach="chart.dots" t-as="dot" t-key="dot.key">
@@ -337,11 +350,14 @@
                                                                     <t t-esc="billingLabel(h.billing_status)"/>
                                                                 </span>
                                                             </td>
-                                                            <td class="text-end cmd_strong" t-att-rowspan="billRows.length" t-esc="fmtPrice(h.price)"/>
+                                                            <td class="text-end" t-att-rowspan="billRows.length" t-esc="fmtPrice(h.po_price)"/>
                                                             </t>
-                                                            <td class="text-end">
+                                                            <td class="text-end" t-att-class="{ 'cmd_text_up': h.multi_price and b and !b.is_refund }">
                                                                 <t t-if="b">
-                                                                    <t t-esc="fmtPrice(b.price)"/>
+                                                                    <i class="fa fa-flag me-1" t-if="h.multi_price and !b.is_refund"
+                                                                       title="Billed at different prices on several bills, the highest one is used"/>
+                                                                    <span t-att-class="{ 'cmd_strong': !b.is_refund and !pricesDiffer(b.price, h.price) }"
+                                                                          t-esc="fmtPrice(b.price)"/>
                                                                     <div class="cmd_muted cmd_small">
                                                                         <a href="#" t-esc="b.name"
                                                                            t-on-click.prevent.stop="() => this.openBill(b.id)"/>

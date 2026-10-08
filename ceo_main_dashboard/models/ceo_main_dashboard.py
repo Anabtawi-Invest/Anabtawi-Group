@@ -35,7 +35,6 @@ class CeoMainDashboard(models.AbstractModel):
 
     _SEARCH_PRODUCT_LIMIT = 200
     _HISTORY_LIMIT = 12
-    _HISTORY_SCAN_LIMIT = 60
     _RECENT_RECEIPTS_LIMIT = 10
 
     # ---------------------------------------------------------------------
@@ -51,7 +50,8 @@ class CeoMainDashboard(models.AbstractModel):
         start, end = self._utc_bounds(date_from, date_to)
 
         moves, ratios = self._received_moves(company, date_from, date_to, billing)
-        rows, impact = self._get_period_price_comparison(company, moves, ratios, billing, end)
+        compared_moves = moves if billing == 'all' else self._received_moves(company, date_from, date_to)[0]
+        rows, impact = self._get_period_price_comparison(company, compared_moves, end)
 
         return {
             'company_name': company.name,
@@ -74,10 +74,9 @@ class CeoMainDashboard(models.AbstractModel):
         }
 
     @api.model
-    def search_purchase_prices(self, term, date_to=None, billing='all'):
-        """Latest vs previous received price of matching products, whole history up to date_to."""
+    def search_purchase_prices(self, term, date_to=None):
+        """Latest vs previous billed price of matching products, whole history up to date_to."""
         self._check_dashboard_access()
-        self._check_billing(billing)
         term = (term or '').strip()
         if not term:
             return []
@@ -94,45 +93,36 @@ class CeoMainDashboard(models.AbstractModel):
             return []
 
         _start, end = self._utc_bounds(date_to, date_to)
-        outer = SQL("hist.rn = 1") if billing == 'all' else SQL("TRUE")
-        fetched = self._fetch_price_lines(company, end, products.ids, outer)
+        fetched = self._fetch_price_lines(company, end, products.ids, SQL("hist.rn = 1"))
         lines = self._browse_lines(fetched)
         ratios = self._billing_ratios(self._lines_recordset(lines))
-        rows = [
-            self._build_row(rec, lines, ratios, company.currency_id)
-            for rec in self._latest_matching(fetched, lines, ratios, billing).values()
-        ]
+        bills = self._bill_unit_prices(self._lines_recordset(lines))
+        rows = [self._build_row(rec, lines, ratios, bills, company.currency_id) for rec in fetched]
         return self._sort_rows(rows)
 
     @api.model
-    def get_product_price_history(self, product_id, date_to=None, billing='all'):
-        """Last received purchases of one product, oldest first, with the change vs the one received before."""
+    def get_product_price_history(self, product_id, date_to=None):
+        """Last billed purchases of one product, oldest first, with the change vs the one billed before."""
         self._check_dashboard_access()
-        self._check_billing(billing)
         company = self.env.company
         _dummy, date_to = self._parse_range(date_to, date_to)
         _start, end = self._utc_bounds(date_to, date_to)
-        scan = self._HISTORY_LIMIT if billing == 'all' else self._HISTORY_SCAN_LIMIT
-        fetched = self._fetch_price_lines(company, end, [product_id], SQL("hist.rn <= %s", scan))
+        fetched = self._fetch_price_lines(company, end, [product_id], SQL("hist.rn <= %s", self._HISTORY_LIMIT))
         lines = self._browse_lines(fetched)
         ratios = self._billing_ratios(self._lines_recordset(lines))
+        bills_by_line = self._bill_unit_prices(self._lines_recordset(lines))
         currency = company.currency_id
 
-        matching = [
-            rec for rec in fetched
-            if self._billing_factor(ratios.get(rec['id'], 0.0), billing) > RATIO_EPSILON
-        ][:self._HISTORY_LIMIT]
-        bill_prices = self._bill_unit_prices(self._lines_recordset({rec['id']: True for rec in matching}))
-
         history = []
-        for rec in reversed(matching):
+        for rec in reversed(fetched):
             line = lines[rec['id']]
-            row = self._build_row(rec, lines, ratios, currency)
-            bills = bill_prices.get(line.id, [])
+            row = self._build_row(rec, lines, ratios, bills_by_line, currency)
+            po_price = self._unit_price(line)
+            bills = bills_by_line.get(line.id, [])
             for bill in bills:
-                diff = bill['price'] - row['last_price']
+                diff = bill['price'] - po_price
                 bill['diff'] = 0.0 if currency.is_zero(diff) else diff
-                bill['pct'] = (bill['diff'] / row['last_price'] * 100.0) if row['last_price'] else None
+                bill['pct'] = (bill['diff'] / po_price * 100.0) if po_price else None
             history.append({
                 'line_id': line.id,
                 'order_id': line.order_id.id,
@@ -145,6 +135,8 @@ class CeoMainDashboard(models.AbstractModel):
                 'billing_status': row['billing_status'],
                 'uom': row['uom'],
                 'price': row['last_price'],
+                'po_price': po_price,
+                'multi_price': row['multi_price'],
                 'bills': bills,
                 'diff': row['diff'],
                 'pct': row['pct'],
@@ -270,10 +262,10 @@ class CeoMainDashboard(models.AbstractModel):
     # ---------------------------------------------------------------------
     # Price comparison
     # ---------------------------------------------------------------------
-    def _get_period_price_comparison(self, company, moves, ratios, billing, end):
-        """One row per product received in the period (its latest received purchase line matching
-        the billing filter vs the line received before it, whatever its billing status), plus the
-        money impact of every receipt in the period."""
+    def _get_period_price_comparison(self, company, moves, end):
+        """One row per product with a billed purchase line received in the period (the latest one
+        vs the billed line received before it), plus the money impact of every receipt in the
+        period. Prices are the highest bill price of each line; lines without a posted bill are ignored."""
         currency = company.currency_id
         impact = {
             'extra_paid': 0.0, 'saved': 0.0, 'net': 0.0,
@@ -283,11 +275,10 @@ class CeoMainDashboard(models.AbstractModel):
             return [], impact
 
         fetched = self._fetch_price_lines(
-            company, end, moves.product_id.ids,
-            SQL("(hist.rn = 1 OR hist.id = ANY(%s))", moves.purchase_line_id.ids),
-        )
+            company, end, moves.product_id.ids, SQL("hist.id = ANY(%s)", moves.purchase_line_id.ids))
         lines = self._browse_lines(fetched)
-        ratios = {**self._billing_ratios(self._lines_recordset(lines)), **ratios}
+        ratios = self._billing_ratios(self._lines_recordset(lines))
+        bills = self._bill_unit_prices(self._lines_recordset(lines))
         prev_of = {rec['id']: rec['prev_id'] for rec in fetched}
 
         # Receipts and returns of the same line are netted before splitting into extra paid / saved.
@@ -297,22 +288,27 @@ class CeoMainDashboard(models.AbstractModel):
             prev_id = prev_of.get(line.id)
             if not prev_id:
                 continue
-            diff = self._unit_price(line) - self._unit_price(lines[prev_id])
+            diff = self._compare_price(line, bills) - self._compare_price(lines[prev_id], bills)
             if not currency.is_zero(diff):
                 line_impact[line] += diff * self._move_received_qty(move)
 
         product_impact = defaultdict(float)
         for line, amount in line_impact.items():
-            amount *= self._billing_factor(ratios.get(line.id, 0.0), billing)
             product_impact[line.product_id.id] += amount
             if amount > 0:
                 impact['extra_paid'] += amount
             else:
                 impact['saved'] -= amount
 
+        latest = {}
+        for rec in fetched:
+            current = latest.get(rec['product_id'])
+            if current is None or rec['rn'] < current['rn']:
+                latest[rec['product_id']] = rec
+
         rows = []
-        for product_id, rec in self._latest_matching(fetched, lines, ratios, billing).items():
-            row = self._build_row(rec, lines, ratios, currency)
+        for product_id, rec in latest.items():
+            row = self._build_row(rec, lines, ratios, bills, currency)
             row['impact'] = product_impact.get(product_id, 0.0)
             impact[f"{row['trend']}_count"] += 1
             rows.append(row)
@@ -321,23 +317,13 @@ class CeoMainDashboard(models.AbstractModel):
         impact['product_count'] = len(rows)
         return self._sort_rows(rows), impact
 
-    def _latest_matching(self, fetched, lines, ratios, billing):
-        """Per product, the most recently received fetched line matching the billing filter."""
-        latest = {}
-        for rec in fetched:
-            if self._billing_factor(ratios.get(rec['id'], 0.0), billing) <= RATIO_EPSILON:
-                continue
-            current = latest.get(rec['product_id'])
-            if current is None or rec['rn'] < current['rn']:
-                latest[rec['product_id']] = rec
-        return latest
-
     def _fetch_price_lines(self, company, end, product_ids, outer_condition):
-        """Received purchase lines of the given products, ranked per product by first receipt date.
+        """Received and billed purchase lines of the given products, ranked per product by first receipt date.
 
-        Returns dicts with: id, product_id, first_date, prev_id / prev_date (line received right
-        before, any vendor) and rn (1 = most recently received line of the product).
-        Only lines with a validated receipt up to `end` and a positive received quantity count.
+        Returns dicts with: id, product_id, first_date, prev_id / prev_date (billed line received
+        right before, any vendor) and rn (1 = most recently received billed line of the product).
+        Only lines with a validated receipt up to `end`, a positive received quantity and a
+        posted vendor bill count.
         """
         if not product_ids:
             return []
@@ -346,6 +332,8 @@ class CeoMainDashboard(models.AbstractModel):
             ['order_id', 'product_id', 'display_type', 'is_downpayment', 'qty_received'])
         self.env['stock.move'].flush_model(
             ['state', 'date', 'purchase_line_id', 'product_id', 'location_dest_id', 'origin_returned_move_id'])
+        self.env['account.move'].flush_model(['state', 'move_type'])
+        self.env['account.move.line'].flush_model(['move_id', 'purchase_line_id', 'quantity'])
         self.env.cr.execute(SQL(
             """
             WITH receipts AS (
@@ -377,6 +365,15 @@ class CeoMainDashboard(models.AbstractModel):
                    AND pol.display_type IS NULL
                    AND COALESCE(pol.is_downpayment, FALSE) = FALSE
                    AND pol.qty_received > 0
+                   AND EXISTS (
+                       SELECT 1
+                         FROM account_move_line aml
+                         JOIN account_move am ON am.id = aml.move_id
+                        WHERE aml.purchase_line_id = pol.id
+                          AND am.state = 'posted'
+                          AND am.move_type = 'in_invoice'
+                          AND aml.quantity > 0
+                   )
                 WINDOW w_asc AS (PARTITION BY pol.product_id ORDER BY r.first_date, pol.id),
                        w_desc AS (PARTITION BY pol.product_id ORDER BY r.first_date DESC, pol.id DESC)
             )
@@ -400,12 +397,12 @@ class CeoMainDashboard(models.AbstractModel):
     def _lines_recordset(self, lines_by_id):
         return self.env['purchase.order.line'].sudo().browse(list(lines_by_id))
 
-    def _build_row(self, rec, lines, ratios, currency):
+    def _build_row(self, rec, lines, ratios, bills, currency):
         line = lines[rec['id']]
         prev_line = lines[rec['prev_id']] if rec['prev_id'] else None
         product = line.product_id
-        last_price = self._unit_price(line)
-        prev_price = self._unit_price(prev_line) if prev_line else None
+        last_price = self._compare_price(line, bills)
+        prev_price = self._compare_price(prev_line, bills) if prev_line else None
         received_qty = self._line_qty_in_product_uom(line, line.qty_received)
         ratio = ratios.get(line.id, 0.0)
 
@@ -422,6 +419,9 @@ class CeoMainDashboard(models.AbstractModel):
             'default_code': product.default_code or '',
             'uom': product.uom_id.name or '',
             'last_price': last_price,
+            'last_po_price': self._unit_price(line),
+            'multi_price': self._has_multi_bill_price(line, bills, currency),
+            'prev_multi_price': self._has_multi_bill_price(prev_line, bills, currency) if prev_line else False,
             'last_qty': received_qty,
             'last_ordered_qty': line.product_uom_qty,
             'billed_qty': received_qty * ratio,
@@ -513,6 +513,19 @@ class CeoMainDashboard(models.AbstractModel):
                 'price': abs(balance) / quantity,
             })
         return bills
+
+    @staticmethod
+    def _invoice_prices(line, bills):
+        return [bill['price'] for bill in bills.get(line.id, []) if not bill['is_refund']]
+
+    def _compare_price(self, line, bills):
+        """Highest unit price of the line on its posted vendor bills (PO price if it has none)."""
+        prices = self._invoice_prices(line, bills)
+        return max(prices) if prices else self._unit_price(line)
+
+    def _has_multi_bill_price(self, line, bills, currency):
+        prices = self._invoice_prices(line, bills)
+        return len(prices) > 1 and not currency.is_zero(max(prices) - min(prices))
 
     @staticmethod
     def _billing_factor(ratio, billing):
