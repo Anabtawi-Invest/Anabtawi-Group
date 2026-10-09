@@ -1,20 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="module_category_ceo_dashboard" model="ir.module.category">
-        <field name="name">Executive Company Cost Dashboard</field>
-        <field name="description">Executive Cost and P&amp;L Intelligence across Holding and Branches</field>
-        <field name="sequence">15</field>
-    </record>
-
     <record id="group_ceo_cost_dashboard_viewer" model="res.groups">
         <field name="name">Executive Cost Dashboard Viewer</field>
-        <field name="category_id" ref="module_category_ceo_dashboard"/>
         <field name="comment">Can view Executive Company Cost Dashboard with branch analytics.</field>
     </record>
 
     <record id="group_ceo_cost_dashboard_manager" model="res.groups">
         <field name="name">Executive Cost Dashboard Manager</field>
-        <field name="category_id" ref="module_category_ceo_dashboard"/>
         <field name="implied_ids" eval="[(4, ref('group_ceo_cost_dashboard_viewer'))]"/>
         <field name="comment">Full managerial access to Executive Company Cost Dashboard and smart auto-scan.</field>
     </record>
