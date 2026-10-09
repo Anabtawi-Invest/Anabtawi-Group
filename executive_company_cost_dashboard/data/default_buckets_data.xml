@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="bucket_revenue" model="ceo.cost.bucket">
+            <field name="name">Revenue &amp; Sales (الإيرادات والمبيعات)</field>
+            <field name="code">REVENUE</field>
+            <field name="category_type">revenue</field>
+            <field name="color">#10b981</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="bucket_cogs" model="ceo.cost.bucket">
+            <field name="name">Cost of Revenue (تكلفة المبيعات والمواد)</field>
+            <field name="code">COGS</field>
+            <field name="category_type">cogs</field>
+            <field name="color">#f59e0b</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="bucket_rent" model="ceo.cost.bucket">
+            <field name="name">Shop &amp; Facility Rent (إيجارات المعارض والمباني)</field>
+            <field name="code">RENT</field>
+            <field name="category_type">expense</field>
+            <field name="color">#6366f1</field>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="bucket_utilities" model="ceo.cost.bucket">
+            <field name="name">Utilities: Power &amp; Water (الكهرباء والمياه والمحروقات)</field>
+            <field name="code">UTILITIES</field>
+            <field name="category_type">expense</field>
+            <field name="color">#06b6d4</field>
+            <field name="sequence">40</field>
+        </record>
+
+        <record id="bucket_payroll" model="ceo.cost.bucket">
+            <field name="name">People &amp; Labor (الرواتب والأجور ومستحقات الموظفين)</field>
+            <field name="code">PAYROLL</field>
+            <field name="category_type">expense</field>
+            <field name="color">#3b82f6</field>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="bucket_tech" model="ceo.cost.bucket">
+            <field name="name">IT, Telecom &amp; Platforms (تكنولوجيا المعلومات والاتصالات والبرمجيات)</field>
+            <field name="code">TECH</field>
+            <field name="category_type">expense</field>
+            <field name="color">#8b5cf6</field>
+            <field name="sequence">60</field>
+        </record>
+
+        <record id="bucket_delivery" model="ceo.cost.bucket">
+            <field name="name">Delivery Aggregator Commissions (عمولات تطبيقات التوصيل طلبات/كريم)</field>
+            <field name="code">DELIVERY</field>
+            <field name="category_type">expense</field>
+            <field name="color">#ec4899</field>
+            <field name="sequence">70</field>
+        </record>
+
+        <record id="bucket_fleet" model="ceo.cost.bucket">
+            <field name="name">Fleet &amp; Logistics (الأسطول وصيانة السيارات وتتبع GPS)</field>
+            <field name="code">FLEET</field>
+            <field name="category_type">expense</field>
+            <field name="color">#14b8a6</field>
+            <field name="sequence">80</field>
+        </record>
+
+        <record id="bucket_security" model="ceo.cost.bucket">
+            <field name="name">Security &amp; CCTV (أمن وحماية ومراقبة الكاميرات)</field>
+            <field name="code">SECURITY</field>
+            <field name="category_type">expense</field>
+            <field name="color">#f43f5e</field>
+            <field name="sequence">90</field>
+        </record>
+
+        <record id="bucket_maintenance" model="ceo.cost.bucket">
+            <field name="name">Maintenance &amp; Facility Upkeep (صيانة عامة ومعدات)</field>
+            <field name="code">MAINTENANCE</field>
+            <field name="category_type">expense</field>
+            <field name="color">#eab308</field>
+            <field name="sequence">100</field>
+        </record>
+
+        <record id="bucket_loss" model="ceo.cost.bucket">
+            <field name="name">Waste, Spoilage &amp; Discrepancies (تلف وهدر وفروقات فروع)</field>
+            <field name="code">LOSS</field>
+            <field name="category_type">expense</field>
+            <field name="color">#ef4444</field>
+            <field name="sequence">110</field>
+        </record>
+
+        <record id="bucket_other" model="ceo.cost.bucket">
+            <field name="name">Other Operational OpEx (مصاريف تشغيلية وإدارية أخرى)</field>
+            <field name="code">OTHER_OPEX</field>
+            <field name="category_type">expense</field>
+            <field name="color">#64748b</field>
+            <field name="sequence">120</field>
+        </record>
+    </data>
+</odoo>

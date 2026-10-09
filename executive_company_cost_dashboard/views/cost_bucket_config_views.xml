@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Tree View for ceo.cost.bucket -->
+    <record id="view_ceo_cost_bucket_tree" model="ir.ui.view">
+        <field name="name">ceo.cost.bucket.tree</field>
+        <field name="model">ceo.cost.bucket</field>
+        <field name="arch" type="xml">
+            <list string="Executive Cost Buckets" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="category_type"/>
+                <field name="color" widget="color"/>
+                <field name="account_count" string="Mapped Accounts"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View for ceo.cost.bucket -->
+    <record id="view_ceo_cost_bucket_form" model="ir.ui.view">
+        <field name="name">ceo.cost.bucket.form</field>
+        <field name="model">ceo.cost.bucket</field>
+        <field name="arch" type="xml">
+            <form string="Executive Cost Bucket">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Bucket Name"/>
+                        <h1><field name="name" placeholder="e.g. Shop &amp; Facility Rent (إيجارات المعارض)"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="category_type"/>
+                            <field name="color" widget="color"/>
+                        </group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                            <field name="account_count"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Mapped Accounts (الحسابات المربوطة)">
+                            <field name="mapping_ids">
+                                <list editable="bottom">
+                                    <field name="account_id" domain="[('deprecated', '=', False)]"/>
+                                    <field name="account_code"/>
+                                    <field name="company_id"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action for ceo.cost.bucket -->
+    <record id="action_ceo_cost_bucket" model="ir.actions.act_window">
+        <field name="name">Cost Buckets</field>
+        <field name="res_model">ceo.cost.bucket</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Define the high-level buckets the CEO sees on the dashboard (Rent, Utilities, IT, etc.)
+            </p>
+        </field>
+    </record>
+
+    <!-- Wizard View for Smart Scanner -->
+    <record id="view_ceo_smart_scanner_wizard_form" model="ir.ui.view">
+        <field name="name">ceo.smart.scanner.wizard.form</field>
+        <field name="model">ceo.smart.scanner.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Smart Account Scanner (المستكشف الذكي للحسابات)">
+                <div class="alert alert-info" role="alert">
+                    <p class="mb-0">
+                        This wizard scans your entire Chart of Accounts in <strong>Arabic &amp; English</strong> using normalized keyword matching and account codes to categorize Rent, Utilities, Telecom, IT, Payroll, Delivery apps, and Security automatically.
+                    </p>
+                </div>
+                <group>
+                    <field name="overwrite_existing" string="Overwrite Existing Mappings (إعادة مسح وتحديث الكل)"/>
+                </group>
+                <footer>
+                    <button string="Run Smart Scanner (بدء المسح الآن)" type="object" name="action_run_smart_scan" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action for Smart Scanner Wizard -->
+    <record id="action_ceo_smart_scanner_wizard" model="ir.actions.act_window">
+        <field name="name">Run Smart Account Scanner</field>
+        <field name="res_model">ceo.smart.scanner.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

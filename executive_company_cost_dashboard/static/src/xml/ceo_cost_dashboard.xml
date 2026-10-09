@@ -1,0 +1,422 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_company_cost_dashboard.ExecutiveCompanyCostDashboard">
+        <div class="o_ceo_cost_dashboard">
+            <!-- Header & Filter Bar -->
+            <div class="dashboard-header">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div class="brand-title">
+                        <i class="fa fa-line-chart text-primary"/>
+                        <span>ANABTAWI GROUP</span>
+                        <span class="badge-group">Executive Company Cost Dashboard</span>
+                    </div>
+
+                    <div class="filter-controls">
+                        <!-- Period Selector -->
+                        <div class="period-pill-group">
+                            <button t-att-class="state.period_mode === 'this_month' ? 'active' : ''"
+                                    t-on-click="() => this.setPeriod('this_month')">This Month</button>
+                            <button t-att-class="state.period_mode === 'last_month' ? 'active' : ''"
+                                    t-on-click="() => this.setPeriod('last_month')">Last Month</button>
+                            <button t-att-class="state.period_mode === 'qtd' ? 'active' : ''"
+                                    t-on-click="() => this.setPeriod('qtd')">QTD</button>
+                            <button t-att-class="state.period_mode === 'ytd' ? 'active' : ''"
+                                    t-on-click="() => this.setPeriod('ytd')">YTD</button>
+                            <button t-att-class="state.period_mode === 'year_2026' ? 'active' : ''"
+                                    t-on-click="() => this.setPeriod('year_2026')">2026 Year</button>
+                        </div>
+
+                        <!-- Company Switcher -->
+                        <select class="form-select form-select-sm w-auto"
+                                t-att-value="state.company_id"
+                                t-on-change="onCompanyChange">
+                            <option value="0">🏢 Consolidated Group (All Companies)</option>
+                            <t t-foreach="data.all_companies" t-as="c" t-key="c.id">
+                                <option t-att-value="c.id" t-esc="c.name"/>
+                            </t>
+                        </select>
+
+                        <!-- Action Buttons -->
+                        <button class="btn btn-sm btn-outline-primary"
+                                t-on-click="actionRunSmartScan"
+                                title="Auto-scan accounts with Arabic &amp; English keyword intelligence">
+                            <i class="fa fa-magic me-1"/> Smart Auto-Scan
+                        </button>
+
+                        <button class="btn btn-sm btn-light border"
+                                t-on-click="() => this.loadDashboardData()"
+                                title="Refresh dashboard data">
+                            <i class="fa fa-refresh me-1"/> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab Navigation -->
+                <div class="mt-3 pt-2 border-top d-flex gap-2">
+                    <button class="btn btn-sm"
+                            t-att-class="state.activeTab === 'overview' ? 'btn-primary' : 'btn-light border'"
+                            t-on-click="() => this.setActiveTab('overview')">
+                        <i class="fa fa-dashboard me-1"/> Executive Overview
+                    </button>
+                    <button class="btn btn-sm"
+                            t-att-class="state.activeTab === 'sister_companies' ? 'btn-primary' : 'btn-light border'"
+                            t-on-click="() => this.setActiveTab('sister_companies')">
+                        <i class="fa fa-building-o me-1"/> Sister Companies P&amp;L
+                    </button>
+                    <button class="btn btn-sm"
+                            t-att-class="state.activeTab === 'departments' ? 'btn-primary' : 'btn-light border'"
+                            t-on-click="() => this.setActiveTab('departments')">
+                        <i class="fa fa-sitemap me-1"/> Department Spend (IT/HR/CCTV)
+                    </button>
+                    <button class="btn btn-sm"
+                            t-att-class="state.activeTab === 'branches' ? 'btn-primary' : 'btn-light border'"
+                            t-on-click="() => this.setActiveTab('branches')">
+                        <i class="fa fa-map-marker me-1"/> 21-Branch Matrix &amp; Rent
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div t-if="state.loading" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading Financial Intelligence...</span>
+                </div>
+                <div class="mt-2 text-muted fw-semibold">Loading Financial &amp; Cost Intelligence...</div>
+            </div>
+
+            <t t-if="!state.loading">
+                <!-- TAB 1: EXECUTIVE OVERVIEW -->
+                <t t-if="state.activeTab === 'overview'">
+                    <!-- Top KPI Scorecards -->
+                    <div class="kpi-grid">
+                        <!-- Revenue -->
+                        <div class="kpi-card border-highlight-emerald">
+                            <div class="kpi-label">
+                                <span>Total Revenue</span>
+                                <i class="fa fa-arrow-up text-success"/>
+                            </div>
+                            <div class="kpi-value text-success" t-esc="formatCurrency(data.kpis.total_revenue)"/>
+                            <div class="kpi-subtext neutral">Top-line Sales Across Entities</div>
+                        </div>
+
+                        <!-- Gross Profit -->
+                        <div class="kpi-card border-highlight-blue">
+                            <div class="kpi-label">
+                                <span>Gross Profit</span>
+                                <span class="badge bg-light text-primary fw-bold" t-esc="(data.kpis.gross_margin_pct || 0) + '%'"/>
+                            </div>
+                            <div class="kpi-value" t-esc="formatCurrency(data.kpis.gross_profit)"/>
+                            <div class="kpi-subtext neutral">Gross Margin Ratio</div>
+                        </div>
+
+                        <!-- Total OpEx -->
+                        <div class="kpi-card border-highlight-amber">
+                            <div class="kpi-label">
+                                <span>Total Operating OpEx</span>
+                                <i class="fa fa-pie-chart text-warning"/>
+                            </div>
+                            <div class="kpi-value text-warning" t-esc="formatCurrency(data.kpis.total_opex)"/>
+                            <div class="kpi-subtext neutral">Rent, Utilities, People, Tech, Maint</div>
+                        </div>
+
+                        <!-- Net Operating Profit -->
+                        <div class="kpi-card border-highlight-indigo">
+                            <div class="kpi-label">
+                                <span>Net Operating Profit</span>
+                                <span t-att-class="'badge fw-bold ' + (data.kpis.net_profit >= 0 ? 'bg-success' : 'bg-danger')"
+                                      t-esc="(data.kpis.net_margin_pct || 0) + '%'"/>
+                            </div>
+                            <div t-att-class="'kpi-value ' + (data.kpis.net_profit >= 0 ? 'text-primary' : 'text-danger')"
+                                 t-esc="formatCurrency(data.kpis.net_profit)"/>
+                            <div class="kpi-subtext" t-att-class="data.kpis.net_profit >= 0 ? 'positive' : 'negative'">
+                                <t t-if="data.kpis.net_profit >= 0">Net Healthy Operating Margin</t>
+                                <t t-else="">Operating at Net Deficit</t>
+                            </div>
+                        </div>
+
+                        <!-- Rent Burden -->
+                        <div class="kpi-card border-highlight-purple">
+                            <div class="kpi-label">
+                                <span>Rent &amp; Leases (إيجارات)</span>
+                                <span class="badge bg-light text-secondary fw-bold" t-esc="(data.kpis.rent_pct || 0) + '% of Sales'"/>
+                            </div>
+                            <div class="kpi-value" t-esc="formatCurrency(data.kpis.rent_amount)"/>
+                            <div class="kpi-subtext neutral">Shop &amp; Facility Leases</div>
+                        </div>
+
+                        <!-- Utilities -->
+                        <div class="kpi-card border-highlight-blue">
+                            <div class="kpi-label">
+                                <span>Utilities (كهرباء ومياه)</span>
+                                <span class="badge bg-light text-secondary fw-bold" t-esc="(data.kpis.utilities_pct || 0) + '% of Sales'"/>
+                            </div>
+                            <div class="kpi-value" t-esc="formatCurrency(data.kpis.utilities_amount)"/>
+                            <div class="kpi-subtext neutral">Power, Water &amp; Fuel</div>
+                        </div>
+
+                        <!-- IT & Telecom -->
+                        <div class="kpi-card border-highlight-rose">
+                            <div class="kpi-label">
+                                <span>IT &amp; Telecom (اتصالات وبرامج)</span>
+                                <span class="badge bg-light text-secondary fw-bold" t-esc="(data.kpis.tech_pct || 0) + '% of Sales'"/>
+                            </div>
+                            <div class="kpi-value" t-esc="formatCurrency(data.kpis.tech_amount)"/>
+                            <div class="kpi-subtext neutral">Internet, Platforms &amp; Software</div>
+                        </div>
+
+                        <!-- Branch Health -->
+                        <div class="kpi-card border-highlight-emerald">
+                            <div class="kpi-label">
+                                <span>Branch Health</span>
+                                <span class="badge bg-info text-dark fw-bold" t-esc="data.kpis.active_branches_count + ' Active'"/>
+                            </div>
+                            <div class="kpi-value">
+                                <span class="text-success" t-esc="data.kpis.profitable_branches_count"/> /
+                                <span class="text-danger" t-esc="data.kpis.loss_branches_count"/>
+                            </div>
+                            <div class="kpi-subtext neutral">Profitable vs Loss-Making Branches</div>
+                        </div>
+                    </div>
+
+                    <!-- Sister Companies Summary Cards -->
+                    <div class="section-card">
+                        <div class="section-header">
+                            <h3><i class="fa fa-cubes text-primary me-2"/>Sister Companies Performance (الشركات الشقيقة)</h3>
+                            <button class="btn btn-sm btn-link" t-on-click="() => this.setActiveTab('sister_companies')">View Detailed Breakdown →</button>
+                        </div>
+                        <div class="sister-companies-grid">
+                            <t t-foreach="data.sister_companies" t-as="sc" t-key="sc.company_id">
+                                <div class="sister-card">
+                                    <div class="company-name">
+                                        <span t-esc="sc.company_name"/>
+                                        <span t-att-class="'status-badge ' + sc.status">
+                                            <t t-if="sc.status === 'profitable'">🟢 Strong</t>
+                                            <t t-elif="sc.status === 'break_even'">🟡 Break-Even</t>
+                                            <t t-else="">🔴 Net Loss</t>
+                                        </span>
+                                    </div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">Revenue (الإيرادات)</span>
+                                        <span class="metric-val text-success" t-esc="formatCurrency(sc.revenue)"/>
+                                    </div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">Cost of Revenue (COGS)</span>
+                                        <span class="metric-val text-danger" t-esc="formatCurrency(sc.cogs)"/>
+                                    </div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">Operating OpEx</span>
+                                        <span class="metric-val" t-esc="formatCurrency(sc.opex)"/>
+                                    </div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">Net Profit (صافي الربح)</span>
+                                        <span t-att-class="'metric-val fw-bold ' + (sc.net_profit >= 0 ? 'text-primary' : 'text-danger')"
+                                              t-esc="formatCurrency(sc.net_profit)"/>
+                                    </div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">Net Margin %</span>
+                                        <span class="metric-val" t-esc="sc.net_margin_pct + '%'"/>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    <!-- Visual Charts -->
+                    <div class="row g-3">
+                        <div class="col-lg-8">
+                            <div class="section-card h-100">
+                                <div class="section-header">
+                                    <h3><i class="fa fa-line-chart text-success me-2"/>Monthly 12-Month Run-Rate Trajectory</h3>
+                                </div>
+                                <div style="height: 300px; position: relative;">
+                                    <canvas t-ref="trendCanvas"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="section-card h-100">
+                                <div class="section-header">
+                                    <h3><i class="fa fa-pie-chart text-primary me-2"/>Operating Expense Composition</h3>
+                                </div>
+                                <div style="height: 300px; position: relative;">
+                                    <canvas t-ref="donutCanvas"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- TAB 2: SISTER COMPANIES P&L -->
+                <t t-if="state.activeTab === 'sister_companies'">
+                    <div class="section-card">
+                        <div class="section-header">
+                            <h3><i class="fa fa-building-o text-primary me-2"/>Holding &amp; Sister Companies Consolidated Income Statement</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="executive-table">
+                                <thead>
+                                    <tr>
+                                        <th>Company / Business Entity</th>
+                                        <th>Revenue (المبيعات)</th>
+                                        <th>Cost of Revenue (COGS)</th>
+                                        <th>Gross Profit</th>
+                                        <th>Operating OpEx</th>
+                                        <th>Net Profit (EBITDA)</th>
+                                        <th>Net Margin %</th>
+                                        <th>Financial Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="data.sister_companies" t-as="sc" t-key="sc.company_id">
+                                        <tr>
+                                            <td>
+                                                <i class="fa fa-building text-muted me-2"/>
+                                                <span t-esc="sc.company_name"/>
+                                            </td>
+                                            <td class="text-success fw-bold" t-esc="formatCurrency(sc.revenue)"/>
+                                            <td class="text-danger" t-esc="formatCurrency(sc.cogs)"/>
+                                            <td class="fw-semibold" t-esc="formatCurrency(sc.gross_profit)"/>
+                                            <td class="text-muted" t-esc="formatCurrency(sc.opex)"/>
+                                            <td t-att-class="'fw-bold ' + (sc.net_profit >= 0 ? 'text-primary' : 'text-danger')"
+                                                t-esc="formatCurrency(sc.net_profit)"/>
+                                            <td class="fw-semibold" t-esc="sc.net_margin_pct + '%'"/>
+                                            <td>
+                                                <span t-att-class="'status-badge ' + sc.status">
+                                                    <t t-if="sc.status === 'profitable'">🟢 Healthy Profit</t>
+                                                    <t t-elif="sc.status === 'break_even'">🟡 Break-Even</t>
+                                                    <t t-else="">🔴 Net Deficit</t>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- TAB 3: DEPARTMENTS BREAKDOWN -->
+                <t t-if="state.activeTab === 'departments'">
+                    <div class="section-card">
+                        <div class="section-header">
+                            <h3><i class="fa fa-sitemap text-primary me-2"/>Departmental Operating Costs (IT, HR, Operations, Maintenance, CCTV Room)</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="executive-table">
+                                <thead>
+                                    <tr>
+                                        <th>Department / Analytic Business Unit</th>
+                                        <th>Total Operational Expenditure (JOD)</th>
+                                        <th>Operational Share %</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="data.departments" t-as="d" t-key="d.name">
+                                        <tr>
+                                            <td>
+                                                <i class="fa fa-folder-open-o text-primary me-2"/>
+                                                <span t-esc="d.name"/>
+                                            </td>
+                                            <td class="fw-bold" t-esc="formatCurrency(d.amount)"/>
+                                            <td class="text-muted">
+                                                <span t-esc="data.kpis.total_opex > 0 ? ((d.amount / data.kpis.total_opex * 100).toFixed(1) + '%') : '0.0%'"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- TAB 4: 21-BRANCH MASTER MATRIX -->
+                <t t-if="state.activeTab === 'branches'">
+                    <div class="section-card">
+                        <div class="section-header">
+                            <div>
+                                <h3><i class="fa fa-map-marker text-danger me-2"/>21-Branch Profitability &amp; Cost Intelligence Matrix</h3>
+                                <p class="text-muted small mb-0">Ranks each retail shop and location with individual Rent, Utilities, Delivery apps, and Net Margin.</p>
+                            </div>
+                            <div class="w-auto">
+                                <input type="text"
+                                       class="form-control form-control-sm"
+                                       placeholder="🔍 Search Branch Name..."
+                                       t-model="state.searchBranch"/>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="executive-table">
+                                <thead>
+                                    <tr>
+                                        <th t-on-click="() => this.sortBy('branch_name')" style="cursor: pointer;">
+                                            Branch / Location <i class="fa fa-sort"/>
+                                        </th>
+                                        <th t-on-click="() => this.sortBy('revenue')" style="cursor: pointer;">
+                                            Revenue (المبيعات) <i class="fa fa-sort"/>
+                                        </th>
+                                        <th t-on-click="() => this.sortBy('rent')" style="cursor: pointer;">
+                                            Shop Rent (إيجار) <i class="fa fa-sort"/>
+                                        </th>
+                                        <th>Rent %</th>
+                                        <th t-on-click="() => this.sortBy('utilities')" style="cursor: pointer;">
+                                            Utilities (كهرباء/مياه) <i class="fa fa-sort"/>
+                                        </th>
+                                        <th t-on-click="() => this.sortBy('delivery_comm')" style="cursor: pointer;">
+                                            Delivery Apps (تطبيقات) <i class="fa fa-sort"/>
+                                        </th>
+                                        <th t-on-click="() => this.sortBy('payroll')" style="cursor: pointer;">
+                                            Payroll (الرواتب) <i class="fa fa-sort"/>
+                                        </th>
+                                        <th t-on-click="() => this.sortBy('tech')" style="cursor: pointer;">
+                                            Tech &amp; Telecom <i class="fa fa-sort"/>
+                                        </th>
+                                        <th t-on-click="() => this.sortBy('total_opex')" style="cursor: pointer;">
+                                            Total OpEx <i class="fa fa-sort"/>
+                                        </th>
+                                        <th t-on-click="() => this.sortBy('net_profit')" style="cursor: pointer;">
+                                            Net Profit (صافي الربح) <i class="fa fa-sort"/>
+                                        </th>
+                                        <th>Net Margin %</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="filteredBranches" t-as="b" t-key="b.branch_id">
+                                        <tr>
+                                            <td>
+                                                <i class="fa fa-store text-primary me-2"/>
+                                                <span t-esc="b.branch_name"/>
+                                            </td>
+                                            <td class="text-success fw-bold" t-esc="formatCurrency(b.revenue)"/>
+                                            <td class="fw-semibold" t-esc="formatCurrency(b.rent)"/>
+                                            <td>
+                                                <span t-att-class="b.rent_pct > 25 ? 'badge bg-danger' : (b.rent_pct > 15 ? 'badge bg-warning text-dark' : 'text-muted')"
+                                                      t-esc="b.rent_pct + '%'"/>
+                                            </td>
+                                            <td t-esc="formatCurrency(b.utilities)"/>
+                                            <td t-esc="formatCurrency(b.delivery_comm)"/>
+                                            <td t-esc="formatCurrency(b.payroll)"/>
+                                            <td t-esc="formatCurrency(b.tech)"/>
+                                            <td class="text-danger fw-semibold" t-esc="formatCurrency(b.total_opex)"/>
+                                            <td t-att-class="'fw-bold ' + (b.net_profit >= 0 ? 'text-primary' : 'text-danger')"
+                                                t-esc="formatCurrency(b.net_profit)"/>
+                                            <td class="fw-semibold" t-esc="b.net_margin_pct + '%'"/>
+                                            <td>
+                                                <span t-att-class="'status-badge ' + b.status">
+                                                    <t t-if="b.status === 'profitable'">🟢 Profitable</t>
+                                                    <t t-elif="b.status === 'warning'">🟡 Watch</t>
+                                                    <t t-else="">🔴 Net Loss</t>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </div>
+    </t>
+</templates>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Client Action for Executive Company Cost Dashboard -->
+    <record id="action_ceo_cost_dashboard_client" model="ir.actions.client">
+        <field name="name">Executive Company Cost Dashboard</field>
+        <field name="tag">executive_company_cost_dashboard_main</field>
+    </record>
+
+    <!-- Top-Level Application Menu on Odoo Main Screen -->
+    <menuitem id="menu_ceo_executive_root"
+              name="Executive Company Cost Dashboard"
+              web_icon="executive_company_cost_dashboard,static/description/icon.png"
+              sequence="5"/>
+
+    <!-- Main Dashboard Menu -->
+    <menuitem id="menu_ceo_financial_dashboard"
+              name="Executive Company Cost Dashboard"
+              parent="menu_ceo_executive_root"
+              action="action_ceo_cost_dashboard_client"
+              sequence="10"/>
+
+    <!-- Configuration Menu -->
+    <menuitem id="menu_ceo_dashboard_config"
+              name="Configuration"
+              parent="menu_ceo_executive_root"
+              sequence="90"/>
+
+    <menuitem id="menu_ceo_cost_buckets"
+              name="Cost Buckets &amp; Categories"
+              parent="menu_ceo_dashboard_config"
+              action="action_ceo_cost_bucket"
+              sequence="10"/>
+
+    <menuitem id="menu_ceo_smart_scanner"
+              name="Smart Account Scanner"
+              parent="menu_ceo_dashboard_config"
+              action="action_ceo_smart_scanner_wizard"
+              sequence="20"/>
+
+    <!-- Also link inside Accounting > Reporting for CFO -->
+    <menuitem id="menu_ceo_dashboard_accounting_reporting"
+              name="Executive Company Cost Dashboard"
+              parent="account.menu_finance_reports"
+              action="action_ceo_cost_dashboard_client"
+              sequence="1"/>
+</odoo>
